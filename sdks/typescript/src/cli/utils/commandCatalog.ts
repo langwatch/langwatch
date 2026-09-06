@@ -70,6 +70,12 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // control-plane relay to intercept and move the user's browser — it fetches
   // no platform data and returns no result of its own.
   "navigate",
+  // Agent-only page control: `ui call` dispatches a typed action to the page
+  // the user has open and `workbench get-state` reads it live. Only works
+  // mid-turn over the turn's own stream, so it is channel plumbing, not a
+  // platform data surface (specs/langy/langy-ui-actions.feature).
+  "ui",
+  "workbench",
   "instrument",
   // Local status + documentation fetchers.
   "status",

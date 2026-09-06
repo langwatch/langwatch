@@ -79,6 +79,14 @@ const AgentWorkflowTargetEditorDrawer = lazyDefault({
   factory: () => import("./agents/AgentWorkflowTargetEditorDrawer"),
   key: "AgentWorkflowTargetEditorDrawer",
 });
+const ConnectedAgentDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectedAgentDrawer"),
+  key: "ConnectedAgentDrawer",
+});
+const ConnectFromCodeDrawer = lazyDefault({
+  factory: () => import("./agents/connected/ConnectFromCodeDrawer"),
+  key: "ConnectFromCodeDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -232,9 +240,21 @@ const ScenarioRunDetailDrawer = lazyDefault({
   factory: () => import("./simulations/ScenarioRunDetailDrawer"),
   key: "ScenarioRunDetailDrawer",
 });
+const ScenarioVersionHistoryDrawer = lazyDefault({
+  factory: () => import("./agent-testing/drawers/ScenarioVersionHistoryDrawer"),
+  key: "ScenarioVersionHistoryDrawer",
+});
 const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
+});
+const AgentTestingSuiteEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/suite/SuiteEditorDrawer"),
+  key: "SuiteEditorDrawer",
+});
+const AgentTestingCaseEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
+  key: "AgentTestingCaseEditorDrawer",
 });
 const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
@@ -296,10 +316,13 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
+  agentConnectedDetail: ConnectedAgentDrawer,
+  agentConnectFromCode: ConnectFromCodeDrawer,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
+  // Experiments workbench
   comparisonLeaderboard: ComparisonLeaderboardDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
@@ -311,8 +334,16 @@ export const drawers = {
   // Scenarios
   scenarioEditor: ScenarioFormDrawerFromUrl,
   scenarioRunDetail: ScenarioRunDetailDrawer,
+  scenarioVersionHistory: ScenarioVersionHistoryDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
+  // Agent Testing v2 draws the same run plan in a right-side drawer.
+  // Agent Testing v2 case editor, opened from the cases table, the run rows
+  // and the run drawer.
+  agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
+  // Agent Testing v2 suite editor: the name, the fields and the evaluators
+  // of a test suite.
+  agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance

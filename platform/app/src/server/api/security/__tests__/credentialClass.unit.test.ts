@@ -57,6 +57,14 @@ const PUBLIC_SURFACES = [
   // for a project app, so nothing else in the document looked wrong.
   { prefix: "/api/prompts", scheme: "project_api_key" },
   { prefix: "/api/evaluators", scheme: "project_api_key" },
+  // The two agent-testing v1 families. They are the first project-key
+  // families built on `@langwatch/api`, so they are pinned here to prove the
+  // framework's mounts reach the registry the stamping reads: a mount the
+  // registry never saw would leave the operation on the document default,
+  // which happens to be the right answer for a project app and would
+  // therefore look correct while nothing enforced it.
+  { prefix: "/api/v1/run-plans", scheme: "project_api_key" },
+  { prefix: "/api/v1/test-suites", scheme: "project_api_key" },
 ] as const;
 
 /** The first surface whose prefix the path starts with; order is longest-first. */

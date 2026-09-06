@@ -327,7 +327,7 @@ secured.access(requires("workflows:create")).post(
   // The caller polls the run + reads results on /api/experiments/runs/:runId(/results),
   // which require evaluations:view. Enforce it here too so a workflows-only key
   // cannot start a run it would then get 403 trying to read.
-  requireApiKeyPermission({ prisma, permission: "evaluations:view" }),
+  requireApiKeyPermission({ permission: "evaluations:view" }),
   zValidator("json", evaluateBodySchema),
   async (c) => {
     const project = c.get("project");

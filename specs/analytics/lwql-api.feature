@@ -507,6 +507,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the result is identical across runs over unchanged data
 
   @integration
+  Scenario: A query naming a column that does not exist is refused with the column named
+    Given an authenticated API client
+    When it submits a query selecting a column no dataset carries
+    Then the query is refused with error code lwql_unknown_identifier at HTTP 400
+    And the response names the column the server could not resolve
+    And the fault is the caller's, and the remediation tells them to check the name against the dataset's columns
+    And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
+
+  @integration
   Scenario: A parameterized query missing a bound value is refused before execution
     Given an authenticated API client
     When it submits a parameterized query without a value for one of its parameters
@@ -594,7 +603,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the client compares verdict and duration metrics across those batches
     Then typed results answer the question from the authenticated tenant's data only
 
-  @integration
+  # @unimplemented — https://github.com/langwatch/langwatch/issues/7334. The
+  # PostgreSQL-resident dataset that bound this was removed in #7194: its
+  # declared grain named a run id `BatchEvaluation` does not have, and its base
+  # relation is written only by the legacy evaluate route, so it answered this
+  # from a subset while the real experiment runs live in ClickHouse. Rebinds
+  # against a ClickHouse-resident dataset.
+  @unimplemented
   Scenario: Experiment run comparisons
     Given seeded experiment runs for two tenants
     When the client compares metrics across experiment runs
@@ -901,8 +916,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: Run comparisons across simulation batches
 #     (the run grouping ClickHouse holds)
 #   → Scenario: Experiment run comparisons
-#     (the experiment-shaped comparison, over the PG-resident experiment and
-#      experiment-run entities)
+#     (the experiment-shaped comparison — @unimplemented, awaiting a
+#      ClickHouse-resident experiment-runs dataset, issue #7334)
 # fanout warning → Fanout warning on a trace-to-span join
 #
 # Tenant isolation and authorization:

@@ -10,6 +10,15 @@ import {
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Where a criterion stops growing and starts scrolling.
+ *
+ * A criterion is one sentence, so the field follows it rather than holding a
+ * fixed box. Without a stop, one pasted paragraph would push the buttons under
+ * the list off the screen.
+ */
+const CRITERION_MAX_HEIGHT = "120px";
+
 type CriteriaInputProps = {
   value: string[];
   onChange: (value: string[]) => void;
@@ -111,6 +120,7 @@ export function CriteriaInput({
                 size="sm"
                 autoresize
                 rows={2}
+                maxHeight={CRITERION_MAX_HEIGHT}
                 autoFocus
               />
               <HStack gap={1}>
@@ -199,6 +209,7 @@ export function CriteriaInput({
               _placeholder={{ color: "gray.400", fontStyle: "italic" }}
               autoresize
               rows={2}
+              maxHeight={CRITERION_MAX_HEIGHT}
             />
           </HStack>
           <HStack gap={1} justify="end">

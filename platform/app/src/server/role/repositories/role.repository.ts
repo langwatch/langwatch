@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -253,9 +253,18 @@ export class RoleRepository {
   async create({
     params,
     actor,
+    requireProjection = false,
   }: {
     params: CreateRoleParams;
     actor: LedgerActor;
+    /**
+     * Whether a definition that did not become readable inside the
+     * read-your-writes window is an error. The API-key mint turns it on: it
+     * binds a grant to this role and then activates the credential, so an
+     * unconfirmed definition would hand out a key whose permissions nothing
+     * can resolve.
+     */
+    requireProjection?: boolean;
   }): Promise<CustomRole> {
     const roleId = nanoid();
     await this.assertNameFree({
@@ -276,6 +285,7 @@ export class RoleRepository {
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
+      requireProjection,
     });
     const now = new Date();
     return {
@@ -398,11 +408,14 @@ export class RoleRepository {
     apiKeyId,
     organizationId,
     actor,
+    awaitProjection = true,
   }: {
     roleIds: string[];
     apiKeyId: string;
     organizationId: string;
     actor: LedgerActor;
+    /** Same contract as `GrantsLedgerWriter.deleteRole`'s parameter of this name. */
+    awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;
     // Revoke this api key's CUSTOM grants on these roles FIRST. The
@@ -436,7 +449,12 @@ export class RoleRepository {
         this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
       ]);
       if (holders > 0 || assignedUsers > 0) continue;
-      await this.writer.deleteRole({ organizationId, roleId, actor });
+      await this.writer.deleteRole({
+        organizationId,
+        roleId,
+        actor,
+        awaitProjection,
+      });
     }
   }
 

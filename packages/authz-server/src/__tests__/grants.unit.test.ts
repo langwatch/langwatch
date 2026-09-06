@@ -1,3 +1,4 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthzCollectorService } from "../authz-collector.service";
 import {
@@ -10,6 +11,7 @@ import type { AuthzReadRepository } from "../authz-read.repository";
 import { AuthzService } from "../authz.service";
 import { GrantValidationError } from "../grant-validation";
 import { GrantsService } from "../grants.service";
+import { GRANT_EVENT_SOURCES } from "../ledger/facts";
 import { OffboardIncompleteError } from "../offboard";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -104,6 +106,7 @@ describe("GrantsService.attach", () => {
           principal: { userId: "alice" },
         },
         actor: WRITE_ACTOR,
+        source: "grants-service",
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });
@@ -172,6 +175,132 @@ describe("GrantsService.attach", () => {
       });
 
       expect(repository.createBinding).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the caller states where the grant came from", () => {
+    /** @scenario "A grant states which surface authored it" */
+    it("stamps that source onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "join-request" }),
+      );
+    });
+
+    /** Every vocabulary entry reaches the port unchanged: the seam is the
+     *  vocabulary's, not a private list of the two callers that exist today.
+     *  @scenario "A grant states which surface authored it" */
+    it("carries every source the vocabulary names", async () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        const repository = makeRepository();
+        const { service } = makeService(repository);
+
+        await service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+          source,
+        });
+
+        expect(repository.createBinding).toHaveBeenCalledWith(
+          expect.objectContaining({ source }),
+        );
+      }
+    });
+  });
+
+  describe("when the caller states no source", () => {
+    /** @scenario "A grant nobody attributed is the grants service's own" */
+    it("attributes the grant to the grants service", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "grants-service" }),
+      );
+    });
+  });
+
+  describe("when the caller is a surface rather than a person", () => {
+    /** The registry's name, never a hand-built `"system:..."` string: what
+     *  reaches the port is what `toLedgerActor` renders it as.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("stamps the registry's system principal onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "scim" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "scim",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+          source: "scim",
+        }),
+      );
+    });
+
+    /** @scenario "A write with no person behind it names the surface that made it" */
+    it("carries the join-requests principal the auto-approval path acts as", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "joinRequests" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.joinRequests },
+          source: "join-request",
+        }),
+      );
+    });
+
+    /** The raw-id shape every boundary already passes is untouched by the
+     *  widening — that is the whole constraint on this change.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("still records a person from the raw id shape", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ actor: WRITE_ACTOR }),
+      );
     });
   });
 
@@ -462,6 +591,31 @@ describe("GrantsService.offboard", () => {
         }),
       );
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+
+  describe("when a directory sync offboards the member", () => {
+    /** D08's de-enroll. The revocation says which surface removed the
+     *  member through its ACTOR — `grant_revoked` has no `source` field and
+     *  does not need one, because the offboarding fact already names the
+     *  surface here and the reason alongside it.
+     *  @scenario "A revocation names the surface that made it without a source of its own" */
+    it("hands the port the surface as the offboarding actor", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.offboard({
+        actor: { type: "system", name: "scim" },
+        userId: "dave",
+        organizationId: ORG,
+      });
+
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        }),
+      );
     });
   });
 

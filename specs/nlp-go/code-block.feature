@@ -12,9 +12,18 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and
-  # code_block_realistic_test.go). The scenarios still tagged @unimplemented
-  # describe behavior not yet built (per-node stdout/stderr on the streamed
-  # execution event, and an env-driven wall-clock timeout), not a binding gap.
+  # code_block_realistic_test.go).
+  #
+  # Read the Given lines literally. A scenario that names
+  # NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is covered through the environment;
+  # one that names "the code executor's configured ceiling" is covered by
+  # handing the executor that ceiling directly, which is the same value one
+  # step later in the same wiring. The distinction matters because only the
+  # first kind proves the variable is read at all.
+  #
+  # The scenarios still tagged @unimplemented describe behavior not yet built
+  # (per-node stdout/stderr on the streamed execution event) or not yet
+  # exercised end to end over HTTP, not a binding gap.
 
   Background:
     Given nlpgo is listening on :5562
@@ -89,14 +98,69 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Wall-clock timeout terminates the subprocess
 
+    # The variable reaching the executor is covered below and by
+    # services/nlpgo/cmd (root_test.go). What is still unbuilt is this whole
+    # path over HTTP: the kill surfacing as a `/go/studio/execute_sync` error
+    # body, and the orphan-process assertion, neither of which any test makes.
     @integration @unimplemented
-    Scenario: a code block exceeding NLP_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
-      Given NLP_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
+    Scenario: a code block exceeding NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
       And a code node whose body sleeps 10 seconds
       When I POST /go/studio/execute_sync
       Then within 3 seconds the response.result.status is "error"
       And the error.message contains "timeout"
       And no orphan python3 process remains for that trace_id
+
+    @unit
+    Scenario: the operator's code-block timeout reaches the executor from the environment
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 7
+      When the service loads its config and builds the code-block executor
+      Then the executor's ceiling is 7 seconds
+
+  # A per-node budget is a way to ask for LESS of the operator's ceiling,
+  # never more: the ceiling bounds how long untrusted customer code may hold
+  # a worker, so a workflow author cannot raise it by writing a bigger number.
+  Rule: A node may ask for less time than the operator's ceiling, never more
+
+    @unit
+    Scenario: A code node's timeout_ms shortens its budget
+      Given the code executor's configured ceiling is 30 seconds
+      And a code node declaring parameter "timeout_ms" = 500 whose body sleeps 10 seconds
+      When the engine invokes the node
+      Then the node is stopped within 3 seconds
+      And the node's error type is "code_block_timeout"
+
+    @unit
+    Scenario: A code node cannot raise its own timeout above the operator ceiling
+      Given the code executor's configured ceiling is 500 milliseconds
+      And a code node declaring parameter "timeout_ms" = 30000 whose body sleeps 10 seconds
+      When the engine invokes the node
+      Then the node is stopped within 3 seconds
+      And the node's error type is "code_block_timeout"
+
+    @unit
+    Scenario: A missing or negative code timeout_ms falls back to the default
+      Given the code executor's configured ceiling is 30 seconds
+      And a code node whose "timeout_ms" parameter is missing, 0, or negative
+      When the engine invokes the node
+      Then the node runs to completion under the executor default
+      And no timeout is reported
+
+    @unit
+    Scenario: A per-node code timeout cannot exceed the operator's ceiling
+      Given the code executor's default timeout is 0.5 seconds
+      And a request asking for 30 seconds whose code sleeps 10 seconds
+      When the executor runs the request
+      Then the run is stopped within 3 seconds
+      And the result is marked timed out with error type "code_block_timeout"
+
+    @unit
+    Scenario: A negative per-node code timeout falls back to the default
+      Given the code executor's default timeout is 30 seconds
+      And a request asking for -1 seconds whose code returns immediately
+      When the executor runs the request
+      Then the result is not marked timed out
+      And the declared output is returned
 
   Rule: Process isolation prevents cross-invocation leaks
 
@@ -165,6 +229,67 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the stored stdout shows the secret value as "[redacted]"
       And the stored stderr shows the secret value as "[redacted]"
       And the stored stdout still contains "eu-central", because a run parameter is not a credential
+
+  Rule: A run's own LangWatch credential reaches user code through the environment
+
+    # Project secrets never travel in the environment. The one exception is
+    # the credential the run itself mints for the sandbox: it belongs to one
+    # run, reaches the project's agent cache and nothing else, and expires by
+    # itself. It travels in the environment because that is where the
+    # LangWatch SDK reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT, so any
+    # other place would mean every agent wiring it up by hand.
+
+    @unit
+    Scenario: the run's credential and endpoint reach user code
+      Given the run carries a sandbox key
+      And the engine knows the LangWatch endpoint
+      When the engine invokes a code node
+      Then user code reads the sandbox key as LANGWATCH_API_KEY
+      And user code reads the endpoint as LANGWATCH_ENDPOINT
+      And user code reads LANGWATCH_SKIP_OTEL_SETUP as "true", because the run already reports the row
+
+    @unit
+    Scenario: a run with no sandbox key gets no LangWatch environment at all
+      Given the run carries no sandbox key
+      And the engine knows the LangWatch endpoint
+      When the engine invokes a code node
+      Then user code reads none of the three variables
+      # An endpoint with no key gives agent code half a credential and one
+      # failure it cannot act on.
+
+    @unit
+    Scenario: a sandbox key with no endpoint is not injected either
+      Given the run carries a sandbox key
+      And the engine does not know the LangWatch endpoint
+      When the engine invokes a code node
+      Then user code reads none of the three variables
+
+    @unit
+    Scenario: the engine's own LangWatch key never reaches user code
+      Given the engine's environment carries its own LANGWATCH_API_KEY
+      And the run carries no sandbox key
+      When the engine invokes a code node
+      Then user code reads no LANGWATCH_API_KEY
+
+    @unit
+    Scenario: The sandbox key is scrubbed from stored code node stdout and stderr
+      Given the run carries a sandbox key
+      And a code node whose body prints the whole environment
+      When the engine invokes the node
+      Then the stored stdout shows the sandbox key as "[redacted]"
+      And the stored stderr shows the sandbox key as "[redacted]"
+
+    # A node error carries the exception text and the traceback the runner
+    # captured, and it travels the same execution events, traces and logs the
+    # stored output travels. An exception raised inside a call that carries the
+    # credential quotes it, so the error is scrubbed the same way.
+    @unit
+    Scenario: The sandbox key is scrubbed from a code node error
+      Given the run carries a sandbox key
+      And a code node whose body raises an exception that quotes the sandbox key
+      When the engine invokes the node
+      Then the node error message shows the sandbox key as "[redacted]"
+      And the node error traceback shows the sandbox key as "[redacted]"
 
   # The former "identical outputs on Go and Python" parity scenario was removed:
   # the Python langwatch_nlp engine has been removed (see _shared/contract.md —

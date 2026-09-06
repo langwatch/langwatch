@@ -275,7 +275,7 @@ reach for `additive union` and `owner ceiling` when you need to say which.
 ## Migration, in one screen
 
 Full detail: [ADR-092 §13](../../dev/docs/adr/092-unified-authorization-engine.md)
-and the [delivery plan](../../dev/docs/plans/adr-092-authz-delivery-plan.md)
+and the [delivery plan](../../dev/docs/adr/110-grant-aggregates-are-grants.md)
 (stages, gates, rollbacks, and the data runbook). The shape:
 
 ```text

@@ -9,7 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { AlertTriangle, Search } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import {
   modelProviderIcons,
@@ -147,6 +147,53 @@ export const providersWithoutRegistryModels = (
   return unavailable;
 };
 
+/**
+ * A real union by model id: the first row that declares a model wins, and the
+ * same model declared again at a wider scope adds nothing. Concatenating
+ * instead put one model in the picker twice, because `getCustomModels` turns
+ * every entry into an option without looking for repeats.
+ */
+const unionCustomModels = <T extends { modelId: string }>(
+  first: readonly T[] | null | undefined,
+  second: readonly T[] | null | undefined,
+): T[] => {
+  const byModelId = new Map<string, T>();
+  for (const model of [...(first ?? []), ...(second ?? [])]) {
+    if (!byModelId.has(model.modelId)) byModelId.set(model.modelId, model);
+  }
+  return [...byModelId.values()];
+};
+
+/**
+ * Adapt the array shape (one row per provider+scope) into the legacy
+ * `Record<provider, config>` shape that getCustomModels and the custom-model
+ * dedup expect. Multiple rows for the same provider (multi-scope) are merged:
+ * the provider counts as enabled if any row is enabled, custom model lists
+ * union.
+ */
+const mergeProviderRowsByKey = (
+  rows: readonly MaybeStoredModelProvider[],
+): Record<string, MaybeStoredModelProvider> => {
+  const byKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of rows) {
+    const existing = byKey[row.provider];
+    if (!existing) {
+      byKey[row.provider] = row;
+      continue;
+    }
+    byKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: unionCustomModels(existing.customModels, row.customModels),
+      customEmbeddingsModels: unionCustomModels(
+        existing.customEmbeddingsModels,
+        row.customEmbeddingsModels,
+      ),
+    };
+  }
+  return byKey;
+};
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -166,103 +213,88 @@ export const useModelSelectionOptions = (
       { enabled: !!project?.id },
     );
 
-  // Adapt the array shape (one row per provider+scope) into the
-  // legacy `Record<provider, config>` shape that getCustomModels +
-  // the custom-model dedup loop below expect. Multiple rows for the
-  // same provider (multi-scope) are merged: the provider counts as
-  // enabled if any row is enabled, customModels lists union.
-  const providersByKey: Record<string, MaybeStoredModelProvider> = {};
-  for (const row of modelProviders.data?.providers ?? []) {
-    const existing = providersByKey[row.provider];
-    if (!existing) {
-      providersByKey[row.provider] = row;
-      continue;
-    }
-    providersByKey[row.provider] = {
-      ...existing,
-      enabled: existing.enabled || row.enabled,
-      customModels: [
-        ...(existing.customModels ?? []),
-        ...(row.customModels ?? []),
-      ],
-      customEmbeddingsModels: [
-        ...(existing.customEmbeddingsModels ?? []),
-        ...(row.customEmbeddingsModels ?? []),
-      ],
-    };
-  }
+  // Memoized as one block: the derivation runs on data changes, not on every
+  // render of the caller. Without this, each render handed back fresh
+  // `selectOptions` / `groupedByProvider` arrays, so every downstream
+  // `useMemo` keyed on them recomputed too — the langy composer's model pill
+  // rebuilt its whole combobox collection per parent render because of it.
+  const providers = modelProviders.data?.providers;
+  const featureKey = opts?.featureKey;
+  const { selectOptions, groupedByProvider } = useMemo(() => {
+    const providersByKey = mergeProviderRowsByKey(providers ?? []);
 
-  // Build a set of custom model IDs for quick lookup
-  const customModelIdSet = new Set<string>();
-  for (const [providerKey, config] of Object.entries(providersByKey)) {
-    const customList =
-      mode === "chat" ? config.customModels : config.customEmbeddingsModels;
-    if (customList) {
-      for (const model of customList) {
-        customModelIdSet.add(`${providerKey}/${model.modelId}`);
+    // Build a set of custom model IDs for quick lookup
+    const customModelIdSet = new Set<string>();
+    for (const [providerKey, config] of Object.entries(providersByKey)) {
+      const customList =
+        mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+      if (customList) {
+        for (const model of customList) {
+          customModelIdSet.add(`${providerKey}/${model.modelId}`);
+        }
       }
     }
-  }
 
-  // Gemini's Agent Platform door serves chat but not the embeddings
-  // endpoint (verified live: :batchEmbedContents answers 404 on
-  // aiplatform.googleapis.com). Offering registry embedding models a
-  // credential cannot run would recreate the selectable-but-always-fails
-  // class this fold removed. Explicit custom models stay — they are the
-  // customer's own claim about what their endpoint serves.
-  const withoutRegistryModels = providersWithoutRegistryModels(
-    modelProviders.data?.providers ?? [],
-    mode,
-  );
+    // Gemini's Agent Platform door serves chat but not the embeddings
+    // endpoint (verified live: :batchEmbedContents answers 404 on
+    // aiplatform.googleapis.com). Offering registry embedding models a
+    // credential cannot run would recreate the selectable-but-always-fails
+    // class this fold removed. Explicit custom models stay — they are the
+    // customer's own claim about what their endpoint serves.
+    const withoutRegistryModels = providersWithoutRegistryModels(
+      providers ?? [],
+      mode,
+    );
 
-  const allModels = filterRestrictedModels({
-    models: getCustomModels(providersByKey, options, mode),
-    featureKey: opts?.featureKey,
-  }).filter(
-    (model) =>
-      customModelIdSet.has(model) ||
-      !withoutRegistryModels.has(model.split("/")[0]!),
-  );
+    const allModels = filterRestrictedModels({
+      models: getCustomModels(providersByKey, options, mode),
+      featureKey,
+    }).filter(
+      (model) =>
+        customModelIdSet.has(model) ||
+        !withoutRegistryModels.has(model.split("/")[0]!),
+    );
 
-  const displayNames = buildCustomModelDisplayNames(
-    modelProviders.data?.providers ?? [],
-  );
+    const displayNames = buildCustomModelDisplayNames(providers ?? []);
 
-  const selectOptions: ModelOption[] = allModels.map((modelValue) => {
-    const provider = modelValue.split("/")[0]!;
+    const selectOptions: ModelOption[] = allModels.map((modelValue) => {
+      const provider = modelValue.split("/")[0]!;
 
-    return {
-      label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
-      value: modelValue,
+      return {
+        label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
+        value: modelValue,
+        icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+        isDisabled: false,
+        mode: mode,
+        isCustom: customModelIdSet.has(modelValue),
+      };
+    });
+
+    // Group models by provider, with custom models at the top of each group
+    const groupedByProvider: GroupedModelOptions = Object.entries(
+      selectOptions.reduce(
+        (acc, option) => {
+          const provider = option.value.split("/")[0]!;
+          if (!acc[provider]) {
+            acc[provider] = [];
+          }
+          acc[provider].push(option);
+          return acc;
+        },
+        {} as Record<string, ModelOption[]>,
+      ),
+    ).map(([provider, models]) => ({
+      provider,
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-      isDisabled: false,
-      mode: mode,
-      isCustom: customModelIdSet.has(modelValue),
-    };
-  });
+      // Custom models first, then registry models
+      models: [
+        ...models.filter((m) => m.isCustom),
+        ...models.filter((m) => !m.isCustom),
+      ],
+    }));
 
-  // Group models by provider, with custom models at the top of each group
-  const groupedByProvider: GroupedModelOptions = Object.entries(
-    selectOptions.reduce(
-      (acc, option) => {
-        const provider = option.value.split("/")[0]!;
-        if (!acc[provider]) {
-          acc[provider] = [];
-        }
-        acc[provider].push(option);
-        return acc;
-      },
-      {} as Record<string, ModelOption[]>,
-    ),
-  ).map(([provider, models]) => ({
-    provider,
-    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-    // Custom models first, then registry models
-    models: [
-      ...models.filter((m) => m.isCustom),
-      ...models.filter((m) => !m.isCustom),
-    ],
-  }));
+    return { selectOptions, groupedByProvider };
+  }, [providers, options, mode, featureKey]);
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 

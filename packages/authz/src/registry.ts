@@ -23,6 +23,8 @@
  * the object. registry.unit.test.ts pins sentinel indices to enforce this.
  */
 
+import type { ScopeTier } from "./vocabulary";
+
 const READ_ONLY = ["view"] as const;
 
 export const AUTHZ_RESOURCES = {
@@ -184,6 +186,12 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "create", "update", "delete", "manage"],
     scopes: ["project", "team", "organization"],
   },
+  agentCache: {
+    // The per-project cache an agent writes its own run state into. `view`
+    // reads an entry, `manage` writes and deletes one.
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
 } as const satisfies Record<
   string,
   {
@@ -194,7 +202,10 @@ export const AUTHZ_RESOURCES = {
 
 export type AuthzResource = keyof typeof AUTHZ_RESOURCES;
 
-export type AuthzScopeType = "project" | "team" | "organization" | "platform";
+/** The tiers a permission may be granted at. Every scope tier except
+ *  `resource`, which is reached by a grant on the resource itself rather
+ *  than by a permission declaration. */
+export type AuthzScopeType = Exclude<ScopeTier, "resource">;
 
 /** Only VALID resource:action pairs — `traces:rotate` is a type error. */
 export type AuthzPermission = {

@@ -11,6 +11,10 @@ import type {
   LangyConversationMetadataUpdatedEventData,
   LangyConversationStartedEventData,
   LangyConversationTitleGeneratedEventData,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
   LangyMessageImportedEventData,
   LangyMessagePart,
   LangyMessageRecordedEventData,
@@ -19,13 +23,20 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
 } from "@langwatch/langy";
 import {
   cursorHasReachedEvent,
+  foldLangyConversationTurn,
+  initLangyConversationTurnState,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnFoldState,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyTurnWait,
   langyConversationTurnEventSchema,
   langyJsonValueSchema,
 } from "@langwatch/langy";
@@ -62,8 +73,73 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "./repositories/langy-message.repository";
+import type {
+  LangyTurnOrderReader,
+  LangyTurnSegment,
+} from "./streaming/langyTurnOrder";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
+
+/**
+ * Whether the developer's folder is attached, as of the last connect or
+ * disconnect in the log. Absent either, it was never attached.
+ */
+function lastWorkspaceConnection(
+  events: readonly LangyConversationProcessingEvent[],
+): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const type = events[i]?.type;
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED) {
+      return true;
+    }
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * One document per turn, folded from that turn's card events only: the waits
+ * ride on the tool calls, and no other part of the vocabulary is needed to
+ * read them back.
+ */
+function foldWaitTurns(
+  events: readonly LangyConversationProcessingEvent[],
+): Map<string, LangyConversationTurnFoldState> {
+  const turns = new Map<string, LangyConversationTurnFoldState>();
+  for (const event of events) {
+    if (!isLangyWaitEventType(event.type)) continue;
+    const parsed = langyConversationTurnEventSchema.safeParse({
+      id: event.id,
+      createdAt: event.createdAt,
+      occurredAt: event.occurredAt,
+      type: event.type,
+      data: event.data,
+    });
+    if (!parsed.success) continue;
+    const turnId = parsed.data.data.turnId;
+    turns.set(
+      turnId,
+      foldLangyConversationTurn(
+        turns.get(turnId) ?? initLangyConversationTurnState(),
+        parsed.data,
+      ),
+    );
+  }
+  return turns;
+}
+
+/** Every card the folded turns carry, tagged with the turn that raised it. */
+function recordWaitsOf(
+  turns: ReadonlyMap<string, LangyConversationTurnFoldState>,
+): LangyLocalRecordWait[] {
+  return [...turns].flatMap(([turnId, turn]) =>
+    turn.ToolCalls.flatMap((call) =>
+      call.wait ? [{ turnId, toolCallId: call.toolCallId, ...call.wait }] : [],
+    ),
+  );
+}
 
 /**
  * Narrow read port over the canonical event log, for the tail read (ADR-059).
@@ -149,6 +225,12 @@ export type ConversationDetail = ConversationListItem & {
    */
   lastError: string | null;
   /**
+   * The model the latest accepted turn ran on, or null before any turn
+   * recorded one. Reopening the conversation seeds the composer's picker
+   * from it, so a conversation keeps the model it was last used with.
+   */
+  lastModel: string | null;
+  /**
    * The projection's event cursor (ADR-059): the snapshot position the client
    * seeds its local fold from before folding the durable tail.
    */
@@ -189,6 +271,15 @@ export interface LangyConversationCommands {
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
   consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
   generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }
 
 function newConversationId(): string {
@@ -202,7 +293,7 @@ function newConversationId(): string {
  * accidental cross-caller collisions implausible, short enough for every index
  * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
  */
-const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
+export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
 /**
  * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
@@ -261,6 +352,29 @@ function toListItem(
   };
 }
 
+/** One card the developer's machine put up, as the durable record holds it. */
+export type LangyLocalRecordWait = LangyTurnWait & {
+  /** The turn that raised it, so the panel keeps them in turn order. */
+  turnId: string;
+  /** The tool call it rides on. */
+  toolCallId: string;
+};
+
+/** Everything one conversation's local control left on the record. */
+export interface LangyLocalRecord {
+  waits: LangyLocalRecordWait[];
+  /** Whether the last thing the folder did was connect. */
+  workspaceConnected: boolean;
+}
+
+/** The two events that carry a card, as the fold reads them. */
+function isLangyWaitEventType(type: string): boolean {
+  return (
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED ||
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED
+  );
+}
+
 /**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
@@ -271,6 +385,7 @@ export class LangyConversationService {
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
     private readonly events: LangyConversationEventsReader | null = null,
+    private readonly turnOrder: LangyTurnOrderReader | null = null,
   ) {}
 
   /**
@@ -361,6 +476,7 @@ export class LangyConversationService {
       status: row.status,
       currentTurnId: row.currentTurnId,
       lastError: row.lastError,
+      lastModel: row.lastModel,
       eventCursor: row.eventCursor ?? null,
     };
   }
@@ -450,6 +566,53 @@ export class LangyConversationService {
       events,
       cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
       truncated,
+    };
+  }
+
+  /**
+   * The developer's own machine in one conversation, off the durable record
+   * (ADR-129): every card it raised, in the order they were raised, and
+   * whether the folder is connected right now.
+   *
+   * The live stream cannot answer either question. A tab that adopted a
+   * running turn never subscribes to it, so a card raised before that tab
+   * opened reached nobody; and the browser's local fold starts at the
+   * snapshot's cursor, so everything the turn did before that cursor — a
+   * pending permission ask included — is not in it. Reopening a finished
+   * conversation had the same hole in the other direction: none of the cards
+   * the developer answered were on screen any more.
+   *
+   * Authorized exactly like the other reads (owner-or-shared, reported as
+   * not-found so it cannot probe), and folded with the SAME reducer the
+   * browser and the server projection use.
+   */
+  async getLocalRecord({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+    if (!this.events) return { waits: [], workspaceConnected: false };
+
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+
+    return {
+      waits: recordWaitsOf(foldWaitTurns(all)),
+      workspaceConnected: lastWorkspaceConnection(all),
     };
   }
 
@@ -703,6 +866,9 @@ export class LangyConversationService {
         // An import runs no turn — there is nothing in flight to stop.
         currentTurnId: null,
         lastError: null,
+        // No turn ran here yet, so the fork carries no model of its own and
+        // the composer falls back to the resolved default.
+        lastModel: null,
         // The fork's projection has not landed yet, so there is no snapshot
         // position to seed from — the client folds from the start.
         eventCursor: null,
@@ -777,6 +943,7 @@ export class LangyConversationService {
     conversationId,
     turnId = crypto.randomUUID(),
     questionParts,
+    model,
     conversationStart,
     userMessage,
     consumeHandoffTurnId,
@@ -786,6 +953,8 @@ export class LangyConversationService {
     turnId?: string;
     /** The user's question that opened the turn — folded into the turn document. */
     questionParts?: LangyMessagePart[];
+    /** The model this turn runs on — the fold keeps the latest as `LastModel`. */
+    model?: string;
     /** Optional first-event marker, committed atomically before acceptance. */
     conversationStart?: Omit<
       LangyConversationStartedEventData,
@@ -802,6 +971,7 @@ export class LangyConversationService {
       conversationId,
       turnId,
       ...(questionParts !== undefined ? { questionParts } : {}),
+      ...(model !== undefined ? { model } : {}),
       ...(conversationStart ? { conversationStart } : {}),
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),
@@ -1030,13 +1200,46 @@ export class LangyConversationService {
       });
       return;
     }
+    const order = await this.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: buildFinalAssistantParts({ text: text ?? "", toolCalls }),
+      parts: buildFinalAssistantParts({
+        text: text ?? "",
+        toolCalls,
+        ...(order.length > 0 ? { order } : {}),
+      }),
       outcome: "completed",
     });
+  }
+
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Read here rather than by the caller because two paths finalize a turn — the
+   * relay's terminal frame and the agent's own HTTP post — and whichever lands
+   * first is the one the record keeps. Reading in one place is what makes the
+   * two produce the same parts.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose read fails, records the shape it always did rather than failing a
+   * finalize that is otherwise complete.
+   */
+  private async readTurnOrder(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]> {
+    if (!this.turnOrder) return [];
+    try {
+      return await this.turnOrder.readTurnOrder(at);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        { ...at, error },
+        "could not read a turn's order; recording its calls before its reply",
+      );
+      return [];
+    }
   }
 
   /**
@@ -1234,7 +1437,14 @@ export class LangyConversationService {
     repository: LangyConversationRepository,
     messages?: LangyMessageRepository,
     events?: LangyConversationEventsReader | null,
+    turnOrder?: LangyTurnOrderReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages, events);
+    return new LangyConversationService(
+      repository,
+      commands,
+      messages,
+      events,
+      turnOrder,
+    );
   }
 }

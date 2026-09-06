@@ -49,6 +49,11 @@ type Options struct {
 	// projected service-account token path, LANGWATCH_* internals, and
 	// DB/Redis/ClickHouse secrets stay out of reach of user code.
 	//
+	// The allowlist names what is COPIED from the engine's environment, so a
+	// value the engine does not hold cannot arrive through it. That is why
+	// the sandbox credential is appended after this list rather than added to
+	// it: it belongs to one run, not to the process.
+	//
 	// Semantics:
 	//   - nil            → defaultEnvAllowlist (secure default)
 	//   - non-nil empty  → pass nothing (maximally locked down)
@@ -57,7 +62,16 @@ type Options struct {
 	// A project's own secrets reach user code via Request.Secrets (piped
 	// over stdin into the `secrets` namespace), never via the environment,
 	// so withholding the environment does not break the secrets contract.
+	//
+	// The one credential that does travel in the environment is the run's
+	// sandbox key; see Request.SandboxAPIKey.
 	EnvAllowlist []string
+	// SandboxEndpoint is the LangWatch instance the sandbox calls, and comes
+	// from the engine's own LANGWATCH_ENDPOINT. It is injected together with
+	// Request.SandboxAPIKey and never on its own: a key with no endpoint, or
+	// an endpoint with no key, gives agent code half a credential and one
+	// failure it cannot read.
+	SandboxEndpoint string
 }
 
 // defaultEnvAllowlist is the environment passed into the code-block
@@ -98,7 +112,10 @@ func New(opts Options) (*Executor, error) {
 		opts.Python = "python3"
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 60 * time.Second
+		// Counterpart: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS in
+		// platform/app/src/server/nlpgo/timeouts.ts, which the platform's client
+		// falls back to when the operator names no ceiling. Change both together.
+		opts.DefaultTimeout = 600 * time.Second
 	}
 	// Secure default: a nil allowlist means "the caller didn't opt out of
 	// the safe default", NOT "inherit everything". A non-nil empty slice is
@@ -143,7 +160,22 @@ type Request struct {
 	// code as a `params` namespace so `params.NAME` works, the same shape
 	// as secrets. Values are typed: a number configured as a number
 	// arrives in Python as an int/float, not as a string.
-	Params  map[string]any
+	Params map[string]any
+	// SandboxAPIKey is the run's own LangWatch credential. It is minted per
+	// run, reaches the project's agent cache and nothing else, and expires by
+	// itself, so agent code can keep state between rows without the project
+	// key ever entering the sandbox. Empty means the run injects nothing.
+	//
+	// This is the one deliberate exception to "credentials never travel in
+	// the environment": the LangWatch SDK reads LANGWATCH_API_KEY and
+	// LANGWATCH_ENDPOINT from there, so putting it anywhere else would mean
+	// every agent wiring it up by hand. The engine scrubs the value out of
+	// captured stdout and stderr, so printing the environment stores nothing.
+	SandboxAPIKey string
+	// Timeout asks for LESS time than the operator allows; it can never buy
+	// more. Options.DefaultTimeout carries the deployment's ceiling on how
+	// long untrusted customer code may hold a worker, so Execute clamps this
+	// value to it. Zero or negative means "no request of my own".
 	Timeout time.Duration
 }
 
@@ -183,6 +215,13 @@ const (
 
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
 
+// DefaultTimeout reports the wall-clock timeout the executor applies to a
+// request that does not carry its own Request.Timeout. Exported so the
+// wiring that builds the executor from operator config can be asserted on.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.opts.DefaultTimeout
+}
+
 // childEnv builds the environment handed to the user-code subprocess from
 // the configured allowlist. It always returns a non-nil slice — even when
 // no allowlisted variable is present — so the caller can assign it to
@@ -202,11 +241,36 @@ func (e *Executor) childEnv() []string {
 	return env
 }
 
+// withSandboxCredential appends the run's LangWatch credential to env, or
+// returns env unchanged.
+//
+// Both halves or neither: a key with no endpoint sends the call to the wrong
+// instance, and an endpoint with no key gets a 401 the agent cannot act on.
+// LANGWATCH_SKIP_OTEL_SETUP rides along because the run already reports this
+// row, so a second exporter inside it would only spend the runner's time
+// budget.
+func withSandboxCredential(env []string, apiKey, endpoint string) []string {
+	if apiKey == "" || endpoint == "" {
+		return env
+	}
+	return append(env,
+		"LANGWATCH_API_KEY="+apiKey,
+		"LANGWATCH_ENDPOINT="+endpoint,
+		"LANGWATCH_SKIP_OTEL_SETUP=true",
+	)
+}
+
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
-	timeout := req.Timeout
-	if timeout == 0 {
-		timeout = e.opts.DefaultTimeout
+	// The operator's ceiling wins. A per-request value only ever shortens the
+	// budget: a workflow author must not be able to escape
+	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
+	// their own node. A non-positive request means no request at all — and in
+	// particular keeps a negative duration away from context.WithTimeout,
+	// which would expire the run before the subprocess starts.
+	timeout := e.opts.DefaultTimeout
+	if req.Timeout > 0 && req.Timeout < timeout {
+		timeout = req.Timeout
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -234,7 +298,13 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// Withhold the pod environment from user code. cmd.Env is always set to
 	// a non-nil slice so exec never falls back to inheriting os.Environ();
 	// see childEnv. Project secrets travel via the request payload, not here.
-	cmd.Env = e.childEnv()
+	// The run's own sandbox credential is the one exception, and it is added
+	// only when the run carries both halves of it.
+	cmd.Env = withSandboxCredential(
+		e.childEnv(),
+		req.SandboxAPIKey,
+		e.opts.SandboxEndpoint,
+	)
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stderrBuf bytes.Buffer

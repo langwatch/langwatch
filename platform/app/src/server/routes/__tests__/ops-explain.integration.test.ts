@@ -27,7 +27,7 @@ import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoin
 // keeps this suite testing the route against a real ClickHouse without
 // booting the rest of the application (redis, postgres, event sourcing).
 // The repository the service reads through resolves
-// `getOpsClickHouseClient()` / `getSharedClickHouseClient()` fresh on every
+// `getOpsClickHouseClient()` (or its injected fallback) fresh on every
 // call, so a single instance built here behaves exactly like one built per
 // request would.
 vi.mock("~/server/app-layer/app", () => ({
@@ -35,7 +35,11 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
     opsExplain: {
-      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
+      service: new OpsExplainService(
+        // The suite always configures CLICKHOUSE_OPS_URL, so the shared-client
+        // fallback is never consulted here.
+        new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
+      ),
     },
   }),
 }));

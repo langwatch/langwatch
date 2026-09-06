@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
@@ -167,7 +168,13 @@ async function causalityLoopGuardFired({
 }): Promise<boolean> {
   const guardDisabled = await featureFlagService.isEnabled(
     CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
-    { distinctId: tenantId, defaultValue: false },
+    {
+      distinctId: tenantId,
+      defaultValue: false,
+      // The event-sourcing tenant id is the project id on this platform.
+      projectId: tenantId,
+      organizationId: NOT_TARGETED,
+    },
   );
 
   if (guardDisabled) {

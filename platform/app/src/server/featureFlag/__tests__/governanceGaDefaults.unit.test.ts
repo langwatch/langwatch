@@ -8,8 +8,8 @@ import { FEATURE_FLAGS } from "../registry";
  * gate: the registry default and the auth-cli device-login gate's
  * call-site fallback. They must move TOGETHER: both true means
  * governance ships open (self-hosted works with zero configuration;
- * per-org kill switches in PostHog or the operator store re-arm the
- * gate). These tests fail loudly if either literal drifts independently.
+ * a per-org kill switch in the operator store re-arms the gate). These
+ * tests fail loudly if either literal drifts independently.
  */
 describe("governance flag defaults (ADR-038, GA: ships open)", () => {
   describe("when the registry resolves release_ui_ai_governance_enabled", () => {

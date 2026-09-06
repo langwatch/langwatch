@@ -11,7 +11,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:invariants": "vitest run test/workspace-invariants.test.ts"
+		"test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
 	},
 	"dependencies": {
 		"chalk": "^6.0.0",

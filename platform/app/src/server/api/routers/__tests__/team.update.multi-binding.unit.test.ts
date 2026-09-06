@@ -5,6 +5,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { teamRouter } from "../team";
 
@@ -98,9 +99,10 @@ describe("team.update", () => {
         count: organizationUserCount,
         // Current-org membership for the caller: the rbac resolver fails
         // closed without it.
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
+        findFirst: vi.fn().mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+          disabledAt: null,
+        }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       roleBinding: {
@@ -131,6 +133,7 @@ describe("team.update", () => {
       publiclyShared: false,
     });
     ctx.prisma = prisma;
+    ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
     caller = teamRouter.createCaller(ctx);
   });
 

@@ -176,28 +176,28 @@ describe("governance routers — RBAC enforcement", () => {
   }
 
   describe("when caller is org MEMBER", () => {
-    it("rejects governance.setupState with UNAUTHORIZED", async () => {
+    it("rejects governance.setupState with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.governance.setupState({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects governance.ocsfExport with UNAUTHORIZED", async () => {
+    it("rejects governance.ocsfExport with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.governance.ocsfExport({ organizationId, limit: 10 }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects ingestionSources.list with UNAUTHORIZED", async () => {
+    it("rejects ingestionSources.list with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.ingestionSources.list({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects ingestionSources.create with UNAUTHORIZED", async () => {
+    it("rejects ingestionSources.create with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.ingestionSources.create({
@@ -205,17 +205,17 @@ describe("governance routers — RBAC enforcement", () => {
           sourceType: "otel_generic",
           name: "leaked-source",
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects anomalyRules.list with UNAUTHORIZED", async () => {
+    it("rejects anomalyRules.list with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.anomalyRules.list({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects anomalyRules.create with UNAUTHORIZED", async () => {
+    it("rejects anomalyRules.create with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.anomalyRules.create({
@@ -226,14 +226,14 @@ describe("governance routers — RBAC enforcement", () => {
           scope: "organization",
           scopeId: organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("rejects activityMonitor.summary with UNAUTHORIZED", async () => {
+    it("rejects activityMonitor.summary with FORBIDDEN", async () => {
       const caller = callerFor(memberUserId);
       await expect(
         caller.activityMonitor.summary({ organizationId, windowDays: 7 }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("still ALLOWS governance.resolveHome (identity routing path)", async () => {

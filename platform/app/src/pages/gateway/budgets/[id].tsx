@@ -515,32 +515,16 @@ function DetailRow({
   );
 }
 
-type ScopeTarget =
-  | { kind: "ORGANIZATION"; id: string; name: string; secondary: string | null }
-  | { kind: "TEAM"; id: string; name: string; secondary: string | null }
-  | { kind: "PROJECT"; id: string; name: string; secondary: string | null }
-  | {
-      kind: "VIRTUAL_KEY";
-      id: string;
-      name: string;
-      secondary: string | null;
-      projectSlug: string | null;
-    }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
-  | {
-      kind: "ATTRIBUTED_USER";
-      id: string;
-      name: string;
-      secondary: string | null;
-      anchorKind: "virtual_key" | "project";
-    }
-  | {
-      kind: "GROUP";
-      id: string;
-      name: string;
-      secondary: string | null;
-      memberCount: number;
-    };
+// Mirrors the wire shape of `BudgetScopeTargetInfo` (the shared
+// scope-target resolver): flat, with the kind-specific extras optional.
+type ScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary: string | null;
+  projectSlug?: string | null;
+  memberCount?: number;
+};
 
 function ScopeBadge({
   target,
@@ -571,7 +555,7 @@ function ScopeBadge({
           {target.secondary}
         </Code>
       )}
-      {target.kind === "GROUP" && (
+      {target.kind === "GROUP" && typeof target.memberCount === "number" && (
         <Text fontSize="xs" color="fg.muted">
           {target.memberCount === 1
             ? "1 member"

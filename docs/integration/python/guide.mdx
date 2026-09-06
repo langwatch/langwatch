@@ -68,7 +68,7 @@ langwatch.setup()
   - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
   - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
 - [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 ### Creating a Trace
 
@@ -206,7 +206,11 @@ langwatch.setup(
 
 <ParamField path="endpoint_url" type="str | None">
   The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment
-  variable or `https://app.langwatch.ai`.
+  variable or `https://app.langwatch.ai`. GET and HEAD requests follow redirects, up to
+  five hops. Every other request only follows an `http://` endpoint's redirect
+  to the same `https://` URL, once, with one warning per process. A refused
+  redirect raises `langwatch.http_client.RedirectRefusedError`: set the
+  endpoint to the final URL.
 </ParamField>
 
 <ParamField path="base_attributes" type="dict[str, Any] | None">

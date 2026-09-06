@@ -90,6 +90,9 @@ export type VirtualKeyDetail = {
       tpm: number | null;
       rpd: number | null;
     };
+    realtime?: {
+      maxOpenSessions: number | null;
+    };
     metadata?: {
       label?: string;
       tags?: string[];
@@ -105,6 +108,23 @@ type VirtualKeyEditDrawerProps = {
 };
 
 const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
+
+/**
+ * Whether the typed open-session cap is something other than blank or a whole
+ * number of 1 or more.
+ *
+ * The whole string is read, not a prefix of it. `Number.parseInt` accepts
+ * "1.9" as 1 and "12voice" as 12, so a typo would silently save a cap the
+ * operator did not choose, and a cap is the thing that refuses a customer's
+ * calls. Zero is refused too: an operator who means "no voice" removes the
+ * provider, and a saved 0 would look like a mistake either way.
+ */
+function maxOpenSessionsInvalid(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") return false;
+  const parsed = Number(trimmed);
+  return !Number.isInteger(parsed) || parsed < 1;
+}
 
 export function VirtualKeyEditDrawer({
   organizationId,
@@ -132,6 +152,7 @@ export function VirtualKeyEditDrawer({
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
+  const [maxOpenSessions, setMaxOpenSessions] = useState<string>("");
   const [expiration, setExpiration] =
     useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
   const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
@@ -146,6 +167,7 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
+    setMaxOpenSessions(vk.config.realtime?.maxOpenSessions?.toString() ?? "");
     const providersAllowed = vk.config.providersAllowed ?? null;
     setProviderAccess({
       allProviders: !providersAllowed || providersAllowed.length === 0,
@@ -284,6 +306,9 @@ export function VirtualKeyEditDrawer({
     if (!name) return "Name is required.";
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
+    if (maxOpenSessionsInvalid(maxOpenSessions)) {
+      return "Max open sessions must be a whole number of 1 or more, or blank for unlimited.";
+    }
     // Until providers resolve, an explicit selection cannot be told
     // apart from an empty one, and submitting would filter the picked
     // ids against an empty eligible set and persist an empty allowlist.
@@ -337,6 +362,11 @@ export function VirtualKeyEditDrawer({
             rpm: rpm ? Number.parseInt(rpm, 10) : null,
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
+          },
+          realtime: {
+            maxOpenSessions: maxOpenSessions.trim()
+              ? Number(maxOpenSessions.trim())
+              : null,
           },
           metadata: {
             tags: parseTagsCsv(tagsCsv),
@@ -572,6 +602,30 @@ export function VirtualKeyEditDrawer({
               </Field.Root>
             </HStack>
 
+            <Separator />
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Realtime voice
+              </Text>
+              <FieldInfoTooltip
+                description="How many brokered voice sessions this key may hold open at once, blank = unlimited. The request limits above do not bound voice: one mint opens a call that bills for as long as it runs. A mint over the cap gets HTTP 429; a slot frees when the call ends."
+                docHref="/ai-gateway/api/realtime"
+              />
+            </HStack>
+            <HStack gap={4} align="flex-start">
+              <Field.Root flex={1}>
+                <Field.Label>max open sessions</Field.Label>
+                <Input
+                  value={maxOpenSessions}
+                  onChange={(e) => setMaxOpenSessions(e.target.value)}
+                  placeholder="unlimited"
+                  inputMode="numeric"
+                />
+                <Field.HelperText>
+                  Concurrent realtime voice sessions
+                </Field.HelperText>
+              </Field.Root>
+            </HStack>
             {vk && (
               <>
                 <Separator />

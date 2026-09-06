@@ -72,7 +72,7 @@ export function QuarantineFillAlert({
               </Box>
             )}
             <Link
-              href="/governance/ingestion-sources"
+              href="/governance/inventory?tab=sources"
               fontSize="sm"
               color="orange.600"
             >

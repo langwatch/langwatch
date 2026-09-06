@@ -187,6 +187,41 @@ Feature: CLI daemon mode
       When I run a command that reads a local file
       Then the file is resolved against my working directory, not the daemon's
 
+  # The connect and handshake bounds only cover getting a command ACCEPTED.
+  # After the handshake nothing bounded the request, and output is held back
+  # until the command finishes, so a daemon that took the exec and then wedged
+  # left the client waiting with nothing written. An agent harness that stops a
+  # command at 30 seconds then killed it, and the caller read the empty result
+  # as the CLI answering nothing. The daemon's own per-request timeout is ten
+  # minutes, far past any harness, so the bound has to be on the client.
+  Rule: A daemon that stops answering becomes a stated failure, never a hang
+
+    @unit
+    Scenario: The daemon accepts a command and then stops answering
+      Given a daemon accepted my command
+      And it sends no output and no exit code
+      When the client's request deadline elapses
+      Then the client stops waiting instead of holding the whole caller budget
+      And it tells me the daemon accepted the command and did not answer
+      And it tells me to run again with LANGWATCH_NO_DAEMON=1
+      And it exits with code 124
+
+    @unit
+    Scenario: A wedged daemon is not left for the next command
+      Given the client gave up on a daemon that stopped answering
+      When the client exits
+      Then that daemon is asked to stop
+      And the command is not run a second time, because the deadline already
+      spent the caller's budget
+
+    @unit
+    Scenario: A command still streaming output is left to finish
+      Given a daemon is serving a command whose output is too large to hold back
+      And part of that output has already been printed to me
+      When the request deadline would have elapsed
+      Then the command is left to run, because output is still arriving
+      And the stream is not cut in half
+
   Rule: The client can cancel an in-flight command
 
     Scenario: Ctrl-C during a daemon-served command

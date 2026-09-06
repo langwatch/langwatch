@@ -18,6 +18,25 @@ import {
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
+  IdentityHeadsRepository,
+  IdentityReservationRepository,
+  IdentityUsersRepository,
+  JoinRequestReadRepository,
+  MfaEnrollmentRepository,
+  ScimSyncReadRepository,
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
+} from "@langwatch/identity-server";
+import {
+  IdentityGuards,
+  JoinRequestGuards,
+  MfaGuards,
+  ScimSyncGuards,
+  SsoConnectionGuards,
+} from "@langwatch/identity-server";
+import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
@@ -25,6 +44,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -82,6 +102,8 @@ import { TraceReadDerivationService } from "../app-layer/traces/trace-read-deriv
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import type { EvaluatorTypes } from "../evaluations/evaluators.generated";
+import { runEvaluation } from "../evaluations/runEvaluation";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
@@ -91,14 +113,28 @@ import type {
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
 import { publishCancellation } from "../scenarios/cancellation-channel";
+import { SCENARIO_EVALUATIONS_JOB } from "../scenarios/evaluations/constants";
+import {
+  loadRunAttachments,
+  type RunScenarioEvaluationsDeps,
+  runScenarioEvaluations,
+} from "../scenarios/evaluations/runScenarioEvaluations";
+import {
+  createScenarioEvaluationsJobHandler,
+  scenarioEvaluationsJobId,
+} from "../scenarios/evaluations/scenarioEvaluations.job";
+import type { ScenarioEvaluationsJobPayload } from "../scenarios/evaluations/types";
 import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
+import { ScenarioService } from "../scenarios/scenario.service";
+import { SuiteService } from "../suites/suite.service";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAgentSandboxMaintenancePipeline } from "./pipelines/agent-sandbox-maintenance/pipeline";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
-import type { AuthzGrantsFoldState } from "./pipelines/authz-grants/projections/authzGrantsState.foldProjection";
+import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
 import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
@@ -116,6 +152,7 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import { RedisSessionContextMemo } from "./pipelines/coding-agent-processing/services/session-context-memo";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
@@ -132,6 +169,7 @@ import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { ReportEvaluationCommandData } from "./pipelines/evaluation-processing/schemas/commands";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
@@ -148,6 +186,12 @@ import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-pro
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
+import { createIdentityPipeline } from "./pipelines/identity/pipeline";
+import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
+import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
+import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -162,19 +206,27 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
+import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
+import { QueueRunCommand } from "./pipelines/simulation-processing/commands/queueRun.command";
+import { RecordEvaluationsCommand } from "./pipelines/simulation-processing/commands/recordEvaluations.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
 import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { SimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
+import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
+import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
+import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -348,10 +400,54 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
-  /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
-  authzGrantsProjection: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Where the grants pipeline's write instructions land (ADR-110). */
+  authzGrantsWrite: GrantProjectionWriteStore;
   /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
   authzAuditTrail: AuthzAuditTrailStore;
+  /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
+  identityProjection: StateProjectionStore<IdentityFoldState>;
+  /** Postgres reads the identity guards run against (ADR-101 §2). */
+  identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
+  /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
+  mfaProjection: StateProjectionStore<MfaFoldState>;
+  /** Postgres reads the two-step verification guards run against (D06). */
+  mfaEnrollments: MfaEnrollmentRepository;
+  /** The connection pipeline's `SsoConnection` head + cursor (D04). */
+  ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
+  /** Postgres reads the connection guards run against (ADR-117 §5). */
+  ssoConnectionReads: SsoConnectionReadRepository;
+  /** Who a teardown would strand, read over the identity heads. */
+  ssoConnectionStranding: SsoConnectionStrandingRepository;
+  /** Activation's break-glass precondition (D05 hardens it). */
+  ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** How the teardown grace wake dispatches its completion command. */
+  ssoConnectionTeardown: ConnectionTeardownPort;
+  /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
+  scimSyncProjection: StateProjectionStore<ScimSyncFoldState>;
+  /** Postgres reads the directory-sync guards run against (D08). */
+  scimSyncReads: ScimSyncReadRepository;
+  /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
+  joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  /** Postgres reads the join-request guards run against (ADR-117, D12). */
+  joinRequestReads: JoinRequestReadRepository;
+  /** How the reminder and expiry wakes reach the world. */
+  joinRequestLifecycle: JoinRequestLifecyclePort;
 }
 
 export interface PipelineRegistryDeps {
@@ -361,7 +457,7 @@ export interface PipelineRegistryDeps {
   broadcast: BroadcastService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
-    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash" | "isStopped">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
   };
@@ -535,6 +631,20 @@ export class PipelineRegistry {
       }),
     );
 
+    // Code agent credential maintenance, on the same footing. A sandbox key is
+    // minted per run and nothing revokes it at the end of one, so this sweep
+    // is what retires it.
+    this.deps.eventSourcing.register(
+      createAgentSandboxMaintenancePipeline({
+        sandboxKeyReap: {
+          reap: () =>
+            reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     // Pull-request linkage maintenance, on the same footing. It used to be a
     // `setTimeout` chain on every replica with no lock, so the fleet ran the
     // same cross-tenant scan N times every ten minutes.
@@ -620,6 +730,7 @@ export class PipelineRegistry {
         suiteRunPipeline,
         traceSummaryStore,
         simComputeRunMetrics,
+        reportEvaluation: mapCommands(evalPipeline.commands).reportEvaluation,
       });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({
@@ -637,15 +748,84 @@ export class PipelineRegistry {
     // The grants ledger (ADR-092 §13). The write paths emit through the
     // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
     // organization whose genesis import has landed (its
-    // SystemMigrationTenantState row, read by the ledger-write-gate) sends
+    // SystemMigrationTenantState row, read by the engine gate) sends
     // these commands; every other organization still takes the imperative
     // Prisma path, and an operator's `rolled_back` flip returns one there
     // with no deploy.
     this.deps.eventSourcing.register(
       createAuthzGrantsPipeline({
-        authzGrantsProjectionStore:
-          this.deps.repositories.authzGrantsProjection,
+        authzGrantsWriteStore: this.deps.repositories.authzGrantsWrite,
         authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
+      }),
+    );
+    // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
+    // writer dispatches these commands until the identity adapter lands, and
+    // the adapter's per-user write gate itself ships closed until a user's
+    // backfill (PR 2) latches — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createIdentityPipeline({
+        identityProjectionStore: this.deps.repositories.identityProjection,
+        identityGuards: new IdentityGuards(
+          this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
+        ),
+        // Two-step verification rides this same aggregate (D06), so its
+        // commands share the per-person lane rather than racing it. Ships
+        // dark: `MFA_ENROLLMENT_OPEN` defaults to `off`, so the two-factor
+        // plugin is not registered and nothing dispatches these.
+        mfaProjectionStore: this.deps.repositories.mfaProjection,
+        mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
+      }),
+    );
+    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
+    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
+    // projection and no `Organization.ssoDomain` write stops. Its only
+    // production writer until D05 is the grandfather migration, which is
+    // paced by per-organization enrollment like every other in-place
+    // migration — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createSsoConnectionPipeline({
+        connectionProjectionStore:
+          this.deps.repositories.ssoConnectionProjection,
+        connectionGuards: new SsoConnectionGuards({
+          connections: this.deps.repositories.ssoConnectionReads,
+          breakGlass: this.deps.repositories.ssoBreakGlassBindings,
+          stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
+        }),
+        teardown: this.deps.repositories.ssoConnectionTeardown,
+      }),
+    );
+    // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`
+    // defaults off, so no SCIM request path dispatches these commands and
+    // the previous write path is unchanged — a deploy changes nothing on its
+    // own. Its projection is what makes a failed apply visible with the
+    // connection, the operation and a reason code, so it is registered
+    // whether the flag is on or not: a history nobody writes to costs
+    // nothing, and one that only exists once the flag flips would have no
+    // past to show on the day it mattered.
+    this.deps.eventSourcing.register(
+      createScimSyncPipeline({
+        scimSyncProjectionStore: this.deps.repositories.scimSyncProjection,
+        scimSyncGuards: new ScimSyncGuards({
+          syncs: this.deps.repositories.scimSyncReads,
+        }),
+      }),
+    );
+
+    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
+    // defaults off, so nothing dispatches a join command, no interstitial
+    // renders and no admin panel appears — a deploy changes nothing on its
+    // own, and rollback is the flag.
+    this.deps.eventSourcing.register(
+      createJoinRequestPipeline({
+        joinRequestProjectionStore:
+          this.deps.repositories.joinRequestProjection,
+        joinRequestGuards: new JoinRequestGuards({
+          requests: this.deps.repositories.joinRequestReads,
+        }),
+        lifecycle: this.deps.repositories.joinRequestLifecycle,
       }),
     );
 
@@ -1008,6 +1188,7 @@ export class PipelineRegistry {
           new CodingAgentSessionEventsAppendStore(
             this.deps.repositories.codingAgentSessionEvents,
           ),
+        sessionContextMemo: new RedisSessionContextMemo(this.deps.redis),
         ...(this.deps.codingAgent
           ? {
               pullRequestMappingHandler: createPullRequestMappingHandler(
@@ -1063,6 +1244,9 @@ export class PipelineRegistry {
           {
             distinctId: "evaluator-settings-recovery",
             defaultValue: false,
+            // A pipeline-wide switch, flipped for the fleet and not per tenant.
+            projectId: NOT_TARGETED,
+            organizationId: NOT_TARGETED,
           },
         ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
@@ -1083,7 +1267,13 @@ export class PipelineRegistry {
           try {
             disabled = await featureFlagService.isEnabled(
               "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+              {
+                distinctId: "evaluation-inputs-offload",
+                defaultValue: false,
+                // A pipeline-wide switch, flipped for the fleet.
+                projectId: NOT_TARGETED,
+                organizationId: NOT_TARGETED,
+              },
             );
           } catch {
             // Unreadable kill switch: stay on the default (offload enabled).
@@ -1415,18 +1605,21 @@ export class PipelineRegistry {
     suiteRunPipeline,
     traceSummaryStore,
     simComputeRunMetrics,
+    reportEvaluation,
   }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     simComputeRunMetrics: Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
+    /** Writes a scenario evaluation on the run's trace (evaluation pipeline). */
+    reportEvaluation: CommandDispatcher<ReportEvaluationCommandData>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
-      new RepositoryFoldStore<SimulationRunStateData>(
-        this.deps.repositories.simulationRunState,
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      new SimulationRunStateFoldStore({
+        repository: this.deps.repositories.simulationRunState,
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
       "simulation_runs",
     );
 
@@ -1459,29 +1652,106 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    // ECST backfill: FinishRunCommand loads the run's prior events straight
-    // from the canonical event store (aggregateType "simulation_run").
-    const finishRunCommand = new FinishRunCommand({
-      loadPriorEvents: async ({ tenantId, scenarioRunId }) => {
-        const eventStore =
-          this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
-        if (!eventStore) return [];
-        return eventStore.getEvents(
-          scenarioRunId,
-          { tenantId: createTenantId(tenantId) },
-          "simulation_run",
-        );
-      },
+    // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
+    // run's prior events straight from the canonical event store
+    // (aggregateType "simulation_run").
+    const loadSimulationRunEvents = async ({
+      tenantId,
+      scenarioRunId,
+    }: {
+      tenantId: string;
+      scenarioRunId: string;
+    }): Promise<readonly SimulationProcessingEvent[]> => {
+      const eventStore =
+        this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+      if (!eventStore) return [];
+      return eventStore.getEvents(
+        scenarioRunId,
+        { tenantId: createTenantId(tenantId) },
+        "simulation_run",
+      );
+    };
+    // Resolves the evaluators a run is graded with. Read when the run is
+    // queued, so an edit to the suite or the plan mid-batch cannot change what
+    // an already scheduled run is graded against, and again when a run that
+    // never passed through the queue command finishes.
+    const loadRunEvaluators = (params: {
+      projectId: string;
+      scenarioId: string;
+      planId: string | null;
+    }) => loadRunAttachments({ deps: scenarioEvaluationDeps, ...params });
+    const queueRunCommand = new QueueRunCommand({
+      loadRunAttachments: loadRunEvaluators,
     });
+    const finishRunCommand = new FinishRunCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+      loadRunAttachments: loadRunEvaluators,
+    });
+    const recordEvaluationsCommand = new RecordEvaluationsCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+    });
+
+    // Scenario evaluations: the subscriber queues one job per finished run,
+    // the job grades the run with the evaluators its suite and plan attach.
+    // The suite service needs the app's suite run service, which exists only
+    // after the app is built, so it is created on first use.
+    const scenarioService = ScenarioService.create(this.deps.prisma);
+    let suiteService: SuiteService | undefined;
+    const suites = (): SuiteService => {
+      suiteService ??= SuiteService.create({
+        prisma: this.deps.prisma,
+        suiteRunService: getApp().suiteRuns.runs,
+      });
+      return suiteService;
+    };
+    const enqueueScenarioEvaluations = new Deferred<
+      CommandDispatcher<ScenarioEvaluationsJobPayload>
+    >("enqueueScenarioEvaluations");
+    const scenarioEvaluationDeps: RunScenarioEvaluationsDeps = {
+      scenarios: scenarioService,
+      suites: {
+        getRunAttachments: (params) => suites().getRunAttachments(params),
+        getAttachedEvaluators: (params) =>
+          suites().getAttachedEvaluators(params),
+      },
+      runs: {
+        getRunState: async ({ tenantId, scenarioRunId }) => {
+          const state = await simulationRunStore.get(scenarioRunId, {
+            tenantId: createTenantId(tenantId),
+            aggregateId: scenarioRunId,
+          });
+          if (!state) return null;
+          return {
+            messages: state.Messages.map((row) => ({
+              role: row.Role,
+              content: row.Content,
+            })),
+            traceIds: state.TraceIds,
+          };
+        },
+      },
+      spans: this.deps.traces.spans,
+      runEvaluation: (params) =>
+        runEvaluation({
+          ...params,
+          evaluatorType: params.evaluatorType as EvaluatorTypes,
+        }),
+      reportEvaluation: (report) => reportEvaluation(report),
+      recordEvaluations: (data) => simCommands.recordEvaluations(data),
+    };
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         simulationRunMetricsStore:
           this.deps.repositories.simulationRunMetricsStore,
+        queueRunCommand,
         finishRunCommand,
+        recordEvaluationsCommand,
         computeRunMetricsCommand,
         simulationRunExecution: {
+          getAttachedEvaluators: (params) =>
+            scenarioEvaluationDeps.suites.getAttachedEvaluators(params),
           getPool: () => scenarioExecutionPool.get(),
           publishCancellation: async ({ projectId, scenarioRunId }) => {
             const publisher = this.deps.eventSourcing.redisConnection ?? null;
@@ -1506,9 +1776,14 @@ export class PipelineRegistry {
         suiteRunSync: {
           recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
           completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+          regradeSuiteRunItem: suiteRunCommands.regradeSuiteRunItem,
         },
         traceMetricsSync: {
           computeRunMetrics: selfComputeRunMetrics.fn,
+        },
+        scenarioEvaluations: {
+          loadRunAttachments: loadRunEvaluators,
+          enqueue: enqueueScenarioEvaluations.fn,
         },
       }),
     );
@@ -1517,6 +1792,55 @@ export class PipelineRegistry {
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
     selfExecutionCommands.resolve(() => simCommands);
+
+    // The scenario evaluations job. One group per run; a repeat of the same
+    // attempt inside the window is dropped, a retry carries the next attempt.
+    const scenarioEvaluationsHandler = createScenarioEvaluationsJobHandler({
+      run: (params) =>
+        runScenarioEvaluations({ deps: scenarioEvaluationDeps, ...params }),
+      reschedule: ({ payload, delayMs }) =>
+        enqueueScenarioEvaluations.fn(payload, { delay: delayMs }),
+    });
+    const scenarioEvaluationsQueue =
+      simulationPipeline.service.registerJob<ScenarioEvaluationsJobPayload>({
+        name: SCENARIO_EVALUATIONS_JOB.NAME,
+        process: scenarioEvaluationsHandler,
+        groupKeyFn: (payload) => payload.scenarioRunId,
+        deduplication: {
+          makeId: scenarioEvaluationsJobId,
+          ttlMs: SCENARIO_EVALUATIONS_JOB.DEDUP_TTL_MS,
+          extend: false,
+          replace: false,
+          shouldSurviveDispatch: true,
+        },
+        spanAttributes: (payload) => ({
+          "scenario_evaluations.tenant_id": payload.tenantId,
+          "scenario_evaluations.scenario_run_id": payload.scenarioRunId,
+          "scenario_evaluations.attempt": payload.attempt,
+        }),
+      });
+    if (scenarioEvaluationsQueue) {
+      enqueueScenarioEvaluations.resolve((payload, options) =>
+        scenarioEvaluationsQueue.send(payload, options),
+      );
+    } else {
+      // Event sourcing disabled: run in-process after the requested delay.
+      enqueueScenarioEvaluations.resolve(async (payload, options) => {
+        const timer = setTimeout(() => {
+          scenarioEvaluationsHandler(payload).catch((error: unknown) => {
+            logger.error(
+              {
+                tenantId: payload.tenantId,
+                scenarioRunId: payload.scenarioRunId,
+                error,
+              },
+              "Scenario evaluations failed",
+            );
+          });
+        }, options?.delay ?? 0);
+        if (typeof timer === "object" && "unref" in timer) timer.unref();
+      });
+    }
 
     // Resolve cross-pipeline deferred (trace → simulation)
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
@@ -1647,6 +1971,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // Introspection — derived from the live EventSourcing runtime
 // ============================================================================
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { getApp } from "../app-layer/app";
 // StaticPipelineDefinition is already imported at the top of the file.
 
@@ -1656,7 +1981,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
-  kind: "fold" | "map";
+  kind: "fold" | "map" | "state";
 }
 
 export interface SubscriberMetadata {
@@ -1712,7 +2037,19 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         kind: "map" as const,
       }),
     );
-    return [...folds, ...maps];
+    const states = Array.from(def.stateProjections?.entries() ?? []).map(
+      ([name]) => ({
+        projectionName: name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // State projections enqueue with `__jobType=stateProjection`; the
+        // dispatcher matches the pause key against that raw segment.
+        pauseKey: `${pipelineName}/stateProjection/${name}`,
+        kind: "state" as const,
+      }),
+    );
+    return [...folds, ...maps, ...states];
   });
 }
 
@@ -1813,63 +2150,82 @@ export interface KillSwitchDescriptor {
 }
 
 export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
+  return getDefinitions().flatMap(killSwitchDescriptorsOf);
+}
+
+function killSwitchDescriptorsOf(
+  def: StaticPipelineDefinition<any, any, any>,
+): KillSwitchDescriptor[] {
   const out: KillSwitchDescriptor[] = [];
-  for (const def of getDefinitions()) {
-    const { name: pipelineName, aggregateType } = def.metadata;
-    for (const { definition } of def.foldProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "projection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const { definition } of def.mapProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "mapProjection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const cmd of def.commands) {
-      out.push({
-        key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
-        aggregateType,
-        componentType: "command",
-        componentName: cmd.name,
-        pipelineName,
-      });
-    }
-    // Subscribers belong here MORE than the others do, not less: the enqueue
-    // seam decides relevance and DISCARDS what it judges irrelevant, and
-    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
-    // those events for good. `ops.setFeatureFlag` rejects any key that is
-    // neither a registry entry nor a live descriptor, so a switch missing from
-    // this list is not merely unlisted — it is unsettable, leaving a revert as
-    // the only way to stop the seam it guards.
-    //
-    // A subscriber may override its key via `options.killSwitch.customKey`;
-    // emit the key the router will actually read, or the page would offer one
-    // nothing consults.
-    for (const definition of def.eventSubscribers.values()) {
-      out.push({
-        // Generated, never re-spelled: the comment above is the reason. A
-        // hand-built key that drifts from `generateKillSwitchKey` is not a
-        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
-        // neither a registry entry nor a live descriptor, so the switch
-        // becomes unsettable.
-        key:
-          definition.options?.killSwitch?.customKey ??
-          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
-        aggregateType,
-        componentType: "subscriber",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
+  const { name: pipelineName, aggregateType } = def.metadata;
+  for (const { definition } of def.foldProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "projection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  for (const { definition } of def.mapProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "mapProjection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  // State projections check `componentType: "projection"` at runtime (the
+  // router reuses the fold-shaped key), so the descriptor must match it —
+  // a "stateProjection" segment here would list a switch nothing reads.
+  // Same for a custom key: emit the one the router consults.
+  for (const [name, definition] of def.stateProjections?.entries() ?? []) {
+    out.push({
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "projection", name),
+      aggregateType,
+      componentType: "projection",
+      componentName: name,
+      pipelineName,
+    });
+  }
+  for (const cmd of def.commands) {
+    out.push({
+      key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
+      aggregateType,
+      componentType: "command",
+      componentName: cmd.name,
+      pipelineName,
+    });
+  }
+  // Subscribers belong here MORE than the others do, not less: the enqueue
+  // seam decides relevance and DISCARDS what it judges irrelevant, and
+  // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+  // those events for good. `ops.setFeatureFlag` rejects any key that is
+  // neither a registry entry nor a live descriptor, so a switch missing from
+  // this list is not merely unlisted — it is unsettable, leaving a revert as
+  // the only way to stop the seam it guards.
+  //
+  // A subscriber may override its key via `options.killSwitch.customKey`;
+  // emit the key the router will actually read, or the page would offer one
+  // nothing consults.
+  for (const definition of def.eventSubscribers.values()) {
+    out.push({
+      // Generated, never re-spelled: the comment above is the reason. A
+      // hand-built key that drifts from `generateKillSwitchKey` is not a
+      // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+      // neither a registry entry nor a live descriptor, so the switch
+      // becomes unsettable.
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "subscriber", definition.name),
+      aggregateType,
+      componentType: "subscriber",
+      componentName: definition.name,
+      pipelineName,
+    });
   }
   return out;
 }

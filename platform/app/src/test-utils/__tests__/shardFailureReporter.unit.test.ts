@@ -14,6 +14,7 @@ import {
   resolveHardFloorMs,
 } from "../../test-unit-global-setup";
 import ShardFailureReporter, {
+  recordShardSelection,
   resetShardState,
   shardModuleTally,
   shardSawFailure,
@@ -165,6 +166,33 @@ describe("given a shard the finalize wedge is holding open", () => {
     });
   });
 
+  describe("when the run was split into shards", () => {
+    /**
+     * The reporter is handed the whole suite before the sequencer splits it,
+     * so a shard that finished all of its own files still reports far fewer
+     * started than selected. Read against the suite, every sharded run looks
+     * like a shard cut off part way through.
+     */
+    /** @scenario "A shard is measured against its own files, not the whole suite" */
+    it("measures the shard against its own files rather than the suite", () => {
+      const reporter = new ShardFailureReporter();
+      const suite = ["a", "b", "c", "d"].map((name) =>
+        module(`src/${name}.unit.test.ts`),
+      );
+      reporter.onTestRunStart(suite);
+      // What the sequencer handed this shard out of that suite.
+      recordShardSelection(1);
+      reporter.onTestModuleQueued(module("src/a.unit.test.ts"));
+
+      const { lines } = report();
+
+      expect(lines[1]).toBe(
+        "[unit globalSetup] test files: 1 in this shard (of 4 selected), 1 started, 0 reported a result",
+      );
+      expect(lines.join("\n")).not.toContain("too slow for the floor");
+    });
+  });
+
   describe("when a file is skipped in full", () => {
     /** @scenario "A skipped file is never mistaken for one that never completed" */
     it("leaves the shard the way a passing file does", () => {
@@ -245,6 +273,7 @@ describe("given the counters behind the floor's log line", () => {
 
       expect(shardModuleTally()).toEqual({
         selected: 1,
+        shardSelected: null,
         started: 0,
         reported: 0,
         unreportedFiles: [],
@@ -264,6 +293,7 @@ describe("given the counters behind the floor's log line", () => {
 
       expect(shardModuleTally()).toEqual({
         selected: 1,
+        shardSelected: null,
         started: 1,
         reported: 0,
         unreportedFiles: ["src/a.unit.test.ts"],

@@ -8,6 +8,7 @@ import type { FieldMapping } from "../../field-mapping";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
+  sourceFieldOf,
 } from "../resolve-field-mappings";
 
 const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
@@ -164,6 +165,45 @@ describe("resolveFieldMappings", () => {
       expect(result.context).toBe("KB context");
     });
   });
+
+  describe("when mapping type is source with path session", () => {
+    const fieldMappings: Record<string, FieldMapping> = {
+      memory: { type: "source", sourceId: "scenario", path: ["session"] },
+    };
+
+    it("resolves a string session as it is", () => {
+      const result = resolveFieldMappings({
+        fieldMappings,
+        agentInput: makeAgentInput(),
+        session: "conv_1",
+      });
+
+      expect(result.memory).toBe("conv_1");
+    });
+
+    it("resolves a structured session as JSON text", () => {
+      const result = resolveFieldMappings({
+        fieldMappings,
+        agentInput: makeAgentInput(),
+        session: { step: 2 },
+      });
+
+      expect(result.memory).toBe('{"step":2}');
+    });
+
+    it("resolves to an empty string before the first answer", () => {
+      const result = resolveFieldMappings({
+        fieldMappings,
+        agentInput: makeAgentInput(),
+      });
+
+      expect(result.memory).toBe("");
+    });
+
+    it("reports session as the source field", () => {
+      expect(sourceFieldOf(fieldMappings.memory!)).toBe("session");
+    });
+  });
 });
 
 describe("computeBestMatchMappings", () => {
@@ -240,6 +280,20 @@ describe("computeBestMatchMappings", () => {
           sourceId: "scenario",
           path: ["threadId"],
         },
+      });
+    });
+  });
+
+  describe("when agent has an input named session", () => {
+    /** @scenario "A code agent input named session maps to the scenario session" */
+    it("maps it to the scenario session, not to the thread id", () => {
+      const result = computeBestMatchMappings({
+        inputs: [{ identifier: "input" }, { identifier: "session" }],
+      });
+
+      expect(result).toEqual({
+        input: { type: "source", sourceId: "scenario", path: ["input"] },
+        session: { type: "source", sourceId: "scenario", path: ["session"] },
       });
     });
   });

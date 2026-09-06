@@ -65,17 +65,18 @@ Feature: Delegated governance viewer reaches the Governance pages
     And no rule row offers an edit or archive control
 
   @integration @rbac
-  Scenario: Ingestion sources offers no controls a viewer cannot use
+  Scenario: The sources tab offers no controls a viewer cannot use
     Given sam holds `ingestionSources:view` and not `ingestionSources:manage`
-    When sam opens the ingestion sources page
+    When sam opens the inventory page (whose default tab for sam is
+      Sources — sam holds no `aiTools:manage`)
     Then there is no control to add a source
     And no source row offers an edit, rotate, or archive control
 
   @integration @rbac
-  Scenario: The tool catalog names its own grant
-    Given sam opens the tool catalog page
-    Then the page names `aiTools:manage`
-    And no catalog editor is rendered
+  Scenario: The inventory Catalog pane names its own grant
+    Given sam opens the inventory page at its Catalog tab
+    Then the pane names `aiTools:manage`
+    And no tiles editor is rendered
 
   @regression @rbac
   Scenario: An org admin still sees every panel on the overview

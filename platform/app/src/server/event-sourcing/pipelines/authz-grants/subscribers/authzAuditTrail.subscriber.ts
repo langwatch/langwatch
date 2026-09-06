@@ -1,27 +1,26 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { GrantEventSource } from "@langwatch/authz-server";
-import { GENESIS_ACTOR_ID } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import {
   AUTHZ_AUDIT_ACTION_PREFIX,
   type AuthzAuditVerb,
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "../schemas/constants";
 import type { AuthzGrantsEvent } from "../schemas/events";
 
-/** The runtime family only: the process family records the cutover
- *  machine's own moves, which are an operator concern, not an access fact
- *  a customer's audit page should carry. */
+/**
+ * Every authorization event is an access fact, so every one of them audits.
+ *
+ * The operator-facing events this list used to exclude — the cutover
+ * machine's moves and the migration runner's witnessed transitions — are
+ * gone with the model that had them (ADR-110).
+ */
 export const AUTHZ_AUDIT_EVENT_TYPES = [
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
@@ -29,25 +28,15 @@ export const AUTHZ_AUDIT_EVENT_TYPES = [
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
 ] as const;
 
 /**
- * The rest of the aggregate's events, listed rather than implied: the cutover
- * machine's own moves and the migration runner's witnessed transitions are an
- * operator concern, not an access fact a customer's audit page should carry.
- *
- * Stated as a constant so the two lists together must cover the wire union
- * exactly (`authzAuditTrail.subscriber.unit.test.ts`). A new event type then
- * fails a test, where before it would have reached the audit page as
- * `authz.grants.undefined` — or been silently dropped, which is worse.
+ * Deliberately empty, and kept rather than deleted: the two lists together
+ * must cover the wire union exactly (`authzAuditTrail.subscriber.unit.test.ts`),
+ * so a new event type that nobody classified fails a test instead of reaching
+ * the audit page as `authz.grants.undefined` or being silently dropped.
  */
-export const AUTHZ_NON_AUDIT_EVENT_TYPES = [
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
-] as const;
+export const AUTHZ_NON_AUDIT_EVENT_TYPES = [] as const;
 
 type AuditableEventType = (typeof AUTHZ_AUDIT_EVENT_TYPES)[number];
 
@@ -61,7 +50,6 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, AuthzAuditVerb> = {
   [ROLE_DEFINED_EVENT_TYPE]: "role_defined",
   [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: "role_permissions_changed",
   [ROLE_DELETED_EVENT_TYPE]: "role_deleted",
-  [MEMBER_OFFBOARDED_EVENT_TYPE]: "offboard",
 };
 
 const logger = createLogger("langwatch:authz:audit-trail");
@@ -69,12 +57,16 @@ const logger = createLogger("langwatch:authz:audit-trail");
 /** Every fact these sources author is backdated history that already
  *  happened somewhere else — the legacy tables, an earlier backfill, or a
  *  key the resolver minted on read. Auditing them would fill the customer's
- *  audit page with thousands of rows for changes nobody made. */
-const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
-  "genesis-import",
-  "backfill-b",
+ *  audit page with thousands of rows for changes nobody made.
+ *
+ *  Exported because the pre-ledger writer applies the same rule to the
+ *  `AuditLog` rows it writes itself (`auditableSource` in
+ *  `app-layer/authz/ledger.ts`), and the two audit paths must not be able to
+ *  disagree about what earns a row. Every OTHER source states a change
+ *  somebody actually made and is audited. */
+export const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
+  "migration",
   "read-through-mint",
-  "cutover-import",
 ];
 
 /** The audit row, in the existing `AuditLog` shape. The store never sees a
@@ -125,9 +117,9 @@ export function isAuditableGrantEvent(event: AuthzGrantsEvent): boolean {
   ) {
     return false;
   }
-  // Role events carry no `source`, so the genesis import's role facts are
-  // recognised by the only actor that authors them.
-  if (actor?.type === "system" && actor.id === GENESIS_ACTOR_ID) {
+  // Role events carry no `source`, so the migration's backdated role facts
+  // are recognised by the only actor that authors them.
+  if (actor?.type === "system" && actor.id === SYSTEM_ACTORS.migrationRunner) {
     return false;
   }
   return true;
@@ -167,7 +159,6 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
   ],
   [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: ["roleId", "permissions"],
   [ROLE_DELETED_EVENT_TYPE]: ["roleId"],
-  [MEMBER_OFFBOARDED_EVENT_TYPE]: ["userId", "revokedGrantIds"],
 };
 
 /** The named fields this event actually carries. An absent optional field

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import {
-  CUTOVER_GATE_CACHE_TTL_MS,
-  resetCutoverGateForTesting,
-} from "../../cutover-gate";
+  ENGINE_GATE_CACHE_TTL_MS,
+  resetAuthzEngineGateForTesting,
+} from "../../engine-gate";
 import { CutoverAwareAccessListingRepository } from "../access-listing.cutover.repository";
 import type { AccessListingRepository } from "../access-listing.repository";
 
@@ -48,12 +48,17 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
   const legacy = spyRepository("legacy");
   const grants = spyRepository("grants");
   const findUnique = vi.fn(
-    async ({ where }: { where: { organizationId: string } }) => ({
-      onEngine: onEngineByOrg[where.organizationId] === true,
-    }),
+    async ({
+      where,
+    }: {
+      where: { migrationName_tenantId: { tenantId: string } };
+    }) =>
+      onEngineByOrg[where.migrationName_tenantId.tenantId] === true
+        ? { status: "finalized" }
+        : null,
   );
   const prisma = {
-    authzCutoverProjection: { findUnique },
+    systemMigrationTenantState: { findUnique },
   } as unknown as Prisma.TransactionClient;
   return {
     legacy,
@@ -67,10 +72,10 @@ const repositoryFor = (onEngineByOrg: Record<string, boolean>) => {
 
 describe("CutoverAwareAccessListingRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     vi.useRealTimers();
   });
 
@@ -252,11 +257,10 @@ describe("CutoverAwareAccessListingRepository", () => {
       const grants = spyRepository("grants");
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ onEngine: true })
-        .mockResolvedValueOnce({ onEngine: false })
-        .mockResolvedValue({ onEngine: false });
+        .mockResolvedValueOnce({ status: "finalized" })
+        .mockResolvedValue(null);
       const prisma = {
-        authzCutoverProjection: { findUnique },
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAccessListingRepository(prisma, {
         legacy,
@@ -272,7 +276,7 @@ describe("CutoverAwareAccessListingRepository", () => {
       // back to the projection to get it. Without this half, the assertion
       // below would hold with no cache at all, or with the TTL widened to a
       // day - it would prove "eventually", not "within one window".
-      vi.advanceTimersByTime(CUTOVER_GATE_CACHE_TTL_MS - 1);
+      vi.advanceTimersByTime(ENGINE_GATE_CACHE_TTL_MS - 1);
       await repository.findOrganizationBindings({ organizationId: "org-1" });
       expect(grants.findOrganizationBindings).toHaveBeenCalledTimes(2);
       expect(legacy.findOrganizationBindings).not.toHaveBeenCalled();
@@ -297,8 +301,10 @@ describe("CutoverAwareAccessListingRepository", () => {
       const grantFindMany = vi.fn().mockResolvedValue([]);
       const roleBindingFindMany = vi.fn().mockResolvedValue([]);
       const prisma = {
-        authzCutoverProjection: {
-          findUnique: vi.fn().mockResolvedValue({ onEngine }),
+        systemMigrationTenantState: {
+          findUnique: vi
+            .fn()
+            .mockResolvedValue(onEngine ? { status: "finalized" } : null),
         },
         grant: { findMany: grantFindMany },
         roleBinding: { findMany: roleBindingFindMany },

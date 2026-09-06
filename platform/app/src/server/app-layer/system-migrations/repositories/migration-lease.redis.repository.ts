@@ -24,9 +24,10 @@ return 0
 `;
 
 /**
- * The fleet-wide single-driver lease on Redis. Fail-safe direction: no
- * Redis, or any Redis error, reads as "not acquired" - the pass simply does
- * not run on this boot, and the legacy paths keep answering.
+ * The runner's named leases on Redis - one claim per organization.
+ * Fail-safe direction: no Redis, or any Redis error, reads as "not
+ * acquired" - no organization is worked on this boot, and the legacy paths
+ * keep answering.
  */
 export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
   private readonly token = randomUUID();
@@ -51,10 +52,11 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
       );
       return result === "OK";
     } catch (error) {
-      // Standing down is right, but silence is not: the runner logs every
-      // falsy acquire as "another process holds the lease", so an unreachable
-      // Redis would read as ordinary contention and the migration would never
-      // run, on any boot, without a word anywhere.
+      // Standing down is right, but silence is not: the runner counts a
+      // falsy acquire as an organization claimed by another process, so an
+      // unreachable Redis would read as ordinary contention and no migration
+      // would ever run, on any boot. This warn is the evidence that it was
+      // an error, not contention.
       logger.warn(
         { error, name },
         "could not acquire the migration lease; treating it as held elsewhere",

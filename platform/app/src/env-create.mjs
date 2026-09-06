@@ -288,6 +288,54 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
+      // ADR-117 §7: the one flag covering the identifier-first router (D03)
+      // and the screens that render its decisions (D13). Three-valued and
+      // shipped `off`, because the front door is the highest-risk flip in the
+      // identity program: `shadow` computes the router's decision on every
+      // live login and logs how it compares against the legacy outcome
+      // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
+      // legacy path byte-for-byte untouched. Rollback is this value.
+      IDENTITY_ROUTER_V2: z
+        .enum(["off", "shadow", "enforce"])
+        .optional()
+        .default("off"),
+      // D06: whether two-step verification exists at all. Reached SIGNED
+      // OUT — a challenge stands between a password and a session — so it is
+      // an env flag rather than a feature flag, which is read per project
+      // and needs somebody already signed in to have a project.
+      //
+      // Off is byte-for-byte the old behaviour: the plugin is not registered,
+      // so none of its routes are mounted and nothing about two-step
+      // verification is reachable. Turning it back off leaves everybody who
+      // set one up signed in and their enrollment rows intact — it stops
+      // being ASKED for, and nothing is deleted.
+      MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether passkeys exist. Same reasoning — registering a passkey
+      // is reached signed out, on the sign-in screen. Off unmounts the
+      // ceremony routes and hides the option; passkeys already registered
+      // are left alone, so turning it on again finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
+      // and shipped `off` for the same reason the router's own flag is: the
+      // front door is the highest-risk flip in the identity program.
+      // `off` composes today's `Organization.ssoDomain` strings and nothing
+      // else. `shadow` still lets the strings decide, and runs the
+      // `SsoConnection` projection lookup alongside so disagreements are
+      // logged with both answers. `enforce` is the flip, and only at `enforce`
+      // do the string writes stop. Rollback is this value.
+      SSOCONN_ROUTING: z
+        .enum(["off", "shadow", "enforce"])
+        .optional()
+        .default("off"),
+      // D08: whether a SCIM push writes membership through the grants
+      // service. Two-valued, because there is no useful middle: `off` keeps
+      // the previous write path — the hand-written OrganizationUser row with
+      // its unconditional MEMBER role — and `on` routes every membership
+      // consequence, including a deprovision and its empty proof, through
+      // GrantsService. Connection scoping and the directory-sync history are
+      // on either way; what this decides is who writes the membership.
+      // Rollback is this value.
+      SCIM_V2_GRANTS: z.enum(["off", "on"]).optional().default("off"),
       // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
       // Counts dispatches (one digest of N traces = 1), not traces or
       // recipients. Only ever bites immediate-cadence triggers; digest
@@ -532,6 +580,18 @@ export function createEnvConfig() {
       ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
+      // Connected agents (ADR-128). The relay payload cap, in mebibytes, for
+      // self-hosted deployments whose turns carry large attachments; and the
+      // app replica count, which decides whether connected agents can run
+      // without Redis (one replica only). Empty strings read as unset.
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().positive().optional(),
+      ),
+      LANGWATCH_APP_REPLICAS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().default(1),
+      ),
 
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
@@ -605,6 +665,9 @@ export function createEnvConfig() {
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
       LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB:
+        process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
+      LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
@@ -613,6 +676,11 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
+      IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
+      MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
+      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
+      SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
+      SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,

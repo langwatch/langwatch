@@ -16,6 +16,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import { api } from "~/utils/api";
 
 import { createLangWatchQLExecute } from "../logic/lwqlExecute";
@@ -44,6 +45,10 @@ export interface UseLangWatchQLQuery {
   ) => void;
   /** Sets the period the next submission reports over, or clears it. */
   setTimeWindow: (timeWindow: LangWatchQLTimeWindowValues | undefined) => void;
+  /** Sets the step the next submission buckets at, or clears it. */
+  setGranularity: (
+    granularitySeconds: LangWatchQLGranularityStep | undefined,
+  ) => void;
   /** Submits the current draft. Ignored while a request is in flight. */
   runQuery: () => void;
   /** Re-sends the submitted snapshot, never the draft. */
@@ -98,6 +103,11 @@ export function useLangWatchQLQuery({
       controller.setTimeWindow(timeWindow),
     [controller],
   );
+  const setGranularity = useCallback(
+    (granularitySeconds: LangWatchQLGranularityStep | undefined) =>
+      controller.setGranularity(granularitySeconds),
+    [controller],
+  );
   const runQuery = useCallback(() => controller.runQuery(), [controller]);
   const reload = useCallback(() => controller.reload(), [controller]);
   const cancelQuery = useCallback(() => controller.cancel(), [controller]);
@@ -109,6 +119,7 @@ export function useLangWatchQLQuery({
     setSql,
     setParameters,
     setTimeWindow,
+    setGranularity,
     runQuery,
     reload,
     cancelQuery,

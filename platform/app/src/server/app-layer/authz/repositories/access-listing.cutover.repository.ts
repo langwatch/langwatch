@@ -31,7 +31,7 @@ import type {
   RoleBindingForSynthesis,
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { cutoverOnEngine } from "../cutover-gate";
+import { organizationOnAuthzEngine } from "../engine-gate";
 import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
 import { PrismaAccessListingRepository } from "./access-listing.prisma.repository";
 import type {
@@ -159,6 +159,6 @@ export class CutoverAwareAccessListingRepository
   }
 
   private async onEngine(organizationId: string): Promise<boolean> {
-    return cutoverOnEngine({ prisma: this.prisma, organizationId });
+    return organizationOnAuthzEngine({ prisma: this.prisma, organizationId });
   }
 }

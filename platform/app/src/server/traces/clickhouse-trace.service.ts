@@ -6,6 +6,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
+import { getApp } from "~/server/app-layer/app";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -17,7 +18,6 @@ import {
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
 import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
@@ -437,7 +437,7 @@ export class ClickHouseTraceService {
    * Resolve the ClickHouse client for a given project.
    *
    * The returned client is already wrapped with wrapWithDefaultSettings
-   * by getClickHouseClientForTenant, so every query automatically receives
+   * by the App's per-tenant resolver, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    *
    * @throws ClickHouseClientUnavailableError when no client resolves —
@@ -445,11 +445,11 @@ export class ClickHouseTraceService {
    *   configuration error, never a signal to fall back.
    */
   private async resolveClient(projectId: string): Promise<ClickHouseClient> {
-    const client = await getClickHouseClientForTenant(projectId);
-    if (!client) {
+    const { clickhouse } = getApp();
+    if (!clickhouse.enabled) {
       throw new ClickHouseClientUnavailableError(projectId);
     }
-    return client;
+    return clickhouse.resolveClient(projectId);
   }
 
   /**

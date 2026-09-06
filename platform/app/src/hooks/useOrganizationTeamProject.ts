@@ -1,7 +1,5 @@
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { isLegacyNavigationDevice } from "~/features/navigation/logic/resolveNavigationMode";
-import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -138,7 +136,7 @@ export function selectAmbientTeam<
     projects: unknown[];
     members?: { userId: string }[];
   },
->(teams: T[], userId?: string): T | undefined {
+>({ teams, userId }: { teams: T[]; userId?: string }): T | undefined {
   const byPreference = (candidates: T[]) =>
     candidates.find((team) => !team.isPersonal && team.projects.length > 0) ??
     candidates.find((team) => !team.isPersonal) ??
@@ -294,9 +292,6 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const [lastVisitedHomeKind, setLastVisitedHomeKind] = useLocalStorage<
-    "" | "project" | "personal"
-  >("lastVisitedHomeKind", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -362,14 +357,21 @@ export const useOrganizationTeamProject = (
       ? slugMatches.find((match) => userBelongsToTeam(match.team, userId))
       : undefined) ?? slugMatches[0];
 
+  // `/me` and its sub-routes ARE the personal workspace, which is the one
+  // place a project of the organization must never resolve unless the address
+  // bar names it. Read before the slug is resolved, so the whole chain below
+  // can hold the persisted selection to it.
+  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+
   // A slug that resolved off the persisted selection rather than off the URL
   // is stickiness, not intent: it survives from the last visit to
   // /[some-slug]/* into every organization-scoped page that carries no project
-  // of its own. Two kinds have to be dropped there. A personal workspace is a
-  // private context the caller never asked to work in, and a team the caller
-  // cannot be shown is one the chrome refuses outright. Both let the ambient
-  // resolution below pick again, which also re-persists what it picks so the
-  // stale selection heals itself.
+  // of its own. Three kinds have to be dropped there. A personal workspace is
+  // a private context the caller never asked to work in, a team the caller
+  // cannot be shown is one the chrome refuses outright, and any project at all
+  // is the wrong answer on the personal-workspace pages. All three let the
+  // ambient resolution below pick again, which also re-persists what it picks
+  // on the pages that write, so the stale selection heals itself.
   //
   // An organization admin passes the second test on their role, so the project
   // they picked in a team they hold no membership row in stays picked. Dropping
@@ -382,7 +384,8 @@ export const useOrganizationTeamProject = (
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
-    (!!slugMatch.team.isPersonal ||
+    (isPersonalScopeRoute ||
+      !!slugMatch.team.isPersonal ||
       !userCanOpenTeam({
         team: slugMatch.team,
         userId,
@@ -410,24 +413,21 @@ export const useOrganizationTeamProject = (
             ) ?? organizations.data[0])
           : undefined;
 
-  // `/me` and its sub-routes are the one place "no project slug in the URL"
-  // does NOT mean "organization-level work", it means the user's own
-  // personal workspace, the opposite of the ambient/shared team `selectAmbientTeam`
-  // exists to prefer. Checked BEFORE the localStorage-remembered-team lookup,
-  // not just added as a further fallback after it: a member who visited any
-  // organization-scoped page earlier in the session has a non-personal team
-  // id already persisted there, and that stale selection legitimately wins
-  // on THOSE pages (see the stickiness handling above) but must never win on
-  // /me itself, which is unambiguously about the personal workspace and
-  // cannot mean anything else. Left as a fallback-only check, that persisted
-  // selection matched before this was ever reached, and /me resolved to the
-  // shared team's first (or, if it holds no project yet, undefined) project,
-  // which then read every personal-scope feature (Langy chief among them) as
-  // running in a context that either belonged to someone else or did not
-  // exist. Gated on the same `/me` prefix DashboardLayout already uses for
-  // `isPersonalScopeRoute`, so every other caller (settings pages,
-  // project-slug pages, demo mode) is unaffected.
-  const isPersonalScopeRoute = router.pathname.startsWith("/me");
+  // The personal workspace itself, on the pages that are about it. Checked
+  // BEFORE the localStorage-remembered-team lookup, not just added as a
+  // further fallback after it: a member who visited any organization-scoped
+  // page earlier in the session has a non-personal team id already persisted
+  // there, and that stale selection legitimately wins on THOSE pages (see the
+  // stickiness handling above) but must never win on /me itself, which is
+  // unambiguously about the personal workspace and cannot mean anything else.
+  // Left as a fallback-only check, that persisted selection matched before
+  // this was ever reached, and /me resolved to the shared team's first (or, if
+  // it holds no project yet, undefined) project, which then read every
+  // personal-scope feature (Langy chief among them) as running in a context
+  // that either belonged to someone else or did not exist. Gated on the same
+  // `/me` prefix DashboardLayout already uses for `isPersonalScopeRoute`, so
+  // every other caller (settings pages, project-slug pages, demo mode) is
+  // unaffected.
   const ownPersonalTeam = isPersonalScopeRoute
     ? organization?.teams.find(
         (team) => team.isPersonal && team.ownerUserId === userId,
@@ -456,13 +456,14 @@ export const useOrganizationTeamProject = (
         t.projects.some(
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
-      ) ?? selectAmbientTeam(organization?.teams ?? [], userId)) // The team holding the demo project, else the ambient one
+      ) ?? selectAmbientTeam({ teams: organization?.teams ?? [], userId })) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : ownPersonalTeam
         ? ownPersonalTeam
         : organization
-          ? (rememberedTeam ?? selectAmbientTeam(organization.teams, userId))
+          ? (rememberedTeam ??
+            selectAmbientTeam({ teams: organization.teams, userId }))
           : undefined;
 
   // For demo mode, find the project with the demo slug
@@ -498,40 +499,26 @@ export const useOrganizationTeamProject = (
     if (organization && organization.id !== localStorageOrganizationId) {
       setLocalStorageOrganizationId(organization.id);
     }
-    if (team && team.id !== localStorageTeamId) {
-      setLocalStorageTeamId(team.id);
-    }
-    if (project && project.slug !== localStorageProjectSlug) {
-      setLocalStorageProjectSlug(project.slug);
-    }
-    // Visiting an actual /[project]/* page marks the implicit home preference
-    // as "project". Pairs with MyLayout's "personal" marker so the `/` index
-    // resolver can fall through to whichever home was visited last when the
-    // user has no explicit pin. Gate on the URL actually carrying a project
-    // slug: `project` also resolves from the persisted selectedProjectSlug on
-    // non-project routes (e.g. /me), and marking "project" there would clobber
-    // MyLayout's "personal" and wrongly bounce `/` back to the project.
-    // `projectSlugFromUrl` (not raw `router.query.project`) so reserved slugs
-    // like /messages or /datasets don't count as project visits either.
-    if (project && !!projectSlugFromUrl && lastVisitedHomeKind !== "project") {
-      // Guarded like the setters above: every unguarded write dispatches a
-      // storage event that setStates all mounted subscribers, which can cascade
-      // past React's nested-update limit during route transitions.
-      setLastVisitedHomeKind("project");
+    // The remembered selection answers "where was I working", which is a
+    // question about the organization's teams and projects. A personal
+    // workspace is not one of them: written here it replaced the project the
+    // reader had open, so the app root sent them to another team's project
+    // afterwards and the product switcher had no project to open LLM Ops
+    // with. The private context is resolved from the /me address every time,
+    // so it needs nothing remembered.
+    if (!team?.isPersonal) {
+      if (team && team.id !== localStorageTeamId) {
+        setLocalStorageTeamId(team.id);
+      }
+      if (project && project.slug !== localStorageProjectSlug) {
+        setLocalStorageProjectSlug(project.slug);
+      }
     }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo, organization, project, team, router.query.project]);
-
-  // Subscribed, not read once. The store holds the last flag answer this
-  // device saw, which is device-wide: a reader who leaves an organization
-  // with the new navigation on for one with it off starts as a v2 device
-  // and becomes a legacy one when the flag answers. The redirect effect
-  // below must run again on that answer, so it reads a subscribed value.
-  // Spec: specs/navigation/navigation-v2-landing.feature
-  const isLegacyNavigation = useNavigationModeStore(isLegacyNavigationDevice);
 
   useEffect(() => {
     if (
@@ -593,28 +580,10 @@ export const useOrganizationTeamProject = (
       return;
     }
 
-    const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
-      (team) => team.projects.length > 0,
-    );
-    if (
-      !hasTeamsWithProjectsOnCurrentOrg &&
-      teamsWithProjectsOnAnyOrg.length > 0 &&
-      // In the navigation-v2 modes the org switch and the landing resolver
-      // own cross-organization destinations; this teleport to another
-      // org's project would fight them mid-navigation.
-      // Spec: specs/navigation/navigation-v2-landing.feature
-      isLegacyNavigation
-    ) {
-      // Personal workspaces are never a valid project-home target — only
-      // redirect when a shared team's project exists (ADR-038 v6).
-      const availableProjectSlug = teamsWithProjectsOnAnyOrg.find(
-        (team) => !team.isPersonal,
-      )?.projects[0]?.slug;
-      if (availableProjectSlug) {
-        void router.push(`/${availableProjectSlug}`);
-        return;
-      }
-    }
+    // The org switch and the landing resolver own cross-organization
+    // destinations; a teleport to another org's project would fight them
+    // mid-navigation, so a member kept in an organization without projects
+    // stays put. Spec: specs/navigation/navigation-v2-landing.feature
 
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
@@ -641,7 +610,6 @@ export const useOrganizationTeamProject = (
     }
   }, [
     isDemo,
-    isLegacyNavigation,
     organization,
     organizations.data,
     finalProject,

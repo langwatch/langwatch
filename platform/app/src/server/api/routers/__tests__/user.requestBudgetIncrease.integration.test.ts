@@ -43,7 +43,10 @@ vi.mock("../../../mailer/emailSender", () => ({
   sendEmail: vi.fn(),
 }));
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { sendEmail } from "../../../mailer/emailSender";
+
+wireDefaultTestApp();
 
 describe("user.requestBudgetIncrease integration", () => {
   const ns = `bri-${nanoid(8)}`;

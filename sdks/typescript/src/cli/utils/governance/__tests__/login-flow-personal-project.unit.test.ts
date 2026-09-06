@@ -153,3 +153,69 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     );
   });
 });
+
+/**
+ * Feature: specs/typescript-sdk/cli-cross-project-access.feature
+ */
+describe("runUnifiedLoginFlow (device session) login-key persistence", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.LANGWATCH_BROWSER = "none";
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    delete process.env.LANGWATCH_BROWSER;
+    vi.restoreAllMocks();
+  });
+
+  describe("when the exchange carries a user-scoped key", () => {
+    it("stores the key and the scope it reaches", async () => {
+      pollUntilDone.mockResolvedValue(
+        exchangeResult({
+          cli_api_key: "sk-lw-lookup01_secret01",
+          cli_api_key_scope: { kind: "organization", project_ids: [] },
+        }),
+      );
+
+      const cfg = await runUnifiedLoginFlow({ kind: "device_session" });
+
+      expect(cfg.cli_api_key).toBe("sk-lw-lookup01_secret01");
+      expect(cfg.cli_api_key_scope).toEqual({
+        kind: "organization",
+        project_ids: [],
+      });
+      expect(saveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ cli_api_key: "sk-lw-lookup01_secret01" }),
+      );
+    });
+  });
+
+  describe("when the server predates the feature", () => {
+    it("leaves both fields unset", async () => {
+      pollUntilDone.mockResolvedValue(exchangeResult());
+
+      const cfg = await runUnifiedLoginFlow({ kind: "device_session" });
+
+      expect(cfg.cli_api_key).toBeUndefined();
+      expect(cfg.cli_api_key_scope).toBeUndefined();
+    });
+
+    it("clears the previous login's key rather than carrying it over", async () => {
+      // The stored key belongs to whoever logged in last. Kept, every command
+      // in the new session would authenticate as them.
+      vi.mocked(loadConfig).mockReturnValue({
+        control_plane_url: "https://app.langwatch.ai",
+        gateway_url: "https://gateway.langwatch.ai",
+        cli_api_key: "sk-lw-priorlookup01_secret01",
+        cli_api_key_scope: { kind: "organization", project_ids: [] },
+      } as never);
+      pollUntilDone.mockResolvedValue(exchangeResult());
+
+      const cfg = await runUnifiedLoginFlow({ kind: "device_session" });
+
+      expect(cfg.cli_api_key).toBeUndefined();
+      expect(cfg.cli_api_key_scope).toBeUndefined();
+    });
+  });
+});

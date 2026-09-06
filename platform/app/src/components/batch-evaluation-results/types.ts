@@ -7,6 +7,7 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { resolveVerdictLabel } from "~/experiments-v3/utils/normalizeComparison";
+import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 
 /**
@@ -84,6 +85,13 @@ export type BatchResultRow = {
 export type BatchTargetColumn = {
   id: string;
   name: string;
+  /**
+   * The name to show the reader. Two targets on one board can carry the
+   * identical stored `name`, so this adds the same "(1)" / "(2)" suffix the
+   * workbench adds, over the columns this run renders. Optional, so callers
+   * that build a column literal fall back to `name`.
+   */
+  displayName?: string;
   type: "prompt" | "agent" | "evaluator" | "custom" | "legacy";
   /** For prompts: the config ID */
   promptId?: string | null;
@@ -284,10 +292,47 @@ export const transformBatchEvaluationData = (
   );
 
   if (targets && targets.length > 0) {
-    // V3 style with explicit targets
-    targetColumns = targets.map((target) => ({
+    // V3 style with explicit targets.
+    //
+    // The run's Targets snapshot lists the whole board, so a run scoped to one
+    // column still declares its siblings. Render only the targets this run
+    // holds data for; a target with no rows shows an empty column with no
+    // output, no latency and no score. When the run holds data for none of
+    // them (it has just started, or its rows carry no target id), keep the
+    // declared list so the table is not empty.
+    const targetIdsWithData = new Set<string>();
+    for (const entry of dataset) {
+      if (entry.targetId) targetIdsWithData.add(entry.targetId);
+    }
+    for (const evaluation of evaluations) {
+      if (evaluation.targetId) targetIdsWithData.add(evaluation.targetId);
+      // A comparison wired as its own column-target hosts a verdict rather
+      // than an output, so it owns no dataset row. Its target id is the
+      // evaluator id.
+      targetIdsWithData.add(evaluation.evaluator);
+    }
+    const withData = targets.filter((target) =>
+      targetIdsWithData.has(target.id),
+    );
+    const runTargets = withData.length > 0 ? withData : targets;
+
+    // Number the whole declared board, not only the targets this run holds
+    // rows for. Compare mode merges columns by target id across runs, so a
+    // label worked out from one run's subset would move: the same target reads
+    // `classifier (2)` beside a sibling and plain `classifier` in a run that
+    // covers it alone.
+    const boardNames = disambiguateNames(targets.map((t) => t.name));
+    const displayNameById = new Map(
+      targets.map((target, index) => [
+        target.id,
+        boardNames[index] ?? target.name,
+      ]),
+    );
+
+    targetColumns = runTargets.map((target) => ({
       id: target.id,
       name: target.name,
+      displayName: displayNameById.get(target.id) ?? target.name,
       type:
         target.type === "custom"
           ? "custom"

@@ -54,6 +54,289 @@ Feature: Redacting secrets from traces
     When an admin tries to save a custom secret pattern that is a catastrophic-backtracking regex
     Then the request is rejected with a validation error
 
+  # Coverage beyond the known-vendor list.
+  #
+  # Redaction started as a fixed allow-list of well-known credential shapes.
+  # A customer report showed a live third-party key, pasted into a coding-agent
+  # prompt, surviving ingestion and rendering in the clear in the trace drawer,
+  # because that vendor's prefix was not on the list. An allow-list can never
+  # keep up with the long tail of vendors, so redaction also matches on shape
+  # (a vendor-style prefix followed by a high-entropy body) and on context (a
+  # credential named in the text and then given a value).
+  #
+  # The negative scenarios below are load-bearing, not decoration. Over-redaction
+  # is a bug of the same severity as a leak: the terminal replay and the trace
+  # explorer are worth nothing if the product's own output comes back as
+  # placeholders. Identifiers, hashes, timestamps and model names must survive.
+
+  @unit
+  Scenario: A key from a vendor with no built-in rule is redacted on shape alone
+    Given a coding-agent prompt containing an API key from a vendor nobody added to the list
+    When the text is redacted
+    Then the key is replaced with the redaction placeholder
+    And the rest of the sentence is preserved
+
+  @unit
+  Scenario: Widely used vendor credentials are redacted
+    When text containing credentials from commonly used developer services is redacted
+    Then each credential is replaced with the redaction placeholder
+
+  @unit
+  Scenario: A credential introduced by name in free text is redacted
+    Given a prompt that names a credential in prose and then gives its value
+    When the text is redacted
+    Then the value is replaced with the redaction placeholder
+    And the words introducing it stay readable
+
+  @unit
+  Scenario: Ordinary identifiers are never mistaken for secrets
+    Given text containing commit hashes, unique identifiers, trace identifiers, timestamps, file paths, model names, package versions and ordinary prose
+    When the text is redacted
+    Then nothing is replaced
+
+  @unit
+  Scenario: A placeholder standing in for a credential stays readable
+    Given documentation text where a credential is written as a placeholder or an environment variable reference
+    When the text is redacted
+    Then the placeholder is left as written
+
+  @unit
+  Scenario: One credential is reported as one leak
+    Given a prompt where a credential is both named in prose and recognisable by shape
+    When the text is scanned without redacting
+    Then a single leak is reported
+
+  @unit
+  Scenario: A large payload is scanned within the ingestion budget
+    Given a payload as large as the ingestion pipeline accepts
+    When the text is redacted
+    Then the scan completes well inside the ingestion budget
+
+  # A connection string is the one secret that is only partly secret. The
+  # password goes and the rest stays, because a reader needs to know which
+  # database the trace was talking to. Schemes are written in many shapes, and
+  # an address or a bare "://" in prose is not a connection string at all.
+
+  @unit
+  Scenario: A connection URL keeps its scheme whatever shape the scheme has
+    Given connection strings whose schemes carry digits, dots and plus signs
+    When the text is redacted
+    Then only the password is replaced and each scheme is kept
+
+  @unit
+  Scenario: Text that only looks like a connection URL is left alone
+    Given text with a "://" that no scheme introduces, and an address with an at sign
+    When the text is redacted
+    Then the text is unchanged
+
+  @unit
+  Scenario: A reported connection URL spans the whole URL
+    Given a connection string with a password in it
+    When the text is scanned without redacting
+    Then the reported leak covers the URL from its scheme onwards
+
+  # Text past the scan budget used to be returned untouched, which was a bypass
+  # rather than a budget: a real agent input of nearly a megabyte carried a live
+  # provider key through ingestion completely unscanned, and being oversized was
+  # a reliable way to smuggle one past redaction. It is sliced now, so the cost
+  # per pass stays bounded and no region goes unscanned.
+
+  @unit
+  Scenario: A credential straddling a slice boundary is still redacted
+    Given a payload larger than the scan budget with a credential on the boundary
+    When the text is redacted
+    Then the credential is replaced rather than split across two slices
+
+  @unit
+  Scenario: A PEM block straddling a slice boundary is still redacted
+    Given a payload larger than the scan budget with a PEM block on the boundary
+    When the text is redacted
+    Then the block is replaced whole
+
+  @unit
+  Scenario: A payload past the scan budget is still scanned
+    Given a payload larger than the scan budget with a credential inside it
+    When the text is redacted
+    Then the credential is replaced wherever in the payload it sits
+
+  # The other half of the same design flaw.
+  #
+  # When the built-in rules were narrow, teams wrote their own patterns to cover
+  # the gap, and a hand-written pattern was accepted exactly as typed. A pattern
+  # meaning "a key starting with sk-" also matches the middle of "task-", and a
+  # trailing wildcard runs to the end of the line, so ordinary transcript text
+  # was stored with the rest of the line replaced by a placeholder. That is
+  # irreversible: the original text is gone at ingestion.
+  #
+  # A custom pattern now matches only at a word boundary and stops at the first
+  # whitespace, quote, backtick or angle bracket. Both are what the author
+  # meant; neither weakens the pattern against the credential it was written
+  # for.
+
+  @unit
+  Scenario: A custom pattern does not fire inside an ordinary word
+    Given a custom pattern that matches tokens starting with "sk-"
+    When text containing the words "task-notification" and "risk-based" is redacted
+    Then the text still reads "task-notification" and "risk-based"
+
+  @unit
+  Scenario: A custom pattern does not swallow the rest of the line
+    Given a custom pattern that ends in a wildcard
+    When a line holding a credential followed by ordinary words is redacted
+    Then only the credential is replaced and the words after it survive
+
+  # Three shapes the matching layers missed. Our own `ik-lw-` ingest keys were
+  # covered by nothing at all and `sk-lw-` only once the body reached the
+  # generic rule's 20-character floor, so both are known prefixes now and match
+  # on the prefix plus three body characters rather than a full-length body. An
+  # all-hex body was refused by the character-mix gate, which is right for a
+  # bare hex run (a commit, a trace id and a digest are the same shape) and
+  # wrong when the token names itself a credential, so a hex body is accepted
+  # only behind a credential segment and never behind an identifier prefix. And the shape rule read lowercase
+  # prefixes only, which missed every vendor minting `LW_`-style keys; the
+  # entropy and character-mix gates are what keep a bare environment variable
+  # name readable.
+
+  @unit
+  Scenario: A key minted by LangWatch is redacted on its prefix
+    Given a token carrying one of the prefixes the app mints
+    When the text is redacted
+    Then the token is redacted without needing a full-length body
+
+  @unit
+  Scenario: A vendor-prefixed key with an all-hex body is redacted
+    Given a token whose prefix names it a credential and whose body is all hexadecimal
+    When the text is redacted
+    Then the token is redacted
+
+  @unit
+  Scenario: An identifier with an all-hex body is left alone
+    Given a commit or trace identifier with an all-hex body
+    When the text is redacted
+    Then the identifier is left as written
+
+  # A second pass over the vendor list, from a sweep of what real payloads
+  # carry. `vk-lw-` is ours and was reaching only the generic shape rule, so it
+  # survived on a short body. `PGP PRIVATE KEY BLOCK` broke the PEM anchor on
+  # its own suffix. The non-Bearer Authorization schemes are ordinary words, so
+  # they count only inside an actual Authorization header: a sentence containing
+  # "token" is not a credential.
+  #
+  # PostHog's `phc_` goes the other way. It is a client-side project key that
+  # ships in published web bundles by design, so it is deliberately NOT
+  # redacted; the shape rule had been catching it against the stated intent.
+
+  @unit
+  Scenario: Credentials the vendor list had missed are redacted
+    Given a credential carrying a vendor prefix, armour or authorization scheme the list had missed
+    When the text is redacted
+    Then the credential is replaced
+
+  @unit
+  Scenario: A key with a standard base64 body is redacted
+    Given a prefixed key whose body uses standard base64 rather than base64url
+    When the text is redacted
+    Then the key is redacted
+
+  @unit
+  Scenario: A key with an upper or mixed case prefix is redacted
+    Given a high-entropy token whose prefix is upper or mixed case
+    When the text is redacted
+    Then the token is redacted
+
+  @unit
+  Scenario: An environment variable name is not mistaken for a key
+    Given a bare environment variable name
+    When the text is redacted
+    Then the name is left as written
+
+  # The cue layer was blind twice over. It read attribute names on separators
+  # only, so every camelCase and PascalCase name was one opaque word and none of
+  # them fired, including AWS Secrets Manager's own `SecretString`. And it
+  # accepted only `:` and `=` as a separator, so `Authorization <token>` was
+  # missed. Whitespace is accepted now on a higher bar: the value has to look
+  # like key material in its own right, because accepting it on the same terms
+  # as `:` matched thousands of ordinary sentences.
+  #
+  # Bare `key` and `token` still need a qualifying word in front, so an
+  # `idempotency_key` and a count of `input_tokens` stay readable.
+
+  @unit
+  Scenario: A camelCase credential name is recognised
+    Given an attribute whose camelCase name says it holds a credential
+    When the name is checked
+    Then it is recognised as sensitive
+
+  @unit
+  Scenario: An ordinary name containing key or token is not a credential
+    Given an attribute named for an identifier or a count
+    When the name is checked
+    Then it is not treated as sensitive
+
+  @unit
+  Scenario: A credential after a whitespace separator is redacted
+    Given a credential word followed by key material with only a space between
+    When the text is redacted
+    Then the credential is replaced
+
+  @unit
+  Scenario: Prose following a credential word is left alone
+    Given an ordinary sentence containing a credential word
+    When the text is redacted
+    Then the sentence is left as written
+
+  # `key` names a map entry at least as often as a credential, and JSON
+  # payloads, OTLP attributes and config dictionaries are full of `key` fields
+  # holding ids and hashes. Treating the bare word as proof of a credential
+  # destroyed those values at ingestion, and destroyed them only there: the same
+  # id on its own was correctly kept.
+
+  @unit
+  Scenario: A bare key field holding an identifier is left alone
+    Given a map entry whose name is key and whose value is an identifier
+    When the text is redacted
+    Then the identifier is left as written
+
+  @unit
+  Scenario: A qualified key name is still a credential
+    Given a credential word qualifying key, followed by key material
+    When the text is redacted
+    Then the credential is replaced
+
+  # Span content arrives JSON-encoded, so a literal two-character escape sits
+  # inside the text. A value allowed to run through one crossed logical lines
+  # and slipped past the guards that recognise an environment reference.
+
+  @unit
+  Scenario: A JSON-escaped newline does not extend a credential value
+    Given a payload where a credential word is followed by an environment reference and an escaped newline
+    When the text is redacted
+    Then the environment reference is left as written
+
+  # Catching it at authorship as well as at match time. An over-broad secret
+  # pattern used to be waved through on the reasoning that it "only
+  # over-redacts", but redaction runs at ingestion and rewrites the text for
+  # good, so it is data loss. The same probe answers the settings page and the
+  # server, so the warning a customer reads is the behaviour they would get.
+
+  @unit
+  Scenario: A pattern that would match ordinary text is reported as too broad
+    Given a candidate custom pattern that matches ordinary prose
+    When the pattern is checked
+    Then it reports the ordinary text it would erase
+
+  @integration
+  Scenario: An over-broad custom secret pattern is rejected when saving the rule
+    When an admin tries to save a custom secret pattern that also matches ordinary text
+    Then the request is rejected with a validation error
+    And no rule is stored
+
+  @unit
+  Scenario: A custom pattern still redacts the credential it was written for
+    Given a custom pattern that matches tokens starting with "sk-"
+    When text containing a provider key is redacted
+    Then the key is redacted
+
   # "langwatch.api_key.id" carries the id of the ApiKey row that authenticated
   # the request, never the key material. The sensitive-attribute-NAME deny-list
   # matches "api_key" and was nuking it to [SECRET], hiding the one field that
@@ -96,3 +379,118 @@ Feature: Redacting secrets from traces
   Scenario: The receiver-written API key id survives the ingestion pipeline
     When the receiver has written ingest provenance onto a span's resource
     Then the API key id is still on the span the pipeline emits
+
+  # Everything above describes the span path. The log and metric pipelines
+  # flatten a decoded payload into one record keyed by a JSON path, because two
+  # attributes may share a name and each value still needs its own address. A
+  # path can never satisfy a rule written against an attribute NAME, so those
+  # rules never ran on those pipelines: a credential-named attribute was left to
+  # the value-shape rules, and a plain-text one survived them. The name travels
+  # beside the path now, which both closes that gap and makes the exemption
+  # apply on purpose rather than by accident.
+
+  @unit
+  Scenario: A credential-named log attribute is redacted by name
+    Given a log attribute named as a credential whose value is ordinary text
+    When the log record is redacted
+    Then the value is replaced
+
+  @unit
+  Scenario: The receiver-written API key id survives redaction on the log path
+    Given a log attribute holding the receiver-written API key id
+    When the log record is redacted
+    Then the key id is still readable
+
+  # Two value rules decide on shape alone: they ask only whether a token looks
+  # random. A record id is minted as `prefix_<random body>` and looks exactly
+  # that random, so a rule tuned for keys takes ids too. That is what happened:
+  # the rule read the prefix up to the FIRST separator, the record-id list held
+  # `scenario`, and the product mints `scenariorun_…`, so every simulation run
+  # id was replaced with a marker at ingestion. A customer report showed the
+  # cost: with the run id gone, a trace could not be attached to its run, and
+  # the pipeline attributed the cost to a run that did not exist. Redaction is
+  # irreversible at ingestion, so the ids on the spans already stored are gone.
+  #
+  # The fix reads the attribute NAME. A name that is `id`, or that ends in
+  # `_id` or `.id`, says the value is an identifier, and an identifier is an
+  # address rather than content: the pipeline compares it to the same value on
+  # another record to attach a trace to its run, its prompt, its conversation
+  # and its customer. So the two shape rules do not run on those values.
+  #
+  # Only those two. An exemption that turned the secrets pass off would trade
+  # one hole for a worse one, because a real key parked under a run id would
+  # then be stored in the clear. Every rule that reads a vendor namespace,
+  # armour, a URL password, an authorization scheme or a credential keyword
+  # still runs, so do the customer's own patterns, and so does the personal-data
+  # pass.
+  #
+  # The name rule reads the name and nothing else, so it does not widen to a
+  # namespace. `langwatch.input` and `langwatch.output` carry the chat content
+  # itself and keep every rule.
+  #
+  # KNOWN LIMIT. An id in FREE TEXT, in a message body or an error string, is
+  # still replaced when its body carries 26 or more high-entropy characters.
+  # That is cosmetic: nothing in the pipeline reads an id out of free text, so
+  # trace linking is unaffected.
+
+  @unit
+  Scenario: An identifier attribute keeps the id it holds
+    Given a span attribute whose name ends in "_id" or ".id"
+    And the value is an id the product minted
+    When the attribute is redacted with secrets redaction on
+    Then the stored attribute still holds the id
+
+  @unit
+  Scenario: The shape rules still run on an attribute that is not an identifier
+    Given a span attribute holding the chat content
+    And the value is a token only the shape rules can match
+    When the attribute is redacted
+    Then the value is replaced
+
+  @unit
+  Scenario: A credential under an identifier attribute is still redacted
+    Given an identifier attribute holding a real vendor credential
+    When the attribute is redacted
+    Then the credential is replaced
+
+  @unit
+  Scenario: A custom secret pattern still runs on an identifier attribute
+    Given a rule that adds a custom secret pattern
+    When an identifier attribute holds a value that pattern matches
+    Then the value is replaced
+
+  @unit
+  Scenario: The identifier of a credential keeps its value while the credential does not
+    Given an attribute named for the identifier of a credential
+    When the attribute is redacted
+    Then the row id is still readable
+    And an attribute named for the credential itself is replaced by name
+
+  @unit
+  Scenario: A name that only resembles an identifier name keeps the shape rules
+    Given an attribute whose name adds a segment after the identifier ending
+    When the attribute is redacted
+    Then the value is treated as ordinary content
+
+  @unit
+  Scenario: An identifier attribute still runs the personal data pass
+    Given an identifier attribute whose value is an email address
+    When the attribute is redacted
+    Then the email address is replaced
+
+  # A handle and a version number are not identifier names, and they do not need
+  # to be. A handle accepts lowercase letters, digits, hyphens, underscores and
+  # one slash, and the shape rule needs two uppercase characters before it
+  # fires. The legacy handle form carries a body under the rule's length floor,
+  # and a version number is digits.
+
+  @unit
+  Scenario: A prompt handle and a version number survive redaction
+    Given a prompt attribute holding a handle or a version number
+    When the attribute is redacted
+    Then the value is left exactly as written
+
+  @integration
+  Scenario: A simulation trace keeps the run id that links it to its run
+    When a trace is ingested with a span attribute "scenario.run_id"
+    Then the stored span still carries the run id

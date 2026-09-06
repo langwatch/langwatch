@@ -51,6 +51,12 @@ import {
   VirtualKeyNotFoundError,
 } from "./errors";
 import { identityPatchData, type ResourceMetadata } from "./resourceMetadata";
+import {
+  type BudgetScopeTargetInfo,
+  resolveScopeTargetsBatch,
+  scopeTargetKey,
+} from "./scopeTargets";
+import { organizationSpendTenantIds } from "./spendTenants";
 import { usdToNanoUsd } from "./wireMoney";
 import { keysetAfter } from "./wirePagination";
 
@@ -166,40 +172,6 @@ export type ArchiveBudgetInput = {
   actorUserId: string;
 };
 
-export type BudgetScopeTarget =
-  | {
-      kind: "ORGANIZATION";
-      id: string;
-      name: string;
-      secondary: string | null;
-    }
-  | { kind: "TEAM"; id: string; name: string; secondary: string | null }
-  | { kind: "PROJECT"; id: string; name: string; secondary: string | null }
-  | {
-      kind: "VIRTUAL_KEY";
-      id: string;
-      name: string;
-      secondary: string | null;
-      projectSlug: string | null;
-    }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
-  | {
-      kind: "ATTRIBUTED_USER";
-      id: string;
-      name: string;
-      secondary: string | null;
-      /** Whether the template anchors a virtual key or a project. */
-      anchorKind: "virtual_key" | "project";
-    }
-  | {
-      kind: "GROUP";
-      id: string;
-      name: string;
-      secondary: string | null;
-      /** Members the per-member allowance currently applies to. */
-      memberCount: number;
-    };
-
 export type BudgetLedgerLine = {
   id: string;
   virtualKeyId: string;
@@ -213,7 +185,7 @@ export type BudgetLedgerLine = {
 
 export type BudgetDetail = {
   budget: GatewayBudgetWithSeats;
-  scopeTarget: BudgetScopeTarget;
+  scopeTarget: BudgetScopeTargetInfo;
   recentLedger: Array<{
     id: string;
     virtualKeyId: string;
@@ -378,17 +350,16 @@ export class GatewayBudgetService {
     }
     if (!this.chRepo) return { budgets, spendAvailable: false, readAt: now };
 
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
-      select: { id: true },
-    });
+    const tenantIds = await organizationSpendTenantIds(
+      this.prisma,
+      organizationId,
+    );
     // No project means nothing has ever been able to emit a ledger row, so
     // zero is the true total rather than a missing one.
-    if (projects.length === 0) {
+    if (tenantIds.length === 0) {
       return { budgets, spendAvailable: true, readAt: now };
     }
 
-    const tenantIds = projects.map((p) => p.id);
     const boundariesByBudget = await this.bucketBoundaries(
       budgets,
       organizationId,
@@ -671,7 +642,21 @@ export class GatewayBudgetService {
       await this.decorateWithHealth([row], organizationId);
     const budget = budgets[0] ?? row;
 
-    const scopeTarget = await this.resolveScopeTarget(budget);
+    const targets = await resolveScopeTargetsBatch(
+      this.prisma,
+      [budget],
+      organizationId,
+    );
+    // Scope FKs are ON DELETE CASCADE, but a stale row must not blank
+    // the page: fall back to the raw scopeId as the display name.
+    const scopeTarget: BudgetScopeTargetInfo = targets.get(
+      scopeTargetKey(budget.scopeType, budget.scopeId),
+    ) ?? {
+      kind: budget.scopeType,
+      id: budget.scopeId,
+      name: budget.scopeId,
+      secondary: null,
+    };
 
     // Recent ledger entries come from ClickHouse
     // (gateway_budget_ledger_events). The CH events table doesn't carry
@@ -679,10 +664,19 @@ export class GatewayBudgetService {
     // single Prisma round-trip on the distinct VK ids in the slice.
     let recentLedger: BudgetDetail["recentLedger"] = [];
     if (this.chRepo) {
-      const tenantId = await this.resolveTenantIdForBudget(budget);
-      const events = tenantId
-        ? await this.chRepo.recentEventsForBudget(tenantId, budget.id, 20)
-        : [];
+      // The ledger is sharded on TenantId = the project the trace landed
+      // in, and org/team/principal/group budgets accrue rows across
+      // every project in the org, so the read fans out over the same
+      // tenant set the utilization read uses. The BudgetId filter keeps
+      // narrower scopes exact.
+      const tenantIds = await organizationSpendTenantIds(
+        this.prisma,
+        organizationId,
+      );
+      const events =
+        tenantIds.length > 0
+          ? await this.chRepo.recentEventsForBudget(tenantIds, budget.id, 20)
+          : [];
       const vkIds = Array.from(new Set(events.map((e) => e.virtualKeyId)));
       const vks = vkIds.length
         ? await this.prisma.virtualKey.findMany({
@@ -714,175 +708,6 @@ export class GatewayBudgetService {
       spendAvailable,
       unreachableByAnyKey: scopeReach.get(budget.id)?.reachable === false,
     };
-  }
-
-  /**
-   * Resolve the projectId that the ClickHouse client should be scoped to
-   * when reading ledger events for `budget`. Tenant resolution mirrors the
-   * debits process: the events table is sharded on
-   * `TenantId = projectId` so only org/team/project/VK-scoped budgets
-   * have a meaningful tenant; principal-scoped budgets cross projects
-   * and we return null (no ledger lookup).
-   */
-  private async resolveTenantIdForBudget(
-    budget: GatewayBudget,
-  ): Promise<string | null> {
-    switch (budget.scopeType) {
-      case "PROJECT":
-        return budget.scopeId;
-      case "VIRTUAL_KEY": {
-        // Post-collapse: VK no longer has a single projectId. Pick the
-        // first PROJECT-scope row; org-scoped VKs without a project
-        // scope have no single tenant (returns null → empty panel,
-        // same shape as ORG/TEAM-scoped budgets).
-        const scope = await this.prisma.virtualKeyScope.findFirst({
-          where: { virtualKeyId: budget.scopeId, scopeType: "PROJECT" },
-          select: { scopeId: true },
-          orderBy: { createdAt: "asc" },
-        });
-        return scope?.scopeId ?? null;
-      }
-      case "ORGANIZATION":
-      case "TEAM":
-        // Org/team budgets span multiple projects → no single CH tenant
-        // to query. Recent-ledger panel is empty for these scopes until a
-        // future iteration teaches the repo to fan out across projects.
-        return null;
-      case "PRINCIPAL":
-      case "GROUP":
-        // Principal and per-member group buckets span every project
-        // the person works in, so there is no single CH tenant to read
-        // their recent ledger from.
-        return null;
-      case "ATTRIBUTED_USER":
-        // Per-user buckets accrue wherever the anchor's traffic lands;
-        // no single tenant, same as GROUP.
-        return null;
-    }
-  }
-
-  private async resolveScopeTarget(
-    budget: GatewayBudget,
-  ): Promise<BudgetScopeTarget> {
-    switch (budget.scopeType) {
-      case "ORGANIZATION": {
-        const org = await this.prisma.organization.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, slug: true },
-        });
-        return {
-          kind: "ORGANIZATION",
-          id: budget.scopeId,
-          name: org?.name ?? budget.scopeId,
-          secondary: org?.slug ?? null,
-        };
-      }
-      case "TEAM": {
-        const team = await this.prisma.team.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, slug: true },
-        });
-        return {
-          kind: "TEAM",
-          id: budget.scopeId,
-          name: team?.name ?? budget.scopeId,
-          secondary: team?.slug ?? null,
-        };
-      }
-      case "PROJECT": {
-        const project = await this.prisma.project.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, slug: true },
-        });
-        return {
-          kind: "PROJECT",
-          id: budget.scopeId,
-          name: project?.name ?? budget.scopeId,
-          secondary: project?.slug ?? null,
-        };
-      }
-      case "VIRTUAL_KEY": {
-        const vk = await this.prisma.virtualKey.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, displayPrefix: true },
-        });
-        const projectScope = await this.prisma.virtualKeyScope.findFirst({
-          where: { virtualKeyId: budget.scopeId, scopeType: "PROJECT" },
-          select: { scopeId: true },
-          orderBy: { createdAt: "asc" },
-        });
-        const project = projectScope
-          ? await this.prisma.project.findUnique({
-              where: { id: projectScope.scopeId },
-              select: { slug: true },
-            })
-          : null;
-        return {
-          kind: "VIRTUAL_KEY",
-          id: budget.scopeId,
-          name: vk?.name ?? budget.scopeId,
-          secondary: vk?.displayPrefix ? `${vk.displayPrefix}…` : null,
-          projectSlug: project?.slug ?? null,
-        };
-      }
-      case "PRINCIPAL": {
-        const user = await this.prisma.user.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, email: true },
-        });
-        return {
-          kind: "PRINCIPAL",
-          id: budget.scopeId,
-          name: user?.name ?? user?.email ?? budget.scopeId,
-          secondary: user?.email ?? null,
-        };
-      }
-      case "GROUP": {
-        const group = await this.prisma.group.findUnique({
-          where: { id: budget.scopeId },
-          select: {
-            name: true,
-            slug: true,
-            _count: { select: { members: true } },
-          },
-        });
-        return {
-          kind: "GROUP",
-          id: budget.scopeId,
-          name: group?.name ?? budget.scopeId,
-          secondary: group?.slug ?? null,
-          memberCount: group?._count.members ?? 0,
-        };
-      }
-      case "ATTRIBUTED_USER": {
-        // The anchor is a virtual key or a project; resolve whichever the
-        // id turns out to be so the UI can render "every end user on X".
-        const vk = await this.prisma.virtualKey.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, displayPrefix: true },
-        });
-        if (vk) {
-          return {
-            kind: "ATTRIBUTED_USER",
-            id: budget.scopeId,
-            name: vk.name,
-            secondary: vk.displayPrefix,
-            anchorKind: "virtual_key",
-          };
-        }
-        const project = await this.prisma.project.findUnique({
-          where: { id: budget.scopeId },
-          select: { name: true, slug: true },
-        });
-        return {
-          kind: "ATTRIBUTED_USER",
-          id: budget.scopeId,
-          name: project?.name ?? budget.scopeId,
-          secondary: project?.slug ?? null,
-          anchorKind: "project",
-        };
-      }
-    }
   }
 
   /**
@@ -1445,11 +1270,10 @@ export class GatewayBudgetService {
     // trace project. Mirrors the materialiser's `loadCurrentSpend`.
     const chSpendByBudgetId = this.chRepo
       ? await (async () => {
-          const orgProjects = await this.prisma.project.findMany({
-            where: { team: { organizationId: input.organizationId } },
-            select: { id: true },
-          });
-          const tenantIds = orgProjects.map((p) => p.id);
+          const tenantIds = await organizationSpendTenantIds(
+            this.prisma,
+            input.organizationId,
+          );
           if (tenantIds.length === 0) return new Map<string, string>();
           const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
             tenantIds,

@@ -492,7 +492,12 @@ export class VirtualKeyService {
               tx,
             );
           } else {
-            await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+            await this.archiveKeyBudgets({
+              vk,
+              actorUserId: input.actorUserId,
+              tx,
+              include: "drawerManaged",
+            });
           }
         }
 
@@ -628,7 +633,12 @@ export class VirtualKeyService {
         // cost us before we killed it" needs the budget row to read them
         // against. Archiving also stops the budget from showing up as an
         // active control that nothing can ever spend against.
-        await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+        await this.archiveKeyBudgets({
+          vk,
+          actorUserId: input.actorUserId,
+          tx,
+          include: "scopedToKey",
+        });
         await this.changeEvents.append(
           {
             organizationId: input.organizationId,
@@ -891,22 +901,59 @@ export class VirtualKeyService {
   }
 
   /**
-   * Archive the drawer-managed budget of this key, and only that one.
-   * Budgets created independently on the Budgets page also target the
-   * key, but their lifecycle carries its own permission
-   * (gatewayBudgets:delete); archiving them from a key update would let
-   * virtualKeys:update silently remove an admin's enforcement control.
+   * Archive the budgets a key's lifecycle carries, which is a different set
+   * depending on what just happened to the key.
+   *
+   * `drawerManaged` is the key still being alive: the drawer's budget field
+   * was cleared, so that one row goes and nothing else does. Budgets created
+   * independently on the Budgets page also target the key, but their
+   * lifecycle carries its own permission (gatewayBudgets:delete); archiving
+   * them from a key update would let virtualKeys:update silently remove an
+   * admin's enforcement control.
+   *
+   * `scopedToKey` is the key being dead. REVOKED is terminal, so a budget
+   * whose scope is this key and nothing else can never count spend or refuse
+   * a request again, whoever created it. Leaving it active does not preserve
+   * an enforcement control, because there is nothing left to enforce against;
+   * it just leaves a row that reads as a live cap and shows up on the budgets
+   * list warning that no key sends traffic to it. The permission argument
+   * above does not carry over, because nothing is being taken away.
+   *
+   * Both cases archive rather than delete, so the ledger rows stay readable
+   * against the cap they accrued under.
    */
-  private async archiveKeyBudgets(
-    vk: VirtualKey,
-    actorUserId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<void> {
+  private async archiveKeyBudgets({
+    vk,
+    actorUserId,
+    tx,
+    include,
+  }: {
+    vk: VirtualKey;
+    actorUserId: string;
+    tx: Prisma.TransactionClient;
+    include: "drawerManaged" | "scopedToKey";
+  }): Promise<void> {
     const budgets = await tx.gatewayBudget.findMany({
       where: {
         organizationId: vk.organizationId,
-        managedByVirtualKeyId: vk.id,
         archivedAt: null,
+        ...(include === "drawerManaged"
+          ? { managedByVirtualKeyId: vk.id }
+          : {
+              OR: [
+                { managedByVirtualKeyId: vk.id },
+                // Scoped to this key and nothing else. ATTRIBUTED_USER counts
+                // when the key is its anchor: the per-end-user allowance hangs
+                // off the key's traffic, so a dead key means a template that
+                // can never open another bucket. The same scope type anchored
+                // on a project is untouched, and so is every PROJECT, TEAM or
+                // ORGANIZATION budget, because those outlive any one key.
+                {
+                  scopeType: { in: ["VIRTUAL_KEY", "ATTRIBUTED_USER"] },
+                  scopeId: vk.id,
+                },
+              ],
+            }),
       },
     });
     for (const budget of budgets) {

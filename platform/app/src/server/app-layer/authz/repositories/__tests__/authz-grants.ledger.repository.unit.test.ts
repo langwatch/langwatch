@@ -13,7 +13,8 @@
  * POSTCONDITION rather than a shape, so what it enumerates and what it proves
  * against are the two things worth pinning.
  */
-import type { AuthzReadRepository, LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
+import type { AuthzReadRepository } from "@langwatch/authz-server";
 import {
   BindingMissingError,
   DuplicateBindingError,
@@ -395,11 +396,16 @@ describe("given a member being offboarded", () => {
         prove: async () => undefined,
       });
 
+      // `revokedAt: null` is the postcondition, not decoration: a revoke
+      // MARKS its row, so without the fence this counts the very rows the
+      // revocation just ended and every departing member who held a grant
+      // fails their own offboarding.
       expect(tx.grant.count).toHaveBeenCalledWith({
         where: {
           organizationId: OFFBOARD_ORG_ID,
           principalType: "USER",
           principalId: OFFBOARD_USER_ID,
+          revokedAt: null,
         },
       });
       expect(tx.roleBinding.count).toHaveBeenCalledWith({

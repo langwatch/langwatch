@@ -59,10 +59,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission: vi.fn().mockImplementation(() => {
-      return async ({ ctx, next }: any) =>
-        next({ ctx: { ...ctx, permissionChecked: true } });
-    }),
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
@@ -74,7 +73,10 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { lwqlRouter } from "../analytics/lwql";
+
+wireDefaultTestApp();
 
 const mockPrismaClient = {
   project: {

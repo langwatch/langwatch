@@ -65,7 +65,9 @@ import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -73,7 +75,6 @@ import {
   triggerFiltersSchema,
 } from "../../filters/types";
 import { rateLimit } from "../../rateLimit";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
@@ -291,7 +292,7 @@ export const automationRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(checkProjectPermission("triggers:create"))
+    .permission("triggers:create")
     .mutation(async ({ ctx, input }) => {
       // This legacy mutation cannot carry the validated/encrypted webhook
       // destination shape. Never let a direct caller create a malformed or
@@ -379,7 +380,7 @@ export const automationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
-    .use(checkProjectPermission("triggers:delete"))
+    .permission("triggers:delete")
     .mutation(async ({ input }) => {
       await getApp().triggers.softDeleteById({
         triggerId: input.triggerId,
@@ -399,7 +400,7 @@ export const automationRouter = createTRPCRouter({
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const triggers = await getApp().triggers.getAllForProject({
         projectId: input.projectId,
@@ -474,7 +475,7 @@ export const automationRouter = createTRPCRouter({
    */
   getDailyCap: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input }) => ({
       cap: await resolvePersistDailyCap(input.projectId),
     })),
@@ -493,7 +494,7 @@ export const automationRouter = createTRPCRouter({
    */
   getDailyCapStatus: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const cap = await resolvePersistDailyCap(input.projectId);
       const triggers = await ctx.prisma.trigger.findMany({
@@ -510,7 +511,7 @@ export const automationRouter = createTRPCRouter({
     }),
   getTriggerStats: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllFireStatsForProject({
@@ -525,7 +526,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(20).default(20),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllRecentFiresForTrigger({
@@ -545,7 +546,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(50).default(50),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const deliveries = WebhookDeliveryService.create(ctx.prisma);
       return deliveries.getRecentByTrigger({
@@ -562,7 +563,7 @@ export const automationRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(100),
       }),
     )
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
       return fireHistory.getAllRecentFiresForProject({
@@ -577,7 +578,7 @@ export const automationRouter = createTRPCRouter({
    */
   getReportSchedules: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input }) => {
       return getApp().triggers.getReportSchedules({
         projectId: input.projectId,
@@ -591,7 +592,7 @@ export const automationRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ input }) => {
       const existing = await getApp().triggers.getById({
         triggerId: input.triggerId,
@@ -656,7 +657,7 @@ export const automationRouter = createTRPCRouter({
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("triggers:view"))
+    .permission("triggers:view")
     .query(async ({ input }) => {
       const trigger = await getApp().triggers.getById({
         triggerId: input.triggerId,
@@ -684,7 +685,7 @@ export const automationRouter = createTRPCRouter({
     )
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ input }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {
@@ -708,7 +709,7 @@ export const automationRouter = createTRPCRouter({
         filters: triggerFiltersPermissiveSchema,
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       const { sanitized, unknownFields } = sanitizeTriggerFilters(
         input.filters,
@@ -823,7 +824,7 @@ export const automationRouter = createTRPCRouter({
           .default(null),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       // ADR-031: test fire is no longer an open relay. The client-supplied
       // recipient list is gone from the input entirely — there is nothing to
@@ -840,7 +841,15 @@ export const automationRouter = createTRPCRouter({
         if (input.channel === "webhook") {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            {
+              distinctId: ctx.session.user.id,
+              projectId: input.projectId,
+              // The drawer reads the same flag with both ids, so the route
+              // resolves the organization too. Without it an organization
+              // rollout would open the picker and the route would refuse it.
+              organizationId:
+                (await resolveOrganizationId(input.projectId)) ?? NOT_TARGETED,
+            },
           );
           if (!allowed) {
             throw new TRPCError({
@@ -1014,7 +1023,7 @@ export const automationRouter = createTRPCRouter({
         traceDebounceMs: traceDebounceMsSchema.optional(),
       }),
     )
-    .use(checkProjectPermission("triggers:update"))
+    .permission("triggers:update")
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
       const isReport = !isGraphAlert && !!input.report;
@@ -1026,7 +1035,15 @@ export const automationRouter = createTRPCRouter({
         if (input.action === TriggerAction.SEND_WEBHOOK) {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            {
+              distinctId: ctx.session.user.id,
+              projectId: input.projectId,
+              // The drawer reads the same flag with both ids, so the route
+              // resolves the organization too. Without it an organization
+              // rollout would open the picker and the route would refuse it.
+              organizationId:
+                (await resolveOrganizationId(input.projectId)) ?? NOT_TARGETED,
+            },
           );
           if (!allowed) {
             throw new TRPCError({

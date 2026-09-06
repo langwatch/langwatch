@@ -19,7 +19,7 @@ Feature: Unified authorization engine
   # See ADR-092 "Grant semantics" for why. That file's premise sentence -
   # "The most specific scope always wins" - is superseded by the same
   # decision and gets rewritten with those scenarios in the contract PR
-  # (the delivery plan's PR 4), not before: until then it still describes
+  # (the delivery plan's PR 6, the contract), not before: until then it still describes
   # the resolver in production for not-yet-cut-over organizations.
   #
   # Also superseded: fetch-org-role-permission-resolution.feature's "Demo
@@ -161,7 +161,7 @@ Feature: Unified authorization engine
   # routes and their build-time enumeration. What is left unbound is the
   # tRPC stack, which has no equivalent sweep yet - stage D adds one, and
   # Gate D is the two stacks answering to the same rule with no allowlist.
-  @unimplemented
+  @unit
   Scenario: Every tRPC procedure declares its access decision or an explicit reason not to
     When the tRPC surface is enumerated at build time
     Then every procedure either declares a permission
@@ -303,12 +303,8 @@ Feature: Unified authorization engine
     Then the check is granted on the engine's answer
     And the answer does not wait for the legacy resolver
 
-  @unit
-  Scenario: Legacy runs behind the engine as the reverse-shadow comparison
-    Given "acme" has been cut over to the engine
-    When a check runs that the legacy resolver would have answered differently
-    Then the disagreement is logged as a warning naming the engine as primary
-    And the answer the caller received is unaffected
+  # The reverse-shadow comparison retired with the fork: the engine is the
+  # only resolver, so there is no legacy answer left to compare against.
 
   @unit
   Scenario: An organization that has not cut over is unchanged
@@ -323,6 +319,13 @@ Feature: Unified authorization engine
     When "acme" is rolled back onto the legacy path
     Then checks in "acme" stop consulting the engine within the gate's cache window
     And nothing is deployed or restarted for that to hold
+
+  @unit
+  Scenario: A failed migration-state read is reported
+    Given the gate cannot read an organization's migration state
+    When a check runs for that organization
+    Then the answer falls back to the legacy path for the cache window
+    And the failure is reported with the organization and the window it reopened
 
   @unit
   Scenario: A cut-over organization's checks read the ledger's own head

@@ -11,28 +11,42 @@ import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
 } from "~/server/app-layer/langy/errors";
-import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type {
   ConversationDetail,
   ConversationListItem,
 } from "~/server/app-layer/langy/langy-conversation.service";
+import { ADOPTABLE_CONVERSATION_ID } from "~/server/app-layer/langy/langy-conversation.service";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
+import { canModelSkipPermissions } from "~/server/app-layer/langy/langySkipPermissions";
 import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import {
-  createLangyTokenBuffer,
-  type LangyStreamEntry,
-} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import type { TurnHealth } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import { streamTurnEntries } from "~/server/app-layer/langy/streaming/langyTurnTail";
+import {
+  LangyUiActionService,
+  type UiActionRedis,
+} from "~/server/app-layer/langy/ui-actions/ui-action.service";
 import type { Session } from "~/server/auth";
-import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import { prisma } from "~/server/db";
+import { toControlRequestWire } from "~/server/langy-local-control/control-request.service";
+import {
+  LangyLocalSkipModelNotAllowedError,
+  LangyWaitExpiredError,
+} from "~/server/langy-local-control/errors";
+import { workspaceChannel } from "~/server/langy-local-control/keys";
+import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
+import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
+import {
+  checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
+} from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -67,7 +81,7 @@ const logger = createLogger("langwatch:langy:router");
 /**
  * Builds a Langy procedure gated on one `langy:*` permission, with three
  * gates in order:
- *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *  1. `.permission(permission)` — may the caller do THIS to the
  *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
  *     because it provisions credentials, spawns a worker and spends the
  *     project's model budget — not something a read grant should buy.
@@ -78,15 +92,17 @@ const logger = createLogger("langwatch:langy:router");
  *     the `langyEgress` router uses. Last, so membership is always proven
  *     before the flag is read.
  *
- * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * The permission declaration comes before any `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyProcedure = (permission: Permission) =>
+const langyProcedure = (
+  permission: "langy:view" | "langy:create" | "langy:update" | "langy:delete",
+) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
@@ -129,14 +145,35 @@ const langyTurnMessageSchema = z.object({
 /**
  * Per-send model override from the sidebar picker. Shape-validated here;
  * the value is checked against the project's Langy VK allowlist in the service.
+ *
+ * The provider segment ends at the FIRST slash; the model half may contain
+ * slashes and colons of its own, because custom OpenAI-compatible providers
+ * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
+ * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);
+
+/**
+ * A caller-chosen conversation id the create path may ADOPT, the same shape
+ * gate the app layer enforces (`ADOPTABLE_CONVERSATION_ID`), applied at the
+ * wire so a malformed id fails validation instead of reaching the aggregate.
+ */
+const adoptableConversationIdSchema = z
+  .string()
+  .regex(
+    ADOPTABLE_CONVERSATION_ID,
+    "conversationId must be 6-120 characters from [A-Za-z0-9_-]",
+  );
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const langyTurnInputShape = {
@@ -219,69 +256,109 @@ async function canWatchTurn({
   return !!conv;
 }
 
-/** How often the settlement watcher consults the durable fold + heartbeat. */
-const SETTLEMENT_POLL_MS = 5_000;
+/** The claim/complete side of the UI-action channel, on the shared app deps. */
 /**
- * Consecutive settled reads required before synthesizing a terminal, so a single
- * projection blip can never end a live stream.
+ * The conversation, when it is this caller's to act on.
+ *
+ * A conversation the caller cannot see dies as not-found rather than as a
+ * refusal, exactly like every other Langy read, so an id never confirms that
+ * it exists.
  */
-const SETTLEMENT_CONFIRM_POLLS = 2;
+async function requireOwnConversation({
+  projectId,
+  conversationId,
+  userId,
+}: {
+  projectId: string;
+  conversationId: string;
+  userId: string;
+}): Promise<ConversationDetail> {
+  const conversation = await getApp().langy.conversations.findByIdVisible({
+    id: conversationId,
+    projectId,
+    userId,
+  });
+  if (!conversation) throw new LangyConversationNotFoundError(conversationId);
+  return conversation;
+}
 
 /**
- * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
- * tailed, and resolve to the terminal entry the buffer never received — or null
- * if the stream ended first (aborted) or the turn never settled.
+ * The card, when it belongs to a conversation this caller can act on.
  *
- * Split out of `onTurnStream` so the subscription body stays at the orchestration
- * level and this confirmation loop is independently testable. The safety gate
- * itself lives in {@link decideSyntheticTerminal}.
+ * The wait record names its own conversation and project, so answering a card
+ * with an id from another chat refuses before the answer reaches the folder.
  */
-async function watchForMissedTerminal({
+async function requireOwnWait({
+  projectId,
+  conversationId,
+  userId,
+  waitId,
+}: {
+  projectId: string;
+  conversationId: string;
+  userId: string;
+  waitId: string;
+}): Promise<void> {
+  await requireOwnConversation({ projectId, conversationId, userId });
+  const wait = await getLocalControlRuntime().waits.read(waitId);
+  if (
+    !wait ||
+    wait.projectId !== projectId ||
+    wait.conversationId !== conversationId
+  ) {
+    throw new LangyWaitExpiredError({ waitId });
+  }
+}
+
+function createUiActionService(): LangyUiActionService {
+  const redis = getApp().redis as unknown as UiActionRedis;
+  return new LangyUiActionService({
+    redis,
+    conversations: getApp().langy.conversations,
+    buffer: createLangyTokenBuffer({ redis: getApp().redis }),
+  });
+}
+
+/**
+ * Read the durable fold and the per-turn heartbeat once, or null when either
+ * read failed — which says nothing about the turn and must not count either way.
+ */
+async function readTurnHealth({
   projectId,
   conversationId,
   turnId,
   userId,
   buffer,
-  signal,
 }: {
   projectId: string;
   conversationId: string;
   turnId: string;
   userId: string;
-  buffer: {
-    liveness(a: {
-      conversationId: string;
-      turnId: string;
-    }): Promise<{ stale: boolean }>;
-  };
-  signal: AbortSignal;
-}): Promise<LangyStreamEntry | null> {
-  let settledStreak = 0;
-  while (!signal.aborted) {
-    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
-    const [conversation, liveness] = await Promise.all([
-      getApp()
-        .langy.conversations.getById({ id: conversationId, projectId, userId })
-        .catch(() => null),
-      buffer.liveness({ conversationId, turnId }).catch(() => null),
-    ]);
-    if (!conversation || !liveness) {
-      settledStreak = 0;
-      continue;
-    }
-    const decision = decideSyntheticTerminal({
+  buffer: LivenessSource;
+}): Promise<TurnHealth | null> {
+  const [conversation, liveness] = await Promise.all([
+    getApp()
+      .langy.conversations.getById({ id: conversationId, projectId, userId })
+      .catch(() => null),
+    buffer.liveness({ conversationId, turnId }).catch(() => null),
+  ]);
+  if (!conversation || !liveness) return null;
+  return {
+    isStale: liveness.stale,
+    terminal: decideSyntheticTerminal({
       status: conversation.status,
       lastError: conversation.lastError,
       heartbeatStale: liveness.stale,
-    });
-    if (!decision) {
-      settledStreak = 0;
-      continue;
-    }
-    settledStreak += 1;
-    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
-  }
-  return null;
+    }),
+  };
+}
+
+/** The one thing this watcher needs of the token buffer. */
+interface LivenessSource {
+  liveness(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ stale: boolean }>;
 }
 
 /**
@@ -293,6 +370,7 @@ async function watchForMissedTerminal({
  */
 async function acceptTurn({
   input,
+  adoptConversationId,
   session,
 }: {
   input: {
@@ -306,6 +384,14 @@ async function acceptTurn({
     pageContext?: LangyTurnContext["pageContext"];
     skills?: LangyTurnContext["skills"];
   };
+  /**
+   * Adopt an unknown `conversationId` as a NEW conversation instead of minting
+   * a fresh id. Only the CREATE path sets this, it is how a first message
+   * lands on the conversation a panel-open warm already booted a worker for
+   * (specs/langy/langy-worker-prewarm.feature). Continue keeps today's
+   * semantics: an unknown id there is stale client state and mints fresh.
+   */
+  adoptConversationId?: boolean;
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
   // Alias resolution for pre-rename client bundles; new clients send
@@ -325,6 +411,7 @@ async function acceptTurn({
     idempotencyKey,
     session,
     requestedConversationId: input.conversationId ?? null,
+    ...(adoptConversationId ? { adoptConversationId: true } : {}),
     messages: input.messages,
     ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
     isRetry: input.trigger === "regenerate-message",
@@ -493,6 +580,13 @@ export const langyRouter = createTRPCRouter({
         eventCursor: { acceptedAt: number; eventId: string } | null;
         /** The turn in flight, or null — what a refresh reattaches to. */
         currentTurnId: string | null;
+        /**
+         * The model the latest accepted turn ran on, or null before any turn
+         * recorded one. Opening a conversation seeds the composer's picker
+         * from it, so a conversation keeps the model it was last used with
+         * across tabs and reloads.
+         */
+        lastModel: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -540,6 +634,7 @@ export const langyRouter = createTRPCRouter({
           shouldAskFeedback,
           eventCursor: conversation.eventCursor,
           currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+          lastModel: conversation.lastModel,
         };
       },
     ),
@@ -615,7 +710,20 @@ export const langyRouter = createTRPCRouter({
    * shared middleware maps to coded TRPCErrors.
    */
   createConversation: langyTurnProcedure
-    .input(z.object(langyTurnInputShape))
+    .input(
+      z.object({
+        /**
+         * The conversation a panel-open warm already booted a worker for
+         * (specs/langy/langy-worker-prewarm.feature). Server-minted by
+         * `warmWorker`, ADOPTED here so the first message reuses the warmed
+         * worker instead of spawning under a fresh id. Absent = mint fresh,
+         * exactly as before. Shape-gated at the wire; an id that exists but is
+         * not adoptable (someone else's, archived) fails loudly in the service.
+         */
+        conversationId: adoptableConversationIdSchema.optional(),
+        ...langyTurnInputShape,
+      }),
+    )
     .mutation(
       async ({
         input,
@@ -626,6 +734,7 @@ export const langyRouter = createTRPCRouter({
             ...input,
             messages: input.messages as LangyChatMessageInput[],
           },
+          ...(input.conversationId ? { adoptConversationId: true } : {}),
           session: ctx.session,
         });
       },
@@ -687,6 +796,432 @@ export const langyRouter = createTRPCRouter({
       });
       return { stopped: true };
     }),
+
+  /**
+   * The page asking to execute a dispatched UI action
+   * (specs/langy/langy-ui-actions.feature). First successful claim wins across
+   * every tab and every stream replay; everyone else gets `isClaimed: false` and
+   * drops. `langy:view` on purpose: executing happens under the human's own
+   * session on their own page, and the dispatch already enforced the action's
+   * real permission against the agent's session key. The pending record the
+   * dispatch pinned in Redis is what this claim is verified against, so a
+   * claim can never attach to another project's or another conversation's
+   * action. The turn is not asked for: the page and the dispatch read it from
+   * two places that settle at different times, and refusing on the difference
+   * pushed live work to the backend behind the user's back.
+   */
+  claimUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isClaimed: boolean }> => {
+      const userId = ctx.session.user.id;
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId,
+      });
+      if (!conversation) return { isClaimed: false };
+      return await createUiActionService().claim({
+        projectId: input.projectId,
+        userId,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+      });
+    }),
+
+  /**
+   * The page reporting a claimed action's outcome. Only the claiming user may
+   * complete; anything else is dropped as `isAccepted: false`. The dispatch has
+   * its own timeout, so a dropped completion cannot wedge the agent.
+   */
+  completeUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+        ok: z.boolean(),
+        result: z.unknown().optional(),
+        errorCode: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isAccepted: boolean }> => {
+      return await createUiActionService().complete({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+        completion: {
+          ok: input.ok,
+          ...(input.result !== undefined ? { result: input.result } : {}),
+          ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+        },
+      });
+    }),
+
+  // ── the developer's own folder (ADR-129) ─────────────────────────────────
+
+  /**
+   * The developer's answer to one permission card. The answer becomes the
+   * `permission` frame the command line is waiting on, and the same turn goes
+   * on with its plan intact.
+   *
+   * A card that already settled refuses with `langy_wait_expired`, which is
+   * what tells the panel to fall back to sending the answer as a message.
+   */
+  answerLocalPermission: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        waitId: z.string(),
+        decision: z.enum(["allow_once", "allow_pattern", "deny"]),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ answered: true }> => {
+      await requireOwnWait({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        waitId: input.waitId,
+      });
+      await getLocalControlRuntime().waits.answer({
+        waitId: input.waitId,
+        userId: ctx.session.user.id,
+        decision: input.decision,
+      });
+      return { answered: true };
+    }),
+
+  /** The developer's answer to one question card. */
+  answerQuestion: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        waitId: z.string(),
+        answers: z
+          .array(
+            z.object({
+              question: z.string(),
+              selected: z.array(z.string()),
+              other: z.string().max(4000).optional(),
+            }),
+          )
+          .min(1)
+          .max(4),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ answered: true }> => {
+      await requireOwnWait({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        waitId: input.waitId,
+      });
+      await getLocalControlRuntime().waits.answer({
+        waitId: input.waitId,
+        userId: ctx.session.user.id,
+        answers: input.answers.map((answer) => ({
+          question: answer.question,
+          selected: answer.selected,
+          ...(answer.other !== undefined ? { other: answer.other } : {}),
+        })),
+      });
+      return { answered: true };
+    }),
+
+  /**
+   * Turn the permission cards off for this conversation, or back on.
+   *
+   * The server owns one half of this and one half only: whether the model
+   * running the conversation is on its provider's allowed list. The command
+   * line keeps the folder boundary and the privilege rule whatever the answer
+   * is, so nothing here can widen what may run on the machine.
+   */
+  setLocalPolicy: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        skipPermissions: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ skipPermissions: boolean }> => {
+      const conversation = await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      let model = conversation.lastModel ?? "";
+      if (input.skipPermissions) {
+        const decision = await canModelSkipPermissions({
+          projectId: input.projectId,
+          model,
+        });
+        if (!decision.allowed) {
+          throw new LangyLocalSkipModelNotAllowedError({
+            model: decision.modelId || model,
+            provider: decision.provider,
+          });
+        }
+        model = `${decision.provider}/${decision.modelId}`;
+      }
+      await runtime.presence.writePolicy({
+        conversationId: input.conversationId,
+        skipPermissions: input.skipPermissions,
+      });
+      await getApp().commands.langy.changeLocalPolicy({
+        tenantId: input.projectId,
+        occurredAt: Date.now(),
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        skipPermissions: input.skipPermissions,
+        ...(model ? { model } : {}),
+      });
+      await runtime.store.publish(
+        workspaceChannel(input.conversationId),
+        JSON.stringify({
+          policy: { skipPermissions: input.skipPermissions },
+        }),
+      );
+      return { skipPermissions: input.skipPermissions };
+    }),
+
+  /** Close the shared folder from the panel header chip. */
+  disconnectLocalWorkspace: langyCreateProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .mutation(async ({ input, ctx }): Promise<{ disconnected: boolean }> => {
+      await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      const workspace = await runtime.presence.read(input.conversationId);
+
+      // The credential goes first, and it goes whether or not a folder is
+      // there to be told.
+      //
+      // The frame below is best effort: a command line that lost the network a
+      // second before this never receives it, and its own reconnect used to
+      // pass authentication on a binding that lives six hours, restoring the
+      // folder the reader had just disconnected. Revoking first closes that
+      // door, and revoking independently of presence closes it again for a
+      // record that had already lapsed.
+      await runtime.requests.revokeConversationBindings(input.conversationId);
+
+      // Then tell the command line, so it prints why it is exiting rather
+      // than reading a closed socket as a network fault.
+      await runtime.store.publish(
+        workspaceChannel(input.conversationId),
+        JSON.stringify({
+          disconnect: { reason: "Disconnected from the LangWatch panel." },
+        }),
+      );
+      await runtime.presence.deregister({
+        conversationId: input.conversationId,
+      });
+      for (const call of await runtime.dispatcher.listPendingForConversation(
+        input.conversationId,
+      )) {
+        await runtime.dispatcher.cancel({
+          callId: call.callId,
+          message:
+            "The shared folder was disconnected, so the command did not finish.",
+        });
+      }
+      // The durable line belongs to a folder that was there. With no record
+      // to name, the revoke above is the whole of what this did.
+      if (!workspace) return { disconnected: false };
+      await getApp().commands.langy.disconnectLocalWorkspace({
+        tenantId: input.projectId,
+        occurredAt: Date.now(),
+        conversationId: input.conversationId,
+        instanceId: workspace.instanceId,
+        reason: "panel",
+      });
+      return { disconnected: true };
+    }),
+
+  /** Remember, or forget, how Langy should reach this person's code. */
+  setCodeAccessPreference: langyUpdateProcedure
+    .input(z.object({ preference: z.enum(["github"]).nullable() }))
+    .mutation(
+      async ({ input, ctx }): Promise<{ preference: "github" | null }> => {
+        await prisma.user.update({
+          where: { id: ctx.session.user.id },
+          data: { langyCodeAccessPreference: input.preference },
+        });
+        return { preference: input.preference };
+      },
+    ),
+
+  /**
+   * The remembered choice on its own, for the settings page: it shows and
+   * clears the preference outside any conversation, so it has no folder to
+   * read and no conversation id to read one with.
+   */
+  getCodeAccessPreference: langyReadProcedure.query(
+    async ({ ctx }): Promise<{ preference: "github" | null }> => {
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { langyCodeAccessPreference: true },
+      });
+      return {
+        preference:
+          user?.langyCodeAccessPreference === "github"
+            ? ("github" as const)
+            : null,
+      };
+    },
+  ),
+
+  /**
+   * Every card the developer's machine put up in this conversation, and
+   * whether the folder is connected, off the durable record (ADR-129).
+   *
+   * The panel reads it on open and while a turn is in flight, which is what
+   * puts a card raised before this tab was watching on screen, keeps the
+   * cards of a finished conversation on screen when it is reopened, and tells
+   * the code access card that the folder connected on a turn this tab never
+   * subscribed to.
+   */
+  localRecord: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return await getApp().langy.conversations.getLocalRecord({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  /** What the panel chip, the code access card and the settings page read. */
+  getLocalWorkspace: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const conversation = await requireOwnConversation({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+      const runtime = getLocalControlRuntime();
+      const connected = await runtime.presence.read(input.conversationId);
+      const pendingRequest = await runtime.requests.findOpenForConversation({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { langyCodeAccessPreference: true },
+      });
+      // The card offers the skip switch only when the model behind the
+      // conversation is on its provider's list, so the panel reads the same
+      // answer the permission card was built with.
+      const skipAllowed = conversation.lastModel
+        ? (
+            await canModelSkipPermissions({
+              projectId: input.projectId,
+              model: conversation.lastModel,
+            })
+          ).allowed
+        : false;
+      return {
+        connected: connected !== null,
+        workspace: connected
+          ? { ...connected.workspace, hostname: connected.hostname }
+          : null,
+        skipAllowed,
+        skipPermissions: await reconcileSkipPolicy({
+          runtime,
+          projectId: input.projectId,
+          conversationId: input.conversationId,
+          model: conversation.lastModel,
+        }),
+        pendingRequest: pendingRequest
+          ? toControlRequestWire(pendingRequest)
+          : null,
+        codeAccessPreference:
+          user?.langyCodeAccessPreference === "github"
+            ? ("github" as const)
+            : null,
+      };
+    }),
+
+  /**
+   * Pre-boot the conversation's worker on panel open, before the first message
+   * (specs/langy/langy-worker-prewarm.feature). Returns the conversation id
+   * the first message should adopt (server-minted when none is given) and
+   * whether a worker is warm or warming.
+   *
+   * `langy:create`, warming provisions credentials and spawns a worker, so it
+   * wants the same permission as sending, but deliberately NOT the
+   * rate-limited `langyTurnProcedure`: a panel open must never consume the
+   * per-user message budget. Strictly fire-and-forget for the caller: a warm
+   * failure is a cold start, never an error, so nothing on the warm path
+   * throws past this mutation (the access gates above it still do, a caller
+   * without Langy gets the same refusal every langy procedure gives).
+   */
+  warmWorker: langyCreateProcedure
+    .input(
+      z.object({
+        /** Warm an existing conversation's worker; absent mints the id the
+         * first message will adopt. Same shape gate as adoption. */
+        conversationId: adoptableConversationIdSchema.optional(),
+        modelOverride: langyModelOverrideSchema.optional(),
+      }),
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{ conversationId: string | null; warmed: boolean }> => {
+        try {
+          // The warm skips langyTurnProcedure so a panel open never spends the
+          // message budget, but each call can mint a conversation, mint a
+          // session key and ask for a worker, so it carries its own looser
+          // budget. Over it, the answer is the same silent one every other
+          // warm failure gives: no error to the panel, a cold start on the
+          // first message.
+          const rl = await checkLangyWarmRateLimit({
+            userId: ctx.session.user.id,
+            projectId: input.projectId,
+          });
+          if (!rl.allowed) {
+            logger.warn(
+              { projectId: input.projectId },
+              "langy warm rate limited, cold start on first message",
+            );
+            return {
+              conversationId: input.conversationId ?? null,
+              warmed: false,
+            };
+          }
+          return await getApp().langy.turns.warmConversationWorker({
+            projectId: input.projectId,
+            session: ctx.session,
+            requestedConversationId: input.conversationId ?? null,
+            ...(input.modelOverride
+              ? { modelOverride: input.modelOverride }
+              : {}),
+          });
+        } catch (error) {
+          // The service already swallows warm-path failures; this is the belt
+          // for anything unexpected around it. Never an error to the panel.
+          logger.warn(
+            { error, projectId: input.projectId },
+            "langy warmWorker mutation failed, cold start on first message",
+          );
+          return {
+            conversationId: input.conversationId ?? null,
+            warmed: false,
+          };
+        }
+      },
+    ),
 
   /**
    * The model allowlist the composer's picker narrows to, or null when the
@@ -913,82 +1448,23 @@ export const langyRouter = createTRPCRouter({
         redis: connection,
         blockingRedis: blocking,
       });
-      // Tear down on client disconnect OR the hard per-turn deadline, whichever
-      // comes first — a wedged turn must not hold a blocking connection forever.
-      const signals: AbortSignal[] = [
-        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-      ];
-      if (opts.signal) signals.push(opts.signal);
-      const signal = AbortSignal.any(signals);
+      // Tear down when the client goes away. The tail carries no deadline of
+      // its own; `streamTurnEntries` says why.
+      const signal = opts.signal ?? new AbortController().signal;
 
-      try {
-        // Drain the buffered prefix, then tail the live edge from where it ended.
-        const { reads, lastId } = await buffer.readTail({
-          conversationId,
-          turnId,
-        });
-        let terminal = false;
-        for (const { entry } of reads) {
-          yield entry;
-          if (entry.type === "end" || entry.type === "error") terminal = true;
-        }
-        if (!terminal) {
-          // A refresh mid-turn can miss the worker's terminal frame (its relay
-          // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on "Starting up…" for minutes
-          // though the turn already finished. While we tail the live edge, watch
-          // the durable fold + per-turn heartbeat; if the turn has settled with
-          // no terminal in the buffer, synthesize one so the client resolves.
-          const settle = new AbortController();
-          const followSignal = AbortSignal.any([signal, settle.signal]);
-          let synthesized: LangyStreamEntry | null = null;
-
-          const watcher = watchForMissedTerminal({
-            projectId,
-            conversationId,
-            turnId,
-            userId,
-            buffer,
-            signal: followSignal,
-          })
-            .then((entry) => {
-              if (!entry) return;
-              synthesized = entry;
-              settle.abort(); // unblock the follow() below
-            })
-            // Attached HERE, not in the finally below: follow() can block for
-            // minutes, so a rejection would sit unhandled until then — and Node's
-            // default --unhandled-rejections=throw would take the process down
-            // first. A failed watcher just means no synthesized terminal.
-            .catch(() => undefined);
-
-          try {
-            for await (const { entry } of buffer.follow({
-              conversationId,
-              turnId,
-              fromId: lastId,
-              signal: followSignal,
-            })) {
-              yield entry;
-              if (entry.type === "end" || entry.type === "error") {
-                // A real terminal reached the buffer — never override it.
-                synthesized = null;
-                return;
-              }
-            }
-          } finally {
-            settle.abort();
-            await watcher; // already has its own .catch()
-          }
-
-          // follow() ended with no buffered terminal. If the watcher proved the
-          // turn settled, deliver the synthesized terminal so the UI resolves
-          // instead of hanging; the client reconciles the transcript via
-          // langy.messages.
-          if (synthesized) yield synthesized;
-        }
-      } finally {
-        blocking.disconnect();
-      }
+      yield* streamTurnEntries({
+        conversationId,
+        turnId,
+        buffer,
+        readHealth: () =>
+          readTurnHealth({ projectId, conversationId, turnId, userId, buffer }),
+        signal,
+        release: () => blocking.disconnect(),
+        onAbandoned: ({ stalePolls }) =>
+          logger.warn(
+            { projectId, conversationId, turnId, stalePolls },
+            "giving up a turn stream whose turn neither settled nor beat",
+          ),
+      });
     }),
 });

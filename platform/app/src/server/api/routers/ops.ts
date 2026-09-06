@@ -27,7 +27,7 @@ import {
 } from "~/server/featureFlag";
 import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
 import {
-  featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
@@ -351,9 +351,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockGroup(input);
+      return ops.queues.unblockGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   unblockAll: protectedProcedure
@@ -363,9 +368,14 @@ export const opsRouter = createTRPCRouter({
         queueName: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockAll(input);
+      return ops.queues.unblockAll({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   drainGroup: protectedProcedure
@@ -376,9 +386,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainGroup(input);
+      return ops.queues.drainGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   pausePipeline: protectedProcedure
@@ -452,9 +467,14 @@ export const opsRouter = createTRPCRouter({
         groupIdContains: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainTenant(input);
+      return ops.queues.drainTenant({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   retryBlocked: protectedProcedure
@@ -941,9 +961,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveToDlq(input);
+      return ops.queues.moveToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   moveAllBlockedToDlq: protectedProcedure
@@ -955,9 +980,14 @@ export const opsRouter = createTRPCRouter({
         errorFilter: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveAllBlockedToDlq(input);
+      return ops.queues.moveAllBlockedToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   replayFromDlq: protectedProcedure
@@ -1331,7 +1361,7 @@ export const opsRouter = createTRPCRouter({
     .input(
       z.object({
         key: z.string().min(1).max(200),
-        rules: featureFlagRulesSchema.max(50),
+        rules: featureFlagRulesWriteSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1493,9 +1523,9 @@ export const opsRouter = createTRPCRouter({
   /**
    * Enroll one organization for one registered migration. Takes effect on
    * the next pass - enrollment is read fresh each time. The service refuses
-   * duplicates, unknown migrations, unknown organizations, and any
-   * enrollment on a self-hosted installation, each with a handled error the
-   * page renders.
+   * duplicates, unknown migrations, unknown organizations, migrations that
+   * admit every organization already, and any enrollment on a self-hosted
+   * installation, each with a handled error the page renders.
    */
   enrollMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1532,10 +1562,51 @@ export const opsRouter = createTRPCRouter({
     }),
 
   /**
+   * Enroll a sampled cohort of organizations for one migration in a single
+   * action. The service draws the sample from organizations not yet
+   * enrolled, excluding enterprise plans and private-dataplane routes by
+   * data rather than by any list in code. The cutover keeps its typed
+   * confirmation: a cohort of cutovers is the same flip N times over.
+   *
+   * Either exclusion can be lifted for one draw, separately, so finishing a
+   * proven rollout does not mean enrolling the held-back organizations one
+   * id at a time. Both default to false here as well as in the service: an
+   * older client that sends neither field gets the safe pool.
+   */
+  enrollMigrationCohort: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        sampleSize: z.number().int().min(1).max(1000),
+        includeEnterprise: z.boolean().default(false),
+        includePrivateDataplane: z.boolean().default(false),
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.enrollCohort({
+        migrationName: input.migrationName,
+        sampleSize: input.sampleSize,
+        actorUserId: ctx.session.user.id,
+        includeEnterprise: input.includeEnterprise,
+        includePrivateDataplane: input.includePrivateDataplane,
+      });
+    }),
+
+  /**
    * Withdraw an enrollment: later passes stop processing the organization
    * for that migration. State already recorded stays exactly as it is -
    * pausing the rollout is this action's whole job; undoing it is the
-   * rollback's.
+   * rollback's. Refused for a migration that admits every organization
+   * anyway, where the row it deletes pauses nothing.
    */
   withdrawMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1557,9 +1628,10 @@ export const opsRouter = createTRPCRouter({
   /**
    * Run one migration for one organization now. Awaited: the operator asked
    * about one organization and gets the status it ended the run in. The
-   * service refuses unknown migrations, unknown organizations, unenrolled
-   * organizations (cloud) and a pass already holding the fleet-wide lease,
-   * each with a handled error the page renders.
+   * service refuses unknown migrations, unknown organizations, an
+   * organization outside the migration's cohort (cloud, and only for a
+   * migration enrollment still paces) and an organization whose claim
+   * another pass already holds, each with a handled error the page renders.
    */
   runSystemMigrationForOrganization: protectedProcedure
     .use(opsManagePermission)
@@ -1590,9 +1662,9 @@ export const opsRouter = createTRPCRouter({
   /**
    * Kick a migration pass now instead of waiting for the next worker boot -
    * the lever for processing a fresh enrollment right away or re-verifying
-   * held tenants after remediation. Fire-and-forget: the fleet-wide lease already
-   * guarantees a single driver, so the worst case for a double click is a
-   * pass that stands down immediately.
+   * held tenants after remediation. Fire-and-forget: per-organization claims
+   * already keep two passes off the same organization, so the worst case for
+   * a double click is a pass that finds everything claimed and does nothing.
    */
   runSystemMigrationPass: protectedProcedure
     .use(opsManagePermission)

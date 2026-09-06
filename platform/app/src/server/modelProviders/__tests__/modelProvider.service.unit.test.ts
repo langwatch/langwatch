@@ -80,6 +80,29 @@ describe("ModelProviderService business logic", () => {
         });
         expect(result).toEqual({ OPENAI_API_KEY: "new-key" });
       });
+
+      it("drops a masked field with nothing behind it", () => {
+        // The drawer shows the placeholder for the secret fields of an enabled
+        // row it found no credentials on, so this payload is the ordinary save
+        // from such a row. Storing the placeholder would give the provider a
+        // credential that was never real.
+        const result = mergeStoredCustomKeys({
+          incoming: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://new-url.com",
+          },
+          stored: null,
+        });
+        expect(result).toEqual({ OPENAI_BASE_URL: "https://new-url.com" });
+      });
+
+      it("drops a masked field the stored row does not have", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
+          stored: { OPENAI_BASE_URL: "https://old-url.com" },
+        });
+        expect(result).toEqual({});
+      });
     });
 
     describe("when a field comes back masked", () => {

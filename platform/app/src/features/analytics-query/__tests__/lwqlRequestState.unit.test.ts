@@ -153,6 +153,52 @@ describe("the LangWatchQL request machine", () => {
       });
     });
 
+    describe("when the member changes the granularity step", () => {
+      /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
+      it("carries the step in its own field, not among the parameters", () => {
+        const { calls, controller } = controllerWith({ sql: "SELECT 1" });
+
+        controller.setGranularity(60);
+        controller.runQuery();
+
+        expect(calls[0]!.request.granularitySeconds).toBe(60);
+        expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty(
+          "period_granularity_seconds",
+        );
+      });
+
+      /** @scenario "Changing the granularity step marks the result stale and restores Run query" */
+      it("marks the visible result stale, since it answers a different question", async () => {
+        const { calls, controller } = controllerWith({ sql: "SELECT 1" });
+
+        controller.setGranularity(3600);
+        controller.runQuery();
+        calls[0]!.deferred.resolve(lwqlResult());
+        await settle();
+
+        controller.setGranularity(60);
+
+        // An hourly answer is not the minute-by-minute one just asked for, and
+        // nothing else in the request changed to say so.
+        const state = controller.getState();
+        expect(isLangWatchQLResultStale(state)).toBe(true);
+        expect(lwqlActionLabel(state)).toBe("Run query");
+      });
+
+      /** @scenario "Clearing the chosen step sends no step at all, not an empty one" */
+      it("sends no step at all once it is cleared", () => {
+        const { calls, controller } = controllerWith({ sql: "SELECT 1" });
+
+        controller.setGranularity(60);
+        controller.setGranularity(undefined);
+        controller.runQuery();
+
+        // Absent, not present-and-undefined: the door reads an absent field as
+        // "the surface offers no step", which is a different request.
+        expect(calls[0]!.request).not.toHaveProperty("granularitySeconds");
+      });
+    });
+
     describe("when the workbench is disposed before the second submission answers", () => {
       /** @scenario "A stale result stays labelled as belonging to the previous submission" */
       it("leaves the earlier result stale rather than crediting it to the abandoned request", async () => {

@@ -11,8 +11,11 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Feature: API Keys REST API", () => {
   const ns = `api-keys-api-${nanoid(8)}`;

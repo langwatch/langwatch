@@ -25,7 +25,7 @@ export interface LangyMessagesResult {
    * DURABLE truth, not the browser stream. Covers the whole span from
    * message-sent (`active`) through the agent responding (`running`), so it
    * includes the worker cold-start window (the fold only reaches `running` at
-   * `agent_turn_accepted`, after opencode has forked + npm-installed). The
+   * `agent_turn_accepted`, after the worker has forked + npm-installed). The
    * live `useChat` transport only knows a turn is running while its
    * `onTurnStream` subscription is open, and that closes the moment a silent
    * worker stops pushing frames — long before the turn ends. This lets the panel
@@ -56,6 +56,13 @@ export interface LangyMessagesResult {
   eventCursor: LangyEventCursor | null;
   /** The turn in flight per the durable fold — what a refresh reattaches to. */
   currentTurnId: string | null;
+  /**
+   * The model the conversation's latest turn ran on, off the durable fold —
+   * null before any turn recorded one. The panel seeds the composer's picker
+   * from it on open, so a conversation keeps the model it was last used with
+   * across tabs and reloads.
+   */
+  lastModel: string | null;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -115,18 +122,27 @@ export function useLangyMessages(
     }
   }, [conversationRead, conversationId]);
 
+  // With no conversation open there is nothing to read. `keepPreviousData`
+  // exists to smooth the switch BETWEEN two conversations, but after New chat
+  // it keeps handing back the conversation just left: its messages, its
+  // in-flight flag and its last error. The panel then reported all three about
+  // a conversation the reader had already walked away from — the composer said
+  // Langy was working and the column showed the old turn's failure.
+  const data = conversationId ? query.data : undefined;
+
   return {
-    messages: (query.data?.messages ?? []) as LangyMessageDto[],
-    lastError: query.data?.lastError ?? null,
-    isTurnInFlight: query.data?.isTurnInFlight ?? false,
-    inFlightTurnId: query.data?.inFlightTurnId ?? null,
-    shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
-    eventCursor: query.data?.eventCursor ?? null,
-    currentTurnId: query.data?.currentTurnId ?? null,
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    isError: query.isError,
-    error: query.error,
+    messages: (data?.messages ?? []) as LangyMessageDto[],
+    lastError: data?.lastError ?? null,
+    isTurnInFlight: data?.isTurnInFlight ?? false,
+    inFlightTurnId: data?.inFlightTurnId ?? null,
+    shouldAskFeedback: data?.shouldAskFeedback ?? false,
+    eventCursor: data?.eventCursor ?? null,
+    currentTurnId: data?.currentTurnId ?? null,
+    lastModel: data?.lastModel ?? null,
+    isLoading: !!conversationId && query.isLoading,
+    isFetching: !!conversationId && query.isFetching,
+    isError: !!conversationId && query.isError,
+    error: conversationId ? query.error : null,
     refetch: () => void query.refetch(),
   };
 }

@@ -8,6 +8,67 @@ import type { NormalizedSpan } from "../../schemas/spans";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";
 
+/**
+ * The prefix the Vercel AI SDK writes `experimental_telemetry.metadata` under.
+ * It flattens the object one attribute per entry, so a `{ labels, user_id }`
+ * metadata object arrives as two separate span attributes.
+ */
+const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
+
+/**
+ * Metadata names that identify a trace rather than describe it, and the
+ * trace-summary key each one fills. Both spellings are accepted because the
+ * REST collector accepts both and callers copy whichever they already use.
+ */
+const VERCEL_RESERVED_METADATA: Readonly<Record<string, string>> = {
+  thread_id: "gen_ai.conversation.id",
+  threadId: "gen_ai.conversation.id",
+  user_id: "langwatch.user_id",
+  userId: "langwatch.user_id",
+  customer_id: "langwatch.customer_id",
+  customerId: "langwatch.customer_id",
+};
+
+/** The metadata name behind a Vercel telemetry key, or null for any other key. */
+const vercelMetadataName = (key: string): string | null =>
+  key.startsWith(VERCEL_METADATA_PREFIX)
+    ? key.slice(VERCEL_METADATA_PREFIX.length) || null
+    : null;
+
+/** Labels as an array, whether they arrive as one or as a JSON string. */
+const labelList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((label): label is string => typeof label === "string")
+    : parseJsonStringArray(typeof value === "string" ? value : void 0);
+
+const unionLabelsInto = (
+  result: Record<string, string>,
+  labels: string[],
+): void => {
+  if (labels.length === 0) return;
+  const existing = parseJsonStringArray(result[ATTR_KEYS.LANGWATCH_LABELS]);
+  result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([
+    ...new Set([...existing, ...labels]),
+  ]);
+};
+
+/** Writes the value only when the key has no value yet, so an explicit one wins. */
+const fillIfEmpty = (
+  result: Record<string, string>,
+  key: string,
+  value: unknown,
+): void => {
+  if (result[key]) return;
+  if (typeof value === "string" && value.length > 0) result[key] = value;
+};
+
+const attributeText = (value: unknown): string =>
+  typeof value === "string"
+    ? value
+    : typeof value === "object"
+      ? JSON.stringify(value)
+      : String(value);
+
 export const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.name", "sdk.name"],
   ["telemetry.sdk.version", "sdk.version"],
@@ -254,6 +315,8 @@ export class TraceAttributeAccumulationService {
       ]);
     }
 
+    this.applyVercelTelemetryMetadata(spanAttrs, result);
+
     const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
     if (promptId?.includes(":")) {
       result["langwatch.prompt.id"] = promptId;
@@ -269,6 +332,43 @@ export class TraceAttributeAccumulationService {
     }
 
     return result;
+  }
+
+  /**
+   * Folds the Vercel AI SDK's metadata channel into the keys the trace
+   * summary already reads.
+   *
+   * `experimental_telemetry: { metadata: {...} }` is flattened by the AI SDK
+   * onto every span it emits, one `ai.telemetry.metadata.<key>` attribute per
+   * entry. It is the only metadata channel the AI SDK gives a caller, so the
+   * reserved names below get the same treatment they get on every other
+   * channel, and anything else becomes custom trace metadata.
+   *
+   * A value the caller set explicitly through `langwatch.*` (or through a
+   * resource attribute) always wins: this only fills a key that is still
+   * empty.
+   */
+  private applyVercelTelemetryMetadata(
+    spanAttrs: NormalizedSpan["spanAttributes"],
+    result: Record<string, string>,
+  ): void {
+    for (const [key, value] of Object.entries(spanAttrs)) {
+      const name = vercelMetadataName(key);
+      if (!name || value === null || value === undefined) continue;
+
+      if (name === "labels" || name === "tags") {
+        unionLabelsInto(result, labelList(value));
+        continue;
+      }
+
+      const reserved = VERCEL_RESERVED_METADATA[name];
+      if (reserved) {
+        fillIfEmpty(result, reserved, value);
+        continue;
+      }
+
+      result[`metadata.${name}`] = attributeText(value);
+    }
   }
 
   accumulateAttributes({

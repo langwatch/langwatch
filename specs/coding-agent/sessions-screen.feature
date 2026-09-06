@@ -229,6 +229,23 @@ Rule: A session lists every pull request it drove
     When the user reads its row
     Then the pull request cell reads as absent
 
+  @integration
+  Scenario: A pull request number opens what the change cost, not GitHub
+    Given a session row that lists a pull request
+    When the user chooses the pull request number
+    Then the pull request's detail opens over the table
+    And the replay of the session does not open
+    # The reader is on this screen to read spend, so the number leads to the
+    # same detail the pull requests screen opens, which is where every
+    # session that worked on that change is added up. GitHub is one click
+    # further, in that detail's own header.
+
+  @integration
+  Scenario: A pull request number is drawn as something to choose
+    Given a session row that lists a pull request
+    When the user reads the row
+    Then the number is underlined
+
 Rule: The table narrows, sorts and pages
 
   @integration

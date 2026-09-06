@@ -18,9 +18,9 @@
  * So the gate is TIME, not shape: the key's own `createdAt` must be strictly
  * earlier than the moment this organization's genesis import actually
  * transitioned this organization onto the ledger (`SystemMigrationTenantState`
- * for `GRANTS_GENESIS_IMPORT_MIGRATION_NAME`, read as that row's own
+ * for `AUTHZ_ENGINE_MIGRATION_NAME`, read as that row's own
  * `occurredAt` when its `status` is `migrated` or `finalized` — the two
- * statuses ledger-write-gate.ts already treats as "the ledger holds this
+ * statuses engine-gate.ts already treats as "the ledger holds this
  * organization's history"). A key created at or after that moment was born
  * into the ledger era and is never minted for, no matter how many bindings it
  * holds. An unreadable, absent, or not-yet-cutover state row (`parked`,
@@ -52,21 +52,19 @@
  * index — the same derivation the cutover import uses, so the two converge
  * rather than duplicate.
  */
-import type { LedgerActor } from "@langwatch/authz-server";
-import {
-  deriveGrantId,
-  GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
-} from "@langwatch/authz-server/migration";
+import type { LedgerActor } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { deriveGrantId } from "@langwatch/authz-server/migration";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
-import { isOrgOnLedgerWrites } from "~/server/app-layer/authz/ledger-write-gate";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
 import { prisma as appPrisma } from "~/server/db";
 import type { ApiKeyWithBindings } from "./api-key.repository";
 
@@ -133,14 +131,19 @@ function sweepGuard(): void {
 }
 
 /**
- * The statuses that mean this organization's genesis import actually cut it
- * over — mirrors `LEDGER_WRITE_STATUSES` in ledger-write-gate.ts (kept as its
+ * The statuses that mean this organization's migration actually cut it
+ * over — mirrors `ON_ENGINE_STATUSES` in engine-gate.ts (kept as its
  * own literal here rather than imported: that gate answers a present-tense
  * "is this organization on the ledger today", this answers "when did it get
  * there", and the two must not be forced to share a type only one of them
  * needs).
+ *
+ * `finalized` only, matching the gate: `migrated` is the HELD state — the
+ * organization's writes are still imperative legacy rows, so a key created
+ * while held belongs to the legacy era and the next migration pass adopts
+ * its bindings; there is no ledger era to date it against yet.
  */
-const CUTOVER_STATUSES: readonly string[] = ["migrated", "finalized"];
+const CUTOVER_STATUSES: readonly string[] = ["finalized"];
 
 /**
  * The moment this organization's genesis import actually cut it over onto the
@@ -177,7 +180,7 @@ export async function genesisImportMoment({
     const row = await prisma.systemMigrationTenantState.findUnique({
       where: {
         migrationName_tenantId: {
-          migrationName: GRANTS_GENESIS_IMPORT_MIGRATION_NAME,
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
           tenantId: organizationId,
         },
       },
@@ -231,7 +234,7 @@ export function legacyGrantForKey(
   return {
     bindingId: deriveGrantId({
       organizationId: apiKey.organizationId,
-      principal: { type: "api_key", id: apiKey.id },
+      principal: { type: "apiKey", id: apiKey.id },
       scope: {
         type: RoleBindingScopeType.ORGANIZATION,
         id: apiKey.organizationId,
@@ -257,7 +260,8 @@ export function legacyGrantForKey(
 export function mintLegacyKeyGrant({
   apiKey,
   writer,
-  onLedgerWrites = isOrgOnLedgerWrites,
+  onLedgerWrites = ({ organizationId }) =>
+    organizationOnAuthzEngine({ prisma: appPrisma, organizationId }),
   genesisMomentFor = genesisImportMoment,
 }: {
   apiKey: ApiKeyWithBindings;

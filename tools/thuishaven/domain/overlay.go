@@ -88,6 +88,29 @@ func (s Stack) OverlayEnv() []string {
 		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The IdP simulator is an opt-in lane; only a worktree actually running (or
+	// falling back to) one gets the pointer, so nothing reads a dead URL.
+	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {
+		// Where the simulator is, and — the part the platform cannot work out
+		// on its own — that it may be TRUSTED. The engine refuses to fetch an
+		// issuer's discovery document from an origin nobody vouched for,
+		// which is what stops a server being pointed at an arbitrary address;
+		// a simulator on a sibling hostname is exactly the arbitrary address
+		// it refuses, so a local single sign-on journey cannot start without
+		// this line.
+		env = append(env,
+			"LANGWATCH_IDPSIM_URL="+idp.URL,
+			"SSO_TRUSTED_IDP_ORIGINS="+idp.URL,
+		)
+		// And its NAMESERVER, because the domains a local walk claims are
+		// reserved names like `acme.test` that no public resolver will ever
+		// answer for. The simulator is authoritative for them and the
+		// machine's resolver has never heard of it, so a domain proof that
+		// does not ask it can only ever fail.
+		if idp.DNSPort != 0 {
+			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
+		}
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
@@ -117,7 +140,7 @@ func (s Stack) OverlayEnv() []string {
 		// as admin@haven.localhost gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
-	// langyagent (the OpenCode manager): the control plane dials it at its loopback
+	// langyagent (the worker manager): the control plane dials it at its loopback
 	// port with the shared internal secret both sides require. Emitted whenever the
 	// service has a port (local or a baseline fallback). The isolation posture
 	// (LANGY_UNSAFE_DEV_DISABLE_ISOLATION) is NOT set here — it is a langyagent-only
@@ -125,7 +148,7 @@ func (s Stack) OverlayEnv() []string {
 	// control plane never reads it.
 	if langy.Port != 0 {
 		env = append(env,
-			fmt.Sprintf("OPENCODE_AGENT_URL=http://127.0.0.1:%d", langy.Port),
+			fmt.Sprintf("LANGY_AGENT_URL=http://127.0.0.1:%d", langy.Port),
 			"LANGY_INTERNAL_SECRET="+DefaultLangyInternalSecret,
 		)
 		// When the worker runs inside colima (the sandboxed / container-unsafe

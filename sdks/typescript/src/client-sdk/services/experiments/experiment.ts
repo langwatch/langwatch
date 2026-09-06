@@ -61,6 +61,7 @@ import {
 } from "./comparison";
 import { printSummary } from "./printSummary";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -226,7 +227,7 @@ export class Experiment {
     }
 
     try {
-      const response = await fetch(`${this.endpoint}/api/experiment/init`, {
+      const response = await langwatchFetch(`${this.endpoint}/api/experiment/init`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -670,7 +671,7 @@ export class Experiment {
     spanId?: string | null;
     asGuardrail?: boolean;
   }): Promise<RunEvaluatorResponse> {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${this.endpoint}/api/evaluations/${evaluatorSlug}/evaluate`,
       {
         method: "POST",
@@ -1382,7 +1383,7 @@ export class Experiment {
     };
 
     // Fire and forget (with error logging)
-    this.pendingFlush = fetch(`${this.endpoint}/api/evaluations/batch/log_results`, {
+    this.pendingFlush = langwatchFetch(`${this.endpoint}/api/evaluations/batch/log_results`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

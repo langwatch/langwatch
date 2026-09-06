@@ -24,9 +24,15 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
   resolveApiKeyPermission: vi.fn(),
 }));
 
-const resolveMock = vi.mocked(resolveApiKeyPermission);
+// The ceiling resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appCredentialPermissionsMock } = await import(
+    "~/test-utils/appCredentialPermissionsMock"
+  );
+  return appCredentialPermissionsMock();
+});
 
-const prisma = {} as never;
+const resolveMock = vi.mocked(resolveApiKeyPermission);
 
 const project = {
   id: "proj1",
@@ -75,7 +81,7 @@ function appWith(
     if (resolved) c.set("resolvedToken" as never, resolved as never);
     await next();
   });
-  app.use("*", requireApiKeyPermission({ prisma, permission }));
+  app.use("*", requireApiKeyPermission({ permission }));
   app.get("/", handler as never);
   return { app, handler };
 }
@@ -92,7 +98,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -106,7 +111,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -119,7 +123,6 @@ describe("enforceApiKeyCeiling()", () => {
         resolveMock.mockResolvedValue(true);
 
         await enforceApiKeyCeiling({
-          prisma,
           resolved: apiKeyToken,
           permission: "project:update",
         });
@@ -151,11 +154,13 @@ describe("enforceApiKeyCeiling()", () => {
       it("says it is not delegable rather than not granted", async () => {
         resolveMock.mockResolvedValue(false);
 
+        // `secrets:view` — the incident grain was `triggers:create`, but that
+        // is delegable since the 2026-08-21 widening; secrets have no safe
+        // read and will never be delegated.
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: langySessionKeyToken,
-            permission: "triggers:create",
+            permission: "secrets:view",
           }),
         ).rejects.toMatchObject({
           code: "api_key_permission_not_delegable",
@@ -174,7 +179,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: langySessionKeyToken,
             permission: "prompts:create",
           }),
@@ -190,7 +194,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "triggers:create",
           }),
@@ -209,7 +212,6 @@ describe("enforceApiKeyCeiling()", () => {
     it("skips the ceiling entirely", async () => {
       await expect(
         enforceApiKeyCeiling({
-          prisma,
           resolved: legacyProjectKeyToken,
           permission: "project:update",
         }),
@@ -257,7 +259,10 @@ describe("requireApiKeyPermission()", () => {
         resolveMock.mockResolvedValue(false);
         const { app, handler } = appWith(
           langySessionKeyToken,
-          "triggers:create",
+          // Never delegable: secrets have no safe read (the original incident
+          // grain, `triggers:create`, is delegable since the 2026-08-21
+          // widening).
+          "secrets:view",
         );
 
         const res = await app.request("/");
@@ -288,19 +293,21 @@ describe("requireApiKeyPermission()", () => {
 
   describe("given no token was resolved onto the context", () => {
     /**
-     * The middleware passes the request through when nothing authenticated it.
-     * That is safe only while it is chained behind the unified auth middleware,
-     * which rejects unauthenticated callers first — mounted alone, this gate
-     * does nothing. Pinned so the fail-open is an asserted decision and any
-     * future mis-wiring has to change a test to land.
+     * A permission gate running with nobody authenticated is a mis-wired
+     * route — the unified auth middleware was not mounted before it. The
+     * gate refuses rather than waving the request through: the old
+     * pass-through meant a route that forgot its auth middleware silently
+     * lost its permission check too. The plain Error degrades to the
+     * generic unknown response at the boundary (ADR-045).
      */
-    it("passes the request through without any permission check", async () => {
+    /** @scenario "The permission gate refuses a request nobody authenticated" */
+    it("refuses the request instead of passing it through", async () => {
       const { app, handler } = appWith(undefined);
 
       const res = await app.request("/");
 
-      expect(res.status).toBe(200);
-      expect(handler).toHaveBeenCalled();
+      expect(res.status).toBe(500);
+      expect(handler).not.toHaveBeenCalled();
       expect(resolveMock).not.toHaveBeenCalled();
     });
   });

@@ -23,6 +23,7 @@
  * read-only paths that should not allocate.
  */
 
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -37,7 +38,6 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:governance:personal-workspace");

@@ -12,7 +12,13 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -171,6 +177,22 @@ const headingFor = (label: string) =>
   screen
     .getByRole("button", { name: `Sort by ${label}` })
     .closest("th") as HTMLElement;
+
+/**
+ * Waits until the period popover is off the screen.
+ *
+ * The popover holds one button per preset, and the trigger takes the name of
+ * the preset that was picked, so while the popover is still on screen that
+ * name is on screen twice and a query by name finds two buttons. Picking an
+ * entry closes the popover, but its content stays on screen for one more
+ * animation frame, and `user.click` returns before that frame. Waiting for the
+ * popover to go is what leaves one button for the next query to name.
+ */
+async function periodPopoverClosed() {
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+}
 
 /** What a case may pin about a row's money, and what is derived from it. */
 type CostOverrides = {
@@ -905,12 +927,14 @@ describe("the personal Pull Requests table", () => {
 
       await user.click(screen.getByRole("button", { name: /all time/i }));
       await user.click(await screen.findByText("Last 7 days"));
+      await periodPopoverClosed();
       expect(
         screen.queryByText("Untouched for a month"),
       ).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /last 7 days/i }));
       await user.click(await screen.findByRole("button", { name: "All time" }));
+      await periodPopoverClosed();
 
       expect(screen.getByText("Untouched for a month")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /all time/i })).toBeVisible();

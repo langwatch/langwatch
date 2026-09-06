@@ -48,6 +48,7 @@ import {
   resourceLimitCooldown,
   UsageLimitService,
 } from "../notifications/usage-limit.service";
+import type { PlanLimitNotifierInput } from "../types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,6 +126,14 @@ function createService({
   };
 }
 
+const PLAN_LIMIT_INPUT = {
+  organizationId: "org_1",
+  planName: "free",
+  usageUnit: "traces",
+  current: 12000,
+  max: 10000,
+} satisfies PlanLimitNotifierInput;
+
 const ORG_WITH_ADMIN = {
   id: "org_1",
   name: "Acme Corp",
@@ -178,8 +187,7 @@ describe("UsageLimitService", () => {
         const { service, organizationService } = createService();
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
 
         expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
@@ -195,8 +203,8 @@ describe("UsageLimitService", () => {
         ).mockResolvedValue(null);
 
         await service.notifyPlanLimitReached({
+          ...PLAN_LIMIT_INPUT,
           organizationId: "org_missing",
-          planName: "free",
         });
 
         expect(
@@ -220,8 +228,7 @@ describe("UsageLimitService", () => {
         });
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
 
         expect(
@@ -239,8 +246,7 @@ describe("UsageLimitService", () => {
         ).mockResolvedValue(ORG_WITH_ADMIN);
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
 
         expect(
@@ -252,6 +258,9 @@ describe("UsageLimitService", () => {
             adminName: "Jane Admin",
             adminEmail: "jane@example.com",
             planName: "free",
+            limitType: "Monthly Traces",
+            current: 12000,
+            max: 10000,
           }),
         );
         expect(
@@ -267,6 +276,37 @@ describe("UsageLimitService", () => {
       });
     });
 
+    describe("for each usage unit a plan cap can be metered in", () => {
+      it.each([
+        { usageUnit: "traces" as const, limitType: "Monthly Traces" },
+        { usageUnit: "events" as const, limitType: "Monthly Events" },
+      ])("labels a $usageUnit cap as $limitType", async ({
+        usageUnit,
+        limitType,
+      }) => {
+        const { service, organizationService, notificationService } =
+          createService();
+        (
+          organizationService.findWithAdmins as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await service.notifyPlanLimitReached({
+          ...PLAN_LIMIT_INPUT,
+          usageUnit,
+        });
+
+        expect(
+          notificationService.sendSlackPlanLimitAlert,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            limitType,
+            current: 12000,
+            max: 10000,
+          }),
+        );
+      });
+    });
+
     describe("when alert was sent more than 30 days ago", () => {
       it("sends notifications again", async () => {
         const { service, organizationService, notificationService } =
@@ -279,8 +319,7 @@ describe("UsageLimitService", () => {
         });
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
 
         expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalled();
@@ -297,24 +336,19 @@ describe("UsageLimitService", () => {
 
         await Promise.all([
           service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
+            ...PLAN_LIMIT_INPUT,
           }),
           service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
+            ...PLAN_LIMIT_INPUT,
           }),
           service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
+            ...PLAN_LIMIT_INPUT,
           }),
           service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
+            ...PLAN_LIMIT_INPUT,
           }),
           service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
+            ...PLAN_LIMIT_INPUT,
           }),
         ]);
 
@@ -333,8 +367,7 @@ describe("UsageLimitService", () => {
         ).mockResolvedValue(ORG_WITH_ADMIN);
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
         expect(
           notificationService.sendSlackPlanLimitAlert,
@@ -350,8 +383,7 @@ describe("UsageLimitService", () => {
         ).mockClear();
 
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
         expect(
           notificationService.sendSlackPlanLimitAlert,
@@ -374,8 +406,7 @@ describe("UsageLimitService", () => {
 
         // Should not throw — allSettled absorbs the rejection
         await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
+          ...PLAN_LIMIT_INPUT,
         });
 
         expect(

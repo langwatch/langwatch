@@ -11,9 +11,10 @@ import {
   type RawOutputFlags,
 } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { cliAuthHeaders } from "../../utils/authHeaders";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Bound the request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -49,9 +50,9 @@ type TranscriptDocument = z.infer<typeof transcriptDocumentSchema>;
 
 export const transcriptTraceCommand = async (
   traceId: string,
-  options: RawOutputFlags,
+  options: RawOutputFlags & { project?: string },
 ): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -62,10 +63,10 @@ export const transcriptTraceCommand = async (
   try {
     events.started("Fetching transcript…");
 
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
       {
-        headers: buildAuthHeaders({ apiKey }),
+        headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );

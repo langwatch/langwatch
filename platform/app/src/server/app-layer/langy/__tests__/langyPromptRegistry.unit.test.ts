@@ -125,6 +125,13 @@ describe("resolveLangyPrompt", () => {
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("retrieve this turn");
     });
 
+    // The other measured defect: replies closing with a next-actions question.
+    // The ban lives in AGENTS.md; this last-position pointer is what makes the
+    // model obey it, so dropping it regresses reply endings silently.
+    it("keeps the ending rule", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("End on the answer");
+    });
+
     // The worker already reads the persona in the agent's config prompt and
     // the operating rules in AGENTS.md. This block is the operator hot-patch
     // channel; when it also repeated the rules, the model read the same

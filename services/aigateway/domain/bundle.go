@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -150,6 +151,137 @@ type ExcludedModelProvider struct {
 	// ProviderID is the provider kind (openai, anthropic, ...), the axis a
 	// resolved request is matched on.
 	ProviderID ProviderID
+	// Handle is the row's routing handle, carried so a request that names the
+	// handle of a dropped row is told WHY it was dropped rather than being
+	// told the handle means nothing. Empty when the row has no handle.
+	Handle string
+}
+
+// CredentialByHandle finds the dispatchable credential a routing handle names.
+// The handle is compared lowercased, the form the control plane stores.
+func (c BundleConfig) CredentialByHandle(handle string) (Credential, bool) {
+	if handle == "" {
+		return Credential{}, false
+	}
+	for _, cred := range c.Credentials {
+		if cred.Handle != "" && strings.EqualFold(cred.Handle, handle) {
+			return cred, true
+		}
+	}
+	return Credential{}, false
+}
+
+// ExcludedByHandle finds a NON-dispatchable provider row a routing handle
+// names. A handle the key's routing policy or provider access dropped is still
+// a real name the operator chose, so recognizing it here is what lets the
+// refusal say which setting removed the provider instead of reporting the
+// handle as an unknown prefix.
+func (c BundleConfig) ExcludedByHandle(handle string) (ExcludedModelProvider, bool) {
+	if handle == "" {
+		return ExcludedModelProvider{}, false
+	}
+	for _, group := range [][]ExcludedModelProvider{c.RoutingExcludedProviders, c.AccessExcludedProviders} {
+		for _, row := range group {
+			if row.Handle != "" && strings.EqualFold(row.Handle, handle) {
+				return row, true
+			}
+		}
+	}
+	return ExcludedModelProvider{}, false
+}
+
+// ReadSpelling turns a model string into the provider it names and the model
+// id that reaches the provider.
+//
+// The first segment is a qualifier only when it names something real: a
+// routing handle on one of the key's provider rows, or a provider family the
+// gateway knows. Everything else is a model id in full, slashes and all,
+// because self-hosted servers and proxies serve models whose own ids contain
+// one ("stealth/ox-alpha", "meta-llama/Llama-3-70B").
+//
+// A handle belonging to a row the key's routing policy or provider access
+// dropped is recognized too, and returns that row's id. Credential selection
+// then finds no dispatchable credential for it and reports which setting
+// removed the provider, which is a far better answer than treating the
+// operator's own handle as an unknown prefix.
+//
+// It hangs off the config because only the key's own config can tell a handle
+// from a model id that happens to contain a slash. Dispatch and the model
+// listing both read spellings, and a second copy of this rule would let the
+// list offer a name dispatch refuses.
+func (c BundleConfig) ReadSpelling(spelling string) ResolvedModel {
+	qualifier, remainder, found := strings.Cut(spelling, "/")
+	if !found || qualifier == "" || remainder == "" {
+		return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+	}
+
+	if cred, ok := c.CredentialByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   cred.ProviderID,
+			CredentialID: cred.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if excluded, ok := c.ExcludedByHandle(qualifier); ok {
+		return ResolvedModel{
+			ModelID:      remainder,
+			ProviderID:   excluded.ProviderID,
+			CredentialID: excluded.ID,
+			Source:       ModelSourceExplicit,
+		}
+	}
+	if KnownProviderFamily(qualifier) {
+		return ResolvedModel{
+			ModelID:    remainder,
+			ProviderID: NormalizeProviderID(strings.ToLower(qualifier)),
+			Source:     ModelSourceExplicit,
+		}
+	}
+
+	return ResolvedModel{ModelID: spelling, Source: ModelSourceImplicit}
+}
+
+// RoutingHandles lists the handles of the key's dispatchable credentials,
+// sorted so an error message reads the same twice. Handles of excluded rows
+// are deliberately absent: a refusal must not offer a row the key cannot use.
+func (c BundleConfig) RoutingHandles() []string {
+	seen := make(map[string]bool)
+	var out []string
+	add := func(handle string) {
+		if handle == "" || seen[handle] {
+			return
+		}
+		seen[handle] = true
+		out = append(out, handle)
+	}
+	for _, cred := range c.Credentials {
+		add(cred.Handle)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// BlockedRowReason reports why one specific ModelProvider row is absent from
+// the dispatch chain. Distinct from BlockedProviderReason, which answers for a
+// provider KIND: a routing handle names one row, and a key holding two
+// Anthropic rows must not borrow the surviving row's answer for the dropped
+// one.
+func (c BundleConfig) BlockedRowReason(id string) ProviderBlockReason {
+	if id == "" {
+		return ProviderBlockNone
+	}
+	for _, e := range c.RoutingExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockRouting
+		}
+	}
+	for _, e := range c.AccessExcludedProviders {
+		if e.ID == id {
+			return ProviderBlockAccess
+		}
+	}
+	return ProviderBlockNone
 }
 
 // ProviderBlockReason names why a provider a request resolved to is not in the
@@ -303,12 +435,27 @@ func ModelSpellings(providerID ProviderID, modelID string) []string {
 // One function so the model listing and the dispatcher cannot disagree about
 // which provider a name means, which is how a listing came to advertise names
 // that dispatch refused.
+//
+// The qualifier has to name a family the gateway knows. Without that check
+// every model id containing a slash read as a provider prefix, so an
+// allowlist entry naming a real self-hosted model was attributed to a
+// provider that does not exist. This function knows no key, so it cannot
+// recognize a routing handle; callers holding a BundleConfig resolve handles
+// through CredentialByHandle first.
+//
+// The qualifier is lowercased before it becomes a ProviderID. KnownProviderFamily
+// accepts any casing, while NormalizeProviderID matches its aliases literally, so
+// passing the raw segment through turned "OpenAI/gpt-5-mini" into the provider id
+// "OpenAI", which matches no credential.
 func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
 	qualifier, model, ok := strings.Cut(spelling, "/")
 	if !ok || qualifier == "" || model == "" {
 		return "", spelling, false
 	}
-	return NormalizeProviderID(qualifier), model, true
+	if !KnownProviderFamily(qualifier) {
+		return "", spelling, false
+	}
+	return NormalizeProviderID(strings.ToLower(qualifier)), model, true
 }
 
 // AllowsResolvedModel reports whether a model the resolver settled on

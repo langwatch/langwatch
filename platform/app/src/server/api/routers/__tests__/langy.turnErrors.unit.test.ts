@@ -29,11 +29,19 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
   LANGY_MESSAGES_PER_MINUTE: 30,
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({ langy: { turns: { startConversationTurn } } }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      langy: { turns: { startConversationTurn } },
+    }),
+  };
+});
 
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 
@@ -49,11 +57,12 @@ vi.mock("../langyAccessMiddleware", () => ({
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
-  const passthrough = async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
+  return {
+    ...actual,
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
-  return { ...actual, checkProjectPermission: () => passthrough };
 });
 
 import { LangyRateLimitedError } from "~/server/app-layer/langy/errors";
@@ -161,6 +170,94 @@ describe("langy turn-start rejections", () => {
       const wire = onTheWire(error);
       expect(wire.data.error).not.toBeNull();
       expect(wire.data.error).toMatchObject({ code: "langy_rate_limited" });
+    });
+  });
+
+  describe("when the send carries a modelOverride", () => {
+    /** @scenario A model id that itself contains a slash is accepted */
+    it("accepts a custom-provider model whose id contains a slash and forwards it intact", async () => {
+      const result = await caller().createConversation({
+        projectId: "project_1",
+        idempotencyKey: "idem-key-0001",
+        messages: [message],
+        modelOverride: "custom/stealth/ox-alpha",
+      });
+
+      expect(result).toMatchObject({ conversationId: "c1", turnId: "t1" });
+      expect(startConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ modelOverride: "custom/stealth/ox-alpha" }),
+      );
+    });
+
+    /** @scenario A model from a named provider row is accepted with the row id in front */
+    it("accepts the canonical mp_<rowId> wire form with a multi-segment model", async () => {
+      const result = await caller().createConversation({
+        projectId: "project_1",
+        idempotencyKey: "idem-key-0001",
+        messages: [message],
+        modelOverride: "mp_01jm7qk3v8/deepseek/deepseek-r1:free",
+      });
+
+      expect(result).toMatchObject({ conversationId: "c1", turnId: "t1" });
+      expect(startConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelOverride: "mp_01jm7qk3v8/deepseek/deepseek-r1:free",
+        }),
+      );
+    });
+
+    /** @scenario A model reference without a provider segment is rejected as invalid input */
+    it("rejects a model without a provider segment as a validation_error naming the field", async () => {
+      const error = await caller()
+        .createConversation({
+          projectId: "project_1",
+          idempotencyKey: "idem-key-0001",
+          messages: [message],
+          modelOverride: "gpt-5-mini",
+        })
+        .catch((e: unknown) => e);
+
+      // Input-parse failures reject as BAD_REQUEST with the ZodError as the
+      // cause; the errorFormatter is what promotes them to the handled
+      // `validation_error` on the wire.
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
+      // The wire names the offending field, so the client card can say which
+      // value to look at instead of the anonymous fallback sentence.
+      const wire = onTheWire(error);
+      expect(wire.data.error).not.toBeNull();
+      expect(wire.data.error).toMatchObject({ code: "validation_error" });
+      expect(
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
+          .meta.fieldErrors,
+      ).toHaveProperty("modelOverride");
+      expect(startConversationTurn).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A model reference with an empty segment is rejected as invalid input */
+    it("rejects a reference whose model segment is empty", async () => {
+      const error = await caller()
+        .createConversation({
+          projectId: "project_1",
+          idempotencyKey: "idem-key-0001",
+          messages: [message],
+          // THE POINT: the slash is a delimiter, not a model. Widening the
+          // pattern for aggregator ids must not let a bare delimiter through —
+          // there is no model here for the allowlist check to match.
+          modelOverride: "custom//stealth",
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
+      const wire = onTheWire(error);
+      expect(wire.data.error).not.toBeNull();
+      expect(wire.data.error).toMatchObject({ code: "validation_error" });
+      expect(
+        (wire.data.error as { meta: { fieldErrors: Record<string, unknown> } })
+          .meta.fieldErrors,
+      ).toHaveProperty("modelOverride");
+      expect(startConversationTurn).not.toHaveBeenCalled();
     });
   });
 

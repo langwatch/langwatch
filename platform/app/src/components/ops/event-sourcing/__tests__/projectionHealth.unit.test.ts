@@ -55,6 +55,32 @@ describe("joinProjectionHealth", () => {
     });
   });
 
+  /** @scenario A map projection's live jobs light up its row */
+  it("joins live map-node counts onto a map projection's row", () => {
+    const rows = joinProjectionHealth({
+      projections: [{ ...META, kind: "map" }],
+      pipelineTree: treeWith("map", { pending: 4, active: 1, blocked: 0 }),
+    });
+    expect(rows[0]).toMatchObject({
+      pending: 4,
+      active: 1,
+      hasLiveNode: true,
+    });
+  });
+
+  /** @scenario A state projection's live backlog joins its registry row */
+  it("joins live state-node counts onto a state projection's row", () => {
+    const rows = joinProjectionHealth({
+      projections: [{ ...META, kind: "state" }],
+      pipelineTree: treeWith("state", { pending: 7, active: 0, blocked: 3 }),
+    });
+    expect(rows[0]).toMatchObject({
+      pending: 7,
+      blocked: 3,
+      hasLiveNode: true,
+    });
+  });
+
   it("does not join counts across the fold/map kind boundary", () => {
     const rows = joinProjectionHealth({
       projections: [META],

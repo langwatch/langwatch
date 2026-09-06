@@ -7,6 +7,7 @@
  * that referrer is same-origin — otherwise it falls back to "/". Exercises
  * the real `isSameOrigin` guard via `importOriginal`, not a reimplementation.
  */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,7 +79,11 @@ describe("Auth error page referrer redirect", () => {
   describe("given a same-origin referrer", () => {
     it("redirects back to the referrer after the countdown", async () => {
       setReferrer(`${origin}/some/prior/page`);
-      render(<Error />);
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
 
       await vi.advanceTimersByTimeAsync(5000);
 
@@ -89,7 +94,11 @@ describe("Auth error page referrer redirect", () => {
   describe("given a cross-origin referrer that shares the origin as a prefix (@regression)", () => {
     it("falls back to / instead of following it off-domain", async () => {
       setReferrer(`${origin}.evil.com/phish`);
-      render(<Error />);
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
 
       await vi.advanceTimersByTimeAsync(5000);
 
@@ -100,7 +109,11 @@ describe("Auth error page referrer redirect", () => {
   describe("given no referrer", () => {
     it("falls back to /", async () => {
       setReferrer("");
-      render(<Error />);
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
 
       await vi.advanceTimersByTimeAsync(5000);
 

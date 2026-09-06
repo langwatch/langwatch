@@ -41,7 +41,6 @@ const {
     selectedOrganizationId: "",
     selectedTeamId: "",
     selectedProjectSlug: "",
-    lastVisitedHomeKind: "",
   } as Record<string, string>,
 }));
 

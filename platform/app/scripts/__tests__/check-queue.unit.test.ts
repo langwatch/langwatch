@@ -88,6 +88,8 @@ type RunOptions = {
   argv?: string[];
   /** Give the run its own process group, so a test can signal the group. */
   isDetached?: boolean;
+  /** The queue to run, for the tests that need one stalled at a known point. */
+  script?: string;
 };
 
 type Run = {
@@ -101,6 +103,7 @@ function startRun({
   env: envOverrides,
   argv: argvOverride,
   isDetached = false,
+  script = QUEUE_SCRIPT,
 }: RunOptions): Run {
   const argv = argvOverride ?? [
     "node",
@@ -128,12 +131,16 @@ function startRun({
     // assertion would flake red. The pressure tests below force their own
     // levels the same way.
     CHECK_PRESSURE: "green",
+    // The suite itself often runs inside an agent shell, where a gate-off
+    // CHECK_SLOTS is ignored by design. Dropped so every test means what it
+    // says; the agent-shell tests below set it back on purpose.
+    CLAUDECODE: undefined,
     ...envOverrides,
   })) {
     if (value !== undefined) env[key] = value;
   }
 
-  const child = spawn(process.execPath, [QUEUE_SCRIPT, ...argv], {
+  const child = spawn(process.execPath, [script, ...argv], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
     detached: isDetached,
@@ -224,15 +231,22 @@ describe("check queue", () => {
     it("tells everything below it that the slot is already held", async () => {
       // The bin shims mean a queued `pnpm typecheck` spawns another gated
       // entry point. Without this, it queues behind the slot it is holding and
-      // waits out the entire maximum wait before starting.
+      // waits out the entire maximum wait before starting. The marker carries
+      // the wrapper's own pid, which is what an agent shell verifies.
       const run = startRun({
         tag: "nested",
-        argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
+        argv: [
+          "node",
+          "-e",
+          'process.stdout.write([process.env.CHECK_SLOTS, process.env.CHECK_QUEUE_HELD, String(process.ppid)].join(" "))',
+        ],
         env: { CHECK_SLOTS: "3" },
       });
       const result = await run.done;
 
-      expect(result.stdout).toBe("0");
+      const [slots, held, wrapper] = result.stdout.split(" ");
+      expect(slots).toBe("0");
+      expect(held).toBe(wrapper);
     });
 
     /** @scenario "The wrapper is transparent to the command it runs" */
@@ -501,6 +515,105 @@ describe("check queue", () => {
     });
   });
 
+  describe("given an agent shell", () => {
+    /** @scenario "An agent shell cannot turn the queue off" */
+    it("ignores a gate-off, says so, and queues like everyone else", async () => {
+      const holder = startRun({ tag: "holder", holdMs: 700 });
+      await waitForHolder();
+      // Red narrows the derived limit to one, so the refusal is observable as
+      // real queueing rather than a message alone.
+      const agent = startRun({
+        tag: "agent",
+        env: {
+          CLAUDECODE: "1",
+          CHECK_SLOTS: "0",
+          CI: undefined,
+          CHECK_PRESSURE: "red",
+        },
+      });
+      const [, second] = await Promise.all([holder.done, agent.done]);
+
+      expect(second.stderr).toContain(
+        "CHECK_SLOTS=0 is ignored in an agent shell",
+      );
+      expect(second.stderr).toContain("Only a person may turn the queue off");
+      expect(second.stderr).toContain("1 check is already active");
+      expect(maxOverlap(readEvents())).toBe(1);
+    });
+
+    /** @scenario "A run the queue spawned itself stays unqueued in an agent shell" */
+    it("keeps the queue's own nested runs unqueued", async () => {
+      // A queued `pnpm typecheck` reaches a bin shim, which is another gated
+      // entry point running under the wrapper's CHECK_SLOTS=0 and marker. In
+      // an agent shell the marker is what carries the gate-off through.
+      const run = startRun({
+        tag: "outer",
+        argv: [
+          "node",
+          QUEUE_SCRIPT,
+          "node",
+          fakeCommand,
+          logFile,
+          "inner",
+          "0",
+        ],
+        // Bounds the failure mode: a regression here queues the inner run
+        // behind the outer's held slot, and "starting anyway" breaks the
+        // silence assertion instead of hanging the suite for the default wait.
+        env: { CLAUDECODE: "1", CHECK_QUEUE_MAX_WAIT_MS: "3000" },
+      });
+      const result = await run.done;
+
+      expect(result.code).toBe(0);
+      // Silent end to end: the outer run found a free slot, and the inner one
+      // was neither refused nor queued.
+      expect(result.stderr).toBe("");
+      expect(startOrder(readEvents())).toEqual(["inner"]);
+    });
+
+    /** @scenario "An agent's own shell is not a queue wrapper" */
+    it("rejects a held-marker naming an ancestor that is not a queue wrapper", async () => {
+      // The test runner is a real live ancestor of the run below, and it is
+      // not the queue. `CHECK_QUEUE_HELD=$$` from an agent shell has exactly
+      // this shape, and it is the cheapest bypass there is, so it must fail.
+      const explained = await startRun({
+        tag: "not-the-queue",
+        argv: ["--explain"],
+        env: {
+          CLAUDECODE: "1",
+          CHECK_SLOTS: "0",
+          CHECK_QUEUE_HELD: String(process.pid),
+          CI: undefined,
+        },
+      }).done;
+
+      expect(explained.stderr).toContain("ignored in an agent shell");
+      expect(explained.stderr).not.toContain("source=held");
+    });
+
+    /** @scenario "A borrowed held-marker does not turn the queue off" */
+    it("rejects a held-marker naming a live process that is not an ancestor", async () => {
+      const bystander = spawn("sleep", ["30"]);
+      try {
+        const explained = await startRun({
+          tag: "borrowed",
+          argv: ["--explain"],
+          env: {
+            CLAUDECODE: "1",
+            CHECK_SLOTS: "0",
+            CHECK_QUEUE_HELD: String(bystander.pid),
+            CI: undefined,
+          },
+        }).done;
+
+        expect(explained.stderr).toContain("ignored in an agent shell");
+        expect(explained.stderr).not.toContain("source=held");
+      } finally {
+        bystander.kill("SIGKILL");
+      }
+    });
+  });
+
   describe("given no explicit limit", () => {
     /** @scenario "The default limit is derived from the machine" */
     it("bounds the default by both memory and cores, never below one", async () => {
@@ -705,16 +818,16 @@ describe("check queue", () => {
       expect(result.stderr).not.toContain("killed from outside");
     });
 
-    /** @scenario "An interrupted run killed from outside is still reported" */
-    it("still names the kill when an interrupt came first", async () => {
-      const pidFile = path.join(scratch, "escalated.pid");
-      // The command ignores the forwarded SIGTERM (the disposition survives the
-      // exec), so the signal that finally ends it is one nobody forwarded.
-      const run = startRun({
-        tag: "escalated",
-        argv: ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`],
-      });
+    /**
+     * The command that ignores a forwarded SIGTERM, so the signal that finally
+     * ends it is one nobody forwarded. It publishes its own pid, because the
+     * test has to reach past the wrapper to kill it.
+     */
+    function ignoresTermArgv(pidFile: string): string[] {
+      return ["sh", "-c", `trap '' TERM; echo $$ > ${pidFile}; exec sleep 5`];
+    }
 
+    async function waitForPid(pidFile: string): Promise<string> {
       let pid = "";
       for (let attempt = 0; attempt < 200 && pid === ""; attempt++) {
         try {
@@ -727,13 +840,75 @@ describe("check queue", () => {
         // on both is what keeps the attempts from burning off in microseconds.
         if (pid === "") await sleep(25);
       }
-      expect(pid).not.toBe("");
+      if (pid === "") throw new Error("the command never published its pid");
+      return pid;
+    }
+
+    /** @scenario "An interrupted run killed from outside is still reported" */
+    it("still names the kill when an interrupt came first", async () => {
+      const pidFile = path.join(scratch, "escalated.pid");
+      const run = startRun({
+        tag: "escalated",
+        argv: ignoresTermArgv(pidFile),
+      });
+      const pid = await waitForPid(pidFile);
 
       run.child.kill("SIGTERM");
       await sleep(100);
       process.kill(Number(pid), "SIGKILL");
       const result = await run.done;
 
+      expect(result.code).toBe(137);
+      expect(result.stderr).toContain("killed from outside by SIGKILL");
+    });
+
+    /**
+     * A copy of the queue that stops for `stallMs` at one exact point: the
+     * moment the child exists.
+     *
+     * The interrupt this pins is a scheduling race, so no arrangement of real
+     * timing reproduces it on demand. A delay is the one edit that cannot
+     * change what a program does, only when it does it, so injecting one is
+     * what turns the race into a decision the test can make.
+     */
+    function queueStalledAsCommandAppears(stallMs: number): string {
+      const source = readFileSync(QUEUE_SCRIPT, "utf8");
+      const call = source.indexOf("spawn(commandArgv[0]");
+      const end = source.indexOf("});", call);
+      if (call === -1 || end === -1) {
+        throw new Error(
+          "the queue no longer spawns the command the way this test stalls it",
+        );
+      }
+      const at = end + "});".length;
+      const copy = path.join(scratch, "check-queue-stalled.mjs");
+      writeFileSync(
+        copy,
+        `${source.slice(0, at)}\n{ const until = Date.now() + ${stallMs}; while (Date.now() < until) {} }\n${source.slice(at)}`,
+        "utf8",
+      );
+      return copy;
+    }
+
+    /** @scenario "An interrupt that arrives as the command starts is forwarded" */
+    it("forwards an interrupt that lands in the instant the command appears", async () => {
+      const pidFile = path.join(scratch, "stalled.pid");
+      const run = startRun({
+        tag: "stalled",
+        script: queueStalledAsCommandAppears(400),
+        argv: ignoresTermArgv(pidFile),
+      });
+      // Published from inside the stall, so the interrupt below is delivered
+      // while the wrapper is still held there.
+      const pid = await waitForPid(pidFile);
+
+      run.child.kill("SIGTERM");
+      await sleep(100);
+      process.kill(Number(pid), "SIGKILL");
+      const result = await run.done;
+
+      // A wrapper that took the interrupt on its default disposition would be
+      // dead by now, reporting no code and leaving the command behind.
       expect(result.code).toBe(137);
       expect(result.stderr).toContain("killed from outside by SIGKILL");
     });

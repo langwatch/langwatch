@@ -9,7 +9,7 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
 
   Per gateway.md "admin OTTL authoring":
     Admin opens the IngestionTemplate detail page (in the
-    /governance/tool-catalog Ingestion Templates tab) and clicks
+    /governance/inventory?tab=catalog Ingestion Templates tab) and clicks
     "Edit OTTL". The OttlEditor (existing component at
     @ee/governance/dashboard/components/OttlEditor) opens with the
     current ottlRules as a per-statement list, async validates each

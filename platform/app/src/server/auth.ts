@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { IncomingHttpHeaders } from "http";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
 import type {
@@ -94,11 +95,18 @@ export const getServerAuthSession = async (ctx: {
     const result = await auth.api.getSession({ headers });
     if (!result) return null;
 
+    // ADR-101 §5, the read fork: for a user whose backfill is finalized the
+    // identifiers own their email and `User.email` is a stale copy, so the
+    // session carries the identifier's answer. null keeps the column's.
+    const identityResolvedEmail = await identityEmail().resolveEmail({
+      userId: result.user.id,
+    });
+
     const baseSession: Session = {
       user: {
         id: result.user.id,
         name: result.user.name ?? null,
-        email: result.user.email ?? null,
+        email: identityResolvedEmail ?? result.user.email ?? null,
         image: result.user.image ?? null,
         pendingSsoSetup:
           ((result.user as Record<string, unknown>).pendingSsoSetup as
@@ -166,12 +174,17 @@ export const getServerAuthSession = async (ctx: {
         targetStillValid && !targetStillValid.deactivatedAt;
 
       if (isTargetActive) {
+        // The impersonated user takes the same fork as anyone else; the
+        // impersonator's own email rides in already resolved.
+        const impersonatedEmail = await identityEmail().resolveEmail({
+          userId: impersonating.id,
+        });
         return {
           ...baseSession,
           user: {
             id: impersonating.id,
             name: impersonating.name ?? null,
-            email: impersonating.email ?? null,
+            email: impersonatedEmail ?? impersonating.email ?? null,
             image: impersonating.image ?? null,
             impersonator: {
               id: baseSession.user.id,

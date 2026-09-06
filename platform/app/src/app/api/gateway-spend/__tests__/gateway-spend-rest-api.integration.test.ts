@@ -42,29 +42,40 @@ const resolveTestClickHouseClient = async () => chClient;
 // route takes its ClickHouse-backed repositories from `getApp().gateway`
 // too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    planProvider: {
-      getActivePlan: async () => ({
-        webhookEndpointsEnabled: planHasWebhookEndpoints,
-      }),
-    },
-    gateway: {
-      budgets: new GatewayBudgetClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-      virtualKeySpend: undefined,
-      spendEvents: new GatewaySpendEventsRepository(
-        resolveTestClickHouseClient,
-      ),
-      webhookEvents: new WebhookEventsClickHouseRepository(
-        resolveTestClickHouseClient,
-      ),
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  // The REST org-auth middleware decides through
+  // appFromContext(c).permissions (ADR-092); the fake carries the real
+  // composition over the real test database so requests reach the routes.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const permissions = permissionsServiceFor(dbForPermissions);
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions,
+      planProvider: {
+        getActivePlan: async () => ({
+          webhookEndpointsEnabled: planHasWebhookEndpoints,
+        }),
+      },
+      gateway: {
+        budgets: new GatewayBudgetClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+        virtualKeySpend: undefined,
+        spendEvents: new GatewaySpendEventsRepository(
+          resolveTestClickHouseClient,
+        ),
+        webhookEvents: new WebhookEventsClickHouseRepository(
+          resolveTestClickHouseClient,
+        ),
+      },
+    }),
+  };
+});
 
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
@@ -202,6 +213,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
             cache_creation_1h_tokens: 0,
             input_audio_tokens: 0,
             output_audio_tokens: 0,
+            input_image_tokens: 0,
+            output_image_tokens: 0,
+            image_count: 0,
             input_chars: 0,
             audio_ms: 0,
           },

@@ -457,6 +457,8 @@ describe("SimulationClickHouseRepository", () => {
         PassCount: "1",
         FailCount: "0",
         RunningCount: "2",
+        SettledCount: "1",
+        StalledCount: "0",
         LastUpdatedAt: "9000",
         LastRunAt: "9000",
         FirstCompletedAt: "0",
@@ -578,27 +580,27 @@ describe("SimulationClickHouseRepository", () => {
           const batch = result.batches[0]!;
           expect(batch.stalledCount).toBe(0);
           expect(batch.runningCount).toBe(2);
+          expect(batch.settledCount).toBe(1);
         });
       });
     });
 
     describe("given a legacy stored STALLED item and a zero RunningCount", () => {
       describe("when the batch history is resolved", () => {
-        it("clamps runningCount at zero", async () => {
+        it("reports the stored runningCount beside the stalled count", async () => {
           setQueryResults(clickhouse, [
             [{ TotalBatchCount: "1" }],
-            // Stored as STALLED, so it is not counted in RunningCount…
+            // A stored STALLED run is outside the running list, so the
+            // aggregate counts it as settled and reports zero running.
             [
               makeBatchRow({
                 RunningCount: "0",
+                SettledCount: "1",
                 TotalCount: "1",
                 PassCount: "0",
               }),
             ],
             [
-              // …and a finished legacy row keeps its stored STALLED status, so
-              // RunningCount - stalledCount would go negative without the
-              // clamp.
               makeItemRow({
                 ScenarioRunId: "run-B",
                 Status: "STALLED",
@@ -615,7 +617,51 @@ describe("SimulationClickHouseRepository", () => {
 
           const batch = result.batches[0]!;
           expect(batch.stalledCount).toBe(1);
+          // The stalled run is not subtracted from the running count: the
+          // aggregate already excludes it.
           expect(batch.runningCount).toBe(0);
+          expect(batch.settledCount).toBe(1);
+        });
+      });
+    });
+
+    describe("given a running run beside a stored STALLED item", () => {
+      describe("when the batch history is resolved", () => {
+        it("keeps both counts as the aggregate reports them", async () => {
+          setQueryResults(clickhouse, [
+            [{ TotalBatchCount: "1" }],
+            [
+              makeBatchRow({
+                TotalCount: "2",
+                PassCount: "0",
+                RunningCount: "1",
+                SettledCount: "1",
+              }),
+            ],
+            [
+              makeItemRow({
+                ScenarioRunId: "run-A",
+                Status: "STALLED",
+                FinishedAt: "5000",
+                UpdatedAt: "5000",
+              }),
+              makeItemRow({
+                ScenarioRunId: "run-B",
+                Status: "IN_PROGRESS",
+                FinishedAt: null,
+              }),
+            ],
+          ]);
+
+          const result = await repo.getBatchHistoryForScenarioSet({
+            projectId: "proj-1",
+            scenarioSetId: "set-1",
+          });
+
+          const batch = result.batches[0]!;
+          expect(batch.stalledCount).toBe(1);
+          expect(batch.runningCount).toBe(1);
+          expect(batch.settledCount).toBe(1);
         });
       });
     });

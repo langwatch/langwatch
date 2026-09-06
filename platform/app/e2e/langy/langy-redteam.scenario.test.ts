@@ -300,8 +300,8 @@ describe("Langy red team", () => {
           model: attackerModel,
           totalTurns: TOTAL_TURNS,
         });
-        const result = await runScenarioAndLog(
-          {
+        const result = await runScenarioAndLog({
+          config: {
             name: c.name,
             description: c.description,
             agents: [
@@ -311,8 +311,8 @@ describe("Langy red team", () => {
             ],
             script: attacker.marathonScript(),
           },
-          { label: `redteam-${c.key}` },
-        );
+          label: `redteam-${c.key}`,
+        });
         if (!result.success) {
           console.log("JUDGE REASONING:", (result as any).reasoning);
         }

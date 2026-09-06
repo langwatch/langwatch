@@ -1,131 +1,143 @@
 ---
 title: Model Naming
-description: How to name models in requests, bare, prefixed, or aliased, and how the gateway resolves each.
+description: How to name a model in a request, and which provider the gateway sends it to.
 sidebarTitle: Model Naming
 ---
 
-The gateway accepts three ways to reference a model in the `model` field of a request. Which to use depends on what your virtual key is bound to, and whether you want a redirect layer in the middle.
+The `model` field accepts three forms. Each one tells the gateway a different amount about where the request goes.
 
-<CardGroup cols={3}>
-  <Card title="Bare" icon="circle-check">
-    `"model": "gpt-5-mini"`, preferred for OpenAI-SDK drop-in and single-provider VKs.
-  </Card>
-  <Card title="Prefixed" icon="slash">
-    `"model": "openai/gpt-5-mini"`, disambiguator for multi-provider VKs.
-  </Card>
-  <Card title="Alias" icon="arrow-right-arrow-left">
-    `"model": "coding-small"`, per-VK redirect to any `provider/model`. See [Model Aliases](/ai-gateway/model-aliases).
-  </Card>
-</CardGroup>
+| Form | Example | Where the request goes |
+|---|---|---|
+| Bare model | `"model": "gpt-5-mini"` | The provider on the key that serves that model. The gateway infers the provider. |
+| Provider and model | `"model": "openai/gpt-5-mini"` | A provider of that kind on the key. |
+| Instance handle and model | `"model": "europe/claude-sonnet-5"` | The one provider instance that carries the handle `europe`. |
 
-## Bare model (preferred)
+A fourth kind of name, an alias, is a name a routing policy maps to one of the forms above. See [Model Aliases](/ai-gateway/model-aliases).
 
-```bash
-curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer vk-lw-..." \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
-```
+## Resolution order
 
-Matches what every OpenAI-SDK codebase already writes. Works on any VK where the model name is unambiguous, i.e. a single-provider VK, or a multi-provider VK where only one bound provider offers that model.
+The gateway reads the `model` string once, in this order. The first step that matches decides.
 
-**Use bare when:**
-- Your VK is bound to one provider.
-- You're migrating an existing OpenAI/Anthropic SDK codebase and want zero code changes.
-- You're writing documentation or examples for broad audiences.
+1. **Alias.** If the routing policy maps the exact string to a target, the target replaces it. The target is then read with the same rules as a request, so an alias can point at any of the three forms.
+2. **Instance handle.** If the text before the first `/` is a routing handle on one of the key's providers, the request is pinned to that provider instance. The rest of the string is the model id.
+3. **Provider family.** If the text before the first `/` is a provider family the gateway knows, the request goes to a provider of that kind. The rest of the string is the model id, including any further `/`.
+4. **Bare model.** Otherwise the whole string is the model id, slashes included, and the gateway infers the provider from it.
 
-## Prefixed model (`provider/model`)
+The prefix is removed before the request leaves. A provider never receives `openai/gpt-5-mini` as a model name.
 
-```bash
-curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer vk-lw-..." \
-  -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
-```
+## Provider families
 
-Explicit disambiguator. Matches the litellm, OpenRouter, Portkey convention and preserves compatibility with codebases that already use that pattern.
+`openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `xai`, `groq`, `cerebras`, `deepseek`, `voyage`, `elevenlabs`, `cloudflare`, `custom`, `openai_codex`.
 
-**Use prefixed when:**
-- Your VK is bound to multiple providers AND more than one offers the same model name (e.g. both OpenAI and Azure OpenAI expose `gpt-5-mini`).
-- You want readers of your code to see at a glance which provider a call is targeting.
-- You're porting from a gateway (litellm, OpenRouter) that required this form.
+The alternative spellings that SDKs emit are accepted too: `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex`, `google_gemini`. The family is case-insensitive, so `OpenAI/gpt-5-mini` works.
 
-The supported prefixes are: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `groq`, `grok`, `ollama`, `openrouter`, plus any custom-OpenAI-compatible provider name you configured.
+A family names a kind of provider, not one instance. If the key reaches two Anthropic providers, `anthropic/claude-sonnet-5` matches both and the first one in the key's provider order serves the request. The others stay available for failover. Use an instance handle to choose one.
 
-## Alias
+The provider order is the order in the key's routing policy. A key with no policy orders its providers by the global fallback priority set on each provider, then by creation date.
 
-```bash
-curl https://gateway.langwatch.ai/v1/chat/completions \
-  -H "Authorization: Bearer vk-lw-..." \
-  -d '{"model":"coding-small","messages":[{"role":"user","content":"hi"}]}'
-```
+## How the gateway infers the provider for a bare model
 
-A per-VK redirect from a client-facing name to a concrete `provider/model`. Aliases decouple client code from provider specifics, you can repoint `coding-small` from OpenAI to Bedrock in a single VK edit without touching any caller.
+For a bare model name the gateway tries four steps and stops at the first one that leaves at least one provider:
 
-See [Model Aliases](/ai-gateway/model-aliases) for the full rules, including how an alias is judged against `models_allowed` and the `GET /v1/models` discovery endpoint.
+1. **Providers that declare the model.** A custom provider lists the models it serves, and a hosted provider ships a catalog. This is what makes a declared model routable without a prefix.
+2. **The vendor in the name.** A short built-in table maps a prefix to the vendor that originated it. This is the safety net for a model newer than the shipped catalog.
+3. **Providers with no model list.** A provider with no model list cannot be ruled out by a model it does not list.
+4. **A key with one provider.** With one provider there is no choice to make, so the gateway forwards any model name to it.
 
-## How resolution works
+If all four steps leave no provider, the request is refused with `model_not_recognized`.
 
-The gateway resolves the `model` field in **constant time on the hot path**: no try-the-bare-form-then-fall-back-to-the-prefixed-form retry, no error branch per request. Whichever form you send, one deterministic O(1) resolution step picks the right route.
+The vendor table in step 2:
 
-Concretely: on every request the resolver inspects the raw `model` string once. If it contains a `/`, the prefix is peeled off and checked against the VK's bound providers; the bare segment then identifies the upstream model. If there's no `/`, the bare string is looked up in the VK's alias map (if present) and then against the VK's bound-provider models. The outgoing request body's `model` field is rewritten to the bare form before dispatch so the raw-body passthrough never ships `openai/gpt-5-mini` to OpenAI (upstreams reject a prefixed name with `invalid model ID`).
-
-| Request `model` | Resolved route |
+| Model name starts with | Provider |
 |---|---|
-| `gpt-5-mini` | openai + `gpt-5-mini` |
-| `openai/gpt-5-mini` | openai + `gpt-5-mini` (prefix stripped before upstream) |
-| `claude-haiku-4-5-20251001` | anthropic + `claude-haiku-4-5-20251001` |
-| `anthropic/claude-haiku-4-5-20251001` | anthropic + `claude-haiku-4-5-20251001` (prefix stripped before upstream) |
-| `coding-small` | *(alias → openai + `gpt-5-mini`)* |
+| `claude-` | `anthropic` |
+| `gpt-`, `o1-`, `o3-`, `o4-`, `chatgpt-`, `text-embedding-`, `dall-e-`, `whisper-`, `tts-` | `openai` |
+| `gemini-` | `gemini` |
 
-If the model isn't bound to this VK, e.g. the prefix names a provider the VK doesn't have credentials for, the request returns `400 bad_request` with an enriched error (below).
+Bedrock and Vertex are not in the table. Write `bedrock/anthropic.claude-…` or `vertex/…`, or use an alias, to reach a Claude or Gemini model through them.
 
-## Ambiguity: rejected at save time
+### Model ids that contain a slash
 
-If a VK is bound to multiple providers that expose the same model name (e.g. both OpenAI and Azure OpenAI offer `gpt-5-mini`), the VK **cannot be saved** without a disambiguating alias. The create/update dialog surfaces an inline error:
+A model id can contain a `/` of its own, which is normal for self-hosted servers and proxies: `stealth/ox-alpha`, `meta-llama/Llama-3-70B`. The gateway reads the first segment as a prefix only when it is a routing handle or a provider family. Once you declare `stealth/ox-alpha` on the provider that serves it, `"model": "stealth/ox-alpha"` works as written.
 
-> `gpt-5-mini` is provided by multiple bound providers on this VK (`openai`, `azure`). Define a model alias that pins the bare name to one provider, or remove one of the duplicate providers.
+One case still needs a prefix. A model whose first segment spells a provider family, for example `openai/my-finetune` on a self-hosted server, is read as the `openai` family. Write `custom/openai/my-finetune` instead.
 
-Rejecting at save time, not at request time, preserves the runtime contract: **every bare name on an active VK resolves unambiguously in a single O(1) lookup**. The hot path never has to branch on collision.
+## Instance handles
 
-Prefixed forms on the same VK always resolve unambiguously, so `"model": "openai/gpt-5-mini"` and `"model": "azure/gpt-5-mini"` always work alongside whatever alias you defined for the bare form.
+A routing handle is a name you give to one model provider. Set it on the provider in **Settings → Model Providers**. It is unique inside your organization, so `europe/claude-sonnet-5` names the same provider from every key that reaches it.
 
-## Model not found
+Use a handle when you run more than one provider of the same kind and want to choose between them in the request. For example, a European and a United States Anthropic account.
 
-If the `model` string matches no map key:
+Rules for a handle:
+
+- Lowercase. It starts with a letter or a number, then letters, numbers, hyphens and underscores, up to 32 characters.
+- It cannot be a provider family name, or one of the reserved words `azure_openai`, `aws_bedrock`, `vertex`, `google_vertex`, `google_gemini`, `cloudflare`, `mp`.
+- Renaming a handle is a breaking change for every caller that uses it. Requests naming the old handle stop reaching that provider immediately.
+
+A handle pins one provider instance. When the key cannot reach that instance, the request is refused with `model_provider_not_bound` naming the handle. No other provider serves it in its place.
+
+`GET /v1/models` lists the models of a provider that has a handle under the handle-qualified name, so `europe/claude-sonnet-5` appears rather than `claude-sonnet-5`. See [API: `GET /v1/models`](/ai-gateway/api/models).
+
+## Declaring the models a provider serves
+
+Hosted providers already declare their models, so `gpt-5-mini` and `claude-sonnet-5` route without setup.
+
+For a **Custom (OpenAI-compatible)** provider, add the models under **Custom models** on the provider. That is what lets a caller send the bare model name instead of `custom/` in front of it, and what puts the model in `GET /v1/models`.
+
+A key with one provider does not need this. Every model name is forwarded to that provider.
+
+## When a name does not resolve
+
+Every refusal is a JSON error with `error.code`, and the HTTP status is fixed per code.
+
+| `error.code` | HTTP | Cause |
+|---|---|---|
+| `missing_model` | 400 | The request names no model. The message says where this endpoint expects it. |
+| `model_not_recognized` | 400 | A bare model name that no provider on the key serves, and the key holds more than one provider. |
+| `model_provider_not_bound` | 400 | The request named a provider family or a handle that this key cannot reach. Also returned when a request arrives on a provider-native route (`/v1/messages`, the Gemini `/v1beta` route) and the key has no provider of that vendor. |
+| `model_not_allowed` | 400 | The model resolved, but the key's `models_allowed` list, its provider access, or its routing policy excludes it. |
+| `no_provider_configured` | 400 | The organization has no model provider at all. Add one in **Settings → Model Providers**. |
+
+`model_provider_not_bound` and `model_not_recognized` list the prefixes the key accepts, so the caller can correct the request from the message. The list is capped at ten names and is also in `error.meta.options`.
 
 ```json
 {
   "error": {
-    "type": "bad_request",
-    "code": "model_not_bound",
-    "message": "Model 'turbo' is not bound to this VK. Bound models: gpt-5-mini, gpt-4o, claude-haiku-4-5-20251001. Or define an alias on the VK."
+    "code": "model_provider_not_bound",
+    "message": "The \"bedrock\" provider is not reachable from this key's scope, so no credential is configured for it. This key reaches \"anthropic\", \"openai\", \"europe\". Ask the key's owner to add the provider, or send the request to one of those."
   }
 }
 ```
 
-The error surfaces the accepted names so an integrator can fix the request without reading docs.
+```json
+{
+  "error": {
+    "code": "model_not_recognized",
+    "message": "No provider on this key serves the model \"private-build\". This key reaches \"anthropic\", \"openai\". Name the provider in the model string, or declare the model on the provider that serves it."
+  }
+}
+```
 
-## Decision tree
+`models_allowed` plays no part in choosing a provider. It judges the model the request resolves to, in both spellings: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` allow the same model.
+
+**Also check:** [Troubleshooting](/ai-gateway/troubleshooting) for the full error index.
+
+## Choosing a form
 
 <Steps>
-  <Step title="Single-provider VK">
-    Use bare. `gpt-5-mini`. Drop-in for OpenAI SDK.
+  <Step title="One provider on the key">
+    Use the bare model name.
   </Step>
-  <Step title="Multi-provider VK, unique model names">
-    Use bare. The map resolves each unique name to the right provider, no ambiguity.
+  <Step title="Several providers, different models">
+    Use the bare model name. Each provider declares its own models, so the name is enough.
   </Step>
-  <Step title="Multi-provider VK, overlapping model names">
-    Use prefixed. `openai/gpt-5-mini` vs `azure/gpt-5-mini` disambiguates. Or define aliases that pin each name to a specific provider.
+  <Step title="Several providers of the same kind">
+    Give each one a routing handle and use it: `europe/claude-sonnet-5`.
   </Step>
-  <Step title="You want a stable client-facing name that can be repointed">
-    Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
+  <Step title="A stable name you can repoint later">
+    Use an alias in the routing policy. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
-  <Step title="Cross-provider fallback (primary dies, secondary takes over)">
-    Name a model that the fallback providers also serve, for example an Anthropic model with an Anthropic credential and a Bedrock credential on the VK. One request resolves to one model. The gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+  <Step title="Failover between providers">
+    Name a model that more than one provider on the key serves. The gateway carries the same model name to the next provider in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>
-
-## Why not just pick one convention?
-
-Gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Provider SDK codebases use the bare name. Requiring either one would create friction for the other population.
-
-Accepting both, with a single O(1) resolution step, not a retry loop, lets you write whichever is natural for your code.

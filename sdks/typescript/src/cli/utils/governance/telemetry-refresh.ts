@@ -80,6 +80,7 @@ import {
 	telemetryEnvVarNames,
 } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
@@ -373,6 +374,7 @@ export function refreshCodexOtelBlockTo({
 	// refresh that keeps the exporters healthy heals the harvest wiring too
 	// (idempotent and quiet while the notify block is already in place).
 	assertCodexTurnHarvest();
+	assertCodexAgentGuidance();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -586,6 +588,7 @@ export async function refreshTelemetryWiringForLogin(
 			// when the hook is already in place.
 			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
 				assertCodexTurnHarvest();
+				assertCodexAgentGuidance();
 			}
 			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockIngestNormalizedSpan = vi.fn();
 const mockReportEvaluation = vi.fn();
 const mockCheckLimit = vi.fn();
+const mockNotifyPlanLimitReached = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -14,8 +15,8 @@ vi.mock("~/server/app-layer/app", () => ({
     usage: { checkLimit: mockCheckLimit },
     traces: { collection: { ingestNormalizedSpan: mockIngestNormalizedSpan } },
     evaluations: { reportEvaluation: mockReportEvaluation },
-    planProvider: { getActivePlan: vi.fn() },
-    usageLimits: { notifyPlanLimitReached: vi.fn() },
+    planProvider: { getActivePlan: vi.fn(async () => ({ name: "free" })) },
+    usageLimits: { notifyPlanLimitReached: mockNotifyPlanLimitReached },
   })),
 }));
 
@@ -204,6 +205,7 @@ describe("POST /api/collector", () => {
           planName: "free",
           count: 10,
           maxMessagesPerMonth: 10,
+          usageUnit: "traces",
         });
 
         const res = await postCollector({
@@ -221,6 +223,28 @@ describe("POST /api/collector", () => {
           activePlanName: "free",
         });
         expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+
+      it("tells the plan limit notifier which cap was hit", async () => {
+        mockCheckLimit.mockResolvedValue({
+          exceeded: true,
+          message: "monthly limit reached",
+          planName: "free",
+          count: 12000,
+          maxMessagesPerMonth: 10000,
+          usageUnit: "traces",
+        });
+
+        await postCollector({ trace_id: "trace-1", spans: [makeSpan(1)] });
+
+        expect(mockNotifyPlanLimitReached).toHaveBeenCalledWith(
+          expect.objectContaining({
+            planName: "free",
+            usageUnit: "traces",
+            current: 12000,
+            max: 10000,
+          }),
+        );
       });
     });
   });

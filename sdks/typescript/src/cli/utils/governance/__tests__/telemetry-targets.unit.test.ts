@@ -28,6 +28,10 @@ import {
 } from "../opencode-plugin";
 import { telemetryEnvVarNames } from "../otel-env-block";
 import {
+	defaultCodexAgentsMdPath,
+	installCodexAgentGuidance,
+} from "../codex-agents-md";
+import {
 	installSessionContextHooks,
 	sessionContextHookCommand,
 } from "../session-context-hooks";
@@ -291,6 +295,29 @@ describe("scanTelemetryTargets", () => {
 				"export const Mine = async () => ({});\n",
 			);
 			expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
+		});
+	});
+
+	describe("when the codex AGENTS.md carries the guidance block and user content", () => {
+		/** @scenario "Logout removes exactly the LangWatch AGENTS.md block" */
+		it("reports the guidance, removes only our block, and keeps theirs", () => {
+			const agentsMd = defaultCodexAgentsMdPath();
+			fs.mkdirSync(path.dirname(agentsMd), { recursive: true });
+			fs.writeFileSync(agentsMd, "# My rules\n");
+			installCodexAgentGuidance(agentsMd);
+
+			expect(
+				presentLabels().some((l) => l.startsWith("codex agent guidance")),
+			).toBe(true);
+
+			for (const t of scan().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			expect(fs.readFileSync(agentsMd, "utf8")).toContain("# My rules");
+			expect(
+				presentLabels().some((l) => l.startsWith("codex agent guidance")),
+			).toBe(false);
 		});
 	});
 

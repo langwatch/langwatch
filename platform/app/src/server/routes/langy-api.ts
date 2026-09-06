@@ -216,7 +216,7 @@ async function authorizeTurn(c: Context) {
   );
   if (!surfaceOpen) return { dark: true as const };
 
-  await enforceApiKeyCeiling({ prisma, resolved, permission: "langy:create" });
+  await enforceApiKeyCeiling({ resolved, permission: "langy:create" });
 
   const identity = await resolveLangyKeyIdentity({ resolved });
   if (!identity.ok) {

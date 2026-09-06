@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
@@ -324,16 +325,20 @@ type nodeRun struct {
 	ns      *NodeState
 	secrets map[string]string
 	params  map[string]any
+	// sandboxAPIKey is the run-scoped credential the sandbox authenticates
+	// with. Empty when the run has none.
+	sandboxAPIKey string
 }
 
 // newNodeRun assembles the context for one node execution from the request
 // that carries the workflow-level values.
 func newNodeRun(req ExecuteRequest, inputs map[string]any, ns *NodeState) nodeRun {
 	return nodeRun{
-		inputs:  inputs,
-		ns:      ns,
-		secrets: req.Workflow.Secrets,
-		params:  req.Workflow.Params,
+		inputs:        inputs,
+		ns:            ns,
+		secrets:       req.Workflow.Secrets,
+		params:        req.Workflow.Params,
+		sandboxAPIKey: req.Workflow.SandboxAPIKey,
 	}
 }
 
@@ -343,9 +348,44 @@ func newNodeRun(req ExecuteRequest, inputs map[string]any, ns *NodeState) nodeRu
 // credential just as surely as an error string that echoes it. Run parameters
 // are not credentials and are left intact, so an author can still print one to
 // see what a run was given.
+//
+// The run-scoped sandbox key is scrubbed the same way. It is the one
+// credential the sandbox reads from its environment, so `print(os.environ)`
+// would otherwise write it into every place a stored output travels.
 func (r nodeRun) storeOutput(stdout, stderr string) {
-	r.ns.Stdout = redactSecrets(stdout, r.secrets)
-	r.ns.Stderr = redactSecrets(stderr, r.secrets)
+	r.ns.Stdout = redactSecrets(stdout, r.scrubbedValues())
+	r.ns.Stderr = redactSecrets(stderr, r.scrubbedValues())
+}
+
+// storeError scrubs a node error the same way stored output is scrubbed.
+//
+// A NodeError travels the same execution events, traces and logs stdout and
+// stderr travel, and the runner fills it from `str(exc)` and
+// `traceback.format_exc()`. An exception raised inside a call that carries a
+// credential quotes that credential, so the message and the traceback are
+// scrubbed before the error leaves the node.
+func (r nodeRun) storeError(err *NodeError) *NodeError {
+	if err == nil {
+		return nil
+	}
+	values := r.scrubbedValues()
+	err.Message = redactSecrets(err.Message, values)
+	err.Traceback = redactSecrets(err.Traceback, values)
+	return err
+}
+
+// scrubbedValues is every value that must never appear in a stored output:
+// the project's resolved secrets, plus the run's sandbox key.
+func (r nodeRun) scrubbedValues() map[string]string {
+	if r.sandboxAPIKey == "" {
+		return r.secrets
+	}
+	values := make(map[string]string, len(r.secrets)+1)
+	for name, value := range r.secrets {
+		values[name] = value
+	}
+	values["__sandbox_api_key"] = r.sandboxAPIKey
+	return values
 }
 
 // dispatch routes a node to its executor and returns its declared
@@ -494,11 +534,11 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, run nodeRu
 		Params:          run.params,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, run.storeError(&NodeError{Type: "code_runner_error", Message: err.Error()})
 	}
 	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
-		return nil, nodeErrorFromCodeBlock(res.Error)
+		return nil, run.storeError(nodeErrorFromCodeBlock(res.Error))
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -556,15 +596,26 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 		DeclaredOutputs: declared,
 		Secrets:         run.secrets,
 		Params:          run.params,
+		SandboxAPIKey:   run.sandboxAPIKey,
+		Timeout:         nodeTimeout(node.Data.Parameters),
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, run.storeError(&NodeError{Type: "code_runner_error", Message: err.Error()})
 	}
 	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
-		return nil, nodeErrorFromCodeBlock(res.Error)
+		return nil, run.storeError(nodeErrorFromCodeBlock(res.Error))
 	}
 	return res.Outputs, nil
+}
+
+// nodeTimeout reads the node's `timeout_ms` parameter — the same identifier
+// and units the HTTP block uses — as a duration. Missing, zero, negative and
+// values too large to convert all yield 0, which the executors read as "use
+// the configured default". The value is a request for a SHORTER budget only;
+// the code executor clamps it to the operator's ceiling.
+func nodeTimeout(params []dsl.Field) time.Duration {
+	return blocktimeout.FromMillis(paramInt(params, "timeout_ms"))
 }
 
 func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
@@ -717,7 +768,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	}
 	// Trace a redacted copy: the model gets the full fetched bytes (req.Messages),
 	// but the span's langwatch.input must not store the base64 attachment payload.
-	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, redactAttachmentsForTracing(messages))
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messagesForTracing(messages))
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {

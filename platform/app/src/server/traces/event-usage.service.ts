@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
+import { tryGetApp } from "~/server/app-layer/app";
 import {
   getBillingMonth,
   queryBillableEventsByProjectApprox,
@@ -27,7 +27,7 @@ export class EventUsageService {
   }: {
     organizationId: string;
   }): Promise<UsageCount> {
-    if (!isClickHouseEnabled()) {
+    if (!(tryGetApp()?.clickhouse.enabled ?? false)) {
       logger.warn(
         { organizationId },
         "getCurrentMonthCount: ClickHouse unavailable, usage is unknown",
@@ -67,7 +67,7 @@ export class EventUsageService {
       return [];
     }
 
-    if (!isClickHouseEnabled()) {
+    if (!(tryGetApp()?.clickhouse.enabled ?? false)) {
       logger.warn(
         { organizationId },
         "getCountByProjects: ClickHouse unavailable, usage is unknown",

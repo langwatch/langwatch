@@ -593,7 +593,12 @@ export function lwqlPostgresApprovedViewStatements({
   );
 }
 
-/** The approved views the reader role must be granted, in catalog order. */
+/**
+ * The approved views the reader role must be granted, in catalog order.
+ *
+ * No production caller in this repo — input to the infra-owned access model
+ * (langwatch-saas#1126); reference implementation, not dead code.
+ */
 export function lwqlApprovedPostgresViewNames(
   views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG,
 ): string[] {
@@ -612,6 +617,9 @@ export function lwqlApprovedPostgresViewNames(
  *
  * Headroom on top of the pools' total demand, for the connection a
  * re-provisioning run or an operator's `psql` needs while the pools are full.
+ *
+ * No production caller in this repo — input to the infra-owned reader role
+ * (langwatch-saas#1126); reference implementation, not dead code.
  */
 export function lwqlPostgresReaderConnectionLimit({
   views = LWQL_VIEW_CATALOG,
@@ -645,6 +653,11 @@ export function lwqlPostgresReaderConnectionLimit({
  *
  * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
  * views over them, and after the named collection exists.
+ *
+ * Not called from any production path in this repo: the real tables are owned
+ * by infra (langwatch-saas#1126). This is the reference implementation that
+ * terraform must match — keep it and its tests in sync, do not delete as dead
+ * code.
  */
 export function lwqlPostgresEngineTableStatements({
   names,
@@ -707,6 +720,11 @@ function singleSourceColumn(
  * from migrations, and the PostgreSQL-engine ones from
  * {@link lwqlPostgresEngineTableStatements}, which must have run first.
  * This function only exposes them.
+ *
+ * Not called from any production path in this repo: the real views' grants and
+ * access model are owned by infra (langwatch-saas#1126). This is the reference
+ * implementation that terraform must match — keep it and its tests in sync, do
+ * not delete as dead code.
  */
 export function lwqlViewSetupStatements({
   names,

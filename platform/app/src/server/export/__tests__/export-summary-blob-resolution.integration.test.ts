@@ -266,6 +266,10 @@ beforeAll(async () => {
         }
         return resolved;
       },
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
     },
   });
 

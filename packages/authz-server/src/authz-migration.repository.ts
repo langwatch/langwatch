@@ -83,6 +83,11 @@ export type RoleHeadRow = {
   description: string | null;
   permissions: unknown;
   kind: string;
+  /** Whether the fold has marked this head deleted. A tombstone is still a
+   *  row - the name it took stays taken - so the read that serves the proof
+   *  returns it and says so, rather than dropping it and leaving the check to
+   *  read an absence as "not folded yet". */
+  deleted: boolean;
 };
 
 /**
@@ -156,13 +161,21 @@ export type ProjectCredentialFact = {
   createdAtMs: number;
 };
 
-/** A user matched from the platform-admin email list. */
-export type PlatformAdminUserFact = {
-  userId: string;
-  /** Normalized (lowercased) — the migration reports the emails it could
-   *  not match, and matching is what decides that. */
-  email: string;
-  createdAtMs: number;
+
+/** One non-RESOURCE `Grant` head row, as the authz-engine migration's proof
+ *  reads it. Columns as stored, uppercase spellings kept. */
+export type GrantHeadRow = {
+  id: string;
+  principalType: string;
+  principalId: string | null;
+  roleKey: string | null;
+  legacyRole: string | null;
+  /** Which writer emitted the fact — what tells the migration's sweep and
+   *  completeness check a row is theirs to own. */
+  source: string;
+  scopeType: string;
+  scopeId: string;
+  revoked: boolean;
 };
 
 /** One RESOURCE-scope `Grant` head row, re-read for the import proof.
@@ -170,6 +183,9 @@ export type PlatformAdminUserFact = {
  *  uppercase spellings, and the proof is where they meet the source row's. */
 export type ResourceGrantRow = {
   grantId: string;
+  /** Which writer emitted the fact — what tells the migration's sweep and
+   *  completeness check a row is theirs to own. */
+  source: string;
   token: string | null;
   resourceKind: string | null;
   /** The RESOURCE scope's id: the shared resource itself. */
@@ -222,11 +238,6 @@ export interface AuthzCutoverRepository
   findProjectCredentialFacts(args: {
     organizationId: string;
   }): Promise<ProjectCredentialFact[]>;
-  /** Users behind the platform-admin email list, matched case-insensitively
-   *  the way the live admin check matches them. */
-  findUsersByEmail(args: {
-    emails: readonly string[];
-  }): Promise<PlatformAdminUserFact[]>;
 
   /** The RESOURCE heads, for the import proof. */
   findResourceGrantRows(args: {

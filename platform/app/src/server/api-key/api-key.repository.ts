@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,
@@ -15,6 +15,7 @@ import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/re
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 /** The grants an API key carries, as the request states them. */
 export type ApiKeyBindingInput = {
@@ -353,11 +354,31 @@ export class ApiKeyRepository {
     });
   }
 
-  async revoke({ id }: { id: string }): Promise<ApiKey> {
-    return this.prisma.apiKey.update({
-      where: { id },
-      data: { revokedAt: new Date() },
+  /**
+   * Marks a key revoked, recording why, and never overwrites a cause already
+   * on the row.
+   *
+   * The fence on `revokedAt` is what makes the cause the FIRST revocation's,
+   * not the last writer's. A person revoking a key from the API-keys page and
+   * the personal ingest-key cap retiring the same key can reach here at the
+   * same moment: both read a live row, and without the fence the later update
+   * decides the cause. A `"cap"` written over a `"user"` is the one that
+   * matters, because the CLI re-mints a key the cap retired and leaves a key
+   * a person revoked dead. Losing the race returns the row that stands, so
+   * the key is dead either way and the first decision is the one recorded.
+   */
+  async revoke({
+    id,
+    cause,
+  }: {
+    id: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKey> {
+    await this.prisma.apiKey.updateMany({
+      where: { id, revokedAt: null },
+      data: { revokedAt: new Date(), revocationCause: cause },
     });
+    return this.prisma.apiKey.findUniqueOrThrow({ where: { id } });
   }
 
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {
@@ -604,6 +625,12 @@ export class ApiKeyRepository {
    * The attach itself, with the outcome intact: which ids were written and
    * which identical rows were already there. `replaceRoleBindings` needs both
    * to know what its revoke must spare.
+   *
+   * `requireProjection` because both callers act on these rows next: a create
+   * activates the credential, and a replace revokes whatever the attach did
+   * not keep. An append that is durable but not yet readable is fine for a
+   * caller that only writes; here it would hand out a token the resolver
+   * refuses, or drop the grants the key already had.
    */
   private async attachRoleBindings({
     apiKeyId,
@@ -630,6 +657,7 @@ export class ApiKeyRepository {
       })),
       actor,
       onDuplicate: "skip",
+      requireProjection: true,
     });
   }
 }

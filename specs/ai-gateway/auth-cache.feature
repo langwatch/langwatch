@@ -351,6 +351,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the confirmed entry keeps serving its credentials with its staleness clock restarted
       And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
       And a response that carried no token leaves the next refresh unconditional
+      And a control plane that changed the config without changing the token keeps confirming a bundle that is no longer current, which is why the token covers the provider rows and not only the key
 
     @unit
     Scenario: a refresh the control plane cannot answer leaves the cached config serving

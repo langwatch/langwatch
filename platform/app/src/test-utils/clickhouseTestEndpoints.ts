@@ -24,6 +24,7 @@ import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
 } from "@testcontainers/clickhouse";
+import { customAlphabet } from "nanoid";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in
@@ -96,6 +97,36 @@ export interface TestClickHouseEndpoint {
   url: string;
   /** The database this endpoint owns, for statements that qualify a table. */
   database: string;
+}
+
+/**
+ * A random organization id for a suite that routes it with a
+ * `CLICKHOUSE_URL__<label>__<orgId>` variable.
+ *
+ * The id lands inside the variable NAME, where `__` separates the label from
+ * the organization and the organization is read as the last such segment. Plain
+ * `nanoid` draws from an alphabet that contains `_`, so about one id in 800
+ * carries a `__` of its own; the name then splits in the wrong place, the route
+ * registers under a fragment of the id, and the organization silently falls
+ * back to the shared client. The alphabet here has no `_`, so the name a suite
+ * writes is the name the parser reads back.
+ *
+ * `name` is held to the same rule, and refused rather than repaired: a suite
+ * that asks for a namespace the variable cannot carry has a mistake to fix in
+ * the line it wrote, and a quietly rewritten namespace would hide it.
+ */
+const routableIdSuffix = customAlphabet(
+  "0123456789abcdefghijklmnopqrstuvwxyz",
+  6,
+);
+
+export function privateRouteOrgId(name: string): string {
+  if (name.includes("__")) {
+    throw new Error(
+      `A private-route org id cannot be named "${name}": "__" separates the label from the organization in the env var name, so the parser would read back only what follows it.`,
+    );
+  }
+  return `${name}-${routableIdSuffix()}`;
 }
 
 /**

@@ -22,12 +22,14 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
+
+wireDefaultTestApp();
 
 // Postgres and an encryption key are all this needs (the setup files
 // provide a deterministic CREDENTIALS_SECRET), so it runs wherever the
@@ -518,6 +520,129 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           ).rejects.toThrow(rejectedWith);
 
           expect(await keysById(created.id)).toEqual(stored);
+        });
+      });
+    });
+
+    // A row whose stored bag will not decrypt reads back as null, exactly like
+    // a row that never had one, so every guard above waved such a save through
+    // and replaced ciphertext a restored CREDENTIALS_SECRET would have brought
+    // back.
+    describe("given a provider whose stored credentials can no longer be used", () => {
+      // Azure again, because its schema accepts a payload that names none of
+      // its credential fields. That is what lets the save reach the guard
+      // instead of being turned back by key validation first.
+      async function createAzureRow() {
+        return await service().updateModelProvider(
+          {
+            projectId,
+            provider: "azure",
+            enabled: true,
+            customKeys: {
+              AZURE_OPENAI_API_KEY: STORED_KEY,
+              AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+            },
+            scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
+          ctx(),
+        );
+      }
+
+      const CIPHERTEXT = "not-a-value-this-secret-can-decrypt";
+
+      async function makeUnusable(id: string) {
+        await prisma.modelProvider.update({
+          where: { id },
+          data: { customKeys: CIPHERTEXT },
+        });
+      }
+
+      async function rawKeysOf(id: string) {
+        const row = await prisma.modelProvider.findUnique({
+          where: { id },
+          select: { customKeys: true },
+        });
+        return row?.customKeys;
+      }
+
+      async function refusal(id: string, customKeys: Record<string, unknown>) {
+        try {
+          await service().updateModelProvider(
+            {
+              projectId,
+              id,
+              provider: "azure",
+              enabled: true,
+              customKeys,
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+        } catch (error) {
+          return error as { code?: string };
+        }
+        return undefined;
+      }
+
+      describe.each([
+        {
+          name: "names no credential field",
+          customKeys: {},
+        },
+        {
+          name: "sends every credential field empty",
+          customKeys: { AZURE_OPENAI_API_KEY: "", AZURE_OPENAI_ENDPOINT: "" },
+        },
+        {
+          // What the drawer actually sends. It renders the masked placeholder
+          // for the secret fields of an enabled row it found no credentials
+          // on, so the ordinary save names every field and carries none.
+          name: "sends the masked placeholder back",
+          customKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: "",
+          },
+        },
+      ])("when a save $name", ({ customKeys }) => {
+        /** @scenario A provider with unusable credentials refuses a save that brings no replacement */
+        it("is refused and the stored value survives", async () => {
+          const created = await createAzureRow();
+          await makeUnusable(created.id);
+
+          const error = await refusal(created.id, customKeys);
+
+          expect(error?.code).toBe("model_provider_credentials_unreadable");
+          expect(await rawKeysOf(created.id)).toBe(CIPHERTEXT);
+        });
+      });
+
+      describe("when the payload carries a new credential", () => {
+        it("goes through, because that is the way back", async () => {
+          const created = await createAzureRow();
+          await makeUnusable(created.id);
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_OPENAI_API_KEY: "sk-fresh",
+                AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          const row = await new ModelProviderRepository(
+            prisma,
+          ).findByIdWithDecryptedKeys(created.id);
+          expect(row?.customKeys).toEqual({
+            AZURE_OPENAI_API_KEY: "sk-fresh",
+            AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+          });
         });
       });
     });

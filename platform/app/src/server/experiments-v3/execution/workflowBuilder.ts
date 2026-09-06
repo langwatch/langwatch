@@ -390,6 +390,13 @@ const buildTargetNode = (
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
+        case "connected":
+          // A connected agent runs in the customer's own process, reached
+          // through the relay by the scenario runner. An experiment cell has
+          // no node that speaks that protocol.
+          throw new Error(
+            `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           const _exhaustive: never = loadedData.agent.type;
           throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -508,10 +515,20 @@ export const buildSignatureNodeFromPrompt = ({
     verbosity: prompt.verbosity,
   });
 
-  const messages: ChatMessage[] = prompt.messages.map((m) => ({
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-  }));
+  // The VersionedPrompt read model prepends a synthesized
+  // `{role:"system", content: prompt.prompt}` to `messages` (storage keeps
+  // system text only in the `prompt` column — see hoistSystemMessage).
+  // `instructions` below already carries that same text, so forwarding the
+  // synthesized entry would send the system prompt twice. Strip system
+  // roles here: for a prompt with no template messages this leaves the
+  // list empty, which makes the engine fold the scalar inputs into a user
+  // turn instead of sending a request with no user message at all.
+  const messages: ChatMessage[] = prompt.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
 
   return {
     id: nodeId,
@@ -770,7 +787,11 @@ export const buildSignatureNodeFromAgent = (
 const buildSignatureNodeParameters = (
   config: TypedAgent["config"],
 ): Field[] => {
-  const baseParams = config.parameters ?? [];
+  // Only the studio node kinds carry node fields as parameters; a connected
+  // agent's parameters are run parameter declarations, never node fields.
+  const baseParams = (
+    "sdk" in config ? [] : (config.parameters ?? [])
+  ) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
   const resultParams: Field[] = [...baseParams];
@@ -855,7 +876,9 @@ export const buildCodeNodeFromAgent = (
       name: agent.name,
       inputs,
       outputs,
-      parameters: config.parameters ?? [],
+      // The caller dispatched on `agent.type === "code"`, so the parameters
+      // are the code node's own fields.
+      parameters: ("sdk" in config ? [] : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };

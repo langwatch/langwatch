@@ -58,7 +58,7 @@ Feature: The scenario editor says when it is still reading
     Then the fields hold the scenario's values
 
   # Creating a scenario reads nothing, so the editor must never wait. The read
-  # is disabled in that case and reports itself as not loading, but the editor
+  # is disabled in that scenario and reports itself as not loading, but the editor
   # gates on there being a scenario to read at all rather than trusting that.
   @integration
   Scenario: A new scenario never waits on a read

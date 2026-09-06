@@ -23,7 +23,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// @scenario "Unknown provider prefix on VK returns 400 with clear envelope"
+// @scenario "A family prefix with no credential names the reachable families"
 func TestChat_UnknownProviderPrefixReturnsNotBoundEnvelope(t *testing.T) {
 	dispatched := false
 	provider := &mockProvider{
@@ -70,6 +70,9 @@ func TestChat_UnknownProviderPrefixReturnsNotBoundEnvelope(t *testing.T) {
 	// provider was refused and that it is not reachable from the key's scope.
 	assert.Contains(t, rec.Body.String(), "bedrock")
 	assert.Contains(t, rec.Body.String(), "not reachable from this key's scope")
+	// And what the key CAN reach, so the caller can correct the request from
+	// the refusal alone rather than guessing at another prefix.
+	assert.Contains(t, rec.Body.String(), "openai")
 }
 
 // @scenario "A provider-native route refuses a key with no provider that speaks it"

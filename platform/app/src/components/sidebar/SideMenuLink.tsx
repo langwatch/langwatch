@@ -182,8 +182,8 @@ export const SideMenuLink = ({
   // A page opened by its address can have its entry below the visible
   // part of a scrolled menu. "nearest" leaves the menu alone whenever
   // the entry is already visible, so click navigation never shifts it.
-  // Where the entry lands when a menu FIRST renders is the column's own
-  // call, not the entry's: useRevealActiveEntryOnLoad.
+  // Where a menu scrolls to is the column's own call, not the entry's:
+  // useMenuScrollPosition.
   useEffect(() => {
     if (isActive) {
       linkRef.current?.scrollIntoView?.({ block: "nearest" });

@@ -69,6 +69,23 @@ export class AlreadyOrganizationMemberError extends HandledError {
   }
 }
 
+/**
+ * The invitation exists but its window has passed. Distinct from
+ * `invite_not_found` on purpose: an expired invitation is recoverable — the
+ * inviter resends it in one click (D11) — so the person holding the link
+ * gets told to ask for a fresh one instead of a dead end.
+ */
+export class InviteExpiredError extends HandledError {
+  declare readonly code: "invite_expired";
+
+  constructor() {
+    super("invite_expired", "This invitation has expired", {
+      httpStatus: 410,
+    });
+    this.name = "InviteExpiredError";
+  }
+}
+
 export class InviteNotFoundError extends HandledError {
   declare readonly code: "invite_not_found";
 
@@ -95,6 +112,56 @@ export class TeamNotInOrganizationError extends HandledError {
       { httpStatus: 422, meta: { teamId } },
     );
     this.name = "TeamNotInOrganizationError";
+  }
+}
+
+/**
+ * Somebody is signed in, and the account they are signed in as is not the
+ * one the invitation names.
+ *
+ * Not a refusal: the way out is to sign in as the invited account, and the
+ * screen offers exactly that. The hint is what makes the offer actionable —
+ * "sign in as the right account" is useless advice to somebody holding three
+ * of them.
+ *
+ * The hint is MASKED, and the whole address never leaves the server. An
+ * invite code is a bearer token that reaches inboxes, chat logs and support
+ * threads; `frontDoor.inviteLanding` already refuses to name the invited
+ * address for that reason, and a mismatch is not the place to hand it over.
+ * Enough survives the mask to recognize an address you own, and not enough
+ * to learn one you do not.
+ */
+export class InviteWrongAccountError extends HandledError {
+  declare readonly code: "invite_wrong_account";
+
+  constructor(invitedHint: string) {
+    super(
+      "invite_wrong_account",
+      "This invitation was sent to a different account",
+      { httpStatus: 403, meta: { invitedHint } },
+    );
+    this.name = "InviteWrongAccountError";
+  }
+}
+
+/**
+ * A resend or a fresh-invitation request came too soon after the last one.
+ *
+ * Both sides of the invitation can trigger an email — the admin resending
+ * and the invitee asking again — so both are throttled, and both land here.
+ * `retryAfterSeconds` is what lets the screen say how long instead of "try
+ * again later".
+ */
+export class InviteThrottledError extends HandledError {
+  declare readonly code: "invite_throttled";
+
+  constructor(retryAfterSeconds: number) {
+    super(
+      "invite_throttled",
+      "That invitation was just sent. Give it a moment before sending another",
+      { httpStatus: 429, meta: { retryAfterSeconds } },
+    );
+    this.name = "InviteThrottledError";
   }
 }
 

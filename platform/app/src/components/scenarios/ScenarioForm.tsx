@@ -3,6 +3,7 @@ import {
   Field,
   HStack,
   Input,
+  NativeSelect,
   Text,
   Textarea,
   VStack,
@@ -31,9 +32,18 @@ export const scenarioFormSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema,
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
+  // null files it nowhere. Only the Agent Testing editor offers the field.
+  testSuiteId: z.string().nullish(),
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
+
+/** One test suite the scenario can be filed in. */
+export type ScenarioTestSuiteOption = { id: string; name: string };
+
+/** What "no test suite" reads as in the suite field. */
+export const UNFILED_OPTION_LABEL = "No test suite";
 
 /**
  * Initial data passed to ScenarioFormDrawer via complexProps when creating
@@ -46,6 +56,11 @@ export interface ScenarioInitialData {
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
+  /**
+   * The test suites the scenario can be filed in. Absent hides the field, which
+   * is what every surface outside Agent Testing does.
+   */
+  testSuiteOptions?: ScenarioTestSuiteOption[];
 };
 
 /**
@@ -53,7 +68,11 @@ type ScenarioFormProps = {
  * Matches the design mockup layout.
  * Submit is handled externally via formRef.
  */
-export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
+export function ScenarioForm({
+  defaultValues,
+  formRef,
+  testSuiteOptions,
+}: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
       name: "",
@@ -97,6 +116,37 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
         </Field.Root>
       </VStack>
+
+      {testSuiteOptions && (
+        <VStack align="stretch" gap={3}>
+          <Field.Root>
+            <SectionHeader>Test suite</SectionHeader>
+            <Controller
+              name="testSuiteId"
+              control={control}
+              render={({ field }) => (
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    aria-label="Test suite"
+                    value={field.value ?? ""}
+                    onChange={(event) =>
+                      field.onChange(event.target.value || null)
+                    }
+                  >
+                    <option value="">{UNFILED_OPTION_LABEL}</option>
+                    {testSuiteOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              )}
+            />
+          </Field.Root>
+        </VStack>
+      )}
 
       {/* SITUATION Section */}
       <VStack align="stretch" gap={3}>
@@ -170,6 +220,7 @@ function useResetOnDefaultsChange({
           defaultValues.parameters,
           defaultValues.maxTurns,
           defaultValues.minTurns,
+          defaultValues.testSuiteId,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -181,6 +232,7 @@ function useResetOnDefaultsChange({
           criteria: [],
           labels: [],
           parameters: [],
+          testSuiteId: null,
           ...defaultValues,
         });
       }

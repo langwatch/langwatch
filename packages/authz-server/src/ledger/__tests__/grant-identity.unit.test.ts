@@ -50,7 +50,7 @@ describe("grant identity", () => {
         deriveGrantId({ ...base, organizationId: "org_other" }),
         deriveGrantId({
           ...base,
-          principal: { type: "api_key", id: "user_alice" },
+          principal: { type: "apiKey", id: "user_alice" },
         }),
         deriveGrantId({
           ...base,

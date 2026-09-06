@@ -66,6 +66,16 @@ Feature: HTTP agent headers render templates and carry trace context
     When the target takes a turn
     Then the request carries the turn's trace id in both places
 
+  # The session value comes back from the agent itself, so a template that
+  # renders it into the url would let the agent choose the host its own turns
+  # are sent to.
+  @unit
+  Scenario: The held session cannot decide the host a turn is sent to
+    Given an http target whose url template reads "session"
+    When the session the agent returned names another host
+    Then the turn is refused, and the url template that reads the session
+      inside the path still renders
+
   @unit
   Scenario: A code execution receives the trace context in its params
     Given a code target

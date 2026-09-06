@@ -1,3 +1,4 @@
+import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 import { type Organization, PricingModel } from "~/generated/prisma/client";
@@ -13,6 +14,7 @@ export const organizationFactory = Factory.define<
   updatedAt: new Date(),
   usageSpendingMaxLimit: null,
   maxSessionDurationDays: 0,
+  mfaRequired: false,
   signedDPA: false,
   elasticsearchNodeUrl: null,
   elasticsearchApiKey: null,
@@ -27,6 +29,8 @@ export const organizationFactory = Factory.define<
   promoCode: null,
   ssoDomain: null,
   ssoProvider: null,
+  domainJoin: DEFAULT_DOMAIN_JOIN_SETTING,
+  joinDomains: [],
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,

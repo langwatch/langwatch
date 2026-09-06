@@ -20,6 +20,7 @@ function repositoryWith(overrides: {
       findUnique: vi.fn().mockResolvedValue(null),
       groupBy: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue(undefined),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
       delete: vi.fn().mockResolvedValue(undefined),
       ...overrides.enrollment,
     },
@@ -152,6 +153,118 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
           createdAt,
         },
       ]);
+    });
+  });
+
+  describe("when the cohort's eligible pool is read", () => {
+    /** @scenario "A cohort samples only organizations not already enrolled" */
+    it("excludes enrolled ids, the caller's exclusions and active enterprise plans", async () => {
+      const { prisma, repository } = repositoryWith({
+        enrollment: {
+          findMany: vi
+            .fn()
+            .mockResolvedValue([{ organizationId: "org_enrolled" }]),
+        },
+        organization: {
+          findMany: vi.fn().mockResolvedValue([{ id: "org_a", name: "A" }]),
+        },
+      });
+
+      const pool = await repository.findCohortEligibleOrganizations({
+        migrationName: "authz-grants-genesis-import",
+        excludeOrganizationIds: ["org_isolated_inc"],
+      });
+
+      expect(pool).toEqual([{ id: "org_a", name: "A" }]);
+      expect(prisma.organization.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { notIn: ["org_isolated_inc", "org_enrolled"] },
+          subscriptions: {
+            none: {
+              status: { in: ["ACTIVE", "PENDING"] },
+              plan: "ENTERPRISE",
+            },
+          },
+        },
+        select: { id: true, name: true },
+      });
+    });
+
+    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+    it("pools from the predecessor's enrollment when one is named", async () => {
+      const findMany = vi
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { migrationName: string } }) =>
+            where.migrationName === "authz-grants-genesis-import"
+              ? [{ organizationId: "org_enrolled" }]
+              : [{ organizationId: "org_first_step" }],
+        );
+      const { prisma, repository } = repositoryWith({
+        enrollment: { findMany },
+        organization: { findMany: vi.fn().mockResolvedValue([]) },
+      });
+
+      await repository.findCohortEligibleOrganizations({
+        migrationName: "authz-grants-genesis-import",
+        enrolledForMigrationName: "authz-team-user-backfill",
+        excludeOrganizationIds: [],
+      });
+
+      expect(prisma.organization.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["org_first_step"], notIn: ["org_enrolled"] },
+          subscriptions: {
+            none: {
+              status: { in: ["ACTIVE", "PENDING"] },
+              plan: "ENTERPRISE",
+            },
+          },
+        },
+        select: { id: true, name: true },
+      });
+    });
+  });
+
+  describe("when a cohort is written", () => {
+    it("creates every row in one statement and passes skipDuplicates for the enrollment race", async () => {
+      const { prisma, repository } = repositoryWith({});
+
+      await repository.createMany({
+        organizationIds: ["org_a", "org_b"],
+        migrationName: "authz-grants-genesis-import",
+        enrolledByUserId: "user_ops",
+      });
+
+      expect(prisma.systemMigrationEnrollment.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            organizationId: "org_a",
+            migrationName: "authz-grants-genesis-import",
+            enrolledByUserId: "user_ops",
+          },
+          {
+            organizationId: "org_b",
+            migrationName: "authz-grants-genesis-import",
+            enrolledByUserId: "user_ops",
+          },
+        ],
+        skipDuplicates: true,
+      });
+    });
+
+    it("writes nothing when the cohort picked nothing", async () => {
+      const { prisma, repository } = repositoryWith({});
+
+      await repository.createMany({
+        organizationIds: [],
+        migrationName: "authz-grants-genesis-import",
+        enrolledByUserId: "user_ops",
+      });
+
+      expect(
+        prisma.systemMigrationEnrollment.createMany,
+      ).not.toHaveBeenCalled();
     });
   });
 

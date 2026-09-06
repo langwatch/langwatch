@@ -1,5 +1,6 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 /**
  * The rollout flag the Bradley-Terry leaderboard hangs off (issue #5103).
@@ -29,11 +30,12 @@ export const COMPARISON_LEADERBOARD_FLAG =
  * state on its own.
  */
 export function useShowComparisonLeaderboard(): boolean {
-  const { organization } = useOrganizationTeamProject({
+  const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const { enabled } = useFeatureFlag(COMPARISON_LEADERBOARD_FLAG, {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     // Without the organization there is nothing for an org-targeted rule to
     // match, so the query would only ever answer false.

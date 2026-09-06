@@ -19,7 +19,6 @@ import {
 import { evaluatorUnavailability } from "../../evaluations/installedEvaluators";
 import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -28,7 +27,7 @@ const logger = createLogger("langwatch:evaluations");
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ input }) => {
       // Azure Safety evaluators resolve their credentials solely from the
       // project's azure_safety Model Provider. There is no process.env
@@ -59,7 +58,7 @@ export const evaluationsRouter = createTRPCRouter({
 
   availableCustomEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ input }) => {
       const customEvaluators = await getCustomEvaluators({
         projectId: input.projectId,
@@ -79,7 +78,7 @@ export const evaluationsRouter = createTRPCRouter({
         mappings: mappingStateSchema,
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -161,7 +160,7 @@ export const evaluationsRouter = createTRPCRouter({
         count: z.number().min(1).max(24).default(5),
       }),
     )
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .mutation(async ({ input }) => {
       const { projectId, count } = input;
 

@@ -60,6 +60,9 @@ const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
   "prompts:manage",
   "scenarios:manage",
   "secrets:manage",
+  // Agent cache — a member runs agents, and an agent writes its own run state.
+  "agentCache:view",
+  "agentCache:manage",
   "virtualKeys:create",
   "virtualKeys:update",
   "virtualKeys:rotate",

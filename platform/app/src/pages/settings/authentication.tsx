@@ -1,5 +1,6 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 
+import { PasskeysSection } from "../../components/me/PasskeysSection";
 import { SignInMethodsSection } from "../../components/me/SignInMethodsSection";
 import SettingsLayout from "../../components/SettingsLayout";
 import { EnterpriseCapabilitiesSection } from "../../components/settings/EnterpriseCapabilitiesSection";
@@ -29,6 +30,12 @@ export default function AuthenticationSettings() {
             <Text color="fg.muted">({session.user.email})</Text>
           )}
         </VStack>
+
+        {/* Above the password, deliberately. The order of this page is an
+            argument about what an account should be secured with, and putting
+            the thing we would rather people used underneath the thing we would
+            rather they stopped using makes the opposite one. */}
+        <PasskeysSection />
 
         <SignInMethodsSection />
 

@@ -44,6 +44,11 @@ vi.mock(
   () => ({ SimulationRunStateRepositoryClickHouse: class {} }),
 );
 
+vi.mock(
+  "../../pipelines/simulation-processing/projections/simulationRunState.store",
+  () => ({ SimulationRunStateFoldStore: class {} }),
+);
+
 vi.mock("../../pipelines/simulation-processing/schemas/constants", () => ({
   SIMULATION_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));

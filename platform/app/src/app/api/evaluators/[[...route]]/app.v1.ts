@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
@@ -8,7 +9,10 @@ import type { Prisma } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import {
+  getEvaluatorDefinitions,
+  getEvaluatorModelSettingFields,
+} from "~/server/evaluations/getEvaluator";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
@@ -194,26 +198,47 @@ export function registerEvaluatorRoutes(
         "Creating evaluator",
       );
 
-      // Resolve the project's DEFAULT and EMBEDDINGS models via the
-      // cascade. ModelNotConfiguredError propagates so the global
-      // domain-error middleware can surface the typed missing-model
-      // response — the PR's "no global system fallback" contract bars
-      // falling back to a hardcoded OpenAI constant when nothing is
-      // configured. Only unrelated resolver-internal errors (DB, race)
-      // become null and let createWithDefaults render with placeholders.
-      const swallowNonMissingConfig = (err: unknown): null => {
-        if (err instanceof ModelNotConfiguredError) throw err;
+      // Resolve the DEFAULT and EMBEDDINGS models via the cascade, but only
+      // the ones this evaluator type will actually store.
+      // `getEvaluatorDefaultSettings` writes a resolved model into `model` and
+      // `embeddings_model`, and nowhere else, so a type whose settings schema
+      // has neither field needs neither resolve. Resolving both unconditionally
+      // refused a `ragas/faithfulness` create, which has no `embeddings_model`
+      // field at all, on an organization that had set DEFAULT and FAST but no
+      // EMBEDDINGS.
+      //
+      // A handled resolver error still propagates for a role the type DOES
+      // use, so the global domain-error middleware surfaces the typed
+      // response: ModelNotConfiguredError when nothing is set, and
+      // ModelRestrictedForFeatureError when the only candidate is licensed for
+      // Langy alone. Both carry remediation the caller can act on, and the "no
+      // global system fallback" contract bars falling back to a hardcoded
+      // OpenAI constant instead. Only unrelated resolver-internal errors (DB,
+      // race) become null and let createWithDefaults render with placeholders.
+      const evaluatorType = (data.config as Record<string, unknown>)
+        .evaluatorType;
+      const modelFields = getEvaluatorModelSettingFields(
+        typeof evaluatorType === "string"
+          ? getEvaluatorDefinitions(evaluatorType)
+          : undefined,
+      );
+      const swallowUnhandledResolverFailure = (err: unknown): null => {
+        if (HandledError.isHandled(err)) throw err;
         return null;
       };
       const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-        resolveModelForFeature("evaluator.create_default", {
-          prisma,
-          projectId: project.id,
-        }).catch(swallowNonMissingConfig),
-        resolveModelForFeature("analytics.topic_clustering_embeddings", {
-          prisma,
-          projectId: project.id,
-        }).catch(swallowNonMissingConfig),
+        modelFields.hasModel
+          ? resolveModelForFeature("evaluator.create_default", {
+              prisma,
+              projectId: project.id,
+            }).catch(swallowUnhandledResolverFailure)
+          : null,
+        modelFields.hasEmbeddingsModel
+          ? resolveModelForFeature("analytics.topic_clustering_embeddings", {
+              prisma,
+              projectId: project.id,
+            }).catch(swallowUnhandledResolverFailure)
+          : null,
       ]);
 
       const evaluator = await service.createWithDefaults({

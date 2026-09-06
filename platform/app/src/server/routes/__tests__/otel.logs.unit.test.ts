@@ -175,6 +175,7 @@ describe("POST /api/otel/v1/logs", () => {
         planName: "free",
         count: 10,
         maxMessagesPerMonth: 10,
+        usageUnit: "traces",
       });
 
       const response = await postLogs();

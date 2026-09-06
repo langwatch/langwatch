@@ -44,6 +44,7 @@ vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
       name: "My Experiment",
       setName: vi.fn(),
       datasets: [],
+      targets: [],
       reset: vi.fn(),
       ui: {
         autosaveStatus: {
@@ -66,12 +67,28 @@ vi.mock("~/experiments-v3/hooks/useAutosaveEvaluationsV3", () => ({
   }),
 }));
 
+vi.mock("~/experiments-v3/hooks/useTargetName", () => ({
+  useTargetNames: () => [],
+}));
+
 vi.mock("~/experiments-v3/hooks/useSavedDatasetLoader", () => ({
   useSavedDatasetLoader: () => ({ isLoading: false }),
 }));
 
+// The freshness listener subscribes over SSE with a real tRPC procedure ref;
+// this layout test has no api.experiments surface, so stub the whole hook.
+vi.mock("~/experiments-v3/hooks/useWorkbenchUpdateListener", () => ({
+  useWorkbenchUpdateListener: () => ({ stale: undefined, reload: vi.fn() }),
+}));
+
 vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
   useLambdaWarmup: () => undefined,
+}));
+
+// The optimize handoff reads a feature flag over tRPC; this layout test has
+// no api.featureFlag surface, so stub the hook (flag off hides the menu item).
+vi.mock("~/experiments-v3/hooks/useOptimizeWithLangy", () => ({
+  useOptimizeWithLangy: () => undefined,
 }));
 
 // The page registers Langy action handlers via useRegisterLangyHandlers, which
@@ -79,6 +96,7 @@ vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
 // here, so stub the hook to a no-op.
 vi.mock("~/features/langy/LangyContext", () => ({
   useRegisterLangyHandlers: () => undefined,
+  useRegisterLangyActions: () => undefined,
 }));
 
 // Heavy children are never rendered (DashboardLayout mock drops them), but the

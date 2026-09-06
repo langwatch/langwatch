@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import { BaseSequencer, type TestSpecification } from "vitest/node";
 
+import { recordShardSelection } from "./src/test-utils/shardFailureReporter";
 import {
   createWeigher,
   loadDurationManifest,
@@ -79,7 +80,12 @@ export default class WeightBalancedSequencer extends BaseSequencer {
     }
 
     // `--shard=N/M` counts from one.
-    return buckets[index - 1] ?? [];
+    const mine = buckets[index - 1] ?? [];
+    // The only place that knows how many files this shard was actually given.
+    // The reporter is handed the whole list before this runs, so without this
+    // the hard-floor would compare a shard's progress against the suite.
+    recordShardSelection(mine.length);
+    return mine;
   }
 }
 

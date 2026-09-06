@@ -46,6 +46,24 @@ const CONVERSATION_ID = "conv-1";
 const MESSAGE_ID = "msg-1";
 const STATEMENT_ID = "stmt-abc";
 const WAREHOUSE_ID = "095eb666b2ed2762";
+/** The whole hour an instant falls in, as the workspace would report it. */
+function usageHourOf(atMs: number): string {
+  return new Date(
+    Math.floor(atMs / (60 * 60 * 1000)) * (60 * 60 * 1000),
+  ).toISOString();
+}
+
+/**
+ * The hour a fixture row is about.
+ *
+ * The hour the sweep is running in, and not a fixed date, because the reply is
+ * now served only to the chunk that owns the row's hour — the way a real
+ * workspace answers, and the premise the sweep relies on when it adds a
+ * straddler's chunks together. Every window these tests read, from two hours to
+ * thirty days, ends at the sweep's own clock, so this is the one hour all of
+ * them contain.
+ */
+const USAGE_HOUR = usageHourOf(Date.now());
 
 type CostPlan = {
   status?: number;
@@ -58,10 +76,57 @@ type CostPlan = {
   totalRowCount?: number;
 };
 
+/**
+ * The rows a real reply would carry back for the window it was asked about.
+ *
+ * The workspace answers per chunk, and the chunks tile the window: an hour
+ * belongs to exactly one of them, which is what lets the sweep add a
+ * straddler's chunks together without doubling anything. A fixture that served
+ * every row to every chunk would break that premise silently — the same
+ * statement-hour would arrive once per chunk and its cost would multiply by how
+ * many chunks the window happened to split into.
+ *
+ * Rows whose columns do not name `usage_hour` are served whole: those plans are
+ * about the adapter refusing a reply it cannot read, and the window is not what
+ * they are testing.
+ */
+function rowsInWindow({
+  rows,
+  columns,
+  body,
+}: {
+  rows: (string | null)[][];
+  columns: string[];
+  body: Record<string, unknown>;
+}): (string | null)[][] {
+  const at = columns.indexOf("usage_hour");
+  if (at === -1) return rows;
+
+  const parameters = (body.parameters ?? []) as {
+    name: string;
+    value: string;
+  }[];
+  const bound = (name: string): number => {
+    const found = parameters.find((parameter) => parameter.name === name);
+    return found === undefined ? NaN : Date.parse(found.value);
+  };
+  const fromMs = bound("from_ts");
+  const toMs = bound("to_ts");
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return rows;
+
+  return rows.filter((row) => {
+    const hourMs = Date.parse(String(row[at]));
+    if (!Number.isFinite(hourMs)) return true;
+    return hourMs >= fromMs && hourMs < toMs;
+  });
+}
+
 let server: http.Server;
 let baseUrl: string;
 /** Bodies the fixture was asked to run a statement with, in order. */
 let statementBodies: Record<string, unknown>[];
+/** What each of those calls was answered with, in the same order. */
+let servedRows: (string | null)[][][];
 let costPlan: CostPlan | null;
 /** Plans that answer the first N cost calls, in order, before `costPlan`. */
 let costPlanQueue: CostPlan[];
@@ -71,6 +136,7 @@ let messageRanSql: boolean;
 
 beforeEach(async () => {
   statementBodies = [];
+  servedRows = [];
   costPlan = null;
   costPlanQueue = [];
   messageCreatedMs = Date.now() - 60_000;
@@ -136,34 +202,38 @@ beforeEach(async () => {
         );
         // Queued plans answer one call each, then `costPlan` answers the rest.
         // Only tests about WHICH day was unpriced need this; the rest set one
-        // plan and mean it for every day.
+        // plan and mean it for every window.
         const plan = costPlanQueue.shift() ?? costPlan;
         if (plan?.status) {
           res.statusCode = plan.status;
           return send({ message: "permission denied" });
         }
+        const columns = plan?.columns ?? [
+          "statement_id",
+          "usage_hour",
+          "execution_ms_in_hour",
+          "hour_total_ms",
+          "hour_billable_usd",
+          "currency_code",
+          "sku_name",
+        ];
+        const served = rowsInWindow({
+          rows: plan?.rows ?? [],
+          columns,
+          body: statementBodies[statementBodies.length - 1]!,
+        });
+        servedRows.push(served);
         send({
           statement_id: "fixture",
           status: { state: plan?.state ?? "SUCCEEDED" },
           manifest: {
-            schema: {
-              columns: (
-                plan?.columns ?? [
-                  "statement_id",
-                  "execution_duration_ms",
-                  "hour_total_ms",
-                  "hour_billable_usd",
-                  "currency_code",
-                  "sku_name",
-                ]
-              ).map((name) => ({ name })),
-            },
+            schema: { columns: columns.map((name) => ({ name })) },
             ...(plan?.totalRowCount === undefined
               ? {}
               : { total_row_count: plan.totalRowCount }),
           },
           result: {
-            data_array: plan?.rows ?? [],
+            data_array: served,
             ...(plan?.nextChunkIndex === undefined
               ? {}
               : { next_chunk_index: plan.nextChunkIndex }),
@@ -272,6 +342,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "1800000",
           "3600000",
           "6.00",
@@ -292,12 +363,80 @@ describe("a source that names a warehouse", () => {
     expect(result.events[0]?.actor).toBe("dana@acme.test");
   });
 
+  /** @scenario "A query that outlives one billing read is charged in full" */
+  it("adds up a statement the window was read in two pieces of", async () => {
+    // The window is read oldest-first in chunks that tile it, and each chunk
+    // answers only for the hours it owns. A statement still running when a
+    // chunk ends therefore comes back twice, once from each side of the
+    // boundary, with a different part of itself each time — and the sweep
+    // emits its question exactly once. Keeping only the last answer is the
+    // defect: the earlier hours are billed to nobody while still diluting
+    // every other question's share of them.
+    //
+    // Ten days apart, so the two hours cannot land in the same seven-day
+    // chunk however the window happens to be aligned.
+    const earlierHour = usageHourOf(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    costPlan = {
+      rows: [
+        // Half of a $12 hour.
+        [
+          STATEMENT_ID,
+          earlierHour,
+          "1800000",
+          "3600000",
+          "12.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+        // And a sixth of a $6 one.
+        [
+          STATEMENT_ID,
+          USAGE_HOUR,
+          "600000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The premise first: the two hours really were answered by two different
+    // calls. Without this the sum below would also pass on a fixture that
+    // handed both rows to one chunk, which is the one arrangement that cannot
+    // exercise the merge.
+    const callsCarrying = (hour: string) =>
+      servedRows.filter((rows) => rows.some((row) => row[1] === hour)).length;
+    expect(callsCarrying(earlierHour)).toBe(1);
+    expect(callsCarrying(USAGE_HOUR)).toBe(1);
+    expect(
+      servedRows.findIndex((rows) =>
+        rows.some((row) => row[1] === earlierHour),
+      ),
+    ).not.toBe(
+      servedRows.findIndex((rows) => rows.some((row) => row[1] === USAGE_HOUR)),
+    );
+
+    // $6 from the earlier hour and $1 from the later one, exactly.
+    expect(hintOf(result).costUsd).toBe("7");
+    expect(result.events[0]?.cost_usd).toBe("7");
+    // And the ingredients span both hours, because each is a sum over the
+    // hours the statement ran through and the chunks partition those hours.
+    expect(result.events[0]?.extra?.warehouseHour).toEqual({
+      totalExecutionMs: "7200000",
+      billableUsd: "18",
+    });
+  });
+
   /** @scenario "A priced question carries the numbers its share was worked out from" */
   it("carries the hour's bill and executed time beside the cost", async () => {
     costPlan = {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "1800000",
           "3600000",
           "6.00",
@@ -334,6 +473,70 @@ describe("a source that names a warehouse", () => {
     const sql = String(statementBodies[0]!.statement);
     expect(sql).toContain("w.genie_space_id IS NOT NULL");
     expect(sql).toContain("OR w.client_application = :genie_app");
+  });
+
+  /** @scenario "Traffic that began before the hour keeps its share of the bill" */
+  it("asks for execution time by the hours a statement ran in, not the one it began in", async () => {
+    costPlan = { rows: [] };
+
+    await pull({ warehouseId: WAREHOUSE_ID });
+
+    // The fixture cannot execute SQL, so what this pins is the question asked.
+    // The defect it guards is invisible in any result set: bucketing a
+    // statement wholly into its start hour leaves the NEXT hour's denominator
+    // holding only what happened to begin in it, and a one-second Genie
+    // question in that hour carries the whole hour's bill.
+    const sql = String(statementBodies[0]!.statement);
+
+    // The statement's end is read, and reconstructed when the row has none —
+    // an in-flight statement with a null end_time would otherwise drop out of
+    // the denominator entirely.
+    expect(sql).toMatch(/COALESCE\(\s*end_time,/);
+    expect(sql).toContain("execution_duration_ms");
+
+    // One row per hour the statement was awake in, not one per statement, and
+    // the span it is cut into runs from the statement's own start. Naming the
+    // bound matters more than naming the alias: bucketing every statement back
+    // into its start hour would keep all the aliases below and change only
+    // this line, which is exactly the defect this test exists to catch.
+    expect(sql).toMatch(
+      /explode\(\s*sequence\(\s*date_trunc\('HOUR',\s*r\.start_time\)/,
+    );
+
+    // And the share's numerator is the part of the runtime inside THAT hour,
+    // divided with `div`. Spark's `/` returns a DOUBLE; a float here is money
+    // computed in floating point, which the rest of this path is built to
+    // avoid.
+    expect(sql).toContain("execution_ms_in_hour");
+    expect(sql).toMatch(/r\.execution_duration_ms\s*\*[\s\S]{0,200}?\bdiv\b/);
+    expect(sql).not.toMatch(/r\.execution_duration_ms\s*\//);
+
+    // The hour each row belongs to travels with it. Without it the allocator
+    // cannot tell one statement's two hours from one hour's two SKUs, and it
+    // has to treat them differently: two hours sum their totals, two SKUs do
+    // not, and an unbilled hour holds the watermark where an unbilled SKU
+    // beside a priced one does not.
+    expect(sql).toContain("usage_hour");
+
+    // The last hour is half-open. `sequence` includes its stop value, so a
+    // statement ending at exactly 10:00:00.000 would otherwise emit a 10:00
+    // slice it did no work in — and if the warehouse shut down at 10:00, that
+    // hour never bills, the null SKU reads as "not billed yet", and the source
+    // stalls for the seven-day hold. Every hourly scheduled query ends on a
+    // boundary.
+    expect(sql).toMatch(/unix_millis\(\s*r\.ended_at\s*\)\s*-\s*1\b/);
+
+    // And an HOUR decides which chunk answers for a row, not the statement's
+    // start. The window is read in chunks that tile it, so gating emission on
+    // `start_time` hands a straddler wholly to the chunk it began in — which
+    // has already dropped the hours past its own end. The next chunk counts
+    // that statement in its denominators and then excludes it from its rows,
+    // so those hours are billed to nobody while still diluting everyone else.
+    // The hour clip below is what keeps each statement-hour emitted exactly
+    // once across the whole window.
+    expect(sql).toMatch(/h\.usage_hour\s*>=\s*:from_ts/);
+    expect(sql).toMatch(/h\.usage_hour\s*<\s*:to_ts/);
+    expect(sql).not.toMatch(/w\.start_time\s*>=\s*:from_ts/);
   });
 
   /** @scenario "A question is still priced when its history row names no space" */
@@ -432,8 +635,9 @@ describe("a source that names a warehouse", () => {
     costPlan = {
       columns: [
         "statement_id",
+        "usage_hour",
         "hour_total_ms",
-        "execution_duration_ms",
+        "execution_ms_in_hour",
         "hour_billable_usd",
         "currency_code",
         "sku_name",
@@ -441,6 +645,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "900000",
           "6.00",
@@ -465,6 +670,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -487,6 +693,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -509,6 +716,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           "some-other-statement",
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -531,6 +739,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -557,6 +766,7 @@ describe("a source that names a warehouse", () => {
       { length: WAREHOUSE_COST_ROW_LIMIT - 1 },
       (_, i): (string | null)[] => [
         `other-statement-${i}`,
+        USAGE_HOUR,
         "1",
         "3600000",
         "6.00",
@@ -568,6 +778,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -593,6 +804,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -614,6 +826,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -640,6 +853,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -679,6 +893,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -724,7 +939,9 @@ describe("a source that names a warehouse", () => {
     // A null SKU in the last column is exactly what the LEFT JOIN produces for
     // an unbilled hour.
     costPlan = {
-      rows: [[STATEMENT_ID, "3600000", "3600000", null, null, null]],
+      rows: [
+        [STATEMENT_ID, USAGE_HOUR, "3600000", "3600000", null, null, null],
+      ],
     };
 
     const result = await pull({ warehouseId: WAREHOUSE_ID });
@@ -732,10 +949,13 @@ describe("a source that names a warehouse", () => {
 
     // Recorded at zero for now — its bill does not exist yet to price from.
     expect(hintOf(result).costUsd).toBe("0");
-    // But the watermark held at the start of the swept window, NOT at the
-    // sweep's clock. This is the assertion the old code failed: a seen-but-
-    // unbilled statement thirty days back would have been passed over for good.
-    expect(cursor.sinceMs).toBeLessThan(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    // But the watermark held BEHIND the unbilled hour, not at the sweep's
+    // clock. This is the assertion the old code failed: a seen-but-unbilled
+    // statement would have been passed over for good. The bound is the hour
+    // itself rather than the far end of the window, because the hold lands at
+    // the start of the chunk that could not be priced — the one owning this
+    // hour — and every earlier chunk keeps the cost it already worked out.
+    expect(cursor.sinceMs).toBeLessThan(Date.parse(USAGE_HOUR));
 
     // The other half: resuming from that held cursor, once the bill lands, the
     // same question is asked about again and now carries its real share.
@@ -743,6 +963,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -848,6 +1069,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -923,6 +1145,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1013,6 +1236,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1038,6 +1262,7 @@ describe("a source that names a warehouse", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1180,6 +1405,7 @@ describe("a billing answer that did not come back", () => {
       rows: [
         [
           STATEMENT_ID,
+          USAGE_HOUR,
           "3600000",
           "3600000",
           "6.00",
@@ -1275,6 +1501,60 @@ describe("a period with more statements than one answer can carry", () => {
     expect(spanOf(statementBodies[0]!)).toBeGreaterThan(24 * 60 * 60 * 1000);
     expect(spanOf(statementBodies[1]!)).toBeLessThanOrEqual(
       24 * 60 * 60 * 1000,
+    );
+  });
+
+  /** @scenario "A statement is held when an hour it ran through has no bill yet" */
+  it("keeps the billed share of a piece that still owes an hour", async () => {
+    // A piece can price one of a statement's hours and still owe another. The
+    // hold is right — the owed hour is re-read once its bill lands — but the
+    // billed share belongs to this run's record, exactly as it would had the
+    // chunk priced whole. Dropping it would emit the question at nothing and
+    // only correct it when billing settles, which the whole-chunk path never
+    // does.
+    //
+    // Deep enough into the window to land in the refused first chunk, and half
+    // a day off the piece boundaries so both hours sit in the same piece.
+    const billedHour = usageHourOf(
+      Date.now() - 29 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000,
+    );
+    const owedHour = usageHourOf(Date.parse(billedHour) + 60 * 60 * 1000);
+    costPlanQueue = [{ rows: [], nextChunkIndex: 1 }];
+    costPlan = {
+      rows: [
+        // Half of a $6 hour, billed.
+        [
+          STATEMENT_ID,
+          billedHour,
+          "1800000",
+          "3600000",
+          "6.00",
+          "USD",
+          "PREMIUM_SERVERLESS_SQL_COMPUTE_EU_WEST",
+        ],
+        // And an hour whose bill has not landed: the LEFT JOIN's null SKU.
+        [STATEMENT_ID, owedHour, "600000", "3600000", null, null, null],
+      ],
+    };
+
+    const result = await pull({ warehouseId: WAREHOUSE_ID });
+    const cursor = JSON.parse(result.cursor!) as { sinceMs: number };
+
+    // The premise: both hours were answered by one piece-sized call, so the
+    // share below was kept by the owed piece itself, not by a later chunk.
+    const carrying = servedRows.filter((rows) => rows.length > 0);
+    expect(carrying).toHaveLength(1);
+    expect(carrying[0]).toHaveLength(2);
+
+    // The billed hour's share survives the hold.
+    expect(hintOf(result).costUsd).toBe("3");
+    expect(result.events[0]?.cost_usd).toBe("3");
+
+    // And the hold still holds: the watermark stays at the owed piece rather
+    // than moving past the unbilled hour.
+    expect(cursor.sinceMs).toBeLessThan(Date.now() - 28 * 24 * 60 * 60 * 1000);
+    expect(cursor.sinceMs).toBeGreaterThan(
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
     );
   });
 });

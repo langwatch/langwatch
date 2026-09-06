@@ -15,14 +15,17 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
 import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
-import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
+import {
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+} from "~/test-utils/clickhouseTestEndpoints";
 import type { ClickHouseClientResolver } from "../clickhouseClient";
 
 let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
 
-const PRIVATE_ORG_ID = `test-iso-priv-org-${nanoid(6)}`;
-const SHARED_ORG_ID = `test-iso-shared-org-${nanoid(6)}`;
+const PRIVATE_ORG_ID = privateRouteOrgId("test-iso-priv-org");
+const SHARED_ORG_ID = privateRouteOrgId("test-iso-shared-org");
 
 // Set the private CH env var BEFORE importing clickhouseClient module
 // so parsePrivateClickHouseEnvVars() picks it up at module load.

@@ -181,6 +181,12 @@ Feature: Billing spend events, one durable record per gateway request
       Then nothing is reported, because zero is the right answer
 
     @unit
+    Scenario: The image count is display only and never a billable quantity
+      Given an image request that reported an image count and no tokens
+      When it rates at zero
+      Then nothing is reported, because the count prices nothing on its own
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim
@@ -296,6 +302,17 @@ Feature: Billing spend events, one durable record per gateway request
       Given a confirmation that arrived before its admission
       When the admission folds afterwards
       Then the status stays confirmed and the attribution fills in
+
+    @unit
+    Scenario: An outcome states the attribution its admission has not delivered
+      Given an outcome that carries its own attribution and no admission yet
+      When it folds
+      Then the record names the organization and the key from the outcome
+      And a later admission still wins wherever it states a value
+      # A brokered voice session is admitted by the gateway and confirmed by
+      # the control plane. Two emitters on two paths means the confirmation
+      # can fold first, and a priced row naming no organization is spend that
+      # belongs to nobody.
 
     @unit
     Scenario: A settled request is its own event type with unknown cost

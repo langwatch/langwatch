@@ -31,6 +31,9 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
         await getApp().usageLimits.notifyPlanLimitReached({
           organizationId: team.organizationId,
           planName: activePlan.name ?? "free",
+          usageUnit: result.usageUnit,
+          current: result.count,
+          max: result.maxMessagesPerMonth,
         });
       }
     } catch (error) {

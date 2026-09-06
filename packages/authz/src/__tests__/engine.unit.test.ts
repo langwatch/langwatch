@@ -57,12 +57,14 @@ function makeGrants({
   legacyTeamMemberships = [] as LegacyTeamMembership[],
   customRolePermissions = new Map<string, readonly string[]>(),
   principal = { type: "user", id: "user-1" } as CollectedGrants["principal"],
+  membershipDisabled = false,
 }: Partial<CollectedGrants> = {}): CollectedGrants {
   return {
     principal,
     organizationId: ORG,
     organizationRole,
     isOrgMember,
+    membershipDisabled,
     bindings,
     legacyTeamMemberships,
     customRolePermissions,
@@ -817,5 +819,173 @@ describe("authz engine explain()", () => {
     expect(lines[0]).toContain("DENIED datasets:delete");
     expect(lines.join("\n")).toContain("via group group-9");
     expect(lines.join("\n")).toContain("denial reason: no-binding");
+  });
+  describe("given a membership an admin disabled to free its seat", () => {
+    /**
+     * The collector is what turns a disabled row into `isOrgMember: false`
+     * (its bindings do not even come back from the reader, which fences on an
+     * active membership). These cases pin what the ENGINE then does with that
+     * snapshot: deny everywhere a member could act, and say which gate closed.
+     */
+    const disabled = (
+      overrides: Partial<CollectedGrants> = {},
+    ): CollectedGrants =>
+      makeGrants({
+        organizationRole: null,
+        isOrgMember: false,
+        membershipDisabled: true,
+        ...overrides,
+      });
+
+    it("denies at organization scope, where a plain member holds the floor", () => {
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "organization:view",
+        scope: orgScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    it("denies at team and project scope", () => {
+      for (const scope of [teamScope, projectScope]) {
+        const decision = engine.decide({
+          grants: disabled(),
+          permission: "traces:view",
+          scope,
+        });
+        expect(decision.allowed).toBe(false);
+        expect(decision.denialReason).toBe("membership-disabled");
+      }
+    });
+
+    it("names the disabled seat rather than the absence it causes", () => {
+      // Reported as "no-membership" this would tell somebody who IS a member
+      // that they are not, and point them at nothing they can do.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.denialReason).not.toBe("no-membership");
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    it("denies even where a stale binding survived on the scope chain", () => {
+      // Belt and braces: the reader already withholds these rows. If one ever
+      // reaches the engine, membership still decides before bindings do.
+      const decision = engine.decide({
+        grants: disabled({
+          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    /** @scenario A link that was public to anyone still opens for a disabled member */
+    it("still resolves a public share link, which never depended on membership", () => {
+      // ADR-057: a link anyone can open is not an organization privilege, so
+      // disabling a seat does not close it. It drops to the public audience.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [publicTraceGrant],
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.audience).toBe("public");
+    });
+
+    /** @scenario A link that was public to anyone still opens for a disabled member */
+    it("loses the member-audience share link, which did depend on membership", () => {
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [
+          {
+            kind: "trace",
+            id: TRACE,
+            projectId: PROJECT,
+            permission: "traces:view",
+            audience: { kind: "organization", id: ORG },
+          },
+        ],
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
+    });
+
+    it("still sees the demo project, which every signed-in user sees", () => {
+      // Not an oversight: the demo project is a product tour, granted to any
+      // signed-in user before membership is consulted at all. Pinned so the
+      // next reader does not "close" it and break the tour for everyone.
+      const decision = engine.decide({
+        grants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("demo-project");
+    });
+
+    /** @scenario A disabled member's API keys stop working */
+    it("stops the API keys they own, through the owner ceiling", () => {
+      // ADR-092 §9: effective(key) = grants(key) ∩ grants(owner). A disabled
+      // owner grants nothing, so their personal keys stop too — which is the
+      // point (a revoked person must not keep a live credential), and is the
+      // one consequence of disabling that reaches beyond their own session.
+      const decision = engine.decideWithCeiling({
+        keyGrants: makeGrants({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationRole: null,
+          isOrgMember: false,
+          bindings: [
+            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+          ],
+        }),
+        ownerGrants: disabled(),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+
+    /** @scenario A disabled member's API keys stop working */
+    it("leaves a service key alone, because it has no owner to disable", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants: makeGrants({
+          principal: { type: "apiKey", id: "key-2" },
+          organizationRole: null,
+          isOrgMember: false,
+          bindings: [
+            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+          ],
+        }),
+        ownerGrants: null,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("re-enabling restores access, because nothing else was taken away", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          organizationRole: "MEMBER",
+          isOrgMember: true,
+          membershipDisabled: false,
+          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+        }),
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+    });
   });
 });

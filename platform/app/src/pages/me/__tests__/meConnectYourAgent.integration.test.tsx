@@ -341,7 +341,7 @@ describe("the docs guide", () => {
     const docsFile = resolve(
       dirname(fileURLToPath(import.meta.url)),
       "../../../../../..",
-      "docs/ai-governance/explore-your-usage-with-your-own-agent.mdx",
+      "docs/coding-agents/explore-your-usage-with-your-own-agent.mdx",
     );
     const contents = readFileSync(docsFile, "utf-8");
     expect(contents).toContain(EXPLORE_USAGE_AGENT_PROMPT);

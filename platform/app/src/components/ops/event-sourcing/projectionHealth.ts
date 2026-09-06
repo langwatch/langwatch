@@ -4,7 +4,7 @@ export interface ProjectionMeta {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
-  kind: "fold" | "map";
+  kind: "fold" | "map" | "state";
 }
 
 export interface ProjectionHealthRow extends ProjectionMeta {
@@ -18,7 +18,7 @@ export interface ProjectionHealthRow extends ProjectionMeta {
  * Registry × live tree for projections, the same shape as the subscribers
  * join: the registry knows every projection that exists, the tree only knows
  * the ones with live jobs, and absence must not render as health. Projection
- * jobs file under the normalized "fold"/"map" type nodes.
+ * jobs file under the normalized "fold"/"map"/"state" type nodes.
  */
 export function joinProjectionHealth({
   projections,
@@ -33,7 +33,12 @@ export function joinProjectionHealth({
   >();
   for (const pipeline of pipelineTree) {
     for (const typeNode of pipeline.children) {
-      if (typeNode.name !== "fold" && typeNode.name !== "map") continue;
+      if (
+        typeNode.name !== "fold" &&
+        typeNode.name !== "map" &&
+        typeNode.name !== "state"
+      )
+        continue;
       for (const nameNode of typeNode.children) {
         live.set(`${pipeline.name}/${typeNode.name}/${nameNode.name}`, {
           pending: nameNode.pending,

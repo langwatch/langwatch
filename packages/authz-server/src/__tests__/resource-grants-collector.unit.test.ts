@@ -30,7 +30,7 @@ describe("collector at the resource tier", () => {
       expect(grants.bindings).toEqual([]);
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.findOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.findOrganizationMembership).not.toHaveBeenCalled();
       expect(reader.findUserBindings).not.toHaveBeenCalled();
     });
   });
@@ -52,7 +52,7 @@ describe("collector at the resource tier", () => {
       expect(grants.organizationRole).toBeNull();
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.findOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.findOrganizationMembership).not.toHaveBeenCalled();
       expect(reader.findLegacyTeamMemberships).not.toHaveBeenCalled();
       expect(reader.findCustomRolePermissions).toHaveBeenCalledWith({
         organizationId: ORG,
@@ -65,7 +65,7 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        findOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
         findCustomRolePermissions: vi
           .fn()

@@ -51,8 +51,113 @@ const FAULTS = new Set<string>(["customer", "platform", "provider"]);
  * must not be able to crash a render by omitting a field.
  */
 export function readHandledError(err: unknown): HandledErrorShape | null {
-  return fromTrpcEnvelope(err) ?? fromRestBody(err);
+  return (
+    fromTrpcEnvelope(err) ?? fromCanonicalEnvelope(err) ?? fromRestBody(err)
+  );
 }
+
+/**
+ * The CANONICAL envelope, nested under `error` as an object:
+ *
+ * ```json
+ * { "error": { "type": "provider_credential_invalid",
+ *              "code": "provider_credential_invalid",
+ *              "message": "...", "meta": { "provider": "vertex" },
+ *              "tips": ["..."], "docs_url": "https://docs.langwatch.ai/...",
+ *              "fault": "customer", "trace_id": "..." } }
+ * ```
+ *
+ * Both planes answer with it — `app/api/shared/schemas.ts` on the TypeScript
+ * side, `pkg/herr` on the Go side — and the Go plane is the only one that also
+ * carries `tips`, `docs_url` and `fault`.
+ *
+ * Without this reading, none of it arrived. `fromRestBody` requires `error` to
+ * be a STRING code, so a nested envelope failed its guard and fell through to
+ * `null`: the AI gateway's failures, and every canonical-envelope route's,
+ * reached the UI as unhandled — generic "Something went wrong" copy, no
+ * remediation tips, no docs link, no trace id — while the server had said
+ * precisely what was wrong and how to fix it.
+ *
+ * Field names are lower_snake_case here, matching the wire on both planes,
+ * which is the other half of why they were lost: the flat reading looked for
+ * `docsUrl` and the envelope spells it `docs_url`.
+ */
+function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
+  if (!isRecord(err)) return null;
+  const envelope = isRecord(err.error) ? err.error : undefined;
+  if (!envelope) return null;
+
+  const code = envelopeCode(envelope);
+  if (code === null) return null;
+
+  // Remediation is rendered as OUR advice, so it is read only off a code we
+  // recognise. A slug-shaped code we do not know may be a provider's own
+  // (`insufficient_quota`, `overloaded_error`) nested under `error` in a body
+  // that never passed through `pkg/herr` — near enough in shape to parse, and
+  // no reason to trust whatever sits beside it in the same object.
+  const ours = KNOWN_CODES.has(code);
+
+  return {
+    code,
+    httpStatus: stampedStatus(err),
+    meta: envelopeMeta({ envelope, code }),
+    fault: safeFault(ours ? envelope.fault : undefined),
+    tips: safeTips(ours ? envelope.tips : undefined),
+    docsUrl: ours ? safeDocsUrl(envelope.docs_url) : undefined,
+    traceId: str(envelope.trace_id),
+    reasons: safeReasons(envelope.reasons),
+  };
+}
+
+/**
+ * The envelope's discriminant: `code` is the field to branch on, `type` the
+ * status-class alias, read as a fallback so an envelope carrying only the alias
+ * still resolves.
+ *
+ * Returns null unless the value is slug-shaped, the same guard the flat reading
+ * applies: a payload whose `code` slot holds prose must not pass itself off as
+ * ours. Shape alone is not provenance, though — a provider's own slug clears
+ * it too, which is why `fromCanonicalEnvelope` reads the remediation fields
+ * only for codes in KNOWN_CODES.
+ */
+function envelopeCode(envelope: Record<string, unknown>): string | null {
+  const code = str(envelope.code) ?? str(envelope.type);
+  if (code === undefined) return null;
+  return KNOWN_CODES.has(code) || SLUG_SHAPED.test(code) ? code : null;
+}
+
+/**
+ * The structured detail, plus the envelope's own sentence kept under `message`
+ * — where the registry looks for it when it has no copy of its own for a code.
+ */
+function envelopeMeta({
+  envelope,
+  code,
+}: {
+  envelope: Record<string, unknown>;
+  code: string;
+}): Record<string, unknown> {
+  const meta = isRecord(envelope.meta) ? { ...envelope.meta } : {};
+  const message = str(envelope.message);
+  if (message !== undefined && message !== code) {
+    meta.message = message;
+  }
+  return meta;
+}
+
+/**
+ * The status a fetch wrapper stamped onto the body, if any. The envelope
+ * carries no status of its own — it IS the HTTP status, which lives on the
+ * response rather than in it.
+ */
+function stampedStatus(body: Record<string, unknown>): number {
+  if (typeof body.httpStatus === "number") return body.httpStatus;
+  if (typeof body.status === "number") return body.status;
+  return 0;
+}
+
+const str = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
 
 /** The tRPC shape: the whole payload under `data.error`. */
 function fromTrpcEnvelope(err: unknown): HandledErrorShape | null {

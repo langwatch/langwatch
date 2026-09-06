@@ -24,8 +24,10 @@ import chalk from "chalk";
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import {
+	type BudgetOverviewResponse,
 	type CliBootstrapResponse,
 	extractLookupIdFromToken,
+	getBudgetOverview,
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
@@ -202,6 +204,31 @@ export async function runUnifiedLoginFlow(
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
 
+			// Per-budget epilogue data. Every budget that binds this key,
+			// labelled with its scope, so the ceremony never presents the
+			// whole organization's cap as if it were personal. Null on older
+			// servers without the endpoint; the ceremony then falls back to
+			// the /bootstrap collapsed line.
+			const budgetOverview = await fetchBudgetOverviewSafely(cfg);
+
+			// Three states, named rather than nested: undefined means the
+			// server predates the overview endpoint and the ceremony may
+			// fall back to the legacy line; an empty list means the member
+			// has no gateway access, which renders nothing budget-related
+			// and stops the legacy line resurfacing it.
+			const ceremonyBudgets = !budgetOverview
+				? undefined
+				: budgetOverview.gatewayAccess
+					? budgetOverview.budgets.map((b) => ({
+							spentUsd: Number.parseFloat(b.spentUsd) || 0,
+							limitUsd: Number.parseFloat(b.limitUsd) || 0,
+							window: b.window,
+							scopePhrase: b.scopePhrase,
+							providerLabel: b.providerLabel,
+							resetsAt: b.resetsAt,
+						}))
+					: [];
+
 			console.log();
 			const ceremonyLines = formatLoginCeremony({
 				email: cfg.user?.email ?? result.user.email,
@@ -216,6 +243,8 @@ export async function runUnifiedLoginFlow(
 								usedUsd: bootstrap.budget.monthlyUsedUsd,
 							}
 						: undefined,
+				budgets: ceremonyBudgets,
+				budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
 			});
 			for (const line of ceremonyLines) {
 				console.log(line);
@@ -327,6 +356,25 @@ function persistDeviceSession(
 			validated_at: Math.floor(Date.now() / 1000),
 		};
 	}
+	// The user-scoped login key, and what it reaches. The previous login's key
+	// goes first for the same reason its personal project does: it belongs to
+	// the user who logged in before, and keeping it would authenticate the new
+	// session as them. A server that ships no key leaves both fields absent,
+	// which is what puts the resolver back on the personal-project path.
+	delete cfg.cli_api_key;
+	delete cfg.cli_api_key_scope;
+	if (result.cli_api_key) {
+		cfg.cli_api_key = result.cli_api_key;
+		if (result.cli_api_key_scope) {
+			cfg.cli_api_key_scope = {
+				kind: result.cli_api_key_scope.kind,
+				project_ids: result.cli_api_key_scope.project_ids ?? [],
+				...(Array.isArray(result.cli_api_key_scope.permissions)
+					? { permissions: result.cli_api_key_scope.permissions }
+					: {}),
+			};
+		}
+	}
 	if (result.endpoint) {
 		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}
@@ -371,6 +419,29 @@ async function fetchBootstrapSafely(
 	try {
 		return await getCliBootstrap(cfg);
 	} catch {
+		return null;
+	}
+}
+
+/**
+ * The login has already succeeded by the time this runs, so the epilogue
+ * gets a deadline rather than the user's patience: a control plane that
+ * accepts the connection and never answers would otherwise stop the
+ * ceremony from printing at all.
+ */
+const BUDGET_OVERVIEW_TIMEOUT_MS = 5_000;
+
+async function fetchBudgetOverviewSafely(
+	cfg: GovernanceConfig,
+): Promise<BudgetOverviewResponse | null> {
+	try {
+		return await getBudgetOverview(cfg, {
+			timeoutMs: BUDGET_OVERVIEW_TIMEOUT_MS,
+		});
+	} catch {
+		// The epilogue is decoration on a login that already succeeded:
+		// a timeout, a refused connection or a 5xx all fall back to the
+		// legacy collapsed line rather than failing the login.
 		return null;
 	}
 }

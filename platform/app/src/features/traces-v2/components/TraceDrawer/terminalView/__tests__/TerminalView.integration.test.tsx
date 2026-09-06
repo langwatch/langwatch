@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import type { TurnDivider } from "../sessionScrollback";
-import { TerminalView } from "../TerminalView";
+import { statusLineCostLabel, TerminalView } from "../TerminalView";
 
 /** How tall a laid-out row is, so a test can say what moved in whole rows. */
 const ROW_HEIGHT = 150;
@@ -1280,3 +1280,47 @@ function prependEarlierTurn(
     });
   });
 }
+
+describe("the bottom bar's cost stat", () => {
+  describe("given a session bigger than what loaded", () => {
+    /** @scenario "The terminal footer states the session total next to the running figure" */
+    it("states the session total beside the running figure", () => {
+      // The running figure moves with the scroll; the session total is the
+      // same figure the Usage tab shows, off the session row. Side by side,
+      // the position-scoped number can never pass for the whole session.
+      expect(statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: 210 })).toBe(
+        "$12.34 of $210.00",
+      );
+    });
+  });
+
+  describe("given the reader has the whole session on screen", () => {
+    it("drops the suffix rather than stating a figure of itself", () => {
+      expect(
+        statusLineCostLabel({ costUsd: 210.001, sessionCostUsd: 210 }),
+      ).toBe("$210.00");
+    });
+  });
+
+  describe("given no session row exists for the trace", () => {
+    it("keeps the running figure alone, as before", () => {
+      expect(
+        statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: null }),
+      ).toBe("$12.34");
+    });
+  });
+
+  describe("given the loaded steps carry no cost", () => {
+    it("still states the session total rather than nothing", () => {
+      expect(statusLineCostLabel({ costUsd: null, sessionCostUsd: 210 })).toBe(
+        "$210.00",
+      );
+    });
+
+    it("shows nothing when neither figure exists", () => {
+      expect(
+        statusLineCostLabel({ costUsd: null, sessionCostUsd: null }),
+      ).toBeNull();
+    });
+  });
+});

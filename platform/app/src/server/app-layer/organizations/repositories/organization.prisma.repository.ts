@@ -1,4 +1,5 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/actor";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { User } from "~/generated/prisma/client";
@@ -17,7 +18,6 @@ import {
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -47,6 +47,7 @@ import {
 } from "../errors";
 import type {
   AuditLogFilters,
+  BillingOrganizationLookup,
   CreateAndAssignInput,
   CreateAndAssignResult,
   CreateForProvisioningInput,
@@ -54,7 +55,6 @@ import type {
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
-  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -515,11 +515,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
-    return this.prisma.organization.findFirst({
-      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+  ): Promise<BillingOrganizationLookup> {
+    // The pricing model is SELECTED rather than filtered on, so one query
+    // still answers both questions. Filtering on it made a non-usage-billed
+    // organization indistinguishable from an absent row, and the only way to
+    // tell them apart afterwards would have been a second query on the exact
+    // path this lookup is trying to keep cheap.
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
       select: {
         id: true,
+        pricingModel: true,
         stripeCustomerId: true,
         subscriptions: {
           where: {
@@ -532,6 +538,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       },
     });
+
+    if (!organization) return { outcome: "not_found" };
+    if (organization.pricingModel !== PricingModel.SEAT_EVENT) {
+      return { outcome: "not_usage_billed" };
+    }
+
+    const { pricingModel: _pricingModel, ...forBilling } = organization;
+    return { outcome: "usage_billed", organization: forBilling };
   }
 
   async createAndAssign(
@@ -658,22 +672,15 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
-      // The grants ledger's projections (ADR-092 §13). They carry
-      // organizationId as a plain column and never a relation - facts derived
-      // from the ledger must not presume the row they describe still exists -
-      // so nothing cascades them, and a purge that skipped them would leave a
-      // deleted tenant's access rows behind as the only surviving head. Usage
-      // before its Grant, and the cursor and cutover flag last, so the state
-      // this org is served from disappears in one transaction with the rest.
+      // The authorization read model. It carries organizationId as a plain
+      // column and never a relation - facts derived from the log must not
+      // presume the row they describe still exists - so nothing cascades
+      // them, and a purge that skipped them would leave a deleted tenant's
+      // access rows behind as the only surviving head. Usage before its
+      // Grant.
       this.prisma.grantUsage.deleteMany({ where: { organizationId } }),
       this.prisma.grant.deleteMany({ where: { organizationId } }),
       this.prisma.role.deleteMany({ where: { organizationId } }),
-      this.prisma.authzProjectionCursor.deleteMany({
-        where: { organizationId },
-      }),
-      this.prisma.authzCutoverProjection.deleteMany({
-        where: { organizationId },
-      }),
       // The migration machinery's own per-tenant rows follow the same rule:
       // plain organizationId columns, no relation, nothing cascades them. A
       // purge that left them behind would keep a deleted tenant enrolled and

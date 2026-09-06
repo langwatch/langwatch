@@ -15,7 +15,6 @@ import {
   evaluatePreconditions,
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
-import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 
@@ -33,7 +32,7 @@ const withEditOverlayInput = z.boolean().default(false);
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -53,7 +52,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -79,7 +78,7 @@ export const tracesRouter = createTRPCRouter({
 
   getEvaluations: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -108,7 +107,7 @@ export const tracesRouter = createTRPCRouter({
         evaluationId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const traceService = TraceService.create(ctx.prisma);
       return traceService.getEvaluationInputs(
@@ -124,7 +123,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -140,7 +139,7 @@ export const tracesRouter = createTRPCRouter({
 
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const traceService = TraceService.create(ctx.prisma);
       const result = await traceService.getTopicCounts(input);
@@ -189,7 +188,7 @@ export const tracesRouter = createTRPCRouter({
 
   getCustomersAndLabels: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const traceService = TraceService.create(ctx.prisma);
       return traceService.getCustomersAndLabels(input);
@@ -202,7 +201,7 @@ export const tracesRouter = createTRPCRouter({
         threadId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
 
@@ -236,7 +235,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -264,7 +263,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -306,7 +305,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, threadIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -334,7 +333,7 @@ export const tracesRouter = createTRPCRouter({
         sortBy: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -381,7 +380,7 @@ export const tracesRouter = createTRPCRouter({
         endDate: z.number(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const traceService = TraceService.create(ctx.prisma);
       return traceService.getDistinctFieldNames(
@@ -403,7 +402,7 @@ export const tracesRouter = createTRPCRouter({
         expectedResults: z.number(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -486,7 +485,7 @@ export const tracesRouter = createTRPCRouter({
         includeSpans: z.boolean(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -519,7 +518,7 @@ export const tracesRouter = createTRPCRouter({
 
   onTraceUpdate: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);

@@ -1,6 +1,5 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
-import { TRPCError } from "@trpc/server";
 import {
   OrganizationUserRole,
   type PrismaClient,
@@ -19,6 +18,12 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+// The SCIM-managed guard's typed refusal, shared with `group.service.ts` so
+// both paths answer the customer with the same `scim_managed_group` code.
+// These three used to throw a raw TRPCError whose `code` published as
+// "BAD_REQUEST" and whose message was the whole contract, which meant the
+// anchor in specs/groups/groups-rest-api.feature held on one path only.
+import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
@@ -1117,10 +1122,7 @@ export class RoleBindingService {
 
       if (rename) {
         if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "SCIM-managed groups cannot be renamed",
-          });
+          throw new ScimManagedGroupError(groupId);
         }
         await tx.group.update({
           where: { id: groupId },
@@ -1130,10 +1132,7 @@ export class RoleBindingService {
 
       if (memberUserIdsToRemove.length > 0) {
         if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot manually remove members from a SCIM-managed group",
-          });
+          throw new ScimManagedGroupError(groupId);
         }
         await tx.groupMembership.deleteMany({
           where: { groupId, userId: { in: memberUserIdsToRemove } },
@@ -1142,10 +1141,7 @@ export class RoleBindingService {
 
       if (memberUserIdsToAdd.length > 0) {
         if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot manually add members to a SCIM-managed group",
-          });
+          throw new ScimManagedGroupError(groupId);
         }
         const uniqueMemberIds = [...new Set(memberUserIdsToAdd)];
         const orgMembers = await tx.organizationUser.findMany({

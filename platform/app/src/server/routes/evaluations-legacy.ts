@@ -180,7 +180,7 @@ async function authenticateRequest(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the descriptor
@@ -736,7 +736,7 @@ secured.access(legacyEvaluationAuth).post(
       };
     }
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
+    const experiment = await ExperimentService.create({ prisma }).findBySlug({
       projectId: project.id,
       slug: experimentSlug,
     });

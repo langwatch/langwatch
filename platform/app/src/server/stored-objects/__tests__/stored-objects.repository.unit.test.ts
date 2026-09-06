@@ -22,10 +22,20 @@ const { mockInsert, mockQuery, mockQueryResult } = vi.hoisted(() => {
   };
 });
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForTenant: () =>
-    Promise.resolve({ insert: mockInsert, query: mockQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () =>
+        Promise.resolve({ insert: mockInsert, query: mockQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({

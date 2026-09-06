@@ -1,4 +1,4 @@
-Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
+Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=catalog
   As an org admin curating which AI tools my team can see on /me
   I want a catalog editor with sections per tile type, drag-to-reorder,
   add/edit drawer, and per-team scoping
@@ -6,7 +6,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
   database access
 
     The admin editor is the only authoring surface — no API for tile
-    creation outside of /governance/tool-catalog. Reuses Chakra
+    creation outside of /governance/inventory?tab=catalog. Reuses Chakra
     Drawer pattern from existing IngestionSource/AnomalyRule editors.
     Reuses iter109 Chakra multi-select scope picker for team-scope binding.
 
@@ -17,13 +17,13 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
 
   Scenario: page is gated by aiTools:manage permission
     Given user "jane@acme.com" is a MEMBER of "acme" without `aiTools:manage` permission
-    When user "jane@acme.com" navigates to "/governance/tool-catalog"
+    When user "jane@acme.com" navigates to "/governance/inventory?tab=catalog"
     Then the page renders the not-found scene OR the no-permission scene
     And no `api.aiTools.adminList` query is fired
 
   Scenario: admin sees three sections, even when empty
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the page renders three section headings:
       | Coding assistants (0) |
       | Model providers (0)   |
@@ -33,7 +33,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
 
   Scenario: starter pack lets the admin choose which tools to publish
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the starter-pack callout lists every starter tool as a checkbox, all checked by default
     When user "carol@acme.com" unchecks "AWS Bedrock" and "Google AI"
     And user "carol@acme.com" imports the starter pack
@@ -42,7 +42,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
 
   Scenario: importing the starter pack with no tools selected is not allowed
     Given the org-scoped catalog is empty
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     And user "carol@acme.com" unchecks every starter tool
     Then the import action is disabled
 
@@ -55,7 +55,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
   @bdd @admin-catalog @starter-pack @integration
   Scenario: a populated catalog still offers the starter pack import behind a toggle
     Given the org-scoped catalog already has entries
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then an "Import starter pack" button is shown instead of the empty-state callout
     And clicking it reveals the starter tool checklist
 
@@ -79,7 +79,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
       | coding_assistant | Claude Code    | organization | acme             | true    |
       | coding_assistant | Gemini CLI     | team         | engineering_team | true    |
       | model_provider   | Anthropic      | organization | acme             | false   |
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then the Claude Code row shows scope badge "Org-wide"
     And the Gemini CLI row shows scope badge "Team: engineering"
     And the Anthropic row renders dimmed (opacity 0.5) because `enabled=false`
@@ -168,7 +168,7 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
 
   Scenario: UI-preview banner renders while backend router is unwired
     Given Sergey's `aiToolsCatalogRouter` is not yet shipped
-    When user "carol@acme.com" loads "/governance/tool-catalog"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
     Then a yellow/orange banner renders at the top of the page
     And the banner reads "UI preview only" and names the backend dependency
     And mock data renders in the editor

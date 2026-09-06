@@ -470,6 +470,11 @@ export function dropLangWatchQLRowPolicyStatement({
  * The LangWatchQL objects themselves (fact tables, PostgreSQL-engine tables) are
  * NOT created here — they come from migrations and from the PG mapping. This
  * function provisions only the access model over them.
+ *
+ * Not called from any production path in this repo: the real access model is
+ * owned by infra (langwatch-saas#1126). This is the reference implementation
+ * that terraform must match — keep it and its tests in sync, do not delete as
+ * dead code.
  */
 export function lwqlClickHouseSetupStatements({
   names,

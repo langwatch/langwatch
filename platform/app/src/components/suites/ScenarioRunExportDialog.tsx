@@ -13,12 +13,12 @@ const MODES: { value: ScenarioRunExportMode; label: string; hint: string }[] = [
   {
     value: "full",
     label: "Full",
-    hint: "One row per message — the complete export",
+    hint: "One row per message, the complete export",
   },
   {
     value: "criteria",
     label: "Criteria",
-    hint: "One row per checklist item — rank what fails most",
+    hint: "One row per checklist item, to rank what fails most",
   },
 ];
 

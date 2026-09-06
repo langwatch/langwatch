@@ -4,6 +4,10 @@ import { Prisma } from "~/generated/prisma/client";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
+import {
   ShareLinkNotFoundError,
   ShareReadRateLimitedError,
 } from "~/server/app-layer/share/errors";
@@ -15,11 +19,6 @@ import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redac
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  skipPermissionCheck,
-} from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
 import {
@@ -112,23 +111,18 @@ export const sharedTraceRouter = createTRPCRouter({
     // `.output()` comes after `.use()`: the app's permission builder exposes
     // only `input`/`use` so every procedure is forced through the permission
     // middleware, and it is that `use` which hands back the full tRPC builder.
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "the share token in the input is the whole authorization; see ADR-057",
+    })
     .output(sharedTraceDtoSchema)
     .query(async ({ input, ctx }) => {
       const viewer: ShareViewer = {
         isOrgMember: async (organizationId) =>
           !!ctx.session?.user &&
-          hasOrganizationPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            organizationId,
-            "organization:view",
-          ),
+          probeOrganizationPermission(ctx, organizationId, "organization:view"),
         isProjectMember: async (projectId) =>
-          hasProjectPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            projectId,
-            "traces:view",
-          ),
+          probeProjectPermission(ctx, projectId, "traces:view"),
       };
 
       // This is the one trace read the open internet can drive, and each call

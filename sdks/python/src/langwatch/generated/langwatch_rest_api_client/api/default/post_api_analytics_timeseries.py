@@ -10,12 +10,12 @@ from ...models.post_api_analytics_timeseries_response_400 import PostApiAnalytic
 from ...models.post_api_analytics_timeseries_response_401 import PostApiAnalyticsTimeseriesResponse401
 from ...models.post_api_analytics_timeseries_response_422 import PostApiAnalyticsTimeseriesResponse422
 from ...models.post_api_analytics_timeseries_response_500 import PostApiAnalyticsTimeseriesResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiAnalyticsTimeseriesBody | Unset = UNSET,
+    body: PostApiAnalyticsTimeseriesBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,8 +24,7 @@ def _get_kwargs(
         "url": "/api/analytics/timeseries",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -96,8 +95,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiAnalyticsTimeseriesBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiAnalyticsTimeseriesBody,
 ) -> Response[
     PostApiAnalyticsTimeseriesResponse200
     | PostApiAnalyticsTimeseriesResponse400
@@ -108,7 +107,7 @@ def sync_detailed(
     """Query analytics timeseries data with metrics, aggregations, and filters
 
     Args:
-        body (PostApiAnalyticsTimeseriesBody | Unset):
+        body (PostApiAnalyticsTimeseriesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,8 +130,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiAnalyticsTimeseriesBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiAnalyticsTimeseriesBody,
 ) -> (
     PostApiAnalyticsTimeseriesResponse200
     | PostApiAnalyticsTimeseriesResponse400
@@ -144,7 +143,7 @@ def sync(
     """Query analytics timeseries data with metrics, aggregations, and filters
 
     Args:
-        body (PostApiAnalyticsTimeseriesBody | Unset):
+        body (PostApiAnalyticsTimeseriesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,8 +161,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiAnalyticsTimeseriesBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiAnalyticsTimeseriesBody,
 ) -> Response[
     PostApiAnalyticsTimeseriesResponse200
     | PostApiAnalyticsTimeseriesResponse400
@@ -174,7 +173,7 @@ async def asyncio_detailed(
     """Query analytics timeseries data with metrics, aggregations, and filters
 
     Args:
-        body (PostApiAnalyticsTimeseriesBody | Unset):
+        body (PostApiAnalyticsTimeseriesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -195,8 +194,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiAnalyticsTimeseriesBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiAnalyticsTimeseriesBody,
 ) -> (
     PostApiAnalyticsTimeseriesResponse200
     | PostApiAnalyticsTimeseriesResponse400
@@ -208,7 +207,7 @@ async def asyncio(
     """Query analytics timeseries data with metrics, aggregations, and filters
 
     Args:
-        body (PostApiAnalyticsTimeseriesBody | Unset):
+        body (PostApiAnalyticsTimeseriesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

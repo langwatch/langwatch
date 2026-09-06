@@ -27,6 +27,12 @@ export type FormSnapshot = {
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
   /**
+   * The slug that addresses this instance in a gateway model string. Empty
+   * means the operator wants no handle, which is a real choice: it releases
+   * the name for another provider in the organization.
+   */
+  routingHandle: string;
+  /**
    * Tenant anchor for the write. A provider belongs to an organization
    * and reaches the scopes attached to it, so the organization is always
    * the answer and the project is the narrower handle when there is one.
@@ -75,12 +81,24 @@ export type UseProviderFormSubmitActions = {
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState &
   UseProviderFormSubmitActions;
 
+/**
+ * What the drawer's Advanced section adds to the update payload.
+ *
+ * Two independent halves, because two independent audiences own them. The
+ * `gateway` half is null when the AI Gateway section is not rendered, so a
+ * save never clears rate limits the operator cannot see; the
+ * skip-permissions half is undefined when its field is not rendered, and an
+ * empty array when the operator cleared it.
+ */
 export type AdvancedGatewayPayload = {
-  rateLimitRpm: number | null;
-  rateLimitTpm: number | null;
-  rateLimitRpd: number | null;
-  fallbackPriorityGlobal: number | null;
-  providerConfig: Record<string, unknown> | null;
+  gateway: {
+    rateLimitRpm: number | null;
+    rateLimitTpm: number | null;
+    rateLimitRpd: number | null;
+    fallbackPriorityGlobal: number | null;
+    providerConfig: Record<string, unknown> | null;
+  } | null;
+  langySkipPermissionsModels?: string[];
 };
 
 export function useProviderFormSubmit({
@@ -165,6 +183,7 @@ export function useProviderFormSubmit({
       projectTopicClusteringModel,
       projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -311,6 +330,9 @@ export function useProviderFormSubmit({
         organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
+        // Always sent, because an empty string is how the operator clears the
+        // handle. Leaving it out on a clear would keep the old one.
+        routingHandle: (routingHandle ?? "").trim(),
         enabled: true,
         customKeys: customKeysToSend,
         customModels,
@@ -322,12 +344,17 @@ export function useProviderFormSubmit({
         scopes: scopes && scopes.length > 0 ? scopes : undefined,
         scopeType,
         scopeId,
-        ...(advancedPayload && {
-          rateLimitRpm: advancedPayload.rateLimitRpm,
-          rateLimitTpm: advancedPayload.rateLimitTpm,
-          rateLimitRpd: advancedPayload.rateLimitRpd,
-          fallbackPriorityGlobal: advancedPayload.fallbackPriorityGlobal,
-          providerConfig: advancedPayload.providerConfig,
+        ...(advancedPayload?.gateway && {
+          rateLimitRpm: advancedPayload.gateway.rateLimitRpm,
+          rateLimitTpm: advancedPayload.gateway.rateLimitTpm,
+          rateLimitRpd: advancedPayload.gateway.rateLimitRpd,
+          fallbackPriorityGlobal:
+            advancedPayload.gateway.fallbackPriorityGlobal,
+          providerConfig: advancedPayload.gateway.providerConfig,
+        }),
+        ...(advancedPayload?.langySkipPermissionsModels !== undefined && {
+          langySkipPermissionsModels:
+            advancedPayload.langySkipPermissionsModels,
         }),
       });
 

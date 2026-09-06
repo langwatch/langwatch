@@ -100,6 +100,7 @@ function emptyState() {
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+    agentReportedCostUsd: 0,
     modelCallMs: 0,
     toolMs: 0,
     ttftMsTotal: 0,
@@ -177,6 +178,7 @@ function makeService({
       row ? { row, appliedEventIds: [] } : null,
     findManyRecent: async () => listed,
     listByRepositoryBranch: async () => [],
+    listBySessionIds: async () => [],
   };
   const traceSessions: CodingAgentTraceSessionRepository = {
     ensure: async () => {},
@@ -197,6 +199,7 @@ function makeService({
           findBySessionId: async ({ occurredAt }) =>
             onEventsRead({ occurredAt }),
           sumTokensByModelPerSession: async () => [],
+          listSessionsByStampedBranch: async () => [],
         }
       : new NullCodingAgentSessionEventsRepository(),
   });
@@ -213,6 +216,7 @@ describe("CodingAgentSessionService", () => {
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
           listByRepositoryBranch: async () => [],
+          listBySessionIds: async () => [],
         },
         traceSessions: {
           ensure: async () => {},
@@ -229,6 +233,7 @@ describe("CodingAgentSessionService", () => {
             return { events: [], nextCursor: null };
           },
           sumTokensByModelPerSession: async () => [],
+          listSessionsByStampedBranch: async () => [],
         },
       });
 
@@ -404,6 +409,7 @@ describe("CodingAgentSessionService", () => {
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
           listByRepositoryBranch: async () => [],
+          listBySessionIds: async () => [],
         };
         const service = new CodingAgentSessionService({
           sessions,

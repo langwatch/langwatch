@@ -58,7 +58,7 @@ export interface LangyTurnHandoff {
    * ADR-048 shutdown-handoff: an opaque, worker-authored resume token from a
    * prior turn that checkpointed on pod termination. Set by the route when it
    * found a pending handoff on the conversation projection; `runTurn` threads it onto
-   * the manager /chat body so opencode resumes from the checkpoint instead of a
+   * the manager /chat body so the worker resumes from the checkpoint instead of a
    * cold start. Absent on a normal turn.
    */
   resumeToken?: string;
@@ -68,6 +68,8 @@ export interface LangyTurnHandoff {
 export interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
+  /** Returns 1 when the key existed and was extended, 0 when it was already gone. */
+  expire(key: string, ttlSeconds: number): Promise<number>;
 }
 
 /** TTL for a stashed handoff. Matches the stream buffer window (ADR-044). */
@@ -75,6 +77,10 @@ export const LANGY_HANDOFF_TTL_SECONDS = 300;
 
 function handoffKey(conversationId: string, turnId: string): string {
   return `langy:handoff:{${conversationId}}:${turnId}`;
+}
+
+function stoppedKey(conversationId: string, turnId: string): string {
+  return `langy:stopped:{${conversationId}}:${turnId}`;
 }
 
 export class LangyTurnHandoffStore {
@@ -87,6 +93,70 @@ export class LangyTurnHandoffStore {
       "EX",
       LANGY_HANDOFF_TTL_SECONDS,
     );
+  }
+
+  /**
+   * Extend a live handoff by another full TTL, without rewriting the record.
+   *
+   * The TTL is written once at `stash`, so a turn that runs longer than
+   * LANGY_HANDOFF_TTL_SECONDS used to lose its handoff while the worker was
+   * still working: the heartbeat proving the worker alive refreshes a key with
+   * a 10 second TTL and touched nothing here. Called from the heartbeat frame,
+   * so a turn that is still reporting activity keeps something to be revived
+   * with for as long as it runs.
+   *
+   * Reports whether a handoff was there to extend. False means it had already
+   * aged out, which is worth knowing and is not worth failing a frame over.
+   */
+  async refresh({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    const extended = await this.redis.expire(
+      handoffKey(conversationId, turnId),
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+    return extended === 1;
+  }
+
+  /**
+   * Record that this turn was stopped, so nothing dispatches it afterwards.
+   *
+   * A turn is admitted, and its handoff stashed, before any worker is running
+   * it: the fast-path dispatch is fire-and-forget and the process outbox
+   * re-drives the same handoff for as long as it lives. A stop writes the
+   * durable terminal, which the record honours, but the handoff on its own
+   * still reads as work to do. This marker is what a dispatch checks before
+   * spending a worker on an answer nobody is waiting for. Same TTL as the
+   * handoff it guards: once that has aged out there is nothing left to redrive.
+   */
+  async markStopped({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    await this.redis.set(
+      stoppedKey(conversationId, turnId),
+      "1",
+      "EX",
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+  }
+
+  /** Whether a stop was recorded for this turn (see `markStopped`). */
+  async isStopped({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return (await this.redis.get(stoppedKey(conversationId, turnId))) !== null;
   }
 
   /**

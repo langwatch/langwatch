@@ -43,6 +43,7 @@ import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { SHELL_FUNCTION_TOOLS, assertCodexTurnHarvest } from "./shell-rc";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	type ClaudeProjectPinResult,
 	ensureClaudeProjectTelemetryPin,
@@ -543,6 +544,7 @@ export async function resolveWrapperMode(
 		// The exporters carry no conversation; the turn harvest is what
 		// recovers it, so the two are wired (and healed) together.
 		assertCodexTurnHarvest();
+		assertCodexAgentGuidance();
 	}
 
 	if (tool === "opencode") {

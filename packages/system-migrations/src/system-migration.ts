@@ -39,17 +39,38 @@ export interface SystemMigration {
   /**
    * Whether a SELF-HOSTED installation runs this migration automatically.
    *
-   * Cloud never reads this - there the pacing is per-organization enrollment,
-   * decided by operators at runtime. Self-hosted has no operator pacing at
-   * all (the in-place doctrine: nobody ever learns a migration happened), so
-   * its pacing is this declaration: an OSS release can ship a migration's
-   * code while cloud is still migrating and soaking, and the migration stays
+   * Cloud never reads this. Self-hosted has no operator pacing at all (the
+   * in-place doctrine: nobody ever learns a migration happened), so its
+   * pacing is this declaration: an OSS release can ship a migration's code
+   * while cloud is still migrating and soaking, and the migration stays
    * inert on every self-hosted installation - the runner does not drive it
    * for any tenant, so it is never attempted, parked or reported - until a
    * later release flips this to `true`. Flipping it IS the self-hosted
    * release act, made only after the cloud rollout has soaked.
    */
   readonly runsAutomaticallyOnSelfHosted: boolean;
+
+  /**
+   * Whether CLOUD puts every tenant in this migration's cohort with no
+   * operator action.
+   *
+   * The counterpart to `runsAutomaticallyOnSelfHosted` on the other
+   * installation, and a different axis from it: this one is about WHO, that
+   * one about WHETHER the installation drives the migration at all.
+   *
+   * `false` is the soaking posture: on cloud the migration processes only
+   * the tenants an operator has enrolled from the ops migrations page, so a
+   * release ships it dark and the rollout widens deliberately. `true` says
+   * the rollout is over - the migration has already run for the tenants that
+   * existed and must now reach every tenant, including every one created
+   * since, without an operator remembering to enroll it. Enrollment rows for
+   * such a migration decide nothing, so the ops page stops offering them.
+   *
+   * Self-hosted ignores this exactly as cloud ignores
+   * `runsAutomaticallyOnSelfHosted`: off cloud every tenant is in every
+   * driven migration's cohort already.
+   */
+  readonly enrolledAutomatically: boolean;
 
   /**
    * Migrate one tenant. The contract that makes the runner safe to re-run

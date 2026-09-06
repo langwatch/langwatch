@@ -30,6 +30,7 @@ import {
   confirmSpendWireSchema,
   failSpendWireSchema,
   type SpendUsage,
+  spendUsageSchema,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
@@ -46,6 +47,12 @@ import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
+import {
+  correlateRealtimeSession,
+  releaseRealtimeSession,
+  reportRealtimeSessionUsage,
+  reserveRealtimeSession,
+} from "~/server/gateway/realtimeSession.service";
 import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
@@ -570,11 +577,16 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     );
   }
 
+  const materialiser = new GatewayConfigMaterialiser(
+    prisma,
+    getApp().gateway.budgets ?? null,
+  );
+
   const ifNoneMatch = c.req.header("If-None-Match");
-  const currentRevision = vk.revision.toString();
-  if (ifNoneMatch && ifNoneMatch === currentRevision) {
+  const currentETag = await materialiser.versionToken(vk);
+  if (ifNoneMatch && ifNoneMatch === currentETag) {
     return c.body(null, 304, {
-      ETag: currentRevision,
+      ETag: currentETag,
       "Cache-Control": "no-store",
     });
   }
@@ -585,12 +597,9 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   // then sees fresh state on every re-materialise after a BUDGET_UPDATED
   // eviction. Without this the wire output reads the stale
   // `GatewayBudget.spentUsd` PG column that no writer updates.
-  const payload = await new GatewayConfigMaterialiser(
-    prisma,
-    getApp().gateway.budgets ?? null,
-  ).materialise(vk);
+  const payload = await materialiser.materialise(vk);
   return c.json(payload, 200, {
-    ETag: currentRevision,
+    ETag: currentETag,
     "Cache-Control": "no-store",
   });
 });
@@ -1316,6 +1325,212 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     rejected,
   });
 });
+
+// ── realtime voice sessions (ADR-097) ───────────────────────────────────
+
+const reserveRealtimeSessionSchema = z.object({
+  session_id: z.string().min(1).max(256),
+  project_id: z.string().min(1).max(256),
+  organization_id: z.string().min(1).max(256),
+  virtual_key_id: z.string().min(1).max(256),
+  model_provider_id: z.string().min(1).max(256),
+  // The trace the mint's own span belongs to. Optional so a gateway that
+  // predates this field, or a request with no trace context, still books.
+  trace_id: z.string().max(128).optional(),
+  requested_model: z.string().max(512).optional(),
+  vendor: z.enum(["openai", "elevenlabs"]),
+  agent_id: z.string().max(256).optional(),
+  model: z.string().min(1).max(512),
+});
+
+/**
+ * A patch has to change something. Both fields are optional on their own, so
+ * the refinement is what enforces the rule the 400 message states: without it
+ * a body carrying only `project_id` parses, applies nothing, and answers 404
+ * as though the session were missing.
+ */
+const patchRealtimeSessionSchema = z
+  .object({
+    project_id: z.string().min(1).max(256),
+    vendor_conversation_id: z.string().min(1).max(256).optional(),
+    status: z.enum(["FAILED", "EXPIRED"]).optional(),
+    reason: z.string().max(256).optional(),
+  })
+  .refine((body) => Boolean(body.vendor_conversation_id ?? body.status), {
+    message: "a vendor_conversation_id or a terminal status is required",
+  });
+
+const reportRealtimeUsageSchema = z.object({
+  project_id: z.string().min(1).max(256),
+  // Required, not optional. Several virtual keys can point at one project, so
+  // the project alone does not say whose session this is; the spend record
+  // belongs to the key that was admitted.
+  virtual_key_id: z.string().min(1).max(256),
+  usage: spendUsageSchema,
+});
+
+/**
+ * Books a voice session and decides the key's open-session cap in the same
+ * transaction that inserts the row.
+ *
+ * The gateway calls this BEFORE it mints, and refuses the mint when this
+ * refuses. That ordering is what makes the cap real: a mint that ran first
+ * would already have handed out a working credential by the time the count
+ * said no.
+ */
+secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
+  const parsed = reserveRealtimeSessionSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_reservation",
+          message:
+            "a session reservation names the session, its tenancy, its key and its vendor",
+        },
+      },
+      400,
+    );
+  }
+  const body = parsed.data;
+  const result = await reserveRealtimeSession({
+    sessionId: body.session_id,
+    projectId: body.project_id,
+    organizationId: body.organization_id,
+    virtualKeyId: body.virtual_key_id,
+    modelProviderId: body.model_provider_id,
+    vendor: body.vendor,
+    agentId: body.agent_id,
+    model: body.model,
+    traceId: body.trace_id,
+    requestedModel: body.requested_model,
+  });
+  if (!result.ok) {
+    return c.json(
+      {
+        error: {
+          type: "rate_limited",
+          code: "realtime_session_limit",
+          message:
+            "this virtual key already holds the most realtime voice sessions it may keep open at once",
+          open: result.open,
+          limit: result.limit,
+        },
+      },
+      429,
+    );
+  }
+  return c.json({ session_id: body.session_id, status: "OPEN" });
+});
+
+/**
+ * Records the vendor's own conversation id on a booked session, or closes a
+ * booking whose mint never produced a credential.
+ */
+secured
+  .access(gatewayPolicy())
+  .patch("/realtime-sessions/:session_id", async (c) => {
+    const parsed = patchRealtimeSessionSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_session_patch",
+            message:
+              "project_id is required, with a vendor_conversation_id or a terminal status",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const body = parsed.data;
+    let applied = false;
+    if (body.vendor_conversation_id) {
+      applied = await correlateRealtimeSession({
+        sessionId,
+        projectId: body.project_id,
+        vendorConversationId: body.vendor_conversation_id,
+      });
+    }
+    if (body.status) {
+      applied =
+        (await releaseRealtimeSession({
+          sessionId,
+          projectId: body.project_id,
+          status: body.status,
+          reason: body.reason ?? "released by the gateway",
+        })) || applied;
+    }
+    if (!applied) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ session_id: sessionId, updated: true });
+  });
+
+/**
+ * Closes an OpenAI voice session with the usage its socket reported.
+ *
+ * OpenAI reports a realtime session's usage over the socket, and that socket
+ * runs client to vendor, so the client posting it back is the only path by
+ * which those numbers reach billing. The gateway has already made the audio
+ * and text counts disjoint.
+ */
+secured
+  .access(gatewayPolicy())
+  .post("/realtime-sessions/:session_id/usage", async (c) => {
+    const parsed = reportRealtimeUsageSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_usage_report",
+            message:
+              "project_id, virtual_key_id and a usage object of integer quantities are required",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const outcome = await reportRealtimeSessionUsage({
+      sessionId,
+      projectId: parsed.data.project_id,
+      virtualKeyId: parsed.data.virtual_key_id,
+      usage: parsed.data.usage,
+    });
+    if (outcome === "not_found") {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ session_id: sessionId, status: "CLOSED" });
+  });
 
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 

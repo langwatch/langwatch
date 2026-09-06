@@ -1,0 +1,58 @@
+---
+title: Repository and Pull Request Attribution
+sidebarTitle: Repo & PR Attribution
+description: How a coding-agent session gets joined to the repository, branch and pull request it worked on.
+keywords:
+  - repository attribution
+  - git branch attribution
+  - pull request attribution
+  - claude code repository
+  - coding agent worktree
+---
+
+Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. The [pull requests view](/coding-agents/pull-requests) prices each change through this join. This page covers how the report happens, what moves it, and what its limits are.
+
+## Two channels report the working context
+
+Together they cover every way a session moves between checkouts.
+
+**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the next report uses the new directory. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
+
+**Declared by the agent.** The agent runs one command from inside a checkout:
+
+```bash
+langwatch ingest context
+```
+
+LangWatch attributes the session to that repository and branch from that point on. This covers the case the automatic channel cannot see: work done through shell commands in a directory the session never natively entered.
+
+A standing agent that runs from a scratch directory and works on one checkout after another declares in each checkout, and each piece of work attributes to its own repository and branch.
+
+You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also tell a session "declare your working context" at any time.
+
+The command identifies the session on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
+
+## From branch to pull request
+
+With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping works in both time directions: a pull request opened after the session went quiet is still found, and connecting GitHub backfills recent branches.
+
+LangWatch reads pull request status (open, merged, closed) live from GitHub whenever you look, and never stores it.
+
+## Limits, exactly
+
+- **A session keeps the first repository it reported.** Later declarations for other branches of the same repository attribute in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository does not move the session's row off the first repository.
+- **Work outside any checkout attaches to no repository.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
+- **One declaration cannot be split.** A single turn that touches two repositories attributes to the one the agent declared last.
+
+## Verify it
+
+Run a session, do some work, then open [/me/sessions](https://app.langwatch.ai/me/sessions): the session row shows the pull requests its branches map to. From the terminal:
+
+```bash
+langwatch ingest context
+# Declared github.com/acme/shop@feat/checkout for claude_code session 6f2e...
+```
+
+The command prints one line saying what it declared, or why it declared no attribution. It never interrupts the session.
+
+**Also check:** [Pull request cost](/coding-agents/pull-requests) for what the join buys you, and each agent's setup page for agent-specific mechanics, for example [Codex in a sandbox](/coding-agents/openai-codex).

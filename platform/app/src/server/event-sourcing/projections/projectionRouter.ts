@@ -543,6 +543,14 @@ export class ProjectionRouter<
       projectionDefs[name] = {
         name,
         groupKeyFn: projection.key,
+        // Dispatch in log-accept order, ALWAYS: the state executor's cursor
+        // is (createdAt, id), so a group ordered by business time can hand a
+        // late-appended event to an early drain, commit a cursor past the
+        // rest of the backlog, and silently drop every earlier-appended
+        // event still queued behind it - with no refold lane to heal the
+        // loss. Scoring by createdAt makes delivery order agree with the
+        // cursor, so the staleness guard only ever drops true redeliveries.
+        scoreFn: (event) => event.createdAt,
         coalesceMaxBatch: projection.options?.coalesceMaxBatch ?? 1,
         options: projection.options,
       };

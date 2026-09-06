@@ -116,6 +116,11 @@ export const UNPUBLISHED = [
     why: "inbound Auth0 provisioning webhook, addressed by Auth0 and no one else",
   },
   {
+    match: "/api/elevenlabs/webhook",
+    category: "internal",
+    why: "inbound ElevenLabs post-call webhook; the schema is the vendor's and the signature check against the provider row's own secret makes ElevenLabs the only valid caller. A customer does configure this URL in their workspace, and its shape is documented for that at docs/ai-gateway/api/realtime.mdx, but it is not an operation anyone calls from our API",
+  },
+  {
     match: "/api/github",
     category: "internal",
     why: "the GitHub App install redirect, setup callback and webhook. The redirect runs on a browser session from our own settings page, and the other two are addressed by GitHub, so an API-key caller can reach none of them",
@@ -239,6 +244,24 @@ export const UNPUBLISHED = [
     match: "GET /api/openapi.json",
     category: "elsewhere",
     why: "serves the document itself, for the same reason /api/gateway/v1/openapi.json above is absent: an operation inside the document describing where to fetch that same document is circular, and a reader holding it has already answered the question",
+  },
+
+  {
+    match: "/api/langy/local",
+    category: "internal",
+    why: "the Langy worker's door onto a folder the developer shared from their own machine (ADR-129). Every call is bound to the conversation the caller's own session key was minted for and only answers while that turn runs, so no reader of the API reference can call it; the payload contract is the in-repo local control protocol, which the command line and the worker both ship with",
+  },
+
+  {
+    match: "/api/langy/waits",
+    category: "internal",
+    why: "the other half of the same worker surface: it parks a tool while a card waits for the developer's answer in the chat. Same session key, same conversation binding, same in-repo contract",
+  },
+
+  {
+    match: "/api/langy/ui",
+    category: "internal",
+    why: "the live UI-action channel between a Langy worker and the user's open browser tab. It only answers mid-turn, for the conversation the caller's own session key was minted for, so no reader of the API reference can call it: outside a turn every request is refused, and the payload contract is the in-repo action manifest, not a stable public schema",
   },
 
   // ── Gap: public, should be documented, not yet ─────────────────────────

@@ -51,6 +51,7 @@ import {
 	removeSessionContextHooks,
 } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function (no
@@ -436,6 +437,7 @@ export async function maybeOfferIngestionShellRcPersist({
 	// the same grant.
 	if (tool === "codex") {
 		assertCodexTurnHarvest();
+		assertCodexAgentGuidance();
 		return;
 	}
 

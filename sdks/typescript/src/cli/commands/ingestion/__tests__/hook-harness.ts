@@ -96,12 +96,20 @@ export interface RunHookOptions {
   readInput?: () => Promise<string>;
   env?: NodeJS.ProcessEnv;
   git?: Record<string, string>;
+  /** Full control over git answers, for runs where the directory matters. */
+  runGit?: GitRunner;
   fetchImpl?: typeof fetch;
   now?: number;
   tool?: string;
   /** Claude's live session registry. Defaults to an empty per-test one. */
   claudeRegistryDir?: string;
   readCliConfig?: Parameters<typeof hookCommand>[0]["readCliConfig"];
+  /**
+   * The healer a rejected key is handed to. Defaults to one that declines, so
+   * no test ever reaches the machine's real config or a collector with a real
+   * login.
+   */
+  healRevokedKey?: Parameters<typeof hookCommand>[0]["healRevokedKey"];
   /**
    * Run with no exporter variables at all, the way Claude Code hands its hooks
    * an environment. Every other run seeds `OTEL_EXPORTER_OTLP_ENDPOINT`.
@@ -185,11 +193,13 @@ export const installHookHarness = (): HookHarness => {
       readInput,
       env = {},
       git = WORKTREE_GIT,
+      runGit,
       fetchImpl = collector(),
       now = NOW,
       tool = "claude-code",
       claudeRegistryDir,
       readCliConfig = NO_CLI_CONFIG,
+      healRevokedKey = async () => ({ status: "declined" }) as const,
       shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
       hookCommand({
@@ -203,7 +213,7 @@ export const installHookHarness = (): HookHarness => {
             Promise.resolve(
               typeof input === "string" ? input : JSON.stringify(input),
             )),
-        runGit: gitRunner(git),
+        runGit: runGit ?? gitRunner(git),
         fetchImpl,
         now: () => now,
         stateDir,
@@ -211,6 +221,7 @@ export const installHookHarness = (): HookHarness => {
         // registry and finds a name it did not plant.
         claudeRegistryDir: claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
         readCliConfig,
+        healRevokedKey,
       }),
   };
 };

@@ -12,27 +12,51 @@ function createMockPrisma() {
       updateMany: vi.fn(),
       deleteMany: vi.fn(),
     },
+    ssoConnection: {
+      findFirst: vi.fn(),
+    },
   } as unknown as Parameters<typeof ScimTokenService.create>[0];
+}
+
+/** The directory-sync history a mint and a revoke state facts on (D08). */
+function createSyncLifecycle() {
+  return {
+    tokenIssued: vi.fn().mockResolvedValue(undefined),
+    revoked: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 describe("ScimTokenService", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
+  let syncLifecycle: ReturnType<typeof createSyncLifecycle>;
   let service: ScimTokenService;
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = ScimTokenService.create(prisma);
+    syncLifecycle = createSyncLifecycle();
+    service = ScimTokenService.create(prisma, {
+      syncLifecycle: syncLifecycle as never,
+    });
   });
 
   describe("when generating a token", () => {
-    describe("given an organization id", () => {
+    describe("given an organization id and one of its connections", () => {
+      beforeEach(() => {
+        (
+          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ id: "conn-okta" });
+      });
+
       it("creates a token record with a hashed value", async () => {
         const mockToken = { id: "token-1", organizationId: "org-1" };
         (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
           mockToken,
         );
 
-        const result = await service.generate({ organizationId: "org-1" });
+        const result = await service.generate({
+          organizationId: "org-1",
+          connectionId: "conn-okta",
+        });
 
         expect(result.token).toBeDefined();
         expect(result.token.length).toBe(64); // 32 bytes hex
@@ -54,12 +78,101 @@ describe("ScimTokenService", () => {
 
         await service.generate({
           organizationId: "org-1",
+          connectionId: "conn-okta",
           description: "Okta integration",
         });
 
         const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
           .mock.calls[0]![0];
         expect(createCall.data.description).toBe("Okta integration");
+      });
+
+      it("names the connection on the token and starts that connection's sync", async () => {
+        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {
+            id: "token-1",
+          },
+        );
+
+        const result = await service.generate({
+          organizationId: "org-1",
+          connectionId: "conn-okta",
+        });
+
+        expect(result.connectionId).toBe("conn-okta");
+        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0];
+        expect(createCall.data.connectionId).toBe("conn-okta");
+        expect(syncLifecycle.tokenIssued).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          connectionId: "conn-okta",
+          tokenId: "token-1",
+        });
+      });
+    });
+
+    describe("given no connection", () => {
+      /** @scenario A token cannot exist without a connection to belong to */
+      it("refuses with scim_connection_required and writes nothing", async () => {
+        await expect(
+          service.generate({ organizationId: "org-1" }),
+        ).rejects.toMatchObject({
+          code: "scim_connection_required",
+          httpStatus: 422,
+        });
+
+        expect(prisma.scimToken.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given a connection belonging to another organization", () => {
+      /** @scenario A token cannot be issued against another organization's connection */
+      it("refuses as not found, revealing nothing about the other organization", async () => {
+        (
+          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+
+        const refusal = await service
+          .generate({ organizationId: "org-1", connectionId: "conn-elsewhere" })
+          .catch((error: unknown) => error);
+
+        expect(refusal).toMatchObject({
+          code: "scim_connection_not_found",
+          httpStatus: 404,
+        });
+        // Every value in the refusal is the id the caller already sent, so
+        // nothing about the other organization is revealed. Asserted over the
+        // whole of `meta` rather than field by field, because a field added
+        // later is exactly what would leak.
+        const { meta } = refusal as { meta: Record<string, unknown> };
+        expect(Object.values(meta)).toEqual(
+          Object.values(meta).map(() => "conn-elsewhere"),
+        );
+        expect(prisma.scimToken.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when a connection is torn down", () => {
+    it("revokes only that connection's tokens and ends its sync", async () => {
+      (
+        prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ count: 2 });
+
+      const result = await service.revokeForConnection({
+        organizationId: "org-1",
+        connectionId: "conn-okta",
+      });
+
+      expect(result).toEqual({ revoked: 2 });
+      expect(prisma.scimToken.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1", connectionId: "conn-okta" },
+      });
+      expect(syncLifecycle.revoked).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        connectionId: "conn-okta",
+        tokenId: null,
+        cause: "teardown",
       });
     });
   });
@@ -149,6 +262,7 @@ describe("ScimTokenService", () => {
       expect(prisma.scimToken.findMany).toHaveBeenCalledWith({
         where: { organizationId: "org-1" },
         select: {
+          connectionId: true,
           id: true,
           description: true,
           createdAt: true,

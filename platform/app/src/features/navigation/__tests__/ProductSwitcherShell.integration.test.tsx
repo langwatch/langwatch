@@ -10,7 +10,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,12 +42,44 @@ const teamA = {
     },
   ],
 };
+/** The reader's own workspace, which is what the Me pages resolve. */
+const personalTeam = {
+  id: "team_personal",
+  name: "Ada's Workspace",
+  slug: "personal-ada",
+  isPersonal: true,
+  ownerUserId: "user_1",
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: [
+    {
+      id: "project_personal",
+      slug: "personal-ada-abc123",
+      name: "Personal Workspace",
+      isPersonal: true,
+    },
+  ],
+};
 const orgA = {
   id: "org_1",
   name: "ACME",
   members: [{ userId: "user_1", role: "ADMIN" }],
-  teams: [teamA],
+  teams: [teamA, personalTeam],
 };
+/** The team the page being rendered resolves to. */
+let mockAmbientTeam: {
+  id: string;
+  name: string;
+  slug: string;
+  isPersonal: boolean;
+  ownerUserId: string | null;
+  members: Array<{ userId: string; role: string }>;
+  projects: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    isPersonal: boolean;
+  }>;
+} = teamA;
 const orgB = {
   id: "org_2",
   name: "Beta Corp",
@@ -67,6 +105,50 @@ const orgB = {
 };
 let mockOrganizations: unknown[] = [orgA];
 
+/** Two teams and eleven projects: past the search threshold. */
+const crowdedTeamCore = {
+  id: "team_core",
+  name: "Core",
+  slug: "crowded-core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: Array.from({ length: 9 }, (_, index) => ({
+    id: `project_core_${index}`,
+    slug: `core-app-${index}`,
+    name: `Core App ${index}`,
+    isPersonal: false,
+  })),
+};
+const crowdedTeamPlatform = {
+  id: "team_platform",
+  name: "Platform",
+  slug: "crowded-platform",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: [
+    {
+      id: "project_router",
+      slug: "edge-router",
+      name: "Edge Router",
+      isPersonal: false,
+    },
+    {
+      id: "project_billing",
+      slug: "billing-sync",
+      name: "Billing Sync",
+      isPersonal: false,
+    },
+  ],
+};
+const crowdedOrg = {
+  id: "org_1",
+  name: "ACME",
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  teams: [crowdedTeamCore, crowdedTeamPlatform, personalTeam],
+};
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     pathname: mockPathname,
@@ -90,14 +172,16 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  userBelongsToTeam: () => true,
+// Only the hook is stubbed. The access helpers beside it are pure, and the
+// fixture holds the membership rows they read, so the real ones answer.
+vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useOrganizationTeamProject: () => ({
     isLoading: false,
     organization: mockOrganizations[0],
     organizations: mockOrganizations,
-    team: teamA,
-    project: teamA.projects[0],
+    team: mockAmbientTeam,
+    project: mockAmbientTeam.projects[0],
     organizationRole: "ADMIN",
     hasPermission: () => true,
   }),
@@ -270,6 +354,11 @@ function renderShell(props: Partial<DashboardLayoutProps> = {}) {
   );
 }
 
+/** The switcher row for a product, which is what carries its state. */
+function productMenuItem(label: string) {
+  return screen.getByText(label).closest("[role='menuitem']");
+}
+
 async function openProductSwitcher() {
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Switch product" }));
@@ -285,10 +374,12 @@ beforeEach(() => {
   mockPathname = "/[project]";
   mockGovernanceFlagEnabled = true;
   mockOrganizations = [orgA];
+  mockAmbientTeam = teamA;
   pushMock.mockClear();
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -428,10 +519,144 @@ describe("the product-switcher top bar", () => {
     });
   });
 
+  describe("when the organization holds more than eight projects", () => {
+    beforeEach(() => {
+      mockOrganizations = [crowdedOrg];
+      mockAmbientTeam = crowdedTeamCore;
+    });
+
+    async function openProjectPicker() {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText("Search projects"),
+        ).toBeInTheDocument();
+      });
+      return user;
+    }
+
+    // Ark's combobox input is machine-controlled, so per-character typing
+    // races the re-render and drops characters on a slow runner; one
+    // change event with the whole query is deterministic.
+    function searchFor(text: string) {
+      fireEvent.change(screen.getByPlaceholderText("Search projects"), {
+        target: { value: text },
+      });
+    }
+
+    /** @scenario A large project list opens with a focused search field */
+    it("opens with a focused search field that filters by project and team name", async () => {
+      renderShell();
+      await openProjectPicker();
+
+      // The field carries its own accessible name, not only a placeholder.
+      expect(
+        screen.getByRole("combobox", { name: "Search projects" }),
+      ).toHaveFocus();
+      await waitFor(() => {
+        expect(screen.getByText("Edge Router")).toBeInTheDocument();
+      });
+
+      searchFor("router");
+      await waitFor(() => {
+        expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
+      });
+      expect(screen.getByText("Edge Router")).toBeInTheDocument();
+
+      // Team names match too: "platform" is the team, not a project name.
+      searchFor("platform");
+      await waitFor(() => {
+        expect(screen.getByText("Billing Sync")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Edge Router")).toBeInTheDocument();
+      expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The project search answers the keyboard */
+    it("moves with the arrow keys and opens the highlighted project on Enter", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+
+      searchFor("billing");
+      await waitFor(() => {
+        expect(screen.getByText("Billing Sync")).toBeInTheDocument();
+      });
+      await user.keyboard("{ArrowDown}{Enter}");
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
+    });
+
+    /** @scenario Typing highlights the top result */
+    it("highlights the first result as I type, with no arrow key", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+      const field = screen.getByPlaceholderText("Search projects");
+
+      searchFor("billing");
+      // Highlighted by the typing itself, before any arrow key. The field
+      // names the highlighted option, which is the machine's own state
+      // rather than a class the list happens to carry.
+      await waitFor(() => {
+        const [first] = screen.getAllByRole("option");
+        expect(first).toHaveAttribute("data-highlighted");
+        expect(field).toHaveAttribute("aria-activedescendant", first?.id);
+      });
+
+      // Enter alone opens it, which is the point of the highlight.
+      await user.keyboard("{Enter}");
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
+    });
+
+    /** @scenario Creating a project stays available while the list is unfiltered */
+    it("keeps the per-team create entries while nothing is typed and drops them while searching", async () => {
+      renderShell();
+      await openProjectPicker();
+
+      // One create entry per team the user can create in (org admin: both).
+      expect(screen.getAllByText("New Project")).toHaveLength(2);
+
+      searchFor("core");
+      await waitFor(() => {
+        expect(screen.queryByText("New Project")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when the organization holds eight projects or fewer", () => {
+    /** @scenario A short project list stays a plain menu */
+    it("lists the projects with no search field", async () => {
+      renderShell();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(screen.getByText("Support Bot")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByPlaceholderText("Search projects"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when on a Me page", () => {
+    beforeEach(() => {
+      mockPathname = "/me";
+      // The Me pages resolve the personal workspace, so the project the
+      // chrome carries there is a private one LLM Ops can never open.
+      mockAmbientTeam = personalTeam;
+    });
+
     /** @scenario The Me scope shows my name with a Personal badge */
     it("shows the user name with a Personal badge", () => {
-      mockPathname = "/me";
       renderShell({ personalScope: true });
 
       expect(screen.getByText("Ada")).toBeInTheDocument();
@@ -439,6 +664,47 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.queryByRole("button", { name: "Switch project" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario LLM Ops opens from the personal workspace */
+    it("offers LLM Ops and opens the project last worked in", async () => {
+      localStorage.setItem(
+        "selectedProjectSlug",
+        JSON.stringify("support-bot"),
+      );
+      renderShell({ personalScope: true });
+      const user = await openProductSwitcher();
+
+      expect(productMenuItem("LLM Ops")).not.toHaveAttribute("data-disabled");
+
+      await user.click(screen.getByText("LLM Ops"));
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith("/support-bot");
+      });
+    });
+
+    /** @scenario LLM Ops opens a project I can reach when I have opened none yet */
+    it("opens a project of a team it can open when nothing is remembered", async () => {
+      renderShell({ personalScope: true });
+      const user = await openProductSwitcher();
+
+      await user.click(screen.getByText("LLM Ops"));
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith("/demo");
+      });
+    });
+
+    /** @scenario LLM Ops stays closed when the organization holds no project for me */
+    it("greys LLM Ops out when no team it can open holds a project", async () => {
+      mockOrganizations = [
+        { ...orgA, teams: [{ ...teamA, projects: [] }, personalTeam] },
+      ];
+      renderShell({ personalScope: true });
+      await openProductSwitcher();
+
+      expect(productMenuItem("LLM Ops")).toHaveAttribute("data-disabled");
     });
   });
 

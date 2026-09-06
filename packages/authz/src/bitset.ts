@@ -1,11 +1,7 @@
 /**
  * ADR-092 §12 — permission bitsets. The registry is a fixed, append-only
  * ordered list, so an effective permission set is a few dozen bytes and a
- * membership test is a bit test. Used by passports; client-safe.
- *
- * The base64url wire codecs live in passport.ts, which implements the
- * passport wire format and is their only production consumer: they need
- * node's Buffer, and this module stays on the browser-safe barrel.
+ * membership test is a bit test.
  */
 import { ALL_PERMISSIONS, permissionIndex } from "./registry";
 

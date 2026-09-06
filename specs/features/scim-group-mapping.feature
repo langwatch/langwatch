@@ -15,32 +15,17 @@ Feature: SCIM Group Mapping
   # an IdP deprovision is the fired-employee case, so the deny effect
   # holds before the push returns, queue or no queue.
 
-  # Parity status: 4 of 26 scenarios bound to existing tests.
-  # The remaining are tracked under #3458:
-  #   - 22 NO_TEST: behavior shipped + correct, no integration test yet exists
-  # NO_TEST gaps:
-  #   - "A replayed SCIM push changes nothing"
-  #   - "An IdP removal takes effect before the push returns, with the queue stopped"
-  #   - "Entra pushes a new group via SCIM"
-  #   - "Entra pushes a group that already exists"
-  #   - "Entra pushes members for a group with no RoleBindings"
-  #   - "Entra pushes members for a group that has a RoleBinding"
-  #   - "Entra removes a member from a group"
-  #   - "Entra replaces full member list on a group"
-  #   - "Entra deletes a SCIM group"
-  #   - "Admin lists all SCIM groups"
-  #   - "Admin adds a RoleBinding to a SCIM group"
-  #   - "Admin removes a RoleBinding from a SCIM group"
-  #   - "Admin deletes a SCIM group"
-  #   - "Non-enterprise org cannot access group management endpoints"
-  #   - "Non-admin user cannot manage group bindings"
-  #   - "Custom role is available when assigning a binding to a group"
-  #   - "Deprovisioned user's org membership and role bindings are cleaned up"
-  #   - "Admin views SCIM groups table"
-  #   - "Admin sees member count per group"
-  #   - "Admin assigns a RoleBinding to a group via the settings UI"
-  #   - "Group member's access is resolved through standard RBAC"
-  #   - "Org admin override applies for SCIM-managed group members"
+  # Which scenarios below are bound is answered by the feature-parity check,
+  # not by a count kept here - a hand-maintained tally goes stale the first
+  # time somebody binds one, and the @unimplemented tags already say which
+  # gaps are tracked. Closing them is #3458.
+
+  # D08 amends the deprovisioning section: what a removal must leave behind
+  # is now a proved postcondition rather than a list of records deleted, and
+  # every membership consequence a push has - group bindings included -
+  # arrives as a grant. The connection-level rules (one token, one
+  # connection; who the directory means; what a failure looks like) live in
+  # specs/identity/scim-connection-sync.feature.
 
   Background:
     Given an organization on the ENTERPRISE plan
@@ -198,15 +183,51 @@ Feature: SCIM Group Mapping
 
   # --- User deprovisioning ---
 
-  @integration @unimplemented
+  # The customer's reason for deprovisioning is usually that somebody left
+  # under a cloud, so the postcondition is the deliverable: not "these
+  # records were deleted" but "nothing resolves for this person here any
+  # more", checked before the removal is allowed to stand. A removal that
+  # cannot prove it fails loudly rather than passing quietly.
+  #
+  # Calibration, so nobody reads the deactivate scenario as a live breach:
+  # today a deprovision leaves grants in place and deactivation does block
+  # sign-in and API-key verification, so the retained authority is LATENT.
+  # What it costs is a decision - reactivating somebody restores everything
+  # they held on the day they left, with nobody choosing that. Reactivation
+  # is therefore re-entry, not undo; specs/identity/scim-connection-sync.feature
+  # carries what a return does and does not restore.
+
+  @integration
   Scenario: Deprovisioned user's org membership and role bindings are cleaned up
     Given user "user-1" is a member of the organization
     And user "user-1" has GroupMembership records for groups "abc-123" and "def-456"
     And user "user-1" has direct RoleBindings in the organization
     When Entra pushes a SCIM DELETE for user "user-1"
     Then user "user-1" is deactivated
-    And all direct RoleBinding records for user "user-1" are removed
-    And user "user-1"'s organization membership is removed
+    And the removal is proved to have left nothing resolving for "user-1" in the organization
+    And a permission check for "user-1" in the organization answers no, everywhere
+
+  @integration
+  Scenario: Deactivating a user deprovisions them with the same proof
+    Given user "user-1" is a member of the organization with access through group "abc-123"
+    When Entra pushes user "user-1" as inactive
+    Then the removal is proved to have left nothing resolving for "user-1" in the organization
+    And "user-1"'s next permission check answers no
+
+  @unit
+  Scenario: A deprovision that cannot prove itself empty fails loudly
+    Given a deprovision of "user-1" whose proof still finds access resolving for them
+    When the deprovision is applied
+    Then it is refused with code offboard_incomplete and status 500
+    And "user-1"'s access is exactly what it was before the push
+    And the failure is surfaced rather than retried into silence
+
+  @integration @unimplemented
+  Scenario: Reactivating a deprovisioned user restores no access on its own
+    Given user "user-1" was pushed inactive and their access was removed
+    When Entra pushes user "user-1" as active again
+    Then "user-1" can sign in
+    And "user-1" holds no access until a push asserts it again
 
   # --- SCIM Settings UI ---
 

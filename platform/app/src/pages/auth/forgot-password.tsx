@@ -14,6 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useIdentityFrontDoor } from "~/features/auth-front-door";
 import { authClient } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { AuthCard } from "../../components/auth/AuthCard";
@@ -25,16 +26,33 @@ const forgotPasswordSchema = z.object({ email: z.string().email() });
 
 export default function ForgotPassword() {
   const publicEnv = usePublicEnv();
+  const frontDoor = useIdentityFrontDoor();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
   if (!publicEnv.data) {
     return null;
   }
 
-  // Reset is a credential-mode concept. In SSO / social deployments the
-  // identity provider owns the password, so point the user back to sign in
-  // instead of a form that would only no-op against the blocked endpoint.
-  if (isAuthProvider && isAuthProvider !== "email") {
+  // Reset follows the identifier, not the deployment (ADR-117 §6, epic Q9).
+  // Whether a reset can happen is a fact about the account (does it hold a
+  // password?), and the name of the deployment's sign-in provider is not that
+  // fact. An installation that authenticates people itself keeps this door
+  // open however it federates, which is what makes self-recovery reachable
+  // for somebody whose identity provider is the thing that is broken.
+  //
+  // The one place the deployment still has the last word is where it holds no
+  // passwords to reset at all: the reset endpoints are not mounted there, so
+  // offering the form would promise an email nobody can send. That is the
+  // method-set policy governing, not the mode, and it stops governing when
+  // those installations hold password identifiers.
+  //
+  // Until the front door is enforced, the legacy rejection stands unchanged:
+  // in SSO and social deployments the identity provider owns the password.
+  const deploymentHoldsNoPasswords = frontDoor.enabled
+    ? Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email"
+    : Boolean(isAuthProvider) && isAuthProvider !== "email";
+
+  if (deploymentHoldsNoPasswords) {
     return (
       <AuthCard title="Forgot password">
         <Text>

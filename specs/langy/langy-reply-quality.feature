@@ -17,6 +17,13 @@ Feature: Langy reply quality
       turn that completed a write is not repeated blindly
 
   @unit
+  Scenario: A turn that ends on a card says what the card is waiting for
+    Given Langy ended its turn on a card that is waiting for my answer
+    When the turn reaches its end with no prose
+    Then the line says the turn is waiting for my answer on that card
+    And it does not apologise for a reply it was never going to write
+
+  @unit
   Scenario: A stream that ends without the turn finishing says nothing
     Given the user stops the turn, or the worker checkpoints and hands it off
     When the live stream ends

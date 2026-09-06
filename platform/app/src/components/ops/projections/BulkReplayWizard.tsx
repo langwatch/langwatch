@@ -22,6 +22,12 @@ import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
 import { TenantSelector } from "./TenantSelector";
 
+const KIND_PALETTE = {
+  fold: "blue",
+  map: "purple",
+  state: "teal",
+} as const;
+
 /**
  * One numbered step of the replay flow, drawer-native: a flat section with a
  * heading row instead of a nested card, dimmed until its preconditions hold.
@@ -371,11 +377,9 @@ export function BulkReplayWizard({
                               <Badge
                                 size="sm"
                                 variant="subtle"
-                                colorPalette={
-                                  meta.kind === "map" ? "purple" : "blue"
-                                }
+                                colorPalette={KIND_PALETTE[meta.kind]}
                               >
-                                {meta.kind === "map" ? "map" : "fold"}
+                                {meta.kind}
                               </Badge>
                             )}
                             {!hasData && (

@@ -17,7 +17,7 @@ import {
   buildAnthropicAdminPullConfig,
   buildParserConfig,
   type ComposerState,
-} from "../ingestion-sources";
+} from "../inventory";
 
 function composer(
   parserConfig: Record<string, string>,
@@ -30,6 +30,9 @@ function composer(
     parserConfig,
     ottlStatements: [],
     pullSchedule,
+    // An aggregate pull has no conversations to route (ADR-088 Decision 8),
+    // so this stays null and the drawer offers no destination.
+    traceProjectId: null,
   };
 }
 

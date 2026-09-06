@@ -6,7 +6,12 @@
  * when each one appeared. Pure; no rendering here (see LangyPlanCard tests).
  */
 import { describe, expect, it } from "vitest";
-import { cleanPlanContent, langyPlan, parseTodoList } from "../logic/langyPlan";
+import {
+  cleanPlanContent,
+  langyPlan,
+  normalisePlanStatus,
+  parseTodoList,
+} from "../logic/langyPlan";
 
 /** A `todowrite` snapshot part carrying a whole-list rewrite. */
 function todo(todos: Array<{ content: string; status: string }>): {
@@ -64,46 +69,38 @@ describe("langyPlan", () => {
   });
 
   describe("given tool calls interleaved with plan updates", () => {
-    it("attributes each call to the step that was current when it started", () => {
+    // The calls themselves are the transcript's (logic/langyTranscript.ts), so
+    // the plan reads the steps out of the snapshots and leaves the work alone.
+    /** @scenario "The checklist is the steps, and the work stays in the transcript" */
+    it("reads the steps and carries none of the work", () => {
       const message = {
         parts: [
-          tool("bash", "warmup"), // before any plan → preamble
+          tool("bash", "warmup"),
           todo([
             { content: "Find slow traces", status: "in_progress" },
             { content: "Summarise them", status: "pending" },
           ]),
-          tool("bash", "search"), // step 1 running
+          tool("bash", "search"),
           todo([
             { content: "Find slow traces", status: "completed" },
             { content: "Summarise them", status: "in_progress" },
           ]),
-          tool("bash", "read"), // step 2 running
+          tool("bash", "read"),
         ],
       };
 
       const plan = langyPlan(message)!;
-      expect(plan.preamble).toHaveLength(1);
-      expect((plan.preamble[0] as { toolCallId: string }).toolCallId).toBe(
-        "warmup",
-      );
-      expect(
-        plan.itemParts[0]!.map((p) => (p as { toolCallId: string }).toolCallId),
-      ).toEqual(["search"]);
-      expect(
-        plan.itemParts[1]!.map((p) => (p as { toolCallId: string }).toolCallId),
-      ).toEqual(["read"]);
-    });
-
-    it("does not attribute a preamble call to a later step", () => {
-      const message = {
-        parts: [
-          tool("bash", "early"),
-          todo([{ content: "Do the thing", status: "in_progress" }]),
-        ],
-      };
-      const plan = langyPlan(message)!;
-      expect(plan.itemParts[0]).toEqual([]);
-      expect(plan.preamble).toHaveLength(1);
+      expect(plan.items.map((item) => item.status)).toEqual([
+        "completed",
+        "in_progress",
+      ]);
+      expect(plan.currentIndex).toBe(1);
+      expect(Object.keys(plan)).toEqual([
+        "items",
+        "currentIndex",
+        "completedCount",
+        "totalCount",
+      ]);
     });
   });
 
@@ -207,7 +204,7 @@ describe("langyPlan", () => {
       ]);
     });
 
-    it("still attributes tool calls from the message's snapshot history", () => {
+    it("takes the override's items whatever the parts also ran", () => {
       const message = {
         parts: [
           todo([{ content: "Do the thing", status: "in_progress" }]),
@@ -217,10 +214,10 @@ describe("langyPlan", () => {
       const plan = langyPlan(message, {
         overrideItems: [{ content: "Do the thing", status: "in_progress" }],
       })!;
-      // The override supplies the items; attribution still comes from the parts.
-      expect(
-        plan.itemParts[0]!.map((p) => (p as { toolCallId: string }).toolCallId),
-      ).toEqual(["c1"]);
+      expect(plan.items).toEqual([
+        { content: "Do the thing", status: "in_progress" },
+      ]);
+      expect(plan.currentIndex).toBe(0);
     });
 
     it("normalises an unknown override status to pending", () => {
@@ -239,6 +236,128 @@ describe("langyPlan", () => {
       expect(plan.items).toEqual([
         { content: "From parts", status: "in_progress" },
       ]);
+    });
+  });
+
+  describe("given statuses written with another word for the same thing", () => {
+    /** @scenario "A step written with another word for done still counts as done" */
+    it("counts them, so a finished plan never reads 0 of 5 done", () => {
+      const message = {
+        parts: [
+          todo([
+            { content: "Read the failing test", status: "done" },
+            { content: "Fix the query", status: "Completed" },
+            { content: "Open the pull request", status: "in-progress" },
+            { content: "Tell the team", status: "TODO" },
+            { content: "Rewrite the world", status: "wont do" },
+            { content: "Anything at all", status: "banana" },
+          ]),
+        ],
+      };
+
+      const plan = langyPlan(message)!;
+      expect(plan.items.map((item) => item.status)).toEqual([
+        "completed",
+        "completed",
+        "in_progress",
+        "pending",
+        "cancelled",
+        "pending",
+      ]);
+      expect(plan.completedCount).toBe(2);
+      // The cancelled step counts toward neither.
+      expect(plan.totalCount).toBe(5);
+      expect(plan.currentIndex).toBe(2);
+    });
+
+    it("reads every synonym the same way, whatever its case or spacing", () => {
+      const cases: Array<[string, string]> = [
+        ["done", "completed"],
+        ["Complete", "completed"],
+        ["FINISHED", "completed"],
+        ["  in progress  ", "in_progress"],
+        ["In-Progress", "in_progress"],
+        ["active", "in_progress"],
+        ["doing", "in_progress"],
+        ["not started", "pending"],
+        ["todo", "pending"],
+        ["skipped", "cancelled"],
+        ["canceled", "cancelled"],
+        ["wont_do", "cancelled"],
+      ];
+      for (const [word, expected] of cases) {
+        expect(normalisePlanStatus(word), word).toBe(expected);
+      }
+    });
+
+    it("leaves a word it does not know as not started", () => {
+      // A step is only ever ticked from a status the agent actually wrote.
+      expect(normalisePlanStatus("banana")).toBe("pending");
+      expect(normalisePlanStatus("")).toBe("pending");
+      expect(normalisePlanStatus(undefined)).toBe("pending");
+      expect(normalisePlanStatus(3)).toBe("pending");
+    });
+  });
+
+  describe("given the live snapshot is behind the turn's own plan updates", () => {
+    /** @scenario "The fresher of the two plan snapshots wins" */
+    it("takes the snapshot with more finished steps", () => {
+      // The stream dropped, or this tab adopted the turn late, so the store
+      // still holds the first all-pending list.
+      const message = {
+        parts: [
+          todo([
+            { content: "One", status: "completed" },
+            { content: "Two", status: "completed" },
+            { content: "Three", status: "completed" },
+            { content: "Four", status: "in_progress" },
+          ]),
+        ],
+      };
+
+      const plan = langyPlan(message, {
+        overrideItems: [
+          { content: "One", status: "pending" },
+          { content: "Two", status: "pending" },
+          { content: "Three", status: "pending" },
+          { content: "Four", status: "pending" },
+        ],
+      })!;
+      expect(plan.completedCount).toBe(3);
+      expect(plan.currentIndex).toBe(3);
+    });
+
+    it("keeps the override when the parts have finished no more than it has", () => {
+      // The override is the capped, manager-authored list, so it stays the
+      // default: only a strictly fresher parts snapshot displaces it.
+      const message = {
+        parts: [
+          todo([
+            { content: "Raw uncapped step", status: "completed" },
+            { content: "Second raw step", status: "pending" },
+          ]),
+        ],
+      };
+      const plan = langyPlan(message, {
+        overrideItems: [
+          { content: "Capped step", status: "completed" },
+          { content: "Second capped step", status: "in_progress" },
+        ],
+      })!;
+      expect(plan.items.map((item) => item.content)).toEqual([
+        "Capped step",
+        "Second capped step",
+      ]);
+    });
+
+    it("never ticks a step neither snapshot marked done", () => {
+      const message = {
+        parts: [todo([{ content: "One", status: "in_progress" }])],
+      };
+      const plan = langyPlan(message, {
+        overrideItems: [{ content: "One", status: "pending" }],
+      })!;
+      expect(plan.completedCount).toBe(0);
     });
   });
 

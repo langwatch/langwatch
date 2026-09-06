@@ -12,6 +12,7 @@ import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
+import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -173,7 +174,33 @@ function ReportsContent() {
     );
   };
 
-  const graphs = graphsQuery.data ?? [];
+  // The datapoint step each workbench widget runs at, keyed by chart id, held
+  // in URL state beside the period.
+  //
+  // Not a stored column: `CustomGraph` has no `granularitySeconds` field, and
+  // adding one is a migration this slice does not own. Not component state
+  // either — that would lose the pick on reload and leave it out of a shared
+  // link, so a member who coarsened a card to read it would send a colleague a
+  // different chart from the one they were describing. Persisting per member
+  // is the follow-up that adds the column.
+  const { granularityByGraphId, setGranularity } = useWidgetGranularity();
+
+  const handleGraphGranularityChange = ({
+    graphId,
+    granularitySeconds,
+  }: {
+    graphId: string;
+    granularitySeconds: number;
+  }) => {
+    setGranularity(graphId, granularitySeconds);
+  };
+
+  const graphs = (graphsQuery.data ?? []).map((graph) => {
+    const picked = granularityByGraphId[graph.id];
+    return picked === undefined
+      ? graph
+      : { ...graph, granularitySeconds: picked };
+  });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
   // Build add chart URL with current dashboard
@@ -228,9 +255,11 @@ function ReportsContent() {
             <ReportGrid
               graphs={graphs}
               projectSlug={project?.slug ?? ""}
+              projectId={projectId}
               dashboardId={activeDashboardId ?? undefined}
               onGraphDelete={handleGraphDelete}
               onGraphSizeChange={handleGraphSizeChange}
+              onGraphGranularityChange={handleGraphGranularityChange}
               onGraphsReorder={handleGraphsReorder}
               deletingGraphId={
                 deleteGraph.isPending

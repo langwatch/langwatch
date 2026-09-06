@@ -1,13 +1,13 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../..";
 import {
-  AUTHZ_GRANTS_AGGREGATE_TYPE,
+  AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-  CUTOVER_COMPLETED_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -22,12 +22,16 @@ import {
   type AuthzAuditRow,
   type AuthzAuditTrailStore,
   createAuthzAuditTrailSubscriber,
+  NON_AUDITABLE_SOURCES,
 } from "../authzAuditTrail.subscriber";
 
 const ORG = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;
 const USER_ACTOR = { type: "user" as const, id: "user_admin" };
-const GENESIS_ACTOR = { type: "system" as const, id: "system:genesis-import" };
+const MIGRATION_ACTOR = {
+  type: "system" as const,
+  id: "system:migration-runner",
+};
 
 function event(
   type: string,
@@ -37,7 +41,7 @@ function event(
   return {
     id: overrides?.id ?? "evt_2Zk",
     aggregateId: ORG,
-    aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
+    aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
     tenantId: createTenantId(ORG),
     createdAt: 1_800_000_000_000,
     occurredAt: overrides?.occurredAt ?? OCCURRED_AT,
@@ -99,11 +103,7 @@ describe("authz audit trail subscriber", () => {
         ROLE_DEFINED_EVENT_TYPE,
         ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
         ROLE_DELETED_EVENT_TYPE,
-        MEMBER_OFFBOARDED_EVENT_TYPE,
       ]);
-      expect([...AUTHZ_AUDIT_EVENT_TYPES]).not.toContain(
-        CUTOVER_COMPLETED_EVENT_TYPE,
-      );
     });
   });
 
@@ -154,13 +154,11 @@ describe("authz audit trail subscriber", () => {
     });
   });
 
-  describe("when the event carries a cutover source", () => {
-    /** @scenario "The migration's own facts never reach the audit trail" */
+  describe("when the event carries a backdated source", () => {
+    /** @scenario "Facts stated by the platform itself never reach the audit trail" */
     it.each([
-      "genesis-import",
-      "backfill-b",
+      "migration",
       "read-through-mint",
-      "cutover-import",
     ])("writes no row for %s", async (source) => {
       const store = recordingStore();
       await deliver(store, attached({ source }));
@@ -168,17 +166,26 @@ describe("authz audit trail subscriber", () => {
       expect(store.inserts).toHaveLength(0);
     });
 
-    /** @scenario "The migration's own facts never reach the audit trail" */
-    it("still writes a row for a live source", async () => {
+    /** Driven from the vocabulary rather than from a list of the sources
+     *  that exist today: a source added to `GRANT_EVENT_SOURCES` and left
+     *  out of the skip list is a change a customer made, and it audits by
+     *  default. A new one that ought to be skipped has to say so.
+     *  @scenario "A grant an automated surface made still reaches the audit trail" */
+    it.each(
+      GRANT_EVENT_SOURCES.filter(
+        (source) => !NON_AUDITABLE_SOURCES.includes(source),
+      ),
+    )("still writes a row for %s", async (source) => {
       const store = recordingStore();
-      await deliver(store, attached({ source: "invite" }));
+      await deliver(store, attached({ source }));
 
       expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]!.metadata).toMatchObject({ source });
     });
   });
 
   describe("when a role event carries no source", () => {
-    it("skips the genesis import, recognised by its actor", async () => {
+    it("skips the migration, recognised by its actor", async () => {
       const store = recordingStore();
       await deliver(
         store,
@@ -187,7 +194,7 @@ describe("authz audit trail subscriber", () => {
           name: "Auditor",
           permissions: ["traces.read"],
           kind: "custom",
-          actor: GENESIS_ACTOR,
+          actor: MIGRATION_ACTOR,
         }),
       );
 
@@ -228,12 +235,38 @@ describe("authz audit trail subscriber", () => {
         "authz.grants.role_permissions_changed",
       ],
       [ROLE_DELETED_EVENT_TYPE, "authz.grants.role_deleted"],
-      [MEMBER_OFFBOARDED_EVENT_TYPE, "authz.grants.offboard"],
     ])("maps %s onto the stable verb %s", async (type, action) => {
       const store = recordingStore();
       await deliver(store, event(type, { actor: USER_ACTOR }));
 
       expect(store.inserts[0]!.action).toBe(action);
+    });
+  });
+
+  describe("when a surface rather than a person revokes a grant", () => {
+    /** `grant_revoked` carries no `source`, so what makes a revocation
+     *  attributable is its actor plus its reason. Only the migration runner
+     *  is filtered by actor — a directory sync's de-enroll is a change the
+     *  customer's own directory made, and it belongs on their audit page.
+     *  @scenario "A revocation names the surface that made it without a source of its own" */
+    it("records the row, with the reason and no invented person", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        event(GRANT_REVOKED_EVENT_TYPE, {
+          grantId: "grant_1",
+          reason: "offboarded:user_dave",
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        }),
+      );
+
+      expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]!.action).toBe("authz.grants.revoke");
+      expect(store.inserts[0]!.userId).toBeNull();
+      expect(store.inserts[0]!.metadata).toEqual({
+        grantId: "grant_1",
+        reason: "offboarded:user_dave",
+      });
     });
   });
 
@@ -292,11 +325,11 @@ describe("authz audit trail subscriber", () => {
     it("writes no row and fails loudly", async () => {
       const store = recordingStore();
 
+      // A type outside the verb map on purpose: every type the family
+      // currently publishes IS audited, so the only way to reach this guard
+      // is to hand it the shape a future unmapped event would have.
       await expect(
-        deliver(
-          store,
-          event(CUTOVER_COMPLETED_EVENT_TYPE, { actor: USER_ACTOR }),
-        ),
+        deliver(store, event("authz.grants.unmapped", { actor: USER_ACTOR })),
       ).rejects.toThrow(/no audit verb/);
       expect(store.inserts).toHaveLength(0);
     });
@@ -332,10 +365,10 @@ describe("authz audit trail subscriber", () => {
       const context = { tenantId: ORG, aggregateId: ORG, state: undefined };
 
       expect(
-        subscriber.when?.(attached({ source: "genesis-import" }), context),
+        subscriber.when?.(attached({ source: "migration" }), context),
       ).toBe(false);
       expect(
-        subscriber.when?.(attached({ source: "cutover-import" }), context),
+        subscriber.when?.(attached({ source: "read-through-mint" }), context),
       ).toBe(false);
       expect(subscriber.when?.(attached(), context)).toBe(true);
     });

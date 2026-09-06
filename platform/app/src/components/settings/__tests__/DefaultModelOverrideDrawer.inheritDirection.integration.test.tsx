@@ -23,6 +23,9 @@ const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
+const mockInvalidateModelProvider = vi.fn();
+const mockResolvedDefaultGetData = vi.fn();
+const mockResolvedDefaultFetch = vi.fn();
 const mockToasterCreate = vi.fn();
 
 vi.mock("~/hooks/useDrawer", () => ({
@@ -69,8 +72,13 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       modelProvider: {
+        invalidate: mockInvalidateModelProvider,
         getDefaultModelsForProject: { invalidate: mockInvalidate },
-        getResolvedDefault: { invalidate: vi.fn() },
+        getResolvedDefault: {
+          invalidate: vi.fn(),
+          getData: mockResolvedDefaultGetData,
+          fetch: mockResolvedDefaultFetch,
+        },
       },
     }),
     modelProvider: {
@@ -186,6 +194,12 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
     mockSave.mockReset();
     mockSave.mockResolvedValue({ id: "cfg_org" });
     mockInvalidate.mockReset();
+    mockInvalidateModelProvider.mockReset();
+    mockInvalidateModelProvider.mockResolvedValue(void 0);
+    mockResolvedDefaultGetData.mockReset();
+    mockResolvedDefaultGetData.mockReturnValue(null);
+    mockResolvedDefaultFetch.mockReset();
+    mockResolvedDefaultFetch.mockResolvedValue(null);
     mockCloseDrawer.mockReset();
     mockToasterCreate.mockReset();
   });
@@ -329,6 +343,32 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       });
       expect(mockSave).toHaveBeenCalledWith(
         expect.objectContaining({ id: "cfg_proj", config: {} }),
+      );
+    });
+  });
+
+  describe("when the cache refresh after a saved config fails", () => {
+    /** @scenario A cache refresh that fails after the write still reads as saved */
+    it("still reports the save as done", async () => {
+      mockResolvedDefaultFetch.mockRejectedValue(
+        new Error("resolver unavailable"),
+      );
+      mockInvalidateModelProvider.mockRejectedValue(
+        new Error("cache sync unavailable"),
+      );
+      renderDrawer("cfg_proj");
+
+      fireEvent.click(screen.getByTestId("config-save"));
+
+      await vi.waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "Config removed, every value inherits now",
+          }),
+        );
+      });
+      expect(mockToasterCreate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error" }),
       );
     });
   });

@@ -68,7 +68,6 @@ const CLIENT_MODULE_VALUE_EXPORTS = new Set([
   "getClickHouseClientForTenant",
   "getClickHouseClientForOrganization",
   "getAllClickHouseInstances",
-  "getSharedClickHouseClient",
   "isClickHouseEnabled",
   "clearCustomClientCache",
   "getCustomClientCacheSize",
@@ -167,6 +166,10 @@ const MAY_RESOLVE_VIA_APP = new Set([
  *    managed client applies client-side; the managed constructor cannot carry
  *    a second identity's credentials, and must not, or the two pools' policies
  *    would be decided in one another's terms.
+ *  - `tasks/provisionLwql.ts` provisions the LangWatchQL objects at deploy
+ *    time, before the app (and its shared client) exists, on an admin client
+ *    it opens and closes per run — the same shape as `goose.ts`, whose
+ *    migrations run immediately before it in `start:prepare:db`.
  *
  * None of them read tenant rows as the application, so none of them belong
  * behind a repository.
@@ -177,6 +180,7 @@ const MAY_CONSTRUCT = new Set([
   "src/server/clickhouse/ttlReconciler.ts",
   "src/server/ops/explain-core.ts",
   "src/server/analytics/lwql/executor.ts",
+  "src/tasks/provisionLwql.ts",
   "src/test-utils/clickhouseTestEndpoints.ts",
 ]);
 
@@ -202,11 +206,7 @@ function mayResolveByLocation(path: string): boolean {
  * the caller takes that repository from `getApp()`. Delete a line when its file
  * is done. Do not add one.
  */
-const RESOLVES_DIRECTLY_BACKLOG = new Set([
-  "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/traces/clickhouse-trace.service.ts",
-]);
+const RESOLVES_DIRECTLY_BACKLOG = new Set<string>([]);
 
 const SKIPPED_DIRECTORIES = new Set([
   "node_modules",

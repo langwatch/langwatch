@@ -17,7 +17,7 @@ import (
 // stream line to Observe in order, then read the assembled result once via Result
 // after the stream has ended. NOT safe for concurrent use: Observe runs on the
 // single stream-consumer goroutine, and Result is called after that goroutine has
-// signalled completion (a happens-before, so no lock is needed).
+// signaled completion (a happens-before, so no lock is needed).
 type Accumulator struct {
 	text  strings.Builder
 	order []string
@@ -47,7 +47,7 @@ type frame struct {
 	IsError *bool           `json:"isError"`
 }
 
-// Observe folds one output frame into the final. Best-effort: an unrecognised or
+// Observe folds one output frame into the final. Best-effort: an unrecognized or
 // malformed frame is ignored. A `delta` appends its text; a `tool` upserts the
 // call. Ephemeral frames (status / progress / heartbeat / card) and the terminal
 // frames (final / error / handoff) carry no accumulation content and are skipped.
@@ -111,8 +111,13 @@ func (a *Accumulator) Result() (text string, tools []frames.ToolCall) {
 	text = a.text.String()
 	if a.sawTool {
 		if trailing := a.afterTools.String(); strings.TrimSpace(trailing) != "" {
-			text = strings.TrimLeft(trailing, " \t\r\n")
+			text = trailing
 		}
 	}
-	return text, tools
+	// Trimmed on both ends, on both paths. The post-tool segment almost always
+	// opens with the newline that separated it from the tool call, and a model
+	// that goes quiet after its last tool can still emit a stray trailing one —
+	// neither is part of the answer, and both render as blank lines in the
+	// user's panel.
+	return strings.TrimSpace(text), tools
 }

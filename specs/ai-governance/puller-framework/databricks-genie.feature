@@ -77,6 +77,18 @@ Feature: Databricks AI/BI Genie puller
       # Dividing the hour across Genie's queries alone hands Genie the whole
       # warehouse bill, including the dashboards and jobs sharing it.
 
+    @unit @integration
+    Scenario: Traffic that began before the hour keeps its share of the bill
+      Given a query that started in the hour before and ran on into this one
+      And a short question asked inside this hour
+      When the puller prices this hour
+      Then the query that ran in from before carries part of this hour's bill
+      And the short question carries only its own share of the time worked
+      # The bill is for the hour the work ran in, not the hour it was started
+      # in. Counting a straddling query only against the hour it began in
+      # leaves this hour's bill divided among whatever happened to start in it,
+      # so a one-second question can end up carrying an entire hour of compute.
+
     @integration
     Scenario: The puller's own billing query is not charged to a question
       Given the puller asks the warehouse for its billing
@@ -364,6 +376,49 @@ Feature: Databricks AI/BI Genie puller
       And it is not held waiting on the unbilled one
       # The priced line wins. Holding an already-priced statement would stall
       # the watermark on every hour where two SKUs bill at different speeds.
+
+    @unit @integration
+    Scenario: A statement is held when an hour it ran through has no bill yet
+      Given a query that ran through two hours
+      And only the first of those hours has been billed
+      When the puller allocates warehouse cost
+      Then the query keeps what the billed hour is worth
+      And the query is held until the unbilled hour arrives
+      # A query spanning two hours is only fully priced once both hours have
+      # billed. What did price is worth keeping, but settling there would
+      # leave the second hour recorded at nothing for good — so the unbilled
+      # hour holds the query and the re-read that lands it restates the
+      # total. The same rule as an entirely unbilled question, applied per
+      # hour.
+
+    @unit @integration
+    Scenario: A query that outlives one billing read is charged in full
+      Given a Genie question whose query was still running when one billing read ended
+      And a later read priced the hours it ran into
+      When the puller allocates warehouse cost
+      Then the recorded cost covers the query's whole runtime
+      # The window is read oldest-first in chunks that tile it, and each chunk
+      # answers only for the hours it owns, so a straddler comes back once per
+      # chunk with a different part of itself. The sweep emits its question
+      # once, so the parts are added. Deciding ownership by the statement's
+      # start instead hands it wholly to the chunk it began in — which has
+      # already dropped every hour past its own end — and the hours it ran into
+      # are then billed to nobody while still diluting every other question's
+      # share of them.
+
+    @unit
+    Scenario: An hour a statement did no work in cannot hold it
+      Given a query that ends exactly on the hour
+      And the hour it ends on has no bill
+      When the puller allocates warehouse cost
+      Then the query keeps what the hour it worked in is worth
+      And the query is not held for the hour it did not work in
+      # A null price means the bill has not landed yet, and holding the source
+      # until it does is right for an hour the query was awake in. For an hour
+      # it was not, no bill is coming — the warehouse may have shut down at
+      # that boundary — and holding stalls every later pull for the seven-day
+      # hold. Every hourly scheduled query ends on a boundary, so this is a
+      # weekly outage, not a corner.
 
     @unit
     Scenario: The billing query only ever runs on the configured workspace

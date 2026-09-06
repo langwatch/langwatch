@@ -40,18 +40,14 @@ import { type AuthzGrantsCommandSenders, GrantsLedgerWriter } from "../ledger";
 
 const ns = `authz-revoke-${nanoid(8)}`;
 
-/** Every command the writer can send, none of which ever reaches a fold. */
+/** Every command the writer can send, one per entity. */
 const COMMAND_VERBS = [
-  "attachGrants",
+  "attachGrant",
   "changeGrantRole",
-  "revokeGrants",
-  "defineRoles",
+  "revokeGrant",
+  "defineRole",
+  "changeRolePermissions",
   "deleteRole",
-  "offboardMember",
-  "proveMigrationParity",
-  "completeCutover",
-  "rollBackCutover",
-  "recordMigrationTenantState",
 ] as const;
 
 describe("given a revocation with the queue severed and Redis disconnected", () => {
@@ -63,10 +59,12 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
   let survivingGrantId: string;
   let previousApp: App | null = null;
 
-  const grantIds = async () =>
+  /** The grants that still authorize — which, now that a revoke marks its
+   *  row rather than deleting it, is the only count that means anything. */
+  const liveGrantIds = async () =>
     (
       await prisma.grant.findMany({
-        where: { organizationId: organization.id },
+        where: { organizationId: organization.id, revokedAt: null },
         select: { id: true },
       })
     ).map((row) => row.id);
@@ -183,7 +181,7 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
   it("resolves with both heads already deleted, and leaves the grants it did not name", async () => {
     // Without this the deletion assertions below would pass just as happily
     // against a seed that never landed.
-    expect(await grantIds()).toHaveLength(2);
+    expect(await liveGrantIds()).toHaveLength(2);
     expect(await compatBindingIds()).toHaveLength(2);
 
     await writer().revokeBindings({
@@ -193,17 +191,25 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
       reason: "offboarded",
     });
 
-    // The fact was appended first - enforcement is early application of an
-    // accepted event, never a delete the ledger never heard about.
-    expect(appended.map((call) => call.verb)).toEqual(["revokeGrants"]);
-    // ...and nothing folded it: whatever deleted the rows was this call.
-    expect(
-      await prisma.authzProjectionCursor.count({
-        where: { organizationId: organization.id },
-      }),
-    ).toBe(0);
+    // The fact was appended first: enforcement is early application of an
+    // accepted event, never a mark the log never heard about.
+    expect(appended.map((call) => call.verb)).toEqual(["revokeGrant"]);
 
-    expect(await grantIds()).toEqual([survivingGrantId]);
-    expect(await compatBindingIds()).toEqual([survivingGrantId]);
+    // The revoked grant is MARKED, not deleted. A row that disappeared could
+    // be resurrected by a redelivered attach; a row that says when it ended
+    // cannot.
+    const revoked = await prisma.grant.findUnique({
+      where: { id: revokedGrantId },
+      select: { revokedAt: true, revokedReason: true },
+    });
+    expect(revoked?.revokedAt).not.toBeNull();
+    // The synchronous mark writes the AUTHORED reason — the same string the
+    // event carries. The projection's later `grant.revoke` guards on
+    // `revokedAt: null` and so never rewrites this row; if the mark wrote a
+    // placeholder instead, the placeholder would be what the audit record
+    // kept forever.
+    expect(revoked?.revokedReason).toBe("offboarded");
+
+    expect(await liveGrantIds()).toEqual([survivingGrantId]);
   });
 });
