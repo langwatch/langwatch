@@ -364,12 +364,20 @@ Feature: Langy guides the first setup after sign-up
       And the two-things line, the suite, its run, the open run, the commit and pull request follow
       And the closing line comes before complete-path, which is last
 
+    # The line is true whatever the verdict: the agent answered and the traces
+    # flowed. Only a run that answers an error instead of a verdict skips it.
+    @unit
+    Scenario: A failed first run still gets the two-things line
+      When the compiled guided-onboarding skill is read
+      Then a run that answers a verdict, passed or failed, gets the two-things line
+      And after a failed verdict the explanation comes first, then the line, then the suite
+
     @unit
     Scenario: A failed step stops with one line and no completion
       When the compiled guided-onboarding skill is read
       Then a run that answers an error instead of a verdict stops the path
       And Langy says in one line what is not done and what it needs, and ends the turn
-      And neither the why-a-scenario line, the closing line nor complete-path follow
+      And neither the why-a-scenario line, the two-things line, the closing line nor complete-path follow
 
     @unit
     Scenario: The instrumentation that cannot be applied stops the path
@@ -521,7 +529,9 @@ Feature: Langy guides the first setup after sign-up
       Given the first scenario run failed
       When Langy reads the result
       Then Langy explains in plain words why the scenario did not pass
-      And Langy keeps the suite and points at the run to replay the conversation
+      And Langy points at the run to replay the conversation
+      And Langy says "That one run just proved two things: your agent answers scenarios, and traces are flowing in. Let me add a few more scenarios so every change you ship gets checked against real conversations."
+      And Langy keeps the suite
       And the llmops path is still recorded as complete
 
     @e2e

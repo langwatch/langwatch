@@ -200,6 +200,24 @@ describe("the guided-onboarding skill", () => {
       }
     });
 
+    /** @scenario "A failed first run still gets the two-things line" */
+    it("says the two-things line after a failed verdict, and only an error skips it", () => {
+      expect(rendered).toContain(
+        "A run that answers a verdict, passed or failed, gets the two-things line.",
+      );
+      expect(rendered).toContain(
+        "**If the run failed**, the explanation comes first: say in plain words what the judge saw and why the agent did not meet the criteria, and point at the run so they can replay the conversation.",
+      );
+      expect(rendered).toContain(
+        "the run still proved what the line says: the agent answered, and the traces flowed.",
+      );
+      expect(rendered).not.toContain("**If the run passed**");
+      const explanation = rendered.indexOf("**If the run failed**");
+      const line = rendered.indexOf(VERBATIM_LINES["the two-things line"]);
+      expect(explanation).toBeGreaterThan(-1);
+      expect(line).toBeGreaterThan(explanation);
+    });
+
     /** @scenario "A failed step stops with one line and no completion" */
     it("stops on a failed step with one line and no completion", () => {
       const failed = rendered.indexOf("### When a step fails");
@@ -210,7 +228,9 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain("stop there, without diagnosing");
       expect(section).toContain("`langwatch onboarding complete-path` does not run");
-      expect(section).toContain("the why-a-scenario line and the closing line are not said");
+      expect(section).toContain(
+        "the why-a-scenario line, the two-things line and the closing line are not said",
+      );
       expect(section).toContain("a scenario or suite run answers an error instead of a verdict");
       expect(rendered).toContain(
         "never one that stopped at a failed step",

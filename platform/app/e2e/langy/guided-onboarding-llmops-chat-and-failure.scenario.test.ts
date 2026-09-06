@@ -130,7 +130,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                   `When the developer picks "${GUIDED_OPTIONS.chatAboutThis}", Langy says, word for word, "${GUIDED_LINES.chatAboutThis}" and ends its turn there, creating nothing.`,
                   "After the developer describes the scenario, Langy writes it as described, opens it, runs it against the connected agent, and does not argue the developer out of it.",
                   "When the run fails, Langy explains in plain words what the judge saw and why the agent did not meet the criteria (the code was refused as expired), without blaming the developer and without hiding the failure.",
-                  `Langy still says, word for word, "${GUIDED_LINES.proved}" is NOT required after a failed run; instead it keeps going with the suite as a finding, not a blocker.`,
+                  `After explaining the failure, Langy still says, word for word: "${GUIDED_LINES.proved}", and keeps going with the suite as a finding, not a blocker.`,
                   "Langy creates the suite with a few more scenarios, runs it, points at the run so the developer can replay the conversation, and closes the path.",
                   `Langy closes with, word for word: "${GUIDED_LINES.allReady}"`,
                   ...GUIDED_TONE_CRITERIA,
@@ -257,6 +257,11 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
           .join("\n");
         expect(firstRunOutputs).toMatch(/"verdict":\s*"failure"|FAILED/i);
         expect(firstRunOutputs).not.toMatch(/"status":\s*"ERROR"/);
+        // The failed verdict still gets the two-things line: the agent
+        // answered and the traces flowed.
+        expect(
+          saysVerbatim(storedAssistantText(stored), GUIDED_LINES.proved),
+        ).toBe(true);
         expect(watcher.navigateHrefs.length).toBeGreaterThanOrEqual(2);
         expect(
           commands.some((c) =>
@@ -309,6 +314,17 @@ function storedCommands(
   return commandParts(messages).map((part) =>
     String((part.input as { command: string }).command),
   );
+}
+
+function storedAssistantText(
+  messages: Array<{ role: string; parts: Array<Record<string, unknown>> }>,
+): string {
+  return messages
+    .filter((message) => message.role === "assistant")
+    .flatMap((message) => message.parts)
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => String(part.text))
+    .join("\n");
 }
 
 function storedOutputs(
