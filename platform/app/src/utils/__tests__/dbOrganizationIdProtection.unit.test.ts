@@ -141,6 +141,18 @@ describe("guardOrganizationId — bare queries throw", () => {
       ).rejects.toThrow(/organizationId/);
     });
   });
+
+  describe("when running findMany on DepartmentMembershipHistory without a tenancy key", () => {
+    it("THROWS — a userId filter alone would read another tenant's history", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "findMany",
+          args: { where: { userId: "user_1", validTo: null } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
 });
 
 describe("guardOrganizationId — single-organization invariant", () => {
@@ -261,18 +273,6 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
           },
         }),
       ).resolves.toBe("ok");
-    });
-  });
-
-  describe("when running findMany on DepartmentMembershipHistory without a tenancy key", () => {
-    it("THROWS — a userId filter alone would read another tenant's history", async () => {
-      await expect(
-        runGuard({
-          model: "DepartmentMembershipHistory",
-          action: "findMany",
-          args: { where: { userId: "user_1", validTo: null } },
-        }),
-      ).rejects.toThrow(/organizationId/);
     });
   });
 
