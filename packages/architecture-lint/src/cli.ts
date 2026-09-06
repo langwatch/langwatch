@@ -11,6 +11,7 @@ import {
   lintCommentBlockRoots,
   lintFeatureLayouts,
   lintManifests,
+  lintOxlintBaseline,
   lintServiceQuality,
   lintServiceQualityBaseline,
   lintStrictPortModules,
@@ -45,7 +46,15 @@ const boundaryEdgeBaselineReference =
   (baselineReferenceDirectory
     ? `${baselineReferenceDirectory}/boundary-edge-baseline.json`
     : void 0);
+const oxlintBaselineReference =
+  valueAfter("--oxlint-baseline-reference") ??
+  (baselineReferenceDirectory ? `${baselineReferenceDirectory}/oxlint-baseline.json` : void 0);
 const commentBlockRoots = lintCommentBlockRoots(root, commentBlockRootsBaselineReference);
+// Validity (sorted, no duplicates, every entry carries `measured`) is checked
+// on every run, not only `--shrinking-baseline-only`: an entry missing
+// `measured` fails the run immediately, the same way a malformed
+// typed-Prisma-seam baseline does.
+const oxlintBaselineValidity = lintOxlintBaseline(root);
 const baselineOnly =
   process.argv.includes("--shrinking-baseline-only") ||
   process.argv.includes("--service-quality-baseline-only");
@@ -70,6 +79,7 @@ const baselineCheck = baselineOnly
         baselineBoundaryEdges,
         boundaryEdgeBaselineReference,
       ),
+      oxlintBaseline: lintOxlintBaseline(root, oxlintBaselineReference),
       commentBlockRoots,
     }
   : void 0;
@@ -79,6 +89,7 @@ const baselinePolicyViolations =
         ...baselineCheck.serviceQuality.violations,
         ...baselineCheck.strictPorts.violations,
         ...baselineCheck.boundaryEdges.violations,
+        ...baselineCheck.oxlintBaseline.violations,
         ...baselineCheck.commentBlockRoots.violations,
         ...lintServiceQuality(root, baselineDiscovery.packages),
         ...lintStrictPortModules(root, baselineDiscovery.packages),
@@ -113,6 +124,7 @@ function fullWorkspaceViolations(): ArchitectureViolation[] {
     ...filterBaselinedBoundaryEdges(workspaceViolations, boundaryEdges.entries),
     ...commentBlockRoots.violations,
     ...boundaryEdges.violations,
+    ...oxlintBaselineValidity.violations,
   ];
 }
 

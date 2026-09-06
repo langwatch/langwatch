@@ -1,4 +1,5 @@
 export { childNodes, walk } from "./ast.mjs";
+export { isBaselined, loadBaseline, resetBaselineCache, validateBaseline } from "./baseline.mjs";
 export {
   classify,
   normalizedFilename,
@@ -33,6 +34,7 @@ export { featureSourceLayoutRule } from "./rules/feature-source-layout.rule.mjs"
 export { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mjs";
 export { logicalStatementSpacingRule } from "./rules/logical-statement-spacing.rule.mjs";
 export { maxStatementsPerLineRule } from "./rules/max-statements-per-line.rule.mjs";
+export { nestedTernaryRule } from "./rules/nested-ternary.rule.mjs";
 export { noRawHonoMountRule } from "./rules/no-raw-hono-mount.rule.mjs";
 export { boundaryRule } from "./rules/package-boundaries.rule.mjs";
 export { prismaContainmentRule } from "./rules/prisma-containment.rule.mjs";

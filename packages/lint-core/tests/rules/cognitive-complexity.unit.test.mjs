@@ -1,10 +1,12 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { resetBaselineCache } from "../../src/baseline.mjs";
 import { cognitiveComplexityRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
+afterEach(() => resetBaselineCache());
 
 function report(code, options = []) {
   return runRule(cognitiveComplexityRule, { code, cwd: workspace.cwd, filename: "x.ts", options });
@@ -46,6 +48,22 @@ describe("given a function", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].data.max).toBe(0);
+    });
+  });
+
+  describe("when the file is baselined for cognitive-complexity", () => {
+    /** @scenario "A baselined file reports nothing" */
+    it("reports nothing even past the maximum", () => {
+      workspace.write(
+        "packages/architecture-lint/src/oxlint-baseline.json",
+        JSON.stringify({
+          version: 0,
+          entries: [{ key: "cognitive-complexity|x.ts", measured: "2026-09-06" }],
+        }),
+      );
+      resetBaselineCache();
+
+      expect(report(ifChain(6))).toEqual([]);
     });
   });
 });

@@ -124,6 +124,7 @@ export { collectStrictPortBaseline } from "./port-modules";
 export { formatStrictPortBaseline } from "./port-modules";
 export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam";
 export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam";
+export { lintOxlintBaseline, readOxlintBaselineFile } from "./oxlint-baseline-check";
 export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
