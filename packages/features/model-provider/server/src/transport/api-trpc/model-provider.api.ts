@@ -178,6 +178,16 @@ type CanonicalProvider = {
    * the listed row, so narrowing it away made a saved list read back as the default on reopen.
    */
   langySkipPermissionsModels?: string[] | null;
+  /**
+   * The gateway knobs the Advanced (Gateway) accordion edits, dropped here
+   * the same way `langySkipPermissionsModels` was: a saved value read back
+   * as unset on reopen (specs/ai-gateway/gateway-provider-settings.feature).
+   */
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  providerConfig?: Record<string, unknown> | null;
 };
 
 /**
@@ -208,6 +218,11 @@ function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
       mode: "embedding" as const,
     })),
     langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
+    rateLimitRpm: provider.rateLimitRpm ?? null,
+    rateLimitTpm: provider.rateLimitTpm ?? null,
+    rateLimitRpd: provider.rateLimitRpd ?? null,
+    fallbackPriorityGlobal: provider.fallbackPriorityGlobal ?? null,
+    providerConfig: provider.providerConfig ?? null,
   };
 }
 

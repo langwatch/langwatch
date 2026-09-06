@@ -18,7 +18,18 @@ const PROJECT_A = "project_a";
 
 type TestContext = ModelProviderTrpcContext & { userId: string };
 
-function harness(options: { stored?: string[] | null } = {}) {
+function harness(
+  options: {
+    stored?: string[] | null;
+    gateway?: {
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      providerConfig?: Record<string, unknown> | null;
+    };
+  } = {},
+) {
   const trpc = initTRPC.context<TestContext>().create();
   const upserts: unknown[] = [];
 
@@ -36,6 +47,11 @@ function harness(options: { stored?: string[] | null } = {}) {
     customModels: [],
     customEmbeddingsModels: [],
     langySkipPermissionsModels: options.stored ?? null,
+    rateLimitRpm: options.gateway?.rateLimitRpm ?? null,
+    rateLimitTpm: options.gateway?.rateLimitTpm ?? null,
+    rateLimitRpd: options.gateway?.rateLimitRpd ?? null,
+    fallbackPriorityGlobal: options.gateway?.fallbackPriorityGlobal ?? null,
+    providerConfig: options.gateway?.providerConfig ?? null,
   };
 
   const router = ModelProviderTrpcApi.create(
@@ -62,6 +78,7 @@ function harness(options: { stored?: string[] | null } = {}) {
           return saved;
         },
         getForProject: async () => ({ openai: saved }),
+        listForProject: async () => [saved],
       },
     },
     actor: () => ({ id: "user_a" }),
@@ -117,6 +134,43 @@ describe("modelProvider.update — the Langy skip-permissions list", () => {
       const providers = await caller.getAllForProject({ projectId: PROJECT_A });
 
       expect(providers.openai?.langySkipPermissionsModels).toEqual(["^gpt-9$"]);
+    });
+  });
+});
+
+describe("modelProvider.update — the Advanced (Gateway) fields", () => {
+  describe("when the stored provider carries saved gateway knobs", () => {
+    /** @scenario "A saved gateway rate limit reopens as saved" */
+    it("carries rateLimitRpm, fallbackPriorityGlobal, and providerConfig on the list projection", async () => {
+      const { caller } = harness({
+        gateway: {
+          rateLimitRpm: 600,
+          fallbackPriorityGlobal: 1,
+          providerConfig: { region: "us-east-1" },
+        },
+      });
+
+      const providers = await caller.getAllForProject({ projectId: PROJECT_A });
+
+      expect(providers.openai?.rateLimitRpm).toBe(600);
+      expect(providers.openai?.rateLimitTpm).toBeNull();
+      expect(providers.openai?.rateLimitRpd).toBeNull();
+      expect(providers.openai?.fallbackPriorityGlobal).toBe(1);
+      expect(providers.openai?.providerConfig).toEqual({ region: "us-east-1" });
+    });
+
+    /** @scenario "A saved gateway rate limit reopens as saved" */
+    it("carries the same fields on listAllForProjectForFrontend", async () => {
+      const { caller } = harness({
+        gateway: { rateLimitRpm: 600, fallbackPriorityGlobal: 1 },
+      });
+
+      const providers = await caller.listAllForProjectForFrontend({
+        projectId: PROJECT_A,
+      });
+
+      expect(providers[0]?.rateLimitRpm).toBe(600);
+      expect(providers[0]?.fallbackPriorityGlobal).toBe(1);
     });
   });
 });

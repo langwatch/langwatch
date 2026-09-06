@@ -210,15 +210,12 @@ export const EditModelProviderForm = ({
   // flag has no payload-shape side effects.
   const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(() => {
     const seeded = draftFromProvider({
-      rateLimitRpm: (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
-      rateLimitTpm: (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
-      rateLimitRpd: (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
-      fallbackPriorityGlobal:
-        (provider as { fallbackPriorityGlobal?: number | null }).fallbackPriorityGlobal ?? null,
-      providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
-      langySkipPermissionsModels:
-        (provider as { langySkipPermissionsModels?: string[] | null }).langySkipPermissionsModels ??
-        null,
+      rateLimitRpm: provider.rateLimitRpm ?? null,
+      rateLimitTpm: provider.rateLimitTpm ?? null,
+      rateLimitRpd: provider.rateLimitRpd ?? null,
+      fallbackPriorityGlobal: provider.fallbackPriorityGlobal ?? null,
+      providerConfig: provider.providerConfig,
+      langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
     });
     if (gatewayMenuEnabled) return seeded;
     return {

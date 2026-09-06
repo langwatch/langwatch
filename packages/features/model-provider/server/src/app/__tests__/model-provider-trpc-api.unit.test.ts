@@ -285,6 +285,14 @@ describe("ModelProviderTrpcApi", () => {
         // A row with no operator list travels as null, which is what tells the
         // drawer the provider's registry default applies.
         langySkipPermissionsModels: null,
+        // Same rule as langySkipPermissionsModels: an unset gateway knob
+        // travels as null rather than being dropped, so the drawer reads
+        // "not configured" instead of falling back silently.
+        rateLimitRpm: null,
+        rateLimitTpm: null,
+        rateLimitRpd: null,
+        fallbackPriorityGlobal: null,
+        providerConfig: null,
       });
     });
   });

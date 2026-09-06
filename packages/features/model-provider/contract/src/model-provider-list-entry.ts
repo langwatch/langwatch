@@ -61,6 +61,16 @@ export const modelProviderListEntrySchema = z
      * every test fixture that predates the column means the default.
      */
     langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
+    /**
+     * The gateway knobs the Advanced (Gateway) accordion edits, dropped for
+     * the same reason `langySkipPermissionsModels` was above (see its
+     * docblock): a saved value read back as unset on reopen.
+     */
+    rateLimitRpm: z.number().int().nonnegative().nullable().optional(),
+    rateLimitTpm: z.number().int().nonnegative().nullable().optional(),
+    rateLimitRpd: z.number().int().nonnegative().nullable().optional(),
+    fallbackPriorityGlobal: z.number().int().nullable().optional(),
+    providerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
     /** See the docblock: carried by the domain, dropped by the projection. */
     isSystem: z.boolean().optional(),
   })

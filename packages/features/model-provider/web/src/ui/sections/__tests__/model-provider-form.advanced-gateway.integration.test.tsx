@@ -16,7 +16,7 @@
  * so the flag gates the fields rather than the accordion. There is one Save:
  * it funnels basic + advanced to one `modelProvider.update` mutation.
  */
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockUseFeatureFlag, EXISTING_PROVIDER } = vi.hoisted(() => ({
@@ -35,6 +35,11 @@ const { mockUseFeatureFlag, EXISTING_PROVIDER } = vi.hoisted(() => ({
     embeddingsModels: ["openai/text-embedding-3-small"],
     customModels: [],
     customEmbeddingsModels: [],
+    rateLimitRpm: 600,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: 1,
+    providerConfig: { region: "us-east-1" },
   },
 }));
 
@@ -174,6 +179,15 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
           name: /^save$/i,
         });
         expect(saveButtons).toHaveLength(1);
+      });
+
+      /** @scenario "A saved gateway rate limit reopens as saved" */
+      it("seeds the expanded fields from the stored row rather than the registry default", async () => {
+        fireEvent.click(await screen.findByText("Advanced"));
+
+        expect(await screen.findByDisplayValue("600")).toBeTruthy();
+        expect(screen.getByDisplayValue("1")).toBeTruthy();
+        expect(screen.getByDisplayValue(/"region": ?"us-east-1"/)).toBeTruthy();
       });
     });
   });
