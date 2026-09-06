@@ -29,15 +29,20 @@ The product is four Node applications — `apps/ui` (the browser application, Vi
 
 Nothing in the day-to-day loop needs Docker or colima. If you run ClickHouse,
 Postgres and Redis natively (brew, or a LaunchAgent), point `.env` at them and
-set these three, and `make haven up` brings up the whole application stack,
+set these two, and `make haven up` brings up the whole application stack,
 everything except the observability container, with no container runtime
 installed at all:
 
 ```bash
 LANGWATCH_HAVEN_CH=0          # use .env CLICKHOUSE_URL instead of a managed container
 LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
-LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
 ```
+
+The langyagent worker needs no third knob: a development stack with no container
+runtime reachable resolves the host tier by itself and prints one line saying so
+on `up`. `LANGY_UNSAFE_HOST_ACCESS=0` refuses that and keeps the sandboxed tier
+(langy then does not start without a runtime); `=1` still forces the host tier on
+a machine that does have one.
 
 haven resolves its own knobs from `.env` (then `.env.portless`) as
 well as the shell, so these travel with the worktree; an exported variable still

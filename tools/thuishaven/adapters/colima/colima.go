@@ -36,6 +36,19 @@ func New(profile string, limits domain.ColimaLimits) *Runtime {
 // Profile is the colima profile this runtime drives.
 func (r *Runtime) Profile() string { return r.profile }
 
+// Available reports whether a container tier can run on this machine, without
+// starting or creating anything: both binaries haven drives — colima for the VM
+// and docker for the image build and the worker container — have to be on PATH.
+// A stopped profile is still available, because Ensure starts it.
+func (r *Runtime) Available(context.Context) bool {
+	for _, bin := range []string{"colima", "docker"} {
+		if _, err := exec.LookPath(bin); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // profileStatus is the subset of `colima list --json` haven reads.
 type profileStatus struct {
 	Name   string `json:"name"`

@@ -94,10 +94,15 @@ type PlanOptions struct {
 	// langyImageTag is the content-addressed image tag Up resolves before
 	// provisioning (internal — derived, never set by the composition root).
 	langyImageTag string
-	// LangyTier is the local isolation posture for the langyagent worker, resolved
-	// from LANGY_UNSAFE_CONTAINER / LANGY_UNSAFE_HOST_ACCESS. The zero value is the
-	// sandboxed (production-like) default: the worker runs in colima with the
-	// per-worker UID sandbox on.
+	// LangyTierRequest is what the langy isolation posture is resolved FROM: the
+	// developer's two env flags plus whether this is a development stack. Up
+	// resolves it into LangyTier once, before the stack is built, because the
+	// machine (does a container runtime exist here?) is half the answer.
+	LangyTierRequest domain.LangyTierRequest
+	// LangyTier is the resolved local isolation posture for the langyagent worker
+	// — set by Up from LangyTierRequest, and persisted on the stack. The zero
+	// value is the sandboxed (production-like) default: the worker runs in colima
+	// with the per-worker UID sandbox on.
 	LangyTier domain.LangyTier
 	IsStub    bool // verification: echo servers instead of the real apps
 	RepoRoot  string

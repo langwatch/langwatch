@@ -127,11 +127,21 @@ the `LangyHarnessPort` that would fill it are vestigial — no composition root
 supplies the port, and the manager would ignore the field. They want deleting in
 their own change.
 
-What is deliberately not changed is haven's fail-closed tier: with no container
-runtime it still deselects langy and names `LANGY_UNSAFE_HOST_ACCESS=1` rather
-than dropping to the host runner on its own. Falling back silently is the one
-place where a developer could end up with less isolation than they believe they
-have, and the opt-in is one line.
+haven follows the same environment rule. It resolves the langy isolation tier
+once, before the stack is built — the tier is persisted on the stack, threaded
+into the overlay, the plan, `restart` and the reconcile guard, so a tier settled
+later would be a different tier in each of them — and it resolves it from the two
+developer flags **and the machine**. On a development stack with no container
+runtime reachable it now chooses the host tier instead of deselecting langy and
+naming the opt-in, because a local orchestrator that runs no manager at all is
+the worse of the two answers. What made the fallback unacceptable was silence, so
+it is not silent: `up` prints one line naming the cause, the consequence and the
+refusal (`no container runtime; running langyagent on the host because this is a
+development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to refuse`). An explicit
+`LANGY_UNSAFE_HOST_ACCESS=0` is honoured, and a stack whose `NODE_ENV` or
+`ENVIRONMENT` names anything outside `local`, `dev`, `development` and `test`
+keeps today's fail-closed behaviour unchanged — the same allowlist the manager
+enforces, so an unknown name fails closed on both sides.
 
 ## References
 

@@ -372,6 +372,17 @@ registry, and dashboard stay the same.
     full host filesystem access — the least safe, for when it genuinely must reach
     host paths.
 
+  The tier is resolved once, before the stack is built, from those flags **and the
+  machine**: on a development stack with no container runtime reachable (neither
+  `colima` nor `docker` on PATH) haven resolves the host tier by itself rather than
+  running no manager at all, and prints `no container runtime; running langyagent on
+  the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to
+  refuse`. That one line is the whole point: a quieter isolation posture than the one
+  you believe you have is never inferred in silence. `LANGY_UNSAFE_HOST_ACCESS=0`
+  refuses it, and a stack that is not a development one (`NODE_ENV` / `ENVIRONMENT`
+  naming anything outside `local`/`dev`/`development`/`test`) still fails closed:
+  langy is deselected with the opt-in named.
+
   In the container tiers the worker reaches the control plane + gateway back on the
   host via `host.docker.internal` (haven injects `LANGY_WORKER_CALLBACK_URL` /
   `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published

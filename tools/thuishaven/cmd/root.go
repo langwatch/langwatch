@@ -280,16 +280,30 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
 		ShouldGoWatch: devEnv("LANGWATCH_GO_WATCH") == "1",
 		ShouldSeed:    os.Getenv("LANGWATCH_SEED") == "1",
-		// The langyagent worker's local isolation posture. Default (neither flag) is
-		// the sandboxed, production-like tier: the worker runs in colima with the
-		// per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes the sandbox inside
-		// the VM; LANGY_UNSAFE_HOST_ACCESS drops the VM and runs it on the host.
-		LangyTier: domain.ResolveLangyTier(
-			envTruthy("LANGY_UNSAFE_CONTAINER"),
-			envTruthy("LANGY_UNSAFE_HOST_ACCESS"),
-		),
-		IsStub:   os.Getenv("HAVEN_STUB") == "1",
-		RepoRoot: repoRoot,
+		// What the langyagent worker's local isolation posture is resolved from;
+		// `up` settles it against this machine before it builds the stack. Default
+		// (neither flag) is the sandboxed, production-like tier: the worker runs in
+		// colima with the per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes
+		// the sandbox inside the VM; LANGY_UNSAFE_HOST_ACCESS drops the VM and runs
+		// it on the host, and set to a falsey value refuses the host tier outright.
+		LangyTierRequest: langyTierRequest(),
+		IsStub:           os.Getenv("HAVEN_STUB") == "1",
+		RepoRoot:         repoRoot,
+	}
+}
+
+// langyTierRequest reads the two isolation knobs and the environment this
+// checkout describes. Host access is tri-state on purpose: unset is an opinion
+// nobody has expressed (and the only one `up` may answer for the developer),
+// while a falsey value is an explicit refusal of the host tier.
+func langyTierRequest() domain.LangyTierRequest {
+	hostAccess, hostAccessSet := dotenvLookup("LANGY_UNSAFE_HOST_ACCESS")
+	isTruthy := hostAccess == "1" || hostAccess == "true"
+	return domain.LangyTierRequest{
+		UnsafeContainer:   envTruthy("LANGY_UNSAFE_CONTAINER"),
+		UnsafeHostAccess:  hostAccessSet && isTruthy,
+		HostAccessRefused: hostAccessSet && !isTruthy,
+		IsDevelopment:     domain.IsDevelopmentEnvironment(devEnv("NODE_ENV"), devEnv("ENVIRONMENT")),
 	}
 }
 

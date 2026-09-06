@@ -34,6 +34,7 @@ type fakeContainer struct{}
 
 func (fakeContainer) Ensure(context.Context) (string, error) { return "unix:///fake.sock", nil }
 func (fakeContainer) Profile() string                        { return "fake" }
+func (fakeContainer) Available(context.Context) bool         { return true }
 
 // playCheckout is a complete-enough checkout for the launcher: a lockfile, so
 // the dependency install resolves a workspace root. Nothing is built first —

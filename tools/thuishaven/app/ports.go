@@ -378,6 +378,11 @@ type ContainerRuntime interface {
 	Ensure(ctx context.Context) (dockerHost string, err error)
 	// Profile is the colima profile name, for logs and error messages.
 	Profile() string
+	// Available reports whether the runtime can be reached on this machine at
+	// all, without starting anything. It answers the question the langy tier is
+	// resolved from before the stack is built — "can a container tier run here?"
+	// — which Ensure can only answer by doing the work.
+	Available(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the

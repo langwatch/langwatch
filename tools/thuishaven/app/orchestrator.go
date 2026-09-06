@@ -390,6 +390,11 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
+	// The isolation tier is resolved before anything reads it: it is persisted on
+	// the stack, threaded into the overlay, the plan and restart, and compared by
+	// the reconcile guard, so a tier settled later would be a different tier in
+	// each of them.
+	o.resolveLangyTier(ctx, &opts)
 	// Resolve the langy image tag before anything else: it is pure file hashing,
 	// and the reconcile guard needs it to notice a source edit under an
 	// unchanged selection (same services, new bytes — still a restart).
@@ -434,6 +439,30 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir, langyDockerHost))
 	return nil
+}
+
+// resolveLangyTier settles the langyagent isolation posture from the developer's
+// flags and this machine, and says so when the machine decided it.
+//
+// A development stack with no container runtime resolves to the host tier
+// instead of the sandboxed default it cannot run: haven is a local-dev
+// orchestrator, and the alternative was langy silently deselected at launch. It
+// is printed as well as logged, because a quieter isolation posture than the one
+// the developer believes they have has to be visible in the terminal they are
+// looking at. A non-development stack, or an explicit LANGY_UNSAFE_HOST_ACCESS=0,
+// keeps the fail-closed behaviour.
+func (o *Orchestrator) resolveLangyTier(ctx context.Context, opts *PlanOptions) {
+	req := opts.LangyTierRequest
+	req.ContainerRuntimeAvailable = o.container != nil && o.container.Available(ctx)
+	tier, notice := domain.ResolveLangyTier(req)
+	opts.LangyTier = tier
+	// Said only when this stack actually runs langy: a worktree that opted out
+	// has no isolation posture to be surprised by.
+	if notice == "" || !opts.Selection.Langy {
+		return
+	}
+	fmt.Printf("  langyagent: %s\n", notice)
+	o.log.Warn("langyagent tier resolved to the host runner", zap.String("reason", notice), zap.String("tier", tier.String()))
 }
 
 // resolveLangyImageTag derives the content-addressed langy image tag for a

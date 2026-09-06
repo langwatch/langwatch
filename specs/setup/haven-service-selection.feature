@@ -99,3 +99,39 @@ Feature: haven service selection
     Then langy is on
     And gateway and nlp keep the defaults they would have had
     And a file that names no services at all is treated as never written
+
+  Rule: Langy's isolation tier is decided before the stack is built
+
+    # The tier is the isolation posture the Langy worker runs under, and it is
+    # persisted on the stack, carried into the overlay, the plan, a restart and
+    # the reconcile guard — so it is resolved once, up front, from the
+    # developer's own choice and from the machine. On a laptop with no container
+    # runtime the only alternative to the host tier was no manager at all, which
+    # is a stack that looks healthy and answers no chat. Bound by
+    # domain/langytier_test.go and app/langy_tier_test.go. See ADR-129.
+
+    Scenario: No container runtime on a development machine runs langy on the host
+      Given a development stack on a machine with no container runtime
+      And the developer has not chosen an isolation tier
+      When they run "haven up +langy"
+      Then the worker runs on the host instead of langy being skipped
+      And one line names the missing runtime, why the worker runs on the host, and how to refuse
+
+    Scenario: A development machine with a container runtime keeps the sandbox
+      Given a development stack on a machine that has a container runtime
+      When they run "haven up +langy"
+      Then the worker runs in the container with the per-worker sandbox on
+      And nothing is said about the tier
+
+    Scenario: A non-development stack with no container runtime keeps the sandbox
+      Given a stack whose environment is not a development one
+      And the machine has no container runtime
+      When they run "haven up +langy"
+      Then the tier stays the production-like one
+      And langy is skipped with the host-access opt-in named, as before
+
+    Scenario: An explicit isolation choice is never overridden by the machine
+      Given the developer asked for a tier by hand
+      When they run "haven up +langy" on a machine with no container runtime
+      Then the tier they asked for is the tier they get
+      And refusing host access explicitly keeps the sandboxed tier

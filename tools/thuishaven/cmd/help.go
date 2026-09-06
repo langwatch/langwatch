@@ -198,9 +198,12 @@ var envHelpText = `Environment variables.
                                  flag) keeps the sandbox on, mirroring production.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
                                  with no colima and no VM boundary, so it has
-                                 full host access.
-                                 The fast-iteration tier, and the one that lets a
-                                 stack come up with no container runtime at all.
+                                 full host access. The fast-iteration tier.
+                                 A development stack with no container runtime
+                                 resolves to it on its own and says so on "up";
+                                 LANGY_UNSAFE_HOST_ACCESS=0 refuses that and
+                                 keeps the sandboxed tier (langy then does not
+                                 start without a runtime).
     HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
                                  to pull a CI-published langy image for the
                                  current content hash instead of building.
