@@ -338,6 +338,11 @@ test.describe("guided onboarding", () => {
       timeout: 60_000,
     });
     await expect(page.getByTestId("guided-onboarding-offer")).toHaveCount(0);
+    // The kickoff owed at landing survives the panel's scope reset: the tour
+    // card is in the thread behind the model gate, waiting for a model.
+    await expect(page.getByTestId("guided-tour-card")).toBeVisible({
+      timeout: 30_000,
+    });
     const state = await readGuidedState({ page, organizationName });
     expect(state.providerSkippedAt).toBeTruthy();
     // Skip anyway skips the guide as a whole: the tour is recorded as skipped
