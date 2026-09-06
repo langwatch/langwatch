@@ -32,6 +32,16 @@ const configSchema = z.object({
   agentsFilePath: z.string().min(1),
   skillsDir: z.string().optional(),
   sessionDir: z.string().min(1),
+  /**
+   * Whether the pre-execution delete gate is registered (issue #7608). Resolved
+   * server-side from `release_langy_delete_gate` and written into the config by
+   * the manager. ABSENT means ON: a config that predates the flag, or a manager
+   * that failed to resolve it, still gets the gate — the fail-safe direction. A
+   * literal `false` (the flag resolved OFF) is the only value that unregisters
+   * it. Not folded into the worker signature: a flip takes effect on the next
+   * warm/probe-MISS re-warm, not on a live worker (flip latency is a non-goal).
+   */
+  deleteGateEnabled: z.boolean().optional(),
 });
 
 export type LangyWorkerModelConfig = z.infer<typeof modelConfigSchema>;

@@ -27,6 +27,7 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
+import { resolveLangyDeleteGate } from "~/server/app-layer/langy/langyDeleteGate";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
@@ -1445,6 +1446,9 @@ export function initializeDefaultApp(options?: {
     // Check-only cap view for the panel-open warm: signature parity with the
     // turn's token strip, without spending a PR permit on a panel open.
     checkPermit: getLangyGithubPrUsage,
+    // The delete-gate flag (`release_langy_delete_gate`), evaluated once per
+    // turn and riding `credentials.deleteGate` into the worker config (#7608).
+    resolveDeleteGate: resolveLangyDeleteGate,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
