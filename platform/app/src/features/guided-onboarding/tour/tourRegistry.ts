@@ -3,7 +3,10 @@
  * it) registers what it can do on mount and takes it back on unmount, the
  * way `useRegisterLangyActions` lends UI actions to the agent. The tour only
  * ever calls what is registered right now, so a step whose page is gone does
- * nothing rather than reaching into a component that no longer exists.
+ * nothing rather than reaching into a component that no longer exists. An
+ * action that fires a request hands back its promise: the next step's target
+ * often exists only once that request has answered, and the tour waits for
+ * it before it gives up on the target.
  *
  * A module store rather than context: the tour layer is mounted once in the
  * Langy layout, above every page, and the drawer that types the key name is
@@ -21,7 +24,8 @@ export interface TourActions {
   restoreGroups: () => void;
   openVirtualKeyCreate: () => void;
   typeVirtualKeyName: (name: string) => void;
-  submitVirtualKeyCreate: () => void;
+  /** Hands back the create request, so the tour knows when it answered. */
+  submitVirtualKeyCreate: () => Promise<void>;
   revealVirtualKeySecret: () => void;
 }
 

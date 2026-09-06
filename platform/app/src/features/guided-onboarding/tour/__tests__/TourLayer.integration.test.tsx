@@ -29,6 +29,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 import { useGuidedTourStore } from "../guidedTourStore";
 import {
+  TOUR_ACTION_CEILING_MS,
   TOUR_MISSING_TARGET_MS,
   TOUR_TARGET_POLL_MS,
   TourLayer,
@@ -363,6 +364,125 @@ describe("TourLayer", () => {
       expect(openVirtualKeyCreate).not.toHaveBeenCalled();
       fireEvent.click(screen.getByText("Next"));
       expect(openVirtualKeyCreate).toHaveBeenCalled();
+    });
+  });
+
+  describe("given the gateway tour on the create step with the create still in flight", () => {
+    const SECRET_WAIT_MS = TOUR_STEPS.gateway[4]!.waitMs!;
+    let answerCreate: () => void;
+    let failCreate: () => void;
+
+    beforeEach(() => {
+      mountTarget("gw-new-key", rect(500, 80, 120, 32));
+      mountTarget("vk-name", rect(600, 100, 460, 40));
+      mountTarget("vk-create", rect(780, 660, 64, 36));
+      mountTarget("langy-panel", rect(880, 60, 392, 640));
+      const submitVirtualKeyCreate = vi.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            answerCreate = resolve;
+            failCreate = () => reject(new Error("refused"));
+          }),
+      );
+      useTourRegistry.getState().register({ submitVirtualKeyCreate });
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("gateway"));
+      act(() => useGuidedTourStore.getState().goToStep(3));
+      landStep(true);
+    });
+
+    const answered = async () => {
+      await act(async () => {
+        answerCreate();
+      });
+    };
+
+    /** @scenario Next while the next target is still mounting waits for it like the auto-advance */
+    it("waits for the secret after a manual Next and lands on it when it mounts", async () => {
+      expect(screen.getByText("4 of 5")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("Next"));
+      await answered();
+      act(() => vi.advanceTimersByTime(SETTLE + 5000));
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      expect(useGuidedTourStore.getState().stepIndex).toBe(4);
+      expect(screen.queryByTestId("tour-caption")).toBeNull();
+      expect(screen.getByTestId("tour-spotlight")).toBeInTheDocument();
+      mountTarget("vk-secret", rect(400, 300, 480, 60));
+      act(() => vi.advanceTimersByTime(TOUR_TARGET_POLL_MS));
+      act(() => vi.advanceTimersByTime(TRAVEL + 550));
+      expect(screen.getByTestId("tour-caption")).toHaveTextContent(
+        TOUR_STEPS.gateway[4]!.text,
+      );
+      expect(screen.getByText("5 of 5")).toBeInTheDocument();
+    });
+
+    /** @scenario the screen stays dimmed with no lone box while a step waits for its target */
+    it("closes the spotlight onto the cursor, keeps the cursor and shows no caption while it waits", () => {
+      const cursorBefore = screen.getByTestId("tour-cursor").style.transform;
+      fireEvent.click(screen.getByText("Next"));
+      act(() => vi.advanceTimersByTime(SETTLE + TOUR_TARGET_POLL_MS));
+      const spot = screen.getByTestId("tour-spotlight");
+      expect(spot.style.width).toBe("0px");
+      expect(spot.style.height).toBe("0px");
+      /* the cursor sits at 72% / 62% of the Create button: 826.08, 682.32 */
+      expect(spot.style.left).toBe("826.08px");
+      expect(spot.style.top).toBe("682.32px");
+      expect(screen.getByTestId("tour-cursor").style.transform).toBe(
+        cursorBefore,
+      );
+      expect(screen.queryByTestId("tour-caption")).toBeNull();
+    });
+
+    /** @scenario a step whose target comes from the previous step's request waits for the request first */
+    it("does not give up on the secret while the create is pending", async () => {
+      fireEvent.click(screen.getByText("Next"));
+      act(() => vi.advanceTimersByTime(SETTLE + 20_000));
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      expect(useGuidedTourStore.getState().stepIndex).toBe(4);
+      await answered();
+      act(() => vi.advanceTimersByTime(1000));
+      mountTarget("vk-secret", rect(400, 300, 500, 60));
+      act(() => vi.advanceTimersByTime(TOUR_TARGET_POLL_MS));
+      /* the cursor sits at 72% / 62% of the secret */
+      expect(screen.getByTestId("tour-cursor").style.transform).toBe(
+        "translate(760px, 337.2px)",
+      );
+      expect(useGuidedTourStore.getState().running).toBe(true);
+    });
+
+    /** @scenario a step whose target comes from the previous step's request waits for the request first */
+    it("gives the secret its own wait once the create has answered", async () => {
+      const onEnd = vi.fn();
+      useGuidedTourStore.setState({ onEnd });
+      fireEvent.click(screen.getByText("Next"));
+      act(() => vi.advanceTimersByTime(SETTLE + 20_000));
+      await answered();
+      act(() => vi.advanceTimersByTime(SECRET_WAIT_MS - 200));
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      act(() => vi.advanceTimersByTime(300));
+      expect(useGuidedTourStore.getState().running).toBe(false);
+      expect(onEnd).toHaveBeenCalledWith("completed");
+    });
+
+    /** @scenario a step whose target comes from the previous step's request waits for the request first */
+    it("treats a create that failed as answered", async () => {
+      fireEvent.click(screen.getByText("Next"));
+      await act(async () => {
+        failCreate();
+      });
+      act(() => vi.advanceTimersByTime(SETTLE + SECRET_WAIT_MS - 200));
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      act(() => vi.advanceTimersByTime(300));
+      expect(useGuidedTourStore.getState().running).toBe(false);
+    });
+
+    /** @scenario a step whose target comes from the previous step's request waits for the request first */
+    it("ends the wait after a minute when the create never answers", () => {
+      fireEvent.click(screen.getByText("Next"));
+      act(() => vi.advanceTimersByTime(SETTLE + TOUR_ACTION_CEILING_MS - 200));
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      act(() => vi.advanceTimersByTime(300));
+      expect(useGuidedTourStore.getState().running).toBe(false);
     });
   });
 

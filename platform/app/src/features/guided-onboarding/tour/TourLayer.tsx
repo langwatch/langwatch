@@ -38,6 +38,14 @@ export const TOUR_SETTLE_MS = 350;
  */
 export const TOUR_MISSING_TARGET_MS = 4000;
 export const TOUR_TARGET_POLL_MS = 100;
+/**
+ * A page action may hand back a promise for work that answers later (the
+ * create request the gateway tour submits). The next step's wait for its
+ * target does not count down while that promise is pending, so a manual
+ * Next and the auto-advance give the target the same chance to mount. A
+ * request that never answers ends the wait after this long instead.
+ */
+export const TOUR_ACTION_CEILING_MS = 60_000;
 /** The panel stays lit this long before the dim fades. */
 export const TOUR_HANDOFF_HOLD_MS = 4600;
 /** The dim fades out over this long. */
@@ -83,6 +91,23 @@ function padded(rect: DOMRect, pad: number): Rect {
     w: rect.width + pad * 2,
     h: rect.height + pad * 2,
   };
+}
+
+interface PendingAction {
+  settled: boolean;
+}
+
+/** Follows a page action's result when it is a promise; nothing otherwise. */
+function trackAction(result: unknown): PendingAction | null {
+  if (!result || typeof (result as PromiseLike<unknown>).then !== "function") {
+    return null;
+  }
+  const pending: PendingAction = { settled: false };
+  const settle = () => {
+    pending.settled = true;
+  };
+  (result as PromiseLike<unknown>).then(settle, settle);
+  return pending;
 }
 
 function cursorPoint(rect: DOMRect): Point {
@@ -214,6 +239,9 @@ function TourLayerInner() {
   const handoffTimers = useRef<number[]>([]);
   /* the first cursor placement is instant, so it never flies in from a corner */
   const cursorMoves = useRef(0);
+  const lastCursor = useRef<Point | null>(null);
+  /* the last page action that answers later; the next step waits for it */
+  const pendingAction = useRef<PendingAction | null>(null);
   const startedAt = useRef(0);
 
   const steps = path ? TOUR_STEPS[path] : [];
@@ -230,6 +258,8 @@ function TourLayerInner() {
   const endTour = useCallback(
     (status: TourEndStatus) => {
       clear();
+      pendingAction.current = null;
+      lastCursor.current = null;
       setCursor(null);
       setCaption(null);
       setArrived(false);
@@ -289,6 +319,8 @@ function TourLayerInner() {
     setHandoff(null);
     setSpotZ(TOUR_SPOTLIGHT_Z);
     cursorMoves.current = 0;
+    lastCursor.current = null;
+    pendingAction.current = null;
     startedAt.current = Date.now();
     if (path) emit("started", "tour", { path });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,7 +337,8 @@ function TourLayerInner() {
       navigate: (to: string) => void router.push(to),
       actions: getTourActions(),
     };
-    step.before?.(ctx);
+    const beforeResult = step.before?.(ctx);
+    if (beforeResult) pendingAction.current = trackAction(beforeResult);
 
     const advance = () => {
       if (stepIndex + 1 >= steps.length) endTour("completed");
@@ -319,14 +352,22 @@ function TourLayerInner() {
         target: step.target,
       });
       cursorMoves.current += 1;
-      setCursor(cursorPoint(rect));
+      const moveCursor = (point: Point) => {
+        lastCursor.current = point;
+        setCursor(point);
+      };
+      moveCursor(cursorPoint(rect));
       /* spotlight: the target stays lit, the rest dims */
       setSpot(padded(rect, 6));
 
       later(() => {
         setArrived(true);
         if (step.click) setRipple((r) => r + 1);
-        step.onArrive?.({ ...ctx, actions: getTourActions() });
+        const arriveResult = step.onArrive?.({
+          ...ctx,
+          actions: getTourActions(),
+        });
+        if (arriveResult) pendingAction.current = trackAction(arriveResult);
 
         /* caption near the target, clamped on screen */
         later(
@@ -336,7 +377,7 @@ function TourLayerInner() {
                had while the cursor was still travelling */
             let fresh = targetRect(step.target) ?? rect;
             setSpot(padded(fresh, 6));
-            if (!sameRect(fresh, rect)) setCursor(cursorPoint(fresh));
+            if (!sameRect(fresh, rect)) moveCursor(cursorPoint(fresh));
             setCaption(captionPoint(fresh, step));
             /* the auto-advance: a slow read, then move on by itself */
             later(advance, readMs(step.text));
@@ -348,7 +389,7 @@ function TourLayerInner() {
               if (now && !sameRect(now, fresh)) {
                 fresh = now;
                 setSpot(padded(now, 6));
-                setCursor(cursorPoint(now));
+                moveCursor(cursorPoint(now));
                 setCaption(captionPoint(now, step));
               }
               later(follow, TOUR_TARGET_POLL_MS);
@@ -361,12 +402,35 @@ function TourLayerInner() {
     };
 
     /* measure after layout settles (a before() may have navigated), and
-       keep looking for a target that is still mounting */
+       keep looking for a target that is still mounting. While a page
+       action from an earlier step is still answering, the wait does not
+       count down: the target is about to mount, not missing */
     let waited = 0;
+    let awaitedAction = 0;
+    let closed = false;
     const measure = () => {
       const rect = targetRect(step.target);
       if (rect) {
+        pendingAction.current = null;
         land(rect);
+        return;
+      }
+      if (!closed) {
+        /* the screen stays dimmed while the step waits, with no lone
+           hole around the previous target: the spotlight closes onto the
+           cursor and opens again on the target once it is there */
+        closed = true;
+        const at = lastCursor.current;
+        if (at) setSpot({ x: at.x, y: at.y, w: 0, h: 0 });
+      }
+      const pending = pendingAction.current;
+      if (pending && !pending.settled) {
+        if (awaitedAction >= TOUR_ACTION_CEILING_MS) {
+          advance();
+          return;
+        }
+        awaitedAction += TOUR_TARGET_POLL_MS;
+        later(measure, TOUR_TARGET_POLL_MS);
         return;
       }
       if (waited >= (step.waitMs ?? TOUR_MISSING_TARGET_MS)) {

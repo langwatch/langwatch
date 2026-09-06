@@ -42,12 +42,21 @@ type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } =
-  vi.hoisted(() => ({
-    createMutateAsync: vi.fn(),
-    applicableBudgetsData: { rows: [] as ApplicableBudget[] },
-    capturedApplicableInputs: [] as unknown[],
-  }));
+const {
+  createMutateAsync,
+  createMutationOptions,
+  listInvalidate,
+  applicableBudgetsData,
+  capturedApplicableInputs,
+} = vi.hoisted(() => ({
+  createMutateAsync: vi.fn(),
+  createMutationOptions: {
+    current: null as { onSuccess?: (result: unknown) => unknown } | null,
+  },
+  listInvalidate: vi.fn(async () => undefined),
+  applicableBudgetsData: { rows: [] as ApplicableBudget[] },
+  capturedApplicableInputs: [] as unknown[],
+}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -79,7 +88,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       virtualKeys: {
         list: {
-          invalidate: async () => undefined,
+          invalidate: listInvalidate,
           getData: () => listedKeys,
         },
         applicableBudgets: { invalidate: async () => undefined },
@@ -87,10 +96,20 @@ vi.mock("~/utils/api", () => ({
     }),
     virtualKeys: {
       create: {
-        useMutation: () => ({
-          mutateAsync: createMutateAsync,
-          isPending: false,
-        }),
+        /* like react-query, mutateAsync settles only once onSuccess has */
+        useMutation: (options: {
+          onSuccess?: (result: unknown) => unknown;
+        }) => {
+          createMutationOptions.current = options;
+          return {
+            mutateAsync: async (input: unknown) => {
+              const result = await createMutateAsync(input);
+              await options.onSuccess?.(result);
+              return result;
+            },
+            isPending: false,
+          };
+        },
       },
       applicableBudgets: {
         useQuery: (input: unknown, opts?: { enabled?: boolean }) => {
@@ -160,13 +179,15 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderDrawer = () =>
+const renderDrawer = (
+  onCreated: (created: unknown) => void = () => undefined,
+) =>
   render(
     <VirtualKeyCreateDrawer
       organizationId={ORG_ID}
       open
       onOpenChange={() => undefined}
-      onCreated={() => undefined}
+      onCreated={onCreated}
     />,
     { wrapper: Wrapper },
   );
@@ -191,6 +212,9 @@ describe("given the new-virtual-key drawer", () => {
     applicableBudgetsData.rows = [];
     capturedApplicableInputs.length = 0;
     listedKeys = [];
+    listInvalidate.mockReset();
+    listInvalidate.mockResolvedValue(undefined);
+    createMutationOptions.current = null;
   });
 
   afterEach(() => cleanup());
@@ -221,6 +245,55 @@ describe("given the new-virtual-key drawer", () => {
       listedKeys = [{ name: "production-app" }, { name: "production-app-2" }];
       renderDrawer();
       expect(typeThroughTheTour("production-app")).toBe("production-app-3");
+    });
+  });
+
+  describe("when the guided tour submits the key", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const submitThroughTheTour = () => {
+      act(() => {
+        useTourRegistry
+          .getState()
+          .actions.typeVirtualKeyName?.("production-app");
+      });
+      act(() => vi.advanceTimersByTime(60 * 20));
+      let request: Promise<void> | undefined;
+      act(() => {
+        request = useTourRegistry.getState().actions.submitVirtualKeyCreate?.();
+      });
+      return request;
+    };
+
+    /** @scenario the submit action reports when the create has answered */
+    it("hands back the create request, settled once the secret is handed over", async () => {
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      expect(request).toBeInstanceOf(Promise);
+      expect(onCreated).not.toHaveBeenCalled();
+      await act(async () => {
+        await request;
+      });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
+    });
+
+    /** @scenario the secret shows as soon as the create answers */
+    it("hands the secret over while the key list is still refreshing", async () => {
+      listInvalidate.mockReturnValue(new Promise<void>(() => undefined));
+      const onCreated = vi.fn();
+      renderDrawer(onCreated);
+      const request = submitThroughTheTour();
+      await act(async () => {
+        await request;
+      });
+      expect(listInvalidate).toHaveBeenCalledWith({ organizationId: ORG_ID });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ secret: "vk-lw-secret" }),
+      );
     });
   });
 

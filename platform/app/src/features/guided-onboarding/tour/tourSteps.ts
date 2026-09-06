@@ -38,10 +38,14 @@ export interface TourStep {
    * previous step fired has answered.
    */
   waitMs?: number;
-  /** Runs when the step starts, before the cursor moves (navigate, collapse). */
-  before?: (ctx: TourStepContext) => void;
-  /** Runs when the cursor lands on the target (expand, open the drawer). */
-  onArrive?: (ctx: TourStepContext) => void;
+  /**
+   * Runs when the step starts, before the cursor moves (navigate, collapse).
+   * A returned promise is work that answers later; the next step waits for
+   * it before it gives up on its target.
+   */
+  before?: (ctx: TourStepContext) => void | Promise<unknown>;
+  /** Runs when the cursor lands on the target (expand, open the drawer). Same promise rule. */
+  onArrive?: (ctx: TourStepContext) => void | Promise<unknown>;
 }
 
 /** The sidebar section id of the Build group (`MainMenu.tsx`). */

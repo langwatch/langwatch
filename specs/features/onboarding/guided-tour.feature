@@ -86,6 +86,24 @@ Feature: Guided onboarding tour
     And the step 1 auto-advance never fires
 
   @unit
+  Scenario: Next while the next target is still mounting waits for it like the auto-advance
+    Given the gateway tour is on the "vk-create" step
+    And the create request is still in flight
+    When the user clicks Next
+    Then the tour is on the secret step with the dim kept on and no caption
+    When the secret mounts five seconds later
+    Then the cursor lands on it and the counter reads "5 of 5"
+
+  @unit
+  Scenario: the screen stays dimmed with no lone box while a step waits for its target
+    Given the gateway tour left the "vk-create" step
+    And the secret is not on the page yet
+    When the secret step waits for it
+    Then the spotlight closes onto the cursor, so the whole screen is dimmed
+    And no caption shows until the secret is there
+    And the cursor stays where it was
+
+  @unit
   Scenario: the step counter doubles as Back
     Given the llmops tour is on step 2
     When the user clicks the "2 of 4" counter
@@ -199,9 +217,30 @@ Feature: Guided onboarding tour
     And the caption still reads "I'll name it for you."
 
   @unit
+  Scenario: a step whose target comes from the previous step's request waits for the request first
+    Given the create step submitted the key through the page's action
+    And the create request takes twenty seconds to answer
+    When the secret step waits for its target
+    Then it does not give up while the request is pending
+    And once the request answers it waits up to fifteen seconds for the secret
+    And a request that never answers ends the wait after a minute
+
+  @unit
+  Scenario: the submit action reports when the create has answered
+    Given the gateway tour is running on the virtual keys page
+    When the tour submits the key through the drawer's registered action
+    Then the action hands back the create request, so the tour knows when it answered
+
+  @unit
+  Scenario: the secret shows as soon as the create answers
+    Given the create request has answered
+    Then the drawer hands the secret over before the key list refreshes
+    And the list refreshes behind it
+
+  @unit
   Scenario: the secret step reveals the secret
     Given the create request was sent by the previous step
-    Then the secret step waits up to fifteen seconds for the key to be created
+    Then the secret step waits for the create to answer, then up to fifteen seconds for the secret
     When the cursor lands on the secret
     Then the secret is revealed rather than masked
 

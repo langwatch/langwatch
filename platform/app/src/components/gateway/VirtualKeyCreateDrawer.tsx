@@ -147,8 +147,10 @@ export function VirtualKeyCreateDrawer({
 
   const utils = api.useUtils();
   const createMutation = api.virtualKeys.create.useMutation({
-    onSuccess: async () => {
-      await utils.virtualKeys.list.invalidate({ organizationId });
+    // The secret is handed over as soon as the create answers; the list
+    // refreshes behind it rather than holding the reveal.
+    onSuccess: () => {
+      void utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
   const orgProvidersQuery =
@@ -346,7 +348,7 @@ export function VirtualKeyCreateDrawer({
           );
         }
       },
-      submitVirtualKeyCreate: () => void submitRef.current(),
+      submitVirtualKeyCreate: () => submitRef.current(),
     }),
     [utils, organizationId],
   );
