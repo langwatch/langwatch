@@ -38,6 +38,22 @@ export {
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
 } from "./ports/workflow-nlp-lambda.port";
+export {
+  NlpLambdaArnCachePort,
+  NlpLambdaArnResolverPort,
+  type NlpLambdaArnEntry,
+} from "./ports/nlp-lambda-arn.port";
+export {
+  NLP_LAMBDA_ARN_CACHE_PREFIX,
+  NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
+  NlpLambdaRuntime,
+} from "./services/nlp-lambda-runtime.service";
+export {
+  LWA_DEFAULT_STATUS,
+  LWA_PRELUDE_SEPARATOR_LENGTH,
+  findLwaPreludeSeparator,
+} from "./rules/lambda-web-adapter-stream.rules";
+export { LambdaWebAdapterStreamService } from "./services/lambda-web-adapter-stream.service";
 export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter";
 export {
   HttpWorkflowStudioStreamAdapter,

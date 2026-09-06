@@ -81,6 +81,21 @@ describe("httpProxy.execute", () => {
         expect(recorded[0]!.trace.span.output).toMatchObject({ value: { status: 200 } });
       });
 
+      /**
+       * The Traces page reads this type: a trace recorded without it is filed
+       * as ordinary traffic and the agent's test history never lists it.
+       */
+      /** @scenario "Test execution creates a trace visible on the Traces page" */
+      it("files exactly one trace, typed as an agent test", async () => {
+        const { caller, recorded } = harness();
+
+        await caller.execute({ ...REQUEST, agentId: "agent_1" });
+
+        expect(recorded).toHaveLength(1);
+        expect(recorded[0]!.trace.customMetadata).toMatchObject({ type: "agent_test" });
+        expect(recorded[0]!.trace.traceId).toMatch(/^[0-9a-f]{32}$/);
+      });
+
       /** @scenario "Traceparent header enables distributed tracing" */
       it("sends a W3C traceparent naming the trace it goes on to record", async () => {
         const { caller, dispatched, recorded } = harness();

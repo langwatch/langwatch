@@ -72,6 +72,12 @@ export class ApiProcess {
      * The packaged tRPC namespaces, when this process composed them.
      */
     features?: ApiTrpcFeaturesPort<TRPCCreateRouterOptions>;
+    /**
+     * Whether every mounted tRPC procedure's answer is checked against the
+     * output schema it declares. Resolved once from configuration by the
+     * composition root and handed down; nothing below reads an environment.
+     */
+    validateOutput?: boolean;
   }): ApiProcess {
     if (options.http && options.requestPolicy) {
       throw new Error("API process composition accepts HTTP options or request policy, not both.");
@@ -91,6 +97,7 @@ export class ApiProcess {
       ...(options.connectedAgents ? { connectedAgents: options.connectedAgents } : {}),
       secrets: options.secrets ?? new MissingSecretService(),
       features: options.features ?? new NoApiTrpcFeatures(),
+      validateOutput: options.validateOutput ?? false,
       http: {
         ...http,
         ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),

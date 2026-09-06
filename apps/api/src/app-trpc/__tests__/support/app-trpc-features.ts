@@ -84,14 +84,9 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 };
 
 /**
- * The mount the record is built against: the application's OWN root, and the
- * two procedures a feature builds its surfaces on.
- *
- * `authenticate` is what the public-surface sweep needs. The two procedures are
- * the same bare builder by default, which is all the surface lists read; with
- * it, the authenticated one carries a middleware, so a mounted procedure that
- * skipped authentication is distinguishable from one that did not — which is
- * the only way to enumerate the anonymous surface.
+ * The mount the record is built against. `authenticate` gives the authenticated
+ * procedure a middleware, which is what makes one built on the public procedure
+ * distinguishable — the only way to enumerate the anonymous surface.
  */
 export function buildAppTrpcMount(options: { authenticate?: boolean } = {}) {
   // The application's OWN root, not a second one shaped by hand: the record is

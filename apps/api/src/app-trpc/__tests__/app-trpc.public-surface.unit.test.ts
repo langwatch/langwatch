@@ -1,11 +1,7 @@
 /**
- * The tripwire behind ADR-057's core guarantee: anonymous access to trace data
- * flows through exactly ONE endpoint (`sharedTrace.get`), and every other
- * procedure requires a session. This walks the process's real procedure map, so
- * building a surface on the public procedure anywhere fails the suite until
- * this reviewed allowlist is deliberately extended.
- *
- * Spec: packages/features/share/specs/share.feature
+ * ADR-057: anonymous trace access goes through ONE endpoint. This walks the
+ * real procedure map, so a new public surface fails until the allowlist below
+ * is extended. Spec: packages/features/share/specs/share.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -20,28 +16,19 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // Both are gated by the single-purpose unsubscribe token in the URL.
   "emailSuppression.confirmUnsubscribe",
   "emailSuppression.resolveUnsubscribeToken",
-  // The signed-out front door (ADR-117). Every one of these answers a question
-  // somebody asks BEFORE they have a session, so none of them can be protected
-  // without breaking sign-in itself. Each carries a no-permission reason at its
-  // definition and its own per-IP rate limit.
-  //
-  // `route` is a mutation rather than a query on purpose: a per-address query
-  // cache is an account-existence oracle built out of network timing. It reads
-  // no user data — organization-level routing only.
-  //
-  // `inviteLanding` is the only one that returns anything tenant-shaped (an
-  // organization name and the inviter's name). The invite code IS the
-  // authorization, exactly as in `organization.acceptInvite`, and a revoked
-  // invitation is answered identically to a missing one.
+  // The signed-out front door (ADR-117). Each answers a question asked BEFORE
+  // a session exists, and each carries its own per-IP rate limit.
   "frontDoor.completeSignUpVerification",
   "frontDoor.inviteLanding",
   "frontDoor.requestFreshInvite",
   "frontDoor.requestSignUpVerification",
+  // A mutation rather than a query on purpose: a per-address query cache is an
+  // account-existence oracle built out of network timing.
   "frontDoor.route",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
-  // The one anonymous trace read. Token-gated by the share service's
-  // resolve-for-viewer, and it answers the explicit share-safe payload. ADR-057.
+  // The one anonymous trace read: token-gated by the share service, answering
+  // the explicit share-safe payload (ADR-057).
   "sharedTrace.get",
   // Sign-up — necessarily pre-session.
   "user.register",
