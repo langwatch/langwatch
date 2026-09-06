@@ -7,17 +7,21 @@ import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features";
-import type { ApiHandlerManagedCredentials } from "../api-handler-managed-credential";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features.ts";
+import type { ApiHandlerManagedCredentials } from "../api-handler-managed-credential.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
-} from "../api-trace-ingest.composition";
+} from "../api-trace-ingest.composition.ts";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -317,6 +321,7 @@ type MountOverrides = {
   credential?: ApiHandlerManagedCredentials["authenticate"];
   allowance?: ApiTraceIngestAllowance;
   report?: (capability: "command-queue" | "dedup" | "plan-allowance") => void;
+  media?: Parameters<typeof composeApiTraceIngest>[0]["media"];
 };
 
 /**
@@ -336,6 +341,7 @@ function mount(overrides: MountOverrides = {}) {
     credentials: credentialsStub(overrides.credential),
     ...(overrides.allowance ? { allowance: overrides.allowance } : {}),
     ...(overrides.report ? { report: { absent: overrides.report } as never } : {}),
+    ...(overrides.media ? { media: overrides.media } : {}),
     processName: "langwatch-api-test",
   });
   if (!ingest) throw new Error("the OTLP ports must compose over a command queue");
@@ -458,7 +464,7 @@ function jsonExport(span: { attributes?: unknown[] } = {}) {
 }
 
 /** The same export, encoded the way most production collectors send it. */
-function protobufExport(): ArrayBuffer {
+function protobufExport(attributes: unknown[] = []): ArrayBuffer {
   const now = Date.now();
   const message = traceRequestType.create({
     resourceSpans: [
@@ -475,7 +481,7 @@ function protobufExport(): ArrayBuffer {
                 kind: 3,
                 startTimeUnixNano: (now - 1000) * 1_000_000,
                 endTimeUnixNano: now * 1_000_000,
-                attributes: [],
+                attributes,
                 status: { code: 0 },
               },
             ],
@@ -526,3 +532,43 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeOrganizationPermissionThrowing: unreachable,
   } as never);
 }
+
+describe("given the API process composed edge media extraction", () => {
+  describe("when the extraction fails open on a span carrying media", () => {
+    /** @scenario "The receiver publishes the edge media fail-open series" */
+    it("publishes the fail-open series under the stage that failed and still ingests the span", async () => {
+      const metrics: RecordingMeterProvider = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        const { api, commands } = mount({
+          media: {
+            featureFlags: {
+              isEnabled: () => Promise.reject(new Error("the flag store is unreachable")),
+            } as never,
+            hasContentDropRules: () => Promise.resolve(false),
+            service: {} as never,
+          },
+        });
+
+        const response = await api.fetch("/api/otel/v1/traces", {
+          method: "POST",
+          headers: { "content-type": "application/x-protobuf", "x-auth-token": "token" },
+          body: protobufExport([
+            { key: "input.value", value: { stringValue: "data:image/png;base64,AAAA" } },
+          ]),
+        });
+
+        expect(response.status).toBe(200);
+        // Fail-open: the span still reaches the producer, unmodified.
+        expect(commands).toHaveLength(1);
+        expect(
+          metrics.valueOf("langwatch_edge_media_extract_fail_open_total", {
+            reason: "flag_store",
+          }),
+        ).toBe(1);
+      } finally {
+        metrics.uninstall();
+      }
+    });
+  });
+});

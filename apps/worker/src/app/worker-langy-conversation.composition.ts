@@ -3,11 +3,11 @@ import {
   LangyWorkerHttpAdapter,
   EventingLangyConversationAdapter,
   LangyAnalyticsEventStorageAdapter,
-  NullLangyWorkerMetricsAdapter,
   PostgresLangyAdapter,
   LangyTokenBufferAdapter,
   LangyTitleGeneratorService,
   LangyTurnHandoffAdapter,
+  OtelLangyWorkerMetricsAdapter,
   UnavailableLangyWorkerAdapter,
   type LangyAnalyticsClickHouseClientResolver,
   type LangyBroadcastPort,
@@ -18,7 +18,7 @@ import {
 import type { TenantBroadcastPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** The Prisma models Langy's conversation graph reads and writes. */
 export type WorkerLangyConversationDatabase = LangyDatabase;
@@ -64,7 +64,7 @@ export function createWorkerLangyConversation(
 ): EventingLangyConversationAdapter {
   const logger = options.logger ?? createLogger("langwatch:langy-conversation");
   const persistence = PostgresLangyAdapter.create({ database: options.database }).eventing();
-  const workerMetrics = NullLangyWorkerMetricsAdapter.create();
+  const workerMetrics = OtelLangyWorkerMetricsAdapter.create();
 
   if (!options.config.langy) options.absence?.withoutAgentManager();
   if (!options.titleModels) options.absence?.withoutTitleGeneration();

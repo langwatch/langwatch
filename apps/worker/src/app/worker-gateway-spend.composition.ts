@@ -26,9 +26,11 @@ import {
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
+  GatewayBudgetChangeDedupeService,
   GatewayBudgetLedgerAdapter,
   GatewaySpendEventsClickHouseAdapter,
   PostgresGatewayBudgetResolutionAdapter,
+  RedisGatewayBudgetChangeDedupeRepository,
   settlementGraceMs,
   type GatewayBudgetResolutionDatabase,
   type GatewayClickHouseInstanceResolver,
@@ -159,6 +161,13 @@ export function createWorkerGatewaySpend(
           GatewayBudgetLedgerAdapter.create(options.resolveClickHouseClient as never),
           PostgresGatewayBudgetResolutionAdapter.create({ database: options.database }),
           PrismaGatewayChangeEventsRepository.create(options.database),
+          // Without this the advisory BUDGET_UPDATED fires on EVERY debit, so a
+          // busy project evicts its own gateway bundles as fast as it spends.
+          // A process with no Redis gets the always-emit stand-in, which is what
+          // this path did before the window existed.
+          GatewayBudgetChangeDedupeService.create(
+            options.redis ? RedisGatewayBudgetChangeDedupeRepository.create(options.redis) : null,
+          ),
         ),
         new WorkerGovernanceSignalDelivery(options.governanceCommands),
       )

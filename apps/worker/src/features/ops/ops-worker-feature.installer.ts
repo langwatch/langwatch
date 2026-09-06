@@ -1,9 +1,12 @@
 import type { OpsWorkerPort, StorageStatsCollectionService } from "@langwatch/ops-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer.ts";
 
 /**
- * Worker registration for the three operational loops. One installer rather than three, because
- * they share a single condition — a process that owns them owns all three — and because each is a
+ * Worker registration for the operational loops. One installer rather than one each, because
+ * they share a single condition — a process that owns them owns every one — and because each is a
  * timer rather than a routing key, so nothing about their order relative to a pipeline matters.
  */
 export class OpsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
@@ -26,10 +29,12 @@ export class OpsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   install(): Promise<WorkerFeatureCloser | undefined> {
     const anomaly = this.options.workers.tryStartAnomalyWorker();
     const usageStats = this.options.workers.tryStartUsageStatsWorker();
+    const queueMetrics = this.options.workers.tryStartQueueMetricsWriter();
     const storageStats = this.options.storageStats?.start();
 
     return Promise.resolve(async () => {
       storageStats?.stop();
+      await queueMetrics?.stop();
       await usageStats?.stop();
       await anomaly?.stop();
     });

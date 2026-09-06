@@ -5,9 +5,9 @@ import {
   NoopSchedulerWakeService,
   SchedulerAuditSinkPort,
   type ScheduledJobRecord,
-} from "../../index";
-import type { SchedulerOpsRepository } from "../../index";
-import { SchedulerOpsService } from "../scheduler-ops.service";
+} from "../../index.ts";
+import type { SchedulerOpsRepository } from "../../index.ts";
+import { SchedulerOpsService } from "../scheduler-ops.service.ts";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);

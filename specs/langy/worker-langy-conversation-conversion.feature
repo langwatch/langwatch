@@ -52,3 +52,11 @@ Feature: The worker mounts the Langy conversation pipeline
       Given a worker that composes no model provider and no authorization graph
       When it composes the langy conversation pipeline
       Then both absences are reported by name at boot
+
+  Rule: The dispatch outcomes an operator watches Langy by are published
+
+    @unit
+    Scenario: The worker publishes the Langy dispatch series
+      Given a running turn whose agent stopped sending heartbeats
+      When the liveness subscriber re-drives it through the composed worker port
+      Then the dispatch is counted on the published series under its outcome

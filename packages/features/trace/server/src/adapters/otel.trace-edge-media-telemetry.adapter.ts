@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   type TraceEdgeMediaFailOpenReason,
   TraceEdgeMediaTelemetryPort,
-} from "../ports/trace-media-store.port";
+} from "../ports/trace-media-store.port.ts";
 
 export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
   "langwatch_edge_media_extract_fail_open_total";
@@ -11,10 +11,10 @@ export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
  * The one series edge media extraction reports, pushed over OTLP.
  *
  * It was declared in the platform application's `server/metrics.ts` while that
- * process supplied the port. It lives beside the port now. The port itself is
- * optional on the extraction service (`telemetry?:`, called through `?.`), and
- * no root supplies it, so absent still means unreported — which is what the
- * port's own docblock says.
+ * process supplied the port. It lives beside the port now, and the API's trace
+ * ingest composition supplies it wherever it composes media extraction. The port
+ * stays optional on the extraction service (`telemetry?:`, called through `?.`),
+ * so a caller that passes none still reports nothing.
  */
 export class OtelTraceEdgeMediaTelemetryAdapter extends TraceEdgeMediaTelemetryPort {
   static create(): OtelTraceEdgeMediaTelemetryAdapter {

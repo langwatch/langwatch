@@ -1,5 +1,8 @@
 export { GatewayService } from "./services/gateway.service.ts";
-export { PrismaGatewayAdapter, type GatewayPersistence } from "./adapters/prisma.gateway.adapter.ts";
+export {
+  PrismaGatewayAdapter,
+  type GatewayPersistence,
+} from "./adapters/prisma.gateway.adapter.ts";
 export { GatewaySpendEventsService } from "./services/gateway-spend-events.service.ts";
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
 export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service.ts";
@@ -245,3 +248,10 @@ export type {
   TraceDestinationKeyRow,
   TraceDestinationProjectRow,
 } from "./repositories/gateway-trace-destination-report.repository.ts";
+export {
+  BUDGET_CHANGE_EVENT_WINDOW_SECONDS,
+  GatewayBudgetChangeDedupeService,
+  type BudgetChangeEventDedupeService,
+} from "./services/gateway-budget-change-dedupe.service.ts";
+export { GatewayBudgetChangeDedupeRepository } from "./repositories/gateway-budget-change-dedupe.repository.ts";
+export { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";

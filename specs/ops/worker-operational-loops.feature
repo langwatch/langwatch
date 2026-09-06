@@ -1,9 +1,10 @@
 Feature: The worker runs the operational loops nobody else can
-  Three loops react to the passage of time rather than to an event: the
+  Four loops react to the passage of time rather than to an event: the
   per-tenant enqueue-rate tick behind the Ops page's runaway-tenant view, the
-  anonymous daily usage report a self-hosted install sends about itself, and
-  the ClickHouse storage collection every table-size, disk-capacity and backup
-  alert is built on.
+  anonymous daily usage report a self-hosted install sends about itself, the
+  queue-metrics writer that publishes the snapshot every operations dashboard
+  reads, and the ClickHouse storage collection every table-size, disk-capacity
+  and backup alert is built on.
 
   No routing key can carry any of them, so no queue can redeliver one, and a
   process that never starts them looks exactly like a healthy one. The symptom
@@ -21,7 +22,8 @@ Feature: The worker runs the operational loops nobody else can
     Scenario: The worker starts all three loops when it boots
       Given a deployment that opted out of nothing
       When the ops feature installer runs
-      Then the enqueue-rate tick, the usage report and the storage collection are all running
+      Then the enqueue-rate tick, the usage report, the queue-metrics writer and
+        the storage collection are all running
 
     @unit
     Scenario: Shutting the worker down stops every loop it started
@@ -49,6 +51,22 @@ Feature: The worker runs the operational loops nobody else can
       Given a worker composed without the queue's Redis
       When it composes the operational loops
       Then the enqueue-rate tick is reported absent by name
+
+  Rule: The operations dashboard reads a snapshot this process writes
+
+    @unit
+    Scenario: The worker publishes the operations snapshot the dashboard reads
+      Given a worker process holding the queue's Redis
+      When the queue-metrics writer starts
+      Then it claims the fleet's writer lease on the shared snapshot store
+      And it takes a writer epoch from the same store
+
+    @unit
+    Scenario: A worker with no queue Redis names the snapshot nobody will write
+      Given a worker composed without the queue's Redis
+      When it composes the operational loops
+      Then the queue-metrics writer is reported absent by name
+      And no writer is started
 
   Rule: Storage collection reports what the endpoint holds now, not what it held
 

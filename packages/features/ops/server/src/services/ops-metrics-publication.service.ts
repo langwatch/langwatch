@@ -10,13 +10,13 @@ import { SNAPSHOT_VERSION } from "@langwatch/ops-contract";
 import type {
   DashboardData,
   DetailSnapshot,
-  OpsService,
   OpsSnapshotService,
   QueueInfo,
 } from "@langwatch/ops-contract";
-import { OpsDashboardViewService } from "./ops-dashboard-view.service";
-import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
-import type { OpsMetricsWindowService } from "./ops-metrics-window.service";
+import type { OpsQueueMetricsSourcePort } from "../ports/ops-queue-metrics-source.port.ts";
+import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
+import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
+import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
 const logger = createLogger("langwatch:ops:metrics-publication");
 
@@ -38,7 +38,7 @@ export class OpsMetricsPublicationService {
   private latestDetail: DetailSnapshot | null = null;
 
   private constructor(
-    private readonly ops: OpsService,
+    private readonly ops: OpsQueueMetricsSourcePort,
     private readonly sampling: OpsMetricsSamplingService,
     private readonly window: OpsMetricsWindowService,
     private readonly writerId: string,
@@ -48,7 +48,7 @@ export class OpsMetricsPublicationService {
   ) {}
 
   static create(params: {
-    ops: OpsService;
+    ops: OpsQueueMetricsSourcePort;
     sampling: OpsMetricsSamplingService;
     window: OpsMetricsWindowService;
     writerId: string;

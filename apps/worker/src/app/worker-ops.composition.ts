@@ -1,6 +1,6 @@
 /**
- * The three operational loops this process owns, and nothing else does. anomaly detection   a per-
- * tenant enqueue-rate tick,
+ * The operational loops this process owns, and nothing else does: a per-tenant enqueue-rate tick,
+ * the anonymous usage report, the fleet's queue-metrics writer and the ClickHouse storage gauges.
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
@@ -22,7 +22,7 @@ import {
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** Where a self-hosted install reports what it is running. */
 const USAGE_STATS_RECEIVER = "https://app.langwatch.ai/api/track_usage";
@@ -41,6 +41,8 @@ export abstract class WorkerOpsAbsenceReportPort {
   abstract withoutAnomalyDetection(): void;
 
   abstract withoutStorageStats(): void;
+
+  abstract withoutQueueMetricsWriter(): void;
 }
 
 export type WorkerOpsCompositionInput = Readonly<{
@@ -50,7 +52,9 @@ export type WorkerOpsCompositionInput = Readonly<{
   redis: RedisConnection | null | undefined;
   featureFlags: FeatureFlagService;
   /** The organization's own ClickHouse endpoint, for its usage counts. */
-  resolveOrganizationClient: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined;
+  resolveOrganizationClient:
+    | ((organizationId: string) => UsageStatsClickHouseClientPort)
+    | undefined;
   /**
    * Every configured endpoint, for the one read that is nobody's tenant. `system.parts` is a
    * property of an INSTALL rather than of a tenant, and an install with private organization routes
@@ -67,7 +71,10 @@ export interface WorkerOpsComposition {
 
 export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsComposition {
   const logger = createLogger("langwatch:worker:ops");
-  if (!options.redis) options.absence?.withoutAnomalyDetection();
+  if (!options.redis) {
+    options.absence?.withoutAnomalyDetection();
+    options.absence?.withoutQueueMetricsWriter();
+  }
 
   const workers = OpsWorkerAdapter.create({
     anomaly: {
@@ -75,6 +82,7 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
       featureFlags: options.featureFlags,
       hardTierAlerts: LoggedHardTierAlert.create(logger),
     },
+    queueMetrics: { redis: options.redis ?? undefined },
     usageStats: {
       database: options.database,
       clickhouse: WorkerUsageStatsClickHouse.create(options.resolveOrganizationClient),
@@ -137,7 +145,9 @@ class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolverPort 
   }
 
   private constructor(
-    private readonly resolve: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined,
+    private readonly resolve:
+      | ((organizationId: string) => UsageStatsClickHouseClientPort)
+      | undefined,
   ) {
     super();
   }
@@ -199,6 +209,12 @@ export class LoggedWorkerOpsAbsence extends WorkerOpsAbsenceReportPort {
   withoutAnomalyDetection(): void {
     this.logger.warn(
       "worker composed no enqueue-rate anomaly detection: the Ops page surfaces no runaway tenant, and a tenant flooding the queue is visible only as work nobody can drain",
+    );
+  }
+
+  withoutQueueMetricsWriter(): void {
+    this.logger.warn(
+      "worker composed no ops queue-metrics writer: the operations dashboard reads a snapshot nothing publishes, so every queue reads as empty rather than as unreported",
     );
   }
 

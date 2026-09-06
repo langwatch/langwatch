@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UsageStatsErrorReporterPort, UsageStatsTelemetryClientPort } from "../../index";
+import { UsageStatsErrorReporterPort, UsageStatsTelemetryClientPort } from "../../index.ts";
 import {
   type UsageStatsCollector,
   UsageStatsOrganizationRepositoryPort,
   type UsageStatsOrganization,
   type UsageStatsReport,
-} from "../../ports/usage-stats-worker.port";
+} from "../../ports/usage-stats-worker.port.ts";
 import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
-} from "../ops-worker-contribution.adapter";
+} from "../ops-worker-contribution.adapter.ts";
 
 const logger = vi.hoisted(() => ({
   debug: vi.fn(),

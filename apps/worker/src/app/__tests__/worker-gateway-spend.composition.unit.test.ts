@@ -63,11 +63,13 @@ function compose(
   substrates: {
     instances?: Array<ReturnType<typeof instance>>;
     awsClientConfig?: () => never;
+    database?: object;
+    redis?: object;
   } = {},
 ) {
   return createWorkerGatewaySpend({
     config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
-    database: createWorkerProcessDatabase() as never,
+    database: (substrates.database ?? createWorkerProcessDatabase()) as never,
     resolveClickHouseClient: (async () => ({
       insert: async () => undefined,
       query: async () => ({ json: async () => [] }),
@@ -76,7 +78,7 @@ function compose(
       ? { resolveClickHouseInstances: (async () => substrates.instances) as never }
       : {}),
     ...(substrates.awsClientConfig ? { awsClientConfig: substrates.awsClientConfig as never } : {}),
-    redis: null,
+    redis: (substrates.redis ?? null) as never,
     processStore: {} as never,
     egress: WebhookEgressService.create({
       rateLimiter: InMemoryWebhookDispatchRateLimiterAdapter.create(),
@@ -450,3 +452,144 @@ describe("given a webhook endpoint's last hop", () => {
     });
   });
 });
+
+/**
+ * The advisory BUDGET_UPDATED signal is a cache invalidation, not a data carrier: the gateway
+ * evicts every bundle for the project and re-reads spend. Emitting one per debit is what made a
+ * busy project evict its own bundles as fast as it spent.
+ */
+describe("given the budget-change signal the gateway invalidates its bundles on", () => {
+  describe("when two debits land inside one dedupe window", () => {
+    /** @scenario "Two debits inside one window emit a single budget-updated signal" */
+    it("appends one budget-updated event rather than one per debit", async () => {
+      reset();
+      const appended: Array<Record<string, unknown>> = [];
+      const claimed: string[] = [];
+      const settlement = compose(
+        {},
+        {
+          database: gatewayDebitDatabase(appended),
+          redis: {
+            set: async (key: string) => {
+              claimed.push(key);
+              return claimed.length === 1 ? "OK" : null;
+            },
+          },
+        },
+      )
+        .spend.buildProcessing()
+        .processManagers.get("gatewayDebits") as unknown as {
+        config: {
+          intents: Record<string, { run: (payload: never, context: never) => Promise<void> }>;
+        };
+      };
+      if (!settlement) throw new Error("the pipeline registered no gatewayDebits process manager");
+
+      await settlement.config.intents.writeDebits!.run(
+        debitPayload() as never,
+        { projectId: "project-1", messageKey: "debit:1", attempt: 1 } as never,
+      );
+      await settlement.config.intents.writeDebits!.run(
+        debitPayload({ gateway_request_id: "gwr-2" }) as never,
+        { projectId: "project-1", messageKey: "debit:2", attempt: 1 } as never,
+      );
+
+      // Both debits were durably written; only the first claimed the window.
+      expect(claimed).toEqual([
+        "gateway_budget_change:project-1",
+        "gateway_budget_change:project-1",
+      ]);
+      expect(appended.map((event) => event.kind)).toEqual(["BUDGET_UPDATED"]);
+    });
+
+    /** @scenario "A process with no Redis emits a budget-updated signal for every debit" */
+    it("emits for every debit where this process composed no dedupe store", async () => {
+      reset();
+      const appended: Array<Record<string, unknown>> = [];
+      const settlement = compose({}, { database: gatewayDebitDatabase(appended) })
+        .spend.buildProcessing()
+        .processManagers.get("gatewayDebits") as unknown as {
+        config: {
+          intents: Record<string, { run: (payload: never, context: never) => Promise<void> }>;
+        };
+      };
+      if (!settlement) throw new Error("the pipeline registered no gatewayDebits process manager");
+
+      await settlement.config.intents.writeDebits!.run(
+        debitPayload() as never,
+        { projectId: "project-1", messageKey: "debit:1", attempt: 1 } as never,
+      );
+      await settlement.config.intents.writeDebits!.run(
+        debitPayload({ gateway_request_id: "gwr-2" }) as never,
+        { projectId: "project-1", messageKey: "debit:2", attempt: 1 } as never,
+      );
+
+      expect(appended.map((event) => event.kind)).toEqual(["BUDGET_UPDATED", "BUDGET_UPDATED"]);
+    });
+  });
+});
+
+/** One warn-on-breach organization budget, and a sink for the change events appended over it. */
+function gatewayDebitDatabase(appended: Array<Record<string, unknown>>) {
+  const now = new Date();
+  return createWorkerProcessDatabase({
+    virtualKeyScope: { findMany: async () => [] },
+    groupMembership: { findMany: async () => [] },
+    gatewayBudget: {
+      findMany: async () => [
+        {
+          id: "budget-1",
+          organizationId: "organization-1",
+          scopeType: "ORGANIZATION",
+          scopeId: "organization-1",
+          providerKey: null,
+          name: "Monthly",
+          description: null,
+          window: "MONTH",
+          limitUsd: "100",
+          onBreach: "WARN",
+          timezone: "UTC",
+          externalId: null,
+          metadata: null,
+          spentUsd: "1",
+          currentPeriodStartedAt: now,
+          resetsAt: now,
+          lastResetAt: null,
+          cycleAnchorAt: now,
+          archivedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          createdById: null,
+          managedByVirtualKeyId: null,
+        },
+      ],
+    },
+    gatewayChangeEvent: {
+      create: async (input: { data: Record<string, unknown> }) => {
+        appended.push(input.data);
+        return { revision: 1n };
+      },
+    },
+  });
+}
+
+/** One confirmed debit, as the spend fold hands it to the writer. */
+function debitPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    gateway_request_id: "gwr-1",
+    organization_id: "organization-1",
+    team_id: "team-1",
+    project_id: "project-1",
+    virtual_key_id: "vk-1",
+    principal_user_id: "",
+    end_user_id: "",
+    model_provider_id: "",
+    model: "gpt-5-mini",
+    cost_nano_usd: 3_500,
+    rate_version: "catalog@2026-07-30",
+    status: "confirmed",
+    duration_ms: 120,
+    occurred_at: 1_753_800_000_000,
+    ...overrides,
+  };
+}

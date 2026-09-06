@@ -170,6 +170,9 @@ export {
   PostgresSystemMigrationsAdapter,
   type PostgresSystemMigrationsAdapterOptions,
 } from "./adapters/postgres.system-migrations.adapter.ts";
+// The state rows on their own, for a reader that is not the runner: the
+// identity write gate decides a user's fork from the backfill's record.
+export { PrismaSystemMigrationStateRepository } from "./repositories/prisma/prisma.system-migration-state.repository.ts";
 export { NullOrganizationDataplaneAdapter } from "./adapters/null.organization-dataplane.adapter.ts";
 export { RoutingTableOrganizationDataplaneAdapter } from "./adapters/routing-table.organization-dataplane.adapter.ts";
 export {

@@ -179,3 +179,12 @@ Feature: The background worker owns automation settlement
     Then the automation stays active
     And its administrators are told it reached its daily limit
     And the decision is taken against the project's own trace count
+
+  @unit
+  Scenario: The worker publishes the settlement overflow series
+    Given a settlement that flushed matches early to stay within its bound
+    When the overflow intent runs
+    Then the flushed count is published on the overflow series
+    And the settlement is still named in this process's own log
+    And a flush of nothing is not counted, so an ordinary settlement does not
+      read as an overflow

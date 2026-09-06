@@ -15,6 +15,7 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
+  OtelTraceEdgeMediaTelemetryAdapter,
   TraceEdgeMediaPayloadService,
   TraceIngestionService,
   TraceIngressCommandPort,
@@ -32,7 +33,7 @@ import {
   type TraceIngressPayloadPort,
 } from "@langwatch/trace-server";
 
-import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
+import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
 
 /** The pipeline both the annotation commands and this receiver send on. */
 const TRACE_PROCESSING_PIPELINE = "trace_processing";
@@ -525,7 +526,10 @@ function composeApiTraceIngestPayloads(options: {
   }
 
   return TraceEdgeMediaPayloadService.create({
-    deps: media,
+    // The fail-open series has no other producer: extraction that gives up on a
+    // span still stores the trace, so an unreported fail-open is indistinguishable
+    // from a span that carried no media at all.
+    deps: { ...media, telemetry: media.telemetry ?? OtelTraceEdgeMediaTelemetryAdapter.create() },
     logger: createLogger("langwatch:api:trace-ingest:edge-media-extraction"),
     ...(options.payloads ? { next: options.payloads } : {}),
   });

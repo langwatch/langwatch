@@ -79,3 +79,19 @@ Feature: The worker mounts the gateway spend and governance signal pipelines
       Then the organization's own plan decides whether the endpoint is enabled
       And a worker that opened no client refuses the batch and names the absence
         rather than answering a plan it cannot resolve
+
+  Rule: The budget-change signal is an invalidation, not one message per debit
+
+    @unit
+    Scenario: Two debits inside one window emit a single budget-updated signal
+      Given a project spending against a budget that warns rather than blocks
+      When two debits are written inside the same dedupe window
+      Then both debits are recorded
+      And one budget-updated signal is appended, not one per debit
+
+    @unit
+    Scenario: A process with no Redis emits a budget-updated signal for every debit
+      Given a worker composed without the queue's Redis
+      When two debits are written for the same project
+      Then a budget-updated signal is appended for each, because holding an
+        invalidation back is never safer than sending it twice

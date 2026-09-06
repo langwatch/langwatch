@@ -250,3 +250,11 @@ Feature: Trace media blob extraction at the ingestion edge
     And once the deadline passes no further parts are stored, parts already
       externalized keep their references (no orphaned bytes), and the drop is
       logged and counted rather than silent
+
+  @integration
+  Scenario: The receiver publishes the edge media fail-open series
+    Given a project whose feature-flag store cannot be read
+    When a span carrying inline media is exported to the OTLP receiver
+    Then the span is still ingested unmodified
+    And the fail-open is counted under the stage that failed, so a hook that
+      stood down for every span is distinguishable from one with nothing to do

@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   type LangyDispatchOutcome,
   LangyWorkerMetricsPort,
-} from "../ports/langy-turn-runtime.port";
+} from "../ports/langy-turn-runtime.port.ts";
 
 export const LANGY_DISPATCH_METRIC_NAME = "langwatch_langy_dispatch_total";
 
@@ -10,9 +10,8 @@ export const LANGY_DISPATCH_METRIC_NAME = "langwatch_langy_dispatch_total";
  * Langy worker-dispatch outcomes, pushed over OTLP.
  *
  * The counter was declared in the platform application's `server/metrics.ts`
- * while that process composed the dispatcher. It lives beside the port now.
- * `apps/worker` still composes `NullLangyWorkerMetricsAdapter`, so the series
- * is unpublished until that composition swaps to this one.
+ * while that process composed the dispatcher. It lives beside the port now, and
+ * `apps/worker` composes it for the process that dispatches turns.
  */
 export class OtelLangyWorkerMetricsAdapter extends LangyWorkerMetricsPort {
   static create(): OtelLangyWorkerMetricsAdapter {
