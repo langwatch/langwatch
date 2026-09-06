@@ -357,10 +357,10 @@ describe("given a folder connected to a Langy conversation", () => {
       await settle();
       register();
 
-      // `true` is not in the read-only set, so the first call asks and the
-      // grant it produces is `true *`.
+      // `sync` is not in the read-only set, so the first call asks, and it
+      // carries no argument of its own, so the grant it produces is `sync *`.
       socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
+        callFrame({ tool: "local_bash", params: { command: "sync" } }),
       );
       await settle();
       expect(socket.sentOf("permission_required")).toHaveLength(1);
@@ -374,11 +374,11 @@ describe("given a folder connected to a Langy conversation", () => {
       });
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "true again" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync again" } }),
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: "true again" },
+            params: { command: "sync again" },
           }).call,
           callId: "call-2",
         },
@@ -449,7 +449,7 @@ describe("given a folder connected to a Langy conversation", () => {
       await settle();
       register();
       socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
+        callFrame({ tool: "local_bash", params: { command: "touch marker" } }),
       );
       await settle();
       socket.deliver({
@@ -468,7 +468,7 @@ describe("given a folder connected to a Langy conversation", () => {
       await settle();
       register();
       socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
+        callFrame({ tool: "local_bash", params: { command: "touch marker" } }),
       );
       await waitUntil(() => socket.sentOf("permission_required").length === 1, {
         what: "the second session to ask again",
@@ -515,7 +515,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "Allowing the pattern runs the call and settles the line" */
     it("runs the call, tells the platform and grants the pattern", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("sync");
 
       approvals.answer({ decision: "allow_pattern" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
@@ -526,16 +526,16 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(answered).toBeDefined();
       expect(answered!.callId).toBe("call-1");
       expect(answered!.decision).toBe("allow_pattern");
-      expect(answered!.patterns).toEqual(["true *"]);
-      expect(lines.join("\n")).toContain('Allowed "true *" for this session');
+      expect(answered!.patterns).toEqual(["sync *"]);
+      expect(lines.join("\n")).toContain('Allowed "sync *" for this session');
       expect(lines.join("\n")).not.toContain("on the card in LangWatch");
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "true again" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync again" } }),
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: "true again" },
+            params: { command: "sync again" },
           }).call,
           callId: "call-2",
         },
@@ -548,7 +548,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "Allowing once runs the call and grants nothing" */
     it("runs the call once and carries no patterns", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       approvals.answer({ decision: "allow_once" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
@@ -596,12 +596,12 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "Two questions at once are asked one at a time" */
     it("asks the second question only after the first one is answered", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "false" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync" } }),
         call: {
-          ...callFrame({ tool: "local_bash", params: { command: "false" } })
+          ...callFrame({ tool: "local_bash", params: { command: "sync" } })
             .call,
           callId: "call-2",
         },
@@ -614,13 +614,13 @@ describe("given a folder connected to a Langy conversation", () => {
       await waitUntil(() => approvals.cards.length === 2, {
         what: "the second question to open",
       });
-      expect(approvals.cards[1]!.subject).toBe("false");
+      expect(approvals.cards[1]!.subject).toBe("sync");
       expect(approvals.state.open).toBe(1);
     });
 
     /** @scenario "The card can answer first and the settled line names it" */
     it("closes the selector when the card answers first and names the card", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       socket.deliver({
         type: "permission",
@@ -639,7 +639,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A card answer after the terminal answered is ignored" */
     it("ignores the card's answer once the terminal answered", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       approvals.answer({ decision: "allow_once" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
