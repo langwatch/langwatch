@@ -1919,8 +1919,8 @@ clickhouse:
     # set `database` to your instance's, and keep `user: lwql_ro` unless you
     # provision a different reader yourself.
     postgres:
-      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: ""] PostgreSQL host the lwql_postgres bridge dials. Empty auto-derives to the chart-managed PostgreSQL Service (<release>-postgresql); REQUIRED for an external PostgreSQL (the render fails if left empty with postgresql.chartManaged=false).
-      host: ""
+      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: "{{ .Release.Name }}-postgresql"] PostgreSQL host the lwql_postgres bridge dials, tpl'd by the clickhouse-serverless subchart. Defaults to the chart-managed PostgreSQL Service so a default install works out of the box. Every external-PostgreSQL example/profile resets this to "" to disable the bridge (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) instead of failing the render — but a PARTIAL override (only .database/.user/.passwordSecretKey changed while this stays empty) still fails the render as a likely mistake.
+      host: '{{ .Release.Name }}-postgresql'
       ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads. Must equal postgresql.auth.database for chart-managed PostgreSQL; set to your instance's database for an external PostgreSQL.
       database: langwatch
       ## @param clickhouse.lwqlAccessModel.postgres.user [default: lwql_ro] PostgreSQL role the bridge connects as — a dedicated read-only reader the app converges (never the superuser). Keep the default unless you provision your own reader on an external PostgreSQL.

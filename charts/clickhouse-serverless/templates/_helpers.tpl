@@ -43,26 +43,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* Effective host for the lwql_postgres bridge (ClickHouse -> PostgreSQL).
-     An explicit lwqlAccessModel.postgres.host wins (set by an external PostgreSQL).
-     Empty auto-derives to the langwatch chart's own PostgreSQL Service
-     (<release>-postgresql, the same name the app's DATABASE_URL dials), so the
-     named collection renders and works out of the box on the default chart-managed
-     path instead of being silently omitted.
-
-     Deriving here is not the same as OWNING the decision. A subchart cannot see
-     the parent's postgresql.chartManaged (its .Values is only its own subtree plus
-     global — verified), so it cannot tell an external PostgreSQL from a
-     chart-managed one. The parent's validateSecrets makes that call: it refuses
-     the render when postgresql.chartManaged=false and this host is left empty. So
-     an empty host reaches this helper ONLY on the chart-managed path, where
-     <release>-postgresql is exactly right. The empty->omit branch below therefore
-     never fires for a completed render (the render already failed for the one case
-     it would have mattered) — it stays only as the standalone-subchart default. */}}
+     Empty means the bridge is disabled: this subchart cannot tell an external
+     PostgreSQL from a chart-managed one (its .Values is only its own subtree
+     plus global — verified), so it never guesses a host. The langwatch parent
+     chart's OWN values.yaml supplies '{{ .Release.Name }}-postgresql' as ITS
+     default for clickhouse.lwqlAccessModel.postgres.host — a tpl string this
+     helper evaluates below — so a default chart-managed-PostgreSQL install
+     still gets a working bridge without this helper ever needing to see
+     postgresql.chartManaged. Every external-PostgreSQL example/profile resets
+     that key back to "" to cancel the parent default, which is what actually
+     disables the bridge (see examples/overlays/postgres-external.yaml). A
+     standalone subchart install (no parent langwatch chart) sees this
+     subchart's own default of "" and the bridge stays disabled unless you set
+     a host yourself. */}}
 {{- define "clickhouse-serverless.lwqlPgHost" -}}
   {{- if .Values.lwqlAccessModel.postgres.host -}}
     {{- tpl .Values.lwqlAccessModel.postgres.host . -}}
-  {{- else -}}
-    {{- printf "%s-postgresql" .Release.Name -}}
   {{- end -}}
 {{- end -}}
 

@@ -18,9 +18,12 @@
 #   - external ClickHouse: the app self-provisions, so it emits
 #     LWQL_SELF_PROVISION=true and derives URL/user/database/tenant from
 #     CLICKHOUSE_URL itself — the chart must NOT emit the four chart-managed vars.
-#   - external PostgreSQL with no bridge host: the chart cannot invent the
-#     address, so the render must FAIL rather than silently dial a Service that
-#     does not exist.
+#   - external PostgreSQL with the bridge host cancelled to "": the bridge
+#     renders disabled (no CLICKHOUSE_LWQL_PG_HOST at all) rather than
+#     silently dialing a Service that does not exist, and the app Deployment
+#     carries a langwatch.io/lwql-postgres-bridge: disabled annotation. A
+#     PARTIAL override (some other postgres.* field set while host stays
+#     empty) still fails the render as a likely mistake.
 #
 # Each test carries a plain "# Verifies:" line naming what it pins.
 #
@@ -194,31 +197,61 @@ $(cat "$err")"
   done
 }
 
-# Verifies: External PostgreSQL with no bridge host fails the render, fail-closed
-test_external_postgres_requires_host() {
+# Verifies: external PostgreSQL with the bridge host cancelled to "" (every
+# external-PostgreSQL example/profile does this) renders successfully with the
+# bridge disabled — surfaced via the app Deployment's annotation — and emits no
+# CLICKHOUSE_LWQL_PG_HOST at all, instead of silently pointing it at the
+# nonexistent in-cluster PostgreSQL Service.
+test_external_postgres_no_host_disables_bridge() {
   local out="${TMPDIR:-/tmp}/lwql-conn-extpg.yaml"
   local err="${TMPDIR:-/tmp}/lwql-conn-extpg.err"
-  # External PostgreSQL, no bridge host set. A blank host would silently render
-  # the in-cluster <release>-postgresql Service, which does not exist for a BYO
-  # PostgreSQL, and every postgres-resident LWQL view would fail at query time.
+  if ! render_to "$out" "$err" t \
+      --set autogen.enabled=true \
+      --set postgresql.chartManaged=false \
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
+      --set clickhouse.lwqlAccessModel.postgres.host=""; then
+    fail "extpg-no-host-render-failed" \
+      "render failed with postgresql.chartManaged=false and the bridge host cancelled to \"\". This must render successfully with the bridge disabled (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) — got:
+$(cat "$err")"
+    return
+  fi
+  if ! grep -q 'langwatch.io/lwql-postgres-bridge: "disabled"' "$out"; then
+    fail "extpg-no-host-annotation" \
+      "render succeeded but did not annotate the app Deployment with langwatch.io/lwql-postgres-bridge: disabled."
+  fi
+  if grep -q 'CLICKHOUSE_LWQL_PG_HOST' "$out"; then
+    fail "extpg-no-host-env-emitted" \
+      "render emitted CLICKHOUSE_LWQL_PG_HOST although the bridge host was cancelled to \"\" for an external PostgreSQL — this would silently target the non-existent in-cluster PostgreSQL Service."
+  fi
+}
+
+# Verifies: a PARTIAL external-PostgreSQL bridge override (some other
+# postgres.* field changed while host stays empty) still fails closed — that
+# looks like a forgotten host, not a deliberate disable.
+test_external_postgres_partial_config_fails() {
+  local out="${TMPDIR:-/tmp}/lwql-conn-extpg-partial.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-conn-extpg-partial.err"
   if render_to "$out" "$err" t \
       --set autogen.enabled=true \
       --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch"; then
-    fail "extpg-no-host-rendered" \
-      "render succeeded with postgresql.chartManaged=false and no clickhouse.lwqlAccessModel.postgres.host. It must fail closed — a blank host silently targets the non-existent in-cluster PostgreSQL Service."
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
+      --set clickhouse.lwqlAccessModel.postgres.host="" \
+      --set clickhouse.lwqlAccessModel.postgres.database=analytics_db; then
+    fail "extpg-partial-rendered" \
+      "render succeeded with clickhouse.lwqlAccessModel.postgres.database overridden but .host left empty — that is a partial, likely-mistaken configuration and must fail closed."
     return
   fi
-  if ! grep -q 'clickhouse.lwqlAccessModel.postgres.host is required' "$err"; then
-    fail "extpg-no-host-message" \
-      "render failed, but not with the expected bridge-host guidance. Got:
+  if ! grep -q 'clickhouse.lwqlAccessModel.postgres.host is empty but' "$err"; then
+    fail "extpg-partial-message" \
+      "render failed, but not with the expected partial-config guidance. Got:
 $(cat "$err")"
   fi
 }
 
 test_chart_managed_full_connection
 test_external_self_provision
-test_external_postgres_requires_host
+test_external_postgres_no_host_disables_bridge
+test_external_postgres_partial_config_fails
 
 if [[ $failures -gt 0 ]]; then
   echo

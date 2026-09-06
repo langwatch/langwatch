@@ -234,10 +234,15 @@ repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
   `postgresql.auth.database` (the render fails if they diverge), and the bridge
   connects as a dedicated read-only role `lwql_ro` — never the superuser — that
   the app converges from the reader password at deploy time. An **external
-  PostgreSQL** (`postgresql.chartManaged: false`) must set
-  `clickhouse.lwqlAccessModel.postgres.host` (the render fails if it is left
-  empty) and its `database`; keep `user: lwql_ro` unless you provision your own
-  reader.
+  PostgreSQL** (`postgresql.chartManaged: false`) needs
+  `clickhouse.lwqlAccessModel.postgres.host` set to reach it; every external
+  PostgreSQL example/profile cancels the auto-derived default back to `""`
+  instead, which renders successfully with the bridge disabled — a loud
+  NOTES.txt warning and a `langwatch.io/lwql-postgres-bridge: disabled`
+  annotation on the app Deployment (no shipped LangWatchQL view reads through
+  this bridge yet, langwatch-saas#7387). A **partial** override — only
+  `.database`, `.user` or `.passwordSecretKey` changed while `host` stays empty
+  — still fails the render as a likely mistake.
 - **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
   cannot render config into a server it does not run, so the application
   self-provisions the same objects via SQL DDL at startup, and fails closed

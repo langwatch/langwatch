@@ -477,15 +477,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      ClickHouse only — for external ClickHouse the app self-provisions the bridge
      from DATABASE_URL and none of this applies.
 
-     The subchart derives the bridge host from the release name, which is only a
-     real address when this chart also manages PostgreSQL. So:
+     The subchart derives the bridge host from the release name via the PARENT
+     chart's own values.yaml default (a tpl string), which is only a real
+     address when this chart also manages PostgreSQL. So:
 
-       - EXTERNAL PostgreSQL with no explicit host: refuse. A blank host would
-         silently render the in-cluster <release>-postgresql Service, which does
-         not exist for a BYO PostgreSQL, and every postgres-resident LWQL view
-         would fail at query time with no signal. postgresql.chartManaged is a
-         parent value the subchart cannot see, so this guard is the only place the
-         two facts meet.
+       - EXTERNAL PostgreSQL, host left at its default-derived value cancelled to
+         "" (every external-PostgreSQL example/profile does this): the bridge is
+         deliberately disabled, not a mistake — no shipped LangWatchQL view reads
+         through it yet (langwatch-saas#7387), so the render proceeds with the
+         bridge omitted entirely (no CLICKHOUSE_LWQL_PG_HOST rendered). Surfaced
+         loudly via NOTES.txt and the langwatch.io/lwql-postgres-bridge annotation
+         on the app Deployment (langwatch.lwql.postgresBridgeDisabled) rather than
+         failing silently or failing the render.
+
+       - EXTERNAL PostgreSQL, host empty but .database/.user/.passwordSecretKey
+         were changed from their defaults: that is a PARTIAL configuration, not a
+         deliberate disable — refuse the render, since it looks like an operator
+         started configuring an external bridge and forgot the host.
 
        - CHART-MANAGED PostgreSQL: the bridge reads the app's own database, so its
          database name must equal postgresql.auth.database. Helm cannot derive one
@@ -496,7 +504,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- $bridge := ($chLwql.postgres | default dict) }}
   {{- if not .Values.postgresql.chartManaged }}
     {{- if empty $bridge.host }}
-      {{- $errors = append $errors "clickhouse.lwqlAccessModel.postgres.host is required when postgresql.chartManaged=false and LangWatchQL is enabled: the ClickHouse->PostgreSQL bridge (the lwql_postgres named collection) cannot reach an external PostgreSQL without it, and a blank host silently targets the non-existent in-cluster <release>-postgresql Service. Set clickhouse.lwqlAccessModel.postgres.host, .database and .user to your external PostgreSQL." }}
+      {{- $bridgeDb := $bridge.database | default "langwatch" }}
+      {{- $bridgeUser := $bridge.user | default "lwql_ro" }}
+      {{- $bridgePwKey := $bridge.passwordSecretKey | default "lwql_pg_password" }}
+      {{- if or (ne $bridgeDb "langwatch") (ne $bridgeUser "lwql_ro") (ne $bridgePwKey "lwql_pg_password") }}
+        {{- $errors = append $errors "clickhouse.lwqlAccessModel.postgres.host is empty but .database, .user or .passwordSecretKey was changed from its default — that looks like a partial external-PostgreSQL bridge configuration, not a deliberate disable. Set clickhouse.lwqlAccessModel.postgres.host too, or remove the other overrides to leave the bridge disabled (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387)." }}
+      {{- end }}
     {{- end }}
   {{- else }}
     {{- $bridgeDb := $bridge.database | default "langwatch" }}
@@ -696,6 +709,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{- end }}
+
+{{/* True ("true") when chart-managed ClickHouse + LWQL enabled + external
+     PostgreSQL leaves the lwql_postgres bridge host cancelled to "" — i.e. the
+     bridge is deliberately disabled rather than failing the render (no shipped
+     LangWatchQL view reads through it yet, langwatch-saas#7387). Shared by
+     NOTES.txt and the app Deployment's annotation so the condition is surfaced
+     loudly instead of silently. */}}
+{{- define "langwatch.lwql.postgresBridgeDisabled" -}}
+{{- $chLwql := (.Values.clickhouse.lwqlAccessModel | default dict) }}
+{{- if and .Values.lwql.enabled .Values.clickhouse.chartManaged $chLwql.enabled (not .Values.postgresql.chartManaged) }}
+  {{- $bridge := ($chLwql.postgres | default dict) }}
+  {{- if empty $bridge.host }}true{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}

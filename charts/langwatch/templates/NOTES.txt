@@ -370,6 +370,16 @@ With autogen.enabled=true the chart generates them; with autogen off you
 pre-create that Secret yourself — Section 7 lists the exact Secret name and
 keys. The application does NOT issue that DDL (one owner per entity name), and
 still creates the views, engine tables and key-map rows it must.
+{{- if eq (include "langwatch.lwql.postgresBridgeDisabled" .) "true" }}
+
+⚠ LangWatchQL Postgres bridge disabled: postgresql.chartManaged=false and
+clickhouse.lwqlAccessModel.postgres.host is unset, so the lwql_postgres named
+collection has no external PostgreSQL to dial. Postgres-resident LangWatchQL
+datasets stay unavailable until you set clickhouse.lwqlAccessModel.postgres.host
+(and .database/.user if they differ from the lwql_ro reader). Nothing else is
+affected today — no shipped LangWatchQL view reads through this bridge yet
+(langwatch-saas#7387).
+{{- end }}
 {{- else }}
 Your ClickHouse is external, so the chart cannot render config into it: the app
 self-provisions the LangWatchQL backend on every boot — a restricted identity,
