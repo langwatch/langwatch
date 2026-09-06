@@ -123,6 +123,15 @@ vi.mock("~/utils/api", () => ({
     },
   },
   api: {
+    onboarding: {
+      attachConversation: {
+        useMutation: () => ({
+          mutate: () => undefined,
+          mutateAsync: () => Promise.resolve(),
+          isPending: false,
+        }),
+      },
+    },
     useUtils: () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },

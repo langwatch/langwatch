@@ -58,6 +58,7 @@ import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { readHandledError, showErrorToast } from "~/features/errors";
 import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
+import { useGuidedTourStore } from "~/features/guided-onboarding/tour/guidedTourStore";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -184,6 +185,7 @@ import {
   ConversationSkeleton,
   skeletonMessageCount,
 } from "./ConversationSkeleton";
+import { GuidedTourCard } from "./derived-cards/GuidedTourCard";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { EmptyState } from "./EmptyState";
@@ -673,6 +675,11 @@ function LangyPanel({
   // opens itself and auto-sends it (see the pendingPrompt effect below).
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
   const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
+  // The guided tour runs before its kickoff message exists. While it does,
+  // and while the kickoff it queued waits to be sent, the panel shows the
+  // tour card in place of the empty state, so the row is there for the
+  // whole tour and the kickoff message takes over without a flash.
+  const guidedTourRunning = useGuidedTourStore((s) => s.running);
   const consumePendingKickoff = useLangyStore((s) => s.consumePendingKickoff);
   const consumePendingPrompt = useLangyStore((s) => s.consumePendingPrompt);
   const appliedOutcomes = useLangyStore((s) => s.appliedOutcomes);
@@ -3558,6 +3565,20 @@ function LangyPanel({
                           <ConversationSkeleton
                             count={skeletonMessageCount(restoringMessageCount)}
                             dense={!floating}
+                          />
+                        </VStack>
+                      ) : isEmpty && (guidedTourRunning || pendingKickoff) ? (
+                        // The tour card, before the kickoff message exists:
+                        // in progress while the tour runs, settled once the
+                        // tour ended and the kickoff is only waiting to send.
+                        <VStack
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <GuidedTourCard
+                            kickoff={pendingKickoff ?? null}
+                            organizationId={organizationId ?? null}
                           />
                         </VStack>
                       ) : isEmpty && !pendingPrompt ? (

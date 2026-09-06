@@ -138,6 +138,21 @@ Feature: Langy guides the first setup after sign-up
       And it cannot be expanded
 
     @integration
+    Scenario: The panel shows the tour in progress before the kickoff exists
+      Given the guided tour is running
+      And the guided conversation does not exist yet
+      When the panel renders
+      Then it shows the tour card reading "Doing guided tour"
+      And it does not show the empty state's invitation
+
+    @integration
+    Scenario: The tour card settles into the kickoff message without a flash
+      Given the tour has just ended and the kickoff is queued
+      When the kickoff message lands in the conversation
+      Then the panel shows exactly one tour card
+      And the empty state's invitation never showed in between
+
+    @integration
     Scenario: The card settles once the tour is over
       Given the guided tour is not running
       When the tour card renders

@@ -30,7 +30,14 @@ export function GuidedTourCard({
   kickoff,
   organizationId,
 }: {
-  kickoff: GuidedKickoffInput;
+  /**
+   * What the takeover collected. Null while the tour is still running and
+   * the kickoff message does not exist yet: the panel then shows this card
+   * in its in-progress state in place of the empty state, so the row is
+   * visible for the whole tour and the real kickoff message takes over
+   * without a flash.
+   */
+  kickoff: GuidedKickoffInput | null;
   /** The organization the replay is recorded on. Absent = replay only. */
   organizationId?: string | null;
 }) {
@@ -40,13 +47,14 @@ export function GuidedTourCard({
   const tone = CARD_TAXONOMY.activity;
 
   const replay = () => {
+    if (!kickoff) return;
     useGuidedTourStore.getState().replay(kickoff.path);
     if (organizationId) {
       recordTour.mutate({ organizationId, status: "replayed" });
     }
   };
 
-  const expanded = open && !running;
+  const expanded = open && !running && kickoff !== null;
 
   return (
     <Box
@@ -98,7 +106,7 @@ export function GuidedTourCard({
           </Box>
         )}
       </chakra.button>
-      {expanded ? (
+      {expanded && kickoff ? (
         <Box
           borderTopWidth="1px"
           borderColor="border.muted"
