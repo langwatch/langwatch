@@ -3,6 +3,7 @@
  * Agent Testing release flag is on for the project.
  * @see specs/suites/new-simulations-callout.feature
  */
+import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { useSyncExternalStore } from "react";
 
 const STORAGE_PREFIX = "langwatch:prefer-legacy-simulations:v1:";
@@ -11,33 +12,20 @@ const CHANGE_EVENT = "langwatch:prefer-legacy-simulations-changed";
 const storageKey = (projectId: string) => `${STORAGE_PREFIX}${projectId}`;
 
 export function isLegacySimulationsPreferred(projectId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(storageKey(projectId)) === "1";
-  } catch {
-    return false;
-  }
+  return readUiStorage(storageKey(projectId)) === "1";
 }
 
 export function preferLegacySimulations(projectId: string): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(storageKey(projectId), "1");
-  } catch {
-    // A blocked localStorage still gets the navigation, just not the
-    // persistent preference.
-  }
+  // A device that will not remember still gets the navigation; the port
+  // already answers a refusal as "nothing remembered".
+  writeUiStorage(storageKey(projectId), "1");
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
 export function clearLegacySimulationsPreference(projectId: string): void {
   if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(storageKey(projectId));
-  } catch {
-    // A blocked localStorage still gets the navigation, just not the
-    // cleared preference.
-  }
+  removeUiStorage(storageKey(projectId));
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 

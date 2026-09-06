@@ -23,6 +23,7 @@ import {
 } from "@langwatch/navigation-web/surfaces/command-bar";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web/surfaces/langy-mark";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import { useLegacySimulationsPreference } from "@langwatch/scenario-web/surfaces/simulations-preference";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
@@ -220,6 +221,11 @@ export function NavigationHostSection({
 
   const deployment = useMemo(readDeployment, []);
 
+  // THE MENU'S ONE SCENARIO-OWNED READING. The preference is the scenario
+  // family's and the Test section the navigation package's; neither web package
+  // may name the other, so the application reads it and answers the port.
+  const prefersPreviousSimulationsScreens = useLegacySimulationsPreference(project?.id);
+
   /** The assistant, as the palette's hand-off needs it; `null` is the gate — see the two constants above. */
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
@@ -358,6 +364,7 @@ export function NavigationHostSection({
       langy: () => langy,
       hasPermission: (permission) => session.hasPermission(permission),
       featureFlag: (flag) => readNavigationFeatureFlag({ answer: session.featureFlag(flag) }),
+      prefersPreviousSimulationsScreens: () => prefersPreviousSimulationsScreens,
       replace: (to) => navigation.replace(to),
       navigate: (to) => navigation.navigate(to),
       back: () => navigation.back(),
@@ -399,6 +406,7 @@ export function NavigationHostSection({
       setDocumentTitle,
       commandBarAnswer,
       langy,
+      prefersPreviousSimulationsScreens,
       openDrawerByName,
       accountMenu,
     ],

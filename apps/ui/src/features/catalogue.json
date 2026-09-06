@@ -255,6 +255,7 @@
           "@langwatch/langy-web/surfaces/langy-mark",
           "@langwatch/langy-web/surfaces/langy-store",
           "@langwatch/navigation-web/surfaces/command-bar",
+          "@langwatch/scenario-web/surfaces/simulations-preference",
           "@langwatch/trace-web/surfaces/presence-menu-item"
         ]
       }

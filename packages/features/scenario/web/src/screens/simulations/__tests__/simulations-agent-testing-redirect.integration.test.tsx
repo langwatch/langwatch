@@ -8,6 +8,7 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host";
 
 const state = vi.hoisted(() => ({
@@ -92,6 +93,7 @@ async function renderRoute() {
 
 describe("the simulations address", () => {
   beforeEach(() => {
+    setUiStorage(new BrowserUiStorage());
     state.flagEnabled = false;
     state.flagLoading = false;
     state.replace.mockReset();

@@ -18,6 +18,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./surfaces/simulations-preference": {
+      "types": "./src/surfaces/simulations-preference/index.ts",
+      "default": "./src/surfaces/simulations-preference/index.ts"
+    },
     "./screens/simulations": {
       "types": "./src/screens/simulations/index.ts",
       "default": "./src/screens/simulations/index.ts"

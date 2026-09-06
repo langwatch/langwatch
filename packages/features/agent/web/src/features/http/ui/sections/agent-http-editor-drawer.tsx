@@ -83,6 +83,7 @@ function buildHttpConfig(input: {
   method: HttpMethod;
   bodyTemplate: string;
   outputPath: string;
+  sessionPath: string;
   headers: HttpHeader[];
   auth: HttpAuth | undefined;
   scenarioMappings: Record<string, AgentInputBinding>;
@@ -94,6 +95,7 @@ function buildHttpConfig(input: {
     method: input.method,
     bodyTemplate: input.bodyTemplate,
     outputPath: input.outputPath,
+    sessionPath: input.sessionPath.trim() || void 0,
     headers: input.headers.length > 0 ? input.headers : void 0,
     auth: input.auth?.type === "none" ? void 0 : input.auth,
     scenarioMappings:
@@ -119,6 +121,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [method, setMethod] = useState<HttpMethod>(DEFAULT_METHOD);
   const [bodyTemplate, setBodyTemplate] = useState(DEFAULT_BODY_TEMPLATE);
   const [outputPath, setOutputPath] = useState(DEFAULT_OUTPUT_PATH);
+  const [sessionPath, setSessionPath] = useState("");
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
   const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -168,6 +171,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setMethod(config.method ?? DEFAULT_METHOD);
       setBodyTemplate(config.bodyTemplate || DEFAULT_BODY_TEMPLATE);
       setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
+      setSessionPath(config.sessionPath ?? "");
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
       setScenarioMappings(initialScenarioMappings);
@@ -182,6 +186,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setMethod(DEFAULT_METHOD);
       setBodyTemplate(DEFAULT_BODY_TEMPLATE);
       setOutputPath(DEFAULT_OUTPUT_PATH);
+      setSessionPath("");
       setHeaders([]);
       setAuth({ type: "none" });
       setScenarioMappings(defaultScenarioMappings);
@@ -249,6 +254,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       method,
       bodyTemplate,
       outputPath,
+      sessionPath,
       headers,
       auth,
       scenarioMappings,
@@ -281,6 +287,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     outputPath,
     props,
     scenarioMappings,
+    sessionPath,
     url,
   ]);
 
@@ -395,6 +402,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 outputPath={outputPath}
                 onOutputPathChange={(value) => {
                   setOutputPath(value);
+                  markDirty();
+                }}
+                sessionPath={sessionPath}
+                onSessionPathChange={(value) => {
+                  setSessionPath(value);
                   markDirty();
                 }}
                 variables={variables}

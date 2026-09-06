@@ -45,6 +45,8 @@ export type StubNavigationReadings = {
   rememberedProjectSlug?: string;
   permissions?: readonly string[];
   flags?: Readonly<Record<string, NavigationFlagReading>>;
+  /** The previous-simulations-screens choice, as the scenario family records it. */
+  prefersPreviousSimulationsScreens?: boolean;
   waiting?: ReactNode;
   notFound?: ReactNode;
   pathname?: string;
@@ -149,6 +151,10 @@ export class StubNavigationHost extends NavigationHostPort {
 
   featureFlag(flag: string): NavigationFlagReading {
     return this.readings.flags?.[flag] ?? { enabled: false, isLoading: false };
+  }
+
+  prefersPreviousSimulationsScreens(): boolean {
+    return this.readings.prefersPreviousSimulationsScreens ?? false;
   }
 
   waiting(): ReactNode {

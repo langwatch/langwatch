@@ -18,7 +18,13 @@ vi.mock("../../../behavior/navigation-api", () => ({
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
-function renderMenu({ agentTestingEnabled }: { agentTestingEnabled: boolean }) {
+function renderMenu({
+  agentTestingEnabled,
+  prefersPreviousSimulationsScreens = false,
+}: {
+  agentTestingEnabled: boolean;
+  prefersPreviousSimulationsScreens?: boolean;
+}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <WithStubNavigationHost
@@ -26,6 +32,7 @@ function renderMenu({ agentTestingEnabled }: { agentTestingEnabled: boolean }) {
           project: PROJECT,
           pathname: "/[project]",
           permissions: ["scenarios:view"],
+          prefersPreviousSimulationsScreens,
           flags: {
             release_ui_agent_testing_v2_enabled: {
               enabled: agentTestingEnabled,
@@ -66,6 +73,16 @@ describe("the Agent Testing destination in the main menu", () => {
       expect(simulationsGroupTrigger()).toBeNull();
       expect(linkNamed("Scenarios")).toBeNull();
       expect(linkNamed("Runs")).toBeNull();
+    });
+  });
+
+  describe("given the flag is on and the previous-screens preference is recorded", () => {
+    /** @scenario "The previous-screens preference restores the Simulations menu" */
+    it("offers the Simulations group instead of Agent Testing", () => {
+      renderMenu({ agentTestingEnabled: true, prefersPreviousSimulationsScreens: true });
+
+      expect(simulationsGroupTrigger()).toBeInTheDocument();
+      expect(linkNamed("Agent Testing")).toBeNull();
     });
   });
 

@@ -8,6 +8,7 @@ import { BodyTemplateEditor } from "../elements/http-body-template-editor";
 import { HeadersConfigSection } from "../elements/http-headers-config-section";
 import { HttpTestPanel } from "./http-test-panel";
 import { OutputPathInput } from "../elements/http-output-path-input";
+import { SessionPathInput } from "../elements/http-session-path-input";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation";
 import type { HttpTestResult } from "../../model/http-test.types";
@@ -20,6 +21,8 @@ export type AgentHttpEditorTabsProps = {
   onBodyTemplateChange: (value: string) => void;
   outputPath: string;
   onOutputPathChange: (value: string) => void;
+  sessionPath: string;
+  onSessionPathChange: (value: string) => void;
   variables: Variable[];
   scenarioMappings: Record<string, FieldMapping>;
   onScenarioMappingChange: (identifier: string, mapping: FieldMapping | undefined) => void;
@@ -47,6 +50,8 @@ export function AgentHttpEditorTabs({
   onBodyTemplateChange,
   outputPath,
   onOutputPathChange,
+  sessionPath,
+  onSessionPathChange,
   variables,
   scenarioMappings,
   onScenarioMappingChange,
@@ -96,6 +101,7 @@ export function AgentHttpEditorTabs({
             <Field.Label>Output Path (JSONPath)</Field.Label>
             <OutputPathInput value={outputPath} onChange={onOutputPathChange} />
           </Field.Root>
+          <SessionPathInput value={sessionPath} onChange={onSessionPathChange} />
           {presentation.renderScenarioMappings({
             inputs: variables,
             mappings: scenarioMappings,

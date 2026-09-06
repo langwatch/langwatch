@@ -31,6 +31,7 @@ vi.mock("../../../../behavior/use-feature-flag", () => ({
 }));
 
 import posthog from "posthog-js";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
 import { ReturnToNewSimulationsBanner } from "../../../sections/suites/return-to-new-simulations-banner";
 
@@ -45,6 +46,7 @@ const bannerLink = () => screen.getByRole("link", { name: /Go to the new simulat
 
 describe("<ReturnToNewSimulationsBanner />", () => {
   beforeEach(() => {
+    setUiStorage(new BrowserUiStorage());
     localStorage.clear();
     vi.clearAllMocks();
     featureFlagState.enabled = true;

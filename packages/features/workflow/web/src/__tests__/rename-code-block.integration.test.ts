@@ -1,8 +1,13 @@
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
-import { fieldSchema } from "@langwatch/workflow-contract";
-import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store";
+import { fieldSchema, nameToId } from "@langwatch/workflow-contract";
+import {
+  getWorkflow,
+  serializeWorkflow,
+  store as storeCreator,
+  type WorkflowStore,
+} from "../behavior/workflow-store";
 
 function makeCodeNode({
   id,
@@ -146,6 +151,35 @@ describe("rename code blocks", () => {
       expect(state.edges).toHaveLength(1);
       expect(state.edges[0]!.source).toBe("data_processor");
       expect(state.edges[0]!.target).toBe("nodeB");
+    });
+  });
+
+  describe("when the renamed workflow is saved and read back", () => {
+    /** @scenario "Rename persists on workflow save" */
+    it("reloads the code block under the name the rename gave it", () => {
+      const nodes = [
+        makeCodeNode({
+          id: "code1",
+          name: "code1",
+          code: 'class Code1(dspy.Module):\n    def forward(self, input: str):\n        return {"output": input}',
+        }),
+      ];
+      testStore.setState({ nodes, edges: [] });
+
+      const renamedId = nameToId("Custom Name");
+      testStore.getState().setNode({ id: "code1", data: { name: "Custom Name" } }, renamedId);
+
+      // What the save mutation sends, through the wire it sends it on.
+      const saved = JSON.parse(
+        JSON.stringify(serializeWorkflow(getWorkflow(testStore.getState()))),
+      ) as { nodes: Node[]; edges: Edge[] };
+
+      const reloaded = createStore<WorkflowStore>(storeCreator);
+      reloaded.getState().setWorkflow(saved);
+
+      const node = reloaded.getState().nodes.find((candidate) => candidate.id === renamedId);
+      expect(node?.data.name).toBe("Custom Name");
+      expect(reloaded.getState().nodes.find((candidate) => candidate.id === "code1")).toBeFalsy();
     });
   });
 

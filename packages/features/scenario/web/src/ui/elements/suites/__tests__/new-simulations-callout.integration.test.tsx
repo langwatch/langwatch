@@ -25,6 +25,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 }));
 
 import posthog from "posthog-js";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
 import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout";
 
@@ -43,6 +44,7 @@ const bodyLink = () =>
 
 describe("<NewSimulationsCallout />", () => {
   beforeEach(() => {
+    setUiStorage(new BrowserUiStorage());
     localStorage.clear();
     vi.clearAllMocks();
     for (const key of Object.keys(routerQuery)) delete routerQuery[key];
