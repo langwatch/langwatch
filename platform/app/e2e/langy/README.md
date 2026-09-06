@@ -198,7 +198,7 @@ never touched.
 
 ## The guided onboarding (guided-onboarding-*.scenario.test.ts)
 
-Nine files cover `specs/langy/langy-guided-onboarding.feature`, the
+Eight files cover `specs/langy/langy-guided-onboarding.feature`, the
 conversation Langy runs after the guided sign-up: the kickoff message the tour
 sends when it ends, and each path's script from the `guided-onboarding` skill.
 
@@ -215,27 +215,39 @@ sends when it ends, and each path's script from the `guided-onboarding` skill.
 
 `guided-onboarding-fixture.ts` is what they share:
 
-- `seedGuidedOrganization` creates a fresh organization in the guided variant
-  (the picks, the current path, the tour outcome) with one project and the
-  OpenAI provider attached at organization scope as the Langy model, then
-  points the whole suite at that project with `useProject` (config.ts keeps
-  the project id as a live binding for exactly this). Every file seeds its
-  own organization, so one run's scenarios and keys never change what the next
-  run's kickoff finds.
+- `seedGuidedOrganization` signs a fresh account up through the sign-up
+  endpoint and runs the rest of the process as it (`useAccount` in config.ts,
+  the browser QA pass included), then creates a fresh organization in the
+  guided variant (the picks, the current path, the tour outcome) with one
+  project and the OpenAI provider attached at organization scope as the Langy
+  model, and points the whole suite at that project with `useProject`. Every
+  file seeds its own account and organization: one run's scenarios and keys
+  never change what the next run's kickoff finds, and no other session signed
+  in on a shared account can land on the organization and send its kickoff
+  first.
 - `queueGuidedKickoff` builds the kickoff parts the panel sends (the typed
   `guided-onboarding-kickoff` part beside the text brief, from the app's own
   `kickoff.ts`) and hands them to `adapter.queueNextTurn`, so the next
   `scenario.agent()` sends the kickoff through the same create or continue
-  mutation as any message. `attachKickoffConversation` then records the
-  conversation on the organization, which is what the panel does once the
-  transport names it.
+  mutation as any message. The conversation is recorded on the organization
+  the moment the adapter learns its id (`onConversationCreated`), the way the
+  panel does once the transport names it; `attachKickoffConversation` reads
+  it back for the assertions.
+- `assertPathCompletedAfterSkill` proves on the stream's tool frames (the
+  adapter's and the watcher's `toolEvents`, merged by `mergeToolEvents`) that
+  `complete-path` ran as its own step: no other call of its turn open when it
+  started, none started before it settled, after the skill call when the
+  skill reached the model as one, and after the commands the path has to
+  finish first (the suite run on the llmops path).
 - `GUIDED_LINES` and `GUIDED_OPTIONS` are the skill's verbatim lines and
   option labels; `saysVerbatim` compares them allowing for curly quotes and
   wrapping. The judge gets the same lines as criteria, but every verbatim
   line is also asserted structurally on the stored text, because a judge will
   accept a paraphrase.
 - The reads: `readGuidedState`, `listProjectScenarios`, `listProjectSuites`,
-  `listVirtualKeys`, `conversationTitle`, `conversationMessages`.
+  `listVirtualKeys`, `conversationTitle`, `conversationMessages`,
+  `gatewayPublicUrl` (the instance's own gateway, which the gateway path's
+  snippet has to name).
 
 The watcher answers the `question` cards (the proposal, the governance
 sources) through an async picker, so a file can read the world before it
