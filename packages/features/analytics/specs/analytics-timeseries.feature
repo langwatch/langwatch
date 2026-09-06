@@ -57,3 +57,23 @@ Feature: Analytics timeseries service
       When an Evaluation projection writes or reads evaluation analytics
       Then Analytics does not resolve a ClickHouse client
       And the read returns no row
+
+  Rule: A period-over-period read compares against the window immediately before
+
+    @unit
+    Scenario: The comparison window is the same length as the window it precedes
+      Given a requested window of a whole number of days
+      When the comparison window is taken
+      Then it begins exactly that many days before the requested window, counting the days the calendar actually has
+
+    @unit
+    Scenario: A comparison window walks back across a year end
+      Given a requested window early in January
+      When the comparison window is taken
+      Then it begins in December of the year before
+
+    @unit
+    Scenario: A comparison window is always a whole number of days
+      Given a datapoint step shorter than a day
+      When the comparison window is taken, including for a window handed over end first
+      Then it walks back a whole day rather than failing on a fraction of one

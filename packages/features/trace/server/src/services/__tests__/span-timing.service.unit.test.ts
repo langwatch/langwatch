@@ -89,6 +89,7 @@ describe("SpanTimingService", () => {
 
   describe("accumulateTiming()", () => {
     describe("when processing a single real span", () => {
+      /** @scenario "A single span sets the trace start and duration" */
       it("computes timing from the span timestamps", () => {
         const result = service.accumulateTiming({
           state: makeState(),
@@ -101,6 +102,7 @@ describe("SpanTimingService", () => {
     });
 
     describe("when processing multiple sequential spans", () => {
+      /** @scenario "Several spans give the wall clock from earliest start to latest end" */
       it("computes wall-clock time from earliest start to latest end", () => {
         let state = makeState();
 
@@ -124,6 +126,7 @@ describe("SpanTimingService", () => {
     });
 
     describe("when a langwatch.track_event span is present", () => {
+      /** @scenario "A synthetic event span does not stretch the trace" */
       it("excludes synthetic span from timing calculation", () => {
         let state = makeState();
 
@@ -149,6 +152,7 @@ describe("SpanTimingService", () => {
         expect(result.totalDurationMs).toBe(1600);
       });
 
+      /** @scenario "A synthetic event span does not stretch the trace" */
       it("does not inflate timing when track_event is the only span", () => {
         const result = service.accumulateTiming({
           state: makeState(),
@@ -165,6 +169,7 @@ describe("SpanTimingService", () => {
     });
 
     describe("when span has invalid timestamps", () => {
+      /** @scenario "A span with unusable timestamps leaves the trace timing alone" */
       it("returns unchanged state", () => {
         const state = makeState({ occurredAt: 1000, totalDurationMs: 500 });
 
@@ -175,6 +180,79 @@ describe("SpanTimingService", () => {
 
         expect(result.occurredAt).toBe(1000);
         expect(result.totalDurationMs).toBe(500);
+      });
+    });
+    describe("when a span arrives out of order, starting before the trace did", () => {
+      /** @scenario "Several spans give the wall clock from earliest start to latest end" */
+      it("pulls the start back and keeps the end the later span already set", () => {
+        const state = makeState({ occurredAt: 2000, totalDurationMs: 500 });
+
+        const result = service.accumulateTiming({
+          state,
+          span: makeSpan({ startTimeUnixMs: 1000, endTimeUnixMs: 1200 }),
+        });
+
+        expect(result.occurredAt).toBe(1000);
+        expect(result.totalDurationMs).toBe(1500);
+      });
+    });
+
+    describe("when a span carries an infinite or not-a-number time", () => {
+      /** @scenario "A span with unusable timestamps leaves the trace timing alone" */
+      it.each([
+        ["infinite end", 1000, Number.POSITIVE_INFINITY],
+        ["not-a-number end", 1000, Number.NaN],
+        ["not-a-number start", Number.NaN, 2000],
+        ["negative start", -1000, 2000],
+      ])("leaves the trace timing alone for a span with an %s", (_label, start, end) => {
+        const state = makeState({ occurredAt: 1000, totalDurationMs: 500 });
+
+        const result = service.accumulateTiming({
+          state,
+          span: makeSpan({ startTimeUnixMs: start, endTimeUnixMs: end }),
+        });
+
+        expect(result.occurredAt).toBe(1000);
+        expect(result.totalDurationMs).toBe(500);
+      });
+    });
+
+    describe("when a span ends before it starts", () => {
+      /** @scenario "A span that ends before it starts does not give the trace a negative duration" */
+      it("reports no duration rather than a negative one", () => {
+        const result = service.accumulateTiming({
+          state: makeState(),
+          span: makeSpan({ startTimeUnixMs: 5000, endTimeUnixMs: 4000 }),
+        });
+
+        expect(result.occurredAt).toBe(5000);
+        expect(result.totalDurationMs).toBe(0);
+      });
+
+      /** @scenario "A span that ends before it starts does not give the trace a negative duration" */
+      it("does not shorten a trace a real span had already timed", () => {
+        const state = makeState({ occurredAt: 1000, totalDurationMs: 4000 });
+
+        const result = service.accumulateTiming({
+          state,
+          span: makeSpan({ startTimeUnixMs: 500, endTimeUnixMs: 400 }),
+        });
+
+        expect(result.occurredAt).toBe(500);
+        expect(result.totalDurationMs).toBe(4500);
+      });
+    });
+
+    describe("when a span starts and ends at the same instant", () => {
+      /** @scenario "A span that starts and ends at the same instant lasts no time" */
+      it("gives the trace a start and no duration", () => {
+        const result = service.accumulateTiming({
+          state: makeState(),
+          span: makeSpan({ startTimeUnixMs: 5000, endTimeUnixMs: 5000 }),
+        });
+
+        expect(result.occurredAt).toBe(5000);
+        expect(result.totalDurationMs).toBe(0);
       });
     });
   });

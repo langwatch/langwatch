@@ -106,3 +106,41 @@ Feature: Date and time arithmetic runs on Temporal
       Given a file that imports date-fns
       When the architecture lint runs
       Then it reports the import and says to use @langwatch/time instead
+
+  Rule: Every form a moment arrives in reads as the same instant
+
+    Dates no longer cross the wire as dates: the response carries an ISO string
+    and the caller may hold that, an epoch millisecond count, a Date or a zoned
+    value. All four name one instant, and arithmetic over any of them agrees.
+
+    @unit
+    Scenario: One moment reads the same whichever wire form carries it
+      Given one instant expressed as a Date, an epoch millisecond count, an ISO string and a zoned value
+      When each is read
+      Then all four give the same epoch millisecond count, and reading one in two zones moves only the wall clock
+
+    @unit
+    Scenario: A date serialised as an ISO string subtracts like a Date
+      Given two moments that crossed the wire as ISO strings
+      When they are subtracted and compared
+      Then the answers match the ones the Dates they were serialised from give
+
+    @unit
+    Scenario: A zone-less ISO string is read as the runtime reads it
+      Given an ISO string carrying no zone suffix
+      When it is read
+      Then it names the moment the platform's own date parsing names
+
+    @unit
+    Scenario: An unreadable moment fails loudly rather than landing at the epoch
+      Given a value that names no moment
+      When a calculation is asked for over it
+      Then the call fails rather than answering as though the moment were 1970
+
+  Rule: Elapsed time and wall-clock time are told apart across a clock change
+
+    @unit
+    Scenario: Relative wording counts the wall clock across a clock change
+      Given a span crossing the spring change in Europe/Amsterdam and the autumn change in America/New_York
+      When elapsed milliseconds and wall-clock seconds are both taken
+      Then the elapsed count includes the hour the clock skipped or repeated and the wall-clock count does not

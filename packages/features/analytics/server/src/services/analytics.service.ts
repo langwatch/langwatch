@@ -45,7 +45,10 @@ function currentAndPreviousDates(
   readonly endDate: Date;
   readonly previousPeriodStartDate: Date;
 } {
-  const periodInDays = period === undefined ? 1 : period / MINUTES_PER_DAY;
+  // Whole days, always: the scale arrives in minutes and a sub-day scale is a
+  // fraction of one, which Temporal refuses outright rather than truncating the
+  // way the retired library did.
+  const periodInDays = period === undefined ? 1 : Math.ceil(period / MINUTES_PER_DAY);
   const days = Math.max(periodInDays, differenceInCalendarDays(endDate, startDate) + 1);
   const previousPeriodStartDate = addDays(startDate, -days);
 

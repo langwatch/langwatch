@@ -85,3 +85,46 @@ Feature: SDK timing and metrics canonicalisation
       And the span also carries an explicit total cost
       When the span cost is computed
       Then the computed cost uses the per-token rates, not the explicit total
+
+  Rule: Trace wall-clock time is accumulated from the spans, never below zero
+
+    A trace's duration is the wall clock from its earliest span start to its
+    latest span end. The spans arrive from a customer's own machines, so their
+    clocks disagree: a span can carry an end that precedes its start, and spans
+    arrive out of order. Neither may put a negative duration on the trace.
+
+    @unit
+    Scenario: A single span sets the trace start and duration
+      Given a trace with no timing yet
+      When one span with a start and an end is folded
+      Then the trace starts at the span start and lasts the span's own duration
+
+    @unit
+    Scenario: Several spans give the wall clock from earliest start to latest end
+      Given a trace with timing from one span
+      When further spans are folded
+      Then the duration spans the earliest start to the latest end, whatever order they arrived in
+
+    @unit
+    Scenario: A synthetic event span does not stretch the trace
+      Given a trace with timing from a real span
+      When a langwatch.track_event span outside that window is folded
+      Then the trace timing is unchanged
+
+    @unit
+    Scenario: A span with unusable timestamps leaves the trace timing alone
+      Given a trace with timing from a real span
+      When a span carrying a missing, zero, negative, infinite or not-a-number time is folded
+      Then the trace timing is unchanged
+
+    @unit
+    Scenario: A span that ends before it starts does not give the trace a negative duration
+      Given a span whose end precedes its start, from a machine whose clock ran backwards
+      When it is folded into a trace
+      Then the trace duration is zero rather than negative
+
+    @unit
+    Scenario: A span that starts and ends at the same instant lasts no time
+      Given a span whose start and end are the same instant
+      When it is folded into a trace
+      Then the trace duration is zero

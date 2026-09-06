@@ -36,7 +36,10 @@ export class SpanTimingService {
         ? Math.min(state.occurredAt, span.startTimeUnixMs)
         : span.startTimeUnixMs;
     const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
-    const totalDurationMs = Math.max(currentEnd, span.endTimeUnixMs) - occurredAt;
+    // Never negative: the spans come from the customer's own machines, so a
+    // clock that ran backwards mid-span sends an end before its start, and a
+    // negative trace duration is neither renderable nor aggregatable.
+    const totalDurationMs = Math.max(0, Math.max(currentEnd, span.endTimeUnixMs) - occurredAt);
 
     return { occurredAt, totalDurationMs };
   }

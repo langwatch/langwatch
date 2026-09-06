@@ -150,6 +150,22 @@ describe("AnalyticsService", () => {
     expect(repository.lastQuery?.maxResultRows).toBe(250);
   });
 
+  /** @scenario "A comparison window is always a whole number of days" */
+  it("reads a window handed over end first without failing on a fractional day", async () => {
+    const repository = new RecordingRepository();
+    const service = createService(repository);
+    const startDate = new Date("2026-01-12T00:00:00.000Z");
+    const endDate = new Date("2026-01-10T00:00:00.000Z");
+
+    await service.getTimeseries(
+      input({ startDate: startDate.getTime(), endDate: endDate.getTime(), timeScale: 60 }),
+    );
+
+    expect(repository.lastQuery?.previousPeriodStartDate).toEqual(
+      new Date("2026-01-11T00:00:00.000Z"),
+    );
+  });
+
   it("uses the legacy local-calendar date calculation around a UTC date boundary", async () => {
     const repository = new RecordingRepository();
     const service = createService(repository);

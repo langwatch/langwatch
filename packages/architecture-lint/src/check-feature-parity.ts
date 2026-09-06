@@ -556,7 +556,6 @@ const LEGACY_INERT: string[] = [
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",
   "specs/trace-processing/oversized-trace-lighter-processing.feature",
-  "packages/features/trace/specs/sdk-timing-and-metrics-canonicalisation.feature",
   "specs/traces-v2/accessibility.feature",
   "specs/traces-v2/attribute-value-readability.feature",
   "specs/traces-v2/column-configuration.feature",

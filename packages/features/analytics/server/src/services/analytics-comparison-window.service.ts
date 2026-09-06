@@ -31,7 +31,10 @@ export class AnalyticsComparisonWindowService {
   } {
     const startDate = new Date(input.startDate);
     const endDate = new Date(input.endDate);
-    const periodInDays = typeof period === "number" ? period / (24 * 60) : 1;
+    // Whole days, always: the step arrives in minutes and a sub-day step is a
+    // fraction of one, which Temporal refuses outright rather than truncating
+    // the way the retired library did.
+    const periodInDays = typeof period === "number" ? Math.ceil(period / (24 * 60)) : 1;
     const daysDifference = Math.max(periodInDays, getDaysDifference(startDate, endDate));
 
     return {

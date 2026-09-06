@@ -67,3 +67,26 @@ Feature: Trace span-tree read service
     When the viewer searches, cycles, or closes the find bar
     Then matching rows are indexed and highlighted without another trace request
     And the app retains only query, shortcut, and visual-skin composition
+
+  # The LLM-mode read hands a trace to a model rather than to a screen, so its
+  # three timestamps are rendered as a reader would say them. Recent times read
+  # as an interval; anything older than a day reads as a date, because
+  # "97 hours ago" tells a model nothing it can act on.
+
+  @unit
+  Scenario: A time inside the last day reads as an interval
+    Given a trace whose start is minutes old
+    When it is read in LLM mode
+    Then the start reads as an interval ending in "ago"
+
+  @unit
+  Scenario: A time older than a day reads as a date
+    Given a trace whose start is more than a day old
+    When it is read in LLM mode
+    Then the start reads as a day, month and time of day rather than as an interval
+
+  @unit
+  Scenario: A missing timestamp reads as nothing rather than as 1970
+    Given a trace carrying no insert or update time
+    When it is read in LLM mode
+    Then those times read as empty strings, not as dates at the epoch
