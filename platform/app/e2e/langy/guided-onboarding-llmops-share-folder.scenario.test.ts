@@ -187,6 +187,8 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                 terminal = await startShareControl({
                   repo,
                   label: "guided-llmops",
+                  // This conversation asked for the folder before the terminal started.
+                  clearOpenRequests: false,
                 });
                 await terminal.approve();
                 const conversationId = langy.state.conversationId ?? "";

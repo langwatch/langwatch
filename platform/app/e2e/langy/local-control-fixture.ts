@@ -620,12 +620,22 @@ export async function cancelOpenControlRequests(): Promise<void> {
 export async function startShareControl({
   repo,
   label,
+  clearOpenRequests = true,
 }: {
   repo: DemoRepo;
   label: string;
+  /**
+   * Whether to cancel the requests already open on the project first. The
+   * default suits scenarios that share one project, where a leftover from
+   * an earlier run would turn the command line into a picker. A scenario
+   * whose own conversation asked for the folder BEFORE the command line
+   * starts, on a project of its own, keeps that ask: it is the one the
+   * terminal is about to answer.
+   */
+  clearOpenRequests?: boolean;
 }): Promise<CliTerminal> {
   await buildCli();
-  await cancelOpenControlRequests();
+  if (clearOpenRequests) await cancelOpenControlRequests();
   const apiKey = await getCliApiKey();
   const sessionName = `langy-${label}-${Date.now().toString(36)}`;
   const configPath = path.join(repo.root, "..", `${sessionName}-config.json`);

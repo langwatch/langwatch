@@ -159,6 +159,8 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                 terminal = await startShareControl({
                   repo,
                   label: "guided-chat",
+                  // This conversation asked for the folder before the terminal started.
+                  clearOpenRequests: false,
                 });
                 await terminal.approve();
                 const conversationId = langy.state.conversationId ?? "";
