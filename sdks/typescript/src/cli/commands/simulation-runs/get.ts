@@ -9,6 +9,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
  * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;
@@ -106,7 +107,7 @@ export const getSimulationRunCommand = async (
   const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",

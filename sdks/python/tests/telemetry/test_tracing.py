@@ -119,7 +119,7 @@ def test_share_retries_on_transient_timeout(monkeypatch):
                 request=httpx.Request("POST", url),
             )
 
-    monkeypatch.setattr(httpx, "Client", lambda: _FakeClient())
+    monkeypatch.setattr("langwatch.telemetry.tracing.create_client", lambda **kwargs: _FakeClient())
     # Collapse tenacity's exponential backoff so the test is fast.
     import time as time_module
 
@@ -149,7 +149,7 @@ def test_share_gives_up_after_max_attempts(monkeypatch):
             call_count["n"] += 1
             raise httpx.ReadTimeout("read operation timed out")
 
-    monkeypatch.setattr(httpx, "Client", lambda: _FakeClient())
+    monkeypatch.setattr("langwatch.telemetry.tracing.create_client", lambda **kwargs: _FakeClient())
     import time as time_module
 
     monkeypatch.setattr(time_module, "sleep", lambda *a, **kw: None)
