@@ -36,6 +36,7 @@ import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/ap
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
   allRegisteredRoutes,
@@ -366,6 +367,7 @@ export default async function execute() {
 
   console.log("Stamping per-operation security...");
   stampSecurityFromRegistry(mergedSpec as SpecShape);
+  normalizeExclusiveBounds(mergedSpec);
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),

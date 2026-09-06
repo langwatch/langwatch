@@ -322,8 +322,8 @@
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Billing\"",
-                "scenario update": "langwatch scenario update <id> --test-suite \"Billing\"",
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
+                "scenario update": "langwatch scenario update <id> --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
                 "scenario run": "langwatch scenario run <id> --target http:<agent-id> --note \"after the timeout fix\"",
                 "scenario delete": "langwatch scenario delete <id>",
                 "scenario version list": "langwatch scenario version list <id> -o json",
@@ -413,14 +413,16 @@
                 "test-suite list",
                 "test-suite create",
                 "test-suite get",
+                "test-suite update",
                 "test-suite rename",
                 "test-suite archive",
                 "test-suite run"
               ],
               "hints": {
                 "test-suite list": "langwatch test-suite list -o json",
-                "test-suite create": "langwatch test-suite create \"Refunds\"",
+                "test-suite create": "langwatch test-suite create \"Case lookups\" --field golden_sql:text --field table_schema:text --evaluator sql-query-equivalence --required",
                 "test-suite get": "langwatch test-suite get <id-or-name> -o json",
+                "test-suite update": "langwatch test-suite update <id-or-name> --field golden_sql:text --evaluator sql-query-equivalence --evaluator answer-quality-judge --not-required",
                 "test-suite rename": "langwatch test-suite rename <id-or-name> \"Refunds and credits\"",
                 "test-suite archive": "langwatch test-suite archive <id-or-name>",
                 "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
@@ -434,6 +436,7 @@
                 "platform_list_test_suites",
                 "platform_create_test_suite",
                 "platform_get_test_suite",
+                "platform_update_test_suite",
                 "platform_rename_test_suite",
                 "platform_archive_test_suite",
                 "platform_run_test_suite"
@@ -470,7 +473,7 @@
                 "run-plan archive"
               ],
               "hints": {
-                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --name \"nightly regression\" --wait",
+                "run-plan run": "langwatch run-plan run --all --target 'http:agent_abc123?model=gpt-5' --target 'http:agent_abc123?model=gpt-5-mini' --evaluator pii-leak-scanner --name \"nightly regression\" --wait",
                 "run-plan list": "langwatch run-plan list -o json",
                 "run-plan get": "langwatch run-plan get <id> -o json",
                 "run-plan archive": "langwatch run-plan archive <id>"

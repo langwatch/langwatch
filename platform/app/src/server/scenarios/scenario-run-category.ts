@@ -41,6 +41,9 @@ export function categorizeRunStatus(
     case ScenarioRunStatus.IN_PROGRESS:
     case ScenarioRunStatus.PENDING:
     case ScenarioRunStatus.RUNNING:
+    // The conversation is over, but a required evaluator can still fail the
+    // run, so it is not counted as a pass or a failure until they are in.
+    case ScenarioRunStatus.PENDING_EVALUATION:
       return "in_progress";
     case ScenarioRunStatus.QUEUED:
       return "queued";

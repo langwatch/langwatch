@@ -1,0 +1,45 @@
+---
+title: Workflow as Agent
+sidebarTitle: Workflow as agent
+keywords: langwatch, workflow agent, agent testing target, scenario mappings, test a workflow
+description: Register a workflow as a Workflow Agent, so Agent Testing runs its scenarios against the workflow and judges the answers.
+---
+
+## What a workflow agent is
+
+A workflow agent is an agent of the project whose logic is a workflow. Agent Testing sends each turn of a scenario to the workflow's entry inputs and reads the answer from one of its End node results. Use it to test a pipeline that lives in LangWatch the same way you test an agent that runs in your own infrastructure.
+
+**Also check:** [Targets](/agent-testing/targets) for the other target types and how a run picks its target.
+
+## Create one
+
+1. Open **Agents** and click **New Agent**.
+2. Pick **Workflow Agent** in the **Choose Agent Connection Type** drawer.
+3. Give the agent a name, an icon and a description, then click **Create & Open Editor**.
+
+<Frame>
+<img className="block" src="/images/workflows/workflow-agent-create.png" alt="The Create Workflow Agent form with the name, icon and description fields" />
+</Frame>
+
+LangWatch creates a workflow with an Entry point, one LLM Call and an End node, links it to the new agent, and opens the editor. Build the agent logic there, see [Building a workflow](/workflows/building-a-workflow). The agent runs the latest saved version of the workflow.
+
+## Map the scenario to the workflow
+
+Open the agent from the **Agents** page to edit it. **Linked Workflow** shows the workflow and opens it in the editor. **Scenario Mappings** connects the scenario data to the workflow.
+
+<Frame>
+<img className="block" src="/images/workflows/workflow-agent-editor.png" alt="The Edit Workflow Agent drawer with the linked workflow and the scenario mappings" />
+</Frame>
+
+| Section | Rows | Source |
+|---|---|---|
+| **Inputs** | The fields a scenario provides on each turn: `input` (the latest message from the simulated user), `messages` (the full conversation history as a JSON string), `threadId` (the identifier of the conversation) and `session` (the value the agent returned as session on the previous turn, empty on the first turn). | **Agent Inputs**, the entry inputs of the workflow. Map each scenario field to the entry input that receives it. |
+| **Output** | `output`, the answer the scenario judge reads. | **Agent Outputs**, the results of the End node. |
+
+A run needs `input` or `messages` mapped. A workflow with one entry input runs without mappings: the last user message goes to that input. A workflow with several entry inputs refuses to run until you map them.
+
+Click **Save Changes**. The mappings are part of the agent, so every scenario that targets it uses them.
+
+## Run scenarios against it
+
+Pick the agent as **Agent to be tested** in the run dialog of a test suite, or as the target of a scenario. The run parameters of the scenario reach the workflow as entry inputs. See [Run parameters](/agent-testing/run-parameters) and [Test from the platform](/agent-testing/test-from-the-platform).

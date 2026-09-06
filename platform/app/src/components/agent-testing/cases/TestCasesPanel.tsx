@@ -56,8 +56,9 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onOpenExternalCase={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))
       }
-      onRenameSuite={() => {
-        if (selectedSuite) suiteDialog.openRename(selectedSuite.id);
+      onEditSuite={(attachmentId) => {
+        if (!selectedSuite) return;
+        base.openSuiteEditor({ testSuiteId: selectedSuite.id, attachmentId });
       }}
     />
   );

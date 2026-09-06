@@ -3730,7 +3730,7 @@ export interface paths {
         /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
         get: operations["listTestSuites"];
         put?: never;
-        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        /** @description Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start. */
         post: operations["createTestSuite"];
         delete?: never;
         options?: never;
@@ -3756,8 +3756,8 @@ export interface paths {
         delete: operations["archiveTestSuite"];
         options?: never;
         head?: never;
-        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
-        patch: operations["renameTestSuite"];
+        /** @description Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are. */
+        patch: operations["updateTestSuite"];
         trace?: never;
     };
     "/api/v1/test-suites/{id}/run": {
@@ -5564,6 +5564,13 @@ export interface operations {
                                 inflight: number;
                                 maxConcurrency: number;
                             }[];
+                            /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                            selectable: boolean;
+                            /**
+                             * @description Why the agent cannot be run by this credential. Null when it can.
+                             * @enum {string|null}
+                             */
+                            notSelectableReason: "owned_by_another_person" | null;
                             createdAt: string;
                             updatedAt: string;
                             /** Format: uri */
@@ -5666,6 +5673,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5749,6 +5763,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5847,6 +5868,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5974,6 +6002,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -19060,6 +19095,21 @@ export interface operations {
                         pattern: string;
                         reason: string;
                         skipOffered: boolean;
+                        segments?: {
+                            command: string;
+                            pattern: string;
+                            readOnly: boolean;
+                        }[];
+                        timeoutSeconds?: number;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_answered";
+                        callId: string;
+                        /** @enum {string} */
+                        decision: "allow_once" | "allow_pattern" | "deny";
+                        patterns?: string[];
                     } | {
                         /** @enum {number} */
                         protocol: 1;
@@ -24932,6 +24982,24 @@ export interface operations {
                         metCriteria: string[];
                         unmetCriteria: string[];
                         error?: string;
+                        evaluations?: {
+                            evaluatorId: string;
+                            name: string;
+                            /** @enum {string} */
+                            status: "passed" | "failed" | "scored" | "skipped" | "error";
+                            required: boolean;
+                            passed?: boolean;
+                            score?: number;
+                            label?: string;
+                            details?: string;
+                            cost?: {
+                                currency: string;
+                                amount: number;
+                            };
+                            inputs?: {
+                                [key: string]: string;
+                            };
+                        }[];
                     } | null;
                 } | {
                     /** @constant */
@@ -25642,6 +25710,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -25734,6 +25806,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -25770,6 +25846,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25868,6 +25948,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25972,6 +26056,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -26008,6 +26096,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -26197,6 +26289,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -26233,6 +26329,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -26458,6 +26558,10 @@ export interface operations {
                             judgeModel: string | null;
                             maxTurns: number | null;
                             minTurns: number | null;
+                            /** @description The field values as this version saved them. Absent on servers that predate suite fields. */
+                            fields?: {
+                                [key: string]: string | number | boolean;
+                            };
                         };
                     };
                 };
@@ -27350,6 +27454,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -27453,6 +27576,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
@@ -28739,6 +28881,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -28807,6 +28972,29 @@ export interface operations {
                         judgeModel?: string | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
+                        /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
@@ -28946,6 +29134,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -29108,6 +29319,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -29136,6 +29380,39 @@ export interface operations {
                 "application/json": {
                     /** @description The test suite name, as it reads in the platform. */
                     name: string;
+                    /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -29157,6 +29434,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -29202,6 +29512,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -29256,7 +29599,7 @@ export interface operations {
             };
         };
     };
-    renameTestSuite: {
+    updateTestSuite: {
         parameters: {
             query?: never;
             header?: never;
@@ -29269,8 +29612,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The test suite name, as it reads in the platform. */
-                    name: string;
+                    /** @description The new name. The slug is kept. */
+                    name?: string;
+                    /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -29292,6 +29668,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */

@@ -248,6 +248,10 @@ const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
 });
+const AgentTestingSuiteEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/suite/SuiteEditorDrawer"),
+  key: "SuiteEditorDrawer",
+});
 const AgentTestingCaseEditorDrawer = lazyDefault({
   factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
   key: "AgentTestingCaseEditorDrawer",
@@ -337,6 +341,9 @@ export const drawers = {
   // Agent Testing v2 case editor, opened from the cases table, the run rows
   // and the run drawer.
   agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
+  // Agent Testing v2 suite editor: the name, the fields and the evaluators
+  // of a test suite.
+  agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
