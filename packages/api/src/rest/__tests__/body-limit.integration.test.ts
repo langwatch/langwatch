@@ -1,22 +1,10 @@
 /**
  * @vitest-environment node
- *
- * The body cap runs against the EXACT production wiring — `getRequestListener`
- * with `overrideGlobalObjects: false`, from `src/start.ts` — over a real
- * socket, because that wiring is what the middleware has to survive.
- *
- * A request without `Content-Length` can only be measured by draining it, so
- * the body must be handed back to the route afterwards. `hono/body-limit`
- * rebuilds it with `new Request(c.req.raw, init)`, which the global `Request`
- * cannot do to the stand-in `@hono/node-server` supplies while the platform
- * keeps its own globals: it throws, and the route answers 500. Every chunked
- * upload takes that path, including the OTLP exporters posting to
- * `/api/otel/v1/traces`, so the streaming cases below are the ones that matter
- * — a store-and-forward assertion on a `Content-Length` request would pass
- * against the broken middleware.
- *
- * @see src/server/routes/_lib/body-limit.ts
- * @see src/start.ts (honoFetchForNode + getRequestListener wiring)
+ * Runs the body cap against the exact production wiring over a real
+ * socket, since a chunked/no-Content-Length request needs draining and
+ * rebuilding, which throws against the platform's own globals — a 500 a
+ * store-and-forward assertion would never catch.
+ * @see src/server/routes/_lib/body-limit.ts, src/start.ts
  */
 
 import { getRequestListener } from "@hono/node-server";
@@ -25,7 +13,7 @@ import { bodyLimit as honoBodyLimit } from "hono/body-limit";
 import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
 import { afterEach, describe, expect, it } from "vitest";
-import { bodyLimit } from "../body-limit";
+import { bodyLimit } from "../body-limit.ts";
 
 async function listen(server: Server): Promise<number> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

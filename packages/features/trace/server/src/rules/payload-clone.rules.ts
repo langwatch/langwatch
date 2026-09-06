@@ -1,16 +1,10 @@
 /**
- * The deep copy the span pipeline takes before it rewrites a payload.
- *
- * Every recorded span is cloned so redaction, the attribute cap and cost
- * enrichment work on a copy with no reference back into the command. That made
- * `structuredClone` the single most expensive step on ingestion: on a 200-span
- * batch it costs 7.2 ms against 0.4 ms here, because it walks the structured
- * clone algorithm — transferables, cycles, every platform type — for payloads
- * that are decoded OTLP and therefore plain objects, arrays and scalars.
- *
- * So plain values take a plain recursive copy and anything else is handed to
- * `structuredClone` unchanged. A key holding `undefined` is preserved, which a
- * `JSON.parse(JSON.stringify(...))` round trip would drop.
+ * The deep copy the span pipeline takes before rewriting a payload, so
+ * redaction/cap/cost enrichment never reference back into the command.
+ * `structuredClone` cost 7.2ms per 200-span batch against 0.4ms here, since
+ * decoded OTLP is plain objects/arrays/scalars; a plain recursive copy
+ * handles those and defers anything else to `structuredClone` unchanged.
+ * Preserves keys holding `undefined`, unlike a JSON stringify/parse round trip.
  */
 export function clonePayload<T>(value: T): T {
   return cloneUnknown(value) as T;

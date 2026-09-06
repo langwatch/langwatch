@@ -1,5 +1,5 @@
-import type { WireVersionedPrompt } from "../model/wire-versioned-prompt";
-import { usePromptHost } from "../model/prompt-host";
+import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
+import { usePromptHost } from "../model/prompt-host.ts";
 import cloneDeep from "lodash-es/cloneDeep";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
@@ -7,18 +7,18 @@ import {
   getSaveBlockerMessage,
   type PromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "../model/prompt-form";
-import { useLatestPromptVersion } from "./use-latest-prompt-version";
-import { usePromptConfigContext } from "../model/prompt-config-context";
-import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion";
-import { promptApi } from "./prompt-api";
-import { useTabId } from "../model/prompt-tab-context";
-import type { TabData } from "../model/prompt-tabs-store";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+} from "../model/prompt-form/index.ts";
+import { useLatestPromptVersion } from "./use-latest-prompt-version.ts";
+import { usePromptConfigContext } from "../model/prompt-config-context.ts";
+import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion.ts";
+import { promptApi } from "./prompt-api.ts";
+import { useTabId } from "../model/prompt-tab-context.tsx";
+import type { TabData } from "../model/prompt-tabs-store.ts";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**
- * Hook to handle the saving of a prompt in the prompt studio.
- * Single Responsibility: Orchestrates prompt save/create operations with proper validation and error handling.
+ * Hook to handle the saving of a prompt in the prompt studio: orchestrates
+ * save/create with validation and error handling.
  * @returns Object containing handleSaveVersion function
  */
 export function useHandleSavePrompt() {
@@ -35,8 +35,8 @@ export function useHandleSavePrompt() {
   const { nextVersion } = useLatestPromptVersion({ configId, currentVersion });
 
   /**
-   * handleSaveVersion
-   * Single Responsibility: Validates handle, triggers appropriate save operation, and updates UI state on success/error.
+   * handleSaveVersion: validates the handle, triggers the appropriate save
+   * operation, and updates UI state on success/error.
    */
   const handleSaveVersion = useCallback(async () => {
     // Validate the full form so the save-time refinement (#3196: system

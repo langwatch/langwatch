@@ -6,8 +6,8 @@ import {
   conflictSchema,
   errorSchema,
   unauthorizedSchema,
-} from "./schemas.js";
-import type { RouteResponse } from "./response-types.js";
+} from "./schemas.ts";
+import type { RouteResponse } from "./response-types.ts";
 
 /**
  * The documented errors for the families that predate the canonical envelope,
@@ -62,19 +62,11 @@ function canonicalResponse(description: string): RouteResponse {
 }
 
 /**
- * The documented errors for the families that publish the canonical envelope
- * ({@link apiErrorSchema}). Every refusal these families can answer with is
- * one shape, so the documented 400/401/500 match the body a caller actually
- * receives, whichever layer refused.
- *
- * 422 is absent on purpose: the canonical families answer request-validation
- * failures 400 `validation_error`, so documenting a 422 would describe a
- * status they never send.
- *
- * That reasoning covers validation only. A route that can refuse for a reason
- * which is not a malformed request — a deliberate ceiling the caller can clear
- * by asking for less — does send a 422, and documents it by spreading
- * {@link canonicalUnprocessableResponses} alongside these.
+ * The documented errors for families that publish the canonical envelope
+ * ({@link apiErrorSchema}): 400/401/500 match whichever layer refused. 422
+ * is absent on purpose — validation failures answer 400 `validation_error`
+ * — but a route refusing on a deliberate ceiling instead of shape does send
+ * 422, documented by spreading {@link canonicalUnprocessableResponses}.
  */
 export const canonicalBaseResponses: Record<number, RouteResponse> = {
   400: canonicalResponse("Bad Request"),

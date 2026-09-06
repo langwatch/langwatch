@@ -1,17 +1,13 @@
 /**
- * The authoring rules that must hold in the editor AND at startup.
- *
- * A rule stated only in the types is invisible to a JavaScript-shaped call —
- * an untyped mount, a `as never` cast, a build that skipped the checker — and a
- * rule stated only at startup is found far too late. Both statements come from
- * ONE table here, so a rule cannot be relaxed on one side while the other keeps
- * claiming it.
+ * The authoring rules that must hold in the editor AND at startup. A rule
+ * stated only in the types is invisible to a JS-shaped call; one stated
+ * only at startup is found far too late. Both come from one table here.
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createRestService } from "../builder.js";
-import type { RestEndpoint } from "../definition.js";
+import { createRestService } from "../builder.ts";
+import type { RestEndpoint } from "../definition.ts";
 
 const input = z.object({ name: z.string() });
 const output = z.object({ ok: z.boolean() });

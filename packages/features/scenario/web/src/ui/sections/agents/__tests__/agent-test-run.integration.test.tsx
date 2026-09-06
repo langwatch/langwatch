@@ -1,5 +1,6 @@
 /**
- * "Test agent" from the agents page: the menu item on a card and on a connected row, the run it schedules, and the run drawer it opens.
+ * "Test agent" from the agents page: the menu item on a card and a
+ * connected row, the run it schedules, and the run drawer it opens.
  * @vitest-environment jsdom
  * @see specs/agents/agent-test-run.feature
  */
@@ -14,7 +15,7 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 type Agent = WireOf<StoredAgent>;
 import { AgentCard } from "@langwatch/agent-web/surfaces/connected-agents";
-import { useAgentTestRun } from "../use-agent-test-run";
+import { useAgentTestRun } from "../use-agent-test-run.ts";
 
 const openDrawer = vi.fn();
 const testRunMutate = vi.fn();
@@ -41,7 +42,7 @@ vi.mock("@langwatch/ui-host/errors", () => ({
   showErrorToast: (args: unknown) => showErrorToast(args),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       testRun: {

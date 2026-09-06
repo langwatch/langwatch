@@ -2,8 +2,6 @@
  * The people in an organization, at `/settings/members`.
  */
 
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import {
   Badge,
   Box,
@@ -20,33 +18,33 @@ import {
 } from "@chakra-ui/react";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { OverflownTextWithTooltip } from "../../ui/elements/overflown-text";
-import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
+import { OverflownTextWithTooltip } from "../../ui/elements/overflown-text.tsx";
+import { RandomColorAvatar } from "../../ui/elements/random-color-avatar.tsx";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { type OrganizationUserRole, RoleBindingScopeType } from "../../model/prisma-types";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useMemberDisableAction } from "../../behavior/use-member-disable-action";
+import { type OrganizationUserRole, RoleBindingScopeType } from "../../model/prisma-types.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useMemberDisableAction } from "../../behavior/use-member-disable-action.ts";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
-import { CopyInput } from "../../ui/elements/copy-input";
-import { DomainJoinCard } from "../../ui/blocks/domain-join-card";
-import { InvitesTable } from "../../ui/sections/invites-table";
-import { JoinRequestsTable } from "../../ui/blocks/join-requests-table";
-import { useJoinRequests } from "../../behavior/use-join-requests";
-import { DepartmentPicker } from "../../ui/sections/department-picker";
-import { MemberDetailDialog } from "../../ui/sections/member-detail-dialog";
-import { MemberSeatUsage } from "../../ui/sections/member-seat-usage";
-import { useDepartmentColumn } from "../../behavior/use-department-column";
+import { CopyInput } from "../../ui/elements/copy-input.tsx";
+import { DomainJoinCard } from "../../ui/blocks/domain-join-card.tsx";
+import { InvitesTable } from "../../ui/sections/invites-table.tsx";
+import { JoinRequestsTable } from "../../ui/blocks/join-requests-table.tsx";
+import { useJoinRequests } from "../../behavior/use-join-requests.ts";
+import { DepartmentPicker } from "../../ui/sections/department-picker.tsx";
+import { MemberDetailDialog } from "../../ui/sections/member-detail-dialog.tsx";
+import { MemberSeatUsage } from "../../ui/sections/member-seat-usage.tsx";
+import { useDepartmentColumn } from "../../behavior/use-department-column.ts";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { useInviteActions } from "../../behavior/use-invite-actions";
-import { useOrganizationHost, type OrganizationTeamReading } from "../../model/organization-host";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { usePublicEnv } from "../../behavior/use-public-env";
-import { useRequiredSession } from "../../behavior/use-required-session";
-import type { RouterOutputs } from "../../behavior/organization-api";
-import { api } from "../../behavior/organization-api";
-import { useOrganizationToaster } from "../../behavior/organization-feedback";
-import { reportUnexpected } from "../../behavior/report-unexpected";
+import { useInviteActions } from "../../behavior/use-invite-actions.ts";
+import { useOrganizationHost, type OrganizationTeamReading } from "../../model/organization-host.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import type { RouterOutputs } from "../../behavior/organization-api.ts";
+import { api } from "../../behavior/organization-api.ts";
+import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { reportUnexpected } from "../../behavior/report-unexpected.ts";
 
 /** The organization graph as the browser receives it: instants are ISO strings. */
 type OrganizationWithMembersAndTheirTeams =

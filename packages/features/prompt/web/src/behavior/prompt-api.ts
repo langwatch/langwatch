@@ -1,32 +1,10 @@
 /**
  * The procedures this screen calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts`,
- * `governance-api.ts`, `automation-api.ts`, `ops-api.ts`, `agent-api.ts`,
- * `data-retention-api.ts`, `dataset-api.ts` and `model-provider-api.ts` say of
- * their own maps: the procedures are mounted by the process out of
- * `@langwatch/prompt-server`, `@langwatch/trace-server` and the application's
- * own routers, which a web package may not import even for a type, and the
- * router type does not exist until a process instantiates it. Emitting this
- * file from the mounted router is the fix; writing it by hand is the interim.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `prompts`, `promptTags`, `modelProvider`,
- * `llmModelCost`, `spans`, `traces` and `experiments` are mount points on the
- * root router and tRPC hashes that path into the React Query cache key; spell
- * one differently and these hooks quietly stop sharing a cache with the
- * `promptApi.prompts.*` call sites that have not moved — of which there are many,
- * because the prompt editor drawer, the workflow signature panel and the
- * experiments workbench all still read prompts from `platform/app`.
- *
- * WHERE A PAYLOAD IS `unknown` IT IS DELIBERATE: those entries are declared for
- * their CACHE ENTRY rather than for a call, so an invalidation from this screen
- * reaches a list an un-migrated surface created. The shape the model-provider
- * family introduced for the same reason.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. Recorded here so the finding it
- * raises is a decision rather than a surprise.
+ * Hand-written until the mounted router can generate it (ADR-130). Segment
+ * names are load-bearing tRPC cache-key segments — renaming one stops
+ * sharing a cache with the many `promptApi.prompts.*` call sites that have
+ * not moved. Where a payload is `unknown`, it is declared for its cache
+ * entry rather than for a call, so invalidation reaches an un-migrated list.
  */
 
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
@@ -160,12 +138,9 @@ export type PromptApiMap = {
   modelProvider: {
     /**
      * The project's configured providers, keyed by provider id.
-     *
-     * `LegacyModelProvider` is the shape `toLegacyProviderMap` answers with and
-     * `mergeCustomModelMetadata` takes, both published by
-     * `@langwatch/model-provider-contract` — so naming it here is a real
-     * declaration rather than a restatement, and the custom-model merge is
-     * checked against the same type on both sides of the wire.
+     * `LegacyModelProvider` is `@langwatch/model-provider-contract`'s own
+     * shape, so naming it here checks the custom-model merge against the
+     * same type on both sides of the wire.
      */
     getAllForProjectForFrontend: {
       query: { input: ProjectScope; output: Record<string, LegacyModelProvider> };
@@ -221,20 +196,11 @@ export type PromptApiMap = {
 
   organization: {
     /**
-     * The organization graph, narrowed to what this family reads off it.
-     *
-     * Read by the frontend feature that mounts the screen rather than by the
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it: the graph is fetched once per
-     * document however many halves of the product want it.
-     *
-     * `apiKey` is the project's, and the server already decides who may see it
-     * — it arrives blank for a reader who cannot update the project, and for
-     * every demo project. Two surfaces send it rather than display it: the
-     * playground chat authenticates its run with it, and the deploy dialog
-     * seeds the snippets it prints. The membership columns are declared because
-     * the replication picker offers only the projects the reader may create a
-     * prompt in, and that answer is per TEAM rather than per current scope.
+     * The organization graph, narrowed to this family's reads. Declared here
+     * (not by the screen) so it shares the shell's own cache entry. `apiKey`
+     * arrives blank when the reader may not see it (server-decided); two
+     * surfaces send rather than display it. Membership is per team, since
+     * the replication picker offers only projects the reader may create in.
      */
     getAll: {
       query: {

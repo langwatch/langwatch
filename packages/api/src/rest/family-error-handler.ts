@@ -3,29 +3,18 @@ import { createLogger } from "@langwatch/observability";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { HttpError, InternalServerError, isFrameworkRefusal } from "./http-errors.js";
-import { errorSchema } from "./schemas.js";
+import { HttpError, InternalServerError, isFrameworkRefusal } from "./http-errors.ts";
+import { errorSchema } from "./schemas.ts";
 
 /**
  * A family's own `onError`: its domain mapping layered over the process's
- * boundary handler.
- *
- * Every family that installs one wants the same three things — log the status
- * the caller actually received, answer an {@link HttpError} from its own
- * fields, and hand anything it has not specifically claimed to the boundary so
- * a handled error keeps its code, meta, reasons and remediation. Only the
- * logger's name and the sentence it prefixes differ, so those are the
- * parameters and the rest is shared.
- *
- * `boundary` is the process's `legacyErrorHandler`, off the security spine:
- * installing an `onError` REPLACES the one the spine installed, so a family
- * that did not delegate would silently stop rendering handled errors.
+ * boundary handler (`legacyErrorHandler`). Delegates anything unclaimed so
+ * a handled error keeps its code/meta/reasons; only the logger's name and
+ * prefix differ between families.
  */
-/**
- * The status the caller actually received, in the same precedence as the
- * response dispatch below: a family's own {@link HttpError}, a handled
- * error's own status, a framework refusal's status, else an internal 500.
- */
+
+/** The status precedence: a family's {@link HttpError}, a handled error's
+ *  own status, a framework refusal's, else an internal 500. */
 function resolveResponseStatus(error: unknown): ContentfulStatusCode {
   if (error instanceof HttpError) return error.status;
   if (HandledError.isHandled(error)) return error.httpStatus as ContentfulStatusCode;

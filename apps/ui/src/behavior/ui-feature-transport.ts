@@ -95,7 +95,7 @@ function uiFeatureApiLinks({
   ];
 }
 
-/** Builds the transport once per application; `op.context.skipBatch` opts a query out of batching (same flag the host reads). */
+/** Builds the transport once per app; `op.context.skipBatch` opts a query out of batching. */
 export function createUiFeatureApiClient(
   options: UiFeatureApiClientOptions = {},
 ): UiFeatureApiTransport {

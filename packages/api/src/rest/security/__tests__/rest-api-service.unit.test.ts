@@ -14,14 +14,14 @@ import {
   publicEndpoint,
   requires,
   requiresOnProject,
-} from "../../../access-policy.js";
-import { allRegisteredRoutes, getRoutePolicy } from "../route-registry.js";
+} from "../../../access-policy.ts";
+import { allRegisteredRoutes, getRoutePolicy } from "../route-registry.ts";
 import {
   type ApiErrorEnvelope,
   createRestApiService,
   familyFromBasePath,
   type RestApiServicePorts,
-} from "../rest-api-service.js";
+} from "../rest-api-service.ts";
 
 /** What the stub ports saw, in the order the builder asked for it. */
 interface PortCalls {
@@ -318,9 +318,9 @@ describe("SecuredApp", () => {
 
   describe("when a HEAD request arrives", () => {
     /**
-     * Hono answers HEAD from the GET route, and does it BEFORE routing: `#dispatch` sees the method,
-     * re-runs itself as `"GET"`, and returns `new Response(null, thatResponse)`. So the status and headers
-     * are the GET route's and the body is dropped — which is what HEAD should do.
+     * Hono answers HEAD from the GET route, before routing: `#dispatch`
+     * re-runs itself as `"GET"` and returns `new Response(null, thatResponse)`,
+     * so status and headers are the GET route's and the body is dropped.
      */
     it("is answered by the GET route, with the body dropped", async () => {
       const { spine } = recordingSpine();
@@ -336,9 +336,9 @@ describe("SecuredApp", () => {
     });
 
     /**
-     * The other half of the same fact, and the reason this is asserted rather than assumed: a route
-     * registered for HEAD is UNREACHABLE. The rewrite above happens before `router.match`, so nothing
-     * HEAD-shaped is ever looked up, and a path carrying only a HEAD handler 404s.
+     * The other half: a route registered for HEAD is unreachable. The
+     * rewrite above happens before `router.match`, so nothing HEAD-shaped
+     * is ever looked up, and a path with only a HEAD handler 404s.
      */
     it("never reaches a route registered for HEAD alone", async () => {
       const { spine } = recordingSpine();

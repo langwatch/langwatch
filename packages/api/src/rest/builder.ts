@@ -1,6 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { z } from "zod";
-import type { ApiSchema } from "../schema.js";
+import type { ApiSchema } from "../schema.ts";
 
 import {
   ChainBuilder,
@@ -20,12 +20,12 @@ import {
   assertStatusInvariant,
   collectDef,
   mergeDefs,
-} from "./definition.js";
-import { createErrorHandler } from "../errors.js";
-import { loggerMiddleware, tracerMiddleware } from "./middleware.js";
-import { mountResolvedRoutes } from "./route-mounting.js";
-import { canonicalV1Path } from "./v1-alias.js";
-import type { TypedSSEStream } from "./sse.js";
+} from "./definition.ts";
+import { createErrorHandler } from "../errors.ts";
+import { loggerMiddleware, tracerMiddleware } from "./middleware.ts";
+import { mountResolvedRoutes } from "./route-mounting.ts";
+import { canonicalV1Path } from "./v1-alias.ts";
+import type { TypedSSEStream } from "./sse.ts";
 import type {
   BaseApp,
   DateVersion,
@@ -37,15 +37,15 @@ import type {
   ServiceConfig,
   ServiceContext,
   VersionLabel,
-} from "./types.js";
-import { API_VERSION_HEADER, assertVersionLabel, VERSION_PREVIEW } from "./types.js";
-import { type RegistrationEvent, resolveVersions } from "./versioning.js";
+} from "./types.ts";
+import { API_VERSION_HEADER, assertVersionLabel, VERSION_PREVIEW } from "./types.ts";
+import { type RegistrationEvent, resolveVersions } from "./versioning.ts";
 
-// Handler shapes The handler signature is positional: `(c, input)` — the Hono context and the validated input. REST path, query and body fields are normalized into that argument.
-// Provided services remain typed context variables; SSE query stays on context because the stream is its second argument. A note on typing honesty: `input` is declared on the definition
-// chain, which is the argument AFTER the handler — and TypeScript checks arguments in order, so the chain cannot flow back into the handler's parameter type (the compiler checks the
-// handler body before it infers from `define`). Annotate the handler parameter (or delegate to a typed domain function) for a typed `input`; the declared schema is always the runtime
-// guarantee. An endpoint registered without a chain gets `input: undefined` — that one IS enforced by the no-chain overloads below.
+// Handler shapes: the signature is positional, `(c, input)` — Hono context and validated input,
+// with path/query/body fields normalized into that argument. `input` is declared on the definition
+// chain, the argument AFTER the handler, so TypeScript's in-order checking cannot flow it back into
+// the handler's parameter type; annotate the handler parameter (or delegate to a typed domain
+// function) for a typed `input`. A chain-less endpoint gets `input: undefined`, enforced below.
 
 /**
  * Contextual handler shape. The inferred `THandler` retains whether the author
@@ -54,7 +54,7 @@ import { type RegistrationEvent, resolveVersions } from "./versioning.js";
  */
 type RouteHandler<TVariables extends Record<string, unknown>, TApp> = (
   c: ServiceContext<TVariables, TApp>,
-  // oxlint-disable-next-line typescript/no-explicit-any -- the annotated handler parameter is the domain type; this constraint only supplies contextual typing.
+  // oxlint-disable-next-line typescript/no-explicit-any -- annotated param has the domain type
   input: any,
   // oxlint-disable-next-line typescript/no-explicit-any -- inferred from each concrete handler.
 ) => any;
@@ -485,7 +485,7 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         method,
         path,
         config: {},
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        // A withdrawn handler is never invoked; the shape exists to satisfy the record type.
         handler: () => {},
         withdrawn: true,
       },
@@ -503,7 +503,7 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         method,
         path,
         config: {},
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        // A withdrawn handler is never invoked; the shape exists to satisfy the record type.
         handler: () => {},
         withdrawn: true,
       },
@@ -524,7 +524,7 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         method,
         path,
         config: {},
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        // A withdrawn handler is never invoked; the shape exists to satisfy the record type.
         handler: () => {},
         withdrawn: true,
       },
@@ -618,7 +618,8 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
  */
 class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown> {
   constructor(
-    // biome-ignore lint/suspicious/noExplicitAny: the registrar never touches provider factories, so the project type is irrelevant here and `unknown` would be invariant.
+    // The registrar never touches provider factories, so the project type is irrelevant and
+    // `unknown` would be invariant here.
     private readonly _service: ServiceBuilder<any, TVariables, TApp>,
     private readonly _name: string,
     private readonly _defaults: RawEndpointDef,

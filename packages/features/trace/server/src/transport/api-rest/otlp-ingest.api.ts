@@ -35,8 +35,8 @@ import {
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "../../rules/ingest-key-provenance.rules";
-import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service";
+} from "../../rules/ingest-key-provenance.rules.ts";
+import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service.ts";
 
 /**
  * The generated protobuf message this receiver decodes into.
@@ -66,9 +66,10 @@ export type OtlpIngestProject = Readonly<{
  */
 export type OtlpIngestIdentity = Readonly<{
   /**
-   * The scoped key's id, or null for a legacy project key. It is rewritten onto EVERY authenticated request — see
-   * {@link enforceApiKeyIdOnTraceRequest} — so it must never become conditional: the redaction deny-list exempts
-   * that attribute name, and that exemption is only sound while the value cannot come from the payload.
+   * The scoped key's id, or null for a legacy project key. Rewritten onto
+   * every authenticated request (see {@link enforceApiKeyIdOnTraceRequest})
+   * and must never become conditional: the redaction deny-list exempts this
+   * attribute name, sound only while the value cannot come from the payload.
    */
   apiKeyId: string | null;
   organizationId: string;
@@ -194,9 +195,10 @@ function bodyForensics(body: ArrayBuffer | Uint8Array) {
 }
 
 /**
- * Classifies a token by prefix without exposing the value, so on-call can filter a 401 stream by SDK shape.
- * Ingestion keys are ordinary `sk-lw-` API keys and classify as `legacy` here — the ingest discriminator lives on
- * the resolved row, not on the token prefix.
+ * Classifies a token by prefix without exposing the value, so on-call can
+ * filter a 401 stream by SDK shape. Ingestion keys are ordinary `sk-lw-`
+ * API keys and classify as `legacy` here — the ingest discriminator lives
+ * on the resolved row, not the token prefix.
  */
 export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
@@ -205,9 +207,10 @@ export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
 }
 
 /**
- * A misconfigured exporter fleet posts continuously and the signal — which project, which path — is identical on
- * every batch, so a pair is reported at most once a window. Repetition costs money on an ingestion hot path and
- * carries no information the first line did not.
+ * A misconfigured exporter fleet posts continuously with an identical
+ * project/path signal on every batch, so a pair is reported at most once a
+ * window — repetition costs money on an ingestion hot path for no new
+ * information.
  */
 const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
 const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
@@ -225,9 +228,10 @@ function correctedPathIsDueToLog({ pair, now }: { pair: string; now: number }): 
 }
 
 /**
- * Records that this request reached us on a path a misconfigured exporter produced. Logged here rather than at the
- * alias because the project is what makes it actionable: it is the difference between "somebody's exporter is
- * misconfigured" and knowing whose.
+ * Records that this request reached us on a path a misconfigured exporter
+ * produced. Logged here (not at the alias) since the project id is what
+ * makes it actionable — the difference between knowing something is
+ * misconfigured and knowing whose.
  */
 function logCorrectedPath({
   c,
@@ -291,9 +295,10 @@ async function authenticate(
 }
 
 /**
- * Everything the receiver writes onto an OTLP request on its own authority, for one signal. Two rules with
- * different scopes live together because they are the same concern — what the payload is not allowed to decide —
- * and must not drift apart.
+ * Everything the receiver writes onto an OTLP request on its own authority,
+ * for one signal. Two rules with different scopes live together since they
+ * are the same concern — what the payload may not decide — and must not
+ * drift apart.
  */
 async function applyReceiverProvenance({
   request,
@@ -328,10 +333,10 @@ async function applyReceiverProvenance({
   const sourceType = identity.ingestSourceType;
   if (identity.apiKeyId === null || !sourceType) return;
 
-  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived editor; processes VS Code spawns outside
-  // integrated terminals (js-debug internal console, extension children) inherit it, so a developer's own
-  // instrumented service could POST here under this key. Only Copilot's instrumentation scopes pass. The metrics
-  // signal needs the same gate: the code() env enables OTEL_METRICS_EXPORTER too.
+  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived editor; processes VS Code
+  // spawns outside integrated terminals inherit it, so a developer's own instrumented service
+  // could POST here under this key. Only Copilot's instrumentation scopes pass; metrics needs the
+  // same gate, since the code() env enables OTEL_METRICS_EXPORTER too.
   if (signal !== "logs") {
     const droppedForeign = dropForeignScopesForVscodeKey(
       request as Parameters<typeof dropForeignScopesForVscodeKey>[0],
@@ -382,9 +387,10 @@ async function applyReceiverProvenance({
 }
 
 /**
- * Best-effort extraction of customer trace_ids from an OTLP traces body. Never throws — an empty, malformed or
- * unparsable body yields an empty array. Used to tag rejection logs so a customer who reports "I sent trace_id X
- * and it never appeared" can be matched to the rejection.
+ * Best-effort extraction of customer trace_ids from an OTLP traces body.
+ * Never throws — an empty, malformed or unparsable body yields an empty
+ * array. Tags rejection logs so "I sent trace_id X and it never appeared"
+ * can be matched to the rejection.
  */
 export function peekCustomerTraceIds(
   body: ArrayBuffer,

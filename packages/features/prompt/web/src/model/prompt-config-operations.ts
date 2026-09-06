@@ -1,16 +1,9 @@
-import type { WireVersionedPrompt } from "./wire-versioned-prompt";
+import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 /**
  * What the three prompt dialogs are asked to do, and what they answer with.
- *
- * `platform/app` declared these three parameter objects against
- * `RouterInputs["prompts"]["create"]["data"]` and
- * `RouterInputs["prompts"]["update"]["data"]` — an inference through the whole
- * application router, which is exactly what a browser package may not name.
- * They are declared against `@langwatch/prompt-contract`'s
- * `PromptCreateTrpcInput` / `PromptUpdateTrpcInput` instead, and that is a REAL
- * repoint rather than a restatement: the producer is packaged
- * (`@langwatch/prompt-server` builds the same two schemas from the same
- * factories), so both halves of the wire now resolve to one declaration.
+ * Declared against `@langwatch/prompt-contract`'s `PromptCreateTrpcInput`/
+ * `PromptUpdateTrpcInput` rather than a router inference a browser package
+ * may not name — a real repoint, since the server builds the same schemas.
  */
 
 import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";

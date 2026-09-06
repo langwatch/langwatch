@@ -39,25 +39,25 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
-import { describeError } from "../../model/describe-error";
-import { availableFilters } from "../../model/analytics-filter-catalogue";
-import type { FilterField } from "../../model/analytics-filter-definition";
+import { describeError } from "../../model/describe-error.ts";
+import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { useAnalyticsPeriod } from "../../behavior/use-analytics-period";
-import { useFilterParams } from "../../behavior/use-filter-params";
-import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-color";
-import { getGroup, getMetric, type timeseriesSeriesInput } from "../../model/analytics-registry";
-import { analyticsApi } from "../../behavior/analytics-api";
-import { buildMetadataFilterParams } from "../../model/metadata-filter-params";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-color.ts";
+import { getGroup, getMetric, type timeseriesSeriesInput } from "../../model/analytics-registry.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { buildMetadataFilterParams } from "../../model/metadata-filter-params.ts";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
-import type { Unpacked } from "../../model/analytics-value-types";
-import { Delayed } from "../elements/delayed";
-import { ChartErrorState } from "../elements/chart-error-state";
-import { ChartTooltip } from "../elements/chart-tooltip";
-import { formatChartDate } from "../../model/chart-date";
-import { SummaryMetric } from "../elements/summary-metric";
-import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name";
+import type { Unpacked } from "../../model/analytics-value-types.ts";
+import { Delayed } from "../elements/delayed.tsx";
+import { ChartErrorState } from "../elements/chart-error-state.tsx";
+import { ChartTooltip } from "../elements/chart-tooltip.tsx";
+import { formatChartDate } from "../../model/chart-date.ts";
+import { SummaryMetric } from "../elements/summary-metric.tsx";
+import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -98,14 +98,10 @@ export type CustomGraphInput = {
 };
 
 /**
- * The charted read, as the shaping helpers below take it.
- *
- * Stated structurally rather than as the tRPC result types the application
- * named: `UseTRPCQueryResult<inferRouterOutputs<…>>` reaches for the tRPC
- * client, its React Query bindings and the process's own root router type, and
- * a governed screen may import none of the three. The four members below are
- * every one the shaping helpers actually read, and the payload is the analytics
- * contract's own declaration, so a change to the wire fails here.
+ * The charted read, as the shaping helpers below take it. Stated
+ * structurally rather than as `UseTRPCQueryResult<inferRouterOutputs<…>>`,
+ * which a governed screen may not import; the payload is the analytics
+ * contract's own declaration, so a wire change fails here.
  */
 type TimeseriesQuery = {
   data: AnalyticsTimeseriesResult | undefined;
@@ -116,11 +112,9 @@ type TimeseriesQuery = {
 };
 
 /**
- * A drill-down address, as one query string.
- *
- * The application handed `router.push` an object and let the router serialise
- * it; the host port takes a path. A list value stays comma-joined, which is
- * how every filter on the trace explorer reads its own parameter.
+ * A drill-down address, as one query string. The host port takes a path
+ * rather than an object to serialise. A list value stays comma-joined, as
+ * every trace explorer filter reads its own parameter.
  */
 function toQueryString(params: Record<string, string | string[]>): string {
   return Object.entries(params)
@@ -136,17 +130,10 @@ function toQueryString(params: Record<string, string | string[]>): string {
 export const summaryGraphTypes: CustomGraphInput["graphType"][] = ["summary", "pie", "donnut"];
 
 /**
- * The floor a row of figures holds, in pixels.
- *
- * A figure is a label, a number, and — only once the comparison has arrived —
- * a change and the previous value under it. Those last two lines appear late
- * and are not there at all when there is nothing to compare against, so
- * without a floor the row grows by a line the moment the data lands and
- * shrinks again when the window changes. The floor is the tallest form of a
- * figure, so the row is that height from the first paint and never moves.
- *
- * `input.height` deliberately does NOT reach here. It sizes a plotting area,
- * and a row of figures has none: it is as tall as the type in it.
+ * The floor a row of figures holds, in pixels — the tallest form of a
+ * figure (label, number, and once a comparison arrives, a change line),
+ * so the row never grows or shrinks as data lands. `input.height` does not
+ * reach here: it sizes a plotting area, and a figure row has none.
  */
 const SUMMARY_ROW_MIN_HEIGHT = "101px";
 
@@ -238,16 +225,10 @@ const CustomGraph_ = React.memo(
     const project = host.project();
 
     /**
-     * Which series the reader has clicked out of the legend.
-     *
-     * IN COMPONENT STATE, NOT IN BROWSER STORAGE, and that is a deliberate
-     * loss. `platform/app` remembered the picks per project and chart in the
-     * browser's key-value store, so a hidden series stayed hidden across a
-     * reload. A governed screen may not touch that store — the whole
-     * `ui-screen-closure` rule turns on it — so the toggle now lasts as long as
-     * the page does. Recorded rather than smuggled through the host port: a
-     * per-viewer convenience is not something the application should be
-     * answering for, and the picks are one click to redo.
+     * Which series the reader has clicked out of the legend. In component
+     * state, not browser storage, since a governed screen may not touch
+     * that store (`ui-screen-closure`); the toggle lasts the page's life,
+     * and the picks are one click to redo.
      */
     const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(() => new Set());
 
@@ -786,7 +767,8 @@ const CustomGraph_ = React.memo(
                 if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
                   const entry = pieData[index]!;
                   const { series, groupKey } = getSeries(seriesByKey, entry.key);
-                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  // Derive evaluatorId from per-series metadata, falling back to groupByKey or
+                  // first series key
                   const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
@@ -882,7 +864,8 @@ const CustomGraph_ = React.memo(
                 if (handleDataPointClick && item?.payload?.key) {
                   const key = item.payload.key;
                   const { series, groupKey } = getSeries(seriesByKey, key);
-                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  // Derive evaluatorId from per-series metadata, falling back to groupByKey or
+                  // first series key
                   const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
@@ -1037,7 +1020,8 @@ const CustomGraph_ = React.memo(
             const isAreaType = ["area", "stacked_area"].includes(input.graphType);
             const isBarType = ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType);
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
-            // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+            // Derive evaluatorId from per-series metadata, falling back to groupByKey or
+            // first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
             const isHidden = hiddenSeries.has(aggKey);
             // Extra props that only apply to Bar-type graphs
@@ -1047,7 +1031,7 @@ const CustomGraph_ = React.memo(
             }
             return (
               <React.Fragment key={aggKey}>
-                {/* @ts-expect-error - GraphElement is a union type (Line|Bar|Area|Scatter), some props are Bar-specific */}
+                {/* @ts-expect-error - GraphElement is Line|Bar|Area|Scatter, props are Bar-only */}
                 <GraphElement
                   key={aggKey}
                   type="monotone"

@@ -11,17 +11,17 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } from "react-feather";
-import { FilterDisplay } from "../../ui/elements/filter-display";
-import { ClampedText } from "../../ui/elements/clamped-text";
+import { FilterDisplay } from "../../ui/elements/filter-display.tsx";
+import { ClampedText } from "../../ui/elements/clamped-text.tsx";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { AutomationsLayout, type AutomationSection } from "../../ui/sections/automations-layout";
-import { Link } from "../../ui/elements/automation-link";
+import { AutomationsLayout, type AutomationSection } from "../../ui/sections/automations-layout.tsx";
+import { Link } from "../../ui/elements/automation-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AutomationHistory } from "../../features/overview/ui/elements/automation-history";
-import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip";
-import { type TriggerActionParams } from "../../features/overview/model/trigger-action-params";
+import { AutomationHistory } from "../../features/overview/ui/elements/automation-history.tsx";
+import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
+import { type TriggerActionParams } from "../../features/overview/model/trigger-action-params.ts";
 import {
   AlertRuleCell,
   AlertSubjectCell,
@@ -34,43 +34,29 @@ import {
   ReportSubjectCell,
   SectionHeader,
   TableShell,
-} from "../../features/overview/ui/elements/automation-table-cells";
+} from "../../features/overview/ui/elements/automation-table-cells.tsx";
 import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
-import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers";
+import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers.ts";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 /** A monitor as the browser holds one: the wire carries its instants as strings. */
 type Monitor = WireOf<StoredMonitor>;
-import { useAutomationHost } from "../../model/automation-host";
-import { useOrganizationTeamProject } from "../../behavior/automation-session";
-import { useAutomationToaster } from "../../behavior/automation-feedback";
-import { api, type RouterOutputs } from "../../behavior/automation-api";
-import { formatTimeAgo } from "../../model/relative-time";
+import { useAutomationHost } from "../../model/automation-host.ts";
+import { useOrganizationTeamProject } from "../../behavior/automation-session.ts";
+import { useAutomationToaster } from "../../behavior/automation-feedback.ts";
+import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
+import { formatTimeAgo } from "../../model/relative-time.ts";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
 /**
- * The two editors this screen opens, by the name the registry answers to.
- *
- * IT USED TO OWN TWO QUERY KEYS OF ITS OWN, `?automation=` and
- * `?viewAutomation=`, and render the editors inline. The reason was real — the
- * drawer registry is application composition a feature-web package may not
- * reach — and the conclusion was wrong: the registry is addressed by a QUERY
- * STRING, which the host already writes. So the screen names the drawer and the
- * host spells `?drawer.open=`, and there is one mechanism for every overlay in
- * the product rather than one per screen (`dev/docs/best_practices/drawers.md`).
- *
- * What this settles is not tidiness. Every alert email, the REST `platformUrl`,
- * the trace explorer's Automate button and Langy's relay links already write
- * `?drawer.open=automation`; the screen's own rows wrote something else, so the
- * SAME editor had two addresses and only one of them survived being pasted to
- * a colleague on a different page.
- *
- * A create is the same drawer with no id — the registry carries no
- * `drawer.automationId` — rather than the sentinel `?automation=new` the
- * screen's own key needed. The prefills ride along as the drawer's own
- * parameters.
+ * The two editors this screen opens, by the name the registry answers to
+ * (`dev/docs/best_practices/drawers.md`). Addressed via the shared
+ * `?drawer.open=` query string rather than a screen-local key, so every
+ * alert email, the REST `platformUrl`, and Langy's relay links resolve to
+ * the same editor a colleague pastes here. Create is the same drawer with
+ * no id, not a `?automation=new` sentinel.
  */
 const EDIT_DRAWER = "automation" as const;
 const VIEW_DRAWER = "viewAutomation" as const;
@@ -104,13 +90,9 @@ const sectionDetails: Record<AutomationSection, { title: string; description: st
 };
 
 /**
- * The automations screen: four tabs of one page.
- *
- * `platform/app` decided which tab was showing by matching the pathname, which
- * is a screen reading the address to learn something it was already told: the
- * route table gives each of the four URLs its own page key, and the frontend
- * feature maps a key to a screen. So the tab arrives as a prop, and the
- * pathname is nobody's business here.
+ * The automations screen: four tabs of one page. The tab arrives as a prop —
+ * the route table already gives each of the four URLs its own page key — so
+ * this screen never reads the pathname to learn what it was already told.
  */
 export function AutomationsPage({ section = "overview" }: { section?: AutomationSection } = {}) {
   const { project } = useOrganizationTeamProject();
@@ -120,13 +102,9 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
 
   /**
-   * Opens one of the two editors at its registered address.
-   *
-   * The host clears every stale `drawer.*` key on the way, so switching from
-   * the viewer to the editor is one write rather than a clear followed by a
-   * set, and neither editor can open carrying the other's parameters. Closing
-   * is the drawer's own: the registry adapter hands it `closeDrawer`, which is
-   * what takes the name out of the address so the link stops reopening it.
+   * Opens one of the two editors at its registered address. The host clears
+   * every stale `drawer.*` key on the way, so neither editor can open
+   * carrying the other's parameters.
    */
   const openEdit = (automationId: string) =>
     host.openDrawer({ drawer: EDIT_DRAWER, params: { automationId } });
@@ -433,17 +411,11 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     </Menu.Root>
   );
 
-  // WHAT THE ROW LOST IN THE MOVE, said here because this is where it was.
-  // Each row was wrapped in `<LangyContextTarget>` from `@langwatch/langy-web`,
-  // so an armed page could hand the automation to Langy by click or drag. That
-  // package is an ungoverned web package whose source every consumer compiles,
-  // and compiling it needs an `es2023` library and a stylesheet declaration
-  // that `apps/ui` would have to adopt for the whole application — a cost this
-  // family may not impose on a global tsconfig. The affordance goes for now and
-  // returns when `langy-web` publishes a governed surface. The me family
-  // recorded the same loss for its own Langy entry. See
-  // `dev/docs/plans/ui-family-move-manifests.md`.
-  //
+  // Dropped in the move: each row was wrapped in `<LangyContextTarget>` so a
+  // page could hand the automation to Langy by drag. `langy-web` is
+  // ungoverned and needs an `es2023` lib + stylesheet this family may not
+  // impose on the global tsconfig; returns once it publishes a governed
+  // surface (see `dev/docs/best_practices/drawers.md`, "The drawer registry").
   // The `key` moved back onto the row with the wrapper gone.
   const sharedRowProps = (trigger: EnhancedTrigger) => ({
     key: trigger.id,
@@ -971,14 +943,8 @@ function StatTile({
 }
 
 /**
- * The page as its route mounts it.
- *
- * `platform/app` exported it wrapped in
- * `withPermissionGuard("triggers:view", { layoutComponent: DashboardLayout })`.
- * Neither half travels: the permission policy is the route's and is stated in
- * `apps/ui/src/features/automations`, over the session capability, and the
- * layout is the application chrome this package may not import. What is left is
- * the page, and it is exported unwrapped so a test renders the page itself
- * rather than the policy around it.
+ * The page as its route mounts it, exported unwrapped: the permission
+ * policy lives in `apps/ui/src/features/automations` and the layout chrome
+ * is the application's, neither of which this package may import.
  */
 export default AutomationsPage;

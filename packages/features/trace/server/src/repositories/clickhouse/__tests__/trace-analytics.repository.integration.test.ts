@@ -1,27 +1,19 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * Round-trips the slim trace_analytics table (migrations 00039 + 00056) through
- * its real INSERT/SELECT SQL against ClickHouse. The unit tests cover the fold
- * derivation and the pure fromRow decoder with no I/O; this proves the
- * DDL↔repository column contract — a mismatched column name or type fails a
- * real insert loudly, which no mock can catch — plus the ADR-066 read-back path:
- * the 00056 columns (span count, annotation id set, name-resolution bookkeeping,
- * the out-of-order checkpoint) survive the trip so store.get() reconstructs
- * working state without touching event_log, the AppliedEventIds watermark
- * survives cache loss, and a pre-00056 row whose body omits the columns decodes
- * with documented defaults rather than refolding.
+ * Round-trips the slim trace_analytics table (migrations 00039 + 00056)
+ * through real INSERT/SELECT SQL, proving the DDL/repository column
+ * contract and the ADR-066 read-back path that unit tests (no I/O) cannot.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "@langwatch/trace-server";
-import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository";
+import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 const integration = describe.skipIf(!clickHouseConfigured);

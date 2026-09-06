@@ -1,21 +1,9 @@
 /**
- * The procedures the coding-agent activity tables call, and the hooks that call
- * them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, the same statement
- * `gateway-api.ts` and `governance-api.ts` make about their own maps: the
- * procedures live in `@langwatch/coding-agent-server`, `@langwatch/github-server`
- * and `@langwatch/trace-server`, none of which a web package may import even for
- * a type, and the router type does not exist until a process instantiates it.
- * Emitting this file from the mounted router is the fix; writing it by hand is
- * the interim, and it is honest only because the payload types below are the
- * contract's wherever the contract has them — which here is nearly everywhere,
- * because this vertical already speaks in contract schemas.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `codingAgents`, `github` and `tracesV2`
- * are mount points on the root router, and tRPC hashes that path into the React
- * Query cache key; spell one differently and these hooks quietly stop sharing a
- * cache with the `api.codingAgents.*` call sites that have not moved.
+ * The procedures the coding-agent activity tables call, and the hooks that
+ * call them. Hand-written until the mounted router can generate it
+ * (ADR-130). `codingAgents`, `github` and `tracesV2` are load-bearing tRPC
+ * cache-key segments — renaming one stops sharing a cache with
+ * `api.codingAgents.*` call sites that have not moved.
  */
 
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
@@ -24,7 +12,7 @@ import type {
   CodingAgentPullRequestDetail,
   CodingAgentSessionListRow,
 } from "@langwatch/coding-agent-contract";
-import type { PullRequestStatus } from "./pull-request-status";
+import type { PullRequestStatus } from "./pull-request-status.ts";
 
 /**
  * Whether the organization has GitHub connected, and where to install it.
@@ -126,13 +114,8 @@ export type CodingAgentApiMap = {
 };
 
 /**
- * The coding-agent tables' typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
- *
- * Its Provider is mounted by the process shell. `apps/ui` may not import this
- * package (it is not a governed web package), so the screen family that renders
- * these tables — `@langwatch/user-web`'s `screens/personal-workspace` — names it
- * on the shell's behalf.
+ * The coding-agent tables' typed tRPC hooks. Its Provider is mounted by the
+ * process shell; since `apps/ui` may not import this ungoverned package,
+ * `@langwatch/user-web`'s `screens/personal-workspace` names it instead.
  */
 export const codingAgentApi = createFeatureApi<CodingAgentApiMap>();

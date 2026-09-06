@@ -17,14 +17,9 @@ export const LWQL_VALUE_PREVIEW_LIMIT = 120;
 const ELLIPSIS = "…";
 
 /**
- * What a cell is, once the ways a value can be absent or non-finite have been
- * told apart from each other.
- *
- * Six of these are the emptiness-and-non-finite cases the spec refuses to let
- * collapse: `missing`, `null`, an empty string, zero (an ordinary `scalar`),
- * `NaN`, and `Infinity`. They are separate variants rather than separate
- * strings so that neither this module nor a caller can accidentally render two
- * of them the same way.
+ * What a cell is, once absent and non-finite values are told apart. Six
+ * emptiness/non-finite cases the spec refuses to collapse are separate
+ * variants, not strings, so nothing can accidentally render two the same.
  */
 export type LangWatchQLCell =
   /** The column exists, but the row object carries no value under its name. */
@@ -110,15 +105,10 @@ function scalarCell(text: string): LangWatchQLCell {
 }
 
 /**
- * The indented form is built on first read, not on construction.
- *
- * Every cell of every row passes through here, while `pretty` is read by one
- * thing only: the expanded view, which opens a single cell at a time. Building
- * it eagerly walked each structured value a second time for the whole result —
- * ten thousand rows of a nested column meant ten thousand indented copies of
- * documents that can each be kilobytes, none of which anyone looked at. The
- * getter keeps the property a plain `string` to its readers, and memoises so a
- * re-render of an open cell does not pay for it twice.
+ * The indented form is built on first read, not on construction: `pretty` is
+ * read only by the expanded view (one cell at a time), so building it eagerly
+ * for every row would indent documents nobody looked at. Memoised behind a
+ * getter so a re-render of an open cell does not pay for it twice.
  */
 function structuredCell(value: unknown): LangWatchQLCell {
   const compact = safeJson(value);
@@ -153,20 +143,11 @@ function safeJson(value: unknown, space?: number): string {
 }
 
 /**
- * The preview, and whether it is the whole value.
- *
- * Two things can make a preview stand in for the value rather than be it: the
- * value being longer than the cap, and the value carrying its own line breaks.
- * Both set `clipped`, which is what puts the expander on the cell — a member
- * who is not looking at the whole value has to be able to reach it.
- *
- * The line breaks go before the cap is applied, so the limit counts what is on
- * screen. They are collapsed here rather than left to `white-space` because the
- * table gives every row one fixed height and sizes its scroll range from that
- * constant rather than from measurement: a cell that renders two lines is
- * taller than the range it was counted into, and the padding rows stop adding
- * up. Leaving it to CSS would also keep the breaks in the DOM, where they still
- * reach anyone copying a selection or listening to a screen reader.
+ * The preview, and whether it is the whole value. Either an over-cap length
+ * or an embedded line break sets `clipped`, putting the expander on the
+ * cell. Line breaks are collapsed here rather than left to `white-space`
+ * because the table sizes its fixed row height from this constant, not
+ * measurement — and CSS would still leave them in the DOM for copy/reader.
  */
 function clip(text: string): { display: string; clipped: boolean } {
   // \r\n first, so a Windows line ending collapses to one space and not two.
@@ -183,13 +164,9 @@ function clip(text: string): { display: string; clipped: boolean } {
 }
 
 /**
- * The text a cell puts on screen.
- *
- * The one place the visible token for each kind is decided, so a test can prove
- * the kinds stay distinguishable and no surface can quietly disagree with it.
- * `""` for the empty string and `missing` for an absent key are deliberately
- * *words and marks*, not blanks: a blank cell is exactly how these three
- * different facts would collapse into one.
+ * The text a cell puts on screen — the one place the visible token per kind
+ * is decided. `""` and `missing` are deliberately words/marks, not blanks: a
+ * blank cell is how these distinct facts would collapse into one.
  */
 export function lwqlCellText(cell: LangWatchQLCell): string {
   switch (cell.kind) {
@@ -210,14 +187,10 @@ export function lwqlCellText(cell: LangWatchQLCell): string {
 }
 
 /**
- * What copying a cell puts on the clipboard, or `null` when there is nothing
- * to copy.
- *
- * A structure copies as compact JSON and a scalar copies as its exact text —
- * which is what keeps every digit of a wide integer or decimal that arrived as
- * a string. An absent value copies as nothing rather than as the word standing
- * in for it, so a paste never turns "this row had no such key" into the literal
- * text `missing`.
+ * What copying a cell puts on the clipboard, or `null` for nothing to copy.
+ * A scalar copies its exact text (keeping every digit of a wide number that
+ * arrived as a string); an absent value copies as nothing, never the word
+ * `missing`, so a paste can't turn "no such key" into that literal text.
  */
 export function lwqlCellCopyText(cell: LangWatchQLCell): string | null {
   switch (cell.kind) {
@@ -238,13 +211,9 @@ export function lwqlCellCopyText(cell: LangWatchQLCell): string | null {
 }
 
 /**
- * Column names the response used more than once, in the order they first
- * appear.
- *
- * A row arrives as an object keyed by column name, so two columns sharing a
- * name have already collapsed to one value by the time anything renders — the
- * second overwrote the first during parsing. Nothing downstream can recover the
- * lost column, so the only honest move is to say so.
+ * Column names the response used more than once, in first-seen order. A row
+ * arrives keyed by column name, so a duplicate already collapsed to one
+ * value by the time anything renders — the only honest move is to say so.
  */
 export function duplicateLangWatchQLColumnNames(columns: readonly LangWatchQLColumn[]): string[] {
   const counts = new Map<string, number>();

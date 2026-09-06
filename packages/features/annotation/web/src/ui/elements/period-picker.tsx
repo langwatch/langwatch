@@ -1,15 +1,9 @@
 /**
- * The range control at the head of every annotation list.
- *
- * The rendering half of the family-local period copy — `model/annotation-period.ts`
- * holds the presets, the window they resolve to and the address writes. A
- * FAMILY-LOCAL COPY of `platform/app/src/components/PeriodSelector`, which keeps
- * thirty callers and so did not travel.
- *
- * NARROWED: the platform control takes a size, a trigger variant and a
- * placement because an analytics rail foot wants a small ghost button opening
- * upwards. Every annotation list renders it the same way, so those three are
- * gone and the look is stated once.
+ * The range control at the head of every annotation list. The rendering half
+ * of the family-local period copy (`model/annotation-period.ts` holds the
+ * presets and address writes) — a copy of the old `PeriodSelector`, whose
+ * other thirty callers a deletes-only migration forbids repointing.
+ * Narrowed: no size/variant/placement props, since every list looks the same.
  */
 
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
@@ -22,7 +16,7 @@ import {
   type AnnotationPeriod,
   type AnnotationPeriodMode,
   type AnnotationPeriodPresetKey,
-} from "../../model/annotation-period";
+} from "../../model/annotation-period.ts";
 
 export function PeriodPicker({
   period,

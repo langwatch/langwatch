@@ -15,13 +15,13 @@ import { LuArrowLeft } from "react-icons/lu";
 import {
   isScenarioMappingValid,
   ScenarioInputMappingSection,
-} from "../../elements/suites/scenario-input-mapping-section";
+} from "../../elements/suites/scenario-input-mapping-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { Link } from "../../elements/link";
+import { Link } from "../../elements/link.tsx";
 import type { FieldMapping, Variable } from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import type {
@@ -40,7 +40,7 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /** An agent as the browser holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 export type AgentWorkflowEditorDrawerProps = {
@@ -309,9 +309,9 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                 <Field.Root>
                   <Field.Label>Linked Workflow</Field.Label>
                   {editorHref ? (
-                    // isExternal renders a plain anchor directly, not composed through the app router's client-side Link: target="_blank" is always
-                    // a hard navigation into a new tab regardless, and composing through NextLink previously swallowed data-testid — Chakra's
-                    // asChild slot only forwards style-related props to the composed child, not arbitrary data attributes.
+                    // isExternal renders a plain anchor, not the app router's client-side Link:
+                    // target="_blank" is a hard navigation regardless, and NextLink previously
+                    // swallowed data-testid — Chakra's asChild only forwards style props.
                     <Link href={editorHref} isExternal data-testid="open-workflow-editor-link">
                       <WorkflowCardDisplay
                         name={workflowQuery.data.name}

@@ -28,24 +28,24 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers";
-import { type ConfigFormCtx } from "../../../../model/provider-types";
-import { readHandledError } from "../../../../model/handled-error";
+import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers.ts";
+import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
+import { readHandledError } from "../../../../model/handled-error.ts";
 import {
   useAutomationToaster,
   useDescribeError,
   useShowErrorToast,
-} from "../../../../behavior/automation-feedback";
+} from "../../../../behavior/automation-feedback.ts";
 import {
   useAppBaseUrl,
   useFeatureFlag,
   useOrganizationTeamProject,
-} from "../../../../behavior/automation-session";
-import { api } from "../../../../behavior/automation-api";
-import { MainSectionList } from "./main-section-list";
-import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer";
-import { ALERT_TEMPLATE_VARIABLES } from "../../../liquid-editor";
-import { REPORT_TEMPLATE_VARIABLES } from "../../../liquid-editor";
+} from "../../../../behavior/automation-session.ts";
+import { api } from "../../../../behavior/automation-api.ts";
+import { MainSectionList } from "./main-section-list.tsx";
+import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer.tsx";
+import { ALERT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
+import { REPORT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -59,11 +59,11 @@ import {
   reportInputFromDraft,
   subjectIsSet,
   templatesFromDraft,
-} from "./draft-model";
-import { useGraphAlertLabels } from "./use-graph-alert-labels";
-import { useAutomationStore } from "./automation-store";
-import { consumeDraftKeptOnSubFlowReturn, isHandingOverToSubFlow } from "../../behavior/sub-flow";
-import { useConditionsSet, useConfigComplete, useDraft, useSection } from "./automation-selectors";
+} from "./draft-model.ts";
+import { useGraphAlertLabels } from "./use-graph-alert-labels.ts";
+import { useAutomationStore } from "./automation-store.ts";
+import { consumeDraftKeptOnSubFlowReturn, isHandingOverToSubFlow } from "../../behavior/sub-flow.ts";
+import { useConditionsSet, useConfigComplete, useDraft, useSection } from "./automation-selectors.ts";
 
 /** Maps template-validation field metadata to the editor-specific headline. */
 const TEMPLATE_FIELD_TITLES: Record<string, string> = {
@@ -137,18 +137,11 @@ function cadenceTodo(draft: AutomationDraft): string {
 }
 
 /**
- * Orchestrator for the staged automation authoring drawer (ADR-036).
- *
- * - Holds no UI of its own beyond the drawer chrome + footer.
- * - Owns the data-loading lifecycle: scaffold (synchronous client),
- *   trigger row prefill on edit, traces-view filter prefill on create.
- * - Owns the live preview / test-fire / upsert mutations.
- * - Renders three pieces: the main drawer with `<MainSectionList/>`, the
- *   Filters secondary, and the Configuration secondary (which itself
- *   delegates the inner config to the active provider's ConfigForm).
- *
- * Everything else lives in `components/`, `state/`, `providers/`, or
- * `logic/`. Adding a new action type doesn't change this file.
+ * Orchestrator for the staged automation authoring drawer (ADR-036). Owns
+ * the data-loading lifecycle, live preview/test-fire/upsert mutations, and
+ * renders the main drawer plus the Filters and Configuration secondaries.
+ * Everything else lives in `components/`, `state/`, `providers/`, `logic/` —
+ * adding a new action type doesn't change this file.
  */
 export function AutomationDrawer({
   automationId,
@@ -187,14 +180,9 @@ export function AutomationDrawer({
    *  current filter becomes the automation's subject. */
   initialFilterQuery?: string;
   /**
-   * Closes the editor.
-   *
-   * Taken as a prop rather than called on the navigator, which is the drawers
-   * doc's rule: a target that calls `closeDrawer` itself clears the whole
-   * navigation stack and drops the caller with it. Every way in now goes
-   * through the registry — the screen's own rows, the alert emails, the trace
-   * explorer's Automate button — so what arrives here is the composing
-   * application's `closeDrawer`, supplied once by its registry adapter.
+   * Closes the editor. Taken as a prop rather than calling `closeDrawer`
+   * directly (drawers doc rule): that would clear the whole navigation
+   * stack. Supplied once by the composing application's registry adapter.
    */
   onClose: () => void;
 }) {
@@ -758,17 +746,10 @@ export function AutomationDrawer({
           });
         },
         onError: (err) => {
-          // The attempt log is the persistent record of what the toast just
-          // said, so it has to say the same thing. A rejected template names
-          // which of the four editors to open, and takes precedence; anything
-          // else takes the one line the host would have shown.
-          //
-          // `platform/app` asked `explainAnyError` whether the code carried
-          // registered copy, so a title-only code could be logged with its
-          // title and an unregistered one with the generic headline. That
-          // reader is the presentation registry, which has not moved, so the
-          // log takes the host's description — which is the same sentence the
-          // toast shows and the property the log was after.
+          // The attempt log must say what the toast just said: a rejected
+          // template names which editor to open and takes precedence, else
+          // the log takes the host's description from the presentation
+          // registry — the same sentence the toast shows.
           const templateTitle = templateValidationTitle(err);
           pushAttempt({
             at: Date.now(),

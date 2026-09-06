@@ -1,30 +1,9 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts`,
- * `governance-api.ts`, `automation-api.ts`, `ops-api.ts`, `agent-api.ts`,
- * `dataset-api.ts` and `authz-api.ts` say of their own maps: the procedures are
- * mounted by the process out of `@langwatch/annotation-server`, which a web
- * package may not import even for a type, and the router type does not exist
- * until a process instantiates it. Emitting this file from the mounted router
- * is the fix; writing it by hand is the interim, and it is honest only because
- * every payload below is a contract's own or a shape this package already
- * declares for itself.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `annotation`, `annotationScore`,
- * `traces`, `organization`, `project` and `personalWorkspaceFeatures` are mount
- * points on the root router, and tRPC hashes that path into the React Query cache key;
- * spell one differently and these hooks quietly stop sharing a cache with the
- * `api.annotation.*` call sites that have not moved — the annotation queue
- * walker (`/annotations/my-queue`), the trace drawer's annotation rail, the
- * trace table's annotations column and the queue drawer are all still such call
- * sites, and every one of them invalidates the same four count entries this
- * package's mutations do.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. Recorded here so the finding it
- * raises is a decision rather than a surprise.
+ * Hand-written until the mounted router can generate it (ADR-130). The
+ * segment names are load-bearing tRPC cache keys — renaming one stops
+ * sharing a cache with the annotation queue walker, trace drawer rail,
+ * trace table column and queue drawer, which invalidate the same entries.
  */
 
 import type {
@@ -36,7 +15,7 @@ import type {
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
-import type { AnnotationTrace } from "../model/annotation-row";
+import type { AnnotationTrace } from "../model/annotation-row.ts";
 
 /** The project every annotation procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -217,13 +196,9 @@ export type AnnotationApiMap = {
     };
 
     /**
-     * The traces behind a set of annotations, for the input/output columns and
-     * the export.
-     *
-     * `AnnotationTrace` is this package's own narrowing of the trace — the
-     * three fields a row renders — rather than `@langwatch/trace-contract`'s
-     * whole `Trace`: the list neither reads nor should be typed against a span
-     * tree it never touches.
+     * The traces behind a set of annotations, for the input/output columns.
+     * `AnnotationTrace` narrows the trace to the three fields a row renders,
+     * rather than `@langwatch/trace-contract`'s whole `Trace` span tree.
      */
     getTracesWithSpans: {
       query: {
@@ -235,14 +210,10 @@ export type AnnotationApiMap = {
 
   organization: {
     /**
-     * The organization graph, narrowed to what this family needs.
-     *
-     * Read by the frontend feature that mounts these screens rather than by a
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it. `isPersonal` and `ownerUserId` are
-     * declared because the dataset hand-off's feature gate turns on whether the
-     * project in scope is the reader's OWN personal workspace, which is a
-     * column on the team rather than a grant.
+     * The organization graph, narrowed to what this family needs. Declared
+     * here (not by a screen) so it shares the shell's own cache entry.
+     * `isPersonal`/`ownerUserId` gate the dataset hand-off feature, since
+     * "own personal workspace" is a column on the team, not a grant.
      */
     getAll: {
       query: {
@@ -312,13 +283,9 @@ export type AnnotationApiMap = {
 };
 
 /**
- * The annotations family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: hooks here call it, and screens call
- * the hooks. It is exported from `screens/annotations` only so the process
- * shell can mount `annotationApi.Provider`.
+ * The annotations family's typed tRPC hooks. Internal by convention — hooks
+ * here call it, screens call the hooks. Exported only so
+ * `screens/annotations` can mount `annotationApi.Provider`.
  */
 export const annotationApi = createFeatureApi<AnnotationApiMap>();
 

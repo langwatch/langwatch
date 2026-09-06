@@ -1,35 +1,28 @@
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
-import { ApiVersionUnavailableError } from "../errors.js";
-import { runMiddlewareStack } from "./middleware-stack.js";
-import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
+import { ApiVersionUnavailableError } from "../errors.ts";
+import { runMiddlewareStack } from "./middleware-stack.ts";
+import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.ts";
 import {
   mountFamilyRoute,
   mountOptionalVersionRoutes,
   mountStaticVersionRoutes,
-} from "./public-rest-routing.js";
-import type { BaseApp, ServiceConfig, VersionStatus } from "./types.js";
-import { isDateVersion } from "./types.js";
-import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
-import { canonicalV1Path } from "./v1-alias.js";
+} from "./public-rest-routing.ts";
+import type { BaseApp, ServiceConfig, VersionStatus } from "./types.ts";
+import { isDateVersion } from "./types.ts";
+import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.ts";
+import { canonicalV1Path } from "./v1-alias.ts";
 
 type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 /**
- * Mounts the latest catalogue at the family's own paths and nothing else: no
- * dated namespace and no version guard, because a family based at bare `/api`
- * would claim `/api/:apiVersion{…}/*` and shadow every sibling.
- *
- * Every bare-mounted family additionally answers at the `/api/v1` address of
- * each of its own paths — `/api/dataset` at `/api/v1/dataset`,
- * `/api/evaluations/list` at `/api/v1/evaluations/list` — which is the
- * generation it already served and the address the published document names
- * (ADR 002 §1, decision 20). A family opts out by setting `v1Alias: false` on
- * its own service config (the auth and project families do, because their
- * `/api/v1` twin belongs to another family or to nothing at all); that
- * opt-out is respected here unchanged, nothing in this function overrides it.
+ * Mounts the latest catalogue at the family's own paths only — no dated
+ * namespace, no version guard, since a family at bare `/api` would claim
+ * `/api/:apiVersion{…}/*` and shadow every sibling. Every bare-mounted
+ * family also answers at its own `/api/v1` address (ADR 002 §1, decision
+ * 20), unless its service config opts out with `v1Alias: false`.
  */
 function mountBareRoutes<TProject>({
   app,
@@ -317,9 +310,9 @@ interface FallbackCandidate {
 }
 
 /**
- * Pre-builds the dispatch stacks for unregistered dates: one candidate list per effective dated version, always
- * undocumented (unregistered dates are not in the document) and validating params off the fallback's own path
- * match. Returns null when no dated version exists, leaving the guards as plain 404s.
+ * Pre-builds the dispatch stacks for unregistered dates: one candidate list
+ * per effective dated version, always undocumented and validating params
+ * off the fallback's own path match. Null when no dated version exists.
  */
 function buildDateFallback<TProject>({
   basePath,

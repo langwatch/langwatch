@@ -1,14 +1,10 @@
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
- * "Edit API key": the same ceiling, applied to a key that already exists.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/EditApiKeyDrawer.tsx`,
- * mounted inline by the screen exactly as the create drawer is. The
- * substitutions are the create drawer's, for the same reasons, and the one
- * behaviour worth restating here is why the selections are clamped TWICE:
- * a level stored on the key, or picked before another scope was added, can sit
- * above what the caller holds everywhere the key will now be bound, and the save
- * would come back `api_key_scope_violation` for a row that still looked granted.
+ * "Edit API key": the same ceiling as create, applied to a key that already
+ * exists. Selections are clamped TWICE: a level stored on the key, or picked
+ * before another scope was added, can sit above what the caller now holds
+ * everywhere the key binds, and save would else come back
+ * `api_key_scope_violation` for a row that still looked granted.
  */
 
 import {
@@ -28,7 +24,7 @@ import {
   type ApiKeyListEntry,
   type NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker";
+import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -41,12 +37,12 @@ import {
   getUserPermissionsAcrossScopes,
   teamRolePermissions,
   type PermissionMode,
-} from "../../model/api-key-permissions";
+} from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
   type PermissionSelection,
-} from "../blocks/permission-category-list";
+} from "../blocks/permission-category-list.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;

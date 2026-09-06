@@ -3,13 +3,13 @@ import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
-import DynamicZodForm from "../checks/dynamic-zod-form";
+import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import { Link } from "@langwatch/ui-host/link";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared";
-import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section";
+import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
 
 /**
  * Props for the evaluator editor content.
@@ -130,7 +130,7 @@ export function EvaluatorEditorContent({
           </VStack>
         )}
 
-        {/* No settings message - only for non-workflow evaluators with no settings and no mappings */}
+        {/* No settings message - non-workflow evaluators with no settings and no mappings */}
         {!hasSettings && !mappingsConfig && !isWorkflowEvaluator && (
           <Text fontSize="sm" color="fg.muted">
             This evaluator does not have any settings to configure.

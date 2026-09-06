@@ -1,38 +1,10 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts`,
- * `governance-api.ts` and `personal-workspace-api.ts` say of their own maps:
- * the procedures live in `@langwatch/automation-server`,
- * `@langwatch/analytics-server`, `@langwatch/dataset-server` and the trace
- * verticals, none of which a web package may import even for a type, and the
- * router type does not exist until a process instantiates it. Emitting this
- * file from the mounted router is the fix; writing it by hand is the interim,
- * and it is honest only because the payload types below are the contract's
- * wherever the contract has them — and for this family that is most of them.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `automation`, `graphs`, `dashboards`,
- * `dataset`, `tracesV2`, `team` and `annotation` are mount points on the root
- * router, and tRPC hashes that path into the React Query cache key; spell one
- * differently and these hooks quietly stop sharing a cache with the
- * `api.automation.*` call sites that have not moved.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. It buys a content-faithful move:
- * every `api.x.y.useQuery(...)` call site in the screen, the two drawers and
- * the five delivery providers is the line it was in `platform/app`. Recorded
- * here so the finding it raises is a decision rather than a surprise.
- *
- * DATE, STRING OR NUMBER IS NOT A CHOICE THIS FILE MAKES. The automation router
- * returns the stored rows over plain JSON, so every instant on them is an ISO
- * 8601 string; the analytics and trace routers project through DTOs of their own.
- * Every entry below states which, because getting it wrong typechecks here and
- * fails at the call site.
- *
- * ADD A PROCEDURE when a hook in this package needs one. Do not add one
- * speculatively: every entry is a promise that the router still mounts it under
- * that name, and nothing checks that promise until the generator exists.
+ * Hand-written until the mounted router can generate it (ADR-130). Segment
+ * names are load-bearing tRPC cache keys. Every entry states date/string/
+ * number explicitly — the automation router returns ISO 8601 strings, the
+ * analytics and trace routers project through their own DTOs — because
+ * getting it wrong typechecks here and fails at the call site.
  */
 
 import type {
@@ -291,17 +263,11 @@ export type AutomationApiMap = {
   };
 
   /**
-   * The two PUBLIC procedures behind `/unsubscribe`.
-   *
-   * They are the only calls in this map that run with no session at all: the
-   * `?token=` is the authorization (ADR-031), its HMAC binds it to one
-   * recipient, and both are mounted on the process's PUBLIC procedure. A
-   * recipient opening a link from a mail client holds nothing else.
-   *
-   * `emailSuppression` is the mount point on the root router — it is not
-   * `automation`, even though `@langwatch/automation-server` is what mounts it
-   * — and tRPC hashes that path into the React Query cache key, so the segment
-   * is load-bearing.
+   * The two PUBLIC procedures behind `/unsubscribe` — the only calls here
+   * that run with no session. The `?token=` is the authorization (ADR-031),
+   * HMAC-bound to one recipient. `emailSuppression` is the mount point on
+   * the root router, not `automation`, despite both mounting from
+   * `@langwatch/automation-server` — the segment name is load-bearing.
    */
   emailSuppression: {
     /**
@@ -330,13 +296,10 @@ export type AutomationApiMap = {
 
   organization: {
     /**
-     * The organization graph the scope is resolved out of.
-     *
-     * Read by the frontend feature that mounts this screen rather than by the
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it: the graph is fetched once per
-     * document however many halves of the product want it. Only the four
-     * columns this family resolves a scope from are declared.
+     * The organization graph the scope is resolved out of. Declared here
+     * (not by the screen) so it shares the shell's own cache entry, fetched
+     * once per document. Only the four columns this family reads a scope
+     * from are declared.
      */
     getAll: {
       query: {
@@ -367,13 +330,9 @@ export type AutomationApiMap = {
 };
 
 /**
- * The automations family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: hooks here call it, and other
- * packages call the hooks. It is exported from `screens/automations` only so
- * the process shell can mount `automationApi.Provider`.
+ * The automations family's typed tRPC hooks. Internal by convention — hooks
+ * here call it, other packages call the hooks. Exported only so
+ * `screens/automations` can mount `automationApi.Provider`.
  */
 export const automationApi = createFeatureApi<AutomationApiMap>();
 

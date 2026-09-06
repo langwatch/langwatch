@@ -36,18 +36,18 @@ import type { RouterOutputs } from "@langwatch/workflow-web/surfaces/workflow-ap
 type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { newTargetId } from "@langwatch/experiment-contract";
-import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants";
-import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name";
-import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation";
-import { useOpenEvaluatorEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor";
+import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
+import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
+import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
+import { useOpenEvaluatorEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import {
   scrollToTargetColumn,
   useOpenTargetEditor,
-} from "../../../behavior/experiments-v3/use-open-target-editor";
-import { useDatasetSelectionLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader";
-import { useSyncWorkflowTargetFields } from "../../../behavior/experiments-v3/use-sync-workflow-target-fields";
+} from "../../../behavior/experiments-v3/use-open-target-editor.ts";
+import { useDatasetSelectionLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
+import { useSyncWorkflowTargetFields } from "../../../behavior/experiments-v3/use-sync-workflow-target-fields.ts";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -58,41 +58,41 @@ import type {
   TableMeta,
   TableRowData,
   TargetConfig,
-} from "../../../model/experiments-v3/types";
+} from "../../../model/experiments-v3/types.ts";
 import {
   COMPARISON_EVALUATOR_TYPE,
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "../../../model/experiments-v3/types";
+} from "../../../model/experiments-v3/types.ts";
 import { connectedTargetFields } from "@langwatch/experiment-contract";
-import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion";
+import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
 import { isRowEmpty } from "@langwatch/experiment-contract";
-import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks";
+import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import { isCellInExecution } from "@langwatch/experiment-contract";
-import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters";
+import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters.ts";
 import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
-} from "../../../model/experiments-v3/http-agent-utils";
-import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation";
+} from "../../../model/experiments-v3/http-agent-utils.ts";
+import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks";
+import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import {
   type PromptOutputField,
   toTargetOutputFields,
-} from "../../../model/experiments-v3/target-output-fields";
-import { ComparisonCell } from "./comparison-cell";
-import { ComparisonColumnHeader } from "./comparison-column-header";
-import { DatasetSuperHeader } from "./dataset-super-header";
-import { EvaluationsV3DatasetTableProvider } from "./evaluations-v3-dataset-table-provider";
-import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar";
+} from "../../../model/experiments-v3/target-output-fields.ts";
+import { ComparisonCell } from "./comparison-cell.tsx";
+import { ComparisonColumnHeader } from "./comparison-column-header.tsx";
+import { DatasetSuperHeader } from "./dataset-super-header.tsx";
+import { EvaluationsV3DatasetTableProvider } from "./evaluations-v3-dataset-table-provider.tsx";
+import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
 import {
   CheckboxCellFromMeta,
   CheckboxHeaderFromMeta,
   TargetCellFromMeta,
   TargetHeaderFromMeta,
-} from "./table-meta-wrappers";
-import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header";
+} from "./table-meta-wrappers.tsx";
+import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -132,9 +132,9 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
 };
 
 /**
- * Per-row evaluator results for one target: every per-target evaluator's verdict, plus — for a column-target
- * comparison (target.type === "evaluator" with an embedded comparison config) — the target's own row keyed by its
- * own id, since the target IS the evaluator for this row-shaping purpose.
+ * Per-row evaluator results for one target: every per-target evaluator's
+ * verdict, plus — for a column-target comparison — the target's own row
+ * keyed by its own id, since the target IS the evaluator for this shape.
  */
 export const buildTargetEvaluatorsForRow = (
   target: TargetConfig,
@@ -483,7 +483,7 @@ export function EvaluationsV3Table({
         type: field.type as Field["type"],
       }));
 
-      // Comparison column-target: seed an empty comparison config so the column owns its variants/goldenField
+      // Comparison column-target: seed an empty config so the column owns its variants/goldenField
       // selections — this is the discriminator the Run flow and validation use to render the clean
       // ComparisonConfigForm instead of the generic per-row mappings UI.
       const config = (evaluator.config ?? null) as {
@@ -782,7 +782,7 @@ export function EvaluationsV3Table({
   const handleAddTarget = useCallback(() => {
     // Clear any pending mappings from previous flows
     pendingMappingsRef.current = {};
-    // Note: Don't clear switchingTargetIdRef here - it's set by handleSwitchTarget before calling this
+    // Note: don't clear switchingTargetIdRef - handleSwitchTarget sets it before calling this
 
     // Build available sources for variable mapping (for new prompts)
     const availableSources = buildAvailableSources();
@@ -1138,7 +1138,7 @@ export function EvaluationsV3Table({
   }, [ui.selectedCell, setSelectedCell]);
 
   const rowCount = getRowCount(activeDatasetId);
-  // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
+  // Always show at least 3 rows, plus 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);
 
   // Determine if we should use virtualization
@@ -1239,7 +1239,7 @@ export function EvaluationsV3Table({
         ),
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset re-renders on change
   }, [
     activeDatasetId,
     activeDataset,
@@ -1581,9 +1581,9 @@ export function EvaluationsV3Table({
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(0);
 
-  // Single source of truth for a column's default/minimum width, by id and type — every sizing path (drag start, drag clamp, double-click reset, total-width sum,
-  // rendered width) reads through this instead of each re-deriving "is this a comparison column" on its own, which is how the comparison 24%/14% sizing previously
-  // only applied to rendering while the other paths silently fell back to the ordinary target defaults.
+  // Single source of truth for a column's default/minimum width, by id and type — every
+  // sizing path reads through this instead of re-deriving "is this a comparison column" on
+  // its own, which is how the comparison sizing previously only applied to rendering.
   const getDefaultPctForColumn = useCallback(
     (columnId: string, columnType: string): number => {
       if (columnType === "dataset") return DATASET_COL_DEFAULT_PCT;
@@ -1935,9 +1935,10 @@ export function EvaluationsV3Table({
                     key={header.id}
                     style={{
                       width: getColumnWidth(header.id, columnType, isFixedWidth),
-                      // The highlight is a brief auto-clearing flash (see CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it needs to fade smoothly rather than snapping off. boxShadow always has a value
-                      // (harmless — headers don't normally use one) so it has a "from" and "to" to interpolate. background is left unset when not highlighted rather than forced to "transparent" — this inline
-                      // style would otherwise override the header's own opaque background (needed so scrolled rows don't show through the sticky header).
+                      // The highlight is a brief auto-clearing flash (CLICK_HIGHLIGHT_DURATION_MS)
+                      // that must fade, not snap off, so boxShadow always has a "from"/"to" to
+                      // interpolate. background stays unset (not "transparent") when unhighlighted,
+                      // or this would override the sticky header's own opaque background.
                       transition: "box-shadow 300ms ease, background-color 300ms ease",
                       boxShadow: isHighlightedColumn
                         ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`

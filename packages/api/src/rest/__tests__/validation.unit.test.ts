@@ -6,24 +6,15 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { validator as zValidator } from "../validation.js";
+import { validator as zValidator } from "../validation.ts";
 
 /**
- * The boundary the validator's refusal has to reach, in the flat shape the
- * applications render it in: the handled error's own serialization, with
- * `code` published as `error`, the sentence beside it, `meta` flattened out,
- * and `reasons` present only when there are some — an empty list would say a
- * body had field-level faults when it never parsed into fields at all.
- *
- * A failure that is not handled keeps whatever status it declared. That is the
- * case the validator's malformed-body catch has to leave alone: it wraps the
- * middleware, so a 400 raised by the ROUTE would be reported as a parse failure
- * if the wrapper did not track whether the handler had been entered.
- *
- * Written here rather than imported from a process because the subject is the
- * validator, not any one deployment's renderer — and the point of these cases
- * is what happens BETWEEN the two: the stock validator answers a schema
- * failure itself and `onError` never runs at all.
+ * The boundary the validator's refusal has to reach, flattened the way
+ * applications render it: `code` as `error`, `meta` flattened, `reasons`
+ * only when non-empty. A failure that is not handled keeps its declared
+ * status — the malformed-body catch must leave a route's own 400 alone
+ * rather than reporting it as a parse failure. Written here (not imported
+ * from a process) since the subject is the validator, not a renderer.
  */
 const handleError: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

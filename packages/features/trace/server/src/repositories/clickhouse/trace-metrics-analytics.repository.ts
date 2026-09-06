@@ -1,13 +1,13 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
-import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
-} from "../../projections/trace-derived.projection";
-import type { TraceAnalyticsRepository } from "../trace-metrics-analytics.repository";
-import { queryWindowed } from "./windowed-read.mapper";
+} from "../../projections/trace-derived.projection.ts";
+import type { TraceAnalyticsRepository } from "../trace-metrics-analytics.repository.ts";
+import { queryWindowed } from "./windowed-read.mapper.ts";
 
 const TABLE_NAME = "trace_analytics" as const;
 
@@ -20,14 +20,10 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
 } as const;
 
 /**
- * ClickHouse write shape for the slim `trace_analytics` table (ADR-034 Phase 2,
- * migration 00039).
- *
- * The 64-bit-integer columns (`TotalDurationMs`) are serialised as STRINGS in
- * the JSONEachRow body — JSON numbers can't safely round-trip values past 2^53
- * (Phase 1 hit `CANNOT_PARSE_QUOTED_STRING` for the same reason in the rollup
- * repository). Float64 columns stay as numbers. UInt16 / UInt32 / Bool fit in
- * JSON numbers and pass through unstringified.
+ * ClickHouse write shape for the slim `trace_analytics` table (ADR-034
+ * Phase 2, migration 00039). 64-bit-integer columns (`TotalDurationMs`) are
+ * serialised as strings in the JSONEachRow body, since JSON numbers can't
+ * safely round-trip past 2^53; Float64/UInt16/UInt32/Bool stay unstringified.
  */
 interface ClickHouseTraceAnalyticsWriteRecord {
   TenantId: string;
@@ -191,36 +187,9 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
 
   /**
    * The trace's last committed slim row plus its applied-event-id watermark
-   * (ADR-066, migration 00056) — the CH-fallthrough behind a Redis cache miss.
-   *
-   * Mapped onto `queryWindowed` with `fallback: "none"` purely so the read lands
-   * on `clickhouse_windowed_read_total{table="trace_analytics"}` exactly once
-   * (ADR-068): windowed calls count as `hit`, the executor's unwindowed retry as
-   * `unwindowed`, a throw as `error`. Their ratio is this path's window-fit
-   * signal and the baseline for the planned rate-derived limiter. `"none"` is
-   * the only correct fallback here — the fold executor owns the miss retry (see
-   * the unwindowed-inner note on {@link queryLatestVersion}), so a second
-   * recovery ladder inside the repository would re-run a read the executor is
-   * about to re-issue anyway. Same FALLBACK POLICY as the trace_summaries
-   * read-back arm — but not the same cost, and the difference matters: that
-   * table is `ORDER BY (TenantId, TraceId)`, so its dedup subquery is a sort-key
-   * prefix seek, while this one is `(TenantId, OccurredAt, TraceId)` with the
-   * key third. Leaving the dedup scope unwindowed is required for correctness
-   * (see {@link queryLatestVersion}), so on this table it is a tenant-wide
-   * scan across every partition, narrowed only by the skip index — the outer
-   * window prunes the read but cannot prune the dedup. That, not the outer
-   * read, is this query's cost floor; ADR-066's "cache misses are O(one row)"
-   * describes the row count returned, not the granules opened.
-   *
-   * The centre/half-width round-trip is exact: fromMs/toMs are integers, so
-   * their mean and half-difference are exactly representable in float64 and
-   * reconstruct the caller's bounds verbatim.
-   *
-   * `sqlFor` is deliberately NOT used. Its docstring tells adopters to render
-   * the same predicate into the inner and outer scopes of a dedup subquery;
-   * this read must not do that (again, see {@link queryLatestVersion}), so the
-   * bound is threaded through as plain fromMs/toMs and rendered by the query
-   * builder into the OUTER scope alone.
+   * (ADR-066, migration 00056), the CH-fallthrough behind a Redis cache
+   * miss. `fallback: "none"`: the fold executor owns the miss retry (see
+   * {@link queryLatestVersion}), so a second ladder here would be wasted.
    */
   async tryFindByTraceIdWithApplied({
     tenantId,
@@ -266,55 +235,12 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
   }
 
   /**
-   * How two versions sharing `max(UpdatedAt)` are ranked, as SQL.
-   *
-   * ORDER BY breaks UpdatedAt ties, and is NOT the
-   * `ORDER BY <version> DESC LIMIT 1` anti-pattern in
-   * dev/docs/best_practices/clickhouse-queries.md: the IN-tuple has already cut
-   * the input to the rows sharing max(UpdatedAt) — normally one, occasionally
-   * two — so the sort reads no column `SELECT *` was not already materialising
-   * for those same rows, rather than every unmerged version of the trace.
-   *
-   * The tie is reachable despite that doc's "no ties possible" claim.
-   * `AbstractFoldProjection` stamps `max(Date.now(), prev + 1)`, which is
-   * monotonic only WITHIN one state chain; two writers that resumed from the
-   * same committed version can land on the same ms. Both rows then satisfy the
-   * IN-tuple and a bare LIMIT 1 picks arbitrarily — handing the fold stale
-   * state it resumes from and rewrites, silently dropping the other version's
-   * contributions and its applied-id watermark.
-   *
-   * The tiebreak orders by how far each version's fold actually got:
-   *   1. `LastEventOccurredAt DESC` — the fold's own progress watermark
-   *      (`max(prev, event.occurredAt)`, so non-decreasing): the version that
-   *      applied the latest event wins.
-   *   2. `SpanCount DESC` — folds only ever increment it, so among versions
-   *      that saw the same latest event time, more spans folded = more complete.
-   *   3. `length(AppliedEventIds) DESC` — more deliveries absorbed. Last of the
-   *      three because the watermark is a bounded ring, so it saturates.
-   *   4. `OccurredAt ASC` — a last-resort tie-break, and NOT a progress signal:
-   *      since ADR-071 step 3 OccurredAt is the frozen storage anchor, equal
-   *      across a trace's versions except where a rebuild from an absent row
-   *      re-derived it — which can land either side of the original — so no
-   *      direction of it says which version folded further. The three keys above
-   *      it are the progress ranking. Reading the array length costs only its
-   *      offsets column, and every other key is a scalar already in the row.
-   *
-   * The four progress keys are BEST-EFFORT, not total: two concurrent versions
-   * can be equal on every one — same latest event, same span count, same
-   * saturated watermark length, and (precisely because the anchor is now
-   * frozen) the same OccurredAt. `toString(AppliedEventIds) DESC` closes what
-   * that used to leave open: a bare `LIMIT 1` picked ARBITRARILY, so two reads
-   * could crown different winners and the fold would resume from one version
-   * while the applied-id watermark it trusted came from the other. The
-   * watermark CONTENTS discriminate where its length cannot — two writers
-   * racing the same committed version folded different batches, so their
-   * merged id sets differ even at equal size — and any versions still equal on
-   * all five keys carry the same watermark and the same progress, making the
-   * pick between them immaterial. No key can know which fold got further; what
-   * the dedup machinery needs is the SAME winner every read, and a total order
-   * over existing columns provides it without a schema change. Cost: the
-   * serialisation runs only over the handful of candidate rows that survived
-   * the IN-tuple.
+   * How two versions sharing `max(UpdatedAt)` are ranked, as SQL — reachable
+   * because `AbstractFoldProjection`'s monotonic stamp is only monotonic
+   * within one state chain. Full tiebreak rationale (progress watermark,
+   * span count, applied-id length/contents, frozen OccurredAt) in
+   * dev/docs/best_practices/clickhouse-queries.md, "Breaking Ties Among
+   * Versions Sharing max(UpdatedAt)".
    */
   private static readonly LATEST_VERSION_ORDER = `
         ORDER BY
@@ -325,29 +251,12 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
           toString(AppliedEventIds) DESC`;
 
   /**
-   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}.
-   *
-   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
-   * ReplacingMergeTree only physically collapses rows sharing the full sort key
-   * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor (ADR-071 step 3) is
-   * what lets a trace's versions share that key, but rows written before the
-   * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
-   * carry more than one OccurredAt, so superseded versions persist until TTL.
-   * The inner dedup subquery reads only three narrow scalar columns —
-   * `TenantId`, `TraceId` and `max(UpdatedAt)`, the last of which is the RMT
-   * version column rather than part of the sort key — and no heavy Attributes
-   * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
-   * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
-   * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
-   * the narrow column set, not the key prefix.
-   *
-   * `window` bounds OccurredAt on the OUTER read only, keeping it a
-   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
-   * it resolves the TRUE latest version: windowing it too would let a trace
-   * whose latest version's OccurredAt drifted outside the window read back as a
-   * stale older version (a non-null result no fallback catches). Unwindowed, the
-   * same case yields an empty outer read, which the executor's unwindowed retry
-   * recovers.
+   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}. Dedups
+   * with the IN-tuple pattern, never FINAL. `window` bounds OccurredAt on
+   * the outer read only — the inner dedup is deliberately unwindowed, per
+   * the "range filter on a movable column inside a dedup subquery" rule in
+   * dev/docs/best_practices/clickhouse-queries.md, since OccurredAt can
+   * drift after a post-miss rebuild re-stamps the frozen anchor (ADR-071).
    */
   private async queryLatestVersion({
     tenantId,
@@ -494,22 +403,11 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
   }
 
   /**
-   * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
-   * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
-   * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
-   * pre-migration record simply omits the 00056 / 00061 fields, so the parsers
-   * fall back to the documented defaults (0 / empty / false).
-   *
-   * DateTime64 columns MUST go through `parseClickHouseDateTimeMs` on this
-   * class, never
-   * `new Date(str)`: ClickHouse emits them without a zone suffix
-   * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time. On a
-   * non-UTC host that skews the storage anchor by the machine's offset, and the
-   * fold reads that anchor back as frozen and writes it out again — so the row
-   * moves partition and shifts its TTL deadline by the offset, permanently, on
-   * the first cache miss. (The span timing baseline is immune by construction:
-   * `EarliestSpanStartMs` rides as a UInt64 epoch-ms string, which is exactly why
-   * migration 00056 chose that type for the read-back columns.)
+   * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}, the
+   * inverse of {@link toClickHouseRecord}. DateTime64 columns MUST go
+   * through `parseClickHouseDateTimeMs`, never `new Date(str)`: ClickHouse
+   * emits them zone-less, so V8 reads them as local time — skewing the
+   * frozen storage anchor by the host's offset permanently on a cache miss.
    */
   private static fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
     return {

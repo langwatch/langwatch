@@ -1,27 +1,15 @@
 /**
  * @vitest-environment node
- *
- * The branch that decides whether the cap can trust the wire or has to measure
- * the body itself.
- *
- * A `Content-Length` that is not a run of decimal digits states nothing, and
- * reading it as a number anyway is what makes the comparison against the cap
- * false and hands the route a body with no cap at all. Node's own HTTP parser
- * refuses most such headers, but it is not the only thing in front of this
- * middleware: behind the route adapter the header arrives unvalidated, which
- * is also why these cases are driven through the middleware directly rather
- * than over a socket.
- *
- * The wiring they cannot reach, the real bridge and a real chunked upload, is
- * covered in body-limit.integration.test.ts.
- *
- * @see ../body-limit.ts
+ * The branch deciding whether the cap can trust the wire or must measure
+ * the body itself. Driven through the middleware directly since the
+ * header arrives unvalidated behind the route adapter.
+ * @see ../body-limit.ts and body-limit.integration.test.ts
  */
 
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
-import { bodyLimit } from "../body-limit";
+import { bodyLimit } from "../body-limit.ts";
 
 const ECHO_URL = "http://127.0.0.1/echo";
 

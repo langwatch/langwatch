@@ -9,20 +9,20 @@ import {
   credentialClassFor,
   publicEndpoint,
   requires,
-} from "../../access-policy.js";
-import { createService, type ServiceBuilder } from "../builder.js";
-import type { IdempotentRunner } from "../idempotency.js";
-import { RestVersionSelector } from "../rest-version-selector.js";
-import type { DefaultsChain } from "../definition.js";
+} from "../../access-policy.ts";
+import { createService, type ServiceBuilder } from "../builder.ts";
+import type { IdempotentRunner } from "../idempotency.ts";
+import { RestVersionSelector } from "../rest-version-selector.ts";
+import type { DefaultsChain } from "../definition.ts";
 import {
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
   type EndpointVariables,
   type MountableRestApp,
   type MountedRoute,
-} from "../types.js";
-import { canonicalV1Path, undescribedStack } from "../v1-alias.js";
-import { registerRoutePolicy } from "./route-registry.js";
+} from "../types.ts";
+import { canonicalV1Path, undescribedStack } from "../v1-alias.ts";
+import { registerRoutePolicy } from "./route-registry.ts";
 
 /**
  * Which error shape a route family publishes.
@@ -112,9 +112,10 @@ export interface RestApiServicePorts {
 }
 
 /**
- * A strategy turns an {@link AccessPolicy} into the middleware chain that authenticates the caller (for the
- * strategy's scope) and authorizes the requested permission. Strategies delegate to the process's own auth
- * middleware through {@link RestApiServicePorts} so there is exactly one implementation of each check.
+ * A strategy turns an {@link AccessPolicy} into the middleware chain that
+ * authenticates the caller (for the strategy's scope) and authorizes the
+ * requested permission, delegating to the process's own auth middleware
+ * through {@link RestApiServicePorts} so there is one implementation of each check.
  */
 interface AuthStrategy {
   /** Scope name, used in error messages + registry entries. */
@@ -145,9 +146,11 @@ export function familyFromBasePath(basePath: string): string {
 }
 
 /**
- * The verb surface exposed by {@link SecuredApp.access}. Typed EXACTLY as the underlying Hono instance's own verb methods, so validator inference
- * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved natively — that native inference is why the methods keep Hono's own return type
- * (`Hono<E>`) rather than `void`: collapsing the overloaded verb signatures to strip the return would break `c.req.valid(...)`.
+ * The verb surface exposed by {@link SecuredApp.access}. Typed exactly as
+ * the underlying Hono instance's own verb methods, so validator inference
+ * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved
+ * natively — collapsing the overloaded signatures to strip `Hono<E>` for
+ * `void` would break that inference.
  */
 export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
   /**
@@ -174,9 +177,11 @@ export type SealedRestApp = Omit<
 >;
 
 /**
- * A Hono application whose routes cannot be registered without first declaring an {@link AccessPolicy}. The bare app deliberately does NOT
- * expose `.get/.post/...` — the only way to register a route is `app.access(policy).get(path, ...handlers)`. Omitting the policy is a
- * compile-time error; bypassing the builder is caught by the router introspection guard test against the route registry.
+ * A Hono application whose routes cannot be registered without first
+ * declaring an {@link AccessPolicy}: the bare app exposes no
+ * `.get/.post/...`, only `app.access(policy).get(path, ...handlers)`.
+ * Omitting the policy is a compile-time error; bypassing the builder is
+ * caught by the router introspection guard test against the route registry.
  */
 export class SecuredApp<E extends Env> {
   /**
@@ -210,9 +215,9 @@ export class SecuredApp<E extends Env> {
   private readonly strategy: AuthStrategy;
   private readonly errorEnvelope: ApiErrorEnvelope;
   /**
-   * The credential class the family publishes, when its scope's default would name the wrong one. Only
-   * the instance-admin family needs it: a service app enforces a shared secret, but that secret is a
-   * credential an operator holds and the document declares a scheme for.
+   * The credential class the family publishes, when its scope's default
+   * would name the wrong one. Only the instance-admin family needs it: its
+   * shared secret is a credential the document declares a scheme for.
    */
   private readonly credentialClass?: CredentialClass;
 
@@ -295,11 +300,10 @@ export class SecuredApp<E extends Env> {
           credentialClass: this.publishedCredentialClass(policy),
           ...(aliasPath ? { canonicalPath: aliasPath } : {}),
         });
-        // Prepend the enforcement chain, then the caller's handlers. The verb method's STATIC type is Hono's own, so validator + context inference is unaffected by this
-        // runtime prepend. HEAD has no Hono shortcut, and `.on("HEAD", …)` does not give it one: Hono answers HEAD BEFORE routing, by re-dispatching the same request as
-        // GET and returning `new Response(null, thatResponse)` (hono-base.js `#dispatch`). Nothing HEAD-shaped is ever matched, so the handler registered here CANNOT RUN
-        // — a path that also has a GET is served by that GET with the body dropped, and a path that does not 404s. The registration is kept because the policy it records
-        // is what `generateOpenAPISpec` reads; the handler is decoration. Asserted both ways in rest-api-service.unit.test.ts.
+        // Prepend the enforcement chain, then the caller's handlers; the verb's static type is
+        // Hono's own, so inference is unaffected. HEAD has no Hono shortcut and cannot run here:
+        // Hono answers it before routing by re-dispatching as GET (hono-base.js `#dispatch`). The
+        // registration stays since `generateOpenAPISpec` reads its policy — the handler decorates.
         const stack = [this.stampRoute(method, registeredPath), ...chain, ...handlers];
         // The v1 twin: same stack, same policy, one logical route. Its copy
         // carries no OpenAPI metadata, so the describer publishes the bare
@@ -345,9 +349,10 @@ export class SecuredApp<E extends Env> {
   }
 
   /**
-   * Names this family and the endpoint the request resolved to, built once per registration. Twenty-one families share the
-   * `/api` base path, so every one of their app-level middlewares runs for `/api/prompts` and only the route that matched can
-   * say which endpoint answered it. The request logger writes one record per request and reads both off the context.
+   * Names this family and the endpoint the request resolved to, built once
+   * per registration. Twenty-one families share the `/api` base path, so
+   * only the route that matched can say which endpoint answered it; the
+   * request logger reads both off the context.
    */
   private stampRoute(method: string, path: string): MiddlewareHandler {
     const family = this.family;
@@ -360,9 +365,9 @@ export class SecuredApp<E extends Env> {
   }
 
   /**
-   * Mount another secured app under this one. Use for composing versioned sub-apps. Routes mounted this way still
-   * carry their own declared policies (recorded when they were built). Only a {@link SecuredApp} can be mounted — a
-   * raw Hono would smuggle in routes with no declared policy, so wrap one in a SecuredApp first if you must.
+   * Mount another secured app under this one, for composing versioned
+   * sub-apps. Only a {@link SecuredApp} can be mounted — a raw Hono would
+   * smuggle in routes with no declared policy.
    */
   route(path: string, app: SecuredApp<Env>): this {
     this.app.route(mergePath(this.basePath, path), app.app);
@@ -503,9 +508,10 @@ export interface RestApiVersionedFamily {
 }
 
 /**
- * Puts one mount in the route-policy registry, refusing to classify a route that never declared a
- * policy. Every mount the framework creates arrives here: each dated version, `latest`, withdrawn 410
- * tombstones (their inherited config carries the meta), and the two version-namespace guards.
+ * Puts one mount in the route-policy registry, refusing to classify a
+ * route that never declared a policy. Every mount the framework creates
+ * arrives here: each dated version, `latest`, withdrawn 410 tombstones,
+ * and the two version-namespace guards.
  */
 function registerMountedRoute({
   route,
@@ -647,9 +653,10 @@ export interface RestApiService<
   OrganizationVariables extends object,
 > {
   /**
-   * A project-scoped secured app. Authenticates via project API key / legacy project key / browser
-   * session (the process's unified auth middleware) and authorizes `requires(...)` against the caller's
-   * project-scoped role bindings — the Hono equivalent of tRPC's `checkProjectPermission`.
+   * A project-scoped secured app. Authenticates via project API key /
+   * legacy project key / browser session and authorizes `requires(...)`
+   * against the caller's role bindings — the Hono equivalent of tRPC's
+   * `checkProjectPermission`.
    */
   createProjectApp<Extra extends object = Record<never, never>>(
     args: SecuredAppArgs,

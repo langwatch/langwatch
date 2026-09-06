@@ -25,7 +25,7 @@ import {
   isDefaultOnlyPrecondition,
   isRuleAllowedForField,
   RULE_LABELS,
-} from "../../../model/preconditions/precondition-field-utils";
+} from "../../../model/preconditions/precondition-field-utils.ts";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/surfaces/evaluator-editor-callbacks";
@@ -44,7 +44,7 @@ import type {
   CheckPrecondition,
   CheckPreconditionFields,
   CheckPreconditionRule,
-} from "../../../model/evaluations/types";
+} from "../../../model/evaluations/types.ts";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
@@ -52,16 +52,16 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
 import type { MappingState, TRACE_MAPPINGS } from "@langwatch/trace-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared";
+import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box";
-import { StepRadio } from "../../elements/evaluations/step-button";
+import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
+import { StepRadio } from "../../elements/evaluations/step-button.tsx";
 
 const evaluatorSettingsSchema = z.record(z.string(), z.json());
-import { deserializeMappingStateToUI } from "../../../model/evaluations/deserialize-mapping-state-to-ui";
-import { serializeMappingsToMappingState } from "../../../model/evaluations/serialize-mappings-to-mapping-state";
+import { deserializeMappingStateToUI } from "../../../model/evaluations/deserialize-mapping-state-to-ui.ts";
+import { serializeMappingsToMappingState } from "../../../model/evaluations/serialize-mappings-to-mapping-state.ts";
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
@@ -349,7 +349,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // If drawer is opening (was closed, now open), check if we need to reset.
     // Reset when: no persisted state, OR stale state from a previous abandoned session.
     // Stale state = module-level state exists but we're NOT returning from a flow sub-drawer
-    // (the drawer stack would have "onlineEvaluation" if we're returning from evaluator list/editor).
+    // (the stack would have "onlineEvaluation" if returning from evaluator list/editor).
     const hasStaleState = !!onlineEvaluationDrawerState && !isInActiveEvaluationFlow();
     if (!prevIsOpenRef.current && isOpen && (!onlineEvaluationDrawerState || hasStaleState)) {
       onlineEvaluationDrawerState = null;
@@ -702,7 +702,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         initialMappings: autoMappings,
       };
 
-      // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
+      // Open evaluator editor now (replaceCurrentInStack swaps evaluatorList for evaluatorEditor)
       // This way, Cancel/back from evaluatorEditor goes to onlineEvaluation, not evaluatorList
       // Use "Select Evaluator" button text since we're selecting, not editing
       openDrawer(

@@ -1,19 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
+import { createTestService as createService } from "./test-service.ts";
 
 /**
- * An endpoint answers ONE success status. Before this, `serializeEndpointResult`
- * chose between 200 and 204 by looking at what the handler returned, so an
- * `output` schema that accepted `undefined` gave the same operation two shapes:
- * a body on the request that found something, an empty 204 on the one that did
- * not. Callers, the published document and both SDKs each have to pick one.
- *
- * The rule these pin: no `output` (or `z.void()` / `z.undefined()`) means the
- * endpoint never sends a body; any other schema means it always does; a schema
- * that would allow both is refused at registration rather than resolved per
- * request.
+ * An endpoint answers ONE success status. No `output` (or `z.void()`/
+ * `z.undefined()`) means it never sends a body; any other schema means it
+ * always does; a schema allowing both is refused at registration rather
+ * than resolved per request (previously it silently chose 200 vs 204).
  */
 
 const buildTestService = () => createService({ name: "test", basePath: "/api/test" });
@@ -95,7 +89,7 @@ describe("endpoint success status", () => {
           "get",
           "/defaulted",
           "2025-03-15",
-          // biome-ignore lint/suspicious/noExplicitAny: the handler returning undefined is the case under test; the type correctly forbids it.
+          // The handler returning undefined is the case under test; the type correctly forbids it.
           () => undefined as any,
           (b) => b.withOutput(z.string().default("filled")),
         )

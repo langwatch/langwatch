@@ -1,23 +1,10 @@
 /**
- * The cascade the Default Models table renders, as pure functions.
- *
- * Every cell shows the FINAL RESOLVED state for the row's scope, whether the
- * policy on that row pins the model or inherits it from a wider tier —
- * pinned-versus-inherited is only differentiated inside the edit drawer, so a
- * reader never has to parse italics to answer "is gpt-x mine or someone
- * else's?". Getting that walk right is the whole correctness of the table, and
- * it is stated here rather than inside the component so a test can drive it
- * without a DOM.
- *
- * Moved from `platform/app/src/components/settings/DefaultModelsSection.tsx`,
- * whose only consumers were the model-providers page and two tests. The row and
- * snapshot types are `@langwatch/model-provider-contract`'s own rather than
- * `inferRouterOutputs<AppRouter>`: the procedure already answers
- * `ModelDefaultSnapshot`, so naming it is a real repoint and the inference is
- * gone.
- *
- * Contract: specs/model-providers/role-based-default-models.feature and
- * specs/model-providers/model-default-config-cascade.feature.
+ * The cascade the Default Models table renders, as pure functions. Every
+ * cell shows the FINAL RESOLVED state for the row's scope — pinned versus
+ * inherited is only differentiated in the edit drawer — so the walk is
+ * stated here rather than in the component, testable without a DOM.
+ * Contract: specs/model-providers/role-based-default-models.feature,
+ *           specs/model-providers/model-default-config-cascade.feature.
  */
 
 import type {
@@ -29,8 +16,8 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ModelDefaultConfigSnapshot = WireOf<StoredModelDefaultConfigSnapshot>;
-import type { ScopeHierarchy } from "./provider-scope-filter";
-import { scopeBreadthRank } from "./scope-breadth";
+import type { ScopeHierarchy } from "./provider-scope-filter.ts";
+import { scopeBreadthRank } from "./scope-breadth.ts";
 
 /** The four role columns, in the order the table reads them. */
 export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
@@ -119,15 +106,10 @@ function cascadeChainFor(anchor: AnchorScope, hierarchy: ScopeHierarchy): Anchor
 }
 
 /**
- * Cascading walk for a single key at a given scope, mirroring the server
- * resolver's chain: the anchor scope, then the anchor's OWN parent scopes (a
- * project's team, then the organization). Within each tier configs sort by
- * `createdAt` descending and the first carrying the key wins. Returns null if
- * nothing in the anchor's chain carries the key.
- *
- * The chain ids come from `hierarchy`: matching parent tiers by TYPE alone
- * displayed values from any team in the organization, including teams the
- * anchor project does not belong to — values the runtime would never serve.
+ * Cascading walk for a single key, mirroring the server resolver's chain
+ * (anchor, then its own parent scopes). Chain ids come from `hierarchy`
+ * rather than matching parent tiers by type alone, which would surface
+ * values from teams the anchor project does not belong to.
  */
 export function resolveAtScope({
   key,

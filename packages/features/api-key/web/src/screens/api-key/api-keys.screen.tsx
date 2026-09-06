@@ -22,27 +22,27 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { apiKeyApi } from "../../behavior/api-key-api";
-import { apiKeyRowAnchorId } from "../../model/api-key-anchor";
-import { useApiKeyHost, type ApiKeyHostPort } from "../../model/api-key-host";
+import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
+import { useApiKeyHost, type ApiKeyHostPort } from "../../model/api-key-host.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ScopeFilterValue,
-} from "../../model/api-key-scope-filter";
+} from "../../model/api-key-scope-filter.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { ProviderScopeChips, ScopeFilter } from "../../ui/elements/scope-picker";
-import { IngestionKeysSection } from "../../ui/blocks/ingestion-keys-section";
-import { RevokeConfirmDialog } from "../../ui/blocks/revoke-confirm-dialog";
+import { ProviderScopeChips, ScopeFilter } from "../../ui/elements/scope-picker.tsx";
+import { IngestionKeysSection } from "../../ui/blocks/ingestion-keys-section.tsx";
+import { RevokeConfirmDialog } from "../../ui/blocks/revoke-confirm-dialog.tsx";
 import {
   CreateApiKeyDrawer,
   type CreateApiKeyInput,
-} from "../../ui/sections/create-api-key-drawer";
-import { EditApiKeyDrawer } from "../../ui/sections/edit-api-key-drawer";
-import { RegenerateApiKeyDialog } from "../../ui/sections/regenerate-api-key-dialog";
-import { TokenCreatedDialog } from "../../ui/sections/token-created-dialog";
+} from "../../ui/sections/create-api-key-drawer.tsx";
+import { EditApiKeyDrawer } from "../../ui/sections/edit-api-key-drawer.tsx";
+import { RegenerateApiKeyDialog } from "../../ui/sections/regenerate-api-key-dialog.tsx";
+import { TokenCreatedDialog } from "../../ui/sections/token-created-dialog.tsx";
 
 /** The `?scope=` parameter this page's filter is written to. */
 export const API_KEY_SCOPE_QUERY_KEY = "scope";
@@ -424,7 +424,7 @@ export default function ApiKeysScreen() {
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {/* Project service key row — only shown when it survives the active scope filter */}
+                  {/* Project service key row — shown only if it survives the scope filter */}
                   {showProjectKey && projectApiKey && (
                     <Table.Row>
                       <Table.Cell>
@@ -560,7 +560,7 @@ export default function ApiKeysScreen() {
                       <Table.Cell>{getScopeBadge(apiKey)}</Table.Cell>
                       <Table.Cell>{getPermissionBadge(apiKey)}</Table.Cell>
                       <Table.Cell>
-                        {/* Owner or admin can edit/revoke; service keys (no userId) require admin */}
+                        {/* Owner/admin can edit/revoke; service keys (no userId) need admin */}
                         {(isAdmin || apiKey.userId === currentUserId) && (
                           <HStack gap={1}>
                             <Button

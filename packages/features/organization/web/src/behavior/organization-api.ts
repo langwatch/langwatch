@@ -1,35 +1,20 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as every other feature
- * family's map says of itself: the procedures are mounted by the process out of
- * `@langwatch/organization-server`, which a web package may not import even for
- * a type, and the router type does not exist until a process instantiates one.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `organization` and `limits` are mount
- * points on the root router and tRPC hashes that path into the React Query
- * cache key; spell either differently and these hooks quietly stop sharing a
- * cache with the `api.organization.*` call sites that have not moved — of which
- * there are many, the application shell's own organization graph among them.
- *
- * `EnrichedAuditLog` IS THE PRODUCER'S OWN TYPE, not a restatement. It is
- * declared in `@langwatch/organization-contract` and `OrganizationApp.getAuditLogs`
- * is annotated with it, so widening what the audit trail answers is a compile
- * error at the producer rather than a silent disclosure at this table.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package.
+ * Hand-written until the mounted router can generate it (ADR-130).
+ * `organization`/`limits` are load-bearing tRPC cache-key segments —
+ * renaming one stops sharing a cache with the many `api.organization.*`
+ * call sites that have not moved. `EnrichedAuditLog` is the producer's
+ * own type, not a restatement.
  */
 
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
-import type { TeamRoleValue } from "../model/member-role-constraints";
+import type { TeamRoleValue } from "../model/member-role-constraints.ts";
 import type {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "../model/prisma-types";
+} from "../model/prisma-types.ts";
 import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
 
 /**
@@ -79,13 +64,10 @@ export type TeamProjectReading = {
 };
 
 /**
- * A team with its projects, as the teams page lists one.
- *
- * `isPersonal` is declared here rather than on {@link TeamReading} because it
- * arrives on the LIST reads and not on every procedure typed with that alias.
- * The edit-project drawer is what needs it: a personal workspace holds only the
- * project provisioned with it, so it is never offered as somewhere to move a
- * project to.
+ * A team with its projects, as the teams page lists one. `isPersonal` is
+ * declared here (not on {@link TeamReading}) since it arrives only on LIST
+ * reads; the edit-project drawer uses it to exclude the personal workspace
+ * as a move target.
  */
 export type TeamWithProjects = TeamReading & {
   isPersonal: boolean;
@@ -113,19 +95,10 @@ export type TeamWithMembers = TeamWithProjects & {
 };
 
 /**
- * A team as the teams LIST reads it: its projects, the people bound to it
- * directly, and whether it is a project-only team.
- *
- * `directMembers` and `role` are what the list prints per row; a binding that
- * arrives through a GROUP is not a direct member and is deliberately not here.
- */
-/**
- * One person's access, FLAT, as the teams list renders a row.
- *
- * The list draws people rather than joins them, so the name and the image sit
- * on the row. `viaGroupId` is what makes a row un-editable in place: a grant
- * held through a group is changed on the GROUP, and the list says so instead of
- * offering a control that would silently do something else.
+ * One person's access, FLAT, as the teams list renders a row: name and
+ * image sit on the row rather than a join. `viaGroupId` marks a row
+ * un-editable in place — a grant held through a group is changed on the
+ * group, not here.
  */
 export type TeamAccessRow = {
   userId: string;
@@ -302,13 +275,9 @@ export type OrganizationApiMap = {
     };
 
     /**
-     * The organization graph the application shell already holds.
-     *
-     * Asked by the FRONTEND FEATURE rather than by the screen — the screen is
-     * handed the teams and projects through its host port — and declared here
-     * because that feature runs on this package's transport. Same input the
-     * shell asks with, so under tRPC's path-plus-input cache key it is the same
-     * entry: the graph is fetched once for the document.
+     * The organization graph the application shell already holds. Asked by
+     * the frontend feature (not the screen, which gets it via host port),
+     * with the shell's same input, so it shares one cache entry per document.
      */
     getAll: {
       query: {
@@ -328,13 +297,10 @@ export type OrganizationApiMap = {
     };
 
     /**
-     * Every member of the organization, with the teams each of them is on.
-     *
-     * ONE PROCEDURE, TWO READERS, and the shape is the union of what both
-     * need: the audit page's "search by user" box matches a typed name against
-     * it, and the members page renders the whole table off it. The audit page
-     * reads `members[].user`, which is why `OrganizationMemberMatch` is still
-     * exported — it is the narrower view of the same row.
+     * Every member of the organization, with their teams. One procedure,
+     * two readers: the audit page's user search and the members table.
+     * `OrganizationMemberMatch` stays exported as the audit page's narrower
+     * view (`members[].user`) of the same row.
      */
     getOrganizationWithMembersAndTheirTeams: {
       query: {
@@ -827,14 +793,9 @@ export type OrganizationApiMap = {
 export const organizationApi = createFeatureApi<OrganizationApiMap>();
 
 /**
- * The outputs of this map, addressed the way `RouterOutputs` was.
- *
- * `platform/app`'s `RouterOutputs` was inferred from the mounted router, which
- * a browser package cannot name. Screens that wrote
- * `RouterOutputs["group"]["listAll"][number]` keep that line by reading the
- * same shape off the map instead — the map IS the statement of what a
- * procedure answers here, and deriving it through the built router keeps the
- * wire's own shape: dates arrive as ISO strings.
+ * The outputs of this map, addressed the way `RouterOutputs` was — a
+ * mounted-router inference a browser package cannot name. The map is the
+ * statement of what a procedure answers here; dates arrive as ISO strings.
  */
 export type RouterOutputs = OutputsFromMap<OrganizationApiMap>;
 

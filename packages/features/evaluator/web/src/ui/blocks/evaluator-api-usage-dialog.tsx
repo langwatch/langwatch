@@ -1,19 +1,8 @@
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
- * The snippets that call this evaluator from a customer's own code.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/evaluators/EvaluatorApiUsageDialog.tsx`, which
- * `EvaluatorListDrawer` — a drawer with seven openers outside this family —
- * still renders, so the platform module stays and deletes-only forbids
- * repointing it.
- *
- * Three things changed on the way across, all of them the same substitution
- * every family before made: the Design System's dialog replaces
- * `~/components/ui/dialog`, `ui/elements/code-snippet` replaces
- * `~/components/code/RenderCode` (which highlights through
- * `@langwatch/trace-web`, and a web package may not import another web
- * package), and the endpoint helpers are this package's own.
+ * The snippets that call this evaluator from a customer's own code. A
+ * narrowed family-local copy of the old `EvaluatorApiUsageDialog`, which
+ * `EvaluatorListDrawer` still renders — deletes-only forbids repointing it.
  */
 
 import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
@@ -24,8 +13,8 @@ import {
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { langwatchEndpoint, langwatchEndpointEnv } from "../../model/langwatch-endpoint";
-import { CodeSnippet } from "../elements/code-snippet";
+import { langwatchEndpoint, langwatchEndpointEnv } from "../../model/langwatch-endpoint.ts";
+import { CodeSnippet } from "../elements/code-snippet.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 
 export type EvaluatorApiUsageDialogProps = {

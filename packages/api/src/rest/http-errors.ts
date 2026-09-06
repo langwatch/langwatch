@@ -1,18 +1,11 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
- * The status-carrying error vocabulary the REST boundary throws.
- *
- * It lives beside the secured-app builder rather than inside the application
- * because a REST family packaged here throws the same failures a family still
- * mounted from the application does, and both are rendered by the same
- * `onError`. Two definitions would let one surface's 422 become the other's
- * 500 without anything reporting it.
- *
- * These carry no `code`, no fault attribution and no remediation: they are the
- * flat legacy envelope (`{ error, message }`) the families that predate
- * `HandledError` publish, and their consumers parse. Reach for a
- * `HandledError` when the cause is known and the caller can act on it.
+ * The status-carrying error vocabulary the REST boundary throws, kept
+ * beside the secured-app builder so a packaged and an application-mounted
+ * family throw the same failures for the same `onError`. No `code`, fault
+ * or remediation: the flat legacy envelope pre-`HandledError` families
+ * publish. Reach for `HandledError` when the cause is known and actionable.
  */
 export abstract class HttpError extends Error {
   abstract readonly status: ContentfulStatusCode;
@@ -90,15 +83,10 @@ export class InternalServerError extends HttpError {
 }
 
 /**
- * Hono's own `HTTPException`, recognised by shape rather than by `instanceof`.
- *
- * A framework refusal crosses a package boundary on the way from the family
- * that raised it to the process handler that renders it, and `instanceof`
- * answers false whenever the two ends resolved `hono/http-exception` to
- * different module instances — the ESM and CommonJS builds of one version, or
- * a copy the loader wrapped. The refusal then loses its status and reaches the
- * caller as a generic 500, which is the failure this predicate exists to
- * prevent. The two members below are the whole public shape of the class.
+ * Hono's own `HTTPException`, recognised by shape rather than
+ * `instanceof`, which answers false whenever the two ends resolved
+ * `hono/http-exception` to different module instances — losing the
+ * refusal's status and reaching the caller as a generic 500.
  */
 export function isFrameworkRefusal(
   error: unknown,

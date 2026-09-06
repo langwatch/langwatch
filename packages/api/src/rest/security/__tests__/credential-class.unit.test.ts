@@ -1,14 +1,9 @@
 /**
- * Which credential class each route publishes, and where it comes from.
- *
- * The class is derived from the app a route is mounted on rather than
- * declared per route, so these assert the derivation rather than a list: a
- * list would agree with itself forever while the apps moved underneath it.
- *
- * The other half of this question — whether the published API description
- * agrees with what the mounts enforce — is asserted against the committed
- * document, which belongs to the application rather than to this package.
- *
+ * Which credential class each route publishes, and where it comes from —
+ * derived from the mounting app rather than declared per route, so these
+ * assert the derivation rather than a list that would agree with itself
+ * forever. Whether the published API description agrees with the mounts
+ * is asserted separately, against the committed document.
  * Spec: specs/security/api-endpoint-authorization.feature
  */
 import { describe, expect, it } from "vitest";
@@ -22,8 +17,8 @@ import {
   internalSecret,
   publicEndpoint,
   requires,
-} from "../../../access-policy.js";
-import { documentedPathOf, isHttpMethod, securityForCredentialClass } from "../openapi-security.js";
+} from "../../../access-policy.ts";
+import { documentedPathOf, isHttpMethod, securityForCredentialClass } from "../openapi-security.ts";
 
 describe("credentialClassFor", () => {
   describe("given routes mounted on each kind of app", () => {

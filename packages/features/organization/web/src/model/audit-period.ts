@@ -1,22 +1,9 @@
 /**
- * The window the audit trail is read over, as a value rather than as a hook.
- *
- * A NARROWED FAMILY-LOCAL COPY of `platform/app/src/components/PeriodSelector.tsx`.
- * That module has twenty-odd callers across analytics, agent testing and the
- * home page, so it stays where it is and this family takes what it uses. Two
- * things changed on the way, and both are why it is a copy rather than a move:
- *
- * - THE ROUTER IS GONE. The platform hook read `router.query` and called
- *   `router.push` itself, which is exactly the import ADR-004 seals off from a
- *   screen. Here the reading is a pure function of the query the host hands
- *   over, and the writes answer with the NEXT WHOLE QUERY for the host to
- *   apply. That is what makes the two of them assertable without a router.
- * - THE ABSOLUTE-RANGE INPUTS AND THE "All time" ENTRY did not travel: the
- *   audit trail always has a window, and its picker only ever offered presets.
- *
- * `now` is a parameter everywhere. A relative window anchored to a hidden clock
- * is a function whose answer nobody can state, and the audit trail's default is
- * relative.
+ * The window the audit trail is read over, as a value rather than as a
+ * hook. A narrowed family-local copy of the old `PeriodSelector` (which
+ * keeps its other twenty-odd callers): reading is pure over the host's
+ * query, writes answer with the next whole query, and absolute-range
+ * inputs / "All time" did not travel — the audit trail always has a window.
  */
 
 import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
@@ -108,13 +95,9 @@ export function readAuditPeriod(
 }
 
 /**
- * The next whole query for a picked preset.
- *
- * An absolute pair already in the URL is DROPPED rather than left beside the
- * preset: the reading above prefers the pair, so leaving it would make the
- * picker look like it did nothing. Paging is reset for the same reason every
- * filter change resets it — page four of the old window is not page four of the
- * new one.
+ * The next whole query for a picked preset. An absolute pair already in the
+ * URL is dropped, since the reading above prefers it and would otherwise
+ * make the picker look like it did nothing. Paging resets too.
  */
 export function auditPeriodQuery(
   query: Readonly<Record<string, string | undefined>>,
@@ -126,12 +109,8 @@ export function auditPeriodQuery(
 
 /**
  * The label the trigger reads, for a window that matches a preset or not.
- *
- * THE SUB-DAY PRESETS ARE CHECKED FIRST, which is a deliberate correction of
- * the platform control rather than a copy of it. There, the calendar-day match
- * ran first, and every window shorter than a day spans one calendar day — so
- * picking "Last 1 hour" relabelled the trigger "Today", and four of the eleven
- * presets could not be read back off the control that set them.
+ * Sub-day presets are checked first — a deliberate correction: the old
+ * control matched calendar-day first, so "Last 1 hour" relabelled as "Today".
  */
 export function auditPeriodLabel(
   { startDate, endDate }: AuditPeriod,

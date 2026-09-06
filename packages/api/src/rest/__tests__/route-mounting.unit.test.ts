@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
-import type { MountedRoute } from "../types.js";
+import { createTestService as createService } from "./test-service.ts";
+import type { MountedRoute } from "../types.ts";
 
 // onRouteMounted contract: one callback per mounted route, with the absolute
 // path exactly as the Hono route table reports it. The app builds its route
@@ -173,11 +173,10 @@ describe("onRouteMounted", () => {
         expect(table).toContain(entry);
       }
 
-      // The other direction, which is the one a route policy registry depends on: a mount Hono holds and the
-      // callback never reports lands in production with no policy. `ALL /api/test/*` is the service's own
-      // middleware layer rather than a route, so it is the single exclusion. The service's own middleware
-      // layers and every `/api/v1` twin are the exclusions: a twin is the same logical route, reported as
-      // the canonical path of the bare mount rather than as a second route.
+      // The other direction, which a route policy registry depends on: a mount Hono holds that the
+      // callback never reports lands in production with no policy. The service's own middleware
+      // layers and every `/api/v1` twin are the exclusions: a twin is the same logical route,
+      // reported as the canonical path of the bare mount rather than as a second route.
       const canonical = new Set(
         mounted.flatMap((route) =>
           route.canonicalPath ? [`${route.method.toUpperCase()} ${route.canonicalPath}`] : [],

@@ -2,15 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 /**
- * The request log records the path that ARRIVED. That is a different value on
- * every request once ids are in it, so "which endpoint is failing" could not be
- * asked of it — you could group by a url and get one row per caller.
- *
- * `route` is the endpoint that matched, as registered. These pin that it is the
- * pattern rather than the concrete path, that it survives the mounts where it
- * is easiest to lose (a version prefix, a withdrawal), and that it reaches the
- * one error that most needs it: a handler returning something its own schema
- * rejects.
+ * The request log records the arrived path, a different value per request
+ * once ids are in it, so "which endpoint is failing" needs `route` — the
+ * matched pattern. These pin that it survives the mounts where it is
+ * easiest to lose, and reaches the error that most needs it: a handler
+ * returning something its own schema rejects.
  */
 
 const logRecords: {
@@ -35,7 +31,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createService: createRawService } = await import("../builder.js");
+const { createService: createRawService } = await import("../builder.ts");
 const createService: typeof createRawService = ((config: Parameters<typeof createRawService>[0]) =>
   createRawService(config).withoutPermission("framework test endpoint")) as typeof createRawService;
 
@@ -151,7 +147,7 @@ describe("the endpoint a request matched", () => {
             "get",
             "/broken",
             "2026-08-07",
-            // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
+            // Returning the wrong shape is the case under test.
             async () => ({ id: "not-a-number" }) as any,
             (b) => b.withOutput(z.object({ id: z.number() })),
           )
@@ -171,7 +167,7 @@ describe("the endpoint a request matched", () => {
             "get",
             "/broken",
             "2026-08-07",
-            // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
+            // Returning the wrong shape is the case under test.
             async () => ({ id: "not-a-number" }) as any,
             (b) => b.withOutput(z.object({ id: z.number() })),
           )

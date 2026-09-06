@@ -5,20 +5,13 @@ import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";
 
-import type { Period, PeriodMode } from "./session-filters";
+import type { Period, PeriodMode } from "./session-filters.ts";
 
 /**
- * The date-range control the activity tables narrow by.
- *
- * The package's own copy of `platform/app`'s `PeriodSelector`, and only the
- * controlled half of it: the application's `usePeriodSelector` keeps the range
- * in the query string through its own router, which is an import a feature-web
- * package may not make and which neither of these tables used anyway — both
- * hold the range in their own state and pass it in.
- *
- * `Period` and `PeriodMode` are this package's own, already declared by
- * `session-filters`, so the control and the filter it drives agree by
- * construction.
+ * The date-range control the activity tables narrow by. A copy of the old
+ * `PeriodSelector`, controlled-only: both tables hold the range in their own
+ * state rather than the query string, which a feature-web package may not
+ * touch. `Period`/`PeriodMode` are `session-filters`' own.
  */
 
 /**

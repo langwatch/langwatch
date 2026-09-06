@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
   Avatar,
   Box,
@@ -14,12 +14,12 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
-import { HistoryIcon } from "../../../ui/elements/history-icon";
+import { HistoryIcon } from "../../../ui/elements/history-icon.tsx";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { usePromptHost } from "../../../model/prompt-host";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { promptApi } from "../../../behavior/prompt-api";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
 
 /**
  * Minimal interface for version history display
@@ -69,13 +69,10 @@ const VersionNumberBox = ({
 };
 
 /**
- * Author line for a version: an avatar (SSO/OAuth photo → initials → generic
- * silhouette), the author's display name, and a tooltip revealing who it is.
- *
- * The name falls back to the author's email, then to "Unknown author", so the
- * row is never a bare, unlabelled icon. Versions created through the SDK/API
- * have no author on record; that is stated in the tooltip rather than left
- * blank (which previously rendered as a nameless silhouette with no hover).
+ * Author line for a version: avatar, display name, and a tooltip. Name
+ * falls back to email then "Unknown author", so the row is never a bare
+ * icon — an SDK/API version with no author says so rather than rendering
+ * a nameless silhouette with no hover.
  */
 function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
@@ -220,7 +217,7 @@ function VersionHistoryList({
   onRestore: (params: { versionId: string }) => void;
   isLoading: boolean;
   hasUnsavedChanges?: boolean;
-  /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
+  /** The versionId of the version currently being edited. Defaults to latest if omitted. */
   currentVersionId?: string;
 }) {
   // Show loading state

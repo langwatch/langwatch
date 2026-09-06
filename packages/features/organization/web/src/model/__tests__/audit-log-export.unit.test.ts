@@ -1,13 +1,7 @@
 /**
- * What a downloaded audit report says.
- *
- * The half of the export that is decided in this package. The other half — how
- * the bytes reach the reader's disk — is the application's, and is pinned in
- * `apps/ui/tests/ui-file-download.unit.test.ts`. Splitting them is what makes
- * either assertable: the platform page minted an object URL and clicked a
- * synthesised anchor inside the same function that built the rows.
- *
- * Spec: specs/audit-log/audit-log.feature
+ * What a downloaded audit report says — the half of the export decided in
+ * this package. The other half (bytes reaching disk) is pinned in
+ * `apps/ui/tests/ui-file-download.unit.test.ts`. Spec: specs/audit-log/audit-log.feature.
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,7 +18,7 @@ import {
   AUDIT_LOG_CSV_FIELDS,
   CSV_JSON_CAP,
   truncateJsonForCsv,
-} from "../audit-log-export";
+} from "../audit-log-export.ts";
 
 function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
   return {

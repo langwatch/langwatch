@@ -1,15 +1,8 @@
 /**
- * A stored cost rule as the settings table reads it.
- *
- * The stored row spells "this rule sets no rate" as `null`, and the same for a
- * rule anchored above a single project. A table cell wants "absent" instead —
- * `null` renders as text. Converting once here keeps that translation out of
- * the cells that would otherwise each do it.
- *
- * A family-local copy of `platform/app/src/components/settings/llmModelCostRow.ts`,
- * which keeps one non-family caller there: `LLMModelCostDrawer`, the registered
- * drawer this move does not take (the unmapped-cost suggestion in a trace opens
- * it too). The platform copy dies with that drawer.
+ * A stored cost rule as the settings table reads it. The stored row spells
+ * "this rule sets no rate" as `null`, which a table cell wants as "absent"
+ * instead — converting once here keeps that translation out of every cell.
+ * A family-local copy; the old module survives for `LLMModelCostDrawer`.
  */
 
 import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";

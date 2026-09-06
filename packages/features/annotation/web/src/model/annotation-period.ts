@@ -1,20 +1,9 @@
 /**
- * The date range these lists read, as data.
- *
- * A FAMILY-LOCAL COPY of the reading half of
- * `platform/app/src/components/PeriodSelector.tsx`, which keeps thirty callers
- * across the application and so did not travel. Deletes-only forbids repointing
- * any of them, and the Design System publishes no period control.
- *
- * The split is deliberate and is what the platform module did not have: the
- * presets, the window they resolve to and the two address writes are pure
- * functions here, and the popover that renders them is
- * `ui/elements/period-picker.tsx`. That is what lets "the queue list does not
- * narrow until a range is picked" — the rule the Inbox badge and the list
- * depend on agreeing about — be a unit test rather than a rendered assertion.
- *
- * NARROWED: the platform hook also answers `daysDifference`, which the
- * analytics surfaces read and no annotation list does.
+ * The date range these lists read, as data. A family-local copy of the
+ * reading half of the old `PeriodSelector` (deletes-only migration forbids
+ * repointing its thirty other callers). Kept pure and separate from
+ * `ui/elements/period-picker.tsx` so "the queue narrows only once a range is
+ * picked" is a unit test, not a rendered assertion. Narrowed: no `daysDifference`.
  */
 
 import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
@@ -79,12 +68,9 @@ export type AnnotationPeriodReading = {
   mode: AnnotationPeriodMode;
   /**
    * True while the address carries no range of its own, so `period` is this
-   * module's own fallback rather than something the reviewer asked for.
-   *
-   * THE QUEUE LISTS DEPEND ON THIS. A queue is work still to do and the sidebar
-   * badge counts all of it, so a default window that quietly dropped older
-   * items would leave the badge and the list disagreeing. They narrow the read
-   * only once a range has actually been picked.
+   * module's fallback rather than something the reviewer asked for. The
+   * queue lists depend on this: the sidebar badge counts all pending work,
+   * so they narrow the read only once a range is actually picked.
    */
   isDefault: boolean;
 };
@@ -159,16 +145,10 @@ export function clearedPeriodAddress(
 }
 
 /**
- * The preset a window matches, for the trigger's label.
- *
- * MOVED AS IT IS, quirk included. A day-span match is tried first and only when
- * the window ends within a day of now; the minute-span match behind it is
- * therefore unreachable for every preset this module offers, because every
- * sub-day preset also spans one calendar day and so matches `today` on the way
- * past. So a fifteen-minute window is labelled "Today" — which is what
- * `platform/app` has always labelled it, and changing which of two presets wins
- * is a behaviour change a page move does not own. The test says so out loud
- * rather than asserting the label somebody would expect.
+ * The preset a window matches, for the trigger's label. Moved as-is, quirk
+ * included: the day-span match runs first, so every sub-day preset also
+ * matches `today` and a fifteen-minute window labels as "Today". Changing
+ * which preset wins is a behaviour change this move does not own.
  */
 export function matchingPreset({
   period,

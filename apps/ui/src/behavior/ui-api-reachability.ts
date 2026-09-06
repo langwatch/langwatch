@@ -30,12 +30,10 @@ type ReadRefusal = {
 
 /**
  * Whether this failed read means nothing answered, rather than something
- * answering with a refusal.
- *
- * A thrown error is the browser's own — the fetch never completed. An error
- * object is the endpoint's, and it is only unreachable when its status is a
- * gateway's own and it carries no error code: a code means some process named
- * the cause, and something that names a cause was reached.
+ * answering with a refusal. A thrown error is the browser's own (fetch
+ * never completed); an error object is unreachable only when its status is
+ * a gateway's own and it carries no error code, since a code means
+ * something named the cause and was reached.
  */
 export function isUiApiUnreachable(error: unknown): boolean {
   if (error === null || error === void 0) return false;

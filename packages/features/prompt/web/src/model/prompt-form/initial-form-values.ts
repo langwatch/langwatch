@@ -1,15 +1,15 @@
-import type { WireVersionedPrompt } from "../wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
 
-import { buildDefaultFormValues } from "./default-form-values";
-import type { PromptConfigFormValues } from "./prompt-form.schemas";
+import { buildDefaultFormValues } from "./default-form-values.ts";
+import type { PromptConfigFormValues } from "./prompt-form.schemas.ts";
 import {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "./versioned-prompt-form-values";
+} from "./versioned-prompt-form-values.ts";
 
 /**
  * computeInitialFormValuesForPrompt
- * Single Responsibility: Produce initial form values from either a prompt, a default model, or defaults.
+ * Single Responsibility: produce initial form values from a prompt, a default model, or defaults.
  * TODO: This seems redundant with the other methods. Let's consider a refactor
  */
 export function computeInitialFormValuesForPrompt(params: {

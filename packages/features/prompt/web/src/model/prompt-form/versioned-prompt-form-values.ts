@@ -1,24 +1,13 @@
-import type { WireVersionedPrompt } from "../wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
 import { handleSchema } from "@langwatch/prompt-contract";
 
-import { withDerivedDemonstrationColumns } from "./demonstration-columns";
-import { formSchema, type PromptConfigFormValues } from "./prompt-form.schemas";
+import { withDerivedDemonstrationColumns } from "./demonstration-columns.ts";
+import { formSchema, type PromptConfigFormValues } from "./prompt-form.schemas.ts";
 
 /**
- * Extracts the short handle from a potentially full handle path.
- * Full handles may include scope prefixes that need to be stripped:
- * - project_XXX/ (project prefix)
- * - organization_XXX/ (organization prefix, long form)
- * - XXXXXXXXXXXXXXXXXXXXX/ (21-char nanoid prefix)
- *
- * This strips only the scope prefix, preserving folder structure in handles.
- *
- * Examples:
- * - "project_ABC123/gato" -> "gato"
- * - "organization_ABC123/folder/gato" -> "folder/gato"
- * - "iuc4aYIoL5YcI7imutYvl/gato" -> "gato" (nanoid prefix)
- * - "gato" -> "gato" (no change if no prefix)
- * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
+ * Strips only the scope prefix from a full handle path (`project_XXX/`,
+ * `organization_XXX/`, or a 21-char nanoid prefix), preserving folder
+ * structure: "project_ABC123/folder/gato" -> "folder/gato".
  */
 const extractShortHandle = (handle: string | null | undefined): string | null => {
   if (!handle) return null;

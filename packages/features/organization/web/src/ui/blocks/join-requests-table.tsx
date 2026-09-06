@@ -1,6 +1,6 @@
 import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
-import { RandomColorAvatar } from "../elements/random-color-avatar";
-import type { PendingJoinRequest } from "../../model/pending-join-request";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
+import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];
@@ -11,18 +11,10 @@ interface JoinRequestsTableProps {
 }
 
 /**
- * People waiting to join, in the members area beside the invitations (D12).
- *
- * One panel, two directions: an invitation is the organization reaching out,
- * a request is somebody reaching in, and an admin answers both in the same
- * place. Splitting them across two screens would make "who is waiting on me?"
- * a question with two answers.
- *
- * Approve carries no role picker, and that absence is deliberate rather than
- * unfinished: an approval grants the organization's default role, and an
- * admin who wants to hand over more sends a formal invitation — which is the
- * flow that owns roles and teams. Reject asks for no reason, because an admin
- * who has to justify a refusal is an admin who hesitates to make one.
+ * People waiting to join, beside the invitations (D12) — one panel so "who
+ * is waiting on me?" has one answer. Approve has no role picker on purpose:
+ * it grants the default role, and a formal invitation is what owns
+ * roles/teams. Reject asks for no reason.
  */
 export function JoinRequestsTable({
   requests,

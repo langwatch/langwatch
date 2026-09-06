@@ -1,25 +1,8 @@
 /**
- * Every dataset in the project: find one, open it, and manage it.
- *
- * Moved from `platform/app/src/pages/[project]/datasets.tsx`. The page's own
- * shape is unchanged — search, the list, the row menu, the two creation flows
- * and the undoable delete — and what it used to read from the application it
- * now asks `DatasetHostPort` for.
- *
- * THE ROW TYPE IS THE CONTRACT'S, NOT THE ROUTER'S. The page inferred it as
- * `inferRouterOutputs<AppRouter>["dataset"]["getAll"][number]`, which a screen
- * closure may not name; `DatasetSummary` is what `listDatasets` returns and
- * therefore what that inference resolved to, so the type moved rather than being
- * restated.
- *
- * TWO OVERLAYS ARE THE SCREEN'S OWN, addressed by its own state rather than
- * through the application's drawer registry: the add-or-edit drawer and the
- * bulk upload drawer. `platform/app`'s `addOrEditDataset` registry entry stays
- * where it is — the workbench, the studio and the add-record drawer all still
- * open it — and this screen never needed the registry, only the component.
- *
- * Spec: specs/datasets/datasets-list-page.feature,
- *       specs/rbac/lite-member-restrictions.feature.
+ * Every dataset in the project: find, open, manage, via `DatasetHostPort`.
+ * Row type is `DatasetSummary`, not a router inference a screen closure may
+ * not name. Its overlays are local state, not the shared drawer registry.
+ * Spec: specs/datasets/datasets-list-page.feature, specs/rbac/lite-member-restrictions.feature.
  */
 
 import {
@@ -58,13 +41,13 @@ import {
   Upload,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetHost } from "../../model/dataset-host";
-import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog";
-import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block";
-import { AddOrEditDatasetDrawer } from "../../ui/sections/add-or-edit-dataset-drawer";
-import { BulkUploadDrawer } from "../../ui/sections/bulk-upload-drawer";
-import { CopyDatasetDialog } from "../../ui/sections/copy-dataset-dialog";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
+import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block.tsx";
+import { AddOrEditDatasetDrawer } from "../../ui/sections/add-or-edit-dataset-drawer.tsx";
+import { BulkUploadDrawer } from "../../ui/sections/bulk-upload-drawer.tsx";
+import { CopyDatasetDialog } from "../../ui/sections/copy-dataset-dialog.tsx";
 
 /** How long the undoable delete notice stands before it goes. */
 const DELETE_NOTICE_MS = 10_000;

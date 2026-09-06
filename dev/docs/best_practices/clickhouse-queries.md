@@ -282,6 +282,37 @@ repeatedly joining a small, slow-changing lookup table onto a big one, a
 dictionary is the intended tool, and worth an ADR rather than a quiet
 introduction.
 
+## Breaking Ties Among Versions Sharing `max(UpdatedAt)` (added 2026-09-06)
+
+`AbstractFoldProjection` stamps `max(Date.now(), prev + 1)`, monotonic only
+within one state chain — two writers resuming from the same committed
+version can land on the same millisecond, so the IN-tuple dedup pattern can
+still hand back two rows tied on `UpdatedAt`. A bare `LIMIT 1` after that
+picks arbitrarily, handing a fold stale state it rewrites and silently
+dropping the other version's contributions and applied-id watermark.
+
+`TraceAnalyticsClickHouseRepository.LATEST_VERSION_ORDER` breaks the tie by
+how far each version's fold actually got, in this order:
+
+1. `LastEventOccurredAt DESC` — the fold's own non-decreasing progress
+   watermark; the version that applied the latest event wins.
+2. `SpanCount DESC` — folds only increment it, so among equal watermarks,
+   more spans folded means more complete.
+3. `length(AppliedEventIds) DESC` — more deliveries absorbed; last because
+   the watermark is a bounded ring and saturates.
+4. `OccurredAt ASC` — a last-resort tiebreak, not a progress signal: since
+   ADR-071 step 3 froze `OccurredAt` as the storage anchor, it is equal
+   across a trace's versions except where a rebuild re-derived it (which
+   can land either side of the original), so no direction of it indicates
+   which version folded further.
+5. `toString(AppliedEventIds) DESC` — the four keys above are best-effort,
+   not total: two concurrent versions can tie on every one. The watermark's
+   *contents* discriminate where its length cannot (two writers racing the
+   same committed version folded different batches, so their merged id
+   sets differ even at equal size), giving every read the same winner
+   without a schema change. Cost is bounded: serialisation runs only over
+   the handful of candidate rows the IN-tuple already narrowed to.
+
 ## Code Review Checklist
 
 When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:

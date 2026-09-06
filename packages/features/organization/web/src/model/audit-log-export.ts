@@ -1,16 +1,8 @@
 /**
- * What a downloaded audit report contains.
- *
- * SEPARATED FROM THE SAVE ON PURPOSE, which is the credentials family's lesson
- * applied to a file rather than to a wire: WHAT the export says is decided here
- * and pinned here, and HOW it reaches the reader's disk is the application's
- * (`OrganizationHostPort.download`, answered in `apps/ui`). The platform page
- * did both inline, so neither half could be asserted without a browser.
- *
- * THE EXPORT IS THE SAME QUERY AS THE TABLE. A report taken from a pre-filtered
- * deep-link that silently widened to the whole organization's history would be
- * a disclosure dressed up as a convenience, so the screen sends this family's
- * one filter shape to both.
+ * What a downloaded audit report contains, separated from the save: what
+ * the export says is pinned here, how it reaches disk is
+ * `OrganizationHostPort.download`. Uses the same query as the table, so a
+ * pre-filtered deep-link never silently widens to the whole organization.
  */
 
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";

@@ -1,7 +1,7 @@
-import type { EndpointRegistration, HttpMethod } from "./types.js";
-import { isDateVersion, VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
+import type { EndpointRegistration, HttpMethod } from "./types.ts";
+import { isDateVersion, VERSION_LATEST, VERSION_PREVIEW } from "./types.ts";
 
-export { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
+export { VERSION_LATEST, VERSION_PREVIEW } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // Registration events (collected by the builder)
@@ -77,21 +77,10 @@ function applyEvents({
 // ---------------------------------------------------------------------------
 
 /**
- * Resolves registration events into concrete endpoint maps per version.
- *
- * Algorithm:
- * 1. Collect the distinct dated versions and sort them chronologically.
- * 2. For each version, start with a **copy** of the previous version's map.
- * 3. Apply the version's events in call order (overrides / additions /
- *    withdrawals).
- * 4. Withdrawn endpoints are kept as `{ withdrawn: true }` markers.
- * 5. The final dated version is aliased as `latest`.
- * 6. `preview` events resolve into a separate namespace that is never part of
- *    `latest`.
- *
- * Inheritance falls out of the data: an endpoint serves at version V its latest
- * registration dated on or before V.
- *
+ * Resolves registration events into concrete endpoint maps per version, by
+ * forward-copying each dated version's map and applying its events in
+ * call order. Inheritance falls out of the data: an endpoint serves at
+ * version V its latest registration dated on or before V.
  * @returns A map from version label to its resolved endpoint array.
  */
 export function resolveVersions(events: RegistrationEvent[]): Map<string, ResolvedEndpoint[]> {

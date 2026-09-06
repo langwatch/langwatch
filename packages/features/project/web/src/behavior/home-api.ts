@@ -1,16 +1,9 @@
 /**
  * The procedures the project home calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, the line every feature family's
- * map carries: the procedure is mounted by the process, and the router type
- * does not exist until a process instantiates one.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. tRPC hashes the procedure path into the
- * React Query key, so `home`, `plan`, `integrationsChecks`, `analytics` and
- * `scenarios` are spelled exactly as the root router mounts them — the home's
- * recent-items read and the briefing's are ONE cache entry because they are the
- * same path with the same input, which is what the briefing's own comment says
- * it depends on.
+ * Hand-written until the mounted router can generate it (ADR-130).
+ * `home`/`plan`/`integrationsChecks`/`analytics`/`scenarios` are
+ * load-bearing tRPC cache-key segments — the home and briefing recent-items
+ * reads share one cache entry only because they spell the path identically.
  */
 
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";

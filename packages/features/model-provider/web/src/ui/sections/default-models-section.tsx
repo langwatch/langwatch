@@ -1,28 +1,11 @@
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
- * Default Models — the table of every policy the caller can see, one row per
- * policy, with scope chips on the left and the role-level models in the
- * matching columns.
- *
- * The page-level scope filter narrows the rows inclusively (parents + children
- * of the picked scope). Same predicate the Model Providers table above uses, so
- * both tables reveal and hide the same branch of the org tree when the filter
- * changes.
- *
- * "+ Add config" and each row's Edit open `defaultModelOverride`, a registered
- * drawer that is still `platform/app`'s. The screen names it and the host writes
- * the address — see `ModelProviderHostPort.openPlatformDrawer` for the gap that
- * leaves.
- *
- * Moved from `platform/app/src/components/settings/DefaultModelsSection.tsx`,
- * whose only consumers were the model-providers page and its own two tests. The
- * uncontrolled mode went with the move: the section is mounted in exactly one
- * place and always by a page that owns the filter, so the local-state branch and
- * the duplicate filter dropdown it rendered were dead in production and alive
- * only in a test.
- *
- * Contract: specs/model-providers/role-based-default-models.feature and
- * specs/model-providers/model-default-config-cascade.feature.
+ * Default Models — every policy the caller can see, one row per policy. The
+ * page-level scope filter narrows rows inclusively (parents + children),
+ * the same predicate the Model Providers table above uses. "+ Add config"
+ * and Edit open `defaultModelOverride` via `ModelProviderHostPort.openPlatformDrawer`.
+ * Contract: specs/model-providers/role-based-default-models.feature,
+ *           specs/model-providers/model-default-config-cascade.feature.
  */
 
 import {
@@ -58,8 +41,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter.ts";
 import {
   compareConfigsByScopeThenName,
   mostSpecificScope,
@@ -68,10 +51,10 @@ import {
   MODEL_ROLE_LABEL,
   type AnchorScope,
   type ModelRoleKey,
-} from "../../model/default-model-cascade";
-import { useModelProviderHost } from "../../model/model-provider-host";
-import { filterRowsByScope } from "../../model/provider-scope-filter";
-import { ModelChip } from "../elements/model-chip";
+} from "../../model/default-model-cascade.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
+import { ModelChip } from "../elements/model-chip.tsx";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ConfigRow = WireOf<ModelDefaultConfigSnapshot>;

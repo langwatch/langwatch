@@ -778,7 +778,7 @@ export type GatewayApiMap = {
         output: RoutingPolicyView;
       };
     };
-    /** Deliberately no `scopes` and no `isDefault`: both move a policy, and moving one is its own write. */
+    /** No `scopes`/`isDefault`: both move a policy, and moving one is its own write. */
     update: {
       mutation: {
         input: {

@@ -1,9 +1,9 @@
-import { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell";
-import { percentileStats } from "./percentile";
-import { PullRequestStatusBadge } from "./pull-request-status-badge";
-import { SortableColumnHeader } from "./sortable-column-header";
-import { derivePullRequestStatus, type PullRequestStatus } from "./pull-request-status";
-import { usePullRequestSort } from "./pull-request-sort";
+import { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell.tsx";
+import { percentileStats } from "./percentile.ts";
+import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
+import { SortableColumnHeader } from "./sortable-column-header.tsx";
+import { derivePullRequestStatus, type PullRequestStatus } from "./pull-request-status.ts";
+import { usePullRequestSort } from "./pull-request-sort.ts";
 import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest, MoreVertical } from "lucide-react";
 import type React from "react";
@@ -18,45 +18,28 @@ import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 
-import { Link } from "./activity-link";
-import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-api";
-import { useCodingAgentActivityHost } from "./coding-agent-activity-host";
-import { useCodingAgentRouter } from "./coding-agent-router";
-import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip";
-import { formatLastUpdate } from "./last-update";
-import { NoDataInfoBlock } from "./no-data-info-block";
-import { computeRelativeWindow, PeriodSelector } from "./period-selector";
-import { PullRequestDetailDrawer } from "./pull-request-detail-drawer";
+import { Link } from "./activity-link.tsx";
+import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-api.ts";
+import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
+import { useCodingAgentRouter } from "./coding-agent-router.ts";
+import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
+import { formatLastUpdate } from "./last-update.ts";
+import { NoDataInfoBlock } from "./no-data-info-block.tsx";
+import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
+import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
 import {
   decodePullRequestRef,
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
-} from "./pull-request-detail-address";
-import type { Period, PeriodMode } from "./session-filters";
-import type { PullRequestSortColumn, PullRequestSortState } from "./pull-request-sort";
+} from "./pull-request-detail-address.ts";
+import type { Period, PeriodMode } from "./session-filters.ts";
+import type { PullRequestSortColumn, PullRequestSortState } from "./pull-request-sort.ts";
 
 /**
- * What each pull request cost in assistant usage.
- *
- * Every row covers the pull request's whole lifetime: the sessions that ran on
- * its branch before it was opened count toward it too. Which pull requests
- * appear is a personal question (the ones this project's own work touched);
- * what each one cost is answered across every project the viewer may read.
- * Branches whose pull request has not been opened yet take their place among
- * the pull requests rather than being listed after them, and stay the viewer's
- * own work.
- *
- * The list opens on the most recently active work and on all time, because the
- * page prices whole lifetimes and a window would hide the long-lived ones. The
- * search box and the period narrow it from there, every column sorts, and a
- * third click on a column hands the order back.
- *
- * Every numeric column reads the same way: the value, and a thin bar under it
- * saying how the row compares to the other rows on this page. Whether the
- * token cost was really spent or covered by a bundled plan is a detail of the
- * money rather than a different kind of number, so it lives in the value's
- * tooltip and never in its color.
- *
+ * What each pull request cost in assistant usage, over its whole lifetime
+ * (pre-open sessions count too) and across every project the viewer may
+ * read. Opens on all time since the page prices whole lifetimes; every
+ * numeric column shows a comparison bar, never color, for bundled-plan cost.
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 

@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
   Box,
   type BoxProps,
@@ -219,7 +219,7 @@ function VersionHistoryList({
   onRestore: (params: { versionId: string }) => void;
   isLoading: boolean;
   hasUnsavedChanges?: boolean;
-  /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
+  /** The versionId of the version currently being edited. Defaults to latest if omitted. */
   currentVersionId?: string;
 }) {
   // Show loading state

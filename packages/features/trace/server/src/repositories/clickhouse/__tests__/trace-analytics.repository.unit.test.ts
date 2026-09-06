@@ -1,32 +1,11 @@
 /**
  * @vitest-environment node
- *
- * DateTime64 decode is timezone-safe.
- *
- * ClickHouse emits DateTime64(3) without a zone suffix
- * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time, so
- * `new Date(str)` silently skews every timestamp by the host's UTC offset.
- * That matters more here than in a display path: `occurredAt` is folded with
- * `Math.min` against each new span, so a value read back early WINS and is
- * written straight back — the drift compounds on every cache miss instead of
- * cancelling, and `OccurredAt` is the table's partition key, ORDER BY column
- * and TTL anchor.
- *
- * CI runs in UTC, where the broken and correct parses agree, so this suite
- * forces a non-UTC zone before importing anything that touches Date. Kolkata
- * is deliberate: its +05:30 offset also catches a parse that happens to align
- * on whole hours.
+ * DateTime64 decode is timezone-safe (CI runs UTC, so this suite forces
+ * Kolkata, +05:30). Sets TZ through node:process, not the global: under a
+ * vm pool with isolate:false a worker reuses one context, and vitest's
+ * `process` global wraps it, missing Node's native setter that flushes
+ * V8's cached timezone (verified: TZ=UTC, one worker, Date-suite loaded first).
  */
-// Through node:process, NOT the global. Under a vm pool with isolate:false a
-// worker reuses one context across files, and the `process` global vitest
-// hands that context wraps the real one — assigning TZ on it misses Node's
-// native env setter, which is the thing that flushes V8's cached timezone.
-// So whenever another file had already used Date in this worker, the
-// assignment silently did nothing, the guard below collapsed to "expected +0
-// not to be +0", and which files shared a worker depended on the sequencer —
-// a per-shard coin flip. node:process is the real object; its setter flushes
-// the cache even mid-context. Verified against a deterministic repro
-// (TZ=UTC, one worker, a Date-using suite loaded first).
 import { env as nodeProcessEnv } from "node:process";
 
 nodeProcessEnv.TZ = "Asia/Kolkata";
@@ -38,8 +17,8 @@ import {
   clientReturning,
   orderingClient,
   TestWindowedReadMetrics,
-} from "../../../ports/__tests__/repositories/clickhouse-test-helpers";
-import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository";
+} from "../../../ports/__tests__/repositories/clickhouse-test-helpers.ts";
+import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";
@@ -345,17 +324,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 });
 
 /**
- * The write half of the migration window (ADR-066).
- *
- * `withClickHouseDefaultQuerySettings` proxies only `.query`, so an insert
- * carries exactly the settings the repository passes and nothing else.
- * ClickHouse defaults
- * `input_format_skip_unknown_fields` ON, and the workers Deployment overrides
- * the entrypoint so it never runs migrations — they run in the app pod's boot,
- * and the two roll concurrently. Without the explicit 0, a worker writing before
- * migration 00056 applies gets HTTP 200 with the new columns dropped and the row
- * stamped at the CURRENT projection version, so it later passes the store's
- * version gate and decodes as all-defaults with no rebuild path.
+ * The write half of the migration window (ADR-066). Without the explicit
+ * `input_format_skip_unknown_fields: 0`, a worker writing before migration
+ * 00056 applies gets HTTP 200 with the new columns silently dropped, and
+ * the row decodes as all-defaults with no rebuild path.
  */
 describe("TraceAnalyticsClickHouseRepository insert settings", () => {
   const ROW: TraceAnalyticsRow = {

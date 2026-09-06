@@ -1,9 +1,11 @@
-import type { AccessPolicy, CredentialClass } from "../../access-policy.js";
+import type { AccessPolicy, CredentialClass } from "../../access-policy.ts";
 
 /**
- * Process-wide registry of every route declared through the secured app builder. Populated at module-load time as each app file registers
- * its routes. The router-introspection guard test (api-endpoint-authorization.integration) cross-checks the fully composed router against
- * this registry so that ANY mounted route lacking a declared policy fails CI — including a route that bypassed the builder via raw Hono.
+ * Process-wide registry of every route declared through the secured app
+ * builder, populated at module-load time. The router-introspection guard
+ * test cross-checks the composed router against this registry so any
+ * mounted route lacking a declared policy — even one that bypassed the
+ * builder via raw Hono — fails CI.
  */
 export interface RegisteredRoute {
   readonly method: string;
@@ -11,9 +13,11 @@ export interface RegisteredRoute {
   readonly policy: AccessPolicy;
   readonly family: string;
   /**
-   * Which credential an API consumer sends here. Derived by the builder from the app and the policy, so a route cannot be
-   * published claiming a credential class nothing enforces. Read by the OpenAPI generator to stamp each operation's `security`,
-   * which used to inherit one document-wide default that was wrong for every organization-scoped route.
+   * Which credential an API consumer sends here. Derived by the builder
+   * from the app and policy, so a route cannot claim a credential class
+   * nothing enforces. Read by the OpenAPI generator to stamp each
+   * operation's `security`, replacing a document-wide default that was
+   * wrong for every organization-scoped route.
    */
   readonly credentialClass: CredentialClass;
   /**

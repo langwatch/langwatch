@@ -1,16 +1,8 @@
 /**
  * The range every analytics read is scoped to, read out of the address.
- *
- * The reading half of `platform/app/src/components/PeriodSelector.tsx`, made
- * pure so "which window is a chart showing" is a unit test rather than
- * something only a mounted router can answer.
- *
- * PURE MEANS IT TAKES `now`, AND THAT IS A TRAP. A relative window ends at the
- * instant it is read, so calling this straight out of a render body gives a new
- * `endDate` every frame, to the millisecond — and every analytics query keys on
- * the two dates, so the page would refetch forever. `behavior/use-analytics-period.ts`
- * is the render seam that memoises it; the annotations family paid three hours
- * to find this the hard way and the pin beside it says so.
+ * Pure means it takes `now` — calling this straight from a render body
+ * gives a new `endDate` every frame, so every query refetches forever.
+ * `behavior/use-analytics-period.ts` is the render seam that memoises it.
  */
 
 import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";

@@ -6,14 +6,14 @@ import {
 } from "@langwatch/dataset-contract";
 import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventingTraceOriginAdapter } from "../eventing.trace-origin.adapter";
-import { type TraceDeferredOriginSchedulerPort } from "../eventing.deferred-origin.adapter";
-import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.adapter";
-import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.adapter";
+import { EventingTraceOriginAdapter } from "../eventing.trace-origin.adapter.ts";
+import { type TraceDeferredOriginSchedulerPort } from "../eventing.deferred-origin.adapter.ts";
+import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.adapter.ts";
+import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.adapter.ts";
 import {
   TraceProcessingPipelinePort,
   type TraceProcessingPipelineDefinition,
-} from "../../ports/trace-processing-pipeline.port";
+} from "../../ports/trace-processing-pipeline.port.ts";
 
 class TestDatasetNormalization extends DatasetNormalizationWorkerPort {
   readonly process = vi.fn(async (_payload: DatasetNormalizePayload) => {});
@@ -21,21 +21,11 @@ class TestDatasetNormalization extends DatasetNormalizationWorkerPort {
 }
 
 /**
- * Two of Trace's nine commands, which is all this file is about: the installer
- * registers routing names and durable jobs, and the assertions below name
- * `assignTopic`.
- *
- * The return type is the port's, not a widened one. `TraceProcessingPipelinePort`
- * declares the exact definition the real builder produces, and its docblock
- * says why: against `RegisteredCommand` the union erases to its constraint and
- * `eventSourcing.register()` hands every caller an index-signature command map,
- * with `recordSpan` typed as `MappedCommand<Record<string, unknown>> | undefined`
- * rather than as itself. Loosening the port to fit this double would cost the
- * process that typing.
- *
- * So the cast is here, where the narrowing is deliberate and local. Building
- * the real nine would mean four store-backed projections and a projection
- * runtime, none of which the installer looks at.
+ * Two of Trace's nine commands — all the installer's routing/durable-job
+ * registration needs. Return type is the port's own, not widened, so the
+ * narrowing cast lives here rather than loosening `TraceProcessingPipelinePort`
+ * and costing the real builder its typing. Building the real nine would mean
+ * four store-backed projections the installer never looks at.
  */
 class TestTracePipeline extends TraceProcessingPipelinePort {
   deferredOrigins: TraceDeferredOriginSchedulerPort | undefined;

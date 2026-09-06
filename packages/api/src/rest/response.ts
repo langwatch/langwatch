@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 
-import { parseApiSchemaSync } from "../schema.js";
-import { ENDPOINT_ROUTE, type EndpointDef, type EndpointRegistration } from "./types.js";
+import { parseApiSchemaSync } from "../schema.ts";
+import { ENDPOINT_ROUTE, type EndpointDef, type EndpointRegistration } from "./types.ts";
 
 /**
  * The answer a handler gives when the request is not its own after all: the
@@ -81,15 +81,10 @@ export function serializeEndpointResult({
 
   const validation = parseApiSchemaSync(config.output, result);
   if (!validation.success) {
-    // Deliberately a plain `Error`, not a `HandledError`. We know the cause,
-    // but the caller cannot act on it — the handler returned something its own
-    // declared schema rejects, which is our bug. It degrades to "unknown" plus
-    // a trace id at the boundary, which is the correct outcome (ADR-045), and
-    // logs at 500/error because it carries no `httpStatus` or `fault`.
-    //
-    // The endpoint is named because the log line otherwise identified this
-    // only by the concrete URL, leaving "which endpoint breaks its own
-    // contract" a question you had to answer by hand.
+    // Deliberately a plain `Error`, not a `HandledError`: the caller cannot
+    // act on our own bug, so it degrades to "unknown" plus a trace id
+    // (ADR-045). The endpoint is named so the log line says which endpoint
+    // breaks its own contract, not just the concrete URL.
     const route = c.get(ENDPOINT_ROUTE) as string | undefined;
     throw new Error(`Response failed output validation${route ? ` for ${route}` : ""}`, {
       cause: validation.error,

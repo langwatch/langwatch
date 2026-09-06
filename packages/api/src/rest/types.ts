@@ -2,11 +2,11 @@ import type { AccessDeclaration, AuthzPermission } from "@langwatch/authz-contra
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
-import type { RestVersionSelector } from "./rest-version-selector.js";
-import type { ApiSchema } from "../schema.js";
+import type { RestVersionSelector } from "./rest-version-selector.ts";
+import type { ApiSchema } from "../schema.ts";
 
-import type { RateLimiter, ResponseCache } from "../ports.js";
-import type { IdempotentRunner } from "./idempotency.js";
+import type { RateLimiter, ResponseCache } from "../ports.ts";
+import type { IdempotentRunner } from "./idempotency.ts";
 
 // ---------------------------------------------------------------------------
 // Version primitives
@@ -119,9 +119,10 @@ export const ENDPOINT_INPUT = "endpointInput" as const;
 export const REQUEST_FAMILY = "requestFamily" as const;
 
 /**
- * Context key marking that a request log record is already owed for this request. See {@link REQUEST_FAMILY}: a
- * request passing through twenty-one mounted families passed through twenty-one request loggers and wrote
- * twenty-one identical lines. The outermost one owns the record; the rest stand down.
+ * Context key marking that a request log record is already owed for this
+ * request. See {@link REQUEST_FAMILY}: a request through twenty-one mounted
+ * families would otherwise write twenty-one identical lines. The outermost
+ * one owns the record; the rest stand down.
  */
 export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
 
@@ -265,8 +266,9 @@ export interface EndpointDef {
 export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> & AccessDeclaration;
 
 /**
- * The definition shape the chain builder accumulates before precedence is resolved: identical to {@link
- * EndpointDef}, except the two capabilities with explicit opt-outs still carry their `false` markers.
+ * The definition shape the chain builder accumulates before precedence is
+ * resolved: identical to {@link EndpointDef}, except the two capabilities
+ * with explicit opt-outs still carry their `false` markers.
  * @internal
  */
 export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache" | "resourceLimit"> {
@@ -286,7 +288,8 @@ export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache" 
  * this map through the service builder's type, so `c.get("things")` is typed.
  */
 export type EndpointVariables = {
-  // biome-ignore lint/suspicious/noExplicitAny: validated at runtime by the declared SSE query schema; inference from the trailing define callback is not expressible in TypeScript.
+  // Validated at runtime by the declared SSE query schema; inference from
+  // the trailing define callback is not expressible in TypeScript.
   query?: any;
 };
 
@@ -379,12 +382,13 @@ export interface ServiceConfig<TApp = unknown> {
   /** Resolves the authenticated actor when a handler calls `context.actor()`. */
   actor?: (context: Context) => RequestActor;
   /**
-   * Authorizes an input-dependent permission when a handler calls `context.authorize(permission)`.
-   * Static endpoint permissions still belong on `.withPermission(...)`; this seam is for a permission
+   * Authorizes an input-dependent permission when a handler calls
+   * `context.authorize(permission)`. Static endpoint permissions still
+   * belong on `.withPermission(...)`; this seam is for a permission
    * selected from validated request data.
    */
   authorize?: (context: Context, permission: AuthzPermission) => Promise<void>;
-  /** @deprecated Legacy compatibility check; modern REST uses validated input before authorization. */
+  /** @deprecated Legacy compatibility check; modern REST validates input before authorization. */
   projectIdInput?: true;
   /**
    * Rate limiter port backing `.withRateLimit()`. Declaring the capability

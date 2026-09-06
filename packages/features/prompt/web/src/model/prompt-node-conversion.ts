@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "./wire-versioned-prompt";
+import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
@@ -16,16 +16,16 @@ import {
   type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
-} from "./prompt-form";
-import type { SaveVersionParams } from "./prompt-config-operations";
+} from "./prompt-form/index.ts";
+import type { SaveVersionParams } from "./prompt-config-operations.ts";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
 } from "@langwatch/prompt-contract";
-import { DEFAULT_MODEL } from "./prompt-constants";
-import { kebabCase } from "./string-casing";
+import { DEFAULT_MODEL } from "./prompt-constants.ts";
+import { kebabCase } from "./string-casing.ts";
 
 import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
 
@@ -74,16 +74,10 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 }
 
 /**
- * Safely converts node data to form initial values, handling legacy formats and corrupted data.
- *
- * Auto-generates or provides defaults for missing or invalid data:
- * - Identifiers: Auto-generated for inputs/outputs via safeInputs/safeOutputs
- * - Handle: Defaults to null if missing
- * - Scope: Defaults to PROJECT if missing (required by schema)
- * - LLM config: Migrates legacy string format (model name) to object { model }
- * - LLM config: Provides empty object if missing (schema applies defaults)
- * - Prompt: Defaults to empty string if missing
- *
+ * Safely converts node data to form initial values, handling legacy formats
+ * and corrupted data: auto-generates missing identifiers, defaults handle
+ * to null and scope to PROJECT, and migrates a legacy string `llm` (model
+ * name) into `{ model }`.
  * @param nodeData - Raw node data from the workflow
  * @returns Partial form values with safe defaults for all required fields
  */
@@ -153,11 +147,8 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
 }
 
 /**
- * Safely converts node inputs to form values, auto-generating identifiers for corrupted data.
- *
- * If an input has an empty or missing identifier, generates a unique one automatically
- * instead of throwing a validation error.
- *
+ * Safely converts node inputs to form values, auto-generating an identifier
+ * for a corrupted (empty/missing) one instead of throwing a validation error.
  * @param inputs - Raw input data from the node
  * @returns Validated inputs with guaranteed identifiers
  */
@@ -196,11 +187,8 @@ function safeInputs(
 }
 
 /**
- * Safely converts node outputs to form values, auto-generating identifiers for corrupted data.
- *
- * If an output has an empty or missing identifier, generates a unique one automatically
- * instead of throwing a validation error.
- *
+ * Safely converts node outputs to form values, auto-generating an
+ * identifier for a corrupted (empty/missing) one rather than throwing.
  * @param outputs - Raw output data from the node
  * @returns Validated outputs with guaranteed identifiers
  */
@@ -243,16 +231,10 @@ function safeOutputs(
 }
 
 /**
- * Converts inline node data (parameters array) to LocalPromptConfig format.
- *
- * Used for backward compatibility when old workflow nodes have inline LLM config
- * (parameters array with llm, instructions, messages) but no promptId.
- * This allows the PromptEditorDrawer to display the inline config for editing.
- *
- * Returns undefined if the node has no meaningful inline config (no parameters
- * or empty parameters array).
- *
- * @param nodeData - Raw node data from the workflow (Signature or LlmPromptConfigComponent)
+ * Converts inline node data (parameters array) to LocalPromptConfig, for
+ * old workflow nodes with inline LLM config but no promptId, so
+ * `PromptEditorDrawer` can display it. Undefined if there is none.
+ * @param nodeData - Raw node data from the workflow
  * @returns LocalPromptConfig if inline config exists, undefined otherwise
  */
 export function nodeDataToLocalPromptConfig(

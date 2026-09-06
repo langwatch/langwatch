@@ -2,9 +2,9 @@ import {
   createRestApiService,
   type RestApiService,
   type RestApiServicePorts,
-} from "./security/rest-api-service.js";
+} from "./security/rest-api-service.ts";
 
-import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.js";
+import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.ts";
 
 /**
  * Everything the REST composition needs from the process it runs in.
@@ -28,12 +28,10 @@ export type AppRestSecurity = RestApiService<AppRestProjectVariables, AppRestOrg
 
 /**
  * Bind the REST service builder to one process's authentication, logging,
- * tracing and error rendering.
- *
- * Called once, at composition time. A REST feature takes the
- * result as an argument rather than importing a module-level singleton, so a
- * feature can be mounted into a second process (tests, the standalone API
- * process) against different enforcement without touching the feature.
+ * tracing and error rendering. Called once, at composition time; a REST
+ * feature takes the result as an argument rather than importing a
+ * module-level singleton, so it can mount into a second process against
+ * different enforcement without touching the feature.
  */
 export function createAppRestSecurity(ports: AppRestSecurityPorts): AppRestSecurity {
   return createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports);

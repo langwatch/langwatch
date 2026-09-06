@@ -1,47 +1,9 @@
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 /**
  * `defaultModelOverride`: authoring or editing one ModelDefaultConfig policy.
- *
- * Layout:
- *   Scope chip picker         (full row)
- *   Default ........ [model selector] v
- *     prompt.create_default ........ [model selector]
- *     evaluator.create_default ..... [model selector]
- *   Fast ............ [model selector] v
- *     traces.ai_search ............. [model selector]
- *     studio.autocomplete .......... [model selector]
- *     ... (every feature registered in the role)
- *   Embeddings ..... [model selector]    (no expand)
- *
- * Inherit semantics on the wire = absence. The drawer's UI uses an explicit
- * "Inherit" choice in the model selector that, on save, omits the key from the
- * JSON. On reopen, role/feature rows that are not in the saved JSON read as
- * "Inherit" again. The selector renders the resolved-inherited model as a
- * placeholder at reduced opacity so the reader sees what would apply if they
- * do not override.
- *
- * Feature rows under an expanded role default to "Inherit" - picking a model
- * there pins that feature to the chosen value, leaving the role-level pick
- * alone.
- *
- * RECOVERED FROM
- * `platform/app/src/components/settings/DefaultModelOverrideDrawer.tsx`,
- * deleted in `cc91631cd8`. The Default Models table's "+ Add config" and every
- * row's Edit write this address, so with the component gone a customer could
- * not configure a default model at all.
- *
- * ONE BEHAVIOUR DID NOT TRAVEL, and it is named rather than quietly dropped:
- * `syncLangyAfterDefaultModelWrite`. After a save it re-read the resolver and
- * told the Langy store to snap its model pill to the new default, so an open
- * panel stopped offering the outgoing model. That helper is
- * `@langwatch/langy-web`'s, it is unexported, and langy-web already depends on
- * THIS package — so importing it back would be a cycle. What survives is the
- * half that matters to every other surface: the save invalidates the
- * `modelProvider` cache prefix, which is the same React Query key the pill's
- * `getResolvedDefault` read lands on, so its DATA refetches. What is missing is
- * only the store's follow, so an open Langy panel keeps the outgoing model in
- * its own local state until it is remounted. Recorded in
- * `dev/docs/plans/strict-feature-layout.md`.
+ * Inherit on the wire = key absence. Missing on purpose: the Langy pill
+ * sync helper, since it lives in `@langwatch/langy-web` and importing it
+ * back would cycle — an open panel keeps the outgoing model until remounted.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -61,10 +23,10 @@ import {
   type ModelDefaultSnapshot,
 } from "@langwatch/model-provider-contract";
 
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import { useModelProviderHost } from "../../model/model-provider-host";
-import { modelSelectorOptions } from "../elements/model-selector";
-import { INHERIT_SENTINEL, ProviderModelSelector } from "../elements/provider-model-selector";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { modelSelectorOptions } from "../elements/model-selector.tsx";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "../elements/provider-model-selector.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -244,15 +206,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     return m;
   }, [features]);
 
-  // Narrow the model picker to only providers the user explicitly
-  // configured (one of their scopes has a stored ModelProvider row).
-  // The legacy `getAllForProject` Record merges env-fed defaults
-  // (every registry provider whose API key happens to be present in
-  // the server's process env), which surfaces unrelated providers in
-  // the picker - a user with only Anthropic configured would see
-  // Voyage / Gemini / Perplexity embeddings just because those env
-  // vars are set on the host. `listAllForProjectForFrontend` returns
-  // stored rows only.
+  // Narrow the picker to explicitly configured providers only. The legacy
+  // `getAllForProject` Record merges in env-fed defaults, surfacing unrelated
+  // providers just because their key is set on the host.
+  // `listAllForProjectForFrontend` returns stored rows only.
   const projectProviders = modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId && open, refetchOnMount: false },
@@ -370,17 +327,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
           scopeId: s.scopeId,
         })),
       });
-      // Every mounted reader of a default-model answer refetches. tRPC keys
-      // the React Query cache on the procedure PATH, so invalidating the
-      // `modelProvider` prefix here reaches the entries other packages' hooks
-      // created against the same procedures — including the Langy pill's
-      // `getResolvedDefault`. What it cannot reach is Langy's own store, which
-      // is why the docblock above records the pill's follow as absent.
-      //
-      // Isolated in its own try: the write already committed by the time
-      // this runs, so a refresh that fails here must not turn a successful
-      // save into a reported failure — the row is correct on the next
-      // navigation even if this tab's cache stays stale.
+      // Invalidating `modelProvider` reaches every mounted reader keyed on that
+      // procedure prefix, including the Langy pill's `getResolvedDefault` —
+      // but not Langy's own store (see the module docblock).
+      // Isolated in its own try: the write already committed, so a failed
+      // refresh here must not turn a successful save into a reported failure.
       try {
         await utils.modelProvider.invalidate();
       } catch {
@@ -678,19 +629,9 @@ function saveOutcomeCopy({ editingId, hasAnyKey }: { editingId?: string; hasAnyK
 
 /**
  * The inherit entry for a real cascade hit at the picked scopes, or
- * undefined when the server has none. The label names the WIDER scope
- * the value flows down from ("Inherit (from organization)"), which is
- * why the entry is built only from the server's answer for the picked
- * scopes: the server anchors its walk at the most-specific picked
- * scope and excludes the picked scopes themselves, so it can never
- * answer with a narrower tier. The old fallback to the current
- * project's own resolution is what produced "Inherit (from project)"
- * inside an organization-scoped config.
- *
- * The `inferred` source is not a cascade hit, it is the server
- * guessing what the user might want from their enabled providers.
- * Showing it as a ghost value gave the contradictory read that
- * something was set when nothing was.
+ * undefined when the server has none. `inferred` is not a cascade hit — it
+ * is the server guessing from enabled providers — and showing it as a ghost
+ * value gave the contradictory read that something was set when nothing was.
  */
 export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | undefined {
   if (!entry || entry.source === "inferred") return undefined;
@@ -701,13 +642,10 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 }
 
 /**
- * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
- * With a cascade hit the entry carries the inherited model, rendered at
- * reduced opacity in the trigger and as the first dropdown entry. With
- * no hit (nothing set anywhere wider, or the widest scope is picked)
- * the entry reads "Not configured" with no model attached: it still
- * exists so an edit can always clear a pinned key back to inherit, it
- * just never claims a value flows down from somewhere.
+ * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With
+ * no cascade hit it still reads "Not configured" with no model attached, so
+ * an edit can always clear a pinned key back to inherit without claiming a
+ * value flows down from somewhere.
  */
 export function buildInheritOption(entry: InheritedEntry): InheritOptionShape {
   return inheritHitOption(entry) ?? { label: "Not configured" };
@@ -767,14 +705,10 @@ function ReplacedConfigsNote({
 }
 
 /**
- * Scope picker section. Quick-pick chips ("Organization" / "This team"
- * / "This project") follow the same pattern as `ProviderScopeSection`
- * from the model-provider drawer - picking one replaces the selection
- * with that single scope, and the multi-scope chip picker stays
- * available below for fan-out cases. Lives inline here (rather than
- * pulling `ProviderScopeSection` in) because that component is tightly
- * coupled to `useModelProviderForm`'s reducer; pulling it apart is a
- * follow-up if more surfaces need this primitive.
+ * Scope picker section, following `ProviderScopeSection`'s pattern. Lives
+ * inline here rather than pulling that component in, since it is tightly
+ * coupled to `useModelProviderForm`'s reducer — a follow-up if more
+ * surfaces need this primitive.
  */
 function ScopeSection({
   scopes,

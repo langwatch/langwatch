@@ -6,13 +6,13 @@
 
 // The fingerprint a credential refusal is logged with, on every family that
 // resolves its own credential.
-export { type AuthDiagnostics, collectAuthDiagnostics } from "./auth-diagnostics.js";
+export { type AuthDiagnostics, collectAuthDiagnostics } from "./auth-diagnostics.ts";
 // The wire-size cap every ingestion family carries. Here rather than in one
 // family because nine of them apply it, and a second implementation would be a
 // second answer to "how big is too big" on the same process.
-export { bodyLimit, type BodyLimitOptions } from "./body-limit.js";
-export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
-export type { RestService } from "./builder.js";
+export { bodyLimit, type BodyLimitOptions } from "./body-limit.ts";
+export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.ts";
+export type { RestService } from "./builder.ts";
 export type {
   DefaultsChain,
   PermissionScope,
@@ -24,8 +24,8 @@ export type {
   ScopeIdKey,
   ScopeIdsIn,
   SseChain,
-} from "./definition.js";
-export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+} from "./definition.ts";
+export { loggerMiddleware, tracerMiddleware } from "./middleware.ts";
 export {
   restVersionSelectorMiddleware,
   RestVersionSelector,
@@ -33,12 +33,12 @@ export {
   type RestVersionSelectorMiddlewareOptions,
   type RestVersionSelectorOptions,
   type RestVersionSource,
-} from "./rest-version-selector.js";
+} from "./rest-version-selector.ts";
 // Spec generation must come from the same hono-openapi package instance that
 // attached the route metadata. Re-export it so hosts cannot accidentally use
 // a peer-resolved copy with a different metadata symbol.
 export { generateSpecs as generateApiSpecs } from "hono-openapi";
-export { normalizeExclusiveBounds } from "./openapi-exclusive-bounds.js";
+export { normalizeExclusiveBounds } from "./openapi-exclusive-bounds.ts";
 
 import type { Hono } from "hono";
 import { handle } from "hono/vercel";
@@ -47,7 +47,7 @@ export function routeHandlers(app: Hono) {
   const h = handle(app);
   return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
 }
-export { createSSEResponse, type SSEHandler, type TypedSSEStream } from "./sse.js";
+export { createSSEResponse, type SSEHandler, type TypedSSEStream } from "./sse.ts";
 export {
   type BaseApp,
   API_VERSION_HEADER,
@@ -69,8 +69,8 @@ export {
   VERSION_PREVIEW,
   type VersionLabel,
   type VersionStatus,
-} from "./types.js";
-export { type RegistrationEvent, type ResolvedEndpoint, resolveVersions } from "./versioning.js";
+} from "./types.ts";
+export { type RegistrationEvent, type ResolvedEndpoint, resolveVersions } from "./versioning.ts";
 
 // ---------------------------------------------------------------------------
 // Route security — the route-policy registry, the OpenAPI security projection
@@ -83,18 +83,18 @@ export {
   isHttpMethod,
   type SecurityRequirement,
   securityForCredentialClass,
-} from "./security/openapi-security.js";
+} from "./security/openapi-security.ts";
 export {
   assertEveryRouteDeclared,
   type MountedRouteTable,
   undeclaredRoutes,
-} from "./security/route-declaration.js";
+} from "./security/route-declaration.ts";
 export {
   allRegisteredRoutes,
   getRoutePolicy,
   type RegisteredRoute,
   registerRoutePolicy,
-} from "./security/route-registry.js";
+} from "./security/route-registry.ts";
 export {
   type ApiErrorEnvelope,
   createRestApiService,
@@ -108,43 +108,43 @@ export {
   type VersionedAppOptions,
   type VersionedEndpointMeta,
   type VersionedFamilyScope,
-} from "./security/rest-api-service.js";
+} from "./security/rest-api-service.ts";
 
-// The REST kit an application's route families are built from. Everything here was previously `apps/api/src/app-rest`, which a package may not import: a REST family that lives in `packages/features/<f>/server` needs the
-// same request validator, error vocabulary, response schemas, idempotency wire contract and correlation handles as one still mounted from an application, and two definitions would let one surface's 422 become the other's
-// 500 without anything reporting it. What deliberately did NOT come with it is every BOUND instance: the concrete permission catalogue behind `AppRestRbacVocabulary`, the broadcast transport behind `AppRestBroadcast`, the
-// function that reads a deployment's origin to build a `PlatformUrlBuilder`, the idempotency ledger behind `IdempotentRunner`, and the audit sink behind `AppRestManagementAuditPort`. Each of those needs a database, a queue
-// or a validated environment, and a package may read none of the three. The port type is here; the process that owns the substrate supplies the value.
+// The REST kit route families are built from — moved out of `apps/api/src/app-rest`
+// so a family in `packages/features/<f>/server` shares one validator, error
+// vocabulary, and idempotency contract with an application-mounted family.
+// Every BOUND instance (permission catalogue, broadcast transport, audit
+// sink) stayed behind, since each needs a database/queue a package may not read.
 
 export {
   type AppRestSecurity,
   type AppRestSecurityPorts,
   createAppRestSecurity,
-} from "./app-security.js";
-export type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.js";
-export type { MountableRestApp } from "./types.js";
+} from "./app-security.ts";
+export type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.ts";
+export type { MountableRestApp } from "./types.ts";
 
 // Ports a REST family declares and a process binds.
-export type { AppRestBroadcast } from "./broadcast.js";
-export type { AppRestRbacVocabulary } from "./rbac-vocabulary.js";
-export type { PlatformUrlBuilder } from "./platform-url.js";
+export type { AppRestBroadcast } from "./broadcast.ts";
+export type { AppRestRbacVocabulary } from "./rbac-vocabulary.ts";
+export type { PlatformUrlBuilder } from "./platform-url.ts";
 
 // The management surface's shared vintage and audit emission.
-export { MANAGEMENT_API_VERSION } from "./management-version.js";
+export { MANAGEMENT_API_VERSION } from "./management-version.ts";
 export {
   type AppRestManagementAuditPort,
   emitManagementAudit,
   managementActor,
-} from "./management-audit.js";
+} from "./management-audit.ts";
 
 // Marking a family as a deprecated alias: the headers every one of its
 // responses, refusals included, names its successor with.
-export { deprecatedAlias } from "./deprecation.js";
+export { deprecatedAlias } from "./deprecation.ts";
 
 // A family's own `onError`, layered over the spine's.
-export { createCanonicalFamilyErrorHandler } from "./canonical-family-error-handler.js";
-export { createFamilyErrorHandler } from "./family-error-handler.js";
-export { handWrittenDocs } from "./hand-written-docs.js";
+export { createCanonicalFamilyErrorHandler } from "./canonical-family-error-handler.ts";
+export { createFamilyErrorHandler } from "./family-error-handler.ts";
+export { handWrittenDocs } from "./hand-written-docs.ts";
 // The OpenAPI schema wrapper a family needs to document a response body of its
 // own. Re-exported so a transport file never reaches for hono-openapi itself.
 export { resolver } from "hono-openapi";
@@ -159,7 +159,7 @@ export {
   NotFoundError,
   UnauthorizedError,
   UnprocessableEntityError,
-} from "./http-errors.js";
+} from "./http-errors.ts";
 
 // The scope a request arrived on, read off the handler's own context.
 export {
@@ -168,10 +168,10 @@ export {
   type OrganizationScopedContext,
   type ProjectScopedContext,
   type RestErrorHandler,
-} from "./scope-accessors.js";
+} from "./scope-accessors.ts";
 
 // The answer of an any-method route that is not the one to serve this request.
-export { declined, type Declined } from "./response.js";
+export { declined, type Declined } from "./response.ts";
 
 // The wire shapes: the canonical envelope and the flat legacy one.
 export {
@@ -188,7 +188,7 @@ export {
   flexibleDateSchema,
   successSchema,
   unauthorizedSchema,
-} from "./schemas.js";
+} from "./schemas.ts";
 
 // The documented responses a route spreads into its OpenAPI block.
 export {
@@ -198,8 +198,8 @@ export {
   canonicalConflictResponses,
   canonicalUnprocessableResponses,
   conflictResponses,
-} from "./base-responses.js";
-export type { RouteResponse } from "./response-types.js";
+} from "./base-responses.ts";
+export type { RouteResponse } from "./response-types.ts";
 
 // `Idempotency-Key`: the header names, the bounds, the reader and the writer.
 export {
@@ -215,7 +215,7 @@ export {
   MAX_KEY_LENGTH,
   MIN_KEY_LENGTH,
   readIdempotencyKey,
-} from "./idempotency.js";
+} from "./idempotency.ts";
 
 // `Idempotency-Key`: the receipt ledger the wire half dispatches through.
 export {
@@ -234,7 +234,7 @@ export {
   TAKEOVER_AFTER_MS,
   withIdempotency,
   type WithIdempotencyParams,
-} from "./idempotency-ledger.js";
+} from "./idempotency-ledger.ts";
 
 // Shared hardening for the routes that stream stored-object bytes.
 export {
@@ -243,17 +243,17 @@ export {
   safeMediaType,
   sanitizeFilenameSegment,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
-} from "./media-response.js";
+} from "./media-response.ts";
 
 // Who is behind a personal-workspace key.
 export {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   resolvePersonalCaller,
-} from "./personal-caller.js";
+} from "./personal-caller.ts";
 
 // The correlation handles every canonical refusal quotes.
-export { requestTraceIds } from "./trace-ids.js";
+export { requestTraceIds } from "./trace-ids.ts";
 
 // The request validator that fails the way the rest of the boundary fails.
-export { type FieldViolation, RequestValidationError, validator } from "./validation.js";
+export { type FieldViolation, RequestValidationError, validator } from "./validation.ts";

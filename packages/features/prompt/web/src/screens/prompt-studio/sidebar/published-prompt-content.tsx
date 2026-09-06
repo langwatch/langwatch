@@ -1,7 +1,7 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { getDisplayHandle, OrganizationBadge } from "../../../surfaces/prompt-reference";
-import { PublishedPromptActions } from "./published-prompt-actions";
+import { getDisplayHandle, OrganizationBadge } from "../../../surfaces/prompt-reference/index.ts";
+import { PublishedPromptActions } from "./published-prompt-actions.tsx";
 
 interface PublishedPromptContentProps {
   promptId: string;
@@ -11,7 +11,7 @@ interface PublishedPromptContentProps {
 
 /**
  * Renders a published prompt list item with handle and actions.
- * Single Responsibility: Displays a single published prompt's handle and action menu in the sidebar.
+ * Single Responsibility: display a published prompt's handle and action menu in the sidebar.
  */
 export function PublishedPromptContent({
   promptId,

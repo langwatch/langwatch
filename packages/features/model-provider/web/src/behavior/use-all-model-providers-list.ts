@@ -1,21 +1,9 @@
 /**
  * Flat (uncollapsed) list of every stored provider row the caller can see —
- * one entry per row, never deduped by provider type.
- *
- * `useModelProvidersSettings` (still `platform/app`'s, for the editor drawer)
- * returns a `Record<providerKey, row>` collapsed to a single winner per
- * provider type, which is correct for a surface that renders "the effective
- * config for provider X" and wrong for anything that resolves a SPECIFIC row by
- * id: a multi-instance setup (two "openai" rows at different scopes) drops the
- * non-winning row from that Record entirely, so an id lookup against it
- * silently misses (#5380). The providers table lists rows, so it reads this.
- *
- * Harvested from `platform/app/src/hooks/useAllModelProvidersList.ts`. The
- * providers table took the hook alone; `findModelProviderById`,
- * `isResolvableProviderId` and the `isReady` signal followed when the provider
- * editor drawer was recovered, because those three exist for exactly one
- * question — "is there a specific stored row to resolve, and has the list
- * settled enough to say" — and the drawer is what asks it.
+ * one entry per row, never deduped by provider type. `useModelProvidersSettings`
+ * collapses to one winner per type, which drops non-winning rows from a
+ * multi-instance setup and silently misses an id lookup against it (#5380).
+ * The providers table reads this instead.
  */
 
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
@@ -23,17 +11,14 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
 /** A listed provider as the browser holds one: its instants are ISO strings. */
 export type ModelProviderListRow = WireOf<ModelProviderListEntry>;
-import { useModelProviderHost } from "../model/model-provider-host";
-import { modelProviderApi } from "./model-provider-api";
+import { useModelProviderHost } from "../model/model-provider-host.ts";
+import { modelProviderApi } from "./model-provider-api.ts";
 
 /**
- * A fresh `[]` on every render with no data (a disabled, in-flight or errored
- * query) hands each render a new array reference, and any consumer that lists
- * `providers` in a memo's dependencies then re-fires every render — the
- * render-loop class behind #5380. A module-level constant keeps the empty-list
- * identity stable. `readonly` because every caller shares this one instance: a
- * stray `push`/`sort` on a "local" copy would corrupt the empty list for
- * everyone.
+ * A fresh `[]` per render with no data would re-fire any memo depending on
+ * `providers` every render (the render-loop class behind #5380). This
+ * module-level constant keeps the empty-list identity stable; `readonly`
+ * since every caller shares the one instance.
  */
 const NO_PROVIDERS: readonly ModelProviderListRow[] = [];
 
@@ -71,22 +56,15 @@ export function useAllModelProvidersList() {
   return {
     providers: activeQuery.data ?? NO_PROVIDERS,
     /**
-     * react-query's own flag, forwarded unchanged. It stays true for a DISABLED
-     * query — v4 leaves a never-fetched query at `status: "loading"` — which is
-     * what the table wants: show the skeleton until the scope hydrates rather
-     * than render "No model providers" over a list nobody has asked for. It
-     * flips false the moment the query ERRORS (a 403 under `retry: false`), so
-     * a permission failure shows the empty surface instead of spinning forever.
+     * react-query's own flag, forwarded unchanged: true for a disabled query
+     * (shows the skeleton until scope hydrates), false the moment it errors
+     * (a 403 under `retry: false`, showing the empty surface instead).
      */
     isLoading: activeQuery.isLoading,
     /**
-     * Whether the list has actually ARRIVED, which is not the negation of
-     * `isLoading`.
-     *
-     * The editor drawer gates its form on this rather than on `!isLoading`: a
-     * disabled query is not loading and has no data either, and mounting the
-     * form off an empty list is what would silently drop a stored row's values
-     * on save.
+     * Whether the list has actually arrived — not the negation of
+     * `isLoading`. A disabled query is neither loading nor has data, and
+     * mounting the form off it would silently drop a stored row on save.
      */
     isReady: activeQuery.isSuccess,
     refetch: activeQuery.refetch,
@@ -104,15 +82,10 @@ export function isResolvableProviderId(modelProviderId: string | undefined): boo
 }
 
 /**
- * Resolves a single row by id out of the flat list above.
- *
- * Shared by the editor form's edit-target memo and the drawer's title lookup so
- * the two can never resolve different rows for the same id — #5380 was exactly
- * two separate resolvers drifting.
- *
- * Generic over the row rather than pinned to one shape: it resolves out of
- * whatever list the caller holds, and naming a concrete type would hand every
- * caller back something narrower than what it passed in.
+ * Resolves a single row by id out of the flat list above. Shared by the
+ * editor form's edit-target memo and the drawer's title lookup, so the two
+ * can never resolve different rows for the same id (#5380). Generic over
+ * the row so callers get back exactly what they passed in.
  */
 export function findModelProviderById<T extends { id: string }>({
   providers,

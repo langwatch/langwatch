@@ -1,15 +1,11 @@
 /**
- * OTel GenAI Semantic Conventions v1.38.0 Conformance Tests
- *
- * Verifies that spans conforming to the OTel GenAI semantic conventions
- * (https://github.com/open-telemetry/semantic-conventions/tree/v1.38.0/docs/gen-ai)
- * are parsed correctly by the canonicalisation pipeline.
- *
- * These tests use the full TraceCanonicalisationService to catch
- * interaction bugs between extractors.
+ * OTel GenAI Semantic Conventions v1.38.0 conformance tests: spans following
+ * https://github.com/open-telemetry/semantic-conventions/tree/v1.38.0/docs/gen-ai
+ * parse correctly through the full TraceCanonicalisationService (to catch
+ * interaction bugs between extractors).
  */
 import { describe, expect, it } from "vitest";
-import { canonicalisation, makeStubSpan } from "./test-helpers";
+import { canonicalisation, makeStubSpan } from "./test-helpers.ts";
 
 const clientSpan = makeStubSpan({
   name: "chat gpt-4",

@@ -1,23 +1,12 @@
 /**
  * @vitest-environment node
- *
- * The table cells walk the cascade client-side to display each row's
- * resolved models. The walk must follow the row's OWN scope chain
- * (project, then its own team, then the organization). It used to match
- * parent tiers by type alone, so a project row displayed values from
- * any team in the organization, values the runtime resolver would
- * never serve for that project.
- *
- * Binds "Config cells resolve inherited values only from the row's own
- * scope chain" in specs/model-providers/role-based-default-models.feature.
- *
- * Moved from
- * `platform/app/src/components/settings/__tests__/defaultModelsResolveAtScope.unit.test.ts`
- * with the walk itself; every assertion travelled unchanged.
+ * The cascade walk must follow the row's own scope chain, not match parent
+ * tiers by type alone, which previously leaked values from any team.
+ * Binds specs/model-providers/role-based-default-models.feature.
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveAtScope } from "../default-model-cascade";
+import { resolveAtScope } from "../default-model-cascade.ts";
 
 type ConfigRow = Parameters<typeof resolveAtScope>[0]["configs"][number];
 

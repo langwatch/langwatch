@@ -9,9 +9,9 @@ import {
 } from "@opentelemetry/api";
 import type { Context, Next } from "hono";
 
-import { RESOLVED_ERROR, type ResolvedError } from "../errors.js";
-import { getSSECompletion } from "./sse.js";
-import { ENDPOINT_ROUTE, REQUEST_FAMILY, REQUEST_LOG_CLAIM } from "./types.js";
+import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
+import { getSSECompletion } from "./sse.ts";
+import { ENDPOINT_ROUTE, REQUEST_FAMILY, REQUEST_LOG_CLAIM } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // Tracer middleware
@@ -157,11 +157,9 @@ export function loggerMiddleware(options?: { name?: string }) {
             resolved?.status ??
             (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
-          // This is the only error record written per failed request. The error handler deliberately
-          // does not log its own copy. `url` is the path that arrived, so it carries ids and is a
-          // different value on every request. `route` is the endpoint that matched — `GET
-          // /things/:id` — which is what you group by when asking which endpoint is failing. Absent
-          // for anything that never reached an endpoint stack: a 404, or a version-namespace guard.
+          // The only error record written per failed request — the error handler deliberately
+          // does not log its own copy. `route` is the matched endpoint (`GET /things/:id`), what
+          // you group by when asking which endpoint is failing; absent for a 404 or version guard.
           const route = c.get(ENDPOINT_ROUTE) as string | undefined;
           // The family that resolved the route, which is not the family whose
           // logger claimed the record when several share a base path.

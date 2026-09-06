@@ -1,31 +1,32 @@
 /**
- * The wiring behind the results column: permissions, view mode, cancellation, export and the run dialog, plus the
- * header line for the selected run and the settings that run was started with.
+ * The wiring behind the results column: permissions, view mode,
+ * cancellation, export and the run dialog, plus the header line for the
+ * selected run and the settings it was started with.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-scenario-runs";
-import { useCan } from "../../../../behavior/use-can";
-import { useNow } from "../../../../behavior/use-now";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-scenario-runs.ts";
+import { useCan } from "../../../../behavior/use-can.ts";
+import { useNow } from "../../../../behavior/use-now.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
-import type { PeriodControls } from "./period-controls";
-import type { RunPlanDetailRun } from "./run-plan-detail-header";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+import type { PeriodControls } from "./period-controls.ts";
+import type { RunPlanDetailRun } from "./run-plan-detail-header.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type {
   RunPlanBatches,
   RunPlanSelection,
-} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
-import { useRunPlanCancel } from "./use-run-plan-cancel";
-import { useRunPlanRunDialog } from "./use-run-plan-run-dialog";
-import { useRunPlanViewMode } from "./use-run-plan-view-mode";
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { useRunPlanCancel } from "./use-run-plan-cancel.ts";
+import { useRunPlanRunDialog } from "./use-run-plan-run-dialog.ts";
+import { useRunPlanViewMode } from "./use-run-plan-view-mode.ts";
 import { format } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../../../../behavior/scenario-api";
-import { useSession } from "../../../../behavior/auth-session";
-import { type RunSettings, readRunSettings, runActorName } from "./run-settings";
-import { type BatchTarget, isComparison, useBatchTargets } from "./use-batch-targets";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { useSession } from "../../../../behavior/auth-session.ts";
+import { type RunSettings, readRunSettings, runActorName } from "./run-settings.ts";
+import { type BatchTarget, isComparison, useBatchTargets } from "./use-batch-targets.ts";
 
 export type RunPlanResultsColumnState = {
   canManage: boolean;

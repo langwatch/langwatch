@@ -1,14 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The personal Pull Requests table: what a viewer is told when GitHub is not
- * connected, what a repository the connection does not cover is offered, how a
- * status is drawn, and how the list narrows by search, period and sort.
- *
- * The tRPC surface is a proxy that answers every query empty unless a test
- * pins it, so the table's two reads (the usage rollup and the live status)
- * are the only wiring under test.
- *
+ * The personal Pull Requests table. The tRPC surface is a proxy that
+ * answers every query empty unless a test pins it, so the table's two
+ * reads (usage rollup, live status) are the only wiring under test.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -20,7 +15,7 @@ const { queryImpls, permissionsRef } = vi.hoisted(() => ({
   permissionsRef: { canManageOrganization: true },
 }));
 
-vi.mock("../coding-agent-api", () => {
+vi.mock("../coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -49,12 +44,12 @@ vi.mock("../coding-agent-api", () => {
   return { codingAgentApi: makeNode("") };
 });
 
-import { PullRequestsTable } from "../pull-requests-table";
+import { PullRequestsTable } from "../pull-requests-table.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
-} from "../testing";
+} from "../testing.tsx";
 
 const INSTALL_URL = "/api/github/install?organizationId=org-1";
 
@@ -160,14 +155,9 @@ const headingFor = (label: string) =>
   screen.getByRole("button", { name: `Sort by ${label}` }).closest("th") as HTMLElement;
 
 /**
- * Waits until the period popover is off the screen.
- *
- * The popover holds one button per preset, and the trigger takes the name of
- * the preset that was picked, so while the popover is still on screen that
- * name is on screen twice and a query by name finds two buttons. Picking an
- * entry closes the popover, but its content stays on screen for one more
- * animation frame, and `user.click` returns before that frame. Waiting for the
- * popover to go is what leaves one button for the next query to name.
+ * Waits until the period popover is off the screen: the trigger repeats the
+ * picked preset's name, so while the popover's content still renders for one
+ * more animation frame after `user.click`, a query by name finds two buttons.
  */
 async function periodPopoverClosed() {
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

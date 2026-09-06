@@ -1,23 +1,9 @@
 /**
- * How the Role Bindings audit reads: one row per principal, every binding they
- * hold beside them.
- *
- * The page's whole job is answering "who can do what, and where" for an
- * organization, and a principal with four bindings is one person to a reader
- * even though it is four rows on the wire. The grouping, the ordering and the
- * three vocabularies below were inline in
- * `platform/app/src/pages/settings/role-bindings.tsx`; they are values, so they
- * live here and the screen renders them.
- *
- * THE BINDING SHAPE IS THE CONTRACT'S OWN. `RouterOutputs["roleBinding"]["listForOrg"][number]`
- * was an inference off the application's composed router, which a browser
- * package may not name. It did not need a new declaration: the procedure is
- * mounted from `@langwatch/role-server`, whose handler answers
- * `AuthzListManagedBindingsForOrganizationOutput` — the shape
- * `@langwatch/authz-contract` already declares as
- * {@link AuthzManagedOrganizationBinding}. So this is a REAL repoint onto an
- * existing declaration rather than a restatement, and both halves are now
- * checked against one statement of the row.
+ * How the Role Bindings audit reads: one row per principal, every binding
+ * they hold beside them — so four bindings on the wire read as one person.
+ * The binding shape is `@langwatch/authz-contract`'s own
+ * {@link AuthzManagedOrganizationBinding}, not a router-output inference a
+ * browser package may not name.
  */
 
 import type {
