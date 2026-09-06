@@ -367,9 +367,11 @@ export default async function execute() {
     // The two modes take different inputs (manage-role converges the dedicated
     // lwql_ro reader from the password alone; grants-only re-grants a
     // caller-named role), so dispatch per arm rather than passing a role that
-    // the manage-role arm would ignore. Runtime behavior is unchanged: on
-    // manage-role, role was already discarded here (the app always converges
-    // lwql_ro), so it is simply not passed.
+    // the manage-role arm would ignore. On manage-role WITH a password, role is
+    // simply not passed (the app always converges lwql_ro there). On manage-role
+    // WITHOUT a password, the grants-only fallback grants the DEFAULT lwql_ro
+    // role, not LWQL_POSTGRES_READER_ROLE — the chart never sets that env var on
+    // this path, so passing it through would silently grant nothing.
     const readerResult =
       readerMode === "manage-role"
         ? postgresReaderStatementsFor({

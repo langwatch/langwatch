@@ -1893,7 +1893,7 @@ clickhouse:
     # so the query password can never disagree with the one the pod created the
     # langwatch_lwql user from. Set this only to point the pod at a DIFFERENT
     # Secret you own (external-secrets, terraform) — you then own its keys too.
-    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own.
+    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own — it also redirects langwatch.clickhouse.lwqlSecretName, so the app/workers read LWQL_CLICKHOUSE_PASSWORD from this same Secret.
     existingSecret: ""
     ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
     passwordSecretKey: lwql_password
@@ -1924,8 +1924,10 @@ clickhouse:
     # Deployment say so loudly. A PARTIAL override (host left "" but
     # .database/.user/.passwordSecretKey changed) still fails the render as a likely
     # forgotten host. Setting an explicit non-empty `host` turns the bridge live
-    # against your PostgreSQL and now REQUIRES you to supply the lwql_ro reader
-    # password via clickhouse.lwqlAccessModel.existingSecret — the chart never
+    # against your PostgreSQL and now REQUIRES clickhouse.lwqlAccessModel.existingSecret
+    # to point at a Secret you own carrying BOTH `lwql_pg_password` (the lwql_ro
+    # reader password ClickHouse dials your PostgreSQL with) AND `lwql_password`
+    # (the langwatch_lwql ClickHouse identity password) — the chart never
     # provisions a reader on a PostgreSQL it does not own and will not autogenerate
     # a password nobody set there, so the render fails otherwise. Set `database` to
     # your instance's, and keep `user: lwql_ro` unless you provision a different

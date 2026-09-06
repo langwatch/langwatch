@@ -30,9 +30,12 @@ describe("postgresReaderStatementsFor", () => {
       expect(result.warningMessage).toBe(
         "LWQL_MANAGE_POSTGRES_READER is true but LWQL_POSTGRES_READER_PASSWORD is not set — cannot converge the reader role this boot; re-granting the approved views only",
       );
-      // Should contain grants only (from productionPostgresReaderGrantStatements)
+      // Should contain grants only (from productionPostgresReaderGrantStatements),
+      // targeting the DEFAULT lwql_ro role — this arm carries no `role` field, so
+      // it can never grant the caller-named LWQL_POSTGRES_READER_ROLE.
       expect(result.statements[0]).toContain("DO $$");
       expect(result.statements[0]).toContain("GRANT");
+      expect(result.statements.some((s) => s.includes("lwql_ro"))).toBe(true);
     });
   });
 
@@ -40,7 +43,6 @@ describe("postgresReaderStatementsFor", () => {
     it("returns grant-only statements without warning", () => {
       const result = postgresReaderStatementsFor({
         mode: "grants-only",
-        readerPassword: "secret123",
         schema: "public",
         role: "lwql_ro",
       });
@@ -55,7 +57,6 @@ describe("postgresReaderStatementsFor", () => {
     it("returns grant-only statements when password is absent", () => {
       const result = postgresReaderStatementsFor({
         mode: "grants-only",
-        readerPassword: undefined,
         schema: "public",
         role: "lwql_ro",
       });

@@ -370,6 +370,79 @@ test_external_clickhouse() {
   helm_uninstall "$ext_release"
 }
 
+# -----------------------------------------------------------------------------
+# SUITE: lwql external-PostgreSQL bridge secret guard (live-cluster lookup)
+# -----------------------------------------------------------------------------
+# The guard in templates/_helpers.tpl (langwatch.validateSecrets) that catches
+# an operator's existingSecret missing lwql_pg_password or lwql_password uses
+# Helm's `lookup` function to read the Secret from a live API server. `helm
+# template` never has one (lookup returns nil there), so lwql-connection-env.sh
+# cannot exercise this branch at all -- only a real install against a live
+# cluster can. `helm install` (not `helm template --dry-run`) has called lookup
+# against the live API server since Helm 3.1, so no `--dry-run=server` flag
+# (Helm 3.13+, newer than this repo's pinned 3.12.0) is needed here: submitting
+# a real install and reading whether the render step failed is enough, and
+# skipping --wait/--atomic keeps it fast since nothing here needs to become
+# Ready (the bridge host resolves to nothing real).
+test_lwql_external_postgres_secret_guard() {
+  sep; info "Suite: lwql external-PostgreSQL bridge secret guard (lookup)"
+
+  local NAMESPACE="lwql-secret-guard"
+  local RELEASE="lwql-guard"
+  local secret="lwql-bridge-secret"
+
+  kubectl --context "$KUBE_CTX" create namespace "$NAMESPACE" \
+    --dry-run=client -o yaml | kubectl --context "$KUBE_CTX" apply -f - >/dev/null
+
+  # Negative case: the Secret exists but is missing lwql_password -- the render
+  # must fail closed, naming the missing key, instead of installing an identity
+  # with a password nobody set.
+  kc delete secret "$secret" --ignore-not-found >/dev/null
+  kc create secret generic "$secret" --from-literal=lwql_pg_password=reader-pw >/dev/null
+
+  local out="${TMPDIR:-/tmp}/lwql-guard-neg.log"
+  if hc upgrade "$RELEASE" "$CHART_DIR" --install \
+      -f "$CHART_DIR/tests/values-e2e.yaml" \
+      --set postgresql.chartManaged=false \
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
+      --set clickhouse.lwqlAccessModel.postgres.host=extpg \
+      --set clickhouse.lwqlAccessModel.existingSecret="$secret" \
+      >"$out" 2>&1; then
+    fail "lwql-guard-neg-installed: helm install succeeded although $secret is missing lwql_password -- the lookup guard should have failed the render. Output:
+$(cat "$out")"
+  fi
+  if grep -q "lwql_password" "$out"; then
+    pass "lookup guard fails the render and names lwql_password when the Secret is missing it"
+  else
+    fail "lwql-guard-neg-message: helm install failed as expected but the error did not name lwql_password. Output:
+$(cat "$out")"
+  fi
+
+  # Positive case: the Secret carries both keys -- the render (and install)
+  # must succeed.
+  kc delete secret "$secret" --ignore-not-found >/dev/null
+  kc create secret generic "$secret" \
+    --from-literal=lwql_pg_password=reader-pw \
+    --from-literal=lwql_password=identity-pw >/dev/null
+
+  out="${TMPDIR:-/tmp}/lwql-guard-pos.log"
+  if hc upgrade "$RELEASE" "$CHART_DIR" --install \
+      -f "$CHART_DIR/tests/values-e2e.yaml" \
+      --set postgresql.chartManaged=false \
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
+      --set clickhouse.lwqlAccessModel.postgres.host=extpg \
+      --set clickhouse.lwqlAccessModel.existingSecret="$secret" \
+      >"$out" 2>&1; then
+    pass "lookup guard passes the render and installs when the Secret carries both keys"
+  else
+    fail "lwql-guard-pos-install-failed: helm install failed although $secret carries both keys. Output:
+$(cat "$out")"
+  fi
+
+  hc uninstall "$RELEASE" >/dev/null 2>&1 || true
+  kubectl --context "$KUBE_CTX" delete namespace "$NAMESPACE" --wait=false >/dev/null 2>&1 || true
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: App health check
 # Upgrades the release to enable the app (1 replica) and verifies /api/health.
@@ -928,6 +1001,7 @@ main() {
   test_upgrade_strategy_boundary
   test_upgrade
   test_external_clickhouse
+  test_lwql_external_postgres_secret_guard
   test_cold_storage_and_backup
 
   sep

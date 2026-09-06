@@ -97,6 +97,7 @@ secret_ref_of() {
   awk -v want="$src" -v v="$var" '
     /^# Source:/ { insrc = (index($0, want) > 0) }
     insrc && $0 ~ "- name: " v "$" { found=1; inref=0; sn=""; next }
+    insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0; inref=0 }
     found && /secretKeyRef:/ { inref=1; next }
     found && inref && /name:/ { sub(/^[[:space:]]*name:[[:space:]]*/, ""); gsub(/"/, ""); sn=$0 }
     found && inref && /key:/  { sub(/^[[:space:]]*key:[[:space:]]*/, "");  gsub(/"/, ""); print sn, $0; exit }
