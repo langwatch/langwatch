@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { CanonicalSpanStore } from "../../ports/canonical-attributes.port";
+import { CanonicalSpanStore } from "../../ports/canonical-attributes.port.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../../ports/canonical-attributes.port";
-import { StrandsCanonicaliserService } from "../strands-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import type { ExtractorContext } from "../../ports/canonical-attributes.port.ts";
+import { StrandsCanonicaliserService } from "../strands-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 /**
  * Creates a context with events support for Strands tests.
@@ -58,23 +58,44 @@ function createStrandsContext(
 describe("StrandsCanonicaliserService", () => {
   const extractor = StrandsCanonicaliserService.create();
 
-  describe("when Strands detection matches", () => {
-    it("detects via instrumentationScope.name = strands.telemetry.tracer", () => {
-      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" }, []);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
-    });
-
-    it("detects via gen_ai.system = strands-agents", () => {
-      const ctx = createStrandsContext(
-        {
-          [ATTR_KEYS.GEN_AI_SYSTEM]: "strands-agents",
-          [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat",
-        },
-        [],
+  describe("given a span carrying one Strands detection signal", () => {
+    /** @scenario 'A span is recognised as Strands by any of its detection signals' */
+    it.each([
+      [
+        "instrumentationScope.name = strands.telemetry.tracer",
+        { instrumentationScope: { name: "strands.telemetry.tracer", version: null } },
+        {},
+      ],
+      [
+        "instrumentationScope.name = opentelemetry.instrumentation.strands",
+        { instrumentationScope: { name: "opentelemetry.instrumentation.strands", version: null } },
+        {},
+      ],
+      [
+        "gen_ai.system = strands-agents",
         { instrumentationScope: { name: "other", version: null } },
+        { [ATTR_KEYS.GEN_AI_SYSTEM]: "strands-agents" },
+      ],
+      [
+        "system.name = strands-agents",
+        { instrumentationScope: { name: "other", version: null } },
+        { [ATTR_KEYS.SYSTEM_NAME]: "strands-agents" },
+      ],
+      [
+        "service.name = strands-agents",
+        { instrumentationScope: { name: "other", version: null } },
+        { [ATTR_KEYS.SERVICE_NAME]: "strands-agents" },
+      ],
+      [
+        "gen_ai.agent.name = Strands Agents",
+        { instrumentationScope: { name: "other", version: null } },
+        { [ATTR_KEYS.GEN_AI_AGENT_NAME]: "Strands Agents" },
+      ],
+    ])("when apply runs, it recognises the span via %s", (_label, spanOverrides, extraAttrs) => {
+      const ctx = createStrandsContext(
+        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat", ...extraAttrs },
+        [],
+        spanOverrides,
       );
 
       extractor.apply(ctx);
@@ -83,174 +104,9 @@ describe("StrandsCanonicaliserService", () => {
     });
   });
 
-  describe("when gen_ai.operation.name maps to span type", () => {
-    it("maps chat to llm", () => {
-      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" }, []);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
-    });
-
-    it("maps execute_tool to tool", () => {
-      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "execute_tool" }, []);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
-    });
-
-    it("maps invoke_agent to agent", () => {
-      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "invoke_agent" }, []);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("agent");
-    });
-  });
-
-  describe("when role-based events are present", () => {
-    it("extracts gen_ai.user.message events as input messages", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "Hello from user" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
-        { role: "user", content: "Hello from user" },
-      ]);
-    });
-
-    it("promotes gen_ai.system.message to system_instruction and strips from input", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.system.message",
-          attributes: { content: "System prompt" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      // System message promoted to system_instruction, stripped from input
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("System prompt");
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
-    });
-
-    it("preserves conversation order across interleaved roles", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "First question" },
-        },
-        {
-          name: "gen_ai.assistant.message",
-          attributes: { content: "First answer" },
-        },
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "Follow-up question" },
-        },
-        {
-          name: "gen_ai.assistant.message",
-          attributes: { content: "Follow-up answer" },
-        },
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "Current turn" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{
-        role: string;
-        content: string;
-      }>;
-      expect(messages).toEqual([
-        { role: "user", content: "First question" },
-        { role: "assistant", content: "First answer" },
-        { role: "user", content: "Follow-up question" },
-        { role: "assistant", content: "Follow-up answer" },
-        { role: "user", content: "Current turn" },
-      ]);
-    });
-
-    it("promotes system message to system_instruction even when not first event", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "Hi" },
-        },
-        {
-          name: "gen_ai.system.message",
-          attributes: { content: "Be helpful" },
-        },
-        {
-          name: "gen_ai.assistant.message",
-          attributes: { content: "Hello!" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
-
-      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{
-        role: string;
-      }>;
-      expect(messages).toEqual([
-        { role: "user", content: "Hi" },
-        { role: "assistant", content: "Hello!" },
-      ]);
-    });
-
-    it("strips system messages from input and promotes to system_instruction", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.system.message",
-          attributes: { content: "Be helpful" },
-        },
-        {
-          name: "gen_ai.user.message",
-          attributes: { content: "Hi" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      // System instruction promoted
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
-
-      // Only user messages remain in input
-      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as unknown[];
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toEqual({ role: "user", content: "Hi" });
-    });
-  });
-
-  describe("when gen_ai.choice events are present", () => {
-    it("extracts output messages from events", () => {
-      const ctx = createStrandsContext({}, [
-        {
-          name: "gen_ai.choice",
-          attributes: { content: "Response text" },
-        },
-      ]);
-
-      extractor.apply(ctx);
-
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
-        { role: "assistant", content: "Response text" },
-      ]);
-    });
-  });
-
-  describe("when NOT a Strands span", () => {
-    it("does nothing", () => {
+  describe("given a span with none of the Strands detection signals", () => {
+    /** @scenario "A span with none of Strands' detection signals is left untouched" */
+    it("when apply runs, it does not canonicalise the span", () => {
       const ctx = createExtractorContext(
         { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" },
         { instrumentationScope: { name: "opentelemetry", version: null } },
@@ -259,6 +115,194 @@ describe("StrandsCanonicaliserService", () => {
       extractor.apply(ctx);
 
       expect(ctx.setAttr).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given gen_ai.operation.name on a detected span", () => {
+    /** @scenario 'A known operation name maps to its canonical span type' */
+    it.each([
+      ["chat", "llm"],
+      ["execute_tool", "tool"],
+      ["invoke_agent", "agent"],
+    ])("when apply runs, it maps operation %s to span type %s", (operation, expectedSpanType) => {
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: operation }, []);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe(expectedSpanType);
+    });
+
+    /** @scenario 'An unrecognised operation name is dropped rather than guessed at' */
+    it("when apply runs, it leaves the span type unset for an unmapped operation name", () => {
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "something_else" }, []);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBeUndefined();
+    });
+  });
+
+  describe("given role-named events describing the input conversation", () => {
+    /** @scenario 'Role-named events become an ordered input-message list' */
+    it("when apply runs, it preserves conversation order across interleaved roles", () => {
+      const ctx = createStrandsContext({}, [
+        { name: "gen_ai.user.message", attributes: { content: "First question" } },
+        { name: "gen_ai.assistant.message", attributes: { content: "First answer" } },
+        { name: "gen_ai.user.message", attributes: { content: "Follow-up question" } },
+      ]);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
+        { role: "user", content: "First question" },
+        { role: "assistant", content: "First answer" },
+        { role: "user", content: "Follow-up question" },
+      ]);
+    });
+
+    /** @scenario 'A system-role event is promoted to the system instruction and dropped from input' */
+    it.each([
+      [
+        "the system event is first",
+        [
+          { name: "gen_ai.system.message", attributes: { content: "Be helpful" } },
+          { name: "gen_ai.user.message", attributes: { content: "Hi" } },
+        ],
+      ],
+      [
+        "the system event is not first",
+        [
+          { name: "gen_ai.user.message", attributes: { content: "Hi" } },
+          { name: "gen_ai.system.message", attributes: { content: "Be helpful" } },
+        ],
+      ],
+    ])(
+      "when %s, it lifts the system message out and keeps only chat messages",
+      (_label, events) => {
+        const ctx = createStrandsContext({}, events);
+
+        extractor.apply(ctx);
+
+        expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
+        const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as unknown[];
+        expect(messages).toEqual([{ role: "user", content: "Hi" }]);
+      },
+    );
+
+    /** @scenario 'An input-messages attribute already present upstream is never overwritten' */
+    it("when gen_ai.input.messages is already present, it skips extraction from events", () => {
+      const preset = [{ role: "user", content: "already there" }];
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: preset }, [
+        { name: "gen_ai.user.message", attributes: { content: "new message" } },
+      ]);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
+    });
+  });
+
+  describe("given gen_ai.choice events describing the output", () => {
+    /** @scenario 'Choice events become output messages, defaulting role to assistant' */
+    it("when a choice event carries no role, it defaults the output message role to assistant", () => {
+      const ctx = createStrandsContext({}, [
+        {
+          name: "gen_ai.choice",
+          attributes: { content: "Response text", finish_reason: "end_turn" },
+        },
+      ]);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: "Response text", finish_reason: "end_turn" },
+      ]);
+    });
+
+    it("when a choice event carries a role, it preserves that role instead of the assistant default", () => {
+      const ctx = createStrandsContext({}, [
+        { name: "gen_ai.choice", attributes: { content: "Response", role: "customrole" } },
+      ]);
+
+      extractor.apply(ctx);
+
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] as Array<{ role: string }>;
+      expect(message?.role).toBe("customrole");
+    });
+  });
+
+  describe("given content spread across Strands' several event-attribute names", () => {
+    /** @scenario 'Content is read from the first candidate attribute present, in a fixed order' */
+    it.each([
+      ["content", { content: "from content" }, "from content"],
+      ["gen_ai.content", { "gen_ai.content": "from gen_ai.content" }, "from gen_ai.content"],
+      ["message", { message: "from message" }, "from message"],
+      ["text", { text: "from text" }, "from text"],
+      [
+        "gen_ai.prompt.content",
+        { "gen_ai.prompt.content": "from prompt.content" },
+        "from prompt.content",
+      ],
+    ])("when only %s is present, it extracts content from it", (_label, eventAttrs, expected) => {
+      const ctx = createStrandsContext({}, [
+        { name: "gen_ai.user.message", attributes: eventAttrs },
+      ]);
+
+      extractor.apply(ctx);
+
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{ content: unknown }>;
+      expect(message?.content).toBe(expected);
+    });
+
+    it("when both content and text are present, it prefers content", () => {
+      const ctx = createStrandsContext({}, [
+        {
+          name: "gen_ai.user.message",
+          attributes: { content: "preferred", text: "should not be used" },
+        },
+      ]);
+
+      extractor.apply(ctx);
+
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{ content: unknown }>;
+      expect(message?.content).toBe("preferred");
+    });
+  });
+
+  describe("given the model attribute recorded on a detected span", () => {
+    /** @scenario 'A recorded model marks the span as matched' */
+    it.each([
+      ["gen_ai.request.model", { [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "claude-x" }, true],
+      [
+        "gen_ai.response.model as a fallback",
+        { [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: "claude-x" },
+        true,
+      ],
+      ["no model attribute at all", {}, false],
+    ])("when the span carries %s, matched=%s", (_label, modelAttrs, expectMatched) => {
+      const ctx = createStrandsContext(
+        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat", ...modelAttrs },
+        [],
+      );
+
+      extractor.apply(ctx);
+
+      const recordRule = ctx.recordRule as ReturnType<typeof vi.fn>;
+      const recorded = recordRule.mock.calls.some((call) => call[0] === "strands:matched");
+      expect(recorded).toBe(expectMatched);
+    });
+  });
+
+  describe("given span metadata unrelated to gen_ai attributes", () => {
+    /** @scenario 'Canonicalisation never touches span linkage fields' */
+    it("when apply runs, it leaves parentSpanId untouched", () => {
+      const ctx = createStrandsContext({ [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" }, [], {
+        parentSpanId: "parent-xyz",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.span.parentSpanId).toBe("parent-xyz");
     });
   });
 });

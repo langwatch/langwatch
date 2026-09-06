@@ -420,3 +420,172 @@ Feature: Evaluation execution - Backend
     Given a target that produced a verdict for one evaluator and one row
     When the same verdict is recorded a second time
     Then only one verdict is stored for that target, evaluator and row
+
+  # ==========================================================================
+  # Result mapping - what an engine event becomes on the wire
+  # ==========================================================================
+
+  @unit
+  Scenario: A node id names the target and, after the first dot, the evaluator
+    Given an engine event addressed to a node
+    When the node id is read
+    Then a bare id names a target
+    And an id with a dot names a target and the evaluator after the first dot
+
+  @unit
+  Scenario: A target's outputs unwrap only when the sole field is the output
+    Given a target that finished
+    When its outputs are turned into the cell's value
+    Then a lone output field becomes the value itself
+    And a structured or multi-field payload stays whole
+    And no outputs at all leaves the cell empty
+
+  @unit
+  Scenario: An evaluator column drops the fields its node no longer emits
+    Given a column whose target is itself an evaluator
+    When its outputs carry fields the node has stopped filling in
+    Then only the fields it still fills in reach the cell
+    And a payload of nothing but empty fields leaves the cell empty
+
+  @unit
+  Scenario: A workflow evaluator's stringy score and verdict are read as numbers and booleans
+    Given a workflow evaluator that reports its score and verdict as text
+    When the verdict is stored
+    Then a numeric string is read as a score and a true or false string as a verdict
+    And prose is read as neither
+
+  @unit
+  Scenario: A cell's duration is the wall clock between the engine's timestamps
+    Given a cell the engine timed
+    When the result is mapped
+    Then the cell shows the time between the two timestamps
+    And a cell missing either timestamp shows no duration
+
+  @unit
+  Scenario: A coded engine failure reaches the cell on the handled channel
+    Given a node that failed with a code the engine names
+    When the failure is mapped
+    Then the cell carries the code and the trace, not the engine's own words
+    And an upstream status the provider answered with travels with it
+    And a failure with no code leaves the handled channel empty
+
+  @unit
+  Scenario: A guardrail evaluator stores its verdict without a meaningless score
+    Given a guardrail evaluator whose score is only ever pass or fail
+    When its verdict is stored
+    Then the verdict is stored without the score
+    And every other evaluator keeps its score
+
+  @unit
+  Scenario: An execution failure outranks the evaluator's own error output
+    Given an evaluator whose call failed and whose output also reports an error
+    When the verdict is stored
+    Then the cell reports the failure of the call
+
+  @unit
+  Scenario: An evaluator's details survive only when they are real text
+    Given an evaluator that reports details
+    When the verdict is stored
+    Then empty or absent details are dropped
+    And real text is kept
+
+  @unit
+  Scenario: A comparison verdict persists only the candidate ids it judged
+    Given a comparison judge that was sent a list of candidates
+    When its verdict is stored
+    Then only which candidates were judged is kept
+    And an evaluator that judged no candidate list persists nothing
+
+  @unit
+  Scenario: A verdict addressed to no evaluator fails loudly
+    Given a verdict whose node id names no evaluator
+    When it is mapped
+    Then mapping fails rather than storing a verdict against nothing
+
+  @unit
+  Scenario: Only a finished node's event becomes a result
+    Given a stream of engine events
+    When a node is still running, or the event is the entry node, a debug frame or the done frame
+    Then nothing is recorded for it
+
+  @unit
+  Scenario: A finished node's event lands in the cell it names
+    Given a stream of engine events
+    When a target node finishes
+    Then its output, cost and duration land in that target's cell for that row
+    And an evaluator node's verdict lands under the evaluator its node id names
+
+  @unit
+  Scenario: A named failure reaches the customer as its code, an unnamed one as a marker
+    Given a failure thrown while a run is in flight
+    When we know what went wrong
+    Then the customer's client is sent the code and the payload it renders from
+    And when we do not, the event carries a marker and no host, port or internal words
+    And a failure that took the whole run says no more than one that took a cell
+
+  @unit
+  Scenario: A workflow evaluator's verdict shows the node's name, not its id
+    Given an evaluator node inside a studio workflow
+    When its verdict is stored
+    Then the node's display name travels with it
+    And a node with no display name leaves the name unset
+
+  # ==========================================================================
+  # Cell planning - what a run's scope plans
+  # ==========================================================================
+
+  @unit
+  Scenario: A run's scope decides which rows it may touch
+    Given a run over a dataset
+    When its scope is a full run, a whole column, or one evaluator over all rows
+    Then it may touch every row
+    And a scope naming rows may touch only those rows, once each, dropping any that are gone
+    And a cell scope may touch only its own row
+
+  @unit
+  Scenario: A run plans one cell per scoped row and scoped column
+    Given a run over a dataset
+    When its cells are planned
+    Then there is one cell for each scoped row in each scoped column
+    And a scope naming a column that no longer exists plans nothing
+    And the count published before the run matches the cells it runs
+
+  @unit
+  Scenario: A run's cells come out row by row
+    Given a run over several rows and several columns
+    When its cells are planned
+    Then every column of a row is planned before the next row
+
+  @unit
+  Scenario: A cell carries its row and the dataset the row came from
+    Given a run over a dataset
+    When its cells are planned
+    Then each cell carries its row's fields and the dataset they came from
+    And every scoring evaluator is attached to every cell
+
+  @unit
+  Scenario: A row with nothing in it is not run
+    Given a dataset with an empty row
+    When the run's cells are planned
+    Then the empty row is skipped
+
+  @unit
+  Scenario: A comparison waits for phase two rather than running per column
+    Given a workbench with a comparison
+    When the run's cells are planned
+    Then no comparison evaluator is attached to a per-column cell
+    And a comparison that is its own column plans no cell of its own yet
+
+  @unit
+  Scenario: Re-running a comparison does not re-run the columns it already has
+    Given a run scoped to a comparison column
+    When the run's cells are planned
+    Then the columns the comparison compares are pulled in
+    And a column whose answer for that row was carried over is left alone
+
+  @unit
+  Scenario: Re-running one evaluator reuses the outputs already on the row
+    Given a run re-running one evaluator over the rows that already have outputs
+    When its cells are planned
+    Then only that evaluator runs, against the output already on the row
+    And an evaluator that is gone, or one that needs every column, plans nothing

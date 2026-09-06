@@ -11,37 +11,37 @@ Feature: Invitation acceptance and role recomputation
   # organization-group-binding.service.ts, personal-team-scope.service.ts,
   # compute-effective-team-role-updates.service.ts
 
-  @integration @unimplemented
+  @unit
   Scenario: Accepting an invitation grants exactly the role the invitation named
     Given an invitation for the member role on one team
     When the invited user accepts it
     Then they hold the member role on that team and nothing wider
 
-  @integration @unimplemented
+  @unit
   Scenario: Accepting the same invitation twice does not duplicate the membership
     Given an invitation the user has already accepted
     When they follow the link again
     Then their membership and grants are unchanged
 
-  @unit @unimplemented
+  @unit
   Scenario: An expired invitation cannot be accepted
     Given an invitation past its expiry
     When the user accepts it
     Then acceptance fails as not ready and no membership is created
 
-  @unit @unimplemented
+  @unit
   Scenario: An invitation revoked before acceptance grants nothing
     Given an invitation that was revoked
     When the user follows the link
     Then acceptance fails as not found
 
-  @integration @unimplemented
+  @unit
   Scenario: A retried acceptance whose grant tail failed repairs the missing grants
     Given an acceptance that created the membership but not its role binding
     When acceptance runs again
     Then the missing binding is created and no duplicate membership appears
 
-  @unit @unimplemented
+  @unit
   Scenario: Repeated invitation sends to one address are throttled
     Given an invitation already sent to an address moments ago
     When it is sent again
@@ -52,3 +52,21 @@ Feature: Invitation acceptance and role recomputation
     Given a member holding an admin team role under an admin organization role
     When their organization role is lowered to member
     Then their team roles are recomputed to what the lower role permits
+
+  @unit
+  Scenario: Creating an invitation for an organization that no longer exists is refused
+    Given an organization id naming no organization
+    When an admin invite is created against it
+    Then it is refused as organization not found and no invite is written
+
+  @unit
+  Scenario: An invitation with no recorded sender attributes its grants to the service, not the invitee
+    Given an invitation that carries no requesting admin
+    When it is accepted
+    Then its grants are attributed to the invite service, not to the person accepting
+
+  @unit
+  Scenario: Approving payment-pending invitations turns each into a fresh pending invite and sends its mail
+    Given payment-pending invitations bought on one subscription
+    When that subscription's checkout is approved
+    Then each becomes a pending invitation with a fresh expiry and its invitation email is sent
