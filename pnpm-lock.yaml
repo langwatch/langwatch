@@ -1626,8 +1626,8 @@ importers:
         specifier: ^3.0.41
         version: 3.0.79(zod@4.4.3)
       '@langwatch/scenario':
-        specifier: ^1.5.0
-        version: 1.5.0(cf0443684fd47d811d4e643afd142fce)
+        specifier: ^1.6.0
+        version: 1.6.0(cf0443684fd47d811d4e643afd142fce)
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -3488,8 +3488,8 @@ packages:
       '@google/genai':
         optional: true
 
-  '@langwatch/scenario@1.5.0':
-    resolution: {integrity: sha512-guj7WVmAQobNnLbxOfRAlRg8c2T7vPrHNl+6Csguq7VoWXRKz41GVZPmBpbS+psfH1/v3nSJVz5dr8YcTDiPyA==}
+  '@langwatch/scenario@1.6.0':
+    resolution: {integrity: sha512-1P3ULHh4RYDg3HYX0qfYdCko8ZVLv1GtGyJq8XOPCMMcdl3Z7xXequ1W25uD5KY4z2TljlG7bq+gz8iuk7qZAQ==}
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       '@elevenlabs/elevenlabs-js': '>=2.51.0'
@@ -14461,7 +14461,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@langwatch/scenario@1.5.0(cf0443684fd47d811d4e643afd142fce)':
+  '@langwatch/scenario@1.6.0(cf0443684fd47d811d4e643afd142fce)':
     dependencies:
       '@ag-ui/core': 0.0.58
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)
