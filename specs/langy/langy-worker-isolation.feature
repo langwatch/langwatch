@@ -23,13 +23,10 @@ Feature: Langy worker isolation
   # property of authentication rather than of network topology — which also
   # made it survive gVisor, where netfilter does not exist.
   #
-  # The opencode harness has been removed. Pi, the only harness now, has no
-  # listener at all: a worker is driven over anonymous stdio pipes, so there is
-  # no port, no path and no name for a sibling to reach. Holding the pipe IS the
-  # authorization. The threat this file was written to close no longer has a
-  # mechanism, and the password that closed it no longer exists.
-  #
-  # What remains is a narrower and more honest boundary, described below.
+  # Pi uses anonymous stdio pipes instead of a control listener. Distinct Unix
+  # identities protect access to those pipes. Shared identity permits reopening
+  # descriptors through /proc/<pid>/fd, and exposes manager secrets as well as
+  # sibling credentials and conversation files (ADR-130).
   #
   # On the @unimplemented tags. They mean "not bound to a test yet", and that is
   # true of every scenario here. They do NOT all mean "not built". Most of these
@@ -46,22 +43,20 @@ Feature: Langy worker isolation
   # ---------------------------------------------------------------------------
 
   # ===========================================================================
-  # The control channel: closed by construction, at any posture
+  # The control channel: protected by distinct Unix identities
   # ===========================================================================
 
   @unit @unimplemented
-  Scenario: A worker has no control surface a sibling could address
+  Scenario: A worker has no network control listener
     Given two workers are running for different conversations
-    When one looks for the other's control channel
-    Then there is no port, socket or path that names it
-    And the only handles to it are held by the manager and by that worker itself
-    # A pipe cannot be dialled. This holds regardless of which identity the
-    # workers run under, so it is the one isolation property the operator's
-    # posture choice cannot weaken.
+    When one looks for the other's network control channel
+    Then there is no listening port or Unix socket for the worker protocol
+    And the manager drives that protocol over anonymous stdio pipes
 
   @unit @unimplemented
   Scenario: A worker cannot drive another worker's agent
-    Given two workers are running for different conversations
+    Given per-worker identity isolation is enabled
+    And two workers are running for different conversations
     When one attempts to send a command intended for the other
     Then it has no channel on which to send it
     And the other worker's turn is unaffected
@@ -124,8 +119,10 @@ Feature: Langy worker isolation
     And two workers are running for different conversations
     When one reads the other's process environment or session directory
     Then it succeeds
-    And the control channel between them remains unreachable
-    And nothing else about the worker's confinement has changed
+    And it can reopen sibling control descriptors through /proc
+    And it can read the manager process environment including LANGY_INTERNAL_SECRET
+    And the internal secret grants access to manager RPCs and internal turn-result callbacks
+    And the pod sandbox and NetworkPolicy still apply
 
   # ===========================================================================
   # Required connectivity is preserved
@@ -135,17 +132,27 @@ Feature: Langy worker isolation
   # ===========================================================================
 
   @unit @unimplemented
-  Scenario: An isolated worker can still reach the control plane and gateway
-    Given a worker is running under per-worker identity isolation
+  Scenario Outline: A worker can still reach the control plane and gateway under either posture
+    Given a worker is running with workerIsolation set to <posture>
     When the worker calls the LangWatch API or the AI gateway
     Then the call succeeds
 
+    Examples:
+      | posture |
+      | per-uid |
+      | none    |
+
   @unit @unimplemented
-  Scenario: An isolated worker can still perform its GitHub and package work
-    Given a worker is running under per-worker identity isolation
+  Scenario Outline: A worker can still perform its GitHub and package work under either posture
+    Given a worker is running with workerIsolation set to <posture>
     And external egress is permitted for that worker
     When the worker runs git, gh, or a package install against an allowed host
     Then the operation succeeds
+
+    Examples:
+      | posture |
+      | per-uid |
+      | none    |
 
   # ===========================================================================
   # Posture is chosen, never drifted into

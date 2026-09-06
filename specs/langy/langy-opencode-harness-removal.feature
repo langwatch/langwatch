@@ -171,4 +171,5 @@ Feature: Langy runs one harness
     Then it describes the mechanism that is actually in place
     And it does not name the per-worker password or the proxy that carried it
     # The replacement is a stronger claim, not a weaker one: the remaining
-    # harness has no control port to defend, so a sibling has nothing to reach.
+    # harness has no control port to defend. Descriptor access still depends
+    # on Unix identity; shared identity permits access through /proc (ADR-130).

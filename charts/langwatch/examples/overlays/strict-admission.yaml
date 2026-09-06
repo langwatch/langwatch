@@ -64,15 +64,12 @@ clickhouse:
 #     workerIsolation: none
 #     acceptWorkerIsolationDisabled: true
 #
-# What that costs, stated plainly because it is not small: workers keep no
-# credentials on disk and have no listener, so a sibling can reach neither
-# another's control channel nor a credential file at either setting. What a
-# shared identity opens is that one conversation's worker can read another's
-# live credentials from /proc/<pid>/environ and another conversation's content
-# from its session directory. Take it for a single-tenant install whose users
-# are colleagues; do not take it if you serve mutually untrusted users. It also
-# forecloses the per-worker network namespace (ADR-076), which needs
-# CAP_SYS_ADMIN this pod can never hold.
+# Shared identity exposes sibling credentials, conversation files and control
+# descriptors, plus manager secrets including LANGY_INTERNAL_SECRET and any
+# mirror key. The internal secret authenticates manager RPCs and internal
+# turn-result callbacks. Only select it when every conversation is trusted
+# with that authority. It also forecloses the per-worker network namespace
+# (ADR-076), which needs CAP_SYS_ADMIN this pod can never hold.
 #
 # Do NOT instead "fix" the default posture by forcing runAsNonRoot in your own
 # values. Helm merges the capability map rather than replacing it, so the pod

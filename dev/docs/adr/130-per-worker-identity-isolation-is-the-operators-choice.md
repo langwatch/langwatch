@@ -19,28 +19,15 @@ distinct UID; its home, tmp dir and session store are `chown`ed to that UID and
 `syscall.Credential{Uid, Gid}` on the child, and by the `Chown` calls in
 `adapters/pi/spawn.go:217-282`.
 
-**What that identity actually protects, on the pi harness, is narrower than the
-chart's comments suggest** — and the difference is what makes this decision
-tractable. Two things are already closed by construction:
+Unix identity protects process environments, session files and control
+descriptors, including the manager's secrets. Pi uses anonymous stdio pipes
+instead of an HTTP control listener. Distinct UIDs prevent a sibling from
+reopening those pipes, but under shared identity Linux exposes them through
+`/proc/<pid>/fd`; a pipe is not an identity-independent isolation boundary.
 
-- **The control channel is unreachable by a sibling at any UID.** A pi worker is
-  driven over anonymous `os.Pipe()` stdio (`adapters/pi/spawn.go:302-331`), with
-  newline-delimited JSON framing. There is no listener, no port and no path, so
-  there is nothing for a sibling to dial: holding the fd *is* the authorization.
-  `app/workerpool/pool.go:845` records it — "A pi worker has no listener and no
-  authproxy: the stdio pipes are its only control surface." This is categorically
-  stronger than opencode's loopback HTTP port, which a same-netns sibling could
-  always reach and which needed `OPENCODE_SERVER_PASSWORD` to defend.
-- **No secret is written to disk.** The pi worker config holds env var *names*,
-  never values — `BaseURLEnv`/`APIKeyEnv` carry the literal strings
-  `"OPENAI_BASE_URL"` / `"OPENAI_API_KEY"` (`spawn.go:26-29,119-121`), and
-  `spawn.go:213-214` states the invariant directly. Every live credential reaches
-  the worker through its environment (`buildWorkerEnv`, `spawn.go:387-409`).
-
-So on pi the UID wall is not defending a control port or a credential file. It is
-defending two things: each worker's **process environment**, readable by a
-same-UID sibling through `/proc/<pid>/environ`, and each conversation's
-**session directory**, which holds conversation content at `0700`.
+The worker config carries environment variable names rather than credential
+values. This avoids writing injected secrets into config files, but does not
+protect live credentials from another process sharing the same UID.
 
 Holding that boundary costs the container **root plus five capabilities**:
 `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`
@@ -205,28 +192,24 @@ reconstructed from a values file later.
 |---|---|---|
 | Pod runs as | root, 5 capabilities | UID 1000, no capabilities |
 | Admitted under PSA `restricted` | No | Yes |
-| Sibling reaches sibling's control channel | Impossible (pipes) | **Impossible (pipes)** |
+| Sibling reaches sibling's control channel | Kernel refuses access to descriptors | **Possible through `/proc/<pid>/fd`** |
 | Sibling reads sibling's credential file | No such file exists | **No such file exists** |
 | Sibling reads sibling's `/proc/<pid>/environ` | Kernel refuses | **Possible** |
 | Sibling reads sibling's session directory | Kernel refuses | **Possible** |
+| Worker reads manager secrets | Distinct identity protects manager environment | **Possible, including internal secret and mirror key** |
 | Pod→host escape surface | `runtimeClassName` governs it, unchanged | same |
 | Egress: NetworkPolicy + the L7 adapter (ADR-076, shipped) | unchanged | same |
 | Egress: ADR-076's per-worker netns end state | reachable | **foreclosed** |
 
-The two rows that change should be read at full strength. Under `none`, a
-prompt injection in one conversation can read another conversation's live
-LangWatch API key, gateway key and GitHub token out of that worker's process
-environment, and can read the other conversation's content out of its session
-directory. That is a real cross-tenant credential and data exposure, and no
-amount of framing makes it small.
+Shared identity removes isolation between workers and the manager. A worker can
+read sibling credentials and conversation files, reopen control pipes through
+`/proc/<pid>/fd`, and read manager secrets through `/proc/<pid>/environ`. This
+includes `LANGY_INTERNAL_SECRET` and any configured mirror key; the internal
+secret can authenticate manager RPCs and internal turn-result callbacks. Treat
+every conversation as trusted with that authority.
 
-What is worth being equally precise about is that the first two rows do **not**
-change. The sibling-to-sibling control-channel attack that ADR-033 was written to
-close — worker A driving worker B's agent — stays structurally impossible,
-because a pipe has no name to dial. Shared identity does not reopen it. And there
-is no credential file to steal, because pi writes none. An operator weighing this
-should be told what they are trading, not a worst case assembled from the
-opencode era.
+The worker config still contains names rather than credential values. That
+property does not restore any boundary between processes sharing an identity.
 
 The last row is the one this ADR came closest to getting wrong. It is tempting
 to write "egress is unchanged", and for everything ADR-076 actually **shipped**

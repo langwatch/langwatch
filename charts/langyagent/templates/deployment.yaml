@@ -31,14 +31,14 @@
        conversation content from the session directory — so the acceptance
        value exists to keep it from being reached by accident, by a blank field
        or by an override that replaced more than it named. */ -}}
-{{- $isolation := .Values.workerIsolation | default "per-uid" }}
+{{- $isolation := include "langyagent.workerIsolation" . }}
 {{- $podSCVals := .Values.podSecurityContext | default dict }}
 {{- $ctrSCVals := .Values.containerSecurityContext | default dict }}
 {{- if not (has $isolation (list "per-uid" "none")) }}
 {{- fail (printf "langyagent.workerIsolation must be \"per-uid\" or \"none\", got %q. Unset means \"per-uid\", the isolated default." $isolation) }}
 {{- end }}
 {{- if and (eq $isolation "none") (not .Values.acceptWorkerIsolationDisabled) }}
-{{- fail "langyagent.workerIsolation=none removes per-worker identity isolation: every conversation's worker runs as the same user, so one worker can read another's live credentials from /proc/<pid>/environ and another conversation's content from its session directory. This is how the agent runs on a cluster that refuses root, and on such a cluster the alternative is no assistant at all — but it is a trade to make deliberately. Set langyagent.acceptWorkerIsolationDisabled=true to accept it. To run without the assistant entirely, set langyagent.chartManaged=false." }}
+{{- fail "langyagent.workerIsolation=none removes per-worker identity isolation: every conversation's worker runs as the same user, so workers can read sibling credentials and files, reopen control descriptors through /proc, and read manager secrets including LANGY_INTERNAL_SECRET and any mirror key. The internal secret authenticates manager RPCs and internal turn-result callbacks; every conversation must be trusted with that authority. This is how the agent runs on a cluster that refuses root, and on such a cluster the alternative is no assistant at all — but it is a trade to make deliberately. Set langyagent.acceptWorkerIsolationDisabled=true to accept it. To run without the assistant entirely, set langyagent.chartManaged=false." }}
 {{- end }}
 {{- /* The accident this whole feature exists to prevent, refused by name.
 
@@ -145,7 +145,7 @@ spec:
           {{- range $k := list "runAsUser" "runAsGroup" "seLinuxOptions" }}
           {{- if and (hasKey $ctrSCVals $k) (not (and (eq $k "runAsUser") (eq (toString (index $ctrSCVals $k)) "0"))) }}{{- $_ := set $ctrIdent $k (index $ctrSCVals $k) }}{{- end }}
           {{- end }}
-          securityContext: {{- toYaml (merge $ctrIdent (dict "runAsNonRoot" true "runAsUser" 1000 "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "seccompProfile" (dict "type" "RuntimeDefault") "capabilities" (dict "drop" (list "ALL")))) | nindent 12 }}
+          securityContext: {{- toYaml (merge $ctrIdent (dict "runAsNonRoot" true "readOnlyRootFilesystem" true "allowPrivilegeEscalation" false "seccompProfile" (dict "type" "RuntimeDefault") "capabilities" (dict "drop" (list "ALL")))) | nindent 12 }}
           {{- else }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           {{- end }}

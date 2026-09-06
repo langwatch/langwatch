@@ -56128,7 +56128,7 @@ keywords:
 
 ---
 title: How Langy works
-description: "Each Langy conversation is one isolated worker process: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+description: "Each Langy conversation has one worker process, isolated by Unix identity by default: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
@@ -56136,7 +56136,7 @@ keywords:
   - langy worker
 ---
 
-Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one worker process per conversation and reaps it when the conversation goes idle. The manager drives each worker over the stdio pipes it spawned it with, so a worker opens no port and nothing outside the pod can address it.
+Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one worker process per conversation and reaps it when the conversation goes idle. The manager drives each worker over the stdio pipes it spawned it with, so a worker has no network control listener. Access to its control descriptors depends on the [worker isolation posture](/langy/security/sandbox#the-worker-to-worker-boundary).
 
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
@@ -56170,7 +56170,7 @@ graph LR
 | Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
 | Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
 | `langyagent` | The agent service. Spawns one worker per conversation and drives it over stdio. Single replica; scale vertically. |
-| Langy worker | The coding agent itself, holding that conversation's credentials, repo clone, and skills. Walled off from its siblings by its own Unix identity. Reaped after ~10 minutes idle, home wiped. |
+| Langy worker | The coding agent itself, holding that conversation's credentials, repo clone, and skills. A distinct Unix identity separates it from siblings by default; `workerIsolation: none` disables that protection. Reaped after ~10 minutes idle, home wiped. |
 
 The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 
@@ -57005,7 +57005,7 @@ The lane is allow-list based (never a denylist), with three tiers set per organi
 |---|---|
 | `content` | Adds an explicit content allow-list: `gen_ai.input.messages`, `gen_ai.output.messages`, and named tool-payload keys. |
 | `structural` | Timings, tokens, status, and enums only. No prompts, completions, or tool output. |
-| `skip` | Nothing. |
+| `skip` | No trace data is mirrored. |
 
 <Note>
 On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName` names a Secret with the mirror project's API key, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave the mirror Secret unset.
@@ -57111,7 +57111,7 @@ Install and disconnect actions are recorded in the audit log as `langy.github.in
 
 ---
 title: How Langy is Isolated
-description: Langy runs each conversation as an isolated worker process, walled off from its siblings by Unix identity and from the host by a sandboxed container runtime, with an L7 egress adapter on the way out. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
+description: Langy uses a separate Unix identity per worker by default. Shared identity is an explicit opt-out, and a sandboxed container runtime is optional. This page describes those boundaries and cooperative L7 egress controls.
 sidebarTitle: Sandbox and isolation
 keywords:
   - ai agent sandbox
@@ -57124,7 +57124,7 @@ Each conversation runs as a separate worker process inside a single agent pod. T
 
 ## The pod-to-host boundary
 
-gVisor is a user-space kernel that sits between the worker and the host kernel, giving a container that runs arbitrary shell a much smaller escape surface than a normal one. Any sandboxed RuntimeClass does the same job — a Kata class on AKS, GKE Sandbox on GKE.
+gVisor is a user-space kernel that sits between the worker and the host kernel, giving a container that runs arbitrary shell a much smaller escape surface than a normal one. Any sandboxed RuntimeClass does the same job: a Kata class on AKS, GKE Sandbox on GKE.
 
 On LangWatch Cloud the pod always runs under gVisor.
 
@@ -57138,19 +57138,19 @@ langyagent:
   acceptUnsandboxedRuntime: false
 ```
 
-Blanking the class afterwards while `acceptUnsandboxedRuntime` stays `false` is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox. Pinning a class the cluster does not define creates no pod at all — Kubernetes refuses it at admission, and the reason lands on the Deployment rather than on a pod you can see.
+Blanking the class afterward while `acceptUnsandboxedRuntime` stays `false` is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox. Pinning a class the cluster does not define creates no pod at all: Kubernetes refuses it at admission, and the reason lands on the Deployment rather than on a pod you can see.
 
 ## The worker-to-worker boundary
 
-Two conversations in one pod belong to two different people, and a prompt-injected worker's most valuable neighbour is the worker beside it. Three things separate them, and only one of them is configurable.
+Two conversations in one pod belong to two different people, and a prompt-injected worker's most valuable neighbour is the worker beside it. Their isolation depends on Unix identity, including access to the control pipes.
 
-**The control channel cannot be reached at any identity.** A worker is driven over the anonymous stdio pipes it was spawned with. There is no listener, no port and no path, so there is nothing for a sibling to dial: holding the file descriptor *is* the authorization. This is structural — no password, proxy or policy is doing the work, and no setting turns it off.
+**The control channel uses anonymous stdio pipes.** There is no worker HTTP listener. With distinct UIDs, Linux permissions prevent siblings from reopening those pipes; under shared identity, `/proc/<pid>/fd` can expose them. Anonymous pipes alone are not an isolation boundary.
 
 **No credential is written to disk.** A worker's config file carries environment variable *names*, never values. Every live credential reaches the worker through its process environment, so there is no credential file for a sibling to read.
 
 **Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
 
-Holding that wall costs the container root plus five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`) — a UID handoff needs them, and only a root-effective-uid process holds them inside a container. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+Holding that wall costs the container root plus five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`): a UID handoff needs them, and only a root-effective-uid process holds them inside a container. To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ### On a cluster that refuses root
 
@@ -57162,20 +57162,20 @@ langyagent:
   acceptWorkerIsolationDisabled: true
 ```
 
-The pod then renders as UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault` — a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
+The pod then renders as UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` with no exemption, no RuntimeClass and no separate namespace. The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
 
-What it costs is narrower than it sounds and still real. The first two walls above do not move: the control channel stays unreachable, and there is still no credential file. What a shared identity opens is that one conversation's worker can read another's **live credentials** from `/proc/<pid>/environ`, and another conversation's **content** from its session directory. That is a genuine cross-tenant credential and data exposure.
+Shared identity removes isolation between workers and the manager. A worker can read sibling credentials and conversation files, reopen control pipes through `/proc/<pid>/fd`, and read manager secrets through `/proc/<pid>/environ`. This includes `LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can authenticate manager RPCs and internal turn-result callbacks. Treat every conversation as trusted with that authority.
 
 Take it for a single-tenant install whose users are all colleagues in one organization. Do not take it if you serve mutually untrusted users from one install. One further consequence is easy to miss: a pod that cannot hold capabilities can never run the per-worker network namespace described under "hard egress" below, so this setting also forecloses that upgrade path for as long as it is selected.
 
-The pod logs a warning at boot naming exactly what is exposed, so the posture shows up in the first support bundle rather than being reconstructed from a values file after an incident.
+The pod logs a warning at boot identifying the shared-identity posture, so the posture shows up in the first support bundle rather than being reconstructed from a values file after an incident.
 
 ## Isolation layers
 
 | Boundary | Mechanism | Enforced by |
 |---|---|---|
 | Pod to host | A sandboxed RuntimeClass such as gVisor (`runsc`). Off by default self-hosted; opt in with `runtimeClassName` and a render-time guard against losing it | Kubernetes + chart |
-| Worker to worker (control channel) | Anonymous stdio pipes. The worker opens no listener, so a sibling has nothing to dial at any identity | Process construction (not configurable) |
+| Worker to worker (control channel) | Anonymous stdio pipes protected by distinct Unix identities; shared identity permits reopening descriptors through `/proc` | Linux permissions; disabled by `workerIsolation: none` |
 | Worker to worker (credentials at rest) | None are written. The worker config holds variable names; values live only in the process environment | Process construction (not configurable) |
 | Worker to worker (process env and session files) | A distinct Unix UID per conversation, `0700` home, `/proc/<pid>/environ` readable only by the owning UID. Traded away by `workerIsolation: none` | Linux file permissions (DAC) |
 | Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
@@ -57196,7 +57196,7 @@ The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed be
 
 Per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers share one sandbox and one network namespace. The identity wall stops one worker reading another's process environment or session files; it does not give each conversation its own kernel or its own network stack.
 
-With `workerIsolation: none` that wall is **gone entirely** — one conversation's worker can read another's live credentials and conversation content. The control-channel and no-credential-file properties above survive it, but nothing else between siblings does.
+With `workerIsolation: none` that wall is **gone entirely**, including protection of control descriptors and manager secrets. The worker config still contains variable names rather than secret values; that does not protect live credentials from a process running under the same identity.
 
 The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
 
@@ -57218,7 +57218,7 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
 - **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
 - **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
-- **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+- **Does not keep at rest:** worker storage is ephemeral. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
 **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
@@ -57999,7 +57999,7 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
+| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` alone does not configure a destination. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | - |
 | `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required only by `AZURE_BLOB_AUTH_MODE=sharedKey` | - |
 | `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
@@ -58082,7 +58082,7 @@ Three rules before you configure it:
 - **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
 - **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
 
-In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, because the federated identity requires a ServiceAccount binding. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
 
 On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
 
@@ -60589,7 +60589,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 |---|---|---|---|
 | `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
 | `LANGY_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
-| `ENVIRONMENT` | Deployment environment. Read for telemetry and log labelling only; it holds no security boundary. | No | `production` |
+| `ENVIRONMENT` | Deployment environment. Read for telemetry and log labeling only; it holds no security boundary. | No | `production` |
 
 <Warning>
 `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
@@ -60641,7 +60641,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub uses the existing secret. | Yes (prod) | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
@@ -60861,7 +60861,7 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-On a pod pinned to gVisor — the hardened posture, not the default — the user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table there. The L7 adapter below is what makes egress control work identically whichever runtime the pod lands on, which is why it is the mechanism rather than a gVisor workaround.
+On a pod pinned to gVisor (an optional hardening setting), the user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table there. The L7 adapter below is what makes egress control work identically whichever runtime the pod lands on, which is why it is the mechanism rather than a gVisor workaround.
 
 That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
 
@@ -60977,7 +60977,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one [worker](/
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and every other part of the install is left as it was. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, while other components retain their configuration. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -60998,7 +60998,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one [worker](/
 
 ## Hard requirements
 
-- **A sandboxed runtime — recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.** To harden, pin a class and set `acceptUnsandboxedRuntime: false` — GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group. Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime: recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.** To harden, pin a class and set `acceptUnsandboxedRuntime: false`: GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group. Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -61087,28 +61087,24 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 ## How Langy is isolated
 
 Langy's workers run shell written by a language model, and each one holds the
-credentials of the person who asked. Four controls bound that. Two hold
-everywhere and cannot be configured away:
+credentials of the person who asked. Workers use stdio pipes instead of an HTTP
+control listener, and their config files contain environment variable names
+rather than secret values. Access to live credentials and control descriptors
+still depends on Unix identity.
 
-- **No control channel to reach.** The manager drives each worker over the stdio
-  pipes it spawned it with. A worker opens no port, so there is nothing for a
-  sibling to dial at any identity.
-- **No credentials at rest.** A worker's config file carries environment
-  variable *names*, never values. There is no credential file to steal.
-
-The third is on by default and is the one a hardened cluster may force you to
-give up:
+Per-worker identity is on by default and is the protection a hardened cluster
+may force you to give up:
 
 - **Per-worker identity.** Each conversation's worker runs under its own UID,
   with a `0700` home, so a sibling cannot read its process environment or its
-  session files. Holding this costs the pod root plus five capabilities — see
+  session files. Holding this costs the pod root plus five capabilities: see
   [Clusters that refuse root](#hardening-clusters-that-refuse-root) if yours
   will not admit that.
 
-The fourth is on by default and needs no configuration:
+Network restrictions are also on by default:
 
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and no other destination. Egress to the internet is off until you turn it
+  the gateway, with other destinations blocked by default. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
@@ -61138,7 +61134,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
+app.kubernetes.io/name=langyagent` lists no pods, and the reason sits on the
 Deployment.
 
 ```bash
@@ -61316,13 +61312,11 @@ default agent pod cannot satisfy that: handing each worker its own UID needs
 `CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN`, and only a root-effective-uid
 process holds them inside a container.
 
-Setting `runAsUser` and `drop: [ALL]` in your own values does **not** produce a
-working pod, and the way it fails is worth knowing before you try it. Helm
-merges maps rather than replacing them, so your `drop: ["ALL"]` merges with the
-chart's `add: [...]` and the rendered pod still requests all five capabilities.
-The kernel then clears them anyway on the UID transition. The pod is admitted,
-reports healthy, and dies at the first worker spawn — which reads like a Langy
-bug rather than a policy outcome.
+Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
+is rejected during Helm rendering. Dropping required capabilities does not
+select shared identity: it makes worker provisioning fail. Helm also merges
+capability maps, so adding `drop: ["ALL"]` alone does not remove the chart's
+`add` list.
 
 The supported way is to say what you are giving up:
 
@@ -61333,21 +61327,22 @@ langyagent:
 ```
 
 The pod then renders as UID 1000 with `runAsNonRoot: true`,
-`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault` —
+`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
 a spec that PSA `restricted` admits with no exemption, no RuntimeClass and no
 separate namespace. Omitting the acknowledgement fails the render with a message
 naming the trade, so nobody reaches this posture by leaving a field blank.
 
 <Warning>
-**What `workerIsolation: none` costs.** The first two controls above survive it:
-workers still have no control channel to reach and no credentials at rest. What
-a shared identity opens is that one conversation's worker can read another's
-**live credentials** from `/proc/<pid>/environ`, and another conversation's
-**content** from its session directory. That is a real cross-tenant credential
-and data exposure.
+**What `workerIsolation: none` costs.** Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
 
 Take it for a single-tenant install whose users are all colleagues in one
-organization — the case this setting exists for, where the alternative is no
+organization: the case this setting exists for, where the alternative is no
 assistant at all. Do not take it if you serve mutually untrusted users from one
 install.
 
@@ -61357,7 +61352,7 @@ would make egress enforcement mandatory rather than cooperative needs
 bypass-proof egress, stay on `per-uid` and seek a policy exemption instead.
 </Warning>
 
-The pod logs a warning at boot naming exactly what is exposed, so the posture is
+The pod logs a warning at boot identifying the shared-identity posture, so the posture is
 visible in your logs rather than only in a values file:
 
 ```bash
@@ -61443,8 +61438,8 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Every
-other part of your install is left as it was.
+The agent pod and every reference to it are removed on the next upgrade. Other
+components retain their configuration.
 
 ---
 
@@ -62245,7 +62240,7 @@ helm install langwatch ./langwatch \
   --wait --timeout 10m
 ```
 
-That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets, so you have no secret to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets without manual preparation. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
 
 Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
 
@@ -62615,14 +62610,13 @@ helm install lw . \
 A **default** install does not pass on its own. Everything LangWatch authors already complies (read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits), but three bundled components cannot, and the overlay turns all three off:
 
 - **Prometheus** (`prometheus.chartManaged`) is an upstream subchart LangWatch doesn't control. Its pods carry no `readOnlyRootFilesystem`, no seccomp profile, and no resource limits on the config-reload sidecar. Bring your own, or disable metrics.
-- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` in its default posture. That is by design: the manager gives every assistant worker a distinct UID, and without those capabilities sibling workers share a UID and can read each other's live credentials. The overlay turns it off, which is the conservative choice. **You can instead run it non-root** — set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`, and the pod renders as UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp, which this overlay's own posture accepts. Read [what that trades](/self-hosting/langy/setup#hardening-clusters-that-refuse-root) first: it is the right call for a single-tenant install whose users are colleagues, and the wrong one if you serve mutually untrusted users. What you must *not* do is force `runAsNonRoot` on the default posture — Helm merges the capability map rather than replacing it, so the pod is admitted, reports healthy, and dies at the first worker spawn.
-- **The ClickHouse preflight Job** (`clickhouse.preflight.enabled`) shells out to `kubectl` to check your Secret's keys, so it needs both an automounted token and a writable root for kubectl's discovery cache. It only renders when you supply the ClickHouse Secret yourself rather than using autogen, which is the production path, so the overlay pins it off.
+- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` by default. The manager needs those capabilities to provision and launch each worker under a distinct UID. Removing them makes provisioning fail; it does not select shared identity. The overlay disables the assistant. To run it non-root, explicitly set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`. That renders UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp. Read [the accepted exposure](/self-hosting/langy/setup#hardening-clusters-that-refuse-root): workers share credentials, files and control-descriptor access, and can read manager secrets. Forcing `runAsNonRoot` or a nonzero UID while retaining `per-uid` is rejected during Helm rendering.
 
 One more toggle in the overlay isn't an admission failure but an unmet dependency:
 
 - **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one; the overlay pins `gateway.replicaCount: 2` instead.
 
-With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so the app does not expose a `/metrics` endpoint and Prometheus does not scrape it; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
 
 In-cluster datastores satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 

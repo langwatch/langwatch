@@ -2,118 +2,139 @@ package workerpool
 
 import (
 	"context"
-	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/stretchr/testify/require"
 )
 
-// notifyRecordingAgent records every shutdown-imminent notice, so the pool's
-// pre-drain step can be exercised without a worker process.
-type notifyRecordingAgent struct {
-	mu       sync.Mutex
-	notified []string
+type shutdownNotice struct {
+	sessionID string
+	deadline  time.Time
 }
 
-func (a *notifyRecordingAgent) WaitReady(context.Context) error { return nil }
-func (a *notifyRecordingAgent) OpenSession(context.Context) (string, bool, error) {
-	return "sess", false, nil
-}
-func (a *notifyRecordingAgent) Post(context.Context, string, app.Turn) error { return nil }
-func (a *notifyRecordingAgent) Stream(context.Context, string, app.ChatSink) error {
-	return nil
+type handoffRecordingAgent struct {
+	seedRecordingAgent
+	notices           chan shutdownNotice
+	waitUntilCanceled bool
 }
 
-func (a *notifyRecordingAgent) NotifyShutdownImminent(_ context.Context, sessionID string, _ time.Time) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.notified = append(a.notified, sessionID)
-	return nil
-}
-
-func (a *notifyRecordingAgent) sessions() []string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return append([]string(nil), a.notified...)
-}
-
-// newHandoffWorker builds a claimed (in-flight) Worker driving `agent`, for the
-// ShutdownHandoff pool tests. Same-package access to the unexported fields
-// keeps this out of the real spawn path.
-func newHandoffWorker(conversationID, sessionID string, agent app.CodingAgent) *Worker {
-	w := &Worker{
-		conversationID: conversationID,
-		agent:          agent,
-		sessionID:      sessionID,
+func (a *handoffRecordingAgent) NotifyShutdownImminent(ctx context.Context, sessionID string, deadline time.Time) error {
+	a.notices <- shutdownNotice{sessionID: sessionID, deadline: deadline}
+	if a.waitUntilCanceled {
+		<-ctx.Done()
+		return ctx.Err()
 	}
-	w.ClaimTurn("") // mark in-flight
-	return w
+	return nil
 }
 
-// ShutdownHandoff notifies every live worker and returns as soon as the
-// in-flight turns quiesce (their StreamEvents saw the terminal handoff frame and
-// Released), well before the deadline.
-func TestPool_ShutdownHandoff_NotifiesAndWaitsForQuiesce(t *testing.T) {
-	agent := &notifyRecordingAgent{}
-
-	p := newTestPool(4)
-	w1 := newHandoffWorker("conv-1", "sess-1", agent)
-	w2 := newHandoffWorker("conv-2", "sess-2", agent)
-	p.workers["conv-1"] = w1
-	p.workers["conv-2"] = w2
-
-	// Simulate the in-flight turns finishing shortly after the notice.
+func startHandoff(p *Pool, deadline time.Time) <-chan struct{} {
+	done := make(chan struct{})
 	go func() {
-		time.Sleep(120 * time.Millisecond)
-		w1.Release()
-		w2.Release()
+		p.ShutdownHandoff(context.Background(), deadline)
+		close(done)
 	}()
+	return done
+}
 
-	start := time.Now()
-	p.ShutdownHandoff(context.Background(), time.Now().Add(3*time.Second))
-	elapsed := time.Since(start)
-
-	if elapsed >= 3*time.Second {
-		t.Errorf("ShutdownHandoff waited for the full deadline (%s) instead of returning on quiesce", elapsed)
-	}
-	notified := map[string]bool{}
-	for _, s := range agent.sessions() {
-		notified[s] = true
-	}
-	if !notified["sess-1"] || !notified["sess-2"] {
-		t.Errorf("expected every live worker to be notified, got %v", notified)
+func assertHandoffPending(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+	synctest.Wait()
+	select {
+	case <-done:
+		t.Fatal("handoff returned while a turn was still in flight")
+	default:
 	}
 }
 
-// A turn that never quiesces caps at the deadline and falls back to cold restart
-// (the honest ADR-048 limit) — it must not block past the deadline.
-func TestPool_ShutdownHandoff_CapsAtDeadline(t *testing.T) {
-	p := newTestPool(4)
-	// Claimed and never released — the turn does not quiesce.
-	p.workers["conv-stuck"] = newHandoffWorker("conv-stuck", "sess-stuck", &notifyRecordingAgent{})
-
-	start := time.Now()
-	p.ShutdownHandoff(context.Background(), time.Now().Add(250*time.Millisecond))
-	elapsed := time.Since(start)
-
-	if elapsed > 2*time.Second {
-		t.Errorf("ShutdownHandoff blocked past the deadline: %s", elapsed)
-	}
-	if elapsed < 200*time.Millisecond {
-		t.Errorf("ShutdownHandoff returned before the deadline: %s", elapsed)
+func assertHandoffReturned(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+	synctest.Wait()
+	select {
+	case <-done:
+	default:
+		t.Fatal("handoff has not returned")
 	}
 }
 
-// No live workers ⇒ a no-op that returns immediately.
-func TestPool_ShutdownHandoff_NoWorkersIsNoop(t *testing.T) {
-	p := newTestPool(4)
-	start := time.Now()
-	p.ShutdownHandoff(context.Background(), time.Now().Add(5*time.Second))
-	if time.Since(start) > 500*time.Millisecond {
-		t.Errorf("ShutdownHandoff with no workers should return immediately")
+// @scenario "On SIGTERM the manager notifies each live worker before killing it"
+func TestPool_ShutdownHandoff_NotifiesEveryWorkerAndWaitsForAllTurns(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPool(4)
+		notices := make(chan shutdownNotice, 3)
+		agent := &handoffRecordingAgent{notices: notices}
+		first := claimedWorker(t, p, "conv-first", "turn-first", agent)
+		second := claimedWorker(t, p, "conv-second", "turn-second", agent)
+		idle := claimedWorker(t, p, "conv-idle", "turn-idle", agent)
+		first.sessionID = "session-first"
+		second.sessionID = "session-second"
+		idle.sessionID = "session-idle"
+		idle.Release()
+
+		deadline := time.Now().Add(5 * time.Second)
+		done := startHandoff(p, deadline)
+		assertHandoffPending(t, done)
+		require.Len(t, notices, 3, "every live worker must receive a notice")
+		got := make([]shutdownNotice, 0, 3)
+		for range 3 {
+			got = append(got, <-notices)
+		}
+		require.ElementsMatch(t, []shutdownNotice{
+			{sessionID: "session-first", deadline: deadline},
+			{sessionID: "session-second", deadline: deadline},
+			{sessionID: "session-idle", deadline: deadline},
+		}, got)
+
+		first.Release()
+		time.Sleep(100 * time.Millisecond)
+		assertHandoffPending(t, done)
+
+		second.Release()
+		time.Sleep(100 * time.Millisecond)
+		assertHandoffReturned(t, done)
+		require.True(t, time.Now().Before(deadline), "quiescence must finish handoff before its deadline")
+	})
+}
+
+func TestPool_ShutdownHandoff_CapsStuckWorkAtDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		waitUntilCanceled bool
+	}{
+		{name: "turn never quiesces"},
+		{name: "notification never finishes", waitUntilCanceled: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newTestPool(1)
+				agent := &handoffRecordingAgent{
+					notices:           make(chan shutdownNotice, 1),
+					waitUntilCanceled: tc.waitUntilCanceled,
+				}
+				worker := claimedWorker(t, p, "conv-stuck", "turn-stuck", agent)
+				deadline := time.Now().Add(250 * time.Millisecond)
+				done := startHandoff(p, deadline)
+
+				assertHandoffPending(t, done)
+				require.Len(t, agent.notices, 1)
+				time.Sleep(249 * time.Millisecond)
+				assertHandoffPending(t, done)
+				time.Sleep(time.Millisecond)
+				assertHandoffReturned(t, done)
+				require.True(t, worker.isInFlight(), "deadline must allow drain despite an unfinished turn")
+			})
+		})
 	}
 }
 
-func (a *notifyRecordingAgent) AbortTurn(context.Context, string, string) error { return nil }
-func (a *notifyRecordingAgent) TurnEnded()                                      {}
+func TestPool_ShutdownHandoff_EmptyPoolReturnsImmediately(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPool(1)
+		start := time.Now()
+		done := startHandoff(p, start.Add(5*time.Second))
+
+		assertHandoffReturned(t, done)
+		require.Equal(t, start, time.Now(), "an empty pool must not wait for its deadline")
+	})
+}

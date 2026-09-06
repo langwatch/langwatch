@@ -26,12 +26,12 @@ import (
 //
 // Implemented by adapters/runner/sandboxed and adapters/runner/sharedidentity.
 type Runner interface {
-	// CommandContext builds the coding-agent command. Production wraps the
-	// binary with prlimit; local development executes it directly.
+	// CommandContext builds the coding-agent command. Per-uid wraps the binary
+	// with prlimit; shared identity executes it directly.
 	CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd
 	// Chown gives a provisioned file to the worker's per-conversation UID so a
-	// sibling worker cannot read it. A no-op under shared identity (mode 0700
-	// alone gates there, since every worker is the same user).
+	// sibling worker cannot read it. A no-op under shared identity: mode 0700
+	// blocks other UIDs, but workers sharing the same UID can read each other's files.
 	Chown(path string, uid uint32) error
 	// Lchown is Chown for a symlink — it chowns the link itself, not its target.
 	Lchown(path string, uid uint32) error

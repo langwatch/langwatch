@@ -70,8 +70,9 @@ A dormant second harness is not free.
   sibling in the pod netns. Closing that took a per-worker
   `OPENCODE_SERVER_PASSWORD` and a bearer-to-Basic auth proxy — the entire
   subject of ADR-033's Fix A′. Pi is driven over anonymous stdio pipes
-  (`adapters/pi/spawn.go:302-331`); it has no listener, so there is nothing to
-  authenticate and no proxy to run.
+  (`adapters/pi/spawn.go:302-331`), removing the HTTP listener and auth proxy.
+  Descriptor access still depends on Unix identity: shared-identity workers
+  can reopen control pipes through `/proc/<pid>/fd` (ADR-130).
 - **It cannot run two instances under one identity.** Concurrent opencode
   workers collide on `~/.config/opencode/`. This is what forecloses ADR-130's
   shared-identity posture while opencode is present.
@@ -187,7 +188,7 @@ publishes `OPENCODE_SERVER_PASSWORD` as *the* worker-to-worker mitigation),
 `docs/self-hosting/langy/overview.mdx:18,61,69`,
 `docs/self-hosting/langy/setup.mdx:39`,
 `docs/self-hosting/langy/environment-variables.mdx:11,26,37,39`. Regenerate
-`docs/llms.txt` and `docs/llms-full.txt` afterwards. The sandbox page **improves**
+`docs/llms.txt` and `docs/llms-full.txt` afterward. The sandbox page **improves**
 rather than merely changing: "a sibling cannot dial a pipe" is a stronger
 statement than "a sibling gets a 401".
 

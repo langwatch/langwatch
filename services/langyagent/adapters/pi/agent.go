@@ -178,7 +178,7 @@ func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 	return nil
 }
 
-// TurnEnded is the app.TurnBoundary capability. The worker calls it from
+// TurnEnded implements app.CodingAgent. The worker calls it from
 // Release, once Post and Stream have both returned, so it is the one moment
 // where a handle still sitting in the channel is provably unclaimed: its turn
 // is over and no Stream is waiting for it. Dropping it here is what keeps the
@@ -505,7 +505,7 @@ func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ string, deadline t
 	return a.writeCommand(ctx, command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
 }
 
-// AbortTurn is the optional app.TurnAborter capability: it writes abort for
+// AbortTurn implements app.CodingAgent: it writes abort for
 // exactly the named turn. The wrapper double-checks the id against its running
 // turn, so a stale cancel can never halt the wrong generation. The aborted
 // turn still terminates with turn_done aborted, which Stream settles clean.

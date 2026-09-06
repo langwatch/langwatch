@@ -1070,13 +1070,20 @@ test_langy_isolation_postures() {
   openshift=$(tmpl_only "$tpl" --set autogen.enabled=true \
     --set langyagent.workerIsolation=none \
     --set langyagent.acceptWorkerIsolationDisabled=true \
-    --set langyagent.podSecurityContext.runAsUser=1000700000 \
-    --set langyagent.containerSecurityContext.runAsUser=1000700000)
-  # The positive assertion is the whole test: if the branch discarded the
-  # override (the bug), this value is absent and the pod renders uid 1000. A
-  # matching negative check is not possible with a substring match — "1000" is a
-  # prefix of "1000700000" — and a wrong one here would fail on a correct render.
+    --set langyagent.podSecurityContext.runAsUser=1000700000)
   assert_contains "langy none: honours an operator-assigned uid" "$openshift" "runAsUser: 1000700000"
+  if grep -qE '^[[:space:]]*runAsUser: 1000[[:space:]]*$' <<< "$openshift"; then
+    fail "langy none: container uid must inherit the operator-assigned pod uid"
+  else
+    pass "langy none: container uid inherits the operator-assigned pod uid"
+  fi
+  local container_uid
+  container_uid=$(tmpl_only "$tpl" --set autogen.enabled=true \
+    --set langyagent.workerIsolation=none \
+    --set langyagent.acceptWorkerIsolationDisabled=true \
+    --set langyagent.podSecurityContext.runAsUser=1000700000 \
+    --set langyagent.containerSecurityContext.runAsUser=1000700001)
+  assert_contains "langy none: honours an explicit container uid" "$container_uid" "runAsUser: 1000700001"
   # ...while the security floor stays non-negotiable at that uid.
   assert_contains "langy none: keeps drop ALL at an operator uid" "$openshift" "- ALL"
   assert_contains "langy none: keeps seccomp at an operator uid" "$openshift" "RuntimeDefault"

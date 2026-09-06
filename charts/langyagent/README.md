@@ -3,9 +3,9 @@
 Deploys the **Langy agent pod** — the "manager" (Go, `services/langyagent/`) that
 backs the in-product Langy assistant. The manager spawns one isolated worker
 subprocess per conversation and injects that request's credentials into the
-subprocess env at spawn time, so sessions never share credentials. Workers are
-driven over the anonymous stdio pipes they are spawned with; they open no port,
-so there is nothing for a sibling to dial.
+subprocess env at spawn time. Workers use anonymous stdio pipes instead of a
+control listener. Distinct Unix identities protect credentials and pipes by
+default; the shared-identity option removes that protection.
 
 This is an **internal-only** service: it has no Ingress and a default-deny
 NetworkPolicy that admits only the LangWatch control-plane pods. The control
@@ -49,7 +49,7 @@ langyagent:
   acceptUnsandboxedRuntime: false
 ```
 
-Blanking the class afterwards while `acceptUnsandboxedRuntime` stays false is
+Blanking the class afterward while `acceptUnsandboxedRuntime` stays false is
 refused at render time, so a cluster that has hardened cannot quietly lose its
 sandbox.
 
@@ -83,14 +83,16 @@ workerIsolation: none
 acceptWorkerIsolationDisabled: true
 ```
 
-The render fails without the acknowledgement, so nobody arrives here by leaving
-a field blank. What it costs is narrower than it sounds and still real: workers
-keep no credentials on disk and have no listener, so a sibling cannot reach
-another's control channel or steal a credential file at either setting. What a
-shared identity opens is that one conversation's worker can read another's live
-credentials from `/proc/<pid>/environ`, and another's conversation content from
-its session directory. Take it for a single-tenant install whose users are
-colleagues; do not take it if you serve mutually untrusted users. See ADR-130.
+The render fails without the acknowledgement. Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
+
+Use it only when all conversations and their tool inputs are trusted with this
+authority. See ADR-130.
 
 ### Standalone
 
@@ -118,7 +120,7 @@ Override the Secret/key names via `secrets.existingSecretName` and
 | `acceptUnsandboxedRuntime`    | Accept running with no pod-to-host sandbox, on clusters that cannot offer one. Required for a blank `runtimeClassName`, so an unsandboxed deploy is always deliberate |
 | `workerIsolation`             | Per-worker identity posture: `per-uid` (default, each worker gets its own uid; needs root + five capabilities) or `none` (shared identity; the pod needs neither root nor any capability, so it passes PSA `restricted`). See ADR-130 |
 | `acceptWorkerIsolationDisabled` | Accept running workers under one shared identity. Required for `workerIsolation: none`, so the weaker posture is always deliberate |
-| `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Read for telemetry and log labelling only — it gated the isolation bypass until ADR-130 and holds no boundary now |
+| `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Read for telemetry and log labeling only — it gated the isolation bypass until ADR-130 and holds no boundary now |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |
 | `manager.maxWorkers`          | Max concurrent worker subprocesses before the pod returns 503           |

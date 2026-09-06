@@ -35,10 +35,10 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   # written in the operator's own file, and the chart refuses to render without
   # it.
   #
-  # On credentials: workers keep no secret on disk. The exposure a shared
-  # identity opens is the worker's process environment and its session
-  # directory, not a credential file — there isn't one (ADR-131 removed the
-  # harness that had one).
+  # Worker config carries variable names rather than injected secrets. Shared
+  # identity exposes process environments, session files, control descriptors
+  # and manager secrets, including the internal secret used by manager RPCs and
+  # internal turn-result callbacks. These exposures are accepted together.
   #
   # The chart already fails the render when replicaCount != 1 or when
   # service.type != ClusterIP. The guards below are the same family.
@@ -160,7 +160,8 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     When an operator renders the chart to deploy it
     Then the pod renders successfully
     And the pod runs as a non-root user
-    And the pod requests no capabilities at all
+    And the container drops ALL capabilities with no additions
+    And RuntimeDefault seccomp is set at both pod and container level
     # The point of the posture: this spec is admissible under Pod Security
     # Admission "restricted" and the common policy-engine rules without any
     # per-namespace or per-RuntimeClass exemption.
@@ -179,6 +180,8 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     And the operator has turned per-worker identity isolation off and accepted it
     When they install the chart
     Then the agent pod is admitted
+    And the container drops ALL capabilities with no additions
+    And RuntimeDefault seccomp is set at both pod and container level
     And it starts and serves conversations
     # This is the scenario the whole posture exists for. Without it the install
     # is refused at admission; with the default posture on such a cluster there

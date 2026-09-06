@@ -1,9 +1,13 @@
 package workerpool
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sharedidentity"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 
@@ -46,49 +50,51 @@ func TestWorkerUIDFor_DifferentInputsSpread(t *testing.T) {
 	}
 }
 
-// nonApplyingRunner mirrors adapters/runner/sharedidentity: it reports that it
-// applies no identity, so the pool must not reserve one. Only AppliesIdentity is
-// exercised — reserveUIDLocked is reached long before any other method, which is
-// exactly why the embedded port can stay nil.
-type nonApplyingRunner struct{ app.Runner }
-
-func (nonApplyingRunner) AppliesIdentity() bool { return false }
-
+// The pool's reservation is tested separately from privileged syscalls, which
+// the sandboxed runner tests cover. Delegating execution to shared identity
+// lets the spawn run on an unprivileged development machine.
 type applyingRunner struct{ app.Runner }
 
 func (applyingRunner) AppliesIdentity() bool { return true }
 
-// ADR-130 §4. Under shared identity every Chown is a no-op and SysProcAttr
-// ignores the uid, so a reservation would register a number describing no
-// running process, and could fail a spawn closed on a resource nothing is
-// enforcing.
-//
-// This asserts against the POOL's decision rather than the runner's syscall
-// arguments. A runner-level test ("SysProcAttr sets no Credential") passes
-// whether or not the reservation happens, which is how this scenario read as
-// covered while the pool still reserved a uid on every spawn.
-//
 // @scenario "The manager does not reserve worker identities it cannot enforce"
 func TestPool_ReservesNoIdentityWhenTheRunnerCannotApplyOne(t *testing.T) {
-	t.Run("given a runner that applies no identity", func(t *testing.T) {
-		p := newTestPool(4)
-		p.runner = nonApplyingRunner{}
+	for _, tc := range []struct {
+		name         string
+		runner       app.Runner
+		wantUID      uint32
+		wantReserved bool
+	}{
+		{name: "shared identity", runner: sharedidentity.New()},
+		{
+			name:         "per-worker identity",
+			runner:       applyingRunner{Runner: sharedidentity.New()},
+			wantUID:      workerUIDFor("conv-identity"),
+			wantReserved: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newHarnessPool(t, stubPiBinary(t), nil)
+			p.runner = tc.runner
+			got, err := p.Acquire(context.Background(), "conv-identity", spawnableCreds())
+			require.NoError(t, err)
+			worker := got.(*Worker)
+			require.Equal(t, tc.wantUID, worker.uid)
 
-		if p.appliesIdentity() {
-			t.Fatal("a runner reporting AppliesIdentity()=false must not have an identity reserved for it")
-		}
-		if len(p.uidToConv) != 0 {
-			t.Fatalf("uidToConv = %v, want empty — nothing may be reserved under shared identity", p.uidToConv)
-		}
-	})
+			p.mu.Lock()
+			conversation, reserved := p.uidToConv[worker.uid]
+			reservationCount := len(p.uidToConv)
+			p.mu.Unlock()
 
-	t.Run("when the runner does apply one", func(t *testing.T) {
-		p := newTestPool(4)
-		p.runner = applyingRunner{}
-		if !p.appliesIdentity() {
-			t.Fatal("a runner reporting AppliesIdentity()=true must reserve")
-		}
-	})
+			require.Equal(t, tc.wantReserved, reserved)
+			if tc.wantReserved {
+				require.Equal(t, "conv-identity", conversation)
+				require.Equal(t, 1, reservationCount)
+			} else {
+				require.Zero(t, reservationCount)
+			}
+		})
+	}
 
 	// The negative control that makes the two above mean something: a Pool built
 	// by hand with no runner must still reserve, matching New's documented

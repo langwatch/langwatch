@@ -2144,14 +2144,12 @@ gateway:
 ## provider for the project as you would for any other LangWatch feature.
 ##
 ## ISOLATION. The agent runs shell written by a language model, and the workers
-## hold the requesting user's credentials. Four controls bound that. Two hold
-## everywhere and cannot be configured away: a worker opens no listener (the
-## manager drives it over the stdio pipes it spawned it with, so a sibling has
-## nothing to dial at any identity), and no credential is written to disk (the
-## worker config carries variable NAMES, never values). A third is the
-## NetworkPolicy, which denies egress to the internet unless you turn it on.
+## hold the requesting user's credentials. Workers use stdio pipes instead of
+## a control listener, and config files contain variable names rather than
+## secrets. Unix identity protects access to live credentials and control
+## descriptors; the NetworkPolicy restricts network access.
 ##
-## The fourth is per-worker Unix identity, on by DEFAULT, and it is the one that
+## Per-worker Unix identity is on by DEFAULT, and it is the protection that
 ## does NOT work identically on every cluster — the claim this block used to
 ## make. Giving each worker its own uid needs root plus five capabilities, and a
 ## cluster enforcing Pod Security Admission "restricted" admits no such pod at
@@ -2162,12 +2160,12 @@ gateway:
 ##     acceptWorkerIsolationDisabled: true
 ##
 ## renders the pod non-root with no capabilities, which "restricted" admits. It
-## costs real isolation — one worker can then read another's live credentials
-## from /proc/<pid>/environ and another conversation's content from its session
-## directory — so the render refuses it without the acknowledgement and the pod
-## says so at boot. Take it for a single-tenant install whose users are
-## colleagues; do not take it if you serve mutually untrusted users. See ADR-130
-## and https://docs.langwatch.ai/self-hosting/langy/setup#hardening-clusters-that-refuse-root
+## removes isolation between workers and the manager. Workers can read sibling
+## credentials and files, reopen control pipes via /proc/<pid>/fd, and read
+## manager secrets via /proc/<pid>/environ. LANGY_INTERNAL_SECRET authenticates
+## manager RPCs and internal turn-result callbacks; any mirror key is exposed
+## too. Only select this posture when every conversation is trusted with that
+## authority. See ADR-130 and the self-hosting Langy setup guide.
 ##
 ## Together these bound the attack that actually happens: a worker reached by
 ## prompt injection through ingested data, using its own legitimate access to
@@ -2202,7 +2200,7 @@ langyagent:
 
   ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
   acceptUnsandboxedRuntime: true
-  ## @param langyagent.workerIsolation [string, default: per-uid] Per-worker identity posture (ADR-130). "per-uid" gives each conversation's worker its own uid, which costs the pod root plus five capabilities. "none" runs every worker as the pod's own user, which is what makes the pod admissible under Pod Security Admission "restricted" — at the cost of one worker being able to read another's live credentials and conversation content. Any other value is refused at render time. Forcing the default posture non-root instead is refused too, because it renders a pod that is admitted and then fails every worker spawn.
+  ## @param langyagent.workerIsolation [string, default: per-uid] Per-worker identity posture (ADR-130). "per-uid" gives each conversation's worker its own uid, which costs the pod root plus five capabilities. "none" runs every worker as the pod's own user, which is what makes the pod admissible under Pod Security Admission "restricted" — at the cost of access to sibling credentials, files and control descriptors, and manager secrets including LANGY_INTERNAL_SECRET. Any other value is refused at render time. Forcing the default posture non-root instead is refused too, because it renders a pod that is admitted and then fails every worker spawn.
   workerIsolation: per-uid
   ## @param langyagent.acceptWorkerIsolationDisabled [default: false] Accept running every worker under one shared identity. Required for workerIsolation "none"; the render fails without it, so the weaker posture is never reached by leaving a field blank or by an override that replaced more than it named.
   acceptWorkerIsolationDisabled: false

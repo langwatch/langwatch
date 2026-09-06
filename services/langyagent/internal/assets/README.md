@@ -41,15 +41,16 @@ A locally built manager therefore has ONLY the github skill unless you copy
 
 1. `workerpool.New` reads `AGENTS.md` from the embedded FS once
    (`assets.AgentsTemplate`) and materializes the embedded `skills/` tree to
-   the shared workspace on disk (`assets.MaterializeSkills`) — root-owned,
-   world-readable (0755/0644), so every per-conversation UID can read but not
-   modify it.
-2. Per spawn, `pi.Provision` writes the template to the worker's
-   `$HOME/AGENTS.md` byte for byte, and points the worker config's
-   `skillsDir` at the shared skills dir. That is where the worker loads
-   skills from — each `<name>/SKILL.md` becomes an invokable skill.
-3. The worker reads `$HOME/AGENTS.md` as the project rules doc and surfaces
-   the discovered skills to the model.
+   the shared workspace on disk (`assets.MaterializeSkills`), owned by the
+   manager and world-readable (0755/0644). Per-UID workers can read but not
+   modify it; shared-identity workers share its owner and can modify it.
+2. Per spawn, `(*Agent).Provision` in `adapters/pi/spawn.go` writes the template
+   to the worker's `$HOME/AGENTS.md` byte for byte (0600). Under `per-uid` it is
+   chowned to the worker UID; `none` leaves it owned by the manager identity. The
+   generated worker config carries `skillsDir` pointing at the shared skills
+   tree. Each `<name>/SKILL.md` under it becomes an invocable skill.
+3. The worker reads `$HOME/AGENTS.md` as the project rules doc and surfaces the
+   skills it loaded from `skillsDir` to the model.
 
 ## Editing AGENTS.md — the traps
 

@@ -32,28 +32,24 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 ## How Langy is isolated
 
 Langy's workers run shell written by a language model, and each one holds the
-credentials of the person who asked. Four controls bound that. Two hold
-everywhere and cannot be configured away:
+credentials of the person who asked. Workers use stdio pipes instead of an HTTP
+control listener, and their config files contain environment variable names
+rather than secret values. Access to live credentials and control descriptors
+still depends on Unix identity.
 
-- **No control channel to reach.** The manager drives each worker over the stdio
-  pipes it spawned it with. A worker opens no port, so there is nothing for a
-  sibling to dial at any identity.
-- **No credentials at rest.** A worker's config file carries environment
-  variable *names*, never values. There is no credential file to steal.
-
-The third is on by default and is the one a hardened cluster may force you to
-give up:
+Per-worker identity is on by default and is the protection a hardened cluster
+may force you to give up:
 
 - **Per-worker identity.** Each conversation's worker runs under its own UID,
   with a `0700` home, so a sibling cannot read its process environment or its
-  session files. Holding this costs the pod root plus five capabilities — see
+  session files. Holding this costs the pod root plus five capabilities: see
   [Clusters that refuse root](#hardening-clusters-that-refuse-root) if yours
   will not admit that.
 
-The fourth is on by default and needs no configuration:
+Network restrictions are also on by default:
 
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and no other destination. Egress to the internet is off until you turn it
+  the gateway, with other destinations blocked by default. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
@@ -83,7 +79,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
+app.kubernetes.io/name=langyagent` lists no pods, and the reason sits on the
 Deployment.
 
 ```bash
@@ -261,13 +257,11 @@ default agent pod cannot satisfy that: handing each worker its own UID needs
 `CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN`, and only a root-effective-uid
 process holds them inside a container.
 
-Setting `runAsUser` and `drop: [ALL]` in your own values does **not** produce a
-working pod, and the way it fails is worth knowing before you try it. Helm
-merges maps rather than replacing them, so your `drop: ["ALL"]` merges with the
-chart's `add: [...]` and the rendered pod still requests all five capabilities.
-The kernel then clears them anyway on the UID transition. The pod is admitted,
-reports healthy, and dies at the first worker spawn — which reads like a Langy
-bug rather than a policy outcome.
+Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
+is rejected during Helm rendering. Dropping required capabilities does not
+select shared identity: it makes worker provisioning fail. Helm also merges
+capability maps, so adding `drop: ["ALL"]` alone does not remove the chart's
+`add` list.
 
 The supported way is to say what you are giving up:
 
@@ -278,21 +272,22 @@ langyagent:
 ```
 
 The pod then renders as UID 1000 with `runAsNonRoot: true`,
-`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault` —
+`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
 a spec that PSA `restricted` admits with no exemption, no RuntimeClass and no
 separate namespace. Omitting the acknowledgement fails the render with a message
 naming the trade, so nobody reaches this posture by leaving a field blank.
 
 <Warning>
-**What `workerIsolation: none` costs.** The first two controls above survive it:
-workers still have no control channel to reach and no credentials at rest. What
-a shared identity opens is that one conversation's worker can read another's
-**live credentials** from `/proc/<pid>/environ`, and another conversation's
-**content** from its session directory. That is a real cross-tenant credential
-and data exposure.
+**What `workerIsolation: none` costs.** Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
 
 Take it for a single-tenant install whose users are all colleagues in one
-organization — the case this setting exists for, where the alternative is no
+organization: the case this setting exists for, where the alternative is no
 assistant at all. Do not take it if you serve mutually untrusted users from one
 install.
 
@@ -302,7 +297,7 @@ would make egress enforcement mandatory rather than cooperative needs
 bypass-proof egress, stay on `per-uid` and seek a policy exemption instead.
 </Warning>
 
-The pod logs a warning at boot naming exactly what is exposed, so the posture is
+The pod logs a warning at boot identifying the shared-identity posture, so the posture is
 visible in your logs rather than only in a values file:
 
 ```bash
@@ -388,5 +383,5 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Every
-other part of your install is left as it was.
+The agent pod and every reference to it are removed on the next upgrade. Other
+components retain their configuration.

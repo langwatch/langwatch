@@ -230,10 +230,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
-# rule (services/langyagent/iptables.go) that closed the sibling-worker
-# exfiltration path is removed under ADR-033 Fix A′ — a worker has no listener
-# at all, so there is nothing on loopback for a sibling to reach, and this
-# needs no netfilter (which is absent under gVisor anyway).
+# rule (services/langyagent/iptables.go) closed a sibling-worker exfiltration
+# path that no longer has a mechanism: it existed because the harness of the
+# day served an unauthenticated control port any sibling could dial. ADR-033
+# Fix A′ replaced the rule with a per-worker password, and ADR-131 removed
+# the listener entirely — a worker is driven over the stdio pipes it was
+# spawned with. Access to those pipes still depends on Unix identity; shared
+# identity permits reopening descriptors through /proc (ADR-130).
 
 # GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
 # attributed to the requesting user. The user's short-lived user-to-server

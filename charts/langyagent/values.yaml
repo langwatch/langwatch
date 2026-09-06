@@ -139,15 +139,12 @@ scratchSizeLimit: 1Gi
 #            common Gatekeeper / Kyverno rules — with no exemption, no
 #            RuntimeClass and no separate namespace.
 #
-# What `none` actually costs, stated precisely because the honest version is
-# narrower than it sounds. Workers keep NO credentials on disk — the worker
-# config carries environment variable names, never values — and they have no
-# listener, so the sibling-reaches-sibling attack is impossible at either
-# setting. What a shared identity opens is two things: one conversation's
-# worker can read another's live credentials from /proc/<pid>/environ, and can
-# read another's conversation content from its session directory. That is a
-# real cross-tenant credential and data exposure and nothing here makes it
-# small.
+# Under `none`, workers share the manager identity. They can read sibling
+# credentials and conversation files, reopen control pipes via /proc/<pid>/fd,
+# and read manager secrets via /proc/<pid>/environ, including
+# LANGY_INTERNAL_SECRET and any mirror key. The internal secret authenticates
+# manager RPCs and internal turn-result callbacks. Only select this posture
+# when every conversation is trusted with that authority.
 #
 # One further cost, smaller but real: the per-uid runner execs each worker
 # through prlimit, capping its processes, open files and file size. Those caps
