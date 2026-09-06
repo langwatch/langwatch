@@ -1075,9 +1075,16 @@ describe("traceRequest.utils", () => {
 
         expect(result).not.toHaveProperty("event.metrics.missing");
       });
+    });
 
-      /** @scenario "A neutral vote is kept as the value it was sent as" */
-      it("keeps a non-zero reading untouched", () => {
+    /**
+     * The control for the change above, deliberately unbound: no scenario in
+     * the spec claims it, because a reading that was never at risk is not a
+     * behaviour anyone asked for. It is here so that widening the check to
+     * presence is shown not to have moved anything else.
+     */
+    describe("when a numeric attribute is not zero", () => {
+      it("keeps the reading untouched", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes([
           { key: "event.metrics.vote", value: { doubleValue: -1 } },
         ]);
