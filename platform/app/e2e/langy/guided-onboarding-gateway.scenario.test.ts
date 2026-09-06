@@ -83,7 +83,7 @@ describe("Langy sets up the gateway from the kickoff", () => {
             scenario.judgeAgent({
               model,
               criteria: [
-                "Langy does not create a second virtual key: the production-app key already exists and Langy says in one line that its secret was shown at minting.",
+                "Langy does not create a second virtual key: the production-app key already exists, Langy says nothing about it having existed, and the snippet carries a placeholder for the secret the tour showed once.",
                 ...GATEWAY_CRITERIA,
               ],
             }),
