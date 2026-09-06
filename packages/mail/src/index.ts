@@ -51,6 +51,10 @@ export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "
 export { ResendEmailProvider } from "./providers/resend";
 export { computeDefaultFrom, sendEmail } from "./email-sender";
 export { MailRenderPort } from "./ports/mail-render.port";
+export { mailTemplates } from "./templates/index";
+export { propsFormSchema, renderMailTemplate } from "./templates/registry";
+export type { MailFixture, MailTemplate } from "./templates/registry";
+export { expressive } from "./templates/email-layout";
 export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter";
 export {
   renderTriggerDigestEmail,

@@ -1,16 +1,75 @@
-import { Container, Heading, Html, Img } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import { CodeBlock, DetailTable, EmailLayout, Muted, Paragraph } from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
 
-interface SendLicenseEmailParams {
-  email: string;
-  licenseKey: string;
-  planType: string;
-  maxMembers: number;
-  expiresAt: string;
-  organizationName: string;
-}
+export const licenseEmailProps = z.object({
+  email: z.email(),
+  licenseKey: z.string().min(1),
+  planType: z.string().min(1),
+  maxMembers: z.number().int().positive().describe("Seats the license covers"),
+  expiresAt: z.string().min(1).describe("ISO date the license runs out"),
+  organizationName: z.string().min(1),
+});
+
+export type LicenseEmailProps = z.infer<typeof licenseEmailProps>;
+
+export const licenseEmailSubject = (): string => "Your LangWatch License Key";
+
+const formatExpiry = (expiresAt: string): string =>
+  new Date(expiresAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const titleCase = (value: string): string =>
+  value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+
+export const LicenseEmail = ({
+  licenseKey,
+  planType,
+  maxMembers,
+  expiresAt,
+}: LicenseEmailProps) => (
+  <EmailLayout preview="Your license key and how to activate it" heading="Your LangWatch license">
+    <Paragraph>Thank you for your license. Here is what it covers.</Paragraph>
+    <DetailTable
+      rows={[
+        { label: "Plan", value: titleCase(planType) },
+        { label: "Seats", value: maxMembers.toLocaleString() },
+        { label: "Expires", value: formatExpiry(expiresAt) },
+      ]}
+    />
+    <Paragraph>
+      A <code>.langwatch-license</code> file is attached. Go to Settings, then License, in your
+      LangWatch instance and upload it — or paste the key below.
+    </Paragraph>
+    <CodeBlock>{licenseKey}</CodeBlock>
+    <Muted>Keep this key private. Anyone holding it can activate a LangWatch instance.</Muted>
+  </EmailLayout>
+);
+
+export const licenseEmailTemplate = defineTemplate({
+  id: "license",
+  title: "Your LangWatch license",
+  sentWhen: "A license is issued. Sent to the buyer, with the license file attached.",
+  schema: licenseEmailProps,
+  subject: licenseEmailSubject,
+  Component: LicenseEmail,
+  fixtures: {
+    default: {
+      email: "priya@acme.example",
+      licenseKey:
+        "eyJhbGciOiJFZERTQSJ9.eyJvcmciOiJBY21lIENvcnAiLCJzZWF0cyI6NTAsImV4cCI6MTc5ODc2MTYwMH0.5vQnJm2Xr9tKcAb0pWq3ZsLh8YdN1eFgUiOoRtVxCw",
+      planType: "ENTERPRISE",
+      maxMembers: 50,
+      expiresAt: "2027-01-01T00:00:00.000Z",
+      organizationName: "Acme Corp",
+    },
+  },
+});
 
 /**
  * Sanitize a string for safe use as a filename prefix.
@@ -28,107 +87,19 @@ function sanitizeFilenamePrefix(name: string): string {
 
 export const sendLicenseEmail = async ({
   mailer,
-  email,
-  licenseKey,
-  planType,
-  maxMembers,
-  expiresAt,
-  organizationName,
-}: SendLicenseEmailParams & { mailer: EmailDeliveryPort }) => {
-  const expirationDate = new Date(expiresAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "12px",
-        }}
-      >
-        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
-        <Heading as="h1">Your LangWatch License</Heading>
-        <p>Thank you for purchasing a LangWatch license! Your license details:</p>
-        <table
-          style={{
-            borderCollapse: "collapse",
-            marginBottom: "16px",
-          }}
-        >
-          <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Plan</td>
-            <td style={{ padding: "4px 0" }}>
-              {planType.charAt(0).toUpperCase() + planType.slice(1).toLowerCase()}
-            </td>
-          </tr>
-          <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Seats</td>
-            <td style={{ padding: "4px 0" }}>{maxMembers}</td>
-          </tr>
-          <tr>
-            <td style={{ padding: "4px 12px 4px 0", fontWeight: "bold" }}>Expires</td>
-            <td style={{ padding: "4px 0" }}>{expirationDate}</td>
-          </tr>
-        </table>
-
-        <Heading as="h2" style={{ fontSize: "18px" }}>
-          How to activate
-        </Heading>
-        <p>
-          A <code>.langwatch-license</code> file is attached to this email. To activate your
-          license:
-        </p>
-        <ol>
-          <li>
-            Go to <strong>Settings → License</strong> in your LangWatch instance
-          </li>
-          <li>Upload the attached file or paste the license key below</li>
-        </ol>
-
-        <Heading as="h2" style={{ fontSize: "18px" }}>
-          License Key
-        </Heading>
-        <p style={{ fontSize: "12px", color: "#666" }}>
-          You can also copy and paste this key directly:
-        </p>
-        <pre
-          style={{
-            backgroundColor: "#F2F4F8",
-            padding: "12px",
-            borderRadius: "6px",
-            fontSize: "12px",
-            fontFamily: "monospace",
-            wordBreak: "break-all",
-            whiteSpace: "pre-wrap",
-            overflowWrap: "break-word",
-          }}
-        >
-          {licenseKey}
-        </pre>
-
-        <p style={{ fontSize: "12px", color: "#999", marginTop: "24px" }}>
-          If you have any questions, please contact us at{" "}
-          <a href="mailto:support@langwatch.ai">support@langwatch.ai</a>
-        </p>
-      </Container>
-    </Html>,
-  );
-
+  ...props
+}: LicenseEmailProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(licenseEmailTemplate, props);
   await sendEmail({
     mailer,
     content: {
-      to: email,
-      subject: "Your LangWatch License Key",
-      html: emailHtml,
+      to: props.email,
+      subject,
+      html,
       attachments: [
         {
-          filename: `${sanitizeFilenamePrefix(organizationName)}.langwatch-license`,
-          content: licenseKey,
+          filename: `${sanitizeFilenamePrefix(props.organizationName)}.langwatch-license`,
+          content: props.licenseKey,
           contentType: "application/octet-stream",
         },
       ],

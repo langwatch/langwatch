@@ -1,140 +1,116 @@
-import { Button, Container, Heading, Html, Img, Section } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import {
+  DetailTable,
+  EmailLayout,
+  InlineLink,
+  Paragraph,
+  PrimaryButton,
+  TintPanel,
+  TintText,
+} from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
 
-export interface SendBudgetIncreaseRequestEmailInput {
-  to: string;
-  requesterEmail: string;
-  requesterName?: string;
-  organizationName: string;
+export const budgetIncreaseRequestEmailProps = z.object({
+  requesterEmail: z.email(),
+  requesterName: z.string().min(1).optional(),
+  organizationName: z.string().min(1),
   /**
    * Where the recipient goes to act on it.
    *
    * The deployment's public base URL is the deployment's, so it arrives with
    * the message rather than being read out of this package's environment.
    */
-  budgetsUrl: string;
-  scope: string;
-  scopeId: string;
-  limitUsd: string;
-  spentUsd: string;
-  period?: string;
-  message?: string;
-}
+  budgetsUrl: z.url(),
+  scope: z.string().min(1),
+  scopeId: z.string().min(1),
+  limitUsd: z.string().min(1),
+  spentUsd: z.string().min(1),
+  period: z.string().min(1).optional(),
+  message: z.string().optional().describe("What the requester wrote, in their own words"),
+});
 
-const labelCellStyle: React.CSSProperties = {
-  padding: "8px 12px 8px 0",
-  color: "#5f6c7b",
-  fontWeight: 500,
-  fontSize: "13px",
-  whiteSpace: "nowrap",
-  verticalAlign: "top",
+export type BudgetIncreaseRequestEmailProps = z.infer<typeof budgetIncreaseRequestEmailProps>;
+
+export type SendBudgetIncreaseRequestEmailInput = BudgetIncreaseRequestEmailProps & {
+  to: string;
 };
 
-const valueCellStyle: React.CSSProperties = {
-  padding: "8px 0",
-  color: "#1f2933",
-  fontSize: "13px",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-};
+export const budgetIncreaseRequestEmailSubject = ({
+  requesterEmail,
+}: BudgetIncreaseRequestEmailProps): string => `Budget increase requested by ${requesterEmail}`;
 
-export const sendBudgetIncreaseRequestEmail = async (
-  input: SendBudgetIncreaseRequestEmailInput & { mailer: EmailDeliveryPort },
-): Promise<void> => {
-  const dashboardUrl = input.budgetsUrl;
-  const periodLabel = input.period ?? "current period";
-  const subject = `Budget increase requested by ${input.requesterEmail}`;
+export const BudgetIncreaseRequestEmail = (props: BudgetIncreaseRequestEmailProps) => (
+  <EmailLayout
+    preview={`${props.requesterName ?? props.requesterEmail} needs a higher budget`}
+    heading="Budget increase request"
+    footNote={`You are receiving this because you administer ${props.organizationName}. You can reply straight to ${props.requesterEmail}.`}
+  >
+    <Paragraph>
+      <strong>{props.requesterName ?? props.requesterEmail}</strong> (
+      <InlineLink href={`mailto:${props.requesterEmail}`}>{props.requesterEmail}</InlineLink>) has
+      requested a budget increase in <strong>{props.organizationName}</strong>.
+    </Paragraph>
+    <DetailTable
+      rows={[
+        { label: "Scope", value: props.scope },
+        { label: "Scope ID", value: props.scopeId },
+        { label: "Period", value: props.period ?? "current period" },
+        { label: "Current limit", value: `$${props.limitUsd}` },
+        { label: "Spent so far", value: `$${props.spentUsd}` },
+      ]}
+    />
+    {props.message && (
+      <TintPanel>
+        <TintText>
+          <strong>{`Message from ${props.requesterName ?? props.requesterEmail}`}</strong>
+        </TintText>
+        <TintText>{props.message}</TintText>
+      </TintPanel>
+    )}
+    <PrimaryButton href={props.budgetsUrl}>Review the budget</PrimaryButton>
+  </EmailLayout>
+);
 
-  const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "16px",
-          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        }}
-      >
-        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
-        <Heading as="h1" style={{ fontSize: "20px", marginTop: "8px" }}>
-          Budget increase request
-        </Heading>
-        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>
-          <strong>{input.requesterName ?? input.requesterEmail}</strong> (
-          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>) has requested a
-          budget increase in <strong>{input.organizationName}</strong>.
-        </p>
-        <Section style={{ paddingTop: "8px" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <tbody>
-              <tr>
-                <td style={labelCellStyle}>Scope</td>
-                <td style={valueCellStyle}>{input.scope}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Scope ID</td>
-                <td style={valueCellStyle}>{input.scopeId}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Period</td>
-                <td style={valueCellStyle}>{periodLabel}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Current limit</td>
-                <td style={valueCellStyle}>${input.limitUsd}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Spent so far</td>
-                <td style={valueCellStyle}>${input.spentUsd}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Section>
-        {input.message && (
-          <Section style={{ paddingTop: "16px" }}>
-            <Heading as="h3" style={{ fontSize: "15px" }}>
-              Message from the user
-            </Heading>
-            <p
-              style={{
-                fontSize: "14px",
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {input.message}
-            </p>
-          </Section>
-        )}
-        <Section style={{ paddingTop: "16px" }}>
-          <Button
-            href={dashboardUrl}
-            style={{
-              padding: "10px 20px",
-              color: "white",
-              backgroundColor: "#ED8926",
-              textDecoration: "none",
-              borderRadius: "6px",
-            }}
-          >
-            Approve via LangWatch
-          </Button>
-        </Section>
-        <p
-          style={{
-            paddingTop: "12px",
-            fontSize: "12px",
-            color: "#5f6c7b",
-          }}
-        >
-          You're receiving this because you're an organization admin in LangWatch. If this is
-          unexpected, you can reply directly to {input.requesterEmail}.
-        </p>
-      </Container>
-    </Html>,
-  );
+export const budgetIncreaseRequestEmailTemplate = defineTemplate({
+  id: "budget-increase-request",
+  title: "Budget increase request",
+  sentWhen: "Somebody asks for a higher spend limit. Sent to the organization admins.",
+  schema: budgetIncreaseRequestEmailProps,
+  subject: budgetIncreaseRequestEmailSubject,
+  Component: BudgetIncreaseRequestEmail,
+  fixtures: {
+    default: {
+      requesterEmail: "morgan@acme.example",
+      requesterName: "Morgan Ellis",
+      organizationName: "Acme Corp",
+      budgetsUrl: "https://app.langwatch.ai/settings/budgets",
+      scope: "project",
+      scopeId: "project_KAXYxPR8MUgTcP8CF193y",
+      limitUsd: "250.00",
+      spentUsd: "248.60",
+      period: "September 2026",
+      message:
+        "We are running the new support agent evaluation this week and it needs roughly double the usual headroom until Friday.",
+    },
+    "no note, no period": {
+      requesterEmail: "sam@acme.example",
+      organizationName: "Acme Corp",
+      budgetsUrl: "https://app.langwatch.ai/settings/budgets",
+      scope: "organization",
+      scopeId: "organization_2mQvT7hLzR",
+      limitUsd: "1000.00",
+      spentUsd: "1000.00",
+    },
+  },
+});
 
-  await sendEmail({ mailer: input.mailer, content: { to: input.to, subject, html: emailHtml } });
+export const sendBudgetIncreaseRequestEmail = async ({
+  mailer,
+  to,
+  ...props
+}: SendBudgetIncreaseRequestEmailInput & { mailer: EmailDeliveryPort }): Promise<void> => {
+  const { subject, html } = await renderMailTemplate(budgetIncreaseRequestEmailTemplate, props);
+  await sendEmail({ mailer, content: { to, subject, html } });
 };

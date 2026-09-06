@@ -1,131 +1,28 @@
 import { createLogger } from "@langwatch/observability";
-import { Button, Container, Heading, Html, Section, Text } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
 
 const logger = createLogger("langwatch:mailer:automationLimitEmail");
 
-export type AutomationLimitKind = "ceiling_reached" | "paused";
+export const automationLimitKinds = ["ceiling_reached", "paused"] as const;
 
-interface AutomationLimitEmailProps {
-  kind: AutomationLimitKind;
-  automationName: string;
-  projectName: string;
+export type AutomationLimitKind = (typeof automationLimitKinds)[number];
+
+export const automationLimitEmailProps = z.object({
+  kind: z.enum(automationLimitKinds),
+  automationName: z.string().min(1),
+  projectName: z.string().min(1),
   /** Confirmed matches this automation is allowed to act on per day. */
-  dailyCeiling: number;
+  dailyCeiling: z.number().int().positive(),
   /** Confirmed matches it dropped today, at the moment the mail was queued. */
-  skippedToday: number;
-  actionUrl: string;
-}
+  skippedToday: z.number().int().nonnegative(),
+  actionUrl: z.url(),
+});
 
-const BODY_FONT =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
-
-/** The two sentences that differ between a throttle and a pause. */
-function LimitBody({
-  paused,
-  automationName,
-  projectName,
-  dailyCeiling,
-  skippedToday,
-}: Omit<AutomationLimitEmailProps, "kind" | "actionUrl"> & {
-  paused: boolean;
-}) {
-  const lead = paused
-    ? `This automation in ${projectName} matched almost every trace in your project, well past its limit of ${dailyCeiling.toLocaleString()} matches a day. We have paused it so it stops creating records you did not intend.`
-    : `This automation in ${projectName} matched more traces today than its limit of ${dailyCeiling.toLocaleString()} a day allows, so we stopped acting on the rest for today. It is still switched on, and it starts again tomorrow.`;
-  const advice = paused
-    ? "Narrow its condition so it selects the traces you actually want, then switch it back on."
-    : "If this is the volume you expect, narrow the condition so it selects fewer traces, or talk to us about a higher limit on your plan.";
-  const paragraph = {
-    fontSize: "16px",
-    color: "#4b5563",
-    lineHeight: 1.5,
-    margin: "0 0 16px 0",
-  } as const;
-
-  return (
-    <Section style={{ marginBottom: "24px" }}>
-      <Heading
-        as="h1"
-        style={{
-          fontSize: "22px",
-          fontWeight: 600,
-          color: "#1f2937",
-          margin: "0 0 16px 0",
-        }}
-      >
-        {paused ? `We paused "${automationName}"` : `"${automationName}" reached its daily limit`}
-      </Heading>
-      <Text style={paragraph}>{lead}</Text>
-      <Text style={paragraph}>{skippedToday.toLocaleString()} matches were skipped today.</Text>
-      <Text style={{ ...paragraph, margin: 0 }}>{advice}</Text>
-    </Section>
-  );
-}
-
-/** Deep link plus the standard support footer. */
-function LimitFooter({ actionUrl }: { actionUrl: string }) {
-  return (
-    <>
-      <Section style={{ marginBottom: "32px" }}>
-        <Button
-          href={actionUrl}
-          style={{
-            backgroundColor: "#ED8926",
-            color: "white",
-            padding: "12px 24px",
-            textDecoration: "none",
-            borderRadius: "6px",
-            display: "inline-block",
-            fontWeight: 500,
-            fontSize: "14px",
-          }}
-        >
-          Open the automation
-        </Button>
-      </Section>
-
-      <Section style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px" }}>
-        <Text
-          style={{
-            fontSize: "14px",
-            color: "#6b7280",
-            lineHeight: 1.6,
-            margin: 0,
-          }}
-        >
-          Questions? Visit the{" "}
-          <a href="https://docs.langwatch.ai" style={{ color: "#ED8926", textDecoration: "none" }}>
-            Help Center
-          </a>{" "}
-          or reach out to us. Our support engineers are here to help.
-        </Text>
-      </Section>
-    </>
-  );
-}
-
-const AutomationLimitEmailTemplate = ({ kind, actionUrl, ...body }: AutomationLimitEmailProps) => (
-  <Html lang="en" dir="ltr">
-    <Container
-      style={{
-        fontFamily: BODY_FONT,
-        maxWidth: "600px",
-        margin: "0 auto",
-        backgroundColor: "#ffffff",
-        padding: "40px 20px",
-      }}
-    >
-      <LimitBody paused={kind === "paused"} {...body} />
-      <LimitFooter actionUrl={actionUrl} />
-    </Container>
-  </Html>
-);
-
-export const renderAutomationLimitEmail = (props: AutomationLimitEmailProps) =>
-  render(<AutomationLimitEmailTemplate {...props} />);
+export type AutomationLimitEmailProps = z.infer<typeof automationLimitEmailProps>;
 
 export const automationLimitEmailSubject = ({
   kind,
@@ -135,23 +32,79 @@ export const automationLimitEmailSubject = ({
     ? `Automation paused: ${automationName}`
     : `Automation reached its daily limit: ${automationName}`;
 
+export const AutomationLimitEmail = ({
+  kind,
+  automationName,
+  projectName,
+  dailyCeiling,
+  skippedToday,
+  actionUrl,
+}: AutomationLimitEmailProps) => {
+  const paused = kind === "paused";
+  return (
+    <EmailLayout
+      preview={
+        paused ? `"${automationName}" was paused` : `"${automationName}" reached its daily limit`
+      }
+      heading={
+        paused ? `We paused "${automationName}"` : `"${automationName}" reached its daily limit`
+      }
+    >
+      <Paragraph>
+        {paused
+          ? `This automation in ${projectName} matched almost every trace in your project, well past its limit of ${dailyCeiling.toLocaleString()} matches a day. We have paused it so it stops creating records you did not intend.`
+          : `This automation in ${projectName} matched more traces today than its limit of ${dailyCeiling.toLocaleString()} a day allows, so we stopped acting on the rest for today. It is still switched on, and it starts again tomorrow.`}
+      </Paragraph>
+      <Paragraph>{skippedToday.toLocaleString()} matches were skipped today.</Paragraph>
+      <Paragraph>
+        {paused
+          ? "Narrow its condition so it selects the traces you actually want, then switch it back on."
+          : "If this is the volume you expect, narrow the condition so it selects fewer traces, or talk to us about a higher limit on your plan."}
+      </Paragraph>
+      <PrimaryButton href={actionUrl}>Open the automation</PrimaryButton>
+    </EmailLayout>
+  );
+};
+
+export const automationLimitEmailTemplate = defineTemplate({
+  id: "automation-limit",
+  title: "Automation daily limit",
+  sentWhen: "An automation matches past its daily ceiling, or runs away and is paused.",
+  schema: automationLimitEmailProps,
+  subject: automationLimitEmailSubject,
+  Component: AutomationLimitEmail,
+  fixtures: {
+    "ceiling reached": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Support agent",
+      dailyCeiling: 500,
+      skippedToday: 1_284,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_7Kd2ppQ4",
+    },
+    paused: {
+      kind: "paused",
+      automationName: "Tag every conversation",
+      projectName: "Support agent",
+      dailyCeiling: 500,
+      skippedToday: 91_402,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_3Bn8xxL1",
+    },
+  },
+});
+
+export const renderAutomationLimitEmail = async (
+  props: AutomationLimitEmailProps,
+): Promise<string> => (await renderMailTemplate(automationLimitEmailTemplate, props)).html;
+
 export const sendAutomationLimitEmail = async ({
   mailer,
   to,
   ...props
 }: AutomationLimitEmailProps & { to: string[]; mailer: EmailDeliveryPort }) => {
-  const html = await renderAutomationLimitEmail(props);
+  const { subject, html } = await renderMailTemplate(automationLimitEmailTemplate, props);
   const results = await Promise.allSettled(
-    to.map((recipient) =>
-      sendEmail({
-        mailer,
-        content: {
-          to: recipient,
-          subject: automationLimitEmailSubject(props),
-          html,
-        },
-      }),
-    ),
+    to.map((recipient) => sendEmail({ mailer, content: { to: recipient, subject, html } })),
   );
 
   const failures = results.filter((result) => result.status === "rejected");

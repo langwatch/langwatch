@@ -1,17 +1,13 @@
-import { Button, Container, Heading, Html, Img } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
 
-export const sendInviteEmail = async ({
-  mailer,
-  email,
-  organization,
-  acceptInviteUrl,
-}: {
-  email: string;
+export const inviteEmailProps = z.object({
+  email: z.email().describe("The address the invitation was addressed to"),
   /** Only the name is rendered, so the row is narrowed to it. */
-  organization: { name: string };
+  organization: z.object({ name: z.string().min(1) }),
   /**
    * The link the invitation carries, already built.
    *
@@ -20,49 +16,53 @@ export const sendInviteEmail = async ({
    * hand the invitation over some other way, and one builder is what keeps the
    * two from drifting.
    */
-  acceptInviteUrl: string;
-  mailer: EmailDeliveryPort;
-}) => {
-  const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "12px",
-        }}
-      >
-        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
-        <Heading as="h1">LangWatch Invite</Heading>
-        <p>
-          You have been invited to join the <strong>{organization.name}</strong>
-          Organization on LangWatch. Please click the button below to create your account or login
-          with the email <b>{email}</b>:
-        </p>
-        <Button
-          href={acceptInviteUrl}
-          style={{
-            padding: "10px 20px",
-            color: "white",
-            backgroundColor: "#ED8926",
-            textDecoration: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Accept Invite
-        </Button>
-        <p>If this is a mistake, you can safely ignore this email</p>
-      </Container>
-    </Html>,
-  );
+  acceptInviteUrl: z.url(),
+});
 
-  await sendEmail({
-    mailer,
-    content: {
-      to: email,
-      subject: `You were added to ${organization.name} on LangWatch`,
-      html: emailHtml,
+export type InviteEmailProps = z.infer<typeof inviteEmailProps>;
+
+export const inviteEmailSubject = ({ organization }: InviteEmailProps): string =>
+  `You were added to ${organization.name} on LangWatch`;
+
+export const InviteEmail = ({ email, organization, acceptInviteUrl }: InviteEmailProps) => (
+  <EmailLayout
+    preview={`Join ${organization.name} on LangWatch`}
+    heading={`You have been invited to ${organization.name}`}
+  >
+    <Paragraph>
+      You have been invited to join <strong>{organization.name}</strong> on LangWatch. Accept below
+      to create your account, or sign in with <strong>{email}</strong> if you already have one.
+    </Paragraph>
+    <PrimaryButton href={acceptInviteUrl}>Accept invitation</PrimaryButton>
+    <Paragraph>If this was a mistake, you can safely ignore this email.</Paragraph>
+  </EmailLayout>
+);
+
+export const inviteEmailTemplate = defineTemplate({
+  id: "invite",
+  title: "Invitation to an organization",
+  sentWhen: "An admin invites somebody to their organization.",
+  schema: inviteEmailProps,
+  subject: inviteEmailSubject,
+  Component: InviteEmail,
+  fixtures: {
+    default: {
+      email: "morgan@acme.example",
+      organization: { name: "Acme Corp" },
+      acceptInviteUrl: "https://app.langwatch.ai/invite/inv_8f2c41ab9d",
     },
-  });
+    "long organization name": {
+      email: "morgan@northwind-logistics.example",
+      organization: { name: "Northwind Logistics and Freight Group" },
+      acceptInviteUrl: "https://app.langwatch.ai/invite/inv_3b71ee05c4",
+    },
+  },
+});
+
+export const sendInviteEmail = async ({
+  mailer,
+  ...props
+}: InviteEmailProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(inviteEmailTemplate, props);
+  await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

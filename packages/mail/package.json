@@ -16,7 +16,8 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "dev": "vite --config preview/vite.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
@@ -29,13 +30,18 @@
     "@sendgrid/mail": "^8.1.6",
     "nodemailer": "^9.0.3",
     "react": "^19.2.7",
-    "undici": "^8.5.0"
+    "undici": "^8.5.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
+    "vite": "^8.1.2",
     "vitest": "^5.0.0"
   }
 }

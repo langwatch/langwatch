@@ -1,10 +1,11 @@
-import { Button, Container, Heading, Html, Img } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
 
 /**
- * The four join-request emails (D12).
+ * The six join-request emails (D12).
  *
  * Two rules run through all of them.
  *
@@ -20,323 +21,363 @@ import type { EmailDeliveryPort } from "../providers/types";
  * turned them down has learned something that is not theirs.
  */
 
-const shell = ({ heading, children }: { heading: string; children: React.ReactNode }) => (
-  <Html lang="en" dir="ltr">
-    <Container
-      style={{
-        border: "1px solid #F2F4F8",
-        borderRadius: "10px",
-        padding: "24px",
-        paddingBottom: "12px",
-      }}
-    >
-      <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
-      <Heading as="h1">{heading}</Heading>
-      {children}
-    </Container>
-  </Html>
-);
+const adminNotice = "You are receiving this because you administer this organization.";
 
-const actionButton = (href: string, label: string) => (
-  <Button
-    href={href}
-    style={{
-      padding: "10px 20px",
-      color: "white",
-      backgroundColor: "#ED8926",
-      textDecoration: "none",
-      borderRadius: "6px",
-    }}
-  >
-    {label}
-  </Button>
-);
+/* ── Somebody on the company domain is waiting. Sent to every admin. ─────── */
 
-/** Somebody on the company domain is waiting. Sent to every admin. */
-export const sendJoinRequestArrivedEmail = async ({
-  mailer,
-  adminEmail,
+export const joinRequestArrivedProps = z.object({
+  adminEmail: z.email(),
+  organizationName: z.string().min(1),
+  requesterName: z.string().min(1),
+  domain: z.string().min(1),
+  membersSettingsUrl: z.url(),
+});
+
+export type JoinRequestArrivedProps = z.infer<typeof joinRequestArrivedProps>;
+
+export const joinRequestArrivedSubject = ({
+  requesterName,
+  organizationName,
+}: JoinRequestArrivedProps): string => `${requesterName} asked to join ${organizationName}`;
+
+export const JoinRequestArrivedEmail = ({
   organizationName,
   requesterName,
   domain,
   membersSettingsUrl,
-}: {
-  mailer: EmailDeliveryPort;
-  adminEmail: string;
-  organizationName: string;
-  requesterName: string;
-  domain: string;
-  membersSettingsUrl: string;
-}) => {
-  const html = await render(
-    shell({
-      heading: "Someone asked to join your organization",
-      children: (
-        <>
-          <p>
-            <strong>{requesterName}</strong> has a verified <strong>{domain}</strong> address and
-            asked to join <strong>{organizationName}</strong> on LangWatch.
-          </p>
-          <p>
-            Approving adds them with your organization&apos;s default role. If they need more than
-            that, send them an invitation instead — that is the flow that carries roles and teams.
-          </p>
-          {actionButton(membersSettingsUrl, "Open members settings")}
-          <p>If nobody answers, the request lapses on its own after two weeks.</p>
-        </>
-      ),
-    }),
-  );
-  await sendEmail({
-    mailer,
-    content: {
-      to: adminEmail,
-      subject: `${requesterName} asked to join ${organizationName}`,
-      html,
+}: JoinRequestArrivedProps) => (
+  <EmailLayout
+    preview={`${requesterName} asked to join ${organizationName}`}
+    heading="Someone asked to join your organization"
+    footNote={adminNotice}
+  >
+    <Paragraph>
+      <strong>{requesterName}</strong> has a verified <strong>{domain}</strong> address and asked to
+      join <strong>{organizationName}</strong> on LangWatch.
+    </Paragraph>
+    <Paragraph>
+      Approving adds them with your organization&apos;s default role. If they need more than that,
+      send them an invitation instead — that is the flow that carries roles and teams.
+    </Paragraph>
+    <PrimaryButton href={membersSettingsUrl}>Open members settings</PrimaryButton>
+    <Paragraph>If nobody answers, the request lapses on its own after two weeks.</Paragraph>
+  </EmailLayout>
+);
+
+export const joinRequestArrivedTemplate = defineTemplate({
+  id: "join-request-arrived",
+  title: "Someone asked to join",
+  sentWhen: "Somebody on the organization's domain asks to join. Sent to every admin.",
+  schema: joinRequestArrivedProps,
+  subject: joinRequestArrivedSubject,
+  Component: JoinRequestArrivedEmail,
+  fixtures: {
+    default: {
+      adminEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      requesterName: "Morgan Ellis",
+      domain: "acme.example",
+      membersSettingsUrl: "https://app.langwatch.ai/settings/members",
     },
-  });
+  },
+});
+
+export const sendJoinRequestArrivedEmail = async ({
+  mailer,
+  ...props
+}: JoinRequestArrivedProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(joinRequestArrivedTemplate, props);
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };
 
-/**
- * The one nudge, on the seventh day — rendered only.
- *
- * Separated from the send because a process that owns its own envelope still
- * has to send exactly these words. The worker holds the mail gateway and the
- * deployment's host; what it must not hold is a second copy of the message,
- * which is what put react-email on its boot graph and let two admins on one
- * organization receive two differently-worded reminders.
- */
-export const renderJoinRequestReminderEmail = ({
-  organizationName,
-  requesterName,
-  membersSettingsUrl,
-}: {
-  organizationName: string;
-  requesterName: string;
-  membersSettingsUrl: string;
-}): Promise<string> =>
-  render(
-    shell({
-      heading: "A request to join is still waiting",
-      children: (
-        <>
-          <p>
-            <strong>{requesterName}</strong> asked to join <strong>{organizationName}</strong> a
-            week ago and nobody has answered yet.
-          </p>
-          <p>It lapses in another week. This is the only reminder we send about it.</p>
-          {actionButton(membersSettingsUrl, "Open members settings")}
-        </>
-      ),
-    }),
-  );
+/* ── The one nudge, on the seventh day. ──────────────────────────────────── */
+
+export const joinRequestReminderProps = z.object({
+  organizationName: z.string().min(1),
+  requesterName: z.string().min(1),
+  membersSettingsUrl: z.url(),
+});
+
+export type JoinRequestReminderProps = z.infer<typeof joinRequestReminderProps>;
 
 /** The subject the reminder carries, wherever it is sent from. */
 export const joinRequestReminderSubject = ({
   organizationName,
   requesterName,
-}: {
-  organizationName: string;
-  requesterName: string;
-}): string => `${requesterName} is still waiting to join ${organizationName}`;
+}: JoinRequestReminderProps): string =>
+  `${requesterName} is still waiting to join ${organizationName}`;
 
-/** The one nudge, on the seventh day. */
-export const sendJoinRequestReminderEmail = async ({
-  mailer,
-  adminEmail,
+export const JoinRequestReminderEmail = ({
   organizationName,
   requesterName,
   membersSettingsUrl,
-}: {
-  mailer: EmailDeliveryPort;
-  adminEmail: string;
-  organizationName: string;
-  requesterName: string;
-  membersSettingsUrl: string;
-}) => {
-  const html = await renderJoinRequestReminderEmail({
-    organizationName,
-    requesterName,
-    membersSettingsUrl,
-  });
-  await sendEmail({
-    mailer,
-    content: {
-      to: adminEmail,
-      subject: joinRequestReminderSubject({ organizationName, requesterName }),
-      html,
+}: JoinRequestReminderProps) => (
+  <EmailLayout
+    preview={`${requesterName} is still waiting`}
+    heading="A request to join is still waiting"
+    footNote={adminNotice}
+  >
+    <Paragraph>
+      <strong>{requesterName}</strong> asked to join <strong>{organizationName}</strong> a week ago
+      and nobody has answered yet.
+    </Paragraph>
+    <Paragraph>It lapses in another week. This is the only reminder we send about it.</Paragraph>
+    <PrimaryButton href={membersSettingsUrl}>Open members settings</PrimaryButton>
+  </EmailLayout>
+);
+
+export const joinRequestReminderTemplate = defineTemplate({
+  id: "join-request-reminder",
+  title: "A request to join is still waiting",
+  sentWhen: "Seven days after a join request nobody has answered. Sent to every admin.",
+  schema: joinRequestReminderProps,
+  subject: joinRequestReminderSubject,
+  Component: JoinRequestReminderEmail,
+  fixtures: {
+    default: {
+      organizationName: "Acme Corp",
+      requesterName: "Morgan Ellis",
+      membersSettingsUrl: "https://app.langwatch.ai/settings/members",
     },
-  });
+  },
+});
+
+/**
+ * Rendered only, and separated from the send because a process that owns its
+ * own envelope still has to send exactly these words. The worker holds the mail
+ * gateway and the deployment's host; what it must not hold is a second copy of
+ * the message, which is what put react-email on its boot graph and let two
+ * admins on one organization receive two differently-worded reminders.
+ */
+export const renderJoinRequestReminderEmail = async (
+  props: JoinRequestReminderProps,
+): Promise<string> => (await renderMailTemplate(joinRequestReminderTemplate, props)).html;
+
+export const sendJoinRequestReminderEmail = async ({
+  mailer,
+  adminEmail,
+  ...props
+}: JoinRequestReminderProps & { mailer: EmailDeliveryPort; adminEmail: string }) => {
+  const { subject, html } = await renderMailTemplate(joinRequestReminderTemplate, props);
+  await sendEmail({ mailer, content: { to: adminEmail, subject, html } });
 };
 
-/** You are in. Sent to the requester. */
-export const sendJoinRequestApprovedEmail = async ({
-  mailer,
-  requesterEmail,
+/* ── You are in. Sent to the requester. ──────────────────────────────────── */
+
+export const joinRequestApprovedProps = z.object({
+  requesterEmail: z.email(),
+  organizationName: z.string().min(1),
+  organizationUrl: z.url(),
+});
+
+export type JoinRequestApprovedProps = z.infer<typeof joinRequestApprovedProps>;
+
+export const joinRequestApprovedSubject = ({
+  organizationName,
+}: JoinRequestApprovedProps): string => `You are now a member of ${organizationName}`;
+
+export const JoinRequestApprovedEmail = ({
   organizationName,
   organizationUrl,
-}: {
-  mailer: EmailDeliveryPort;
-  requesterEmail: string;
-  organizationName: string;
-  organizationUrl: string;
-}) => {
-  const html = await render(
-    shell({
-      heading: `You are in ${organizationName}`,
-      children: (
-        <>
-          <p>
-            Your request to join <strong>{organizationName}</strong> on LangWatch was approved. You
-            are a member now, with the organization&apos;s default role.
-          </p>
-          {actionButton(organizationUrl, `Open ${organizationName}`)}
-        </>
-      ),
-    }),
-  );
-  await sendEmail({
-    mailer,
-    content: { to: requesterEmail, subject: `You are now a member of ${organizationName}`, html },
-  });
+}: JoinRequestApprovedProps) => (
+  <EmailLayout
+    preview={`Your request to join ${organizationName} was approved`}
+    heading={`You are in ${organizationName}`}
+  >
+    <Paragraph>
+      Your request to join <strong>{organizationName}</strong> on LangWatch was approved. You are a
+      member now, with the organization&apos;s default role.
+    </Paragraph>
+    <PrimaryButton href={organizationUrl}>Open {organizationName}</PrimaryButton>
+  </EmailLayout>
+);
+
+export const joinRequestApprovedTemplate = defineTemplate({
+  id: "join-request-approved",
+  title: "Your request was approved",
+  sentWhen: "An admin approves a join request. Sent to the requester.",
+  schema: joinRequestApprovedProps,
+  subject: joinRequestApprovedSubject,
+  Component: JoinRequestApprovedEmail,
+  fixtures: {
+    default: {
+      requesterEmail: "morgan@acme.example",
+      organizationName: "Acme Corp",
+      organizationUrl: "https://app.langwatch.ai/acme-corp",
+    },
+  },
+});
+
+export const sendJoinRequestApprovedEmail = async ({
+  mailer,
+  ...props
+}: JoinRequestApprovedProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(joinRequestApprovedTemplate, props);
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
 };
 
-/**
- * It was not approved. No reason, and nobody named — see the module docblock.
- */
+/* ── It was not approved. No reason, nobody named. ───────────────────────── */
+
+export const joinRequestRejectedProps = z.object({
+  requesterEmail: z.email(),
+  organizationName: z.string().min(1),
+});
+
+export type JoinRequestRejectedProps = z.infer<typeof joinRequestRejectedProps>;
+
+export const joinRequestRejectedSubject = ({
+  organizationName,
+}: JoinRequestRejectedProps): string => `Your request to join ${organizationName} was not approved`;
+
+export const JoinRequestRejectedEmail = ({ organizationName }: JoinRequestRejectedProps) => (
+  <EmailLayout
+    preview={`Your request to join ${organizationName} was not approved`}
+    heading="Your request was not approved"
+  >
+    <Paragraph>
+      Your request to join <strong>{organizationName}</strong> on LangWatch was not approved.
+    </Paragraph>
+    <Paragraph>
+      If you think that is a mistake, the people who can change it are your colleagues there — ask
+      one of them for an invitation.
+    </Paragraph>
+  </EmailLayout>
+);
+
+export const joinRequestRejectedTemplate = defineTemplate({
+  id: "join-request-rejected",
+  title: "Your request was not approved",
+  sentWhen: "An admin declines a join request. Sent to the requester, without a reason.",
+  schema: joinRequestRejectedProps,
+  subject: joinRequestRejectedSubject,
+  Component: JoinRequestRejectedEmail,
+  fixtures: {
+    default: { requesterEmail: "morgan@acme.example", organizationName: "Acme Corp" },
+  },
+});
+
 export const sendJoinRequestRejectedEmail = async ({
   mailer,
-  requesterEmail,
-  organizationName,
-}: {
-  mailer: EmailDeliveryPort;
-  requesterEmail: string;
-  organizationName: string;
-}) => {
-  const html = await render(
-    shell({
-      heading: "Your request was not approved",
-      children: (
-        <>
-          <p>
-            Your request to join <strong>{organizationName}</strong> on LangWatch was not approved.
-          </p>
-          <p>
-            If you think that is a mistake, the people who can change it are your colleagues there —
-            ask one of them for an invitation.
-          </p>
-        </>
-      ),
-    }),
-  );
-  await sendEmail({
-    mailer,
-    content: {
-      to: requesterEmail,
-      subject: `Your request to join ${organizationName} was not approved`,
-      html,
-    },
-  });
+  ...props
+}: JoinRequestRejectedProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(joinRequestRejectedTemplate, props);
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
 };
 
-/**
- * Nobody answered in time — rendered only. See the reminder above for why the
- * render and the send are separate.
- */
-export const renderJoinRequestExpiredEmail = ({
-  organizationName,
-}: {
-  organizationName: string;
-}): Promise<string> =>
-  render(
-    shell({
-      heading: "Your request lapsed",
-      children: (
-        <>
-          <p>
-            Nobody answered your request to join <strong>{organizationName}</strong> on LangWatch
-            within two weeks, so it lapsed.
-          </p>
-          <p>You can ask again whenever you like.</p>
-        </>
-      ),
-    }),
-  );
+/* ── Nobody answered in time. ────────────────────────────────────────────── */
+
+export const joinRequestExpiredProps = z.object({ organizationName: z.string().min(1) });
+
+export type JoinRequestExpiredProps = z.infer<typeof joinRequestExpiredProps>;
 
 /** The subject the lapse notice carries, wherever it is sent from. */
-export const joinRequestExpiredSubject = ({
-  organizationName,
-}: {
-  organizationName: string;
-}): string => `Your request to join ${organizationName} lapsed`;
+export const joinRequestExpiredSubject = ({ organizationName }: JoinRequestExpiredProps): string =>
+  `Your request to join ${organizationName} lapsed`;
 
-/** Nobody answered in time. Sent to the requester, who may ask again. */
+export const JoinRequestExpiredEmail = ({ organizationName }: JoinRequestExpiredProps) => (
+  <EmailLayout
+    preview={`Your request to join ${organizationName} lapsed`}
+    heading="Your request lapsed"
+  >
+    <Paragraph>
+      Nobody answered your request to join <strong>{organizationName}</strong> on LangWatch within
+      two weeks, so it lapsed.
+    </Paragraph>
+    <Paragraph>You can ask again whenever you like.</Paragraph>
+  </EmailLayout>
+);
+
+export const joinRequestExpiredTemplate = defineTemplate({
+  id: "join-request-expired",
+  title: "Your request lapsed",
+  sentWhen: "Two weeks after a join request nobody answered. Sent to the requester.",
+  schema: joinRequestExpiredProps,
+  subject: joinRequestExpiredSubject,
+  Component: JoinRequestExpiredEmail,
+  fixtures: { default: { organizationName: "Acme Corp" } },
+});
+
+/** Rendered only. See the reminder above for why the render and the send split. */
+export const renderJoinRequestExpiredEmail = async (
+  props: JoinRequestExpiredProps,
+): Promise<string> => (await renderMailTemplate(joinRequestExpiredTemplate, props)).html;
+
 export const sendJoinRequestExpiredEmail = async ({
   mailer,
   requesterEmail,
-  organizationName,
-}: {
-  mailer: EmailDeliveryPort;
-  requesterEmail: string;
-  organizationName: string;
-}) => {
-  const html = await renderJoinRequestExpiredEmail({ organizationName });
-  await sendEmail({
-    mailer,
-    content: {
-      to: requesterEmail,
-      subject: joinRequestExpiredSubject({ organizationName }),
-      html,
-    },
-  });
+  ...props
+}: JoinRequestExpiredProps & { mailer: EmailDeliveryPort; requesterEmail: string }) => {
+  const { subject, html } = await renderMailTemplate(joinRequestExpiredTemplate, props);
+  await sendEmail({ mailer, content: { to: requesterEmail, subject, html } });
 };
 
+/* ── A colleague walked straight in on the domain setting. ───────────────── */
+
 /**
- * A colleague walked straight in on the domain setting. Sent to every admin,
- * after the fact and straight away — a surprising join has to be visible the
- * moment it happens, which is the whole price of admitting somebody with
- * nobody in the loop.
+ * Sent to every admin, after the fact and straight away — a surprising join has
+ * to be visible the moment it happens, which is the whole price of admitting
+ * somebody with nobody in the loop.
  */
-export const sendDomainAutoJoinedEmail = async ({
-  mailer,
-  adminEmail,
+export const domainAutoJoinedProps = z.object({
+  adminEmail: z.email(),
+  organizationName: z.string().min(1),
+  memberName: z.string().min(1),
+  domain: z.string().min(1),
+  membersSettingsUrl: z.url(),
+});
+
+export type DomainAutoJoinedProps = z.infer<typeof domainAutoJoinedProps>;
+
+export const domainAutoJoinedSubject = ({
+  memberName,
+  organizationName,
+}: DomainAutoJoinedProps): string => `${memberName} joined ${organizationName} automatically`;
+
+export const DomainAutoJoinedEmail = ({
   organizationName,
   memberName,
   domain,
   membersSettingsUrl,
-}: {
-  mailer: EmailDeliveryPort;
-  adminEmail: string;
-  organizationName: string;
-  memberName: string;
-  domain: string;
-  membersSettingsUrl: string;
-}) => {
-  const html = await render(
-    shell({
-      heading: "A colleague joined automatically",
-      children: (
-        <>
-          <p>
-            <strong>{memberName}</strong> verified a <strong>{domain}</strong> address and joined{" "}
-            <strong>{organizationName}</strong> on LangWatch with the organization&apos;s default
-            role.
-          </p>
-          <p>
-            They were admitted by your automatic joining setting for that domain, not by anybody
-            clicking approve. You can change that setting, or remove them, from members settings.
-          </p>
-          {actionButton(membersSettingsUrl, "Open members settings")}
-        </>
-      ),
-    }),
-  );
-  await sendEmail({
-    mailer,
-    content: {
-      to: adminEmail,
-      subject: `${memberName} joined ${organizationName} automatically`,
-      html,
+}: DomainAutoJoinedProps) => (
+  <EmailLayout
+    preview={`${memberName} joined ${organizationName} automatically`}
+    heading="A colleague joined automatically"
+    footNote={adminNotice}
+  >
+    <Paragraph>
+      <strong>{memberName}</strong> verified a <strong>{domain}</strong> address and joined{" "}
+      <strong>{organizationName}</strong> on LangWatch with the organization&apos;s default role.
+    </Paragraph>
+    <Paragraph>
+      They were admitted by your automatic joining setting for that domain, not by anybody clicking
+      approve. You can change that setting, or remove them, from members settings.
+    </Paragraph>
+    <PrimaryButton href={membersSettingsUrl}>Open members settings</PrimaryButton>
+  </EmailLayout>
+);
+
+export const domainAutoJoinedTemplate = defineTemplate({
+  id: "domain-auto-joined",
+  title: "A colleague joined automatically",
+  sentWhen: "Automatic domain joining admits somebody. Sent to every admin, straight away.",
+  schema: domainAutoJoinedProps,
+  subject: domainAutoJoinedSubject,
+  Component: DomainAutoJoinedEmail,
+  fixtures: {
+    default: {
+      adminEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      memberName: "Morgan Ellis",
+      domain: "acme.example",
+      membersSettingsUrl: "https://app.langwatch.ai/settings/members",
     },
-  });
+  },
+});
+
+export const sendDomainAutoJoinedEmail = async ({
+  mailer,
+  ...props
+}: DomainAutoJoinedProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(domainAutoJoinedTemplate, props);
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };

@@ -1,59 +1,51 @@
-import { Button, Container, Heading, Html, Img } from "@react-email/components";
-import { render } from "@react-email/render";
+import { z } from "zod";
 import { sendEmail } from "../email-sender";
 import type { EmailDeliveryPort } from "../providers/types";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
+import { defineTemplate, renderMailTemplate } from "./registry";
+
+export const resetPasswordEmailProps = z.object({
+  email: z.email().describe("The account the reset was requested for"),
+  resetUrl: z.url(),
+});
+
+export type ResetPasswordEmailProps = z.infer<typeof resetPasswordEmailProps>;
+
+export const resetPasswordEmailSubject = (): string => "Reset your LangWatch password";
+
+export const ResetPasswordEmail = ({ email, resetUrl }: ResetPasswordEmailProps) => (
+  <EmailLayout preview="Choose a new password" heading="Reset your password">
+    <Paragraph>
+      We received a request to reset the password for your LangWatch account (
+      <strong>{email}</strong>). Choose a new one below.
+    </Paragraph>
+    <PrimaryButton href={resetUrl}>Reset password</PrimaryButton>
+    <Paragraph>
+      This link expires in 1 hour. If you did not request a password reset, you can safely ignore
+      this email and your password will stay the same.
+    </Paragraph>
+  </EmailLayout>
+);
+
+export const resetPasswordEmailTemplate = defineTemplate({
+  id: "reset-password",
+  title: "Reset your password",
+  sentWhen: "Somebody asks to reset the password on their account.",
+  schema: resetPasswordEmailProps,
+  subject: resetPasswordEmailSubject,
+  Component: ResetPasswordEmail,
+  fixtures: {
+    default: {
+      email: "morgan@acme.example",
+      resetUrl: "https://app.langwatch.ai/auth/reset-password?token=tok_abc123def456",
+    },
+  },
+});
 
 export const sendResetPasswordEmail = async ({
   mailer,
-  email,
-  resetUrl,
-}: {
-  email: string;
-  resetUrl: string;
-  mailer: EmailDeliveryPort;
-}) => {
-  const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "12px",
-        }}
-      >
-        <Img src="https://app.langwatch.ai/images/logo-icon.png" alt="LangWatch Logo" width="36" />
-        <Heading as="h1">Reset your password</Heading>
-        <p>
-          We received a request to reset the password for your LangWatch account (<b>{email}</b>).
-          Click the button below to choose a new password:
-        </p>
-        <Button
-          href={resetUrl}
-          style={{
-            padding: "10px 20px",
-            color: "white",
-            backgroundColor: "#ED8926",
-            textDecoration: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Reset password
-        </Button>
-        <p>
-          This link expires in 1 hour. If you did not request a password reset, you can safely
-          ignore this email and your password will stay the same.
-        </p>
-      </Container>
-    </Html>,
-  );
-
-  await sendEmail({
-    mailer,
-    content: {
-      to: email,
-      subject: "Reset your LangWatch password",
-      html: emailHtml,
-    },
-  });
+  ...props
+}: ResetPasswordEmailProps & { mailer: EmailDeliveryPort }) => {
+  const { subject, html } = await renderMailTemplate(resetPasswordEmailTemplate, props);
+  await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };
