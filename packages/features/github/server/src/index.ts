@@ -17,6 +17,11 @@ export { EventingGithubMaintenanceAdapter } from "./adapters/eventing.github-mai
 export { GithubBranchMaintenancePort } from "./ports/github-branch-maintenance.port";
 export { GithubBranchDemandPort } from "./ports/github-branch-demand.port";
 export { GithubProjectActivityPort } from "./ports/github-project-activity.port";
+export { GithubHostPort } from "./ports/github-host.port";
+export {
+  GithubBranchDemandService,
+  type BranchMappingRequest,
+} from "./services/github-branch-demand.service";
 export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,

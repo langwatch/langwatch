@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Trace-level event shape, derived from a span's OTel events.
  *
@@ -7,9 +9,11 @@
  * (`getTraceEventsByTraceId`); this type is the shared contract for that read,
  * used by the trace-detail events query and the trigger precondition matcher.
  */
-export interface DerivedTraceEvent {
-  spanId: string;
-  timestamp: number;
-  name: string;
-  attributes: Record<string, string>;
-}
+export const derivedTraceEventSchema = z.object({
+  spanId: z.string(),
+  timestamp: z.number(),
+  name: z.string(),
+  attributes: z.record(z.string(), z.string()),
+});
+
+export type DerivedTraceEvent = z.infer<typeof derivedTraceEventSchema>;

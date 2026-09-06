@@ -7,6 +7,7 @@ export * from "./experiment-workbench";
 export * from "./experiment-workbench-persistence";
 export * from "./experiment-workbench-version";
 export * from "./experiment-run";
+export * from "./experiment.responses";
 export * from "./experiment-run-eventing.commands";
 export * from "./experiment-run-eventing.events";
 export * from "./experiment-execution.errors";

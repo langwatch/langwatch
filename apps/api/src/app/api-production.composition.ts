@@ -392,6 +392,7 @@ import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import { apiClientAddress } from "./api-client-address";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition";
+import { composeApiTraceSpool } from "./api-trace-spool.composition";
 import { ApiTraceMediaStore } from "./api-packaged-rest.composition";
 import {
   AdminAccessService,
@@ -657,6 +658,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedDataRetention!: ComposedDataRetentionFeature;
   private composedMonitor!: ComposedMonitorFeature;
   private composedStoredObject!: ComposedStoredObjectFeature;
+  /**
+   * The operator's Azure spool assertion, read once with the rest of the
+   * config and held here because the door that composes the spool is built
+   * from the resolved graph rather than from the configuration.
+   */
+  private azureSpoolRetentionConfirmed = false;
   private composedBugReport!: ComposedBugReportFeature;
   private composedDataPrivacy!: ComposedDataPrivacyFeature;
   private composedIntegrationsChecks!: ComposedIntegrationsChecksFeature;
@@ -1004,6 +1011,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // service, evaluator service and evaluator replication — one graph per answer, rather than
     // a second one that could disagree.
     this.composedStoredObject = this.composeStoredObject(options);
+    this.azureSpoolRetentionConfirmed =
+      options.config.infrastructure.storedObjects.azureSpoolRetentionConfirmed;
     // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
     // create writes its resource to and the SAME cipher every other at-rest
     // secret is written under. Composed before the gateway because its three
@@ -1281,6 +1290,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           }
         : {}),
       ...(features ? { features } : {}),
+      // Read once, in api.config.ts, and handed down: every mounted surface
+      // validates its declared outputs or none of them does.
+      validateOutput: options.config.validateTrpcOutput,
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
       ...this.composeDoors(
@@ -1485,6 +1497,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The OTLP receiver, over this process's own producer registration and its
     // own Redis. Absent where there is no command queue: a receiver with
     // nowhere to send a span would answer 200 to data it then drops.
+    const payloads = composeApiTraceSpool({
+      storage: this.composedStoredObject.storage,
+      azureRetentionConfirmed: this.azureSpoolRetentionConfirmed,
+      featureFlags: this.composedFeatureFlag.service,
+      logger: createLogger("langwatch:api:trace-ingest:edge-spool"),
+    });
     const otlpIngest = composeApiTraceIngest({
       eventing: this.composedEventing?.eventSourcing,
       redis: this.composedQueueRedis,
@@ -1504,6 +1522,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ? { service: ApiTraceMediaStore.create(this.composedStoredObject.bytes) }
           : {}),
       },
+      // The ADR-022 whole-payload spool, over the SAME byte storage the media
+      // extraction in front of it externalizes into. Absent where this process
+      // composed no object store, and the receiver says so.
+      ...(payloads ? { payloads } : {}),
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
     // The gateway's public family, over the SAME application the six gateway
@@ -2554,6 +2576,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         : undefined,
       authz,
       audit: this.options.audit,
+      // The SAME coding-agent application the `codingAgents.*` namespace reads,
+      // so the install follow-up maps the branches this organization's own
+      // sessions already named.
+      ...(this.composedCodingAgent.service
+        ? { codingAgents: this.composedCodingAgent.service }
+        : {}),
     });
   }
 

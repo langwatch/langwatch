@@ -14,6 +14,7 @@ export type {
   CodingAgentSignal,
   TokenType,
 } from "./coding-agent-definition";
+export { codingAgentSchema } from "./coding-agent-definition";
 export { isModelCallSpan, readString } from "./coding-agent-span";
 
 /**

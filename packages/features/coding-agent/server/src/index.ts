@@ -8,6 +8,11 @@ export {
 export { CodingAgentBillingPolicyPort } from "./ports/coding-agent-billing.port";
 export { CodingAgentClickHousePort } from "./ports/coding-agent-clickhouse.port";
 export { CodingAgentClockPort } from "./ports/coding-agent-clock.port";
+export {
+  CodingAgentPullRequestMappingBackfillService,
+  type CodingAgentBackfillProjects,
+  type CodingAgentSessionReads,
+} from "./services/coding-agent-pull-request-mapping-backfill.service";
 export { CodingAgentCostEstimatorPort } from "./ports/coding-agent-cost-estimator.port";
 export { CodingAgentProjectActivityPort } from "./ports/coding-agent-project-activity.port";
 export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-request-mapping.port";

@@ -38,14 +38,30 @@
  *
  * Spec: packages/features/experiment/specs/experiment-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Dataset } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
+  dSPyRunsSummarySchema,
+  dSPyStepSchema,
+  experimentArchivedSchema,
+  experimentCopiedSchema,
   ExperimentDspyStepNotFoundError,
+  experimentEvaluationsListPageSchema,
+  experimentRunListSchema,
+  experimentRunWithItemsSchema,
+  experimentSavedWorkbenchSchema,
+  experimentSchema,
+  experimentUpdateFrameSchema,
+  experimentWithDslSchema,
+  experimentWorkbenchPageSchema,
+  experimentWorkbenchVersionProbeSchema,
+  experimentWorkbenchVersionsPageSchema,
   isLegacyOnlineEvaluationWorkbenchState,
   persistedEvaluationsV3StateSchema,
+  workbenchSaveResultSchema,
   type DSPyStep,
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
@@ -97,6 +113,11 @@ type ExperimentTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /**
+   * Check every answer against the output schema its procedure declares. The
+   * host decides: development and test ask for it, production does not.
+   */
+  validateOutput?: boolean;
 }>;
 
 /**
@@ -254,198 +275,220 @@ export class ExperimentTrpcApi {
     ports: ExperimentTrpcPorts<TWorkbenchState>,
   ) {
     const { protected: procedure, policy } = procedures;
+    const validateOutput = procedures.validateOutput ?? false;
 
-    return trpc.router({
-      saveExperiment: policy("workflows:create")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string().optional(),
-            workbenchState: ports.workbenchStateSchema,
-            dsl: studioWorkflowSchema,
-            commitMessage: z.string().optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const experiments = ctx.app.experiments;
-        const state = input.workbenchState as { name?: string | null };
+    const workbench = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .mutation("saveExperiment", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string().optional(),
+              workbenchState: ports.workbenchStateSchema,
+              dsl: studioWorkflowSchema,
+              commitMessage: z.string().optional(),
+            }),
+          )
+          .withOutput(experimentSchema)
+          .withPermission("workflows:create")
+          .handle(async ({ ctx, input }) => {
+            const experiments = ctx.app.experiments;
+            const state = input.workbenchState as { name?: string | null };
 
-        let workflowId = input.dsl.workflow_id;
-        const name =
-          state.name ?? (await experiments.findNextDraftName({ projectId: input.projectId }));
+            let workflowId = input.dsl.workflow_id;
+            const name =
+              state.name ?? (await experiments.findNextDraftName({ projectId: input.projectId }));
 
-        if (input.experimentId) {
-          const currentExperiment = await experiments
-            .getById({ projectId: input.projectId, id: input.experimentId })
-            .catch(mapExperimentError);
+            if (input.experimentId) {
+              const currentExperiment = await experiments
+                .getById({ projectId: input.projectId, id: input.experimentId })
+                .catch(mapExperimentError);
 
-          if (currentExperiment.workflowId) {
-            const workflow = await ports.tryFindWorkflow(ctx, {
-              workflowId: currentExperiment.workflowId,
-              projectId: input.projectId,
-            });
-
-            if (!workflow) {
-              throw new TRPCError({ code: "NOT_FOUND", message: "Workflow not found" });
-            }
-
-            workflowId = workflow.id;
-          }
-
-          // Rename the experiment's datasets alongside it, so a renamed
-          // experiment does not leave its datasets pointing at the old name.
-          if (currentExperiment.name && currentExperiment.name !== name) {
-            const datasetIds = input.dsl.nodes
-              .filter((node) => node.type === "dataset")
-              .map((node) => (node.data as { dataset?: { id?: string } }).dataset?.id)
-              .filter((id): id is string => !!id);
-
-            const datasets = await ctx.app.experiments.getDatasets({
-              datasetIds,
-              projectId: input.projectId,
-            });
-
-            for (const dataset of datasets) {
-              if (dataset.name.startsWith(currentExperiment.name)) {
-                await ctx.app.experiments.renameDataset({
-                  datasetId: dataset.id,
+              if (currentExperiment.workflowId) {
+                const workflow = await ports.tryFindWorkflow(ctx, {
+                  workflowId: currentExperiment.workflowId,
                   projectId: input.projectId,
-                  name: dataset.name.replace(currentExperiment.name, name),
                 });
+
+                if (!workflow) {
+                  throw new TRPCError({ code: "NOT_FOUND", message: "Workflow not found" });
+                }
+
+                workflowId = workflow.id;
+              }
+
+              // Rename the experiment's datasets alongside it, so a renamed
+              // experiment does not leave its datasets pointing at the old name.
+              if (currentExperiment.name && currentExperiment.name !== name) {
+                const datasetIds = input.dsl.nodes
+                  .filter((node) => node.type === "dataset")
+                  .map((node) => (node.data as { dataset?: { id?: string } }).dataset?.id)
+                  .filter((id): id is string => !!id);
+
+                const datasets = await ctx.app.experiments.getDatasets({
+                  datasetIds,
+                  projectId: input.projectId,
+                });
+
+                for (const dataset of datasets) {
+                  if (dataset.name.startsWith(currentExperiment.name)) {
+                    await ctx.app.experiments.renameDataset({
+                      datasetId: dataset.id,
+                      projectId: input.projectId,
+                      name: dataset.name.replace(currentExperiment.name, name),
+                    });
+                  }
+                }
               }
             }
-          }
-        }
 
-        const workflowName = `${name} - Workflow`;
-        if (!workflowId) {
-          const workflow = await ports.createWorkflow(ctx, {
-            projectId: input.projectId,
-            name: workflowName,
-            icon: input.dsl.icon,
-            description: input.dsl.description,
-          });
+            const workflowName = `${name} - Workflow`;
+            if (!workflowId) {
+              const workflow = await ports.createWorkflow(ctx, {
+                projectId: input.projectId,
+                name: workflowName,
+                icon: input.dsl.icon,
+                description: input.dsl.description,
+              });
 
-          workflowId = workflow.id;
-        }
+              workflowId = workflow.id;
+            }
 
-        await ports.saveWorkflowVersion(ctx, {
-          projectId: input.projectId,
-          workflowId,
-          dsl: { ...input.dsl, workflow_id: workflowId, name: workflowName },
-          autoSaved: !input.commitMessage,
-          commitMessage: input.commitMessage ?? "Autosaved",
-          setAsLatestVersion: true,
-        });
-
-        const experimentId = input.experimentId ?? generate("experiment").toString();
-
-        return experiments
-          .save({
-            id: experimentId,
-            projectId: input.projectId,
-            name,
-            type: "BATCH_EVALUATION_V2",
-            requestedSlug: ports.slugify(name),
-            slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
-            workflowId,
-            // The stored state is whatever the host's wizard schema admitted,
-            // which is JSON by construction; the service stores it verbatim.
-            workbenchState: input.workbenchState as SaveExperimentInput["workbenchState"],
-          })
-          .catch(mapExperimentError);
-      }),
-
-      saveEvaluationsV3: policy("experiments:update")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string().optional(),
-            state: persistedEvaluationsV3StateSchema,
-            /**
-             * The version the client last read. Sending it turns the save into
-             * a compare-and-set: a save on top of someone else's newer state is
-             * refused instead of overwriting it. Omitted means last-write-wins,
-             * which is what the existing autosave does until it tracks versions.
-             */
-            expectedVersion: z.number().int().optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const experiments = ctx.app.experiments;
-        const experimentId = input.experimentId ?? generate("experiment").toString();
-
-        const saved = await experiments
-          .saveWorkbenchState(
-            {
+            await ports.saveWorkflowVersion(ctx, {
               projectId: input.projectId,
-              id: experimentId,
-              state: input.state,
-              ...(input.expectedVersion === undefined
-                ? {}
-                : { expectedVersion: input.expectedVersion }),
-            },
-            { kind: "user", id: ctx.actor().id },
-          )
-          .catch(mapExperimentError);
-        const updatedExperiment = await experiments
-          .getById({ projectId: input.projectId, id: saved.experimentId })
-          .catch(mapExperimentError);
-        // The row does not carry the version this save landed on — the counter
-        // it holds is whatever the last read saw. Autosave compares the version
-        // its own write produced against the staleness a concurrent broadcast
-        // may already have raised, so the save result's version rides along.
-        return { ...updatedExperiment, version: saved.version };
-      }),
+              workflowId,
+              dsl: { ...input.dsl, workflow_id: workflowId, name: workflowName },
+              autoSaved: !input.commitMessage,
+              commitMessage: input.commitMessage ?? "Autosaved",
+              setAsLatestVersion: true,
+            });
 
-      getEvaluationsV3BySlug: policy("experiments:view")(
-        procedure.input(projectScopeSchema.extend({ experimentSlug: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        const workbench = await ctx.app.experiments
-          .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
-          .catch(mapExperimentError);
-        return {
-          id: workbench.experimentId,
-          slug: workbench.slug,
-          workbenchState: workbench.state,
-          version: workbench.version,
-          updatedAt: workbench.updatedAt,
-          // Who wrote the version the probing tab is comparing against. A tab
-          // that has to tell its reader their work is out of date owes them the
-          // name: Langy usually wrote it, on their behalf, in the page they are
-          // looking at, and "somewhere else" reads as a stranger.
-          ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
-          // The run that wrote it, when a run did. A tab coming back from the
-          // background adopts a version its own run wrote instead of standing
-          // down over a write it already holds every cell of.
-          ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
-        };
-      }),
+            const experimentId = input.experimentId ?? generate("experiment").toString();
+
+            return experiments
+              .save({
+                id: experimentId,
+                projectId: input.projectId,
+                name,
+                type: "BATCH_EVALUATION_V2",
+                requestedSlug: ports.slugify(name),
+                slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
+                workflowId,
+                // The stored state is whatever the host's wizard schema admitted,
+                // which is JSON by construction; the service stores it verbatim.
+                workbenchState: input.workbenchState as SaveExperimentInput["workbenchState"],
+              })
+              .catch(mapExperimentError);
+          }),
+      )
+
+      .mutation("saveEvaluationsV3", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string().optional(),
+              state: persistedEvaluationsV3StateSchema,
+              /**
+               * The version the client last read. Sending it turns the save into
+               * a compare-and-set: a save on top of someone else's newer state is
+               * refused instead of overwriting it. Omitted means last-write-wins,
+               * which is what the existing autosave does until it tracks versions.
+               */
+              expectedVersion: z.number().int().optional(),
+            }),
+          )
+          .withOutput(experimentSavedWorkbenchSchema)
+          .withPermission("experiments:update")
+          .handle(async ({ ctx, input }) => {
+            const experiments = ctx.app.experiments;
+            const experimentId = input.experimentId ?? generate("experiment").toString();
+
+            const saved = await experiments
+              .saveWorkbenchState(
+                {
+                  projectId: input.projectId,
+                  id: experimentId,
+                  state: input.state,
+                  ...(input.expectedVersion === undefined
+                    ? {}
+                    : { expectedVersion: input.expectedVersion }),
+                },
+                { kind: "user", id: ctx.actor().id },
+              )
+              .catch(mapExperimentError);
+            const updatedExperiment = await experiments
+              .getById({ projectId: input.projectId, id: saved.experimentId })
+              .catch(mapExperimentError);
+            // The row does not carry the version this save landed on — the counter
+            // it holds is whatever the last read saw. Autosave compares the version
+            // its own write produced against the staleness a concurrent broadcast
+            // may already have raised, so the save result's version rides along.
+            return { ...updatedExperiment, version: saved.version };
+          }),
+      )
+
+      .query("getEvaluationsV3BySlug", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+          .withOutput(experimentWorkbenchPageSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const workbench = await ctx.app.experiments
+              .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
+              .catch(mapExperimentError);
+            return {
+              id: workbench.experimentId,
+              slug: workbench.slug,
+              workbenchState: workbench.state,
+              version: workbench.version,
+              updatedAt: workbench.updatedAt,
+              // Who wrote the version the probing tab is comparing against. A tab
+              // that has to tell its reader their work is out of date owes them the
+              // name: Langy usually wrote it, on their behalf, in the page they are
+              // looking at, and "somewhere else" reads as a stranger.
+              ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
+              // The run that wrote it, when a run did. A tab coming back from the
+              // background adopts a version its own run wrote instead of standing
+              // down over a write it already holds every cell of.
+              ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+            };
+          }),
+      )
 
       /**
        * The cheap staleness probe: the version and nothing else. A returning tab
        * compares it with the version it loaded and only refetches the whole state
        * when it is behind, so tab switching costs one point read, not one blob.
        */
-      getWorkbenchVersion: policy("experiments:view")(
-        procedure.input(projectScopeSchema.extend({ experimentSlug: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        const workbench = await ctx.app.experiments
-          .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
-          .catch(mapExperimentError);
-        return {
-          experimentId: workbench.experimentId,
-          version: workbench.version,
-          updatedAt: workbench.updatedAt,
-          // Who wrote the version the probing tab is comparing against. A tab
-          // that has to tell its reader their work is out of date owes them the
-          // name: Langy usually wrote it, on their behalf, in the page they are
-          // looking at, and "somewhere else" reads as a stranger.
-          ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
-          // The run that wrote it, when a run did. A tab coming back from the
-          // background adopts a version its own run wrote instead of standing
-          // down over a write it already holds every cell of.
-          ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
-        };
-      }),
+
+      .query("getWorkbenchVersion", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+          .withOutput(experimentWorkbenchVersionProbeSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const workbench = await ctx.app.experiments
+              .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
+              .catch(mapExperimentError);
+            return {
+              experimentId: workbench.experimentId,
+              version: workbench.version,
+              updatedAt: workbench.updatedAt,
+              // Who wrote the version the probing tab is comparing against. A tab
+              // that has to tell its reader their work is out of date owes them the
+              // name: Langy usually wrote it, on their behalf, in the page they are
+              // looking at, and "somewhere else" reads as a stranger.
+              ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
+              // The run that wrote it, when a run did. A tab coming back from the
+              // background adopts a version its own run wrote instead of standing
+              // down over a write it already holds every cell of.
+              ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+            };
+          }),
+      )
 
       /**
        * SSE subscription pushing `experiment_updated` signals when a workbench
@@ -453,387 +496,353 @@ export class ExperimentTrpcApi {
        * write, or the REST API. Signal-then-refetch; the payload never carries
        * state.
        */
-      onExperimentUpdate: policy("experiments:view")(
-        procedure.input(projectScopeSchema),
-      ).subscription(async function* (opts) {
-        const { projectId } = opts.input;
-        const emitter = opts.ctx.app.experiments.getTenantEmitter(projectId);
-        try {
-          for await (const eventArgs of on(emitter, "experiment_updated", {
-            signal: (opts as { signal?: AbortSignal }).signal,
-          })) {
-            yield (eventArgs as unknown[])[0] as { event?: unknown; timestamp?: number };
-          }
-        } finally {
-          opts.ctx.app.experiments.cleanupTenantEmitter(projectId);
-        }
-      }),
 
-      listWorkbenchVersions: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string(),
-            limit: z.number().int().min(1).max(100).optional(),
-            cursor: z.number().int().optional(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const page = await ctx.app.experiments
-          .listWorkbenchVersions({
-            projectId: input.projectId,
-            id: input.experimentId,
-            ...(input.limit === undefined ? {} : { limit: input.limit }),
-            ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-          })
-          .catch(mapExperimentError);
-
-        // The history names the person who saved each version, and the service
-        // stores only their id.
-        const authorIds = [
-          ...new Set(
-            page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
-          ),
-        ];
-        const authors = authorIds.length > 0 ? await ports.resolveAuthorNames(ctx, authorIds) : [];
-        const nameById = new Map(authors.map((author) => [author.id, author.name]));
-
-        return {
-          ...page,
-          versions: page.versions.map((version) => ({
-            ...version,
-            authorName: version.authorId ? (nameById.get(version.authorId) ?? null) : null,
-          })),
-        };
-      }),
-
-      commitWorkbenchVersion: policy("experiments:update")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string(),
-            commitMessage: z.string().min(1),
-          }),
-        ),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.experiments
-            .commitWorkbenchVersion(
-              {
-                projectId: input.projectId,
-                id: input.experimentId,
-                commitMessage: input.commitMessage,
-              },
-              { kind: "user", id: ctx.actor().id },
-            )
-            .catch(mapExperimentError),
-      ),
-
-      restoreWorkbenchVersion: policy("experiments:update")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string(),
-            version: z.number().int().min(1),
-          }),
-        ),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.experiments
-            .restoreWorkbenchVersion(
-              {
-                projectId: input.projectId,
-                id: input.experimentId,
-                version: input.version,
-              },
-              { kind: "user", id: ctx.actor().id },
-            )
-            .catch(mapExperimentError),
-      ),
-
-      saveAsMonitor: policy("workflows:create")(
-        procedure.input(projectScopeSchema.extend({ experimentId: z.string() })),
-      ).mutation(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getById({ projectId: input.projectId, id: input.experimentId })
-          .catch(mapExperimentError);
-        const workflow = experiment.workflowId
-          ? await ctx.app.experiments.tryGetWorkflow({
-              id: experiment.workflowId,
-              projectId: input.projectId,
-              includeVersion: true,
-            })
-          : null;
-
-        const workbenchState = experiment.workbenchState as
-          | {
-              realTimeExecution?: { preconditions?: unknown; sample?: number };
-              realTimeTraceMappings?: unknown;
+      .subscription("onExperimentUpdate", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(experimentUpdateFrameSchema)
+          .withPermission("experiments:view")
+          .handle(async function* (opts) {
+            const { projectId } = opts.input;
+            const emitter = opts.ctx.app.experiments.getTenantEmitter(projectId);
+            try {
+              for await (const eventArgs of on(emitter, "experiment_updated", {
+                signal: (opts as { signal?: AbortSignal }).signal,
+              })) {
+                yield (eventArgs as unknown[])[0] as { event?: unknown; timestamp?: number };
+              }
+            } finally {
+              opts.ctx.app.experiments.cleanupTenantEmitter(projectId);
             }
-          | undefined;
-        const dsl = workflow?.currentVersion?.dsl as StudioWorkflow | undefined;
-        const evaluator = dsl?.nodes.find((node) => node.type === "evaluator");
-        const evaluatorData = evaluator?.data as
-          | {
-              evaluator?: string;
-              parameters?: ReadonlyArray<{ identifier: string; value: unknown }>;
-            }
-          | undefined;
-
-        if (!workbenchState || !dsl || !evaluatorData?.evaluator) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Experiment is not ready to be saved as a monitor",
-          });
-        }
-
-        return await ports.upsertExperimentMonitor(ctx, {
-          projectId: input.projectId,
-          experimentId: input.experimentId,
-          monitor: {
-            name: experiment.name ?? "Unknown",
-            checkType: evaluatorData.evaluator,
-            slug: experiment.slug,
-            preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
-            parameters: Object.fromEntries(
-              (evaluatorData.parameters ?? []).map((param) => [param.identifier, param.value]),
-            ),
-            mappings: ports.coerceMonitorMappings(workbenchState.realTimeTraceMappings),
-            sample: workbenchState.realTimeExecution?.sample ?? 1,
-            enabled: true,
-            executionMode: "ON_MESSAGE",
-          },
-        });
-      }),
-
-      getExperimentBySlugOrId: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentId: z.string().optional(),
-            experimentSlug: z.string().optional(),
           }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        if (input.experimentId) {
-          return await ctx.app.experiments
-            .getById({ projectId: input.projectId, id: input.experimentId })
-            .catch(mapExperimentError);
-        } else if (input.experimentSlug) {
-          return await ctx.app.experiments
-            .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-            .catch(mapExperimentError);
-        }
+      )
 
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Either experimentId or experimentSlug must be provided",
-        });
-      }),
-
-      getExperimentWithDSLBySlug: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentSlug: z.string(),
-            randomSeed: z.number().optional(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-          .catch(mapExperimentError);
-
-        const workflow = experiment.workflowId
-          ? await ctx.app.experiments.tryGetWorkflow({
-              id: experiment.workflowId,
-              projectId: input.projectId,
-              includeVersion: true,
-            })
-          : undefined;
-
-        return {
-          ...experiment,
-          workbenchState: experiment.workbenchState as TWorkbenchState | undefined,
-          dsl: workflow?.currentVersion?.dsl
-            ? parseStudioWorkflow(workflow.currentVersion.dsl)
-            : undefined,
-        };
-      }),
-
-      getAllByProjectId: policy("experiments:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => ctx.app.experiments.list({ projectId: input.projectId }),
-      ),
-
-      getAllForEvaluationsList: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            pageOffset: z.number().optional(),
-            pageSize: z.number().optional(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const pageOffset = input.pageOffset ?? 0;
-        const pageSize = input.pageSize ?? 25;
-
-        // Fetch every active experiment with its workflow+currentVersion join,
-        // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
-        // for the `task` field inside `workbenchState`, so the count and the
-        // page slice both run off the same in-memory array.
-        const allExperiments = await Promise.all(
-          (await ctx.app.experiments.list({ projectId: input.projectId })).map(
-            async (experiment) => ({
-              ...experiment,
-              workflow: experiment.workflowId
-                ? await ctx.app.experiments.tryGetWorkflow({
-                    id: experiment.workflowId,
-                    projectId: input.projectId,
-                    includeVersion: true,
-                  })
-                : null,
+      .query("listWorkbenchVersions", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string(),
+              limit: z.number().int().min(1).max(100).optional(),
+              cursor: z.number().int().optional(),
             }),
+          )
+          .withOutput(experimentWorkbenchVersionsPageSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const page = await ctx.app.experiments
+              .listWorkbenchVersions({
+                projectId: input.projectId,
+                id: input.experimentId,
+                ...(input.limit === undefined ? {} : { limit: input.limit }),
+                ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+              })
+              .catch(mapExperimentError);
+
+            // The history names the person who saved each version, and the service
+            // stores only their id.
+            const authorIds = [
+              ...new Set(
+                page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
+              ),
+            ];
+            const authors =
+              authorIds.length > 0 ? await ports.resolveAuthorNames(ctx, authorIds) : [];
+            const nameById = new Map(authors.map((author) => [author.id, author.name]));
+
+            return {
+              ...page,
+              versions: page.versions.map((version) => ({
+                ...version,
+                authorName: version.authorId ? (nameById.get(version.authorId) ?? null) : null,
+              })),
+            };
+          }),
+      )
+
+      .mutation("commitWorkbenchVersion", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string(),
+              commitMessage: z.string().min(1),
+            }),
+          )
+          .withOutput(workbenchSaveResultSchema)
+          .withPermission("experiments:update")
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.experiments
+                .commitWorkbenchVersion(
+                  {
+                    projectId: input.projectId,
+                    id: input.experimentId,
+                    commitMessage: input.commitMessage,
+                  },
+                  { kind: "user", id: ctx.actor().id },
+                )
+                .catch(mapExperimentError),
           ),
-        );
-        const nonLegacyExperiments = allExperiments.filter(
-          (experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
-        );
-        const totalHits = nonLegacyExperiments.length;
+      )
 
-        // Pagination is applied after excluding legacy online evaluations.
-        const experiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
-
-        const datasetIds = experiments
-          .map((experiment) => datasetIdOf(experiment.workflow?.currentVersion?.dsl))
-          .filter((id): id is string => !!id);
-
-        const datasetsById = Object.fromEntries(
-          (await ctx.app.experiments.getDatasets({ projectId: input.projectId, datasetIds })).map(
-            (dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }],
+      .mutation("restoreWorkbenchVersion", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string(),
+              version: z.number().int().min(1),
+            }),
+          )
+          .withOutput(workbenchSaveResultSchema)
+          .withPermission("experiments:update")
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.experiments
+                .restoreWorkbenchVersion(
+                  {
+                    projectId: input.projectId,
+                    id: input.experimentId,
+                    version: input.version,
+                  },
+                  { kind: "user", id: ctx.actor().id },
+                )
+                .catch(mapExperimentError),
           ),
-        );
+      )
 
-        const runsByExperimentId = await ctx.app.experiments.listRuns({
-          projectId: input.projectId,
-          experimentIds: experiments.map((experiment) => experiment.id),
-        });
+      .mutation("saveAsMonitor", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+          .withoutOutput(
+            "the monitor upsert is the host's write and answers in the host's own shape; this transport only hands it the experiment it was built from",
+          )
+          .withPermission("workflows:create")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getById({ projectId: input.projectId, id: input.experimentId })
+              .catch(mapExperimentError);
+            const workflow = experiment.workflowId
+              ? await ctx.app.experiments.tryGetWorkflow({
+                  id: experiment.workflowId,
+                  projectId: input.projectId,
+                  includeVersion: true,
+                })
+              : null;
 
-        const experimentsWithDatasetsAndRuns = experiments
-          .map((experiment) => {
-            const runs = runsByExperimentId[experiment.id] ?? [];
-            const latestRun = runs.sort(
-              (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-            )[0];
-            const primaryMetric = latestRun
-              ? Object.values(latestRun.summary.evaluations)[0]
+            const workbenchState = experiment.workbenchState as
+              | {
+                  realTimeExecution?: { preconditions?: unknown; sample?: number };
+                  realTimeTraceMappings?: unknown;
+                }
+              | undefined;
+            const dsl = workflow?.currentVersion?.dsl as StudioWorkflow | undefined;
+            const evaluator = dsl?.nodes.find((node) => node.type === "evaluator");
+            const evaluatorData = evaluator?.data as
+              | {
+                  evaluator?: string;
+                  parameters?: ReadonlyArray<{ identifier: string; value: unknown }>;
+                }
+              | undefined;
+
+            if (!workbenchState || !dsl || !evaluatorData?.evaluator) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Experiment is not ready to be saved as a monitor",
+              });
+            }
+
+            return await ports.upsertExperimentMonitor(ctx, {
+              projectId: input.projectId,
+              experimentId: input.experimentId,
+              monitor: {
+                name: experiment.name ?? "Unknown",
+                checkType: evaluatorData.evaluator,
+                slug: experiment.slug,
+                preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
+                parameters: Object.fromEntries(
+                  (evaluatorData.parameters ?? []).map((param) => [param.identifier, param.value]),
+                ),
+                mappings: ports.coerceMonitorMappings(workbenchState.realTimeTraceMappings),
+                sample: workbenchState.realTimeExecution?.sample ?? 1,
+                enabled: true,
+                executionMode: "ON_MESSAGE",
+              },
+            });
+          }),
+      )
+      .build();
+
+    const experiments = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getExperimentBySlugOrId", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentId: z.string().optional(),
+              experimentSlug: z.string().optional(),
+            }),
+          )
+          .withOutput(experimentSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            if (input.experimentId) {
+              return await ctx.app.experiments
+                .getById({ projectId: input.projectId, id: input.experimentId })
+                .catch(mapExperimentError);
+            } else if (input.experimentSlug) {
+              return await ctx.app.experiments
+                .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
+                .catch(mapExperimentError);
+            }
+
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Either experimentId or experimentSlug must be provided",
+            });
+          }),
+      )
+
+      .query("getExperimentWithDSLBySlug", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentSlug: z.string(),
+              randomSeed: z.number().optional(),
+            }),
+          )
+          .withOutput(experimentWithDslSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
+              .catch(mapExperimentError);
+
+            const workflow = experiment.workflowId
+              ? await ctx.app.experiments.tryGetWorkflow({
+                  id: experiment.workflowId,
+                  projectId: input.projectId,
+                  includeVersion: true,
+                })
               : undefined;
 
             return {
               ...experiment,
               workbenchState: experiment.workbenchState as TWorkbenchState | undefined,
-              runsSummary: {
-                count: runs.length,
-                primaryMetric,
-                latestRun: { timestamps: latestRun?.timestamps },
-              },
-              dataset: datasetsById[datasetIdOf(experiment.workflow?.currentVersion?.dsl) ?? ""],
-              updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
+              dsl: workflow?.currentVersion?.dsl
+                ? parseStudioWorkflow(workflow.currentVersion.dsl)
+                : undefined,
             };
-          })
-          .sort((a, b) => b.updatedAt - a.updatedAt);
-
-        return { experiments: experimentsWithDatasetsAndRuns, totalHits };
-      }),
-
-      getExperimentDSPyRuns: policy("experiments:view")(
-        procedure.input(projectScopeSchema.extend({ experimentSlug: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-          .catch(mapExperimentError);
-
-        return ctx.app.experiments.listDspyRuns({
-          tenantId: input.projectId,
-          experimentId: experiment.id,
-        });
-      }),
-
-      getExperimentDSPyStep: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            experimentSlug: z.string(),
-            runId: z.string(),
-            index: z.string(),
           }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
-          .catch(mapExperimentError);
+      )
 
-        try {
-          const step = await ctx.app.experiments.getDspyStep({
-            tenantId: input.projectId,
-            experimentId: experiment.id,
-            runId: input.runId,
-            stepIndex: input.index,
-          });
+      .query("getAllByProjectId", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(z.array(experimentSchema))
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.experiments.list({ projectId: input.projectId }),
+          ),
+      )
 
-          // The domain type is camelCase; the page reads the snake_case wire
-          // shape the optimization studio has always published.
-          const result: DSPyStep = {
-            project_id: step.tenantId,
-            run_id: step.runId,
-            workflow_version_id: step.workflowVersionId,
-            experiment_id: step.experimentId,
-            index: step.stepIndex,
-            score: step.score,
-            label: step.label,
-            optimizer: {
-              name: step.optimizerName,
-              parameters: step.optimizerParameters as DSPyStep["optimizer"]["parameters"],
-            },
-            predictors: step.predictors as DSPyStep["predictors"],
-            examples: step.examples as DSPyStep["examples"],
-            llm_calls: step.llmCalls as DSPyStep["llm_calls"],
-            timestamps: {
-              created_at: step.createdAt,
-              inserted_at: step.insertedAt,
-              updated_at: step.updatedAt,
-            },
-          };
+      .query("getAllForEvaluationsList", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              pageOffset: z.number().optional(),
+              pageSize: z.number().optional(),
+            }),
+          )
+          .withOutput(experimentEvaluationsListPageSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const pageOffset = input.pageOffset ?? 0;
+            const pageSize = input.pageSize ?? 25;
 
-          return result;
-        } catch (error) {
-          if (error instanceof ExperimentDspyStepNotFoundError) {
-            throw new TRPCError({ code: "NOT_FOUND", message: "DSPy step not found" });
-          }
-          throw error;
-        }
-      }),
+            // Fetch every active experiment with its workflow+currentVersion join,
+            // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
+            // for the `task` field inside `workbenchState`, so the count and the
+            // page slice both run off the same in-memory array.
+            const allExperiments = await Promise.all(
+              (await ctx.app.experiments.list({ projectId: input.projectId })).map(
+                async (experiment) => ({
+                  ...experiment,
+                  workflow: experiment.workflowId
+                    ? await ctx.app.experiments.tryGetWorkflow({
+                        id: experiment.workflowId,
+                        projectId: input.projectId,
+                        includeVersion: true,
+                      })
+                    : null,
+                }),
+              ),
+            );
+            const nonLegacyExperiments = allExperiments.filter(
+              (experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
+            );
+            const totalHits = nonLegacyExperiments.length;
 
-      getExperimentBatchEvaluationRuns: policy("experiments:view")(
-        procedure.input(projectScopeSchema.extend({ experimentId: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getById({ projectId: input.projectId, id: input.experimentId })
-          .catch(mapExperimentError);
+            // Pagination is applied after excluding legacy online evaluations.
+            const experiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
 
-        const runsByExperimentId = await ctx.app.experiments.listRuns({
-          projectId: input.projectId,
-          experimentIds: [experiment.id],
-        });
+            const datasetIds = experiments
+              .map((experiment) => datasetIdOf(experiment.workflow?.currentVersion?.dsl))
+              .filter((id): id is string => !!id);
 
-        return { runs: runsByExperimentId[experiment.id] ?? [] };
-      }),
+            const datasetsById = Object.fromEntries(
+              (
+                await ctx.app.experiments.getDatasets({ projectId: input.projectId, datasetIds })
+              ).map((dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }]),
+            );
 
-      getExperimentBatchEvaluationRun: policy("experiments:view")(
-        procedure.input(projectScopeSchema.extend({ experimentId: z.string(), runId: z.string() })),
-      ).query(async ({ ctx, input }) => {
-        const experiment = await ctx.app.experiments
-          .getById({ projectId: input.projectId, id: input.experimentId })
-          .catch(mapExperimentError);
+            const runsByExperimentId = await ctx.app.experiments.listRuns({
+              projectId: input.projectId,
+              experimentIds: experiments.map((experiment) => experiment.id),
+            });
 
-        return ctx.app.experiments.tryGetRun({
-          projectId: input.projectId,
-          experimentId: experiment.id,
-          runId: input.runId,
-        });
-      }),
+            const experimentsWithDatasetsAndRuns = experiments
+              .map((experiment) => {
+                const runs = runsByExperimentId[experiment.id] ?? [];
+                const latestRun = runs.sort(
+                  (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+                )[0];
+                const primaryMetric = latestRun
+                  ? Object.values(latestRun.summary.evaluations)[0]
+                  : undefined;
+
+                return {
+                  ...experiment,
+                  workbenchState: experiment.workbenchState as TWorkbenchState | undefined,
+                  runsSummary: {
+                    count: runs.length,
+                    primaryMetric,
+                    latestRun: { timestamps: latestRun?.timestamps },
+                  },
+                  dataset:
+                    datasetsById[datasetIdOf(experiment.workflow?.currentVersion?.dsl) ?? ""],
+                  updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
+                };
+              })
+              .sort((a, b) => b.updatedAt - a.updatedAt);
+
+            return { experiments: experimentsWithDatasetsAndRuns, totalHits };
+          }),
+      )
+
+      /** Whether the project's last experiment is still a draft. */
+
+      .query("getLastExperiment", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(experimentSchema.nullable())
+          .withPermission("experiments:view")
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.experiments.tryGetLatest({ projectId: input.projectId }),
+          ),
+      )
 
       /**
        * Archives an experiment (and cascades archive to its workflow + monitor).
@@ -854,136 +863,263 @@ export class ExperimentTrpcApi {
        * The tRPC name remains `deleteExperiment` so the UI does not need to
        * change; the user-visible behaviour is identical.
        */
-      deleteExperiment: policy("workflows:delete")(
-        procedure.input(projectScopeSchema.extend({ experimentId: z.string() })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          // The cascade — the workflow the experiment wrote versions into, and
-          // the monitor it was published as — is one act, and it is the
-          // application's. A second door sequencing the same three writes is a
-          // second chance to sequence them differently.
-          await ctx.app.experiments
-            .archive({ projectId: input.projectId, id: input.experimentId })
-            .catch(mapExperimentError),
-      ),
 
-      copy: policy("evaluations:manage")(
-        procedure.input(
-          z.object({
-            experimentId: z.string(),
-            projectId: z.string(),
-            sourceProjectId: z.string(),
-            copyDatasets: z.boolean().optional(),
+      .mutation("deleteExperiment", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+          .withOutput(experimentArchivedSchema)
+          .withPermission("workflows:delete")
+          .handle(
+            async ({ ctx, input }) =>
+              // The cascade — the workflow the experiment wrote versions into, and
+              // the monitor it was published as — is one act, and it is the
+              // application's. A second door sequencing the same three writes is a
+              // second chance to sequence them differently.
+              await ctx.app.experiments
+                .archive({ projectId: input.projectId, id: input.experimentId })
+                .catch(mapExperimentError),
+          ),
+      )
+
+      .mutation("copy", (p) =>
+        p
+          .withInput(
+            z.object({
+              experimentId: z.string(),
+              projectId: z.string(),
+              sourceProjectId: z.string(),
+              copyDatasets: z.boolean().optional(),
+            }),
+          )
+          .withOutput(experimentCopiedSchema)
+          .withPermission("evaluations:manage")
+          .handle(async ({ ctx, input }) => {
+            // The declared check covers the TARGET project. The source is a second
+            // project it never saw, so it is probed before anything is read.
+            const hasSourcePermission = await ports.probeProjectPermission(
+              ctx,
+              input.sourceProjectId,
+              "evaluations:manage",
+            );
+
+            if (!hasSourcePermission) {
+              throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message: "You do not have permission to manage evaluations in the source project",
+              });
+            }
+
+            const experiment = await ctx.app.experiments
+              .getById({ projectId: input.sourceProjectId, id: input.experimentId })
+              .catch(mapExperimentError);
+
+            // V3 experiments have no workflow; their state lives in workbenchState.
+            if (experiment.type === "EVALUATIONS_V3") {
+              return await copyEvaluationsV3Experiment({
+                app: ctx.app.experiments,
+                slugify: ports.slugify,
+                experiment,
+                targetProjectId: input.projectId,
+                sourceProjectId: input.sourceProjectId,
+                ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
+              });
+            }
+
+            if (!experiment.workflowId) {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
+            }
+            const sourceWorkflow = await ctx.app.experiments.tryGetWorkflow({
+              id: experiment.workflowId,
+              projectId: input.sourceProjectId,
+              includeVersion: true,
+            });
+            if (!sourceWorkflow?.latestVersion?.dsl) {
+              throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
+            }
+
+            const { workflowId, dsl } = await ports.copyWorkflowWithDatasets(ctx, {
+              workflow: {
+                id: sourceWorkflow.id,
+                name: sourceWorkflow.name,
+                icon: sourceWorkflow.icon,
+                description: sourceWorkflow.description,
+                ...(sourceWorkflow.isEvaluator === undefined
+                  ? {}
+                  : { isEvaluator: sourceWorkflow.isEvaluator }),
+                ...(sourceWorkflow.isComponent === undefined
+                  ? {}
+                  : { isComponent: sourceWorkflow.isComponent }),
+                latestVersion: {
+                  ...sourceWorkflow.latestVersion,
+                  dsl: z.json().parse(sourceWorkflow.latestVersion.dsl),
+                },
+              },
+              targetProjectId: input.projectId,
+              sourceProjectId: input.sourceProjectId,
+              ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
+              copiedFromWorkflowId: experiment.workflowId,
+            });
+
+            const newWorkflow = await ports.tryFindWorkflow(ctx, {
+              workflowId,
+              projectId: input.projectId,
+            });
+
+            if (!newWorkflow) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to create workflow",
+              });
+            }
+
+            await ports.saveWorkflowVersion(ctx, {
+              projectId: input.projectId,
+              workflowId,
+              dsl,
+              autoSaved: false,
+              commitMessage: `Copied from ${sourceWorkflow.name}`,
+            });
+
+            const experimentName = experiment.name ?? experiment.slug;
+            const newExperiment = await ctx.app.experiments.save({
+              id: generate("experiment").toString(),
+              name: experimentName,
+              requestedSlug: ports.slugify(experimentName),
+              slugMode: "deduplicate",
+              projectId: input.projectId,
+              type: experiment.type,
+              workflowId,
+              workbenchState: experiment.workbenchState,
+            });
+
+            return { experiment: newExperiment, workflow: newWorkflow };
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        // The declared check covers the TARGET project. The source is a second
-        // project it never saw, so it is probed before anything is read.
-        const hasSourcePermission = await ports.probeProjectPermission(
-          ctx,
-          input.sourceProjectId,
-          "evaluations:manage",
-        );
+      )
+      .build();
 
-        if (!hasSourcePermission) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to manage evaluations in the source project",
-          });
-        }
+    const runs = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getExperimentDSPyRuns", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+          .withOutput(z.array(dSPyRunsSummarySchema))
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
+              .catch(mapExperimentError);
 
-        const experiment = await ctx.app.experiments
-          .getById({ projectId: input.sourceProjectId, id: input.experimentId })
-          .catch(mapExperimentError);
+            return ctx.app.experiments.listDspyRuns({
+              tenantId: input.projectId,
+              experimentId: experiment.id,
+            });
+          }),
+      )
 
-        // V3 experiments have no workflow; their state lives in workbenchState.
-        if (experiment.type === "EVALUATIONS_V3") {
-          return await copyEvaluationsV3Experiment({
-            app: ctx.app.experiments,
-            slugify: ports.slugify,
-            experiment,
-            targetProjectId: input.projectId,
-            sourceProjectId: input.sourceProjectId,
-            ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
-          });
-        }
+      .query("getExperimentDSPyStep", (p) =>
+        p
+          .withInput(
+            projectScopeSchema.extend({
+              experimentSlug: z.string(),
+              runId: z.string(),
+              index: z.string(),
+            }),
+          )
+          .withOutput(dSPyStepSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
+              .catch(mapExperimentError);
 
-        if (!experiment.workflowId) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
-        }
-        const sourceWorkflow = await ctx.app.experiments.tryGetWorkflow({
-          id: experiment.workflowId,
-          projectId: input.sourceProjectId,
-          includeVersion: true,
-        });
-        if (!sourceWorkflow?.latestVersion?.dsl) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
-        }
+            try {
+              const step = await ctx.app.experiments.getDspyStep({
+                tenantId: input.projectId,
+                experimentId: experiment.id,
+                runId: input.runId,
+                stepIndex: input.index,
+              });
 
-        const { workflowId, dsl } = await ports.copyWorkflowWithDatasets(ctx, {
-          workflow: {
-            id: sourceWorkflow.id,
-            name: sourceWorkflow.name,
-            icon: sourceWorkflow.icon,
-            description: sourceWorkflow.description,
-            ...(sourceWorkflow.isEvaluator === undefined
-              ? {}
-              : { isEvaluator: sourceWorkflow.isEvaluator }),
-            ...(sourceWorkflow.isComponent === undefined
-              ? {}
-              : { isComponent: sourceWorkflow.isComponent }),
-            latestVersion: {
-              ...sourceWorkflow.latestVersion,
-              dsl: z.json().parse(sourceWorkflow.latestVersion.dsl),
-            },
-          },
-          targetProjectId: input.projectId,
-          sourceProjectId: input.sourceProjectId,
-          ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
-          copiedFromWorkflowId: experiment.workflowId,
-        });
+              // The domain type is camelCase; the page reads the snake_case wire
+              // shape the optimization studio has always published.
+              const result: DSPyStep = {
+                project_id: step.tenantId,
+                run_id: step.runId,
+                workflow_version_id: step.workflowVersionId,
+                experiment_id: step.experimentId,
+                index: step.stepIndex,
+                score: step.score,
+                label: step.label,
+                optimizer: {
+                  name: step.optimizerName,
+                  parameters: step.optimizerParameters as DSPyStep["optimizer"]["parameters"],
+                },
+                predictors: step.predictors as DSPyStep["predictors"],
+                examples: step.examples as DSPyStep["examples"],
+                llm_calls: step.llmCalls as DSPyStep["llm_calls"],
+                timestamps: {
+                  created_at: step.createdAt,
+                  inserted_at: step.insertedAt,
+                  updated_at: step.updatedAt,
+                },
+              };
 
-        const newWorkflow = await ports.tryFindWorkflow(ctx, {
-          workflowId,
-          projectId: input.projectId,
-        });
+              return result;
+            } catch (error) {
+              if (error instanceof ExperimentDspyStepNotFoundError) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "DSPy step not found" });
+              }
+              throw error;
+            }
+          }),
+      )
 
-        if (!newWorkflow) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create workflow",
-          });
-        }
+      .query("getExperimentBatchEvaluationRuns", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+          .withOutput(experimentRunListSchema)
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getById({ projectId: input.projectId, id: input.experimentId })
+              .catch(mapExperimentError);
 
-        await ports.saveWorkflowVersion(ctx, {
-          projectId: input.projectId,
-          workflowId,
-          dsl,
-          autoSaved: false,
-          commitMessage: `Copied from ${sourceWorkflow.name}`,
-        });
+            const runsByExperimentId = await ctx.app.experiments.listRuns({
+              projectId: input.projectId,
+              experimentIds: [experiment.id],
+            });
 
-        const experimentName = experiment.name ?? experiment.slug;
-        const newExperiment = await ctx.app.experiments.save({
-          id: generate("experiment").toString(),
-          name: experimentName,
-          requestedSlug: ports.slugify(experimentName),
-          slugMode: "deduplicate",
-          projectId: input.projectId,
-          type: experiment.type,
-          workflowId,
-          workbenchState: experiment.workbenchState,
-        });
+            return { runs: runsByExperimentId[experiment.id] ?? [] };
+          }),
+      )
 
-        return { experiment: newExperiment, workflow: newWorkflow };
-      }),
+      .query("getExperimentBatchEvaluationRun", (p) =>
+        p
+          .withInput(projectScopeSchema.extend({ experimentId: z.string(), runId: z.string() }))
+          .withOutput(experimentRunWithItemsSchema.nullable())
+          .withPermission("experiments:view")
+          .handle(async ({ ctx, input }) => {
+            const experiment = await ctx.app.experiments
+              .getById({ projectId: input.projectId, id: input.experimentId })
+              .catch(mapExperimentError);
 
-      /** Whether the project's last experiment is still a draft. */
-      getLastExperiment: policy("experiments:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await ctx.app.experiments.tryGetLatest({ projectId: input.projectId }),
-      ),
-    });
+            return ctx.app.experiments.tryGetRun({
+              projectId: input.projectId,
+              experimentId: experiment.id,
+              runId: input.runId,
+            });
+          }),
+      )
+      .build();
+
+    // One surface, in the three groups the pages are laid out in. Several
+    // chains rather than one because a single twenty-procedure chain exceeds
+    // TypeScript's instantiation depth, and `mergeRouters` puts them back on
+    // the one `experiments.*` name the client has always called.
+    return trpc.mergeRouters(workbench, experiments, runs);
   }
 }
 

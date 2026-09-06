@@ -5,6 +5,7 @@ import {
   Config,
   egressConfigDefinition,
   environmentBooleanSchema,
+  environmentOneOrTrueSchema,
   githubAppConfigDefinition,
   groupQueueConfigDefinition,
   licensingConfigDefinition,
@@ -119,6 +120,14 @@ export const apiConfigDefinition = RuntimeConfig.define({
   port: Config.value(portSchema.default(5560), { env: "API_PORT" }),
   httpDrainGraceMs: Config.value(z.coerce.number().int().min(0).default(5_000), {
     env: "API_HTTP_DRAIN_GRACE_MS",
+  }),
+  /**
+   * Whether every tRPC answer is checked against its declared output schema.
+   * Read here and nowhere else. Unset follows `NODE_ENV` — on outside
+   * production, where a declared shape documents rather than gates.
+   */
+  validateTrpcOutput: Config.value(environmentBooleanSchema.optional(), {
+    env: "API_TRPC_VALIDATE_OUTPUT",
   }),
   shutdown: {
     deadlineMs: Config.value(z.coerce.number().int().positive().optional(), {
@@ -604,7 +613,17 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * still work, which is exactly the danger — one tenant's objects would be
      * addressed in an account they do not own and cannot read.
      */
-    storedObjects: { ...objectStorageConfigDefinition },
+    storedObjects: {
+      ...objectStorageConfigDefinition,
+      /**
+       * The operator's assertion that the Azure container reaps an orphaned
+       * trace spool object. Read exactly the way the worker reads it, since
+       * disagreement either orphans spool objects or ingests spans inline.
+       */
+      azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
+        env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
+      }),
+    },
     redis: { ...redisConfigDefinition },
     groupQueue: { ...groupQueueConfigDefinition },
     /** The connected-agent transport's replica count and its relay payload cap (ADR-128). */
@@ -778,6 +797,8 @@ export type ApiStoredObjectsConfigResolution = Readonly<{
    * the raw shape its resolver takes rather than a validated credential.
    */
   azure: AzureBlobCredentialsConfig & { identity: AzureInjectedIdentity };
+  /** Whether Azure Blob may host the transient trace spool on this deployment. */
+  azureSpoolRetentionConfirmed: boolean;
   routes: ReadonlyMap<string, ApiDataplaneS3Route>;
 }>;
 
@@ -910,8 +931,17 @@ function resolveNlpLambdaFleetConfig(
 }
 
 export type ApiConfig = Readonly<
-  Omit<ApiConfigProjection, "authz" | "browserSession" | "infrastructure" | "mail" | "shutdown"> & {
+  Omit<
+    ApiConfigProjection,
+    "authz" | "browserSession" | "infrastructure" | "mail" | "shutdown" | "validateTrpcOutput"
+  > & {
     authz: ApiAuthzConfig;
+    /**
+     * Whether this process checks every tRPC answer against the output schema
+     * its procedure declares. Resolved here, once, so no surface below reads an
+     * environment variable to find out. @see apiConfigDefinition
+     */
+    validateTrpcOutput: boolean;
     /** The deployment's one browser-session identity, or nothing. */
     browserSession: ApiBrowserSessionConfig | undefined;
     /** Absent when the deployment named no `BASE_HOST`; see `resolveApiMailConfig`. */
@@ -973,6 +1003,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     ...rest,
     ...(mail ? { mail } : {}),
     featureFlags: resolveFeatureFlagConfig(source),
+    // Unset means "follow the deployment": on in development and test, off in
+    // production, where a drifted schema must not turn a working read into a
+    // failure. An explicit export wins either way.
+    validateTrpcOutput: value.validateTrpcOutput ?? process.env.NODE_ENV !== "production",
     otlpMetrics: otlpMetricsExportOptionsFrom({
       telemetry: resolveTelemetryConfiguration(source),
       serviceName: value.serviceName,
@@ -1073,6 +1107,8 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
               undefined,
           },
         },
+        azureSpoolRetentionConfirmed:
+          value.infrastructure.storedObjects.azureSpoolRetentionConfirmed,
         routes: resolveDataplaneS3Routes(source),
       },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),

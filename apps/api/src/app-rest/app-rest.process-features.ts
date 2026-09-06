@@ -696,7 +696,7 @@ export function createApiProcessRestFeatures(options: {
     // posts to a path nobody serves gets one silent, unretryable data loss per
     // batch, so the aliases exist wherever the receiver does — never on their
     // own, which is why they take the receiver rather than importing it.
-    features.push(createOtlpPathAliasRestApp({ canonical: receiver }));
+    features.push(createOtlpPathAliasRestApp({ security, canonical: receiver }));
   }
 
   return features;

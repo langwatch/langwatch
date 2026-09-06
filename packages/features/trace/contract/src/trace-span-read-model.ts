@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * The per-span read models the trace drawer and the trace list render.
  *
@@ -10,25 +12,29 @@
  */
 
 /** One event name a trace recorded, with how often and when it first fired. */
-export interface TraceEventNameCount {
-  name: string;
-  count: number;
+export const traceEventNameCountSchema = z.object({
+  name: z.string(),
+  count: z.number(),
   /** Epoch ms of the earliest event under this name — the display order. */
-  firstTimestamp: number;
-}
+  firstTimestamp: z.number(),
+});
+
+export type TraceEventNameCount = z.infer<typeof traceEventNameCountSchema>;
 
 /** A trace's events as the list renders them: named groups plus true totals. */
-export interface TraceEventRollup {
+export const traceEventRollupSchema = z.object({
   /**
    * Ordered by first occurrence, at most `MAX_EVENT_NAMES_PER_TRACE` entries.
    * Shorter than `distinctCount` when the trim bit.
    */
-  names: TraceEventNameCount[];
+  names: z.array(traceEventNameCountSchema),
   /** Every event the trace recorded, counting names beyond the trim. */
-  totalCount: number;
+  totalCount: z.number(),
   /** Distinct event names the trace recorded, counting those beyond the trim. */
-  distinctCount: number;
-}
+  distinctCount: z.number(),
+});
+
+export type TraceEventRollup = z.infer<typeof traceEventRollupSchema>;
 
 export interface SpanSummaryRow {
   spanId: string;
@@ -87,14 +93,14 @@ export interface SpanResourceInfo {
  * inspector. The `traceId` is implied by the query; `attributes` carries the
  * emitter's event payload (`body`, `event.name`, `request_id`, `cost_usd`, …).
  */
-export interface TraceLogRecordDto {
-  spanId: string;
-  timeUnixMs: number;
-  body: string;
-  attributes: Record<string, string>;
-  resourceAttributes: Record<string, string>;
-  scopeName: string;
-  scopeVersion: string | null;
+export const traceLogRecordDtoSchema = z.object({
+  spanId: z.string(),
+  timeUnixMs: z.number(),
+  body: z.string(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  scopeName: z.string(),
+  scopeVersion: z.string().nullable(),
   /**
    * True when this record carried captured content the viewer may not see, so
    * the content was withheld — the top-level body, the per-event content
@@ -103,7 +109,9 @@ export interface TraceLogRecordDto {
    * placeholder, mirroring the span endpoints' `inputRedacted` /
    * `outputRedacted`.
    */
-  bodyRedacted?: boolean;
+  bodyRedacted: z.boolean().optional(),
   /** Audience label naming who CAN see the withheld content, when restricted. */
-  bodyVisibleTo?: string | null;
-}
+  bodyVisibleTo: z.string().nullable().optional(),
+});
+
+export type TraceLogRecordDto = z.infer<typeof traceLogRecordDtoSchema>;

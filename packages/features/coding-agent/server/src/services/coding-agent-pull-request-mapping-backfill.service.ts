@@ -5,9 +5,8 @@ import {
 } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GithubService } from "@langwatch/github-contract";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
+import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
 
 export const PULL_REQUEST_MAPPING_BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP = 500;
@@ -16,12 +15,32 @@ export const PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY = 5;
 
 const logger = createLogger("langwatch:coding-agent:backfill");
 
+/**
+ * The one read the backfill makes: a project's recent sessions in a window.
+ * Named as its own surface so a caller composes what the backfill uses rather
+ * than the whole session-read graph.
+ */
+export type CodingAgentSessionReads = Pick<CodingAgentSessionReadService, "listRecent">;
+
+/**
+ * The one project read the backfill makes, and the one field it reads back.
+ * `ProjectService` satisfies it; stating it this narrowly is what lets a
+ * caller compose the backfill without the whole project graph.
+ */
+export type CodingAgentBackfillProjects = {
+  listByOrganization(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+  }): Promise<{ data: ReadonlyArray<{ id: string }> }>;
+};
+
 /** Private installation follow-up that discovers Coding Agent's own session branches. */
 export class CodingAgentPullRequestMappingBackfillService {
   static create(options: {
-    sessionReads: CodingAgentSessionReadService;
+    sessionReads: CodingAgentSessionReads;
     github: GithubService;
-    projects: ProjectService;
+    projects: CodingAgentBackfillProjects;
     clock: CodingAgentClockPort;
   }): CodingAgentPullRequestMappingBackfillService {
     return new CodingAgentPullRequestMappingBackfillService(options);
@@ -29,9 +48,9 @@ export class CodingAgentPullRequestMappingBackfillService {
 
   private constructor(
     private readonly dependencies: {
-      sessionReads: CodingAgentSessionReadService;
+      sessionReads: CodingAgentSessionReads;
       github: GithubService;
-      projects: ProjectService;
+      projects: CodingAgentBackfillProjects;
       clock: CodingAgentClockPort;
     },
   ) {}

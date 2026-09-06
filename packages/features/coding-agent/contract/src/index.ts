@@ -12,7 +12,11 @@ export * from "./telemetry/session-context";
 // Temporary test/pure-derivation compatibility exports; production app paths
 // use CodingAgentService methods and do not depend on these directly.
 export * from "./coding-agent-log-content";
-export { buildCodingAgentTranscript } from "./coding-agent-transcript";
+export {
+  buildCodingAgentTranscript,
+  codingAgentTranscriptSchema,
+  transcriptEntrySchema,
+} from "./coding-agent-transcript";
 export type {
   CodingAgentTranscript,
   TranscriptEntry,

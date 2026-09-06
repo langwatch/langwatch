@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * The Langy event cursor — a position in a conversation's durable event stream
  * (ADR-059 §2). The server's projection stores persist one next to every folded
@@ -11,12 +13,14 @@
  * `localeCompare` — locale collation reorders case and can disagree with KSUID
  * byte order, silently corrupting catch-up on both sides at once.
  */
-export interface LangyEventCursor {
+export const langyEventCursorSchema = z.object({
   /** When the canonical event log accepted the event (Unix ms, UTC). */
-  acceptedAt: number;
+  acceptedAt: z.number().int().nonnegative(),
   /** KSUID tie-breaker for events accepted in the same millisecond. */
-  eventId: string;
-}
+  eventId: z.string(),
+});
+
+export type LangyEventCursor = z.infer<typeof langyEventCursorSchema>;
 
 /** Byte-wise total order over cursors: negative, zero, or positive. */
 export function compareLangyEventCursors(a: LangyEventCursor, b: LangyEventCursor): number {

@@ -123,7 +123,7 @@ function buildApi(
 
   const family = createExperimentsRestApp({ security, app: () => stub });
 
-  return { hono: family.hono, stub, chain };
+  return { hono: family, stub, chain };
 }
 
 const summary = {

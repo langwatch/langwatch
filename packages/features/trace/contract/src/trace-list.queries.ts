@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Projected fields required by the trace-list read and mapper. This is deliberately separate
  * from the ingest fold state: the list query owns a read-only projection of `trace_summaries`
@@ -79,10 +81,12 @@ export interface TraceListSort {
  * number by the repository; TraceId is the unique tie-breaker that turns every
  * supported sort into a total order.
  */
-export interface TraceListCursor {
-  sortValue: number;
-  traceId: string;
-}
+export const traceListCursorSchema = z.object({
+  sortValue: z.number(),
+  traceId: z.string(),
+});
+
+export type TraceListCursor = z.infer<typeof traceListCursorSchema>;
 
 export interface TraceListQuery {
   tenantId: string;
@@ -115,32 +119,36 @@ export interface FacetCountResult {
  * sidebar drilldown can render verdict pills and a score range slider inline without firing a
  * second query per evaluator. Other facets leave this absent.
  */
-export interface FacetValueAggregates {
-  passedCount: number;
-  failedCount: number;
-  erroredCount: number;
-  scoreMin: number | null;
-  scoreMax: number | null;
-  hasScore: boolean;
+export const facetValueAggregatesSchema = z.object({
+  passedCount: z.number(),
+  failedCount: z.number(),
+  erroredCount: z.number(),
+  scoreMin: z.number().nullable(),
+  scoreMax: z.number().nullable(),
+  hasScore: z.boolean(),
   /** Distinct non-null score values — lets the drilldown suppress a score
    *  slider that is degenerate (constant, or binary 0/1 mirroring pass/fail). */
-  distinctScores: number;
-  hasLabel: boolean;
+  distinctScores: z.number(),
+  hasLabel: z.boolean(),
   /** Top distinct emitted-label values + counts (capped server-side). Drives
    *  the drilldown's clickable label-filter rows. Absent when none emitted. */
-  labelValues?: { value: string; count: number }[];
-}
+  labelValues: z.array(z.object({ value: z.string(), count: z.number() })).optional(),
+});
+
+export type FacetValueAggregates = z.infer<typeof facetValueAggregatesSchema>;
 
 /**
  * Per-event-name metric value tallies the event facet attaches so its sidebar drilldown
  * (thumbs_up_down → vote values) renders from the discover payload without a second query.
  */
-export interface EventMetricValues {
+export const eventMetricValuesSchema = z.object({
   /** Full storage key, e.g. `event.metrics.vote` — the UI strips the
    *  prefix for display but filters on the full key. */
-  key: string;
-  values: { value: string; count: number }[];
-}
+  key: z.string(),
+  values: z.array(z.object({ value: z.string(), count: z.number() })),
+});
+
+export type EventMetricValues = z.infer<typeof eventMetricValuesSchema>;
 
 export interface CategoricalFacetResult {
   values: {

@@ -24,6 +24,7 @@ import {
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
   StoredObjectStorageRegistryAdapter,
+  StoredObjectStorageRuntimeAdapter,
   StoredObjectsClickHousePort,
   ClickHouseStoredObjectsRepository,
   StoredObjectsService,
@@ -31,6 +32,7 @@ import {
   PayloadStagingS3TargetPort,
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
+  type StoredObjectStorageDriver,
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
   AzureBlobCredentialsAdapter,
@@ -95,6 +97,14 @@ export type ComposedStoredObjectFeature = Readonly<{
    * access; the features that stage take it as a required collaborator.
    */
   payloadStaging: PayloadStagingPort;
+  /**
+   * The project-keyed byte storage, beside the AWS runtime its S3 driver
+   * builds clients on. For a consumer that writes objects this feature owns no
+   * row for: the ADR-022 trace spool. Absent with no byte backend.
+   */
+  storage?:
+    | Readonly<{ runtime: StoredObjectStorageRuntimeAdapter; aws: AwsClientProcessRuntime }>
+    | undefined;
   /** Released with the process: the pooled outbound handlers the S3 clients share. */
   close(): Promise<void>;
 }>;
@@ -110,6 +120,7 @@ export function composeStoredObjectFeature(
     app: composed.app,
     bytes: composed.bytes,
     payloadStaging: composed.payloadStaging,
+    storage: composed.storage,
     close: () => composed.close(),
   };
 }
@@ -172,6 +183,10 @@ function composeStoredObjects(
   app: StoredObjectApp;
   bytes: StoredObjectsService;
   payloadStaging: PayloadStagingPort;
+  storage: Readonly<{
+    runtime: StoredObjectStorageRuntimeAdapter;
+    aws: AwsClientProcessRuntime;
+  }>;
   close(): Promise<void>;
 } {
   const { storage } = options;
@@ -193,31 +208,46 @@ function composeStoredObjects(
     projects: ApiStoredObjectProjectBuckets.create(targets),
   });
 
+  // ONE set of driver factories, read by both the indexed object store below
+  // and the project-keyed runtime published beside it, so a consumer that
+  // writes bytes without a row lands in the same place a stored object does.
+  const s3ForProject = (projectId: string, awsRuntime: AwsClientProcessRuntime) =>
+    S3StoredObjectDriverAdapter.create({
+      projectId,
+      targets,
+      policy: { build: (input) => awsRuntime.build(input) },
+    });
+  const fileForProject = () => LocalFilesystemStoredObjectDriverAdapter.create();
+  // A FACTORY rather than a driver, which is the registry's own Azure policy: a
+  // deployment that never reads an `azure-blob://` URI never resolves credentials,
+  // so an install with no Azure block configured is not made to fail at boot over a
+  // backend it does not use. The resolver's `purpose: "read"` is what lets an
+  // operator who migrated OFF Azure keep reading what was written before.
+  const azureForProject = (): StoredObjectStorageDriver =>
+    AzureBlobStoredObjectDriverAdapter.create(
+      AzureBlobCredentialsAdapter.resolveAzureCredentials({
+        config: storage.azure,
+        purpose: "read",
+        identity: storage.azure.identity,
+      }),
+    );
+
+  const storageRuntime = StoredObjectStorageRuntimeAdapter.create({
+    destination: destinations,
+    s3ForProject,
+    fileForProject,
+    azureForProject,
+  });
+
   const service = StoredObjectsService.create({
     repository: ClickHouseStoredObjectsRepository.create(
       ApiStoredObjectsClickHouse.create(options.resolveClickHouseClient),
     ),
     registry: (projectId: string) =>
       StoredObjectStorageRegistryAdapter.create({
-        s3: S3StoredObjectDriverAdapter.create({
-          projectId,
-          targets,
-          policy: { build: (input) => aws.build(input) },
-        }),
-        file: LocalFilesystemStoredObjectDriverAdapter.create(),
-        // A FACTORY rather than a driver, which is the registry's own Azure policy: a
-        // deployment that never reads an `azure-blob://` URI never resolves credentials,
-        // so an install with no Azure block configured is not made to fail at boot over a
-        // backend it does not use. The resolver's `purpose: "read"` is what lets an
-        // operator who migrated OFF Azure keep reading what was written before.
-        "azure-blob": () =>
-          AzureBlobStoredObjectDriverAdapter.create(
-            AzureBlobCredentialsAdapter.resolveAzureCredentials({
-              config: storage.azure,
-              purpose: "read",
-              identity: storage.azure.identity,
-            }),
-          ),
+        s3: s3ForProject(projectId, aws),
+        file: fileForProject(),
+        "azure-blob": azureForProject,
       }),
     mintStorageUri: async ({ projectId, sha256 }) =>
       mintStoredObjectUri({
@@ -237,6 +267,7 @@ function composeStoredObjects(
       owners: ApiStoredObjectOwnerAbsence.create(logger),
     }),
     bytes: service,
+    storage: { runtime: storageRuntime, aws },
     payloadStaging: storage.s3.bucket
       ? S3PayloadStagingAdapter.create({
           targets: ApiPayloadStagingS3Targets.create({

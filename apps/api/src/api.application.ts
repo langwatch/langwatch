@@ -158,6 +158,12 @@ export type ApiTrpcFeatureMount = Readonly<{
   protectedProcedure: ApiTrpcRoot["procedure"];
   publicProcedure: ApiTrpcRoot["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
+  /**
+   * Whether every mounted procedure's answer is checked against its declared
+   * output schema. On the mount rather than per feature, so a deployment
+   * cannot validate half its surfaces.
+   */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -414,6 +420,8 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
      * what it was: two routers and nothing else.
      */
     features: ApiTrpcFeaturesPort<TRecord>;
+    /** @see ApiTrpcFeatureMount's field of the same name. Off unless asked. */
+    validateOutput?: boolean;
   }): ApiApplication<TRecord> {
     options.topic?.install();
     return new ApiApplication<TRecord>(
@@ -429,6 +437,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
       options.rest,
       options.topic,
       options.features,
+      options.validateOutput ?? false,
     );
   }
 
@@ -443,6 +452,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
     private readonly features: ApiTrpcFeaturesPort<TRecord>,
+    private readonly validateOutput: boolean = false,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();
@@ -510,6 +520,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
       // reaches before they have a session at all.
       publicProcedure: this.root.procedure,
       middlewares: policy.middlewares,
+      validateOutput: this.validateOutput,
     });
   }
 

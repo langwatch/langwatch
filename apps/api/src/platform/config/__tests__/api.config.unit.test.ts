@@ -75,6 +75,13 @@ describe("API process configuration", () => {
       metricsApiKey: undefined,
       spendSettlementGraceMs: undefined,
       browserSession: undefined,
+      // Unset, and NODE_ENV is not production under vitest, so declared tRPC
+      // outputs are checked.
+      validateTrpcOutput: true,
+      cronApiKey: undefined,
+      opsApiKey: undefined,
+      nlpLambdaFleet: undefined,
+      platformDefaultRetentionDays: 49,
       authz: {
         epochCacheEnabled: false,
         demoProjectId: undefined,
@@ -139,6 +146,7 @@ describe("API process configuration", () => {
         // policy owns and this module only supplies the root for.
         storedObjects: {
           backend: undefined,
+          azureSpoolRetentionConfirmed: false,
           localFilesystemRoot: undefined,
           s3: {
             bucket: undefined,
@@ -524,6 +532,7 @@ describe("API process configuration", () => {
       },
       storedObjects: {
         backend: undefined,
+        azureSpoolRetentionConfirmed: false,
         localFilesystemRoot: undefined,
         s3: {
           bucket: undefined,

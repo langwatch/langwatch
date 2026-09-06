@@ -201,12 +201,6 @@ export const workflowEngineModeSchema = z.object({
   optimizeEnabled: z.literal(false),
 });
 
-/** A workflow plus the versions the studio reads alongside it. */
-export const workflowWithVersionSchema = workflowSchema.extend({
-  currentVersion: workflowVersionSchema.nullable().optional(),
-  latestVersion: workflowVersionSchema.nullable().optional(),
-});
-
 /** How far a push to the copies reached, and what each one wrote. */
 export const workflowPushToCopiesSchema = z.object({
   pushedTo: z.number(),

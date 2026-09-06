@@ -132,6 +132,7 @@ export function composeOpsFeature(options: {
         protectedProcedure: mount.protectedProcedure,
         policy: opsPolicyKit(mount.middlewares, composeOpsCheck(app)),
         ports: composeOpsPorts(),
+        validateOutput: mount.validateOutput,
       }),
   };
 }
@@ -152,6 +153,7 @@ export function refusingOpsFeature(): ComposedOpsFeature {
         protectedProcedure: mount.protectedProcedure,
         policy: opsPolicyKit(mount.middlewares, composeOpsCheck(app)),
         ports: composeOpsPorts(),
+        validateOutput: mount.validateOutput,
       }),
   };
 }

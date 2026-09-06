@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * What the AI composer answers with when it turns a sentence into a trace
  * query, or into a saved lens.
@@ -9,14 +11,17 @@
  * loop, the validator — stays where the model providers are.
  */
 
-export type AiQueryResult =
-  | { ok: true; query: string; attempts: number }
-  | {
-      ok: false;
-      lastQuery: string;
-      lastError: string;
-      attempts: number;
-    };
+export const aiQueryResultSchema = z.union([
+  z.object({ ok: z.literal(true), query: z.string(), attempts: z.number() }),
+  z.object({
+    ok: z.literal(false),
+    lastQuery: z.string(),
+    lastError: z.string(),
+    attempts: z.number(),
+  }),
+]);
+
+export type AiQueryResult = z.infer<typeof aiQueryResultSchema>;
 
 /**
  * The AI's higher-level surface — it can either apply a query to the
@@ -24,14 +29,17 @@ export type AiQueryResult =
  * on the user's intent (phrases like "save as", "view for", "lens for"
  * lean toward `create_lens`; everything else toward `apply_query`).
  */
-export type AiActionResult =
-  | { ok: true; kind: "apply_query"; query: string }
-  | {
-      ok: true;
-      kind: "create_lens";
-      name: string;
-      query: string;
-    };
+export const aiActionResultSchema = z.union([
+  z.object({ ok: z.literal(true), kind: z.literal("apply_query"), query: z.string() }),
+  z.object({
+    ok: z.literal(true),
+    kind: z.literal("create_lens"),
+    name: z.string(),
+    query: z.string(),
+  }),
+]);
+
+export type AiActionResult = z.infer<typeof aiActionResultSchema>;
 
 /**
  * The operator-actionable fields the composer's "View details" disclosure

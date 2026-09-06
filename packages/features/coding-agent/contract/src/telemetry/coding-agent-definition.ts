@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Agent Definition Types
  *
@@ -9,14 +11,17 @@
  */
 
 /** The agents we can name. `unknown` is not a failure — it is an honest answer. */
-export type CodingAgent =
-  | "claude_code"
-  | "claude_cowork"
-  | "opencode"
-  | "codex"
-  | "gemini_cli"
-  | "copilot"
-  | "unknown";
+export const codingAgentSchema = z.enum([
+  "claude_code",
+  "claude_cowork",
+  "opencode",
+  "codex",
+  "gemini_cli",
+  "copilot",
+  "unknown",
+]);
+
+export type CodingAgent = z.infer<typeof codingAgentSchema>;
 
 /**
  * The canonical event kinds. Every agent's event name maps onto one of these, or

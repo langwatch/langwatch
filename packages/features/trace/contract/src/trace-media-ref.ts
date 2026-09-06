@@ -1,5 +1,6 @@
+import { z } from "zod";
 import { collectAnnotatedMediaParts } from "./trace-media-part.collector";
-import { isMediaPartRole, type MediaPartRole } from "./trace-media-role";
+import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role";
 
 /**
  * Compact trace-level media references, and the chat roles they carry.
@@ -25,12 +26,12 @@ import { isMediaPartRole, type MediaPartRole } from "./trace-media-role";
  * and the defensive parser reject anything else.
  */
 
-export interface TraceMediaRef {
-  kind: "audio" | "image" | "video" | "file";
-  url: string;
-  filename?: string;
+export const traceMediaRefSchema = z.object({
+  kind: z.enum(["audio", "image", "video", "file"]),
+  url: z.string(),
+  filename: z.string().optional(),
   /** Carried for `file` refs so the attachment chip can pick its icon. */
-  mimeType?: string;
+  mimeType: z.string().optional(),
   /**
    * Role of the chat message the part was found under. A voice turn puts the
    * caller's recording and the agent's reply in the same span payload, so the
@@ -38,8 +39,10 @@ export interface TraceMediaRef {
    * outside a message envelope and for traces ingested before roles were
    * recorded, which every consumer treats as "belongs wherever it used to".
    */
-  role?: MediaPartRole;
-}
+  role: z.enum(MEDIA_PART_ROLES).optional(),
+});
+
+export type TraceMediaRef = z.infer<typeof traceMediaRefSchema>;
 
 export const RESERVED_INPUT_MEDIA_REFS = "langwatch.reserved.media_refs.input";
 export const RESERVED_OUTPUT_MEDIA_REFS = "langwatch.reserved.media_refs.output";

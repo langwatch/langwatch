@@ -1,5 +1,6 @@
+import { z } from "zod";
 import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization";
-import type { CodingAgent } from "./telemetry";
+import { codingAgentSchema, type CodingAgent } from "./telemetry";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { collectLogEntries } from "./coding-agent-transcript-log";
 import {
@@ -13,71 +14,81 @@ import { readUnknown } from "./coding-agent-transcript-value";
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
 const PROMPT_STUB_SAME_TURN_MS = 2_000;
 
-export type TranscriptEntry =
-  | {
-      kind: "system_prompt";
-      atMs: number;
-      text: string;
-      chars: number;
-    }
-  | { kind: "user_prompt"; atMs: number; text: string | null; chars: number }
-  | {
-      kind: "assistant_message";
-      atMs: number;
-      text: string | null;
-      model: string | null;
-    }
-  | {
-      kind: "model_call";
-      atMs: number;
-      model: string | null;
-      tokens: number;
-      costUsd: number;
-      durationMs: number | null;
-      spanId: string;
-      inputTokens: number;
-      outputTokens: number;
-      cacheReadTokens: number;
-      cacheCreationTokens: number;
-    }
-  | {
-      kind: "tool";
-      atMs: number;
-      name: string;
-      mcpServer: string | null;
-      input: unknown;
-      output: unknown;
-      durationMs: number | null;
-      failed: boolean;
-      agentId: string | null;
-      spanId: string;
-    }
-  | {
-      kind: "tool_rejected";
-      atMs: number;
-      name: string | null;
-      reason: string | null;
-    }
-  | {
-      kind: "note";
-      atMs: number;
-      level: "info" | "warning" | "error";
-      event: string;
-      text: string;
-    };
+export const transcriptEntrySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("system_prompt"),
+    atMs: z.number(),
+    text: z.string(),
+    chars: z.number(),
+  }),
+  z.object({
+    kind: z.literal("user_prompt"),
+    atMs: z.number(),
+    text: z.string().nullable(),
+    chars: z.number(),
+  }),
+  z.object({
+    kind: z.literal("assistant_message"),
+    atMs: z.number(),
+    text: z.string().nullable(),
+    model: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal("model_call"),
+    atMs: z.number(),
+    model: z.string().nullable(),
+    tokens: z.number(),
+    costUsd: z.number(),
+    durationMs: z.number().nullable(),
+    spanId: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheCreationTokens: z.number(),
+  }),
+  z.object({
+    kind: z.literal("tool"),
+    atMs: z.number(),
+    name: z.string(),
+    mcpServer: z.string().nullable(),
+    input: z.unknown(),
+    output: z.unknown(),
+    durationMs: z.number().nullable(),
+    failed: z.boolean(),
+    agentId: z.string().nullable(),
+    spanId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("tool_rejected"),
+    atMs: z.number(),
+    name: z.string().nullable(),
+    reason: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal("note"),
+    atMs: z.number(),
+    level: z.enum(["info", "warning", "error"]),
+    event: z.string(),
+    text: z.string(),
+  }),
+]);
 
-export interface CodingAgentTranscript {
-  agent: CodingAgent;
-  sessionId: string | null;
-  entries: TranscriptEntry[];
-  totals: {
-    modelCalls: number;
-    toolCalls: number;
-    tokens: number;
-    costUsd: number;
-  };
-  subAgents: Array<{ agentId: string; toolCalls: number }>;
-}
+export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
+
+export const codingAgentTranscriptSchema = z.object({
+  agent: codingAgentSchema,
+  sessionId: z.string().nullable(),
+  entries: z.array(transcriptEntrySchema),
+  totals: z.object({
+    modelCalls: z.number(),
+    toolCalls: z.number(),
+    tokens: z.number(),
+    costUsd: z.number(),
+  }),
+  subAgents: z.array(z.object({ agentId: z.string(), toolCalls: z.number() })),
+});
+
+export type CodingAgentTranscript = z.infer<typeof codingAgentTranscriptSchema>;
 
 type UserPromptEntry = Extract<TranscriptEntry, { kind: "user_prompt" }>;
 

@@ -19,6 +19,10 @@ function harness() {
     {
       protected: trpc.procedure.use(({ ctx, next }) => next({ ctx })),
       policy: () => (procedure) => procedure,
+      // Every answer is checked against the schema its procedure declares: a
+      // shape that drifted from its contract is a defect, and this is where it
+      // is cheap to find.
+      validateOutput: true,
     },
     {
       checkMessageRateLimit: async () => ({ allowed: true }),

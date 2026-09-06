@@ -319,7 +319,7 @@ function traceUsageGuardFor(options: {
 /**
  * The content-addressed store, in the shape the trace vertical's extractor takes.
  */
-class ApiTraceMediaStore extends TraceMediaStorePort {
+export class ApiTraceMediaStore extends TraceMediaStorePort {
   static create(store: StoredObjectsService): ApiTraceMediaStore {
     return new ApiTraceMediaStore(store);
   }

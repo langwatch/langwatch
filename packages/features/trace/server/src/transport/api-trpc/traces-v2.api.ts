@@ -40,12 +40,43 @@ import type { Protections } from "@langwatch/trace-contract";
  * The anonymous read is NOT here. ADR-057 keeps it on its own router.
  */
 import { on } from "node:events";
-import type { CodingAgentService, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import { createTrpcService } from "@langwatch/api/trpc";
+import {
+  codingAgentSessionSchema,
+  codingAgentTranscriptSchema,
+  type CodingAgentService,
+  type CodingAgentTranscript,
+} from "@langwatch/coding-agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  aiActionResultSchema,
+  aiQueryResultSchema,
   changeTraceNameInputSchema,
+  discoverResultSchema,
+  facetValuesResultSchema,
+  spanDetailSchema,
+  spanTreePageSchema,
+  traceHeaderSchema,
+  traceListFacetCountsSchema,
+  traceResourceInfoSchema,
+  tracesV2ChangedMetadataSchema,
+  tracesV2ChangedNameSchema,
+  tracesV2ConversationContextSchema,
+  tracesV2EvaluationRunsSchema,
+  tracesV2ListEventsSchema,
+  tracesV2ListPageSchema,
+  tracesV2NewCountSchema,
+  tracesV2SessionsPageSchema,
+  tracesV2SpanDetailsSchema,
+  tracesV2SpanLangwatchSignalsSchema,
+  tracesV2SpansDeltaSchema,
+  tracesV2SpansPageSchema,
+  tracesV2SpanTreeNodesSchema,
+  tracesV2SuggestSchema,
+  tracesV2TraceEventsSchema,
+  tracesV2TraceLogsSchema,
   spanTreeDeltaTransportInputSchema,
   spanTreeTransportInputSchema,
   TRACE_NAME_MAX_LENGTH,
@@ -138,6 +169,12 @@ type TracesV2TrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /**
+   * Check every answer against the output schema its procedure declares.
+   * Optional because the process decides: development and test ask for it,
+   * production does not.
+   */
+  validateOutput?: boolean;
 }>;
 
 /**
@@ -562,46 +599,55 @@ export class TracesV2TrpcApi {
     ports: TracesV2TrpcPorts<TMetadata, TMetadataRaw>,
   ) {
     const { protected: procedure, policy } = procedures;
+    const validateOutput = procedures.validateOutput ?? false;
 
-    return trpc.router({
-      list: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
-            sort: sortSchema,
-            page: z.number().int().min(1).default(1),
-            pageSize: z.number().int().min(1).max(1000).default(50),
-            cursor: z
-              .object({
-                sortValue: z.number().finite(),
-                traceId: z.string().min(1),
-              })
-              .optional(),
-            query: z.string().nullish(),
+    const grid = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+              sort: sortSchema,
+              page: z.number().int().min(1).default(1),
+              pageSize: z.number().int().min(1).max(1000).default(50),
+              cursor: z
+                .object({
+                  sortValue: z.number().finite(),
+                  traceId: z.string().min(1),
+                })
+                .optional(),
+              query: z.string().nullish(),
+            }),
+          )
+          .withOutput(tracesV2ListPageSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const page = await ctx.app.traces.readTraceList({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+              sort: input.sort,
+              page: input.page,
+              pageSize: input.pageSize,
+              cursor: input.cursor,
+              filterWhere: buildFilterWhere(input, ports.queryTranslation),
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+            });
+            return {
+              ...page,
+              items: page.items.map((it) =>
+                redactV2Content(it, protections, ports.mappers.contentPrivacy),
+              ),
+            };
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const page = await ctx.app.traces.readTraceList({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          sort: input.sort,
-          page: input.page,
-          pageSize: input.pageSize,
-          cursor: input.cursor,
-          filterWhere: buildFilterWhere(input, ports.queryTranslation),
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-        });
-        return {
-          ...page,
-          items: page.items.map((it) =>
-            redactV2Content(it, protections, ports.mappers.contentPrivacy),
-          ),
-        };
-      }),
+      )
 
       /**
        * The Sessions lens read (specs/traces-v2/sessions-lens.feature): one row
@@ -612,50 +658,55 @@ export class TracesV2TrpcApi {
        * "#6418" finds the session whose transcript mentions it, for a viewer
        * allowed to read that content: see `contentSearchTermsForViewer`.
        */
-      sessions: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
-            sort: sortSchema.optional(),
-            pageSize: z.number().int().min(1).max(100).default(50),
-            cursor: z.string().optional(),
-            query: z.string().nullish(),
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const result = await ctx.app.traces.readSessionGroups({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          sort: input.sort,
-          pageSize: input.pageSize,
-          cursor: input.cursor,
-          filterWhere: buildFilterWhere(input, ports.queryTranslation),
-          contentTerms: contentSearchTermsForViewer({
-            terms: ports.queryTranslation.extractFreeTextTerms(input.query ?? ""),
-            protections,
-          }),
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-        });
-        return {
-          ...result,
-          // Previews and the generated session title are captured content,
-          // spend follows cost:view. The same viewer gates the trace header
-          // applies (ADR-057).
-          sessions: gateSessionCost({
-            sessions: gateSessionTitle({
-              sessions: result.sessions.map((session) =>
-                redactV2Content(session, protections, ports.mappers.contentPrivacy),
-              ),
-              protections,
+
+      .query("sessions", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+              sort: sortSchema.optional(),
+              pageSize: z.number().int().min(1).max(100).default(50),
+              cursor: z.string().optional(),
+              query: z.string().nullish(),
             }),
-            protections,
+          )
+          .withOutput(tracesV2SessionsPageSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const result = await ctx.app.traces.readSessionGroups({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+              sort: input.sort,
+              pageSize: input.pageSize,
+              cursor: input.cursor,
+              filterWhere: buildFilterWhere(input, ports.queryTranslation),
+              contentTerms: contentSearchTermsForViewer({
+                terms: ports.queryTranslation.extractFreeTextTerms(input.query ?? ""),
+                protections,
+              }),
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+            });
+            return {
+              ...result,
+              // Previews and the generated session title are captured content,
+              // spend follows cost:view. The same viewer gates the trace header
+              // applies (ADR-057).
+              sessions: gateSessionCost({
+                sessions: gateSessionTitle({
+                  sessions: result.sessions.map((session) =>
+                    redactV2Content(session, protections, ports.mappers.contentPrivacy),
+                  ),
+                  protections,
+                }),
+                protections,
+              }),
+            };
           }),
-        };
-      }),
+      )
 
       /**
        * Event rollups for the trace list's Events column, keyed by trace id.
@@ -665,138 +716,170 @@ export class TracesV2TrpcApi {
        * in front of the paint that every user waits on — including the ones whose
        * columns and grouping never ask for events.
        */
-      listEvents: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceIds: z.array(z.string().min(1)).max(MAX_LIST_EVENT_TRACE_IDS),
-            timeRange: timeRangeSchema,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<Record<string, TraceEventRollup>> =>
-        ctx.app.traces.readTraceEventRollups({
-          projectId: input.projectId,
-          traceIds: input.traceIds,
-          timeRange: input.timeRange,
-        }),
-      ),
 
-      facets: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
-            query: z.string().nullish(),
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.readFacets({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          filterWhere: buildFilterWhere(input, ports.queryTranslation),
-        });
-      }),
+      .query("listEvents", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceIds: z.array(z.string().min(1)).max(MAX_LIST_EVENT_TRACE_IDS),
+              timeRange: timeRangeSchema,
+            }),
+          )
+          .withOutput(tracesV2ListEventsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<Record<string, TraceEventRollup>> =>
+            ctx.app.traces.readTraceEventRollups({
+              projectId: input.projectId,
+              traceIds: input.traceIds,
+              timeRange: input.timeRange,
+            }),
+          ),
+      )
 
-      newCount: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
-            since: z.number(),
-            query: z.string().nullish(),
+      .query("facets", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+              query: z.string().nullish(),
+            }),
+          )
+          .withOutput(traceListFacetCountsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.traces.readFacets({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+              filterWhere: buildFilterWhere(input, ports.queryTranslation),
+            });
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const count = await ctx.app.traces.readNewCount({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          since: input.since,
-          filterWhere: buildFilterWhere(input, ports.queryTranslation),
-        });
-        return { count };
-      }),
+      )
 
-      suggest: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            field: z.string(),
-            prefix: z.string(),
-            limit: z.number().int().min(1).max(100).default(20),
+      .query("newCount", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+              since: z.number(),
+              query: z.string().nullish(),
+            }),
+          )
+          .withOutput(tracesV2NewCountSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const count = await ctx.app.traces.readNewCount({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+              since: input.since,
+              filterWhere: buildFilterWhere(input, ports.queryTranslation),
+            });
+            return { count };
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const values = await ctx.app.traces.readSuggestions({
-          tenantId: input.projectId,
-          field: input.field,
-          prefix: input.prefix,
-          limit: input.limit,
-        });
-        return { values };
-      }),
+      )
+
+      .query("suggest", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              field: z.string(),
+              prefix: z.string(),
+              limit: z.number().int().min(1).max(100).default(20),
+            }),
+          )
+          .withOutput(tracesV2SuggestSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const values = await ctx.app.traces.readSuggestions({
+              tenantId: input.projectId,
+              field: input.field,
+              prefix: input.prefix,
+              limit: input.limit,
+            });
+            return { values };
+          }),
+      )
 
       /**
        * Conversation/thread context for the trace drawer. Bypasses the search
        * query language so conversationIds with arbitrary characters work
        * unconditionally — builds a typed WHERE fragment server-side.
        */
-      conversationContext: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            conversationId: z.string().min(1),
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        // Window: conversation membership is timeless; cap at 1y to keep
-        // partition pruning effective.
-        const now = Date.now();
-        const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
-        const filterWhere = {
-          sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
-          params: { threadConversationId: input.conversationId },
-        };
-        const page = await ctx.app.traces.readTraceList({
-          tenantId: input.projectId,
-          timeRange,
-          sort: { columnId: "time", direction: "asc" },
-          page: 1,
-          pageSize: 200,
-          filterWhere,
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-        });
-        const turns = page.items.map((t) =>
-          toConversationContextTurn({
-            trace: t,
-            protections,
-            contentPrivacy: ports.mappers.contentPrivacy,
-          }),
-        );
-        // Position/previous/next are derived client-side from the active
-        // traceId so the cache key doesn't churn on J/K navigation.
-        return {
-          conversationId: input.conversationId,
-          turns,
-          total: turns.length,
-        };
-      }),
 
-      discover: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
+      .query("conversationContext", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              conversationId: z.string().min(1),
+            }),
+          )
+          .withOutput(tracesV2ConversationContextSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            // Window: conversation membership is timeless; cap at 1y to keep
+            // partition pruning effective.
+            const now = Date.now();
+            const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
+            const filterWhere = {
+              sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
+              params: { threadConversationId: input.conversationId },
+            };
+            const page = await ctx.app.traces.readTraceList({
+              tenantId: input.projectId,
+              timeRange,
+              sort: { columnId: "time", direction: "asc" },
+              page: 1,
+              pageSize: 200,
+              filterWhere,
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+            });
+            const turns = page.items.map((t) =>
+              toConversationContextTurn({
+                trace: t,
+                protections,
+                contentPrivacy: ports.mappers.contentPrivacy,
+              }),
+            );
+            // Position/previous/next are derived client-side from the active
+            // traceId so the cache key doesn't churn on J/K navigation.
+            return {
+              conversationId: input.conversationId,
+              turns,
+              total: turns.length,
+            };
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.readDiscover({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-        });
-      }),
+      )
+      .build();
+
+    const sidebar = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("discover", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+            }),
+          )
+          .withOutput(discoverResultSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.traces.readDiscover({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+            });
+          }),
+      )
 
       /**
        * SSE subscription that pushes `discover_updated` events to active
@@ -808,146 +891,176 @@ export class TracesV2TrpcApi {
        * Mirrors the shape of `traces.onTraceUpdate` so the existing
        * `useSSESubscription` hook handles it without changes.
        */
-      onDiscoverUpdate: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string() })),
-      ).subscription(async function* (opts) {
-        const { projectId } = opts.input;
-        const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
-        try {
-          for await (const eventArgs of on(emitter, "discover_updated", {
-            signal: opts.signal,
-          })) {
-            yield eventArgs[0];
-          }
-        } finally {
-          opts.ctx.app.traces.cleanupTenantEmitter(projectId);
-        }
-      }),
 
-      facetValues: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            timeRange: timeRangeSchema,
-            facetKey: z.string(),
-            prefix: z.string().optional(),
-            limit: z.number().int().min(1).max(1000).default(50),
-            offset: z.number().int().min(0).default(0),
+      .subscription("onDiscoverUpdate", (p) =>
+        p
+          .withInput(z.object({ projectId: z.string() }))
+          .withoutOutput(
+            "the discover_updated signal carries the emitter's own payload; a browser reads only that its facets were recomputed",
+          )
+          .withPermission("traces:view")
+          .handle(async function* (opts) {
+            const { projectId } = opts.input;
+            const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
+            try {
+              for await (const eventArgs of on(emitter, "discover_updated", {
+                signal: opts.signal,
+              })) {
+                yield eventArgs[0];
+              }
+            } finally {
+              opts.ctx.app.traces.cleanupTenantEmitter(projectId);
+            }
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.readFacetValues({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          facetKey: input.facetKey,
-          prefix: input.prefix,
-          limit: input.limit,
-          offset: input.offset,
-        });
-      }),
+      )
 
-      aiQuery: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            prompt: z.string().min(1).max(2000),
-            timeRange: timeRangeSchema,
+      .query("facetValues", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              timeRange: timeRangeSchema,
+              facetKey: z.string(),
+              prefix: z.string().optional(),
+              limit: z.number().int().min(1).max(1000).default(50),
+              offset: z.number().int().min(0).default(0),
+            }),
+          )
+          .withOutput(facetValuesResultSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.traces.readFacetValues({
+              tenantId: input.projectId,
+              timeRange: input.timeRange,
+              facetKey: input.facetKey,
+              prefix: input.prefix,
+              limit: input.limit,
+              offset: input.offset,
+            });
           }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        return ports.runAiQuery(
-          {
-            projectId: input.projectId,
-            prompt: input.prompt,
-            timeRange: { from: input.timeRange.from, to: input.timeRange.to },
-          },
-          ctx,
-        );
-      }),
+      )
+
+      .mutation("aiQuery", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              prompt: z.string().min(1).max(2000),
+              timeRange: timeRangeSchema,
+            }),
+          )
+          .withOutput(aiQueryResultSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ports.runAiQuery(
+              {
+                projectId: input.projectId,
+                prompt: input.prompt,
+                timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+              },
+              ctx,
+            );
+          }),
+      )
 
       // Higher-level AI action — the model picks between filtering and creating
       // a saved lens. The composer in the search bar uses this so users can
       // say "save as Failing GPT-4" and get a new tab, or "show errors" and
       // just get a query applied.
-      aiAction: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            prompt: z.string().min(1).max(2000),
-            timeRange: timeRangeSchema,
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        return ports.runAiAction(
-          {
-            projectId: input.projectId,
-            prompt: input.prompt,
-            timeRange: { from: input.timeRange.from, to: input.timeRange.to },
-          },
-          ctx,
-        );
-      }),
 
-      header: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            /**
-             * Optional approximate trace timestamp (ms since epoch) used as a
-             * partition-pruning hint. The drawer typically opens from a row
-             * click that already knows the trace's `timestamp`; passing it
-             * here trims the heavy summary fetch from a full-table scan to a
-             * few partitions.
-             */
-            occurredAtMs: z.number().int().optional(),
-            /**
-             * Whether to resolve any offloaded (ADR-022) input/output in full
-             * before returning. Costs one extra spans read per call — only the
-             * drawer's own detail read needs it; every other caller (hover
-             * peek, name lookups, bulk hydrators, sibling prefetch) reads a
-             * truncated preview or discards the content immediately, so every
-             * caller in this codebase passes it explicitly, true or false.
-             *
-             * Defaults to `true` (the pre-existing, unconditional behavior)
-             * purely for rollout safety: a browser tab still running the
-             * previous frontend bundle sends no `full` field at all, and this
-             * default keeps that in-flight request working exactly as before
-             * instead of a Zod validation error, until the tab refreshes onto
-             * the bundle that sends it. Every call site added by this change
-             * passes the field explicitly — this default only ever backstops
-             * a stale client, never a caller in the current code.
-             */
-            full: z.boolean().default(true),
+      .mutation("aiAction", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              prompt: z.string().min(1).max(2000),
+              timeRange: timeRangeSchema,
+            }),
+          )
+          .withOutput(aiActionResultSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ports.runAiAction(
+              {
+                projectId: input.projectId,
+                prompt: input.prompt,
+                timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+              },
+              ctx,
+            );
           }),
-        ),
-      ).query(async ({ input, ctx }): Promise<TraceHeader> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const summary = await ctx.app.traces.readTraceSummary({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-          full: input.full,
-        });
-        const rawHeader = mapTraceSummaryToHeader(summary);
-        // Cost is gated by the viewer's own `cost:view` (via `protections`), the
-        // same rule the detail-pane spans apply through `applySpanProtections` —
-        // a `traces:view`-only viewer must not see spend in the header either.
-        const header = gateHeaderCost({
-          header: redactV2Content(rawHeader, protections, ports.mappers.contentPrivacy),
-          protections,
-        });
-        header.privacy = await deriveTraceDropPrivacy(
-          rawHeader,
-          input.projectId,
-          ports.mappers.contentPrivacy,
-        );
+      )
+      .build();
 
-        return header;
-      }),
+    const drawer = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("header", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              /**
+               * Optional approximate trace timestamp (ms since epoch) used as a
+               * partition-pruning hint. The drawer typically opens from a row
+               * click that already knows the trace's `timestamp`; passing it
+               * here trims the heavy summary fetch from a full-table scan to a
+               * few partitions.
+               */
+              occurredAtMs: z.number().int().optional(),
+              /**
+               * Whether to resolve any offloaded (ADR-022) input/output in full
+               * before returning. Costs one extra spans read per call — only the
+               * drawer's own detail read needs it; every other caller (hover
+               * peek, name lookups, bulk hydrators, sibling prefetch) reads a
+               * truncated preview or discards the content immediately, so every
+               * caller in this codebase passes it explicitly, true or false.
+               *
+               * Defaults to `true` (the pre-existing, unconditional behavior)
+               * purely for rollout safety: a browser tab still running the
+               * previous frontend bundle sends no `full` field at all, and this
+               * default keeps that in-flight request working exactly as before
+               * instead of a Zod validation error, until the tab refreshes onto
+               * the bundle that sends it. Every call site added by this change
+               * passes the field explicitly — this default only ever backstops
+               * a stale client, never a caller in the current code.
+               */
+              full: z.boolean().default(true),
+            }),
+          )
+          .withOutput(traceHeaderSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<TraceHeader> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const summary = await ctx.app.traces.readTraceSummary({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+              full: input.full,
+            });
+            const rawHeader = mapTraceSummaryToHeader(summary);
+            // Cost is gated by the viewer's own `cost:view` (via `protections`), the
+            // same rule the detail-pane spans apply through `applySpanProtections` —
+            // a `traces:view`-only viewer must not see spend in the header either.
+            const header = gateHeaderCost({
+              header: redactV2Content(rawHeader, protections, ports.mappers.contentPrivacy),
+              protections,
+            });
+            header.privacy = await deriveTraceDropPrivacy(
+              rawHeader,
+              input.projectId,
+              ports.mappers.contentPrivacy,
+            );
+
+            return header;
+          }),
+      )
 
       /**
        * Lets a user rename a trace. Trim happens in the procedure so the event
@@ -958,508 +1071,83 @@ export class TracesV2TrpcApi {
        * user-facing message. The command pipeline still re-validates via Zod
        * as a defence-in-depth check (replays from a poisoned event store).
        */
-      changeName: policy("traces:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            newName: z.string(),
-          }),
-        ),
-      ).mutation(async ({ input, ctx }) => {
-        const trimmed = input.newName.trim();
-        const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
-        if (!parsed.success) {
-          throw new ValidationError(
-            `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
-            {
-              meta: {
-                field: "newName",
-                minLength: TRACE_NAME_MIN_LENGTH,
-                maxLength: TRACE_NAME_MAX_LENGTH,
-                receivedLength: trimmed.length,
-                fieldErrors: parsed.error.flatten().fieldErrors,
+
+      .mutation("changeName", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              newName: z.string(),
+            }),
+          )
+          .withOutput(tracesV2ChangedNameSchema)
+          .withPermission("traces:update")
+          .handle(async ({ input, ctx }) => {
+            const trimmed = input.newName.trim();
+            const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
+            if (!parsed.success) {
+              throw new ValidationError(
+                `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
+                {
+                  meta: {
+                    field: "newName",
+                    minLength: TRACE_NAME_MIN_LENGTH,
+                    maxLength: TRACE_NAME_MAX_LENGTH,
+                    receivedLength: trimmed.length,
+                    fieldErrors: parsed.error.flatten().fieldErrors,
+                  },
+                },
+              );
+            }
+
+            await ctx.app.traces.changeTraceName(
+              {
+                projectId: input.projectId,
+                traceId: input.traceId,
+                newName: parsed.data.newName,
               },
-            },
-          );
-        }
+              ctx.actor(),
+            );
 
-        await ctx.app.traces.changeTraceName(
-          {
-            projectId: input.projectId,
-            traceId: input.traceId,
-            newName: parsed.data.newName,
-          },
-          ctx.actor(),
-        );
-
-        return { traceId: input.traceId, newName: parsed.data.newName };
-      }),
-
-      changeMetadata: policy("traces:update")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            metadata: ports.traceMetadataUpdateSchema,
+            return { traceId: input.traceId, newName: parsed.data.newName };
           }),
-        ),
-      ).mutation(async ({ input }) => {
-        await ports.updateTraceMetadata(input);
-        return { traceId: input.traceId };
-      }),
+      )
 
-      spansPaginated: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            limit: z.number().int().min(1).max(1000).default(250),
-            offset: z.number().int().min(0).default(0),
-            ...spanReadHintShape,
+      .mutation("changeMetadata", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              metadata: ports.traceMetadataUpdateSchema,
+            }),
+          )
+          .withOutput(tracesV2ChangedMetadataSchema)
+          .withPermission("traces:update")
+          .handle(async ({ input }) => {
+            await ports.updateTraceMetadata(input);
+            return { traceId: input.traceId };
           }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const page = await ctx.app.traces.readSpansPage({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-          limit: input.limit,
-          offset: input.offset,
-          occurredAtMs: input.occurredAtMs,
-        });
-        // These are full legacy spans (input/output/params/metrics), so the
-        // legacy span protections apply as-is: category visibility, cost,
-        // restricted custom attributes, and hidden content scrubbed wherever
-        // it rides along (e.g. raw gen_ai message attributes inside params).
-        const redactions = buildSpanContentRedactions(
-          page.spans,
-          protections,
-          ports.mappers.spanProtection,
-        );
-        return {
-          ...page,
-          spans: page.spans.map((span) =>
-            ports.mappers.spanProtection.applySpanProtections(span, protections, redactions),
-          ),
-        };
-      }),
+      )
 
-      spansDelta: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            sinceStartTimeMs: z.number(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const spans = await ctx.app.traces.readSpansSince({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          sinceStartTimeMs: input.sinceStartTimeMs,
-          visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-          occurredAtMs: input.occurredAtMs,
-        });
-        const redactions = buildSpanContentRedactions(
-          spans,
-          protections,
-          ports.mappers.spanProtection,
-        );
-        return spans.map((span) =>
-          ports.mappers.spanProtection.applySpanProtections(span, protections, redactions),
-        );
-      }),
-
-      /**
-       * One page of the span tree in `(startTimeMs, spanId)` order. This is the
-       * only fetch path the frontend uses for span trees — traces can carry
-       * 20k–100k+ spans, so the client assembles the tree page by page (see
-       * `spanTreePagedQuery.ts`) instead of ever pulling it in one response.
-       * `nextCursor` is null on the final page.
-       */
-      spanTreePaginated: policy("traces:view")(procedure.input(spanTreeTransportInputSchema)).query(
-        async ({ input, ctx }) => {
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
-          return ctx.app.traces.readSpanTreePage({
-            ...input,
-            canSeeCosts: protections.canSeeCosts === true,
-          });
-        },
-      ),
-
-      /**
-       * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
-       * Keyed on the row version rather than the span start so an in-place update
-       * (end time, duration, status, cost) is picked up too — the root span
-       * starts first and ends last, so a start-keyed delta left its duration, and
-       * with it the waterfall's time scale, frozen at first projection.
-       */
-      spanTreeDelta: policy("traces:view")(
-        procedure.input(spanTreeDeltaTransportInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        return ctx.app.traces.readSpanTreeDelta({
-          ...input,
-          canSeeCosts: protections.canSeeCosts === true,
-        });
-      }),
-
-      /**
-       * Whole-tree read in one response. The frontend no longer fetches through
-       * this — `useSpanTree` pages via `spanTreePaginated` under the same React
-       * Query key, and this procedure remains as that cache entry's type/key
-       * anchor (preview seeding, SSE invalidation, cancel). The underlying read
-       * is bounded (`MAX_LIGHT_SPAN_READ_ROWS`) so a direct call can never
-       * materialize a 100k-span trace in one shot.
-       */
-      spanTree: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const rows = await ctx.app.traces.readSpanSummaries({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-        });
-        return gateTreeCost({
-          nodes: rows.map(mapLegacySpanSummaryToTreeNode),
-          protections,
-        });
-      }),
-
-      /**
-       * Per-span LangWatch instrumentation signals (prompt, scenario, user,
-       * thread, evaluation, rag, metadata, genai). Fired secondarily by the
-       * waterfall and span-list views so the primary `spanTree` query stays
-       * cheap; UIs render badges + filter once this resolves.
-       */
-      spanLangwatchSignals: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<SpanLangwatchSignals[]> => {
-        const rows = await ctx.app.traces.readLangwatchSignals({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-        });
-        return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
-      }),
-
-      /**
-       * Full span data for every span in a trace — used by the LLM Optimized
-       * Trace markdown view to render per-span attributes and input/output.
-       * Heavier than spanTree; fetch lazily.
-       */
-      spansFull: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<SpanDetail[]> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        return loadSpansFullWithProtections({
-          app: ctx.app.traces,
-          ports,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          ...occurredAtFromInput(input),
-          protections,
-        });
-      }),
-
-      /**
-       * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
-       *
-       * The Terminal view used to assemble this in the browser out of three modules.
-       * It lives here now because a transcript is not a rendering concern: the CLI
-       * wants it, an MCP server wants it, and an export wants it, and none of them
-       * are going to run React to get one. One derivation, one answer.
-       *
-       * Reads spans AND logs through the same loaders the sibling endpoints use, so
-       * its content has been through the identical redaction pass — a transcript
-       * endpoint that did its own reads would be a way around the data-privacy
-       * policy, which is precisely why it does not.
-       */
-      codingAgentTranscript: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        return TracesV2TrpcApi.readCodingAgentTranscript({
-          app: ctx.app.traces,
-          ports,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          ...occurredAtFromInput(input),
-          protections,
-          codingAgents: ctx.app.traces.codingAgents,
-        });
-      }),
-
-      spanDetail: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            spanId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<SpanDetail> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        // One narrow span fetch + one narrow events fetch in parallel —
-        // both keyed by SpanId (and partition-pruned by occurredAtMs when
-        // available). Replaces an older path that pulled every span in the
-        // trace into Node memory just to .find() one, plus a third query
-        // whose result was never read.
-        const [span, rawEvents] = await Promise.all([
-          ctx.app.traces.readSpan({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            spanId: input.spanId,
-            visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
-            occurredAtMs: input.occurredAtMs,
-          }),
-          ctx.app.traces.readSpanEvents({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            spanId: input.spanId,
-            occurredAtMs: input.occurredAtMs,
-          }),
-        ]);
-
-        if (!span) {
-          throw ports.traceNotFound(input.spanId);
-        }
-
-        // Coding-agent spans store their content in the trace's OTLP LOGS, not
-        // on the span row — join it on here, BEFORE protections, so the joined
-        // content goes through the same redaction pass as any other span
-        // content (identical order to loadSpansFullWithProtections). Gated so
-        // only coding-agent-shaped spans pay the log read.
-        const targetSpan = ports.codingAgentEnrichment.isCodingAgentShapedSpan(span)
-          ? await enrichSpanDetailFromCodingAgentLogs({
-              app: ctx.app.traces,
-              span,
+      .query("evals", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+            }),
+          )
+          .withOutput(tracesV2EvaluationRunsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.traces.readEvaluationRuns({
               tenantId: input.projectId,
               traceId: input.traceId,
-              ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-              codingAgentEnrichment: ports.codingAgentEnrichment,
-            })
-          : span;
-
-        // Span-level protections first (category visibility, restricted custom
-        // attributes, hidden content scrubbed out of params and events), then
-        // the DTO pass below.
-        const redactions = buildSpanContentRedactions(
-          [targetSpan],
-          protections,
-          ports.mappers.spanProtection,
-        );
-        const protectedSpan = ports.mappers.spanProtection.applySpanProtections(
-          targetSpan,
-          protections,
-          redactions,
-        );
-
-        const detail = mapSpanToDetail(
-          protectedSpan,
-          rawEvents.map((e) => ({
-            name: e.event_type,
-            timeUnixMs:
-              typeof e.timestamps.started_at === "number"
-                ? e.timestamps.started_at
-                : parseInt(String(e.timestamps.started_at), 10),
-            attributes: ports.mappers.spanProtection.redactObject(
-              Object.fromEntries([
-                ...e.event_details.map((d) => [d.key, d.value]),
-                ...e.metrics.map((m) => [m.key, m.value]),
-              ]),
-              redactions,
-            ),
-          })),
-          ports.mappers.spanDisplay,
-        );
-
-        // SDK pattern: `Prompt.compile` / `PromptApiService.get` siblings
-        // carry `langwatch.prompt.*` while the actual `llm` span next door
-        // does not. Walk ancestors/siblings here so the v2 drawer's prompt
-        // accordion lights up on the llm span too (matches legacy
-        // SpanDetails). One extra trace-scoped read, only when the llm
-        // span has no own prompt attrs.
-        if (
-          detail.type === "llm" &&
-          // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
-          // full-trace ancestor walk is a guaranteed miss — skipping it makes
-          // the enriched spanDetail read CHEAPER than before for these spans.
-          !ports.codingAgentEnrichment.isCodingAgentShapedSpan(span) &&
-          !ports.hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
-        ) {
-          const enriched = await ports.resolveAncestorPromptParams({
-            tenantId: input.projectId,
-            traceId: input.traceId,
-            targetSpanId: input.spanId,
-            ...occurredAtFromInput(input),
-            currentParams: detail.params as Record<string, unknown> | null,
-          });
-          if (enriched) {
-            detail.params = enriched;
-          }
-        }
-
-        // Token usage with no price on it, offer the user a cost mapping.
-        // The cheap guards run first; the rule lookup only fires for spans
-        // that actually present the unmapped-cost symptom.
-        detail.costSuggestion = await ports.tryDeriveUnmappedCostSuggestion({
-          projectId: input.projectId,
-          model: detail.model ?? null,
-          cost: detail.metrics?.cost,
-          promptTokens: detail.metrics?.promptTokens,
-          completionTokens: detail.metrics?.completionTokens,
-        });
-
-        const redactedDetail = redactV2Content(detail, protections, ports.mappers.contentPrivacy);
-        const detailParams = detail.params as Record<string, unknown> | null;
-        redactedDetail.contentPrivacy = buildContentPrivacy(
-          protections,
-          readDroppedFromParams(detailParams, ports.mappers.contentPrivacy),
-        );
-        redactedDetail.piiAnalysisIncomplete = readPiiIncompleteFromParams(
-          detailParams,
-          ports.mappers.contentPrivacy,
-        );
-        redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
-        return redactedDetail;
-      }),
-
-      /**
-       * OTel resource attributes + instrumentation scope per span. Surfaced in
-       * the drawer's metadata section and as the "scope" chip on traces and
-       * spans. Standard span mapping drops both, so this reads them raw.
-       */
-      resourceInfo: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
+            });
           }),
-        ),
-      ).query(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const rows = await ctx.app.traces.readSpanResources({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-        });
-
-        const spans = rows.map((r) => ({
-          spanId: r.spanId,
-          parentSpanId: r.parentSpanId,
-          resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
-          scope: { name: r.scopeName ?? "", version: r.scopeVersion },
-        }));
-
-        // Pick the root span (no parent) if present; fall back to earliest.
-        const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
-
-        // `withoutHiddenResourceAttrs` drops the fixed non-billable set; layer the
-        // viewer's data-privacy restrict rules on top via `gateResources` so the
-        // authenticated read honours the same hidden-attribute policy as the share
-        // surface.
-        return gateResources({
-          resources: {
-            rootSpanId: root?.spanId ?? null,
-            resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
-            scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
-            spans,
-          },
-          protections,
-        });
-      }),
-
-      /**
-       * Trace-level events ({spanId, timestamp, name, attributes}) for the drawer.
-       * Split off the header so the header stays a pure summary read; the drawer
-       * fires this separately (like evals), and it reads only the `Events.*`
-       * columns rather than re-fetching the spans the tree already loads.
-       */
-      traceEvents: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
-          }),
-        ),
-      ).query(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const events = await ctx.app.traces.readTraceEvents({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-        });
-        // Event/exception attributes are captured content — same gating as the
-        // shared-trace payload, so the two surfaces cannot drift apart.
-        return ports.mappers.spanProtection.applyDerivedTraceEventProtections(events, protections);
-      }),
-
-      evals: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.readEvaluationRuns({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-        });
-      }),
+      )
 
       /**
        * The pre-folded coding-agent session rollup for one trace (ADR-056).
@@ -1474,22 +1162,27 @@ export class TracesV2TrpcApi {
        * policy to gate. (If that ever stops being true, this comment is the thing
        * that has to change first.)
        */
-      codingAgentSession: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
+
+      .query("codingAgentSession", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+            }),
+          )
+          .withOutput(codingAgentSessionSchema.nullable())
+          .withPermission("traces:view")
+          .handle(async ({ ctx, input }) => {
+            // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
+            // session row — which already spans every trace of the run, so no
+            // conversation-membership fan-out is needed here anymore.
+            return ctx.app.traces.readCodingAgentSession({
+              projectId: input.projectId,
+              traceId: input.traceId,
+            });
           }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
-        // session row — which already spans every trace of the run, so no
-        // conversation-membership fan-out is needed here anymore.
-        return ctx.app.traces.readCodingAgentSession({
-          projectId: input.projectId,
-          traceId: input.traceId,
-        });
-      }),
+      )
 
       /**
        * Every log record correlated to one trace (generic — not Claude-specific).
@@ -1505,31 +1198,551 @@ export class TracesV2TrpcApi {
        * `redactTraceLogContent`, or the raw-log procedure would be a bypass of
        * the data-privacy policy the span endpoints enforce.
        */
-      traceLogs: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceId: z.string(),
-            ...spanReadHintShape,
+
+      .query("traceLogs", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2TraceLogsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
+            // The free-plan teaser window and the viewer's captured-content
+            // permissions are both applied inside the loader, which the transcript
+            // endpoint shares — so the two reads cannot diverge on what they hide.
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            return loadTraceLogsWithProtections({
+              app: ctx.app.traces,
+              ports,
+              projectId: input.projectId,
+              traceId: input.traceId,
+              ...occurredAtFromInput(input),
+              protections,
+              codingAgents: ctx.app.traces.codingAgents,
+            });
           }),
-        ),
-      ).query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
-        // The free-plan teaser window and the viewer's captured-content
-        // permissions are both applied inside the loader, which the transcript
-        // endpoint shares — so the two reads cannot diverge on what they hide.
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-        return loadTraceLogsWithProtections({
-          app: ctx.app.traces,
-          ports,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          ...occurredAtFromInput(input),
-          protections,
-          codingAgents: ctx.app.traces.codingAgents,
-        });
-      }),
-    });
+      )
+      .build();
+
+    const spans = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("spansPaginated", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              limit: z.number().int().min(1).max(1000).default(250),
+              offset: z.number().int().min(0).default(0),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2SpansPageSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const page = await ctx.app.traces.readSpansPage({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+              limit: input.limit,
+              offset: input.offset,
+              occurredAtMs: input.occurredAtMs,
+            });
+            // These are full legacy spans (input/output/params/metrics), so the
+            // legacy span protections apply as-is: category visibility, cost,
+            // restricted custom attributes, and hidden content scrubbed wherever
+            // it rides along (e.g. raw gen_ai message attributes inside params).
+            const redactions = buildSpanContentRedactions(
+              page.spans,
+              protections,
+              ports.mappers.spanProtection,
+            );
+            return {
+              ...page,
+              spans: page.spans.map((span) =>
+                ports.mappers.spanProtection.applySpanProtections(span, protections, redactions),
+              ),
+            };
+          }),
+      )
+
+      .query("spansDelta", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              sinceStartTimeMs: z.number(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2SpansDeltaSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const spans = await ctx.app.traces.readSpansSince({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              sinceStartTimeMs: input.sinceStartTimeMs,
+              visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+              occurredAtMs: input.occurredAtMs,
+            });
+            const redactions = buildSpanContentRedactions(
+              spans,
+              protections,
+              ports.mappers.spanProtection,
+            );
+            return spans.map((span) =>
+              ports.mappers.spanProtection.applySpanProtections(span, protections, redactions),
+            );
+          }),
+      )
+
+      /**
+       * One page of the span tree in `(startTimeMs, spanId)` order. This is the
+       * only fetch path the frontend uses for span trees — traces can carry
+       * 20k–100k+ spans, so the client assembles the tree page by page (see
+       * `spanTreePagedQuery.ts`) instead of ever pulling it in one response.
+       * `nextCursor` is null on the final page.
+       */
+
+      .query("spanTreePaginated", (p) =>
+        p
+          .withInput(spanTreeTransportInputSchema)
+          .withOutput(spanTreePageSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            return ctx.app.traces.readSpanTreePage({
+              ...input,
+              canSeeCosts: protections.canSeeCosts === true,
+            });
+          }),
+      )
+
+      /**
+       * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
+       * Keyed on the row version rather than the span start so an in-place update
+       * (end time, duration, status, cost) is picked up too — the root span
+       * starts first and ends last, so a start-keyed delta left its duration, and
+       * with it the waterfall's time scale, frozen at first projection.
+       */
+
+      .query("spanTreeDelta", (p) =>
+        p
+          .withInput(spanTreeDeltaTransportInputSchema)
+          .withOutput(tracesV2SpanTreeNodesSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            return ctx.app.traces.readSpanTreeDelta({
+              ...input,
+              canSeeCosts: protections.canSeeCosts === true,
+            });
+          }),
+      )
+
+      /**
+       * Whole-tree read in one response. The frontend no longer fetches through
+       * this — `useSpanTree` pages via `spanTreePaginated` under the same React
+       * Query key, and this procedure remains as that cache entry's type/key
+       * anchor (preview seeding, SSE invalidation, cancel). The underlying read
+       * is bounded (`MAX_LIGHT_SPAN_READ_ROWS`) so a direct call can never
+       * materialize a 100k-span trace in one shot.
+       */
+
+      .query("spanTree", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2SpanTreeNodesSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const rows = await ctx.app.traces.readSpanSummaries({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+            });
+            return gateTreeCost({
+              nodes: rows.map(mapLegacySpanSummaryToTreeNode),
+              protections,
+            });
+          }),
+      )
+
+      /**
+       * Per-span LangWatch instrumentation signals (prompt, scenario, user,
+       * thread, evaluation, rag, metadata, genai). Fired secondarily by the
+       * waterfall and span-list views so the primary `spanTree` query stays
+       * cheap; UIs render badges + filter once this resolves.
+       */
+
+      .query("spanLangwatchSignals", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2SpanLangwatchSignalsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<SpanLangwatchSignals[]> => {
+            const rows = await ctx.app.traces.readLangwatchSignals({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+            });
+            return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
+          }),
+      )
+      .build();
+
+    const detail = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      /**
+       * Full span data for every span in a trace — used by the LLM Optimized
+       * Trace markdown view to render per-span attributes and input/output.
+       * Heavier than spanTree; fetch lazily.
+       */
+
+      .query("spansFull", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2SpanDetailsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<SpanDetail[]> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            return loadSpansFullWithProtections({
+              app: ctx.app.traces,
+              ports,
+              projectId: input.projectId,
+              traceId: input.traceId,
+              ...occurredAtFromInput(input),
+              protections,
+            });
+          }),
+      )
+
+      /**
+       * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
+       *
+       * The Terminal view used to assemble this in the browser out of three modules.
+       * It lives here now because a transcript is not a rendering concern: the CLI
+       * wants it, an MCP server wants it, and an export wants it, and none of them
+       * are going to run React to get one. One derivation, one answer.
+       *
+       * Reads spans AND logs through the same loaders the sibling endpoints use, so
+       * its content has been through the identical redaction pass — a transcript
+       * endpoint that did its own reads would be a way around the data-privacy
+       * policy, which is precisely why it does not.
+       */
+
+      .query("codingAgentTranscript", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(codingAgentTranscriptSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            return TracesV2TrpcApi.readCodingAgentTranscript({
+              app: ctx.app.traces,
+              ports,
+              projectId: input.projectId,
+              traceId: input.traceId,
+              ...occurredAtFromInput(input),
+              protections,
+              codingAgents: ctx.app.traces.codingAgents,
+            });
+          }),
+      )
+
+      .query("spanDetail", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              spanId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(spanDetailSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<SpanDetail> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            // One narrow span fetch + one narrow events fetch in parallel —
+            // both keyed by SpanId (and partition-pruned by occurredAtMs when
+            // available). Replaces an older path that pulled every span in the
+            // trace into Node memory just to .find() one, plus a third query
+            // whose result was never read.
+            const [span, rawEvents] = await Promise.all([
+              ctx.app.traces.readSpan({
+                projectId: input.projectId,
+                traceId: input.traceId,
+                spanId: input.spanId,
+                visibilityCutoffMs: await ports.tryGetVisibilityCutoffMs(input.projectId),
+                occurredAtMs: input.occurredAtMs,
+              }),
+              ctx.app.traces.readSpanEvents({
+                projectId: input.projectId,
+                traceId: input.traceId,
+                spanId: input.spanId,
+                occurredAtMs: input.occurredAtMs,
+              }),
+            ]);
+
+            if (!span) {
+              throw ports.traceNotFound(input.spanId);
+            }
+
+            // Coding-agent spans store their content in the trace's OTLP LOGS, not
+            // on the span row — join it on here, BEFORE protections, so the joined
+            // content goes through the same redaction pass as any other span
+            // content (identical order to loadSpansFullWithProtections). Gated so
+            // only coding-agent-shaped spans pay the log read.
+            const targetSpan = ports.codingAgentEnrichment.isCodingAgentShapedSpan(span)
+              ? await enrichSpanDetailFromCodingAgentLogs({
+                  app: ctx.app.traces,
+                  span,
+                  tenantId: input.projectId,
+                  traceId: input.traceId,
+                  ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+                  codingAgentEnrichment: ports.codingAgentEnrichment,
+                })
+              : span;
+
+            // Span-level protections first (category visibility, restricted custom
+            // attributes, hidden content scrubbed out of params and events), then
+            // the DTO pass below.
+            const redactions = buildSpanContentRedactions(
+              [targetSpan],
+              protections,
+              ports.mappers.spanProtection,
+            );
+            const protectedSpan = ports.mappers.spanProtection.applySpanProtections(
+              targetSpan,
+              protections,
+              redactions,
+            );
+
+            const detail = mapSpanToDetail(
+              protectedSpan,
+              rawEvents.map((e) => ({
+                name: e.event_type,
+                timeUnixMs:
+                  typeof e.timestamps.started_at === "number"
+                    ? e.timestamps.started_at
+                    : parseInt(String(e.timestamps.started_at), 10),
+                attributes: ports.mappers.spanProtection.redactObject(
+                  Object.fromEntries([
+                    ...e.event_details.map((d) => [d.key, d.value]),
+                    ...e.metrics.map((m) => [m.key, m.value]),
+                  ]),
+                  redactions,
+                ),
+              })),
+              ports.mappers.spanDisplay,
+            );
+
+            // SDK pattern: `Prompt.compile` / `PromptApiService.get` siblings
+            // carry `langwatch.prompt.*` while the actual `llm` span next door
+            // does not. Walk ancestors/siblings here so the v2 drawer's prompt
+            // accordion lights up on the llm span too (matches legacy
+            // SpanDetails). One extra trace-scoped read, only when the llm
+            // span has no own prompt attrs.
+            if (
+              detail.type === "llm" &&
+              // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
+              // full-trace ancestor walk is a guaranteed miss — skipping it makes
+              // the enriched spanDetail read CHEAPER than before for these spans.
+              !ports.codingAgentEnrichment.isCodingAgentShapedSpan(span) &&
+              !ports.hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
+            ) {
+              const enriched = await ports.resolveAncestorPromptParams({
+                tenantId: input.projectId,
+                traceId: input.traceId,
+                targetSpanId: input.spanId,
+                ...occurredAtFromInput(input),
+                currentParams: detail.params as Record<string, unknown> | null,
+              });
+              if (enriched) {
+                detail.params = enriched;
+              }
+            }
+
+            // Token usage with no price on it, offer the user a cost mapping.
+            // The cheap guards run first; the rule lookup only fires for spans
+            // that actually present the unmapped-cost symptom.
+            detail.costSuggestion = await ports.tryDeriveUnmappedCostSuggestion({
+              projectId: input.projectId,
+              model: detail.model ?? null,
+              cost: detail.metrics?.cost,
+              promptTokens: detail.metrics?.promptTokens,
+              completionTokens: detail.metrics?.completionTokens,
+            });
+
+            const redactedDetail = redactV2Content(
+              detail,
+              protections,
+              ports.mappers.contentPrivacy,
+            );
+            const detailParams = detail.params as Record<string, unknown> | null;
+            redactedDetail.contentPrivacy = buildContentPrivacy(
+              protections,
+              readDroppedFromParams(detailParams, ports.mappers.contentPrivacy),
+            );
+            redactedDetail.piiAnalysisIncomplete = readPiiIncompleteFromParams(
+              detailParams,
+              ports.mappers.contentPrivacy,
+            );
+            redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
+            return redactedDetail;
+          }),
+      )
+
+      /**
+       * OTel resource attributes + instrumentation scope per span. Surfaced in
+       * the drawer's metadata section and as the "scope" chip on traces and
+       * spans. Standard span mapping drops both, so this reads them raw.
+       */
+
+      .query("resourceInfo", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(traceResourceInfoSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const rows = await ctx.app.traces.readSpanResources({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+            });
+
+            const spans = rows.map((r) => ({
+              spanId: r.spanId,
+              parentSpanId: r.parentSpanId,
+              resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
+              scope: { name: r.scopeName ?? "", version: r.scopeVersion },
+            }));
+
+            // Pick the root span (no parent) if present; fall back to earliest.
+            const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
+
+            // `withoutHiddenResourceAttrs` drops the fixed non-billable set; layer the
+            // viewer's data-privacy restrict rules on top via `gateResources` so the
+            // authenticated read honours the same hidden-attribute policy as the share
+            // surface.
+            return gateResources({
+              resources: {
+                rootSpanId: root?.spanId ?? null,
+                resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+                scope: root ? { name: root.scopeName ?? "", version: root.scopeVersion } : null,
+                spans,
+              },
+              protections,
+            });
+          }),
+      )
+
+      /**
+       * Trace-level events ({spanId, timestamp, name, attributes}) for the drawer.
+       * Split off the header so the header stays a pure summary read; the drawer
+       * fires this separately (like evals), and it reads only the `Events.*`
+       * columns rather than re-fetching the spans the tree already loads.
+       */
+
+      .query("traceEvents", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              traceId: z.string(),
+              ...spanReadHintShape,
+            }),
+          )
+          .withOutput(tracesV2TraceEventsSchema)
+          .withPermission("traces:view")
+          .handle(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
+            });
+            const events = await ctx.app.traces.readTraceEvents({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              occurredAtMs: input.occurredAtMs,
+            });
+            // Event/exception attributes are captured content — same gating as the
+            // shared-trace payload, so the two surfaces cannot drift apart.
+            return ports.mappers.spanProtection.applyDerivedTraceEventProtections(
+              events,
+              protections,
+            );
+          }),
+      )
+      .build();
+
+    // One surface, defined in the groups the explorer is laid out in.
+    // Several chains rather than one because a single twenty-nine-procedure
+    // chain exceeds TypeScript's instantiation depth, and `mergeRouters` puts
+    // them back on the one `tracesV2.*` name the client has always called.
+    return trpc.mergeRouters(grid, sidebar, drawer, spans, detail);
   }
 }

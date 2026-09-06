@@ -6,14 +6,15 @@
  * whether that person may manage the organization they are connecting for, and
  * where the connection command is recorded.
  *
- * ONE NAMED ABSENCE. The pull-request backfill that runs after a successful
- * install is not supplied: it lives on the coding-agent SERVICE and this
- * process composes only the application above it. Its effect is a cache of
- * what GitHub already knows, and the periodic branch recheck rebuilds the same
- * mapping — so the linkage arrives later rather than not at all, which is why
- * the port is optional rather than a stand-in that throws.
+ * The pull-request backfill that runs after a successful install is supplied
+ * from the SAME coding-agent application the `codingAgents.*` namespace reads,
+ * so the branches an organization's own sessions already named are mapped the
+ * moment the connection exists. It stays optional: on a process that composed
+ * no coding-agent graph the linkage arrives with the periodic branch recheck
+ * instead, which is later rather than not at all.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { CodingAgentApp } from "@langwatch/coding-agent-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { GithubRestPorts, GithubRestSessionPort } from "@langwatch/github-server";
 
@@ -35,6 +36,11 @@ export type ApiGithubRestOptions = Readonly<{
   authz: AuthzService | undefined;
   /** Where a connection command — and a blocked rebind — is recorded. */
   audit: ApiAuditPort | undefined;
+  /**
+   * The coding-agent application this process composed, or none. The install
+   * follow-up is its `backfillPullRequestMappings`.
+   */
+  codingAgents?: CodingAgentApp | undefined;
 }>;
 
 /**
@@ -56,8 +62,17 @@ export function composeApiGithubRest(options: ApiGithubRestOptions): GithubRestP
   };
 
   const audit = options.audit;
+  const codingAgents = options.codingAgents;
   return {
     github: () => github,
+    // Fire-and-forget at the family: `/setup` starts it and redirects, and a
+    // failure is logged there rather than shown to the person connecting.
+    ...(codingAgents
+      ? {
+          backfillPullRequestMappings: ({ organizationId }: { organizationId: string }) =>
+            codingAgents.backfillPullRequestMappings({ organizationId }),
+        }
+      : {}),
     session: resolveSession,
     canManageOrganization: ({ userId, organizationId }) =>
       authz.hasPermission({

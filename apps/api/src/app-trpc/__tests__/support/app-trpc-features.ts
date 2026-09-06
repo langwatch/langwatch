@@ -6,7 +6,7 @@
  * once rather than shaped by hand twice.
  */
 
-import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import { createIsPublicProcedure, type AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
@@ -83,19 +83,45 @@ const middlewares: AppTrpcPolicyMiddlewares = {
   auditMutations: passThrough(),
 };
 
-export function buildAppTrpcFeatures() {
+/**
+ * The mount the record is built against: the application's OWN root, and the
+ * two procedures a feature builds its surfaces on.
+ *
+ * `authenticate` is what the public-surface sweep needs. The two procedures are
+ * the same bare builder by default, which is all the surface lists read; with
+ * it, the authenticated one carries a middleware, so a mounted procedure that
+ * skipped authentication is distinguishable from one that did not — which is
+ * the only way to enumerate the anonymous surface.
+ */
+export function buildAppTrpcMount(options: { authenticate?: boolean } = {}) {
   // The application's OWN root, not a second one shaped by hand: the record is
   // typed against `ApiTrpcFeatureMount`, so a hand-rolled root would prove
   // something other than what the process mounts.
   const trpc = createTrpcRoot();
+  const authentication = passThrough();
 
   const mount = {
     root: trpc,
-    protectedProcedure: trpc.procedure,
+    protectedProcedure: options.authenticate
+      ? trpc.procedure.use(authentication as never)
+      : trpc.procedure,
     publicProcedure: trpc.procedure,
     middlewares,
+    // Test processes check every declared output: a shape that drifted from
+    // its schema is a defect, and this is where it is cheap to find.
+    validateOutput: true,
   };
 
+  return {
+    trpc,
+    mount,
+    isPublicProcedure: createIsPublicProcedure(trpc.middleware(authentication as never)),
+  };
+}
+
+export function buildAppTrpcFeatures(
+  mount: ReturnType<typeof buildAppTrpcMount>["mount"] = buildAppTrpcMount().mount,
+) {
   return createAppTrpcFeatures({
     mount,
     // The features whose doors are not only tRPC, composed before the mount
