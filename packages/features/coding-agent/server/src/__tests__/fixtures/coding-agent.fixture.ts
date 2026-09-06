@@ -179,6 +179,13 @@ export function sessionEventRecord(
     toolResultBytes: 0,
     promptChars: 0,
     totalTokens: 10,
+    // The working context the contribute command stamps on. '' is what a row
+    // carries before the session declared one, which is the shape these
+    // suites read.
+    repositoryHost: "",
+    repositoryOwner: "",
+    repositoryName: "",
+    branch: "",
     ...overrides,
   });
 }

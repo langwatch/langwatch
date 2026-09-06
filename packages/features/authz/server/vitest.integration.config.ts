@@ -7,7 +7,8 @@ import { defineConfig } from "vitest/config";
  *
  * WHAT IT NEEDS
  *
- *   Postgres, at `DATABASE_URL`. The grant-index suite seeds twenty thousand
+ *   Postgres, at `LANGWATCH_TEST_DATABASE_URL` (or `DATABASE_URL`). The
+ *   grant-index suite seeds twenty thousand
  *   rows and asks the planner what it did with the read, which needs real
  *   statistics rather than a stub.
  */

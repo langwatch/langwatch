@@ -21,9 +21,10 @@ import {
 } from "../adapters/redis.langy-turn-handoff.adapter";
 import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port";
 import { LangyEffectPortsAdapter } from "../adapters/langy-effect.adapter";
+import { testRedisUrl } from "./support/test-redis-url";
 
 /** Native Redis, the way every other datastore suite in this repo asks for one. */
-const REDIS_URL = process.env.LANGWATCH_TEST_REDIS_URL;
+const REDIS_URL = testRedisUrl();
 
 let redis: Redis;
 let handoffStore: LangyTurnHandoffAdapter;

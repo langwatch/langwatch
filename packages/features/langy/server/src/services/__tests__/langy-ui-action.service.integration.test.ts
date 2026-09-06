@@ -11,6 +11,7 @@ import {
   LangyUiActionCatalogPort,
   type LangyUiActionDefinition,
 } from "../../ports/langy-ui-action-catalog.port";
+import { testRedisUrl } from "../../__tests__/support/test-redis-url";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   "workbench.duplicateTarget": {
@@ -63,7 +64,7 @@ async function clearUiKeys() {
 }
 
 beforeAll(async () => {
-  const configuredUrl = process.env.CI_REDIS_URL ?? process.env.TEST_REDIS_URL;
+  const configuredUrl = testRedisUrl();
   if (configuredUrl) {
     redis = new Redis(configuredUrl);
   } else {

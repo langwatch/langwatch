@@ -87,7 +87,10 @@ async function pendingJobCount(): Promise<number> {
 
 describe("pull-request mapping throttle", () => {
   beforeAll(async () => {
-    const configuredUrl = process.env.CI_REDIS_URL ?? process.env.TEST_REDIS_URL;
+    // The name every native-services integration run in this repo sets, with
+    // `REDIS_URL` for a stack exporting only that. Reading neither started a
+    // container against a Redis that was already running.
+    const configuredUrl = process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL;
     if (configuredUrl) {
       redis = new Redis(configuredUrl);
     } else {

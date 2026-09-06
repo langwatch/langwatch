@@ -2,8 +2,11 @@ import {
   LangyConversationNotOwnedError,
   LangyTurnNotStoppableError,
 } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
 import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service";
 import { LangyTurnSharedService } from "./langy-turn-shared.service";
+
+const logger = createLogger("langwatch:langy:turn-stop-service");
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
@@ -50,6 +53,20 @@ export class LangyTurnStopService {
         throw new LangyTurnNotStoppableError(turnId);
       }
     }
+
+    // Before the terminal, so a dispatch racing this stop reads the marker
+    // rather than the handoff alone: a turn can be admitted (and its handoff
+    // stashed) seconds before any worker runs it, and the outbox re-drives that
+    // handoff on its own schedule. Best-effort — the durable terminal below is
+    // what makes the stop true, and a Redis blip may not hold it up.
+    await this.deps.handoffStore
+      ?.markStopped({ conversationId, turnId })
+      .catch((error: unknown) => {
+        logger.warn(
+          { error, projectId, conversationId, turnId },
+          "could not record the langy stop marker; a redrive may still dispatch this turn",
+        );
+      });
 
     const partialText = tokenBuffer
       ? await LANGY_TURN_SHARED.reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })

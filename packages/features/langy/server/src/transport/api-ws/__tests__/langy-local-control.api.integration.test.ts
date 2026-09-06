@@ -33,6 +33,7 @@ import {
   type LocalControlRuntime,
 } from "../../../adapters/langy-local-control-runtime.adapter";
 import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service";
+import { testRedisUrl } from "../../../__tests__/support/test-redis-url";
 
 const ns = `local-control-${nanoid(8)}`;
 
@@ -94,9 +95,16 @@ let podB: Pod;
  */
 const mintedKeys = new Map<string, { apiKeyId: string; userId: string }>();
 
+/** What `personalToken` resolves to: a real key of the project, not a session key. */
+const personalKey = { apiKeyId: `apikey_${nanoid(10)}`, userId };
+
 const apiKeys = {
   async tryResolveToken({ token }: { token: string }): Promise<ResolvedApiKeyToken | null> {
-    const minted = mintedKeys.get(token);
+    // The developer's own key resolves like any other real key: it belongs to
+    // a person, and it is simply not the key approving a control request
+    // mints. That is what separates "wrong kind" from "not a key at all", and
+    // a directory that knows only the minted keys collapses the two.
+    const minted = mintedKeys.get(token) ?? (token === personalToken ? personalKey : undefined);
     if (!minted) return null;
     return {
       type: "apiKey",
@@ -105,7 +113,7 @@ const apiKeys = {
       organizationId,
       ingestSourceType: null,
       ingestionTemplateId: null,
-      isLangySessionKey: true,
+      isLangySessionKey: mintedKeys.has(token),
       project: {
         id: projectId,
         name: "Local Control Project",
@@ -414,7 +422,7 @@ async function noFrame(cli: FakeCli, type: string, withinMs = 1_500): Promise<bo
 
 beforeAll(async () => {
   connection = new RedisConnectionService().connect({
-    url: process.env.REDIS_URL,
+    url: testRedisUrl(),
     clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
     dbIndex: process.env.REDIS_DB_INDEX,
   })!;

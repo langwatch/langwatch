@@ -288,6 +288,11 @@ const suiteRunResultSchema = z.object({
       name: z.string().nullable(),
     }),
   ),
+  // Only a test-suite run files itself under a run plan, so only that half of
+  // the alias answers with the plan it reached. Undeclared, the pipeline
+  // strips both from the body the caller was answered with on main.
+  planName: z.string().optional(),
+  created: z.boolean().optional(),
 });
 
 function toSuiteResponse(suite: Suite) {
@@ -392,10 +397,7 @@ export function createSuiteRestApp(options: {
     return withPlatformUrl(row, project.slug);
   };
 
-  const createHandler = async (
-    c: SuiteContext,
-    input: z.infer<typeof createSuiteInputSchema>,
-  ) => {
+  const createHandler = async (c: SuiteContext, input: z.infer<typeof createSuiteInputSchema>) => {
     const project = projectOf(c);
     logger.info({ projectId: project.id, kind: input.kind }, "Creating suite");
 

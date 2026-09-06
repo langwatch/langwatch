@@ -31,6 +31,7 @@ import type { EventSubscriberContext } from "@langwatch/eventing";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service";
 import { CALL_POLL_HOLD_MS } from "@langwatch/langy-contract";
 import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
+import { testRedisUrl } from "../../__tests__/support/test-redis-url";
 
 /** How long the subscriber lets a turn go quiet before it ends it. */
 const STALL_WINDOW_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;
@@ -130,7 +131,7 @@ async function pollFor({
 
 beforeAll(() => {
   connection = new RedisConnectionService().connect({
-    url: process.env.REDIS_URL,
+    url: testRedisUrl(),
     clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
     dbIndex: process.env.REDIS_DB_INDEX,
   })!;

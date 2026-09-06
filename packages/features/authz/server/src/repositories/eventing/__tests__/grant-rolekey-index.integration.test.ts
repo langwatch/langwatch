@@ -75,13 +75,20 @@ function grantRowsExamined(node: PlanNode): number {
   return (node.Plans ?? []).reduce((total, child) => total + grantRowsExamined(child), own);
 }
 
-describe("given an organization holding many live grants", () => {
+/**
+ * The lane's Postgres, `DATABASE_URL` honoured for a stack setting only that.
+ * Neither is not "the default database": Prisma dials one named after the OS
+ * user, so the suite fails on the seed rather than skipping.
+ */
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+
+describe.skipIf(!DB_URL)("given an organization holding many live grants", () => {
   let prisma: PrismaClient;
   const grantQueries: LoggedQuery[] = [];
 
   beforeAll(async () => {
     prisma = new PrismaClient({
-      adapter: PrismaDriverAdapterService.create().create(process.env.DATABASE_URL ?? "").adapter,
+      adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
       log: [{ emit: "event", level: "query" }],
     });
 

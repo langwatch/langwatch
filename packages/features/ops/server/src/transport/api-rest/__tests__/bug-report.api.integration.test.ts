@@ -13,6 +13,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { BugReport, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ErrorHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -435,8 +436,15 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   });
 });
 
-/** No route here is expected to throw, so a failure must be legible, not swallowed. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+/**
+ * Mirrors the production boundary on the one point this suite depends on: a
+ * framework refusal answers with its own status (the body-size cap throws a
+ * 413), and anything else stays legible rather than swallowed.
+ */
+const renderUnexpected: ErrorHandler = (error, c) =>
+  error instanceof HTTPException && error.status < 500
+    ? c.json({ error: error.message }, error.status)
+    : c.json({ error: String(error) }, 500);
 
 function passThroughSecurity(): AppRestSecurity {
   const noop = async (_c: unknown, next: () => Promise<void>) => {
