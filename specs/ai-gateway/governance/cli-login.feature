@@ -147,6 +147,13 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And an unknown code is reported as expired rather than held open
     And the pod refuses a new stream once it holds too many, so the CLI polls
 
+  @integration @cli @device-flow @login-latency
+  Scenario: A publication reaches nobody if the stream has not subscribed yet
+    Given a device code settles before the stream subscribes to its channel
+    When the stream subscribes afterwards
+    Then it hears nothing, because the channel keeps no history
+    And this is why the stream re-reads the code once its channel is live
+
   @integration @cli @device-flow @login-latency @rate-limit
   Scenario: A poll on a settled device code is answered, not rate limited
     Given the CLI polled once and is inside the per-device poll window

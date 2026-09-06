@@ -1099,10 +1099,13 @@ const MAX_OPEN_APPROVAL_STREAMS = 512;
 let openApprovalStreams = 0;
 
 /** The device code's status once it has settled, or null while it is pending. */
-async function readDeviceCodeStatus(
-  redis: ReturnType<typeof getRedis>,
-  deviceCode: string,
-): Promise<string | null> {
+async function readDeviceCodeStatus({
+  redis,
+  deviceCode,
+}: {
+  redis: ReturnType<typeof getRedis>;
+  deviceCode: string;
+}): Promise<string | null> {
   const raw = await redis.get(deviceCodeKey(deviceCode));
   if (!raw) return "expired";
   const status = (JSON.parse(raw) as DeviceCodeRecord).status;
@@ -1188,7 +1191,7 @@ secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
       // once more now that the channel is live: from here on, either the
       // record already says so or the publication reaches us.
       const status =
-        (await readDeviceCodeStatus(redis, deviceCode)) ??
+        (await readDeviceCodeStatus({ redis, deviceCode })) ??
         (await watch.settled);
       if (status) {
         await stream.writeSSE({ data: JSON.stringify({ status }) });

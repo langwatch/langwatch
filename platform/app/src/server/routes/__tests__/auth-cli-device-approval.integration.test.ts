@@ -24,7 +24,11 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
-import { resetDeviceApprovalSubscriber } from "../_lib/device-approval-signal";
+import {
+  publishDeviceCodeSettled,
+  resetDeviceApprovalSubscriber,
+  waitForDeviceCodeSettled,
+} from "../_lib/device-approval-signal";
 import { app, approveDeviceCode, denyDeviceCode } from "../auth-cli";
 
 const suffix = nanoid(8);
@@ -147,14 +151,47 @@ describe("CLI device-approval stream", () => {
     });
 
     describe("when the code settles while the stream is still subscribing", () => {
+      /** @scenario "A publication reaches nobody if the stream has not subscribed yet" */
+      it("is a window a publication falls into, since pub/sub keeps nothing for a late subscriber", async () => {
+        const deviceCode = await mintDeviceCode();
+        const abort = new AbortController();
+
+        // The premise the re-read exists for, pinned on its own so it cannot
+        // rot silently: publish first, subscribe after, and the subscriber
+        // hears nothing. Redis has no replay for a channel.
+        await publishDeviceCodeSettled({
+          redis: redisConnection!,
+          deviceCode,
+          status: "approved",
+        });
+        const watch = waitForDeviceCodeSettled({
+          redis: redisConnection!,
+          deviceCode,
+          signal: abort.signal,
+        });
+        await watch.subscribed;
+
+        const heard = await Promise.race([
+          watch.settled,
+          new Promise((resolve) => setTimeout(() => resolve("nothing"), 250)),
+        ]);
+        abort.abort();
+
+        expect(heard).toBe("nothing");
+      });
+
       /** @scenario "The approval stream tells the CLI to poll the moment the browser settles the code" */
       it("emits anyway, because the stream re-reads once its channel is live", async () => {
         const deviceCode = await mintDeviceCode();
 
-        // Redis pub/sub keeps nothing for a late subscriber. Approving in the
-        // same tick as the request lands the publication in the window where
-        // the route has read `pending` but has not subscribed yet, which is
-        // the window the re-read exists to cover.
+        // Dropping the pod's subscriber makes the route open a fresh one, so
+        // its subscribe costs a connection handshake while the approval below
+        // runs on a connection that is already up. That is what puts the
+        // publication in the window between the route's first read and its
+        // subscribe, the window the re-read covers. Losing the race would only
+        // make this test less sensitive, never wrong: the frame is the claim.
+        await resetDeviceApprovalSubscriber();
+
         const [stream] = await Promise.all([
           openApprovalStream(deviceCode),
           approveDeviceCode({
