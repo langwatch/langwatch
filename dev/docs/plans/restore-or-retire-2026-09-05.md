@@ -94,3 +94,16 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
 
 | `specs/nlp-go/lambda-invoke-payload-staging.feature` "A real oversized payload round-trips through S3 to the live engine" | 1 | needs a real S3 bucket and AWS credentials (main gated it on `S3_DOGFOOD_BUCKET`); the Go guard only accepts `*.amazonaws.com` hosts so no local object store can stand in. The behaviour exists and the off-S3 refusal is bound against the live engine; only this proof needs infrastructure. Proposed: leave `@e2e` for a dogfood-bucket lane |
+
+## Lint rulings needed (found 2026-09-06 afternoon; the rule and the design disagree)
+
+| rule | findings | question |
+| --- | ---: | --- |
+| `ui-screen-closure` / `ui-surface-closure` / `ui-web-public-entry` / `ui-feature-implementation-import` | 46 / 38 / 30 / 8 | a surface may import another package's `surfaces/<id>` door but a screen may not (`lintWebScreenClosures` never passes `collaboratingSurface`); ~30 screen findings are exactly that door import. Either screens take components from apps/ui composition, or the screen rule admits doors like the surface rule does. `ui-web-public-entry` wants `./drawers`, `./chrome`, `./drawer.store` renamed to `surfaces/<id>`, but drawer families reach `screens/` and `state/`, which a surface closure refuses, so the rename trades 30 findings for more |
+| `enterprise-composition` | 19 | seven governance adapters shared by both process compositions live in `packages/enterprise/composition/api`; the only home the rule admits is `packages/enterprise/features/governance/server`, which turns their barrel imports into self-imports. Decide the shape before moving |
+| `comment-block-size` | 1265 | a five-line cap met by splitting paragraphs makes comments worse. Raise the cap, scope it to production code, or drop the hard tier and keep the review advisory |
+| `application-boundary` | 1 | `apps/ui` imports `type { AppRouter }` from the API for end-to-end tRPC types; the fix is a generated transport contract package that does not exist |
+| `feature-source-layout` (langy delivered-calls) | 1 | a per-connection in-memory set of delivered call ids has no home: `rules/` must be pure, a service cannot be built inside a handler, `stores/` means projection stores |
+| `prisma-containment` + `api-transport-import-boundary` | 2 + 2 | `better-auth-hooks.api.ts` holds 13 direct Prisma calls in transport (a repository and service of its own); `apps/api/src/features/agent-cache/` is a feature package that never got extracted |
+
+Fixed the same afternoon, as rule corrections rather than code: composition roots under `apps/api/src/features` are no longer scanned as transports; `rules/` may construct pure values (Set, Map, Error, RegExp, WeakSet, Uint8Array, never Date); the service-locator detector requires a Promise-returning dispatcher. Deferred to a dogfood lane: the visual diff of every route on main and the branch needs the three additive migrations of 2026-09-04 applied to the shared dev database first.
