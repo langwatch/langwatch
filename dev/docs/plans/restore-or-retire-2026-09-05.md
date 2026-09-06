@@ -25,7 +25,7 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 | langy | 3 | `langyNavigateFallback` (page-name navigation), inline model setup with key field and "Save and continue", derived-stat bar leading marker | `platform/app/src/server/app-layer/langy/streaming/__tests__/langyNavigateFallback.integration.test.ts` |
 | traces-v2 | 10 | `LegacyTraceDrawerRedirect` (5), `PresenceMenuItem` (3), `AnnotationExpectedOutputs` (2) | `platform/app/src/...` per scenario |
 | experiments-v3 | 4 | `TargetVariablesPanel` (3); workbench beside a compact navigation menu (1, `compactMenu` explicitly did not travel) | |
-| suites | 6 | auto-filing into a Default suite (no non-test code creates one); archive cascade | `platform/app/src/server/suites/__tests__/test-suite-membership.integration.test.ts` |
+| suites | 6 | **restored/bound 2026-09-06**: default-suite auto-filing lives in `ScenarioService.create`, the archive cascade in `PrismaScenarioRepository.archiveTestSuite`; both bound against Postgres and ClickHouse | `platform/app/src/server/suites/__tests__/test-suite-membership.integration.test.ts` |
 | scenarios | 2 | reason-based downgrade of an unrecognised failure; ES-by-trace-id span query (superseded by ADR-097: retire) | |
 | ops feature flags | 9 | catch-all-aware rule placement, keyboard and drag reordering, exclusion-aware catch-all note, new-users age-range logic and scope-kind picker | `platform/app/src/components/ops/featureFlags/__tests__/FeatureFlagRulesDialog.integration.test.tsx` |
 | prompts | 3 | standalone Inputs section (needs a UI decision) | |
@@ -45,7 +45,7 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 | data-retention | 5 | nothing reads `LANGWATCH_DEFAULT_RETENTION_DAYS`; only the shape rule survives |
 | background | 10 | no `runGracefulShutdown` registry, per-phase budget, exit code or telemetry flush; `closeApiProcessResources` covers ordering only |
 | ci | 8 + 6 | `hardFloorReport` / `resolveHardFloorMs` never ported (reporter half exists in test-harness); no ClickHouse schema-lock module |
-| nlp-go | 8 | `lambdaFetch` / `InvokePayloadTooLargeError` studio Lambda invoke path |
+| nlp-go | 8 | **restored 2026-09-06** as `NlpLambdaRuntimeService` over an ARN port in workflow-server (cache, single flight, image refresh) and the Lambda Web Adapter stream decoder; exported but not composed, since nothing on the branch implements the Lambda invoke port |
 | trace | 7 | `AmbiguousTraceIdPrefixError` and trace-id prefix resolution |
 | server | 5 + 3 | app-composition-root Redis wiring scenarios; org/project S3 config resolvers (`getS3ConfigForOrganization/Project`) |
 | api | 12 | `check-openapi-route-coverage` / `hono-route-table` scripts died with platform/app |
@@ -92,3 +92,5 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 | `specs/scenarios/otel-trace-context-propagation.feature` remote-span collection | 9 | ADR-009's platform span collection is superseded by ADR-097, which deletes the platform path and moves remote-trace judging into the SDKs; nothing implements it here or on main. Parked `@unimplemented`; proposed retire with ADR-009 |
 
 Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
+
+| `specs/nlp-go/lambda-invoke-payload-staging.feature` "A real oversized payload round-trips through S3 to the live engine" | 1 | needs a real S3 bucket and AWS credentials (main gated it on `S3_DOGFOOD_BUCKET`); the Go guard only accepts `*.amazonaws.com` hosts so no local object store can stand in. The behaviour exists and the off-S3 refusal is bound against the live engine; only this proof needs infrastructure. Proposed: leave `@e2e` for a dogfood-bucket lane |
