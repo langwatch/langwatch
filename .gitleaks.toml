@@ -283,7 +283,7 @@ regexes = ['''^your-api-key$''']
 # Naming the values, as this file requires:
 #   sk-live-abcdef0123456789   stands in for the project's own API key, fed
 #                              back inside a mocked 401 "rejected api key ..."
-#                              herr body.
+#                              error body.
 #   shh-9f3a2b7c4e             stands in for a user-configured secret (a
 #                              `config.secrets` entry), fed back inside a
 #                              mocked engine ValueError message/traceback.
