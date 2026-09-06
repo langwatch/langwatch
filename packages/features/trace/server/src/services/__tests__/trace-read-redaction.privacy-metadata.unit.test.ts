@@ -89,6 +89,7 @@ describe("TraceReadRedactionService.applyTraceProtections metadata preservation"
       expect(result.privacy?.droppedCategories).toEqual(["input", "tools"]);
     });
 
+    /** @scenario "A reader with full visibility sees no privacy marker when nothing was dropped" */
     it("leaves privacy unset when no span carries a drop marker", () => {
       const result = TraceReadRedactionService.applyTraceProtections(traceWithIO(), visibleToAll);
 

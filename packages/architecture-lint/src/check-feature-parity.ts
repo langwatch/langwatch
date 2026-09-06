@@ -250,6 +250,15 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-09-06 core-logic audit: these five ship ahead of the tests that
+  // would bind them (packages/architecture-lint's unspecced-core report),
+  // every scenario @unimplemented on purpose. Remove each entry with its
+  // first real binding.
+  "packages/enterprise/features/billing/specs/stripe-webhook.feature",
+  "packages/enterprise/features/billing/specs/usage-limits.feature",
+  "packages/features/authz/specs/offboarding.feature",
+  "packages/features/organization/specs/invitations.feature",
+  "packages/features/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
   "specs/ai-gateway/azure-endpoint-from-api-base.feature",

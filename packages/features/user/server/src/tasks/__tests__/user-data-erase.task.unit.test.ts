@@ -70,6 +70,7 @@ describe("runGdprUserDataErase", () => {
   });
 
   describe("when execute is true and there are no blockers", () => {
+    /** @scenario "Erasing a user with no blockers runs the erase transaction for the resolved user" */
     it("runs the erase transaction for the resolved user", async () => {
       const repository = emptyRepository();
       const outcome = await runGdprUserDataErase({

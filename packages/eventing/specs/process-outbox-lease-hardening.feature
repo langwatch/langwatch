@@ -63,3 +63,42 @@ Feature: Process outbox lease hardening
     Then the claim is issued as a single locking statement
     And no interactive transaction is opened for it
     And a poll cannot fail for want of a transaction slot while the pool has connections
+
+  # outboxDispatcherService.ts, processOutboxWorker.ts, processWakeWorker.ts,
+  # failureDiagnostic.ts, commandDispatcher.ts, process-manager-maintenance.pipeline.ts
+
+  @integration @unimplemented
+  Scenario: An outbox message is dispatched exactly once across two workers
+    Given two workers polling the same outbox
+    When one message becomes due
+    Then it is dispatched once
+
+  @integration @unimplemented
+  Scenario: A dispatcher that dies mid-send releases its claim for another worker
+    Given a worker holding a claim on an outbox message
+    When that worker stops without finishing
+    Then the message becomes claimable again after its lease elapses
+
+  @integration @unimplemented
+  Scenario: A dispatch that runs longer than its lease does not send twice
+    Given a dispatch still running when its lease elapses
+    When another worker claims the message
+    Then the recipient receives the message once
+
+  @unit @unimplemented
+  Scenario: A message that fails repeatedly stops being retried and is reported
+    Given an outbox message whose dispatch keeps failing
+    When it reaches its attempt ceiling
+    Then it stops being retried and its failure is reported with a diagnosis
+
+  @unit @unimplemented
+  Scenario: A wake scheduled for a process that no longer exists is discarded
+    Given a wake for a completed process instance
+    When the wake worker runs
+    Then the wake is discarded without error
+
+  @unit
+  Scenario: A message already leased by one dispatcher is not dispatched again by another
+    Given a dispatcher holding the lease on a message mid-delivery
+    When a second dispatcher runs
+    Then it does not dispatch that message

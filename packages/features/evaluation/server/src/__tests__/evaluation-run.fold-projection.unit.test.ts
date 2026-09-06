@@ -122,6 +122,7 @@ function createReportedEvent(
 describe("evaluationRun foldProjection", () => {
   describe("apply()", () => {
     describe("when EvaluationCompletedEvent arrives after EvaluationStartedEvent", () => {
+      /** @scenario "A completion folded after a start applies the run's completed state normally" */
       it("applies completed state normally", () => {
         const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),

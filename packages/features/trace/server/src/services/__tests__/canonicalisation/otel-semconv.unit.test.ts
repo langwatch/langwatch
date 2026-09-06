@@ -27,6 +27,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // Inference Span — Core attributes
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with core attributes", () => {
+    /** @scenario "A span following the OTel GenAI semantic conventions canonicalises its model and response metadata" */
     it("preserves gen_ai.operation.name, provider, model, and response metadata", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {

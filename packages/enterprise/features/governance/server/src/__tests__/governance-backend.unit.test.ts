@@ -43,6 +43,7 @@ describe("governance backend services", () => {
     ).resolves.toBe(false);
   });
 
+  /** @scenario "A cost-attribution resolution is cached and an explicit billable tile is honored" */
   it("caches cost attribution and honors an explicit billable tile", async () => {
     const repository = new MemoryPolicyRepository([
       { assistantKind: "claude_code", bundledPlan: false },

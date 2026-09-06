@@ -332,6 +332,7 @@ describe("OutboxDispatcherService", () => {
     });
 
     describe("when another dispatcher holds the lease", () => {
+      /** @scenario "A message already leased by one dispatcher is not dispatched again by another" */
       it("does not double-dispatch the same message", async () => {
         let releaseHandler!: () => void;
         const blocked = new Promise<void>((resolve) => {

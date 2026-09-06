@@ -166,6 +166,7 @@ function expectEverySurfaceAt(extra: CallExtra, expected: number): void {
 describe("the cost of one claude code model call", () => {
   describe("given a main-thread call, whose cache writes are hour-long", () => {
     describe("when every surface prices it", () => {
+      /** @scenario "A trace rollup projection totals a call the same as every other pricing surface" */
       /** @scenario Every surface prices one call at one number */
       it("reaches the amount the provider charged, on all of them", () => {
         expectEverySurfaceAt({ "llm_request.context": "interaction" }, CHARGED_USD);

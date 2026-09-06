@@ -5,6 +5,7 @@ import { OtlpTraceRequestService } from "../otlp-trace-request.service";
 describe("traceRequest.utils", () => {
   describe("normalizeOtlpAttributes", () => {
     describe("when attributes contain flattened array patterns", () => {
+      /** @scenario "Flattened array-pattern attributes reconstruct into objects" */
       it("reconstructs consecutive indexed arrays into objects", () => {
         const attributes = [
           {

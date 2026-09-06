@@ -131,3 +131,11 @@ Feature: Enterprise governance package boundary
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads
+
+  # governance-policy.service.ts
+
+  @unit
+  Scenario: A cost-attribution resolution is cached and an explicit billable tile is honored
+    Given a coding-assistant cost-attribution policy already resolved once
+    When the same source is resolved again
+    Then the cached resolution is reused and an explicit billable tile overrides it

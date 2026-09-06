@@ -87,6 +87,7 @@ class ScimServiceFake extends ScimService {
 }
 
 describe("SCIM characterization: group PATCH membership and operation casing", () => {
+  /** @scenario "A group PATCH with case-insensitive add/remove operations changes only the membership delta" */
   it("accepts case-insensitive add/remove operations and changes only the membership delta", async () => {
     const repo = groupsRepository();
     const grants = new GrantsFake();

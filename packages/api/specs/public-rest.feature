@@ -73,3 +73,30 @@ Feature: Public REST is a first-class API surface
     Given an existing createService consumer
     Then its registrations and public URLs are unchanged
     And no public REST mount exists until createRestService is used
+
+  # idempotency-fingerprint.ts, canonical-family-error-handler.ts, middleware-stack.ts,
+  # public-rest-routing.ts, scope-accessors.ts, personal-caller.ts, pipeline.ts
+
+  @unit @unimplemented
+  Scenario: A retry with the same key but a different body is refused
+    Given a create already answered under an idempotency key
+    When the same key is retried with a different body
+    Then the retry is refused as a fingerprint mismatch
+
+  @unit @unimplemented
+  Scenario: An unhandled failure answers a generic error carrying a trace id
+    Given a route whose handler throws a plain error
+    When a client calls it
+    Then the response is a generic unknown error naming a trace id, and no internals
+
+  @unit @unimplemented
+  Scenario: A handled failure answers its stable code, not its internal message
+    Given a route that throws a handled error
+    When a client calls it
+    Then the response body carries that error's code
+
+  @unit @unimplemented
+  Scenario: A personal caller cannot read another user's personal scope
+    Given a request authenticated as one user
+    When it addresses another user's personal scope
+    Then the request is refused
