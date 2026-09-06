@@ -11,7 +11,7 @@ The gateway has no retention setting of its own. Each record it produces lives i
 
 | Record | What it holds | Where it lives | Governed by |
 |---|---|---|---|
-| Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
+| Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to. A successful `/v1/chat/completions` or `/v1/messages` request that returns no output, no completion tokens and no cost is dropped before export and stores no trace | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
 | Spend records | One spend event per request: cost, tokens, model, virtual key, end user | Spend store | A fixed 13 months. Exempt from the data retention policy. See [Billing and spend events](/ai-gateway/billing-events#retention) |
 | Budget ledger | The debits each budget enforces against | Budget ledger | No expiry |
 | Audit log | Who created, rotated, revoked or changed a virtual key, budget, provider, cache rule or guardrail | Postgres audit log | Not subject to the data retention policy. See [Audit log](/ai-gateway/audit) |

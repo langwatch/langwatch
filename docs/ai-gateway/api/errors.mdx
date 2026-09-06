@@ -58,7 +58,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `guardrail_blocked` | 403 | A pre-call or post-call guardrail returned `block`. | Change the content, or change the guardrail on the key. |
 | `guardrail_upstream_unavailable` | 503 | A guardrail evaluator could not be reached, and the key fails closed. | Retry, or set the key's guardrails to fail open. |
 | `policy_violation` | 403 | The request content matched a deny rule in the key's policy rules. | Change the request, or change the policy rule. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, its policy rules, its provider access, or its routing policy. | Send a model the key allows, or widen the key. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, or its provider access or routing policy leaves the model's provider out of the chain. | Send a model the key allows, or widen the key. |
 | `model_provider_not_bound` | 400 | The request names a provider the key holds no credential for. | Bind that provider to the key, or send the model to a provider the key holds. |
 | `model_not_recognized` | 400 | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider. | Send the model as `provider/model`. |
 | `missing_model` | 400 | The request names no model. `meta.request_type` says where the endpoint expects one. | Add the model to the request. |

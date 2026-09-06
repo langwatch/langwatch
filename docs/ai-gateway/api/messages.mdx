@@ -103,6 +103,6 @@ Translated lanes emit the same event set, built by the gateway. A failure after 
 
 Errors the gateway raises use the envelope on [Errors](/ai-gateway/api/errors): `{"error": {"type", "code", "message", ...}}`. A provider's own error is forwarded with its status and body, under `X-LangWatch-Provider`.
 
-Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `unsupported_parameter`, `end_user_required`. All answer `400`.
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `unsupported_parameter` and `end_user_required`, all `400`. A policy rule that blocks the resolved model, or a model outside a policy allow-only list, answers `403 policy_violation`.
 
 **Also check:** [Streaming](/ai-gateway/streaming), [Parameter mapping](/ai-gateway/parameter-mapping), [Model aliases](/ai-gateway/model-aliases).

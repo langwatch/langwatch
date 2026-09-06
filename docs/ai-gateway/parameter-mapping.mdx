@@ -6,7 +6,7 @@ sidebarTitle: "Parameter mapping"
 
 A lane is the wire format the gateway uses to reach one kind of provider. OpenAI, Azure OpenAI and OpenAI-compatible custom endpoints share one lane; Anthropic, Bedrock, and Gemini with Vertex have a lane each.
 
-On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body byte for byte. It removes only the gateway's own `drop_tuning_params` field. Whatever the provider accepts, you get.
+On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body as written. Two fields are exceptions: it removes the gateway's own `drop_tuning_params`, and the organization's cache rules can strip or add a top-level `cache_control`, see [Cache control](/ai-gateway/cache-control). Whatever the provider accepts, you get.
 
 On the other lanes the gateway builds the provider-native request itself, so every parameter has one of three dispositions:
 

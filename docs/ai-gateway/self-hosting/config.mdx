@@ -10,7 +10,7 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Required
 
-The gateway refuses to start when any of these is empty.
+`LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` have no default: the gateway fails configuration validation and does not start when either is empty. `LW_GATEWAY_BASE_URL` falls back to its default instead.
 
 | Var | Purpose |
 |---|---|
@@ -112,6 +112,8 @@ These variables configure the gateway's own spans and metrics. Customer traces g
 
 Three deprecated names still work and log a rename warning at boot: `OTEL_OTLP_ENDPOINT` (use `OTEL_EXPORTER_OTLP_ENDPOINT`), `OTEL_OTLP_HEADERS` (use `OTEL_EXPORTER_OTLP_HEADERS`) and `OTEL_SAMPLE_RATIO` (use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with `OTEL_TRACES_SAMPLER_ARG`). A deprecated name and its replacement set to different values stop startup.
 
+The gateway does not check the scheme on these endpoints. An `http://` collector sends `OTEL_EXPORTER_OTLP_HEADERS` in cleartext, so use `https://` whenever the collector is not on the same host.
+
 Every gateway span carries the `langwatch.project_id` of the virtual key, so an export pointed at a LangWatch ingest files the span under the right project. See [Observability](/ai-gateway/observability).
 
 ## Customer trace bridge
@@ -122,6 +124,8 @@ Every gateway span carries the `langwatch.project_id` of the virtual key, so an 
 | `LANGY_MIRROR_TRACE_ENDPOINT` | empty | OTLP endpoint that receives a mirror copy of spans produced for Langy virtual keys |
 | `LANGY_MIRROR_TRACE_KEY` | empty | API key sent with the mirror export |
 | `LANGY_MIRROR_PROJECT_ID` | empty | Project that receives the mirror copy. With all three empty the mirror is off |
+
+`LANGY_MIRROR_TRACE_KEY` is sent as a bearer token on every mirror export, so point `LANGY_MIRROR_TRACE_ENDPOINT` at an `https://` URL.
 
 ## Debug
 

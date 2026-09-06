@@ -17,7 +17,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |
 
-None of these endpoints requires a key. The chart publishes `/health` through the ingress and keeps the others in-cluster.
+None of these endpoints requires a key. With the chart's default ClusterIP Service and ingress, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 

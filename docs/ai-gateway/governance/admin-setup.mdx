@@ -46,7 +46,9 @@ You need:
 
 ## Create a routing policy
 
-Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name. Virtual keys then point at the policy.
+Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name.
+
+Tick **Make this the default where it applies** so new keys in that scope pick it up, or attach it per key under **AI Gateway > Virtual Keys**, **Edit**, **Routing**. A key with neither runs in routing mode `none`, and the policy's restrictions never apply to it.
 
 <Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
   <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
@@ -64,7 +66,7 @@ Set at least one budget before you tell members to sign in. A key with no budget
 
 ## Give members their keys
 
-There is no switch to turn personal keys on. A member runs `langwatch login --device`, approves the device in the browser, and gets a personal virtual key as soon as the organization has one model provider the member can reach. Until then, the first tool run stops with `No personal virtual key on this account` and points at **Settings > Model Providers**.
+There is no switch to turn personal keys on. A member runs `langwatch login --device` and approves the device in the browser, which creates the device session only. The personal virtual key is issued on the first tool run that takes the gateway path. If the organization has no model provider the member can reach, that run stops with `409 no_eligible_providers` and points at **Settings > Model Providers**, and no key is created.
 
 To choose which coding tools and which providers members see on their portal, open **Governance > Inventory** (`/governance/inventory`) and edit the **Catalog** tab.
 
@@ -89,4 +91,4 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 3. Open **AI Gateway > Usage** (`/gateway/usage`) for the request and its cost.
 
-A `200` with an OpenAI-shaped body means the credential, the routing policy and the key all resolve. If the request is refused, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
+A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies: check the key's **Routing** section names the policy, then send a request for a model the policy refuses and confirm the answer is `403 policy_violation`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.

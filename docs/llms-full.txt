@@ -2005,7 +2005,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `guardrail_blocked` | 403 | A pre-call or post-call guardrail returned `block`. | Change the content, or change the guardrail on the key. |
 | `guardrail_upstream_unavailable` | 503 | A guardrail evaluator could not be reached, and the key fails closed. | Retry, or set the key's guardrails to fail open. |
 | `policy_violation` | 403 | The request content matched a deny rule in the key's policy rules. | Change the request, or change the policy rule. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, its policy rules, its provider access, or its routing policy. | Send a model the key allows, or widen the key. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, or its provider access or routing policy leaves the model's provider out of the chain. | Send a model the key allows, or widen the key. |
 | `model_provider_not_bound` | 400 | The request names a provider the key holds no credential for. | Bind that provider to the key, or send the model to a provider the key holds. |
 | `model_not_recognized` | 400 | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider. | Send the model as `provider/model`. |
 | `missing_model` | 400 | The request names no model. `meta.request_type` says where the endpoint expects one. | Add the model to the request. |
@@ -2446,7 +2446,7 @@ Translated lanes emit the same event set, built by the gateway. A failure after 
 
 Errors the gateway raises use the envelope on [Errors](/ai-gateway/api/errors): `{"error": {"type", "code", "message", ...}}`. A provider's own error is forwarded with its status and body, under `X-LangWatch-Provider`.
 
-Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `unsupported_parameter`, `end_user_required`. All answer `400`.
+Codes this endpoint raises before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `unsupported_parameter` and `end_user_required`, all `400`. A policy rule that blocks the resolved model, or a model outside a policy allow-only list, answers `403 policy_violation`.
 
 **Also check:** [Streaming](/ai-gateway/streaming), [Parameter mapping](/ai-gateway/parameter-mapping), [Model aliases](/ai-gateway/model-aliases).
 
@@ -2784,7 +2784,8 @@ On the codex lane the backend's own SSE frames reach the client as sent, with no
 | Code | Status | Cause |
 |---|---|---|
 | `missing_model` | 400 | The body has no top-level `model`. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, or the key's routing policy or provider access leaves its provider out of the chain. |
+| `policy_violation` | 403 | A policy rule blocks the resolved model, or the model is not in a policy allow-only list. |
 | `model_provider_not_bound` | 400 | The model names a provider the key holds no credential for. |
 | `unsupported_parameter` | 400 | A refused codex-lane parameter, or a drop refused by `drop_tuning_params: false`. |
 | `codex_session_expired` | 401 | The codex credential's sign-in expired. Sign in with OpenAI again on the model provider. |
@@ -3472,7 +3473,7 @@ sidebarTitle: Cache control
 The gateway decides one cache action for every request, in this order:
 
 1. **Cache rules.** If the organization has cache rules, the gateway evaluates them against the request and the virtual key. The first rule that matches sets the action.
-2. **Provider default.** If no rule matches and the request resolves to an Anthropic model, the gateway applies `force` on its own. This default only runs when the body is 4096 bytes or larger and the client did not send any `cache_control` marker.
+2. **Provider default.** If no rule matches and the request resolves to an Anthropic model, the gateway applies `force` on its own. This default only runs when the body is 4096 bytes or larger and the client is not already managing its own breakpoints: on `/v1/messages` any `cache_control` marker in the body disables it, on `/v1/chat/completions` only a top-level `cache_control` does.
 3. **Passthrough.** Otherwise the body reaches the provider unchanged.
 
 The response header `X-LangWatch-Cache-Mode` reports the outcome: `respect`, `disable` or `force` when a rule fired, `auto` when the provider default fired. The header is absent when neither a rule nor the provider default changed the body.
@@ -3837,12 +3838,13 @@ VK_SECRET=$(echo "$CREATE" | jq -r '.secret')
 [ -n "$VK_ID" ] && [ "$VK_ID" != "null" ] || { echo "FAIL: no virtual key id"; exit 1; }
 [ -n "$VK_SECRET" ] && [ "$VK_SECRET" != "null" ] || { echo "FAIL: no secret"; exit 1; }
 
-# 2. Check the key can reach at least one model.
+# 2. Report what the key enumerates. Discovery can be empty or partial while
+# dispatch still works, so this is a diagnostic, not a gate. Step 3 is the check.
 MODELS=$(curl -sS --fail-with-body --max-time 15 \
   -H "Authorization: Bearer $VK_SECRET" \
   "$GATEWAY_URL/v1/models" | jq -r '.data | length')
 
-[ "$MODELS" -gt 0 ] || { echo "FAIL: the key can route to no models"; exit 1; }
+echo "Models the key enumerates: $MODELS"
 
 # 3. Send a completion.
 BODY=$(mktemp)
@@ -5577,7 +5579,9 @@ You need:
 
 ## Create a routing policy
 
-Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name. Virtual keys then point at the policy.
+Open **AI Gateway > Routing Policies** (`/gateway/routing-policies`) and create a policy. The policy decides which providers a key routes through and in what order, what the model tiers resolve to, and which models, tools and addresses a request may name.
+
+Tick **Make this the default where it applies** so new keys in that scope pick it up, or attach it per key under **AI Gateway > Virtual Keys**, **Edit**, **Routing**. A key with neither runs in routing mode `none`, and the policy's restrictions never apply to it.
 
 <Frame caption="The policy drawer: where it applies, the providers in order, and the model tiers.">
   <img src="/images/ai-gateway/routing-policy-editor.png" alt="The New routing policy drawer with the scope, the ordered providers and the model tiers" />
@@ -5595,7 +5599,7 @@ Set at least one budget before you tell members to sign in. A key with no budget
 
 ## Give members their keys
 
-There is no switch to turn personal keys on. A member runs `langwatch login --device`, approves the device in the browser, and gets a personal virtual key as soon as the organization has one model provider the member can reach. Until then, the first tool run stops with `No personal virtual key on this account` and points at **Settings > Model Providers**.
+There is no switch to turn personal keys on. A member runs `langwatch login --device` and approves the device in the browser, which creates the device session only. The personal virtual key is issued on the first tool run that takes the gateway path. If the organization has no model provider the member can reach, that run stops with `409 no_eligible_providers` and points at **Settings > Model Providers**, and no key is created.
 
 To choose which coding tools and which providers members see on their portal, open **Governance > Inventory** (`/governance/inventory`) and edit the **Catalog** tab.
 
@@ -5620,7 +5624,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 3. Open **AI Gateway > Usage** (`/gateway/usage`) for the request and its cost.
 
-A `200` with an OpenAI-shaped body means the credential, the routing policy and the key all resolve. If the request is refused, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
+A `200` with an OpenAI-shaped body means the credential and the key resolve. It does not prove the policy applies: check the key's **Routing** section names the policy, then send a request for a model the policy refuses and confirm the answer is `403 policy_violation`. If a request is refused unexpectedly, [Troubleshooting](/ai-gateway/troubleshooting) maps the error codes to their cause.
 
 ---
 
@@ -5977,7 +5981,7 @@ The gateway has no retention setting of its own. Each record it produces lives i
 
 | Record | What it holds | Where it lives | Governed by |
 |---|---|---|---|
-| Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
+| Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to. A successful `/v1/chat/completions` or `/v1/messages` request that returns no output, no completion tokens and no cost is dropped before export and stores no trace | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
 | Spend records | One spend event per request: cost, tokens, model, virtual key, end user | Spend store | A fixed 13 months. Exempt from the data retention policy. See [Billing and spend events](/ai-gateway/billing-events#retention) |
 | Budget ledger | The debits each budget enforces against | Budget ledger | No expiry |
 | Audit log | Who created, rotated, revoked or changed a virtual key, budget, provider, cache rule or guardrail | Postgres audit log | Not subject to the data retention policy. See [Audit log](/ai-gateway/audit) |
@@ -6056,7 +6060,7 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `403 policy_violation`. The message names the model, not the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`. A policy rule that blocks the model, or a model outside an allow-only list, is refused with `403 policy_violation` instead. The message names the model, not the policy:
 
 ```json
 {"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}
@@ -6794,7 +6798,7 @@ sidebarTitle: "Parameter mapping"
 
 A lane is the wire format the gateway uses to reach one kind of provider. OpenAI, Azure OpenAI and OpenAI-compatible custom endpoints share one lane; Anthropic, Bedrock, and Gemini with Vertex have a lane each.
 
-On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body byte for byte. It removes only the gateway's own `drop_tuning_params` field. Whatever the provider accepts, you get.
+On the OpenAI-compatible lane the gateway forwards your `POST /v1/chat/completions` body as written. Two fields are exceptions: it removes the gateway's own `drop_tuning_params`, and the organization's cache rules can strip or add a top-level `cache_control`, see [Cache control](/ai-gateway/cache-control). Whatever the provider accepts, you get.
 
 On the other lanes the gateway builds the provider-native request itself, so every parameter has one of three dispositions:
 
@@ -7405,8 +7409,8 @@ The window, the threshold and the open duration are gateway settings: `LW_GATEWA
 
 | Code | Status | Cause |
 |---|---|---|
-| `policy_violation` | 403 | The model resolves to a provider the routing policy does not list. The message names the model: `model "gemini-2.5-flash" is not in allowlist`. |
-| `policy_violation` | 403 | A restriction on the policy refuses the model. The message names the model: `model "gemini-2.5-flash" is blocked by policy`. See [Policy rules](/ai-gateway/policy-rules). |
+| `model_not_allowed` | 400 | The model resolves to a provider the routing policy does not list. The message names the provider and the policy. |
+| `policy_violation` | 403 | A restriction on the policy refuses the model, or the model is not in the policy's allow-only list. The message names the model: `model "gemini-2.5-flash" is blocked by policy`, or `model "gemini-2.5-flash" is not in allowlist`. See [Policy rules](/ai-gateway/policy-rules). |
 | `model_not_allowed` | 400 | The model is outside the key's own model allowlist, or resolves to a provider the key's provider access excludes. |
 | `no_provider_configured` | 400 | The key reaches no provider at all. |
 | `model_not_recognized` | 400 | No provider on the key declares the model. See [Model naming](/ai-gateway/model-naming). |
@@ -8638,7 +8642,7 @@ The receiver compares the signature in constant time before it checks the timest
 
 | Variable | Purpose |
 |---|---|
-| `LW_GATEWAY_INTERNAL_SECRET` | The HMAC secret both sides share. When it is unset, the gateway refuses every `/internal/*` request |
+| `LW_GATEWAY_INTERNAL_SECRET` | The HMAC secret both sides share. It is required: with it unset the gateway fails configuration validation and does not start |
 | `LW_GATEWAY_JWT_SECRET` | Signs and verifies the resolve-key JWT. The gateway requires the issuer `langwatch-control-plane` and the audience `langwatch-gateway` |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | The previous JWT secret. A token that fails against the current secret is retried against this one, so a rotation does not reject tokens already in flight |
 | `LW_VIRTUAL_KEY_PEPPER` | The pepper for the virtual-key hash. Control plane only |
@@ -8689,7 +8693,7 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Required
 
-The gateway refuses to start when any of these is empty.
+`LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` have no default: the gateway fails configuration validation and does not start when either is empty. `LW_GATEWAY_BASE_URL` falls back to its default instead.
 
 | Var | Purpose |
 |---|---|
@@ -8791,6 +8795,8 @@ These variables configure the gateway's own spans and metrics. Customer traces g
 
 Three deprecated names still work and log a rename warning at boot: `OTEL_OTLP_ENDPOINT` (use `OTEL_EXPORTER_OTLP_ENDPOINT`), `OTEL_OTLP_HEADERS` (use `OTEL_EXPORTER_OTLP_HEADERS`) and `OTEL_SAMPLE_RATIO` (use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with `OTEL_TRACES_SAMPLER_ARG`). A deprecated name and its replacement set to different values stop startup.
 
+The gateway does not check the scheme on these endpoints. An `http://` collector sends `OTEL_EXPORTER_OTLP_HEADERS` in cleartext, so use `https://` whenever the collector is not on the same host.
+
 Every gateway span carries the `langwatch.project_id` of the virtual key, so an export pointed at a LangWatch ingest files the span under the right project. See [Observability](/ai-gateway/observability).
 
 ## Customer trace bridge
@@ -8801,6 +8807,8 @@ Every gateway span carries the `langwatch.project_id` of the virtual key, so an 
 | `LANGY_MIRROR_TRACE_ENDPOINT` | empty | OTLP endpoint that receives a mirror copy of spans produced for Langy virtual keys |
 | `LANGY_MIRROR_TRACE_KEY` | empty | API key sent with the mirror export |
 | `LANGY_MIRROR_PROJECT_ID` | empty | Project that receives the mirror copy. With all three empty the mirror is off |
+
+`LANGY_MIRROR_TRACE_KEY` is sent as a bearer token on every mirror export, so point `LANGY_MIRROR_TRACE_ENDPOINT` at an `https://` URL.
 
 ## Debug
 
@@ -8981,7 +8989,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics` and the probes. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
@@ -9048,7 +9056,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |
 
-None of these endpoints requires a key. The chart publishes `/health` through the ingress and keeps the others in-cluster.
+None of these endpoints requires a key. With the chart's default ClusterIP Service and ingress, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 
@@ -17117,6 +17125,7 @@ export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
 export OPENAI_API_KEY="vk-lw-..."
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai/v1"
 export ANTHROPIC_API_KEY="vk-lw-..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 opencode
 ```
 

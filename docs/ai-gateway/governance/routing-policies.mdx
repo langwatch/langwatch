@@ -59,7 +59,7 @@ The key's own model allowlist is checked against the served model, so a mapping 
 
 ## Provider order
 
-The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `403 policy_violation`. The message names the model, not the policy:
+The providers list is the key's fallback chain. The gateway keeps only the providers that can serve the requested model, then tries them in the listed order. A request for a model on a provider the policy does not include is refused with `400 model_not_allowed`. A policy rule that blocks the model, or a model outside an allow-only list, is refused with `403 policy_violation` instead. The message names the model, not the policy:
 
 ```json
 {"error": {"type": "policy_violation", "code": "policy_violation", "message": "model \"gemini-2.5-flash\" is not in allowlist", "fault": "customer"}}

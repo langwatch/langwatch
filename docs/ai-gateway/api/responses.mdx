@@ -94,7 +94,8 @@ On the codex lane the backend's own SSE frames reach the client as sent, with no
 | Code | Status | Cause |
 |---|---|---|
 | `missing_model` | 400 | The body has no top-level `model`. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, policy rules or routing policy. |
+| `model_not_allowed` | 400 | The model is outside the key's allowlist, or the key's routing policy or provider access leaves its provider out of the chain. |
+| `policy_violation` | 403 | A policy rule blocks the resolved model, or the model is not in a policy allow-only list. |
 | `model_provider_not_bound` | 400 | The model names a provider the key holds no credential for. |
 | `unsupported_parameter` | 400 | A refused codex-lane parameter, or a drop refused by `drop_tuning_params: false`. |
 | `codex_session_expired` | 401 | The codex credential's sign-in expired. Sign in with OpenAI again on the model provider. |

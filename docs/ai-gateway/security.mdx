@@ -70,7 +70,7 @@ The receiver compares the signature in constant time before it checks the timest
 
 | Variable | Purpose |
 |---|---|
-| `LW_GATEWAY_INTERNAL_SECRET` | The HMAC secret both sides share. When it is unset, the gateway refuses every `/internal/*` request |
+| `LW_GATEWAY_INTERNAL_SECRET` | The HMAC secret both sides share. It is required: with it unset the gateway fails configuration validation and does not start |
 | `LW_GATEWAY_JWT_SECRET` | Signs and verifies the resolve-key JWT. The gateway requires the issuer `langwatch-control-plane` and the audience `langwatch-gateway` |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | The previous JWT secret. A token that fails against the current secret is retried against this one, so a rotation does not reject tokens already in flight |
 | `LW_VIRTUAL_KEY_PEPPER` | The pepper for the virtual-key hash. Control plane only |

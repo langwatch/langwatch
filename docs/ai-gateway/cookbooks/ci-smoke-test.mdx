@@ -56,12 +56,13 @@ VK_SECRET=$(echo "$CREATE" | jq -r '.secret')
 [ -n "$VK_ID" ] && [ "$VK_ID" != "null" ] || { echo "FAIL: no virtual key id"; exit 1; }
 [ -n "$VK_SECRET" ] && [ "$VK_SECRET" != "null" ] || { echo "FAIL: no secret"; exit 1; }
 
-# 2. Check the key can reach at least one model.
+# 2. Report what the key enumerates. Discovery can be empty or partial while
+# dispatch still works, so this is a diagnostic, not a gate. Step 3 is the check.
 MODELS=$(curl -sS --fail-with-body --max-time 15 \
   -H "Authorization: Bearer $VK_SECRET" \
   "$GATEWAY_URL/v1/models" | jq -r '.data | length')
 
-[ "$MODELS" -gt 0 ] || { echo "FAIL: the key can route to no models"; exit 1; }
+echo "Models the key enumerates: $MODELS"
 
 # 3. Send a completion.
 BODY=$(mktemp)

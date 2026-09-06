@@ -153,7 +153,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics` and the probes. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
