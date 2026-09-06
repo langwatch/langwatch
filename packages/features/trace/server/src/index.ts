@@ -304,6 +304,8 @@ export {
   type TraceSpoolIdentity,
   type TraceSpoolServiceOptions,
 } from "./services/trace-spool.service";
+export { TraceEdgeSpoolService } from "./services/trace-edge-spool.service";
+export { TraceEdgeMediaPayloadService } from "./services/trace-edge-media-payload.service";
 export { SPOOL_REF_V2 } from "./rules/trace-spool-location.rules";
 export {
   StreamTooLargeError,

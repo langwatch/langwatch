@@ -1,3 +1,4 @@
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
   agentApiAgentInputSchema,
   agentApiAgentReferenceInputSchema,
@@ -6,6 +7,18 @@ import {
   agentApiProjectInputSchema,
   agentApiPushToCopiesInputSchema,
   agentApiTestTurnInputSchema,
+  agentCascadeArchiveSchema,
+  agentCopyCreatedSchema,
+  agentCopySchema,
+  agentHistoryEntrySchema,
+  agentPushToCopiesSchema,
+  agentSchema,
+  agentSyncFromSourceSchema,
+  agentTestRunResultSchema,
+  agentTestTurnResultSchema,
+  agentWithFieldsSchema,
+  agentWithLegacyCopyCountSchema,
+  relatedAgentEntitiesSchema,
   AgentCopiesNotFoundError,
   AgentCopySelectionError,
   AgentIsNotCopyError,
@@ -15,7 +28,7 @@ import {
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
 import type { AgentApiUpdateOutput } from "@langwatch/agent-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -94,7 +107,9 @@ type AgentTrpcProcedures<
    * `contextAuthorizationPolicy`, so authorization never depends on the
    * process remembering to pass this.
    */
-  policy?(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy?(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput?: boolean;
 }>;
 
 function asTrpcError(error: unknown): never {
@@ -152,185 +167,246 @@ export class AgentTrpcApi {
   ) {
     const { protected: procedure, policy = contextAuthorizationPolicy } = procedures;
 
-    return trpc.router({
-      getAll: policy("evaluations:view")(procedure.input(agentApiProjectInputSchema)).query(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          const agents = await withAgentErrors(() => ctx.app.agents.getAll(input));
-          return agents.map(withLegacyCopyCount);
-        },
-      ),
+    // Every procedure here declares one permission, so the chain's access
+    // argument is always a bare permission string; a whole declaration would
+    // have no policy of this shape to apply it with.
+    const chainPolicy = (access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator => {
+      if (typeof access !== "string") {
+        throw new Error("the agent tRPC surface declares single permissions only");
+      }
+      return policy(access);
+    };
 
-      getById: policy("evaluations:view")(procedure.input(agentApiAgentInputSchema)).query(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          const agent = await withAgentErrors(() => ctx.app.agents.getById(input));
-          return withLegacyCopyCount(agent);
-        },
-      ),
-
-      create: policy("evaluations:manage")(procedure.input(createInput)).mutation(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          return withAgentErrors(() => ctx.app.agents.create(input));
-        },
-      ),
-
-      update: policy("evaluations:manage")(procedure.input(updateAgentCommandSchema)).mutation(
-        async ({ ctx, input }): Promise<AgentApiUpdateOutput> => {
-          ctx.actor();
-          return withAgentErrors(() => ctx.app.agents.update(input));
-        },
-      ),
-
-      getRelatedEntities: policy("evaluations:view")(
-        procedure.input(agentApiAgentInputSchema),
-      ).query(async ({ ctx, input }) => {
-        ctx.actor();
-        return withAgentErrors(() => ctx.app.agents.relatedEntities(input));
-      }),
-
-      cascadeArchive: policy("evaluations:manage")(
-        procedure.input(agentApiAgentInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        ctx.actor();
-        return withAgentErrors(() => ctx.app.agents.cascadeArchive(input));
-      }),
-
-      delete: policy("evaluations:manage")(procedure.input(agentApiAgentInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          return withAgentErrors(() => ctx.app.agents.archive(input));
-        },
-      ),
-
-      getCopies: policy("evaluations:view")(
-        procedure.input(agentApiAgentReferenceInputSchema),
-      ).query(async ({ ctx, input }) => {
-        ctx.actor();
-        await withAgentErrors(() =>
-          ctx.app.agents.getById({ id: input.agentId, projectId: input.projectId }),
-        );
-        const copies = await withAgentErrors(() =>
-          ctx.app.agents.getCopies({ sourceAgentId: input.agentId }),
-        );
-        // Each copy lives in its own project, which the declared check on the
-        // named project cannot reach: a caller who may read here has proved
-        // nothing about the projects the copies sit in.
-        const permitted = await Promise.all(
-          copies.map(async (copy) => ({
-            copy,
-            allowed: await ctx.can("evaluations:view", { projectId: copy.projectId }),
-          })),
-        );
-        return permitted.filter(({ allowed }) => allowed).map(({ copy }) => copy);
-      }),
-
-      copy: policy("evaluations:manage")(procedure.input(copyInput)).mutation(
-        async ({ ctx, input }) => {
-          const actor = ctx.actor();
-          // The source project is a second scope the declaration cannot express;
-          // it is the caller's own input, so nothing else proves it is theirs.
-          if (!(await ctx.can("evaluations:manage", { projectId: input.sourceProjectId }))) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to manage evaluations in the source project",
-            });
-          }
-          return withAgentErrors(() =>
-            ctx.app.agents.copy({
-              sourceAgentId: input.agentId,
-              sourceProjectId: input.sourceProjectId,
-              targetProjectId: input.projectId,
-              actorUserId: actor.id,
-              newAgentId: input.newAgentId,
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy: chainPolicy },
+        validateOutput: procedures.validateOutput ?? false,
+      })
+        .query("getAll", (p) =>
+          p
+            .withInput(agentApiProjectInputSchema)
+            .withOutput(agentWithLegacyCopyCountSchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              const agents = await withAgentErrors(() => ctx.app.agents.getAll(input));
+              return agents.map(withLegacyCopyCount);
             }),
-          );
-        },
-      ),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(agentApiAgentInputSchema)
+            .withOutput(agentWithLegacyCopyCountSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              const agent = await withAgentErrors(() => ctx.app.agents.getById(input));
+              return withLegacyCopyCount(agent);
+            }),
+        )
+        .mutation("create", (p) =>
+          p
+            .withInput(createInput)
+            .withOutput(agentWithFieldsSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.create(input));
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(updateAgentCommandSchema)
+            .withOutput(agentWithFieldsSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }): Promise<AgentApiUpdateOutput> => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.update(input));
+            }),
+        )
+        .query("getRelatedEntities", (p) =>
+          p
+            .withInput(agentApiAgentInputSchema)
+            .withOutput(relatedAgentEntitiesSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.relatedEntities(input));
+            }),
+        )
+        .mutation("cascadeArchive", (p) =>
+          p
+            .withInput(agentApiAgentInputSchema)
+            .withOutput(agentCascadeArchiveSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.cascadeArchive(input));
+            }),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(agentApiAgentInputSchema)
+            .withOutput(agentSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.archive(input));
+            }),
+        )
+        .query("getCopies", (p) =>
+          p
+            .withInput(agentApiAgentReferenceInputSchema)
+            .withOutput(agentCopySchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await withAgentErrors(() =>
+                ctx.app.agents.getById({ id: input.agentId, projectId: input.projectId }),
+              );
+              const copies = await withAgentErrors(() =>
+                ctx.app.agents.getCopies({ sourceAgentId: input.agentId }),
+              );
+              // Each copy lives in its own project, which the declared check on the
+              // named project cannot reach: a caller who may read here has proved
+              // nothing about the projects the copies sit in.
+              const permitted = await Promise.all(
+                copies.map(async (copy) => ({
+                  copy,
+                  allowed: await ctx.can("evaluations:view", { projectId: copy.projectId }),
+                })),
+              );
+              return permitted.filter(({ allowed }) => allowed).map(({ copy }) => copy);
+            }),
+        )
+        .mutation("copy", (p) =>
+          p
+            .withInput(copyInput)
+            .withOutput(agentCopyCreatedSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              // The source project is a second scope the declaration cannot express;
+              // it is the caller's own input, so nothing else proves it is theirs.
+              if (!(await ctx.can("evaluations:manage", { projectId: input.sourceProjectId }))) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to manage evaluations in the source project",
+                });
+              }
+              return withAgentErrors(() =>
+                ctx.app.agents.copy({
+                  sourceAgentId: input.agentId,
+                  sourceProjectId: input.sourceProjectId,
+                  targetProjectId: input.projectId,
+                  actorUserId: actor.id,
+                  newAgentId: input.newAgentId,
+                }),
+              );
+            }),
+        )
+        .mutation("pushToCopies", (p) =>
+          p
+            .withInput(agentApiPushToCopiesInputSchema)
+            .withOutput(agentPushToCopiesSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              const copies = await withAgentErrors(() =>
+                ctx.app.agents.getCopies({ sourceAgentId: input.agentId }),
+              );
+              // Same second scope as `getCopies`, on the write side: the push only
+              // reaches copies in projects this caller may manage.
+              const permissions = await Promise.all(
+                copies.map(async (copy) => ({
+                  id: copy.id,
+                  allowed: await ctx.can("evaluations:manage", { projectId: copy.projectId }),
+                })),
+              );
+              const allowedIds = permissions.filter(({ allowed }) => allowed).map(({ id }) => id);
+              const copyIds = input.copyIds
+                ? input.copyIds.filter((id) => allowedIds.includes(id))
+                : allowedIds;
+              return withAgentErrors(() =>
+                ctx.app.agents.pushToCopies({
+                  sourceAgentId: input.agentId,
+                  sourceProjectId: input.projectId,
+                  copyIds,
+                }),
+              );
+            }),
+        )
+        .mutation("syncFromSource", (p) =>
+          p
+            .withInput(agentApiAgentReferenceInputSchema)
+            .withOutput(agentSyncFromSourceSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              const source = await withAgentErrors(() => ctx.app.agents.getSourceOfCopy(input));
+              // The source project is resolved from stored data, not named in the
+              // input, so the declaration has no id to check it at.
+              if (!(await ctx.can("evaluations:manage", { projectId: source.projectId }))) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to manage evaluations in the source project",
+                });
+              }
+              return withAgentErrors(() => ctx.app.agents.syncFromSource(input));
+            }),
+        )
+        .query("getHistory", (p) =>
+          p
+            .withInput(agentApiAgentReferenceInputSchema)
+            .withOutput(agentHistoryEntrySchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return withAgentErrors(() => ctx.app.agents.getHistory(input));
+            }),
+        )
 
-      pushToCopies: policy("evaluations:manage")(
-        procedure.input(agentApiPushToCopiesInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        ctx.actor();
-        const copies = await withAgentErrors(() =>
-          ctx.app.agents.getCopies({ sourceAgentId: input.agentId }),
-        );
-        // Same second scope as `getCopies`, on the write side: the push only
-        // reaches copies in projects this caller may manage.
-        const permissions = await Promise.all(
-          copies.map(async (copy) => ({
-            id: copy.id,
-            allowed: await ctx.can("evaluations:manage", { projectId: copy.projectId }),
-          })),
-        );
-        const allowedIds = permissions.filter(({ allowed }) => allowed).map(({ id }) => id);
-        const copyIds = input.copyIds
-          ? input.copyIds.filter((id) => allowedIds.includes(id))
-          : allowedIds;
-        return withAgentErrors(() =>
-          ctx.app.agents.pushToCopies({
-            sourceAgentId: input.agentId,
-            sourceProjectId: input.projectId,
-            copyIds,
-          }),
-        );
-      }),
+        /**
+         * Sends one turn to an agent and answers what it returned. The Test
+         * panel of the agent drawers.
+         */
+        .mutation("testTurn", (p) =>
+          p
+            .withInput(agentApiTestTurnInputSchema)
+            .withOutput(agentTestTurnResultSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              return ctx.app.agents.testTurn({
+                id: input.id,
+                projectId: input.projectId,
+                message: input.message,
+                params: input.params,
+                actorId: actor.id,
+              });
+            }),
+        )
 
-      syncFromSource: policy("evaluations:manage")(
-        procedure.input(agentApiAgentReferenceInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        ctx.actor();
-        const source = await withAgentErrors(() => ctx.app.agents.getSourceOfCopy(input));
-        // The source project is resolved from stored data, not named in the
-        // input, so the declaration has no id to check it at.
-        if (!(await ctx.can("evaluations:manage", { projectId: source.projectId }))) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to manage evaluations in the source project",
-          });
-        }
-        return withAgentErrors(() => ctx.app.agents.syncFromSource(input));
-      }),
-
-      getHistory: policy("evaluations:view")(
-        procedure.input(agentApiAgentReferenceInputSchema),
-      ).query(async ({ ctx, input }) => {
-        ctx.actor();
-        return withAgentErrors(() => ctx.app.agents.getHistory(input));
-      }),
-
-      /**
-       * Sends one turn to an agent and answers what it returned. The Test
-       * panel of the agent drawers.
-       */
-      testTurn: policy("evaluations:manage")(procedure.input(agentApiTestTurnInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const actor = ctx.actor();
-          return ctx.app.agents.testTurn({
-            id: input.id,
-            projectId: input.projectId,
-            message: input.message,
-            params: input.params,
-            actorId: actor.id,
-          });
-        },
-      ),
-
-      /**
-       * Schedules one scripted "Test agent" run, saving nothing. The "Test
-       * agent" item of the agent card menu.
-       */
-      testRun: policy("scenarios:create")(
-        procedure.input(agentApiAgentReferenceInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        return ctx.app.agents.testRun({
-          agentId: input.agentId,
-          projectId: input.projectId,
-          actorId: actor.id,
-        });
-      }),
-    });
+        /**
+         * Schedules one scripted "Test agent" run, saving nothing. The "Test
+         * agent" item of the agent card menu.
+         */
+        .mutation("testRun", (p) =>
+          p
+            .withInput(agentApiAgentReferenceInputSchema)
+            .withOutput(agentTestRunResultSchema)
+            .withPermission("scenarios:create")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              return ctx.app.agents.testRun({
+                agentId: input.agentId,
+                projectId: input.projectId,
+                actorId: actor.id,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

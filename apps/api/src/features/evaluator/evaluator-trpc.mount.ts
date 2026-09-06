@@ -30,7 +30,11 @@ export function createEvaluatorTrpcRouter<
   const service = createTrpcApiService(mount);
   return EvaluatorTrpcApi.create(
     mount.root,
-    { protected: service.protected, policy: (permission) => service.policy(permission) },
+    {
+      protected: service.protected,
+      policy: (permission) => service.policy(permission),
+      validateOutput: service.validateOutput,
+    },
     mount.ports,
   );
 }

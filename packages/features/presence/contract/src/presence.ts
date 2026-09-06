@@ -130,3 +130,7 @@ export const presenceCursorInputSchema = z
   })
   .strict();
 export type PresenceCursorInput = z.infer<typeof presenceCursorInputSchema>;
+
+/** What the presence writes answer with: the tick was accepted. */
+export const presenceAcknowledgedSchema = z.object({ ok: z.literal(true) }).strict();
+export type PresenceAcknowledged = z.infer<typeof presenceAcknowledgedSchema>;

@@ -22,6 +22,7 @@ function harness(triggerIds: string[], skipped: Record<string, number>) {
     {
       protected: trpc.procedure,
       policy: () => (procedure) => procedure,
+      validateOutput: true,
     },
     {
       rateLimit: async () => ({ allowed: true, resetAt: 0 }),

@@ -127,7 +127,7 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     },
   });
 
-  return { hono: family.hono, stub, chain };
+  return { hono: family, stub, chain };
 }
 
 const jsonHeaders = { "content-type": "application/json" };

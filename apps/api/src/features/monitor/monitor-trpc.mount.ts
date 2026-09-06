@@ -43,7 +43,12 @@ export function createMonitorTrpcRouter<
 
   return MonitorTrpcApi.create(
     options.root,
-    { protected: service.protected, policy: service.policy, alsoRequire },
+    {
+      protected: service.protected,
+      policy: service.policy,
+      alsoRequire,
+      validateOutput: service.validateOutput,
+    },
     options.ports,
   );
 }

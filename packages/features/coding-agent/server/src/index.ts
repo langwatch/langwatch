@@ -58,7 +58,6 @@ export {
   type CodingAgentAppDependencies,
   type CodingAgentCaller,
   type CodingAgentCallerScope,
-  type CodingAgentGithubConnection,
   type CodingAgentPullRequestRef,
   type CodingAgentScopePorts,
 } from "./app/coding-agent.app";

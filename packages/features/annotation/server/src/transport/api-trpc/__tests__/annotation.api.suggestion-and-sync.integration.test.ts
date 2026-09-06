@@ -80,6 +80,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
       {
         protected: trpc.procedure,
         policy: () => (procedure) => procedure,
+        validateOutput: true,
       },
       ports,
     );
@@ -207,7 +208,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
       const trpc = initTRPC.context<AnnotationTrpcContext>().create();
       const router = AnnotationTrpcApi.create(
         trpc,
-        { protected: trpc.procedure, policy: () => (procedure) => procedure },
+        { protected: trpc.procedure, policy: () => (procedure) => procedure, validateOutput: true },
         scopedPorts,
       );
       const caller = router.createCaller({

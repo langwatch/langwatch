@@ -41,12 +41,7 @@ export type {
   WebhookSendResult,
 } from "./adapters/webhook-delivery.adapter";
 export { SlackWebApiDeliveryAdapter } from "./adapters/slack-web-api.delivery.adapter";
-export type {
-  SlackApiTransport,
-  SlackChannel,
-  SlackChannelListGap,
-  SlackChannelListing,
-} from "./adapters/slack-web-api.delivery.adapter";
+export type { SlackApiTransport } from "./adapters/slack-web-api.delivery.adapter";
 export {
   createAutomationsPipeline,
   RecordTriggerMatchCommand,

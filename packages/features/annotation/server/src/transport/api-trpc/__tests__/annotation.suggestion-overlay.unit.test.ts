@@ -84,7 +84,7 @@ function harness({ canUpdate = true }: { canUpdate?: boolean } = {}) {
   const trpc = initTRPC.context<TestContext>().create();
   const router = AnnotationTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: () => (procedure) => procedure },
+    { protected: trpc.procedure, policy: () => (procedure) => procedure, validateOutput: true },
     ports,
   );
 

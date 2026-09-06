@@ -93,3 +93,7 @@ export type UpdateSecretInput = z.infer<typeof updateSecretInputSchema>;
 
 export const deleteSecretInputSchema = getSecretInputSchema;
 export type DeleteSecretInput = GetSecretInput;
+
+/** What the tRPC write procedures answer with: the write landed. */
+export const secretWriteAcknowledgedSchema = z.object({ success: z.boolean() }).strict();
+export type SecretWriteAcknowledged = z.infer<typeof secretWriteAcknowledgedSchema>;

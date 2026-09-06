@@ -98,3 +98,70 @@ export type RelatedAgentEntities = z.infer<typeof relatedAgentEntitiesSchema>;
 export type AgentReferenceState = z.infer<typeof agentReferenceStateSchema>;
 export type AgentName = z.infer<typeof agentNameSchema>;
 export type GetAgentResult = z.infer<typeof getAgentResultSchema>;
+
+/** One agent as the legacy tRPC reads render it, copy count included. */
+export const agentWithLegacyCopyCountSchema = z.intersection(
+  agentWithFieldsSchema,
+  z.object({ _count: z.object({ copiedAgents: z.number() }) }),
+);
+
+/** What a cascade archive took with it. */
+export const agentCascadeArchiveSchema = z.object({
+  agent: agentSchema,
+  archivedWorkflow: z.object({ id: z.string() }).nullable(),
+});
+
+/** The agent a copy created, as the copy answers. */
+export const agentCopyCreatedSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  copiedFromAgentId: z.string(),
+});
+
+/** How far a push to the replicas reached. */
+export const agentPushToCopiesSchema = z.object({
+  pushedTo: z.number(),
+  selectedCopies: z.number(),
+});
+
+/** A copy pulled back into line with the agent it came from. */
+export const agentSyncFromSourceSchema = z.object({ ok: z.literal(true) });
+
+/**
+ * What a test turn answered: the adapter's output, how long it took, and the
+ * connected instance that served it, when there was one.
+ */
+export const agentTestTurnResultSchema = z.object({
+  output: z.unknown(),
+  durationMs: z.number(),
+  instance: z.object({ hostname: z.string(), label: z.string().nullable() }).nullable(),
+});
+
+/** The ids a scheduled test run answers with. */
+export const agentTestRunResultSchema = z.object({
+  scenarioRunId: z.string(),
+  batchRunId: z.string(),
+  setId: z.string(),
+});
+export type AgentTestTurnResult = z.infer<typeof agentTestTurnResultSchema>;
+export type AgentTestRunResult = z.infer<typeof agentTestRunResultSchema>;
+
+/** What the agent test panel renders for one HTTP run. */
+export const httpProxyResultSchema = z.object({
+  success: z.boolean(),
+  error: z.string().optional(),
+  /** The engine's stable failure code, which the panel presents copy from. */
+  errorCode: z.string().optional(),
+  response: z.unknown().optional(),
+  extractedOutput: z.string().optional(),
+  status: z.number().optional(),
+  statusText: z.string().optional(),
+  duration: z.number().optional(),
+  responseHeaders: z.record(z.string(), z.string()).optional(),
+  /** The request body the engine sent, after templating. */
+  renderedBody: z.string().optional(),
+  /** Template variables the body referenced but the test did not supply. */
+  warnings: z.array(z.string()).optional(),
+});
+export type HttpProxyResult = z.infer<typeof httpProxyResultSchema>;

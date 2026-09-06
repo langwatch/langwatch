@@ -30,8 +30,13 @@
  * the agent this tests — is the only thing between a member and an outbound
  * request from our network. It is not a coarse pre-filter.
  */
-import { buildHttpNodeParameters } from "@langwatch/agent-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  buildHttpNodeParameters,
+  httpProxyResultSchema,
+  type HttpProxyResult,
+} from "@langwatch/agent-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   HTTP_METHODS,
@@ -56,24 +61,6 @@ import {
 } from "../../rules/agent-test-tracing.rules";
 
 const logger = createLogger("langwatch:httpProxy");
-
-/** What the test panel renders for one run. */
-export type HttpProxyResult = {
-  success: boolean;
-  error?: string;
-  /** The engine's stable failure code, which the panel presents copy from. */
-  errorCode?: string;
-  response?: unknown;
-  extractedOutput?: string;
-  status?: number;
-  statusText?: string;
-  duration?: number;
-  responseHeaders?: Record<string, string>;
-  /** The request body the engine sent, after templating. */
-  renderedBody?: string;
-  /** Template variables the body referenced but the test did not supply. */
-  warnings?: string[];
-};
 
 /**
  * The per-request handle the process's dispatch and ingestion need. Opaque
@@ -103,7 +90,9 @@ type HttpProxyTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs; neither is the agent's own. */
@@ -422,68 +411,76 @@ export class HttpProxyTrpcApi {
       }
     };
 
-    return trpc.router({
-      execute: policy("evaluations:manage")(procedure.input(executeInputSchema)).mutation(
-        async ({ input, ctx }): Promise<HttpProxyResult> => {
-          const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = input;
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .mutation("execute", (p) =>
+        p
+          .withInput(executeInputSchema)
+          .withOutput(httpProxyResultSchema)
+          .withPermission("evaluations:manage")
+          .handle(async ({ input, ctx }): Promise<HttpProxyResult> => {
+            const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = input;
 
-          // Generated up front so the traceparent can ride along on the request
-          // and the customer's agent can correlate its own spans with the test.
-          const traceIds = agentId ? generateTraceIds() : undefined;
-          const headers = [...(call.headers ?? [])];
-          if (traceIds) {
-            headers.push({
-              key: "traceparent",
-              value: buildTraceparentHeader(traceIds),
-            });
-          }
+            // Generated up front so the traceparent can ride along on the request
+            // and the customer's agent can correlate its own spans with the test.
+            const traceIds = agentId ? generateTraceIds() : undefined;
+            const headers = [...(call.headers ?? [])];
+            if (traceIds) {
+              headers.push({
+                key: "traceparent",
+                value: buildTraceparentHeader(traceIds),
+              });
+            }
 
-          const nodeId = "http_agent_test";
-          const workflow = buildAgentTestWorkflow({
-            nodeId,
-            variables: templateVariables,
-            parameters: buildHttpNodeParameters({ ...call, headers, bodyTemplate }),
-          });
-
-          const traceId = traceIds?.traceId ?? `agent-test-${nanoid(12)}`;
-          const startedAt = Date.now();
-
-          let result: HttpProxyResult;
-          try {
-            const state = await runNode({
-              request: ctx,
-              projectId,
+            const nodeId = "http_agent_test";
+            const workflow = buildAgentTestWorkflow({
               nodeId,
-              workflow,
-              traceId,
-              inputs: templateVariables,
+              variables: templateVariables,
+              parameters: buildHttpNodeParameters({ ...call, headers, bodyTemplate }),
             });
-            result = toProxyResult({
-              state,
-              fallbackDuration: Date.now() - startedAt,
-            });
-          } catch (err) {
-            // Failing to reach the engine is our problem, not the author's, and
-            // its message is a transport detail that can name an internal host
-            // and port. It is logged and it degrades to the generic failure,
-            // which is ADR-045: only a coded failure gets words written for it.
-            // The engine's own messages, which are what the author needs,
-            // arrive on the node's state above and are not this path.
-            logger.error({ err, projectId, agentId }, "agent test dispatch failed");
-            result = { success: false };
-          }
 
-          await recordTestTrace({
-            request: ctx,
-            input,
-            userId: ctx.actor().id,
-            traceIds,
-            headers,
-            result,
-          });
-          return result;
-        },
-      ),
-    });
+            const traceId = traceIds?.traceId ?? `agent-test-${nanoid(12)}`;
+            const startedAt = Date.now();
+
+            let result: HttpProxyResult;
+            try {
+              const state = await runNode({
+                request: ctx,
+                projectId,
+                nodeId,
+                workflow,
+                traceId,
+                inputs: templateVariables,
+              });
+              result = toProxyResult({
+                state,
+                fallbackDuration: Date.now() - startedAt,
+              });
+            } catch (err) {
+              // Failing to reach the engine is our problem, not the author's, and
+              // its message is a transport detail that can name an internal host
+              // and port. It is logged and it degrades to the generic failure,
+              // which is ADR-045: only a coded failure gets words written for it.
+              // The engine's own messages, which are what the author needs,
+              // arrive on the node's state above and are not this path.
+              logger.error({ err, projectId, agentId }, "agent test dispatch failed");
+              result = { success: false };
+            }
+
+            await recordTestTrace({
+              request: ctx,
+              input,
+              userId: ctx.actor().id,
+              traceIds,
+              headers,
+              result,
+            });
+            return result;
+          }),
+      )
+      .build();
   }
 }

@@ -10,7 +10,7 @@
  * rather than the contract's.
  */
 import { z } from "zod";
-import { evaluatorTypeSchema } from "./evaluator";
+import { evaluatorFieldSchema, evaluatorSchema, evaluatorTypeSchema } from "./evaluator";
 import type { Evaluator, EvaluatorWithFields } from "./evaluator";
 
 /** One project. The list read names it and nothing else. */
@@ -117,3 +117,57 @@ export type EvaluatorApiUpdateOutput = Evaluator;
 
 /** Deleting archives the row and answers it, so the caller can offer an undo. */
 export type EvaluatorApiDeleteOutput = Evaluator;
+
+/**
+ * What the evaluator tRPC surface answers with, beyond the evaluator rows
+ * above. Each is the shape the procedure already returned.
+ */
+export const evaluatorCopySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  projectId: z.string(),
+  fullPath: z.string(),
+});
+
+export const evaluatorHistoryEntrySchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  createdAt: z.date(),
+  args: z.unknown(),
+  user: z
+    .object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() })
+    .nullable(),
+});
+
+/** The entry-node fields a workflow evaluator maps trace data onto. */
+export const evaluatorWorkflowFieldsSchema = z.object({
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  workflowId: z.string().optional(),
+  workflowName: z.string().optional(),
+  workflowIcon: z.string().optional(),
+  fields: z.array(evaluatorFieldSchema),
+  outputFields: z.array(evaluatorFieldSchema),
+});
+
+/** The workflow and monitors an archive would take with the evaluator. */
+export const evaluatorRelatedEntitiesSchema = z.object({
+  workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
+  monitors: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
+/** What a cascade archive took with it. */
+export const evaluatorCascadeArchiveSchema = z.object({
+  evaluator: evaluatorSchema,
+  archivedWorkflow: z.object({ id: z.string() }).nullable(),
+  deletedMonitorsCount: z.number(),
+});
+
+/** How far a push to the replicas reached. */
+export const evaluatorPushToCopiesSchema = z.object({
+  pushedTo: z.number(),
+  selectedCopies: z.number(),
+});
+
+/** A copy pulled back into line with its source. */
+export const evaluatorSyncFromSourceSchema = z.object({ ok: z.literal(true) });

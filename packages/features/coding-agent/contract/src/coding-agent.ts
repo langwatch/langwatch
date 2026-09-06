@@ -552,3 +552,19 @@ export type CodingAgentPersonalPullRequestUsage = z.infer<
   typeof codingAgentPersonalPullRequestUsageSchema
 >;
 export type CodingAgentPullRequestDetail = z.infer<typeof codingAgentPullRequestDetailSchema>;
+
+/** Whether GitHub is connected for an organization, and where to connect it. */
+export const codingAgentGithubConnectionSchema = z
+  .object({ connected: z.boolean(), installUrl: z.string().nullable() })
+  .strict();
+export type CodingAgentGithubConnection = z.infer<typeof codingAgentGithubConnectionSchema>;
+
+/**
+ * The personal project's pull requests and unmapped branches, plus whether
+ * GitHub is connected — all three at once, because the page needs all three to
+ * decide what to render.
+ */
+export const codingAgentPersonalPullRequestUsageWithConnectionSchema =
+  codingAgentPersonalPullRequestUsageSchema.extend({
+    connection: codingAgentGithubConnectionSchema,
+  });

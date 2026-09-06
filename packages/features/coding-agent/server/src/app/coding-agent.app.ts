@@ -23,6 +23,7 @@
  * A caller arrives as an argument, never read from a session or a request.
  */
 import type {
+  CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPersonalPullRequestUsageInput,
   CodingAgentPullRequestDetail,
@@ -93,12 +94,6 @@ export interface CodingAgentAppDependencies {
   codingAgents: CodingAgentService;
   github: GithubService;
   scope: CodingAgentScopePorts;
-}
-
-/** Whether GitHub is connected for an organization, and where to connect it. */
-export interface CodingAgentGithubConnection {
-  connected: boolean;
-  installUrl: string | null;
 }
 
 export class CodingAgentApp {

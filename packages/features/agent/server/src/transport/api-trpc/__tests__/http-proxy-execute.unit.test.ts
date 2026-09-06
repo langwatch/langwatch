@@ -21,6 +21,7 @@ function harness(state: ExecutionState) {
     {
       protected: trpc.procedure,
       policy: () => (procedure) => procedure,
+      validateOutput: true,
     },
     {
       postStudioEvent: async (_request, { event, onEvent }) => {

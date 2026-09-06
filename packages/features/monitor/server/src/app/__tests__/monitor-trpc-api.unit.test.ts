@@ -56,7 +56,7 @@ function harness({
 
   const router = MonitorTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: decorate, alsoRequire: decorate },
+    { protected: trpc.procedure, policy: decorate, alsoRequire: decorate, validateOutput: true },
     {
       preconditionsSchema,
       resolvePreviousPeriodStartMs: () => 1_000,
@@ -92,6 +92,7 @@ describe("MonitorTrpcApi", () => {
           protected: trpc.procedure,
           policy: () => (procedure) => procedure,
           alsoRequire: () => (procedure) => procedure,
+          validateOutput: true,
         },
         {
           preconditionsSchema,
@@ -157,7 +158,25 @@ describe("MonitorTrpcApi", () => {
     });
 
     it("accepts a workflow evaluator, whose settings live elsewhere", async () => {
-      const create = vi.fn(async () => ({ id: "monitor-1" }));
+      const create = vi.fn(async () => ({
+        id: "monitor-1",
+        projectId: "project-1",
+        experimentId: null,
+        evaluatorId: null,
+        checkType: "workflow",
+        name: "Workflow check",
+        slug: "workflow-check",
+        executionMode: "ON_MESSAGE" as const,
+        enabled: true,
+        preconditions: [],
+        parameters: {},
+        mappings: null,
+        sample: 1,
+        level: "info",
+        threadIdleTimeout: null,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }));
       const { caller } = harness({ monitors: { create: create as never } });
 
       await caller.create({

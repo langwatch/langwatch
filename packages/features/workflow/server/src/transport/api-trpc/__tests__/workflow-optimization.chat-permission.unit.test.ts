@@ -27,14 +27,16 @@ function buildRouter() {
     {
       protected: trpc.procedure,
       policy: (permission) => {
-        declared.push(permission);
+        declared.push(permission as AuthzPermission);
         return (procedure) => procedure;
       },
+      validateOutput: true,
     },
     {
       runPublishedWorkflow,
       tryGetWorkflow: vi.fn(async () => null),
       tryGetWorkflowVersion: vi.fn(async () => null),
+      setWorkflowFlags: vi.fn(async () => undefined),
       listPublishedComponents: vi.fn(async () => []),
     },
   );

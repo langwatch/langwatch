@@ -16,6 +16,7 @@
  */
 import type { Readable } from "node:stream";
 import type {
+  StoredObjectHead,
   StoredObjectOwnerResolver,
   StoredObjectService,
   StoredObjectsConfirmUploadInput,
@@ -27,19 +28,6 @@ import type {
   StoredObjectsGetOutput,
   StoredObjectReference,
 } from "@langwatch/stored-object-contract";
-
-/**
- * The tri-state a probe answers with, matching the `/api/files/:id` HTTP
- * route:
- *  - `available` — row exists and storage has the bytes
- *  - `missing`   — row exists but the blob is gone (compensating delete
- *                  crashed, retention sweep, and so on)
- *  - `not_found` — no row matches
- */
-export type StoredObjectHead =
-  | { status: "available"; mediaType: string }
-  | { status: "missing"; mediaType: string }
-  | { status: "not_found" };
 
 /**
  * The row the file surface builds its response from.

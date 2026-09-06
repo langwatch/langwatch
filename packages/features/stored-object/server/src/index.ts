@@ -9,7 +9,6 @@ export {
   type StoredObjectFileRead,
   type StoredObjectFileReadPort,
   type StoredObjectFileRow,
-  type StoredObjectHead,
 } from "./app/stored-object.app";
 export {
   createFilesRestApp,

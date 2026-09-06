@@ -32,7 +32,11 @@ export function createGithubTrpcRouter<
 >(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TPorts>) {
   return GithubTrpcApi.create(
     mount.root,
-    { protected: mount.protectedProcedure, policy: appTrpcPolicy(mount.middlewares) },
+    {
+      protected: mount.protectedProcedure,
+      policy: appTrpcPolicy(mount.middlewares),
+      validateOutput: mount.validateOutput ?? false,
+    },
     mount.ports,
   );
 }

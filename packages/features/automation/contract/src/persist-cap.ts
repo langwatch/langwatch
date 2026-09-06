@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** Process configuration for the confirmed-persist daily ceiling. */
 export interface AutomationPersistCapConfig {
   free: number;
@@ -26,7 +28,8 @@ export interface AutomationPersistCapDecision {
   skipped: number;
 }
 
-export interface AutomationPersistCapCount {
-  count: number;
-  skipped: number;
-}
+export const automationPersistCapCountSchema = z.object({
+  count: z.number(),
+  skipped: z.number(),
+});
+export type AutomationPersistCapCount = z.infer<typeof automationPersistCapCountSchema>;

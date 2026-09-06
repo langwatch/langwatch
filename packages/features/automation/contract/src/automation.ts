@@ -32,3 +32,23 @@ export const triggerFireSchema = z.object({
   createdAt: z.date(),
   status: z.string().optional(),
 });
+
+/** The masked recipient and names behind an unsubscribe token. */
+export const unsubscribeViewSchema = z.object({
+  projectName: z.string(),
+  triggerName: z.string().nullable(),
+  email: z.string(),
+});
+export type UnsubscribeView = z.infer<typeof unsubscribeViewSchema>;
+
+/**
+ * One suppression row as the operator table renders it: the stored row minus
+ * the project id the caller already named, plus its automation's name.
+ */
+export const emailSuppressionRowSchema = emailSuppressionSchema
+  .omit({ projectId: true })
+  .extend({ triggerName: z.string().nullable() });
+export type EmailSuppressionRow = z.infer<typeof emailSuppressionRowSchema>;
+
+/** What the email-suppression writes answer with: the write landed. */
+export const emailSuppressionAcknowledgedSchema = z.object({ ok: z.boolean() }).strict();

@@ -3,7 +3,9 @@
  * published workflow once with a chat message, the way the studio's chat panel does.
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import { workflowWriteAcknowledgedSchema } from "@langwatch/workflow-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { WorkflowApp } from "#app/workflow.app";
@@ -26,7 +28,9 @@ type WorkflowOptimizationTrpcProcedures<
    * The host's tracing, logging, error, scope-lineage, authorization and audit policy for one
    * declared permission.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The workflow row this surface reads and flips flags on. */
@@ -110,144 +114,187 @@ export class WorkflowOptimizationTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      /**
-       * Running a published workflow spends model budget and executes the
-       * graph's code and HTTP nodes, so it is gated on the same permission the
-       * public run endpoint declares — not on the permission to look at it.
-       */
-      chat: policy("workflows:manage")(
-        procedure.input(
-          workflowScopeSchema.extend({
-            inputMessages: z.array(z.record(z.string(), z.string())),
-          }),
-        ),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ports.runPublishedWorkflow(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-            body: input.inputMessages[0] ?? {},
-          }),
-      ),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * Running a published workflow spends model budget and executes the
+         * graph's code and HTTP nodes, so it is gated on the same permission the
+         * public run endpoint declares — not on the permission to look at it.
+         */
+        .mutation("chat", (p) =>
+          p
+            .withInput(
+              workflowScopeSchema.extend({
+                inputMessages: z.array(z.record(z.string(), z.string())),
+              }),
+            )
+            .withoutOutput(
+              "the run's answer is the process's own engine response, generic in this feature: naming one here would narrow what the studio is handed",
+            )
+            .withPermission("workflows:manage")
+            .handle(
+              async ({ ctx, input }) =>
+                await ports.runPublishedWorkflow(ctx, {
+                  workflowId: input.workflowId,
+                  projectId: input.projectId,
+                  body: input.inputMessages[0] ?? {},
+                }),
+            ),
+        )
 
-      /**
-       * Null when nothing is published yet, which is a state the studio renders
-       * rather than an error: a workflow becomes a component before it has a
-       * published version.
-       */
-      getPublishedWorkflow: policy("workflows:view")(procedure.input(workflowScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const workflow = await ports.tryGetWorkflow(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-          });
-          const publishedWorkflow = await ports.tryGetWorkflowVersion(ctx, {
-            versionId: workflow?.publishedId ?? "",
-            projectId: input.projectId,
-          });
+        /**
+         * Null when nothing is published yet, which is a state the studio renders
+         * rather than an error: a workflow becomes a component before it has a
+         * published version.
+         */
+        .query("getPublishedWorkflow", (p) =>
+          p
+            .withInput(workflowScopeSchema)
+            .withoutOutput(
+              "a published version's shape is the process's own read, generic in this feature: naming one here would narrow what the studio is handed",
+            )
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }) => {
+              const workflow = await ports.tryGetWorkflow(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              });
+              const publishedWorkflow = await ports.tryGetWorkflowVersion(ctx, {
+                versionId: workflow?.publishedId ?? "",
+                projectId: input.projectId,
+              });
 
-          if (!publishedWorkflow) {
-            return null;
-          }
+              if (!publishedWorkflow) {
+                return null;
+              }
 
-          return {
-            ...publishedWorkflow,
-            isComponent: workflow?.isComponent,
-            isEvaluator: workflow?.isEvaluator,
-          };
-        },
-      ),
+              return {
+                ...publishedWorkflow,
+                isComponent: workflow?.isComponent,
+                isEvaluator: workflow?.isEvaluator,
+              };
+            }),
+        )
+        .mutation("disableAsComponent", (p) =>
+          p
+            .withInput(workflowScopeSchema)
+            .withOutput(workflowWriteAcknowledgedSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              await ports.setWorkflowFlags(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+                isComponent: false,
+              });
 
-      disableAsComponent: policy("workflows:update")(procedure.input(workflowScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.setWorkflowFlags(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-            isComponent: false,
-          });
+              return { success: true };
+            }),
+        )
 
-          return { success: true };
-        },
-      ),
+        /**
+         * Archives the evaluator this workflow was published as, so nothing keeps
+         * an evaluator pointing at a workflow that no longer offers itself.
+         */
+        .mutation("disableAsEvaluator", (p) =>
+          p
+            .withInput(workflowScopeSchema)
+            .withOutput(workflowWriteAcknowledgedSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              const { workflowId, projectId } = input;
 
-      /**
-       * Archives the evaluator this workflow was published as, so nothing keeps
-       * an evaluator pointing at a workflow that no longer offers itself.
-       */
-      disableAsEvaluator: policy("workflows:update")(procedure.input(workflowScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { workflowId, projectId } = input;
+              await ports.setWorkflowFlags(ctx, { workflowId, projectId, isEvaluator: false });
 
-          await ports.setWorkflowFlags(ctx, { workflowId, projectId, isEvaluator: false });
+              await ctx.app.workflows.unlinkEvaluatorFromWorkflow({ workflowId, projectId });
 
-          await ctx.app.workflows.unlinkEvaluatorFromWorkflow({ workflowId, projectId });
+              return { success: true };
+            }),
+        )
 
-          return { success: true };
-        },
-      ),
+        /** A workflow is a component or an evaluator, never both. */
+        .mutation("toggleSaveAsComponent", (p) =>
+          p
+            .withInput(
+              workflowScopeSchema.extend({
+                isComponent: z.boolean(),
+                isEvaluator: z.boolean(),
+              }),
+            )
+            .withOutput(workflowWriteAcknowledgedSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              const { workflowId, projectId, isComponent } = input;
+              const isEvaluator = isComponent ? false : input.isEvaluator;
 
-      /** A workflow is a component or an evaluator, never both. */
-      toggleSaveAsComponent: policy("workflows:update")(
-        procedure.input(
-          workflowScopeSchema.extend({
-            isComponent: z.boolean(),
-            isEvaluator: z.boolean(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const { workflowId, projectId, isComponent } = input;
-        const isEvaluator = isComponent ? false : input.isEvaluator;
+              await ports.setWorkflowFlags(ctx, {
+                workflowId,
+                projectId,
+                isComponent,
+                isEvaluator,
+              });
+              return { success: true };
+            }),
+        )
 
-        await ports.setWorkflowFlags(ctx, { workflowId, projectId, isComponent, isEvaluator });
-        return { success: true };
-      }),
+        /**
+         * Publishing as an evaluator creates the evaluator that wraps the
+         * workflow, or renames an existing one to match — so the evaluator picker
+         * never shows a stale name for a workflow that was renamed.
+         */
+        .mutation("toggleSaveAsEvaluator", (p) =>
+          p
+            .withInput(
+              workflowScopeSchema.extend({
+                isEvaluator: z.boolean(),
+                isComponent: z.boolean(),
+              }),
+            )
+            .withOutput(workflowWriteAcknowledgedSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              const { workflowId, projectId, isEvaluator } = input;
 
-      /**
-       * Publishing as an evaluator creates the evaluator that wraps the
-       * workflow, or renames an existing one to match — so the evaluator picker
-       * never shows a stale name for a workflow that was renamed.
-       */
-      toggleSaveAsEvaluator: policy("workflows:update")(
-        procedure.input(
-          workflowScopeSchema.extend({
-            isEvaluator: z.boolean(),
-            isComponent: z.boolean(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const { workflowId, projectId, isEvaluator } = input;
+              const workflow = await ports.tryGetWorkflow(ctx, { workflowId, projectId });
 
-        const workflow = await ports.tryGetWorkflow(ctx, { workflowId, projectId });
+              if (!workflow) {
+                throw new Error("Workflow not found");
+              }
 
-        if (!workflow) {
-          throw new Error("Workflow not found");
-        }
+              await ports.setWorkflowFlags(ctx, {
+                workflowId,
+                projectId,
+                isEvaluator,
+                isComponent: !isEvaluator,
+              });
 
-        await ports.setWorkflowFlags(ctx, {
-          workflowId,
-          projectId,
-          isEvaluator,
-          isComponent: !isEvaluator,
-        });
+              if (isEvaluator) {
+                await ctx.app.workflows.linkEvaluatorToWorkflow({
+                  workflowId,
+                  projectId,
+                  name: workflow.name,
+                });
+              }
 
-        if (isEvaluator) {
-          await ctx.app.workflows.linkEvaluatorToWorkflow({
-            workflowId,
-            projectId,
-            name: workflow.name,
-          });
-        }
-
-        return { success: true };
-      }),
-
-      getComponents: policy("workflows:view")(
-        procedure.input(z.object({ projectId: z.string() })),
-      ).query(
-        async ({ ctx, input }) =>
-          await ports.listPublishedComponents(ctx, { projectId: input.projectId }),
-      ),
-    });
+              return { success: true };
+            }),
+        )
+        .query("getComponents", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string() }))
+            .withoutOutput(
+              "a published component's shape is the process's own read, generic in this feature: naming one here would narrow what the studio is handed",
+            )
+            .withPermission("workflows:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await ports.listPublishedComponents(ctx, { projectId: input.projectId }),
+            ),
+        )
+        .build()
+    );
   }
 }

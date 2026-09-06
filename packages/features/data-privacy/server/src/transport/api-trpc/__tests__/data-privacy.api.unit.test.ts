@@ -64,9 +64,10 @@ function harness(overrides: Partial<DataPrivacyTrpcPorts<Snapshot, Rule>> = {}) 
     trpc,
     {
       protected: authenticated,
-      policy: (permission) => recordingDecorator(permission),
+      policy: (permission) => recordingDecorator(String(permission)),
       scopeWritePolicy: recordingDecorator("scopeWritePolicy"),
       scopeRemovalPolicy: recordingDecorator("scopeRemovalPolicy"),
+      validateOutput: true,
     },
     ports,
   );

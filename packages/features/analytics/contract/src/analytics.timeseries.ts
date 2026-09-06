@@ -106,35 +106,52 @@ export type AnalyticsFilterValue =
 export type AnalyticsFilters = Partial<Record<string, AnalyticsFilterValue>>;
 export type AnalyticsReadInput = z.infer<typeof analyticsReadInputSchema>;
 
-export interface AnalyticsFeedbackEvent {
-  event_id: string;
-  event_type: string;
-  project_id?: string;
-  trace_id: string;
-  timestamps: {
-    started_at: number;
-    inserted_at: number;
-    updated_at: number;
-  };
-  metrics?: Array<{ key: string; value: number }>;
-  event_details?: Array<{ key: string; value: string }>;
-}
+export const analyticsFeedbackEventSchema = z.object({
+  event_id: z.string(),
+  event_type: z.string(),
+  project_id: z.string().optional(),
+  trace_id: z.string(),
+  timestamps: z.object({
+    started_at: z.number(),
+    inserted_at: z.number(),
+    updated_at: z.number(),
+  }),
+  metrics: z.array(z.object({ key: z.string(), value: z.number() })).optional(),
+  event_details: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
+});
+export type AnalyticsFeedbackEvent = z.infer<typeof analyticsFeedbackEventSchema>;
 
-export interface AnalyticsFeedbacksResult {
-  events: AnalyticsFeedbackEvent[];
-}
+export const analyticsFeedbacksResultSchema = z.object({
+  events: z.array(analyticsFeedbackEventSchema),
+});
+export type AnalyticsFeedbacksResult = z.infer<typeof analyticsFeedbacksResultSchema>;
 
-export interface AnalyticsTopDocument {
-  documentId: string;
-  count: number;
-  traceId: string;
-  content?: string;
-}
+export const analyticsTopDocumentSchema = z.object({
+  documentId: z.string(),
+  count: z.number(),
+  traceId: z.string(),
+  content: z.string().optional(),
+});
+export type AnalyticsTopDocument = z.infer<typeof analyticsTopDocumentSchema>;
 
-export interface AnalyticsTopDocumentsResult {
-  topDocuments: AnalyticsTopDocument[];
-  totalUniqueDocuments: number;
-}
+export const analyticsTopDocumentsResultSchema = z.object({
+  topDocuments: z.array(analyticsTopDocumentSchema),
+  totalUniqueDocuments: z.number(),
+});
+export type AnalyticsTopDocumentsResult = z.infer<typeof analyticsTopDocumentsResultSchema>;
+
+/** One offered value for a filter field, exactly as the picker renders it. */
+export const analyticsFilterOptionSchema = z.object({
+  field: z.string(),
+  label: z.string(),
+  count: z.number(),
+});
+export type AnalyticsFilterOption = z.infer<typeof analyticsFilterOptionSchema>;
+
+/** What `dataForFilter` answers with. */
+export const analyticsFilterOptionsResultSchema = z.object({
+  options: z.array(analyticsFilterOptionSchema),
+});
 
 export const analyticsTimeseriesRowSchema = z
   .object({

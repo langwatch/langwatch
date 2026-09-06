@@ -176,3 +176,29 @@ export abstract class LangWatchQLService {
   abstract validate(input: LangWatchQLValidationInput): unknown;
   abstract execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
+
+/**
+ * Which gate closed, when one did.
+ *
+ * `disabled` is the project's own switch being off, which its administrator can
+ * change; `unprovisioned` is a deployment with no LangWatchQL identity to run
+ * as, which they cannot. They read as different refusals, so the page has to be
+ * able to tell them apart.
+ */
+export const langWatchQLUnavailableReasonSchema = z.enum(["disabled", "unprovisioned"]);
+export type LangWatchQLUnavailableReason = z.infer<typeof langWatchQLUnavailableReasonSchema>;
+
+/**
+ * One object with an optional reason rather than a union, so a consumer that
+ * only cares whether the surface is on keeps reading `available` and nothing
+ * else.
+ */
+export const langWatchQLAvailabilitySchema = z
+  .object({
+    /** What the navigation entry and the page gate on. */
+    available: z.boolean(),
+    /** Absent when available. */
+    reason: langWatchQLUnavailableReasonSchema.optional(),
+  })
+  .strict();
+export type LangWatchQLAvailability = z.infer<typeof langWatchQLAvailabilitySchema>;

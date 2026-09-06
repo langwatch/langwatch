@@ -17,8 +17,16 @@
  *
  * Spec: packages/features/analytics/specs/analytics-timeseries.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import {
+  analyticsFeedbacksResultSchema,
+  analyticsFilterOptionsResultSchema,
+  analyticsTimeseriesResultSchema,
+  analyticsTopDocumentsResultSchema,
+  type AnalyticsReadInput,
+  type AnalyticsTimeseriesInput,
+} from "@langwatch/analytics-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -55,7 +63,9 @@ type AnalyticsTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -141,63 +151,82 @@ export class AnalyticsTrpcApi {
       query: z.string().optional(),
     });
 
-    return trpc.router({
-      getTimeseries: policy("analytics:view")(procedure.input(ports.timeseriesInputSchema)).query(
-        async ({ ctx, input }) => ctx.app.analytics.getTimeseries(input),
-      ),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .query("getTimeseries", (p) =>
+          p
+            .withInput(ports.timeseriesInputSchema)
+            .withOutput(analyticsTimeseriesResultSchema)
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => ctx.app.analytics.getTimeseries(input)),
+        )
+        // One `.input()` over an intersection, not two chained calls: tRPC's
+        // second `.input()` merges through a conditional on the input already
+        // accumulated, and the process supplies `sharedFiltersSchema` as a type
+        // parameter — an unresolved parameter never takes the merging branch, so
+        // the chained form lands on tRPC's own `TypeError<…>` and does not
+        // compile.
+        .query("dataForFilter", (p) =>
+          p
+            .withInput(z.intersection(ports.sharedFiltersSchema, filterSelectionSchema))
+            .withOutput(analyticsFilterOptionsResultSchema)
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const { field, key, subkey } = input;
 
-      // One `.input()` over an intersection, not two chained calls: tRPC's
-      // second `.input()` merges through a conditional on the input already
-      // accumulated, and the process supplies `sharedFiltersSchema` as a type
-      // parameter — an unresolved parameter never takes the merging branch, so
-      // the chained form lands on tRPC's own `TypeError<…>` and does not
-      // compile.
-      dataForFilter: policy("analytics:view")(
-        procedure.input(z.intersection(ports.sharedFiltersSchema, filterSelectionSchema)),
-      ).query(async ({ ctx, input }) => {
-        const { field, key, subkey } = input;
+              if (ports.filterFieldRequiresKey(field) && !key) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `Field ${field} requires a key to be defined`,
+                });
+              }
 
-        if (ports.filterFieldRequiresKey(field) && !key) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Field ${field} requires a key to be defined`,
-          });
-        }
+              if (ports.filterFieldRequiresSubkey(field) && !subkey) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `Field ${field} requires a subkey to be defined`,
+                });
+              }
 
-        if (ports.filterFieldRequiresSubkey(field) && !subkey) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Field ${field} requires a subkey to be defined`,
-          });
-        }
+              // The narrowing rule — a field's own selection must not narrow the
+              // values offered for it — belongs to the application, so both doors
+              // ask the same question rather than each remembering to exclude it.
+              const options = await ctx.app.analytics.filterOptions({
+                projectId: input.projectId,
+                field,
+                query: input.query,
+                key,
+                subkey,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                filters: input.filters,
+              });
 
-        // The narrowing rule — a field's own selection must not narrow the
-        // values offered for it — belongs to the application, so both doors
-        // ask the same question rather than each remembering to exclude it.
-        const options = await ctx.app.analytics.filterOptions({
-          projectId: input.projectId,
-          field,
-          query: input.query,
-          key,
-          subkey,
-          startDate: input.startDate,
-          endDate: input.endDate,
-          filters: input.filters,
-        });
-
-        return { options };
-      }),
-
-      // The full shared-filter schema is accepted for API compatibility even
-      // though only projectId, startDate, endDate and filters are read; query,
-      // traceIds and negateFilters are accepted and ignored.
-      topUsedDocuments: policy("cost:view")(procedure.input(ports.sharedFiltersSchema)).query(
-        async ({ ctx, input }) => ctx.app.analytics.getTopUsedDocuments(input),
-      ),
-
-      feedbacks: policy("cost:view")(procedure.input(ports.sharedFiltersSchema)).query(
-        async ({ ctx, input }) => ctx.app.analytics.getFeedbacks(input),
-      ),
-    });
+              return { options };
+            }),
+        )
+        // The full shared-filter schema is accepted for API compatibility even
+        // though only projectId, startDate, endDate and filters are read; query,
+        // traceIds and negateFilters are accepted and ignored.
+        .query("topUsedDocuments", (p) =>
+          p
+            .withInput(ports.sharedFiltersSchema)
+            .withOutput(analyticsTopDocumentsResultSchema)
+            .withPermission("cost:view")
+            .handle(async ({ ctx, input }) => ctx.app.analytics.getTopUsedDocuments(input)),
+        )
+        .query("feedbacks", (p) =>
+          p
+            .withInput(ports.sharedFiltersSchema)
+            .withOutput(analyticsFeedbacksResultSchema)
+            .withPermission("cost:view")
+            .handle(async ({ ctx, input }) => ctx.app.analytics.getFeedbacks(input)),
+        )
+        .build()
+    );
   }
 }

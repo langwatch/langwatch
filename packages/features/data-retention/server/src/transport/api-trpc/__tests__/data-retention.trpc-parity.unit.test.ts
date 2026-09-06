@@ -63,6 +63,7 @@ function createCaller() {
     protected: root.procedure,
     authz,
     policy,
+    validateOutput: true,
   });
 
   return {

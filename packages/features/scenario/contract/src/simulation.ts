@@ -218,3 +218,26 @@ export const simulationExternalSetSummarySchema = z.object({
   lastRunTimestamp: z.number(),
 });
 export type SimulationExternalSetSummary = z.infer<typeof simulationExternalSetSummarySchema>;
+
+/** One page of a single suite's runs. */
+export const simulationScenarioSetRunDataSchema = z.object({
+  runs: z.array(simulationRunDataSchema),
+  nextCursor: z.string().optional(),
+  hasMore: z.boolean(),
+});
+
+/** The cheap freshness probe the run-history views poll. */
+export const simulationRunFreshnessSchema = z.object({ lastUpdatedAt: z.number() });
+
+/** How many batch runs a suite has in the window. */
+export const simulationBatchRunCountSchema = z.object({ count: z.number() });
+
+/**
+ * One frame of the simulation stream. The envelope is what the client parses;
+ * the event itself is the broadcast payload, carried as the JSON text the
+ * publisher wrote.
+ */
+export const simulationStreamFrameSchema = z.object({
+  event: z.unknown(),
+  timestamp: z.number().optional(),
+});

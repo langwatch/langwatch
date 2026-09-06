@@ -146,78 +146,80 @@ export class GithubTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return createTrpcService({
-      root: trpc,
-      procedures: { protected: procedure, policy },
-      validateOutput: procedures.validateOutput,
-    })
-      .query("getConnectionStatus", (p) =>
-        p
-          .withInput(organizationScopeSchema)
-          .withOutput(githubConnectionStatusSchema)
-          .withPermission("organization:view")
-          .handle(async ({ ctx, input }) => {
-            const actor = ctx.actor();
-            await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
-            return ctx.app.github.getConnectionStatus({ organizationId: input.organizationId });
-          }),
-      )
-      .query("listRepos", (p) =>
-        p
-          .withInput(organizationScopeSchema)
-          .withOutput(githubRepositoryRefSchema.array())
-          .withPermission("organization:manage")
-          .handle(async ({ ctx, input }) => {
-            const actor = ctx.actor();
-            await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
-            return ctx.app.github.listRepositoriesForOrganization(input.organizationId);
-          }),
-      )
-      /**
-       * The current status of the pull requests on a page, read live from
-       * GitHub (cached briefly) with the stored snapshot as the fallback.
-       */
-      .query("pullRequestLiveStatus", (p) =>
-        p
-          .withInput(pullRequestLiveStatusInputSchema)
-          .withOutput(githubPullRequestLiveStatusesSchema)
-          .withPermission("traces:view")
-          .handle(async ({ ctx, input }) => {
-            const organizationId = await ports.tryResolveOrganizationForProject(input.projectId);
-            if (!organizationId) return { statuses: [] };
-            const statuses = await ctx.app.github.getLivePullRequestStatuses({
-              organizationId,
-              refs: input.refs,
-            });
-            return { statuses };
-          }),
-      )
-      .mutation("disconnect", (p) =>
-        p
-          .withInput(disconnectInputSchema)
-          .withOutput(githubDisconnectResultSchema)
-          .withPermission("organization:manage")
-          .handle(async ({ ctx, input }) => {
-            const actor = ctx.actor();
-            await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
-            // Throws `GithubNotConnectedError` when the organization has no such
-            // installation, which is also how one owned by another organization
-            // answers — the id cannot be probed.
-            const result = await ctx.app.github.disconnect({
-              organizationId: input.organizationId,
-              installationId: input.installationId,
-            });
-            await ports.recordAudit({
-              userId: actor.id,
-              organizationId: input.organizationId,
-              action: "github.connection.disconnect",
-              args: { installationId: input.installationId },
-            });
-            // We can't uninstall via the API — hand back the deep link; the webhook
-            // removes the local row once GitHub confirms the uninstall.
-            return result;
-          }),
-      )
-      .build();
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .query("getConnectionStatus", (p) =>
+          p
+            .withInput(organizationScopeSchema)
+            .withOutput(githubConnectionStatusSchema)
+            .withPermission("organization:view")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
+              return ctx.app.github.getConnectionStatus({ organizationId: input.organizationId });
+            }),
+        )
+        .query("listRepos", (p) =>
+          p
+            .withInput(organizationScopeSchema)
+            .withOutput(githubRepositoryRefSchema.array())
+            .withPermission("organization:manage")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
+              return ctx.app.github.listRepositoriesForOrganization(input.organizationId);
+            }),
+        )
+        /**
+         * The current status of the pull requests on a page, read live from
+         * GitHub (cached briefly) with the stored snapshot as the fallback.
+         */
+        .query("pullRequestLiveStatus", (p) =>
+          p
+            .withInput(pullRequestLiveStatusInputSchema)
+            .withOutput(githubPullRequestLiveStatusesSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const organizationId = await ports.tryResolveOrganizationForProject(input.projectId);
+              if (!organizationId) return { statuses: [] };
+              const statuses = await ctx.app.github.getLivePullRequestStatuses({
+                organizationId,
+                refs: input.refs,
+              });
+              return { statuses };
+            }),
+        )
+        .mutation("disconnect", (p) =>
+          p
+            .withInput(disconnectInputSchema)
+            .withOutput(githubDisconnectResultSchema)
+            .withPermission("organization:manage")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              await ensureOrganizationMember(actor.id, input.organizationId, ctx.app.github);
+              // Throws `GithubNotConnectedError` when the organization has no such
+              // installation, which is also how one owned by another organization
+              // answers — the id cannot be probed.
+              const result = await ctx.app.github.disconnect({
+                organizationId: input.organizationId,
+                installationId: input.installationId,
+              });
+              await ports.recordAudit({
+                userId: actor.id,
+                organizationId: input.organizationId,
+                action: "github.connection.disconnect",
+                args: { installationId: input.installationId },
+              });
+              // We can't uninstall via the API — hand back the deep link; the webhook
+              // removes the local row once GitHub confirms the uninstall.
+              return result;
+            }),
+        )
+        .build()
+    );
   }
 }

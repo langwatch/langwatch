@@ -3,7 +3,8 @@
  *   - A test fire is not an open relay (ADR-031). The email recipient is the
  * Spec: ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
   automationApiCreateInputSchema,
   automationApiListSlackChannelsInputSchema,
@@ -16,7 +17,11 @@ import {
   automationApiUpdateTriggerFiltersInputSchema,
   automationApiUpsertInputSchema,
   automationApiWebhookDeliveriesInputSchema,
+  automationDailyCapSchema,
+  automationDailyCapStatusSchema,
+  automationDeletedSchema,
   automationFilterFieldSchema,
+  automationListRowSchema,
   buildGraphAlertTriggerData,
   type BuildGraphAlertTriggerDataInput,
   buildReportTriggerData,
@@ -34,12 +39,20 @@ import {
   TriggerAction,
   TriggerActionUnsupportedError,
   TriggerFiltersRequiredError,
+  reportScheduleStatusSchema,
+  slackChannelListingSchema,
+  testFireResultSchema,
+  triggerFireRowSchema,
+  triggerFireStatsSchema,
+  triggerSchema,
+  webhookDeliveryRowSchema,
   WEBHOOK_HEADER_VALUE_KEPT,
   type AutomationAction,
   type AutomationFilters,
   type CreateTriggerCommand,
   type GraphAlertActionParams,
   type NotificationCadence,
+  type SlackChannelListing,
   type TestFireWebhookDestination,
 } from "@langwatch/automation-contract";
 import { isDispatchError } from "@langwatch/eventing";
@@ -47,7 +60,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { SlackChannelListing } from "../../adapters/slack-web-api.delivery.adapter";
 import type { AutomationWebhookStoredParams } from "../../ports/automation-provider.port";
 import {
   AutomationFiltersUnsupportedError,
@@ -91,7 +103,9 @@ type AutomationTrpcProcedures<
    * The process's tracing, logging, error, scope-lineage, authorization and audit policy for
    * one declared permission.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -325,784 +339,854 @@ export class AutomationTrpcApi {
       ),
     });
 
-    return trpc.router({
-      create: policy("triggers:create")(procedure.input(automationApiCreateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          // This legacy mutation cannot carry the validated/encrypted webhook
-          // destination shape. Never let a direct caller create a malformed or
-          // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
-          // the sole webhook writer.
-          if (input.action === TriggerAction.SEND_WEBHOOK) {
-            throw new AutomationWebhookUpsertRequiredError();
-          }
-
-          // This path only ever writes AUTOMATION rows (it carries no graph or
-          // report shape), so the condition is always required here. The rule
-          // lives on the application, which the REST family reaches too.
-          ctx.app.automation.assertTraceConditionPresent(input.filters);
-
-          await ctx.app.automation.getProjectIdentity(input.projectId);
-
-          if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
-            // Server-stamp the creator — the schema does not expose this to the
-            // wire (builder5015-002), so we widen locally to mutate.
-            (input.actionParams as Record<string, unknown>).createdByUserId = ctx.actor().id;
-
-            if (!input.actionParams.annotators) {
-              throw new MissingAnnotatorError();
-            }
-          }
-
-          if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-            if (!input.actionParams.slackWebhook) {
-              throw new MissingSlackWebhookError();
-            }
-            // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
-            // shape only. External recipients are intentionally allowed; the
-            // UI surfaces an "External" warning badge for any non-team
-            // address so operators know what they're shipping. Two server
-            // contracts for the same action would force the drawer to
-            // branch on create-vs-edit, which is a footgun.
-          } else if (
-            input.action === TriggerAction.SEND_EMAIL &&
-            input.actionParams.members &&
-            input.actionParams.members.length > 0
-          ) {
-            validateEmailRecipientFormats(input.actionParams.members);
-          }
-
-          const trigger = await ctx.app.automation.create({
-            id: ksuid(TRIGGER_KSUID_RESOURCE).toString(),
-            name: input.name,
-            action: input.action,
-            actionParams: input.actionParams,
-            filters: input.filters,
-            projectId: input.projectId,
-            lastRunAt: new Date(),
-            notificationCadence: resolveCadenceForCreate(input.action, input.notificationCadence),
-          });
-
-          return redactTriggerForRead(trigger);
-        },
-      ),
-
-      /**
-       * Removal is one operation on the application: the soft delete, the retirement of any
-       * scheduled-report entry, and the dispatch-cache invalidation. Doing it in three calls
-       * here left the REST family free to do two of the three, which is exactly what it did.
-       */
-      deleteById: policy("triggers:delete")(
-        procedure.input(automationApiTriggerScopeSchema),
-      ).mutation(async ({ input, ctx }) => {
-        await ctx.app.automation.delete({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
-        });
-
-        return { success: true };
-      }),
-
-      getTriggers: policy("triggers:view")(procedure.input(automationApiProjectScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const triggers = await ctx.app.automation.getAllForProject({
-            projectId: input.projectId,
-          });
-
-          const allCheckIds = triggers.flatMap((trigger) => extractCheckKeys(trigger.filters));
-
-          const allChecks = await ctx.app.automation.getMonitorsByIds({
-            monitorIds: allCheckIds,
-            projectId: input.projectId,
-          });
-
-          const checksMap = allChecks.reduce<Record<string, (typeof allChecks)[number]>>(
-            (map, check) => {
-              map[check.id] = check;
-              return map;
-            },
-            {},
-          );
-
-          // Load the names of any custom graphs the rows point at so the
-          // automations list can render "Graph: my-p95" for graph alerts
-          // without a second client-side fetch per row.
-          const customGraphIds = triggers
-            .map((t) => t.customGraphId)
-            .filter((id): id is string => typeof id === "string" && id.length > 0);
-          const customGraphs =
-            customGraphIds.length > 0
-              ? await ctx.app.automation.getCustomGraphNamesByIds({
-                  customGraphIds,
-                  projectId: input.projectId,
-                })
-              : [];
-          const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
-
-          const enhancedTriggers = triggers.map((trigger) => {
-            const checkIds = extractCheckKeys(trigger.filters);
-
-            const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
-
-            const customGraph = trigger.customGraphId
-              ? (customGraphsById.get(trigger.customGraphId) ?? null)
-              : null;
-
-            return {
-              ...redactTriggerForRead(trigger),
-              checks,
-              customGraph,
-            };
-          });
-
-          return enhancedTriggers;
-        },
-      ),
-
-      /**
-       * The plan's daily ceiling on persist actions, on its own. The authoring
-       * drawer only advises against the ceiling and never reads a count, so it
-       * takes this rather than the status below and skips a scan it would discard.
-       */
-      getDailyCap: policy("triggers:view")(procedure.input(automationApiProjectScopeSchema)).query(
-        async ({ ctx, input }) => ({
-          cap: await ctx.app.automation.resolvePersistDailyCap(input.projectId),
-        }),
-      ),
-
-      /**
-       * Today's confirmed-match count and skipped count per automation, so the list can say "N
-       * matches skipped today" instead of leaving the customer to wonder why an automation they
-       * can see running produced nothing.
-       */
-      getDailyCapStatus: policy("triggers:view")(
-        procedure.input(automationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const cap = await ctx.app.automation.resolvePersistDailyCap(input.projectId);
-        const triggers = await ctx.app.automation.getAllForProject({
-          projectId: input.projectId,
-        });
-        const counts = await ctx.app.automation.readPersistCapCounts({
-          projectId: input.projectId,
-          triggerIds: triggers.map((trigger) => trigger.id),
-          now: new Date(),
-          cap,
-        });
-        return { cap, counts };
-      }),
-
-      getTriggerStats: policy("triggers:view")(
-        procedure.input(automationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.automation.getFireStats({
-          projectId: input.projectId,
-        });
-      }),
-
-      getRecentFires: policy("triggers:view")(
-        procedure.input(automationApiRecentFiresInputSchema),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.automation.getRecentFires({
-          projectId: input.projectId,
-          triggerId: input.triggerId,
-          limit: input.limit,
-        });
-      }),
-
-      /** ADR-040 §6: the per-attempt webhook delivery log for one automation —
-       *  the drawer's "Recent deliveries" drill-down. Header values are already
-       *  redacted at write time. */
-      getWebhookDeliveries: policy("triggers:view")(
-        procedure.input(automationApiWebhookDeliveriesInputSchema),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.automation.getRecentWebhookDeliveries({
-          projectId: input.projectId,
-          triggerId: input.triggerId,
-          limit: input.limit,
-        });
-      }),
-
-      /** The activity feed: what every automation in the project has been doing. */
-      getRecentActivity: policy("triggers:view")(
-        procedure.input(automationApiRecentActivityInputSchema),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.automation.getRecentFires({
-          projectId: input.projectId,
-          limit: input.limit,
-        });
-      }),
-
-      /**
-       * When each report next runs and last ran. The cron on the trigger only
-       * DESCRIBES the schedule — the scheduler owns the actual instants, so this
-       * is the only honest answer to "when does this next send?".
-       */
-      getReportSchedules: policy("triggers:view")(
-        procedure.input(automationApiProjectScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.automation.getReportSchedules({
-          projectId: input.projectId,
-        });
-      }),
-
-      toggleTrigger: policy("triggers:update")(
-        procedure.input(automationApiToggleTriggerInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const existing = await ctx.app.automation.requireById({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
-        });
-
-        // A report's schedule does not live on `Trigger.active` — it lives on the
-        // scheduler. Flipping the flag alone left the `ScheduledJob` claiming its
-        // slot every cadence (stamping a "last run" for a report that delivers
-        // nothing) and still advertising a next run on the automations page.
-        // Pausing retires the calendar entry; resuming puts it back.
-        const isReport = existing.triggerKind === "REPORT";
-        const report = isReport ? extractReportFromTriggerRow(existing.actionParams) : null;
-        if (isReport && input.active && !report) {
-          throw new ReportScheduleMissingError();
-        }
-
-        const trigger = await ctx.app.automation.update({
-          id: input.triggerId,
-          projectId: input.projectId,
-          active: input.active,
-          // Resuming clears the platform's pause record. Leaving it behind
-          // would make a running automation keep claiming it was paused for
-          // runaway volume, and the next genuine pause would be
-          // indistinguishable from the stale one.
-          ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
-        });
-
-        if (isReport) {
-          if (input.active && report) {
-            await ctx.app.automation.syncReportSchedule({
-              projectId: input.projectId,
-              triggerId: input.triggerId,
-              cron: report.schedule.cron,
-              timezone: report.schedule.timezone,
-            });
-          } else {
-            await ctx.app.automation.removeReportSchedule({
-              projectId: input.projectId,
-              triggerId: input.triggerId,
-            });
-          }
-        }
-
-        return redactTriggerForRead(trigger);
-      }),
-
-      getTriggerById: policy("triggers:view")(
-        procedure.input(automationApiTriggerScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        const trigger = await ctx.app.automation.tryGetById({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
-        });
-        // Never return the encrypted bot token to the browser (ADR-041).
-        return trigger ? redactTriggerForRead(trigger) : trigger;
-      }),
-
-      /**
-       * List the Slack channels a bot token can see, to populate the channel
-       * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
-       */
-      listSlackChannels: policy("triggers:update")(
-        procedure.input(automationApiListSlackChannelsInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        let token = input.botToken?.trim() || null;
-        if (!token && input.automationId) {
-          const saved = await ctx.app.automation.tryGetById({
-            triggerId: input.automationId,
-            projectId: input.projectId,
-          });
-          token = ports.providers.decryptSlackBotToken(saved?.actionParams ?? {});
-        }
-        if (!token) return { channels: [], error: "no_token" as string, gaps: [] };
-        return ports.listSlackChannels(token);
-      }),
-
-      updateTriggerFilters: policy("triggers:update")(
-        procedure.input(automationApiUpdateTriggerFiltersInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const { sanitized, unknownFields } = partitionFilterFields(input.filters);
-
-        if (unknownFields.length > 0 && Object.keys(sanitized).length === 0) {
-          throw new AutomationFiltersUnsupportedError(unknownFields);
-        }
-
-        // Editing is the other way to end up with a match-everything automation:
-        // create it with a real condition, then clear it here. The rule — which
-        // the REST family enforces too — is the application's.
-        if (!hasActionableTriggerFilters(sanitized)) {
-          const existing = await ctx.app.automation.requireById({
-            triggerId: input.triggerId,
-            projectId: input.projectId,
-          });
-          ctx.app.automation.assertConditionSurvivesEdit({ existing, filters: sanitized });
-        }
-
-        const trigger = await ctx.app.automation.update({
-          id: input.triggerId,
-          projectId: input.projectId,
-          filters: sanitized,
-        });
-
-        return redactTriggerForRead(trigger);
-      }),
-
-      testFireTemplate: policy("triggers:update")(
-        procedure.input(automationApiTestFireInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        // ADR-031: test fire is no longer an open relay. The client-supplied
-        try {
-          // The webhook channel ships dark (ADR-040 §7): the type picker is
-          // flag-gated client-side, and the server refuses the channel too so
-          // the flag can't be bypassed by calling the API directly.
-          if (input.channel === "webhook") {
-            await ctx.app.automation.assertWebhookChannelEnabled({
-              projectId: input.projectId,
-              userId: ctx.actor().id,
-            });
-          }
-          // Email shares the mail provider; webhook fires at an ARBITRARY
-          // customer URL from our worker IPs, so an uncapped test button would
-          // be an outbound request-flood primitive (ADR-040 §4). Slack stays
-          // exempt: its destination is host-pinned to hooks.slack.com.
-          if (input.channel === "email" || input.channel === "webhook") {
-            const limit = await ports.rateLimit({
-              key: `testfire:${ctx.actor().id}`,
-              windowSeconds: 60,
-              max: 10,
-            });
-            if (!limit.allowed) {
-              throw new TestFireRateLimitedError(
-                buildRetryAfterMessage({
-                  prefix: "Too many test fires.",
-                  resetAt: limit.resetAt,
-                }),
-                limit.resetAt,
-              );
-            }
-          }
-          let recipients: string[] = [];
-          if (input.channel === "email") {
-            const email = ctx.session?.user.email;
-            if (!email) {
-              throw new TestFireUnavailableError(
-                "email",
-                "Your account has no email address to send a test fire to.",
-              );
-            }
-            recipients = [email];
-          }
-          // Resolve the Slack bot destination: the freshly-typed token, or the
-          // saved automation's stored (encrypted) token when it was kept on edit.
-          let botDestination: { token: string; channel: string } | null = null;
-          if (input.channel === "slack" && input.botDestination) {
-            const channel = input.botDestination.channelId.trim();
-            let token = input.botDestination.botToken?.trim() || null;
-            if (!token && input.automationId) {
-              const saved = await ctx.app.automation.tryGetById({
-                triggerId: input.automationId,
-                projectId: input.projectId,
-              });
-              token = ports.providers.decryptSlackBotToken(saved?.actionParams ?? {});
-            }
-            if (!token || !channel) {
-              throw new TestFireUnavailableError(
-                "slack",
-                "Add a Slack bot token and channel before sending a test fire.",
-              );
-            }
-            botDestination = { token, channel };
-          }
-
-          // ADR-040 §3: header secrets never reach the client, so a saved
-          let webhookDestination: TestFireWebhookDestination | null | undefined =
-            input.webhookDestination;
-          if (
-            webhookDestination &&
-            Object.values(webhookDestination.headers).includes(WEBHOOK_HEADER_VALUE_KEPT)
-          ) {
-            let saved: Record<string, string> = {};
-            if (input.automationId) {
-              const row = await ctx.app.automation.tryGetById({
-                triggerId: input.automationId,
-                projectId: input.projectId,
-              });
-              const stored = (row?.actionParams ?? {}) as AutomationWebhookStoredParams;
-              if (stored?.url !== webhookDestination.url) {
-                throw new TestFireUnavailableError(
-                  "webhook",
-                  "Re-enter webhook header values after changing the destination URL.",
-                );
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .mutation("create", (p) =>
+          p
+            .withInput(automationApiCreateInputSchema)
+            .withOutput(triggerSchema)
+            .withPermission("triggers:create")
+            .handle(async ({ ctx, input }) => {
+              // This legacy mutation cannot carry the validated/encrypted webhook
+              // destination shape. Never let a direct caller create a malformed or
+              // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
+              // the sole webhook writer.
+              if (input.action === TriggerAction.SEND_WEBHOOK) {
+                throw new AutomationWebhookUpsertRequiredError();
               }
-              saved = ports.providers.decryptWebhookHeaders(stored);
-            }
-            webhookDestination = {
-              ...webhookDestination,
-              headers: resolveKeptWebhookHeaders(webhookDestination.headers, saved),
-            };
-          }
 
-          // The signing secret is a stored secret too, so the browser never has
-          // it and cannot send it. Resolve it from the saved trigger so a test
-          // fire signs exactly as a real one does, which is the only way an
-          // author can point the button at their receiver's verification.
-          if (webhookDestination && input.automationId) {
-            const row = await ctx.app.automation.tryGetById({
-              triggerId: input.automationId,
-              projectId: input.projectId,
-            });
-            const signingSecrets = ports.providers.decryptWebhookSigningSecrets(
-              (row?.actionParams ?? {}) as AutomationWebhookStoredParams,
-            );
-            if (signingSecrets.length > 0) {
-              webhookDestination = { ...webhookDestination, signingSecrets };
-            }
-          }
+              // This path only ever writes AUTOMATION rows (it carries no graph or
+              // report shape), so the condition is always required here. The rule
+              // lives on the application, which the REST family reaches too.
+              ctx.app.automation.assertTraceConditionPresent(input.filters);
 
-          const project = await ctx.app.automation.getProjectIdentity(input.projectId);
-          return await ctx.app.automation.testFire({
-            channel: input.channel,
-            trigger: input.trigger,
-            project,
-            draft: input.draft,
-            recipients,
-            webhook: input.webhook,
-            botDestination,
-            webhookDestination,
-            graphAlert: input.graphAlert,
-            report: input.report,
-          });
-        } catch (err) {
-          raiseAsHandled(err);
-        }
-      }),
+              await ctx.app.automation.getProjectIdentity(input.projectId);
 
-      upsert: policy("triggers:update")(procedure.input(automationApiUpsertInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const isGraphAlert = !!input.customGraphId;
-          const isReport = !isGraphAlert && !!input.report;
-          let parsedActionParams: Record<string, unknown> = {};
-          try {
-            ctx.app.automation.validateTemplateDraft(input.templates);
-            // The webhook channel ships dark (ADR-040 §7): gate the save route as
-            // well as the picker, so the flag can't be bypassed via the API.
-            if (input.action === TriggerAction.SEND_WEBHOOK) {
-              await ctx.app.automation.assertWebhookChannelEnabled({
+              if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+                // Server-stamp the creator — the schema does not expose this to the
+                // wire (builder5015-002), so we widen locally to mutate.
+                (input.actionParams as Record<string, unknown>).createdByUserId = ctx.actor().id;
+
+                if (!input.actionParams.annotators) {
+                  throw new MissingAnnotatorError();
+                }
+              }
+
+              if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
+                if (!input.actionParams.slackWebhook) {
+                  throw new MissingSlackWebhookError();
+                }
+                // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
+                // shape only. External recipients are intentionally allowed; the
+                // UI surfaces an "External" warning badge for any non-team
+                // address so operators know what they're shipping. Two server
+                // contracts for the same action would force the drawer to
+                // branch on create-vs-edit, which is a footgun.
+              } else if (
+                input.action === TriggerAction.SEND_EMAIL &&
+                input.actionParams.members &&
+                input.actionParams.members.length > 0
+              ) {
+                validateEmailRecipientFormats(input.actionParams.members);
+              }
+
+              const trigger = await ctx.app.automation.create({
+                id: ksuid(TRIGGER_KSUID_RESOURCE).toString(),
+                name: input.name,
+                action: input.action,
+                actionParams: input.actionParams,
+                filters: input.filters,
                 projectId: input.projectId,
-                userId: ctx.actor().id,
+                lastRunAt: new Date(),
+                notificationCadence: resolveCadenceForCreate(
+                  input.action,
+                  input.notificationCadence,
+                ),
               });
-            }
-            if (isGraphAlert) {
-              // Graph alerts only support notify channels — there is no
-              // "ADD_TO_DATASET on a metric crossing a threshold" UX.
-              if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
-                throw new GraphAlertChannelUnsupportedError();
-              }
-              if (!input.graphAlert) {
-                throw new GraphAlertThresholdRequiredError();
-              }
-              if (!input.alertType) {
-                throw new GraphAlertSeverityRequiredError();
-              }
-              // The graph must belong to the calling project — multitenancy
-              // gate. Without this a hostile client could attach a trigger to
-              // a graph from another tenant. The rule is the application's, so
-              // a second writing door cannot forget it.
-              await ctx.app.automation.requireCustomGraphInProject({
-                customGraphId: input.customGraphId ?? "",
+
+              return redactTriggerForRead(trigger);
+            }),
+        )
+
+        /**
+         * Removal is one operation on the application: the soft delete, the retirement of any
+         * scheduled-report entry, and the dispatch-cache invalidation. Doing it in three calls
+         * here left the REST family free to do two of the three, which is exactly what it did.
+         */
+        .mutation("deleteById", (p) =>
+          p
+            .withInput(automationApiTriggerScopeSchema)
+            .withOutput(automationDeletedSchema)
+            .withPermission("triggers:delete")
+            .handle(async ({ input, ctx }) => {
+              await ctx.app.automation.delete({
+                triggerId: input.triggerId,
                 projectId: input.projectId,
               });
-            }
-            // A report sends a rendered notification on a schedule — notify
-            // channels only, like alerts.
-            if (
-              isReport &&
-              input.action !== TriggerAction.SEND_EMAIL &&
-              input.action !== TriggerAction.SEND_SLACK_MESSAGE
-            ) {
-              throw new ReportChannelUnsupportedError();
-            }
-            // Per-action shape validation: the provider registry's per-action Zod schema is the
-            // authoritative shape for actionParams. The contract's
-            // `automationApiActionParamsSchema` accepts the union for the wire format; this
-            // pass narrows by action, so a SEND_EMAIL upsert can't accidentally save a dataset
-            // config (and ADD_TO_DATASET can't persist an empty datasetId, etc.).
-            const perAction = ports.providers.actionParamsSchemaFor(input.action);
-            const perActionParsed = perAction.safeParse(input.actionParams);
-            if (!perActionParsed.success) {
-              throw new InvalidActionParamsError(
-                `Invalid actionParams for ${input.action}: ${perActionParsed.error.issues[0]?.message ?? "validation failed"}`,
-                input.action,
+
+              return { success: true };
+            }),
+        )
+        .query("getTriggers", (p) =>
+          p
+            .withInput(automationApiProjectScopeSchema)
+            .withOutput(automationListRowSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              const triggers = await ctx.app.automation.getAllForProject({
+                projectId: input.projectId,
+              });
+
+              const allCheckIds = triggers.flatMap((trigger) => extractCheckKeys(trigger.filters));
+
+              const allChecks = await ctx.app.automation.getMonitorsByIds({
+                monitorIds: allCheckIds,
+                projectId: input.projectId,
+              });
+
+              const checksMap = allChecks.reduce<Record<string, (typeof allChecks)[number]>>(
+                (map, check) => {
+                  map[check.id] = check;
+                  return map;
+                },
+                {},
               );
-            }
-            // Persist the PARSED params, not the wire object: Zod strips keys the
-            // action doesn't declare, so a Slack secret typed before switching the
-            // channel to Email can't ride along and land in the row in plaintext
-            // (where the Slack-only encrypt/redact passes would never touch it).
-            parsedActionParams = perActionParsed.data as Record<string, unknown>;
-            if (
-              input.action === TriggerAction.SEND_EMAIL &&
-              input.actionParams.members &&
-              input.actionParams.members.length > 0
-            ) {
-              validateEmailRecipientFormats(input.actionParams.members);
-            }
-            // Slack webhook / bot-channel presence is enforced by the per-action
-            // schema's superRefine above. The bot-token presence check (which must
-            // allow "kept" on edit) runs after this block — it needs the saved row.
-            if (
-              input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
-              (!input.actionParams.annotators || input.actionParams.annotators.length === 0)
-            ) {
-              throw new MissingAnnotatorError();
-            }
-          } catch (err) {
-            raiseAsHandled(err);
-          }
 
-          // ADR-043 Subject facet: normalise + validate the trace-filter query
-          // before persisting. Empty/whitespace collapses to null (the legacy
-          // `filters` path). A non-empty query is dry-run through the compiler so a
-          // malformed query is rejected here with author feedback rather than
-          // silently failing closed (matching nothing) at dispatch time.
-          const filterQuery =
-            input.filterQuery && input.filterQuery.trim() !== "" ? input.filterQuery.trim() : null;
-          if (filterQuery !== null) {
-            try {
-              ports.assertTraceFilterQueryCompiles({
-                query: filterQuery,
-                projectId: input.projectId,
-              });
-            } catch (err) {
-              throw new AutomationTraceFilterInvalidError(
-                err instanceof Error ? err.message : "could not parse the query",
-              );
-            }
-          }
-
-          // A trace automation must say which traces it is about. Checked after
-          // the query is normalised, so a whitespace-only query counts as absent
-          // exactly as it does everywhere else. Graph alerts and reports are
-          // exempt: an alert's condition is its threshold and a report's is its
-          // schedule, and both persist `filters: {}` by construction.
-          if (
-            !isGraphAlert &&
-            !isReport &&
-            filterQuery === null &&
-            !hasActionableTriggerFilters(input.filters)
-          ) {
-            throw new TriggerFiltersRequiredError();
-          }
-
-          // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
-          // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
-          const storedActionParams = await ports.providers.persistActionParamsFor(input.action, {
-            incoming: parsedActionParams,
-            loadExisting: async () =>
-              input.triggerId
-                ? (
-                    await ctx.app.automation.tryGetById({
-                      triggerId: input.triggerId,
+              // Load the names of any custom graphs the rows point at so the
+              // automations list can render "Graph: my-p95" for graph alerts
+              // without a second client-side fetch per row.
+              const customGraphIds = triggers
+                .map((t) => t.customGraphId)
+                .filter((id): id is string => typeof id === "string" && id.length > 0);
+              const customGraphs =
+                customGraphIds.length > 0
+                  ? await ctx.app.automation.getCustomGraphNamesByIds({
+                      customGraphIds,
                       projectId: input.projectId,
                     })
-                  )?.actionParams
-                : undefined,
-          });
+                  : [];
+              const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
 
-          // Annotation-queue dispatch attributes created queue items to a user and skips the
-          // action when `createdByUserId` is absent. The drawer's provider slice doesn't carry
-          // it, so stamp the caller here — same as the legacy create mutation — or an edit
-          // would silently strip it and disable dispatch for the trigger. Force createdByUserId
-          // to the session user — never trust the client (builder5015-002).
-          const actionParams: Record<string, unknown> =
-            input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
-              ? {
-                  ...(storedActionParams as Record<string, unknown>),
-                  createdByUserId: ctx.actor().id,
-                }
-              : { ...(storedActionParams as Record<string, unknown>) };
+              const enhancedTriggers = triggers.map((trigger) => {
+                const checkIds = extractCheckKeys(trigger.filters);
 
-          // Graph alerts: route the row shape through the SSOT builder so it's byte-identical
-          // to what `graphs.updateById` writes on the dashboard path (N1 — the sweep fixed
-          // graphs.ts but automations.ts was still hand-rolling the row). The dispatcher only
-          // knows one shape; drift between the two writers silently breaks dispatch for
-          // whichever format loses.
-          let data: Omit<
-            CreateTriggerCommand,
-            "id" | "projectId" | "lastRunAt" | "notificationCadence" | "traceDebounceMs"
-          >;
-          if (isGraphAlert && input.graphAlert && input.customGraphId) {
-            const graphAlert: GraphAlertActionParams = input.graphAlert;
-            const builderInput = {
-              id: input.triggerId ?? ksuid(TRIGGER_KSUID_RESOURCE).toString(),
-              name: input.name,
-              projectId: input.projectId,
-              action: input.action,
-              alertType: input.alertType ?? "INFO",
-              customGraphId: input.customGraphId,
-              actionParams: {
-                ...actionParams,
-                ...graphAlert,
-              },
-            };
-            const built = buildGraphAlertTriggerData({
-              ...builderInput,
-              action: notifyingActionOr(builderInput.action, "graph alert"),
-            });
-            data = {
-              name: built.name,
-              action: built.action,
-              triggerKind: "ALERT",
-              alertType: built.alertType,
-              filters: z.record(z.string(), z.unknown()).parse(built.filters),
-              // Graph alerts never carry a trace-filter query; clear it so a kind
-              // conversion can't leave a stale one behind.
-              filterQuery: null,
-              customGraphId: built.customGraphId,
-              actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
-              slackTemplateType: input.templates.slackTemplateType ?? null,
-              slackTemplate: input.templates.slackTemplate ?? null,
-              emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-              emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-            };
-          } else if (isReport && input.report) {
-            const built = buildReportTriggerData({
-              id: input.triggerId ?? ksuid(TRIGGER_KSUID_RESOURCE).toString(),
-              name: input.name,
-              projectId: input.projectId,
-              action: notifyingActionOr(input.action, "report"),
-              actionParams: { ...actionParams, ...input.report },
-            });
-            data = {
-              name: built.name,
-              action: built.action,
-              triggerKind: "REPORT",
-              filters: z.record(z.string(), z.unknown()).parse(built.filters),
-              // Converting an existing graph alert into a report must release the
-              // graph: a left-behind `customGraphId` re-arms the row as a threshold
-              // alert on the heartbeat path, so the report fires as an alert too.
-              customGraphId: null,
-              // A trace-query report sends the traces matching the author's Subject
-              // query — without this the report would only ever send the newest
-              // traces in the window. A graph/dashboard report has no trace query,
-              // so the column is cleared (a source change can't strand a stale one).
-              filterQuery: input.report.source.kind === "traceQuery" ? filterQuery : null,
-              actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
-              slackTemplateType: input.templates.slackTemplateType ?? null,
-              slackTemplate: input.templates.slackTemplate ?? null,
-              emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-              emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-            };
-          } else {
-            data = {
-              name: input.name,
-              action: input.action,
-              triggerKind: "AUTOMATION",
-              alertType: input.alertType ?? null,
-              // A trace-subject automation supersedes the structured `filters` with
-              // its liqe query; persist an empty `{}` so the legacy matcher is a
-              // no-op and the dispatcher reads `filterQuery` instead.
-              filters: filterQuery !== null ? {} : input.filters,
-              filterQuery,
-              customGraphId: input.customGraphId ?? null,
-              actionParams,
-              slackTemplateType: input.templates.slackTemplateType ?? null,
-              slackTemplate: input.templates.slackTemplate ?? null,
-              emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-              emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-            };
-          }
+                const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
 
-          let trigger;
-          if (input.triggerId) {
-            const cadenceUpdate = resolveCadenceForUpdate(
-              input.action,
-              input.notificationCadence,
-              isGraphAlert,
-            );
-            trigger = await ctx.app.automation.update({
-              id: input.triggerId,
-              projectId: input.projectId,
-              ...data,
-              ...(cadenceUpdate !== undefined ? { notificationCadence: cadenceUpdate } : {}),
-              ...(input.traceDebounceMs !== undefined
-                ? { traceDebounceMs: input.traceDebounceMs }
-                : {}),
-            });
-          } else {
-            // A graph alert owns its custom-graph's unique `customGraphId` slot. `deleteById`
-            // soft-deletes (keeps the row and its @unique customGraphId occupied), so a fresh
-            // `create` for a graph that ever had an alert would violate the unique index — an
-            // unhandled P2002 → 500, with no UI path to recover since the soft-deleted row is
-            // hidden.
-            const existingForGraph =
-              isGraphAlert && input.customGraphId
-                ? await ctx.app.automation.tryGetByCustomGraphId({
+                const customGraph = trigger.customGraphId
+                  ? (customGraphsById.get(trigger.customGraphId) ?? null)
+                  : null;
+
+                return {
+                  ...redactTriggerForRead(trigger),
+                  checks,
+                  customGraph,
+                };
+              });
+
+              return enhancedTriggers;
+            }),
+        )
+
+        /**
+         * The plan's daily ceiling on persist actions, on its own. The authoring
+         * drawer only advises against the ceiling and never reads a count, so it
+         * takes this rather than the status below and skips a scan it would discard.
+         */
+        .query("getDailyCap", (p) =>
+          p
+            .withInput(automationApiProjectScopeSchema)
+            .withOutput(automationDailyCapSchema)
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => ({
+              cap: await ctx.app.automation.resolvePersistDailyCap(input.projectId),
+            })),
+        )
+
+        /**
+         * Today's confirmed-match count and skipped count per automation, so the list can say "N
+         * matches skipped today" instead of leaving the customer to wonder why an automation they
+         * can see running produced nothing.
+         */
+        .query("getDailyCapStatus", (p) =>
+          p
+            .withInput(automationApiProjectScopeSchema)
+            .withOutput(automationDailyCapStatusSchema)
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              const cap = await ctx.app.automation.resolvePersistDailyCap(input.projectId);
+              const triggers = await ctx.app.automation.getAllForProject({
+                projectId: input.projectId,
+              });
+              const counts = await ctx.app.automation.readPersistCapCounts({
+                projectId: input.projectId,
+                triggerIds: triggers.map((trigger) => trigger.id),
+                now: new Date(),
+                cap,
+              });
+              return { cap, counts };
+            }),
+        )
+        .query("getTriggerStats", (p) =>
+          p
+            .withInput(automationApiProjectScopeSchema)
+            .withOutput(triggerFireStatsSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.automation.getFireStats({
+                projectId: input.projectId,
+              });
+            }),
+        )
+        .query("getRecentFires", (p) =>
+          p
+            .withInput(automationApiRecentFiresInputSchema)
+            .withOutput(triggerFireRowSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.automation.getRecentFires({
+                projectId: input.projectId,
+                triggerId: input.triggerId,
+                limit: input.limit,
+              });
+            }),
+        )
+
+        /** ADR-040 §6: the per-attempt webhook delivery log for one automation —
+         *  the drawer's "Recent deliveries" drill-down. Header values are already
+         *  redacted at write time. */
+        .query("getWebhookDeliveries", (p) =>
+          p
+            .withInput(automationApiWebhookDeliveriesInputSchema)
+            .withOutput(webhookDeliveryRowSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.automation.getRecentWebhookDeliveries({
+                projectId: input.projectId,
+                triggerId: input.triggerId,
+                limit: input.limit,
+              });
+            }),
+        )
+
+        /** The activity feed: what every automation in the project has been doing. */
+        .query("getRecentActivity", (p) =>
+          p
+            .withInput(automationApiRecentActivityInputSchema)
+            .withOutput(triggerFireRowSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.automation.getRecentFires({
+                projectId: input.projectId,
+                limit: input.limit,
+              });
+            }),
+        )
+
+        /**
+         * When each report next runs and last ran. The cron on the trigger only
+         * DESCRIBES the schedule — the scheduler owns the actual instants, so this
+         * is the only honest answer to "when does this next send?".
+         */
+        .query("getReportSchedules", (p) =>
+          p
+            .withInput(automationApiProjectScopeSchema)
+            .withOutput(reportScheduleStatusSchema.array())
+            .withPermission("triggers:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.automation.getReportSchedules({
+                projectId: input.projectId,
+              });
+            }),
+        )
+        .mutation("toggleTrigger", (p) =>
+          p
+            .withInput(automationApiToggleTriggerInputSchema)
+            .withOutput(triggerSchema)
+            .withPermission("triggers:update")
+            .handle(async ({ input, ctx }) => {
+              const existing = await ctx.app.automation.requireById({
+                triggerId: input.triggerId,
+                projectId: input.projectId,
+              });
+
+              // A report's schedule does not live on `Trigger.active` — it lives on the
+              // scheduler. Flipping the flag alone left the `ScheduledJob` claiming its
+              // slot every cadence (stamping a "last run" for a report that delivers
+              // nothing) and still advertising a next run on the automations page.
+              // Pausing retires the calendar entry; resuming puts it back.
+              const isReport = existing.triggerKind === "REPORT";
+              const report = isReport ? extractReportFromTriggerRow(existing.actionParams) : null;
+              if (isReport && input.active && !report) {
+                throw new ReportScheduleMissingError();
+              }
+
+              const trigger = await ctx.app.automation.update({
+                id: input.triggerId,
+                projectId: input.projectId,
+                active: input.active,
+                // Resuming clears the platform's pause record. Leaving it behind
+                // would make a running automation keep claiming it was paused for
+                // runaway volume, and the next genuine pause would be
+                // indistinguishable from the stale one.
+                ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
+              });
+
+              if (isReport) {
+                if (input.active && report) {
+                  await ctx.app.automation.syncReportSchedule({
                     projectId: input.projectId,
-                    customGraphId: input.customGraphId,
-                  })
-                : null;
-            if (existingForGraph) {
-              trigger = await ctx.app.automation.update({
-                id: existingForGraph.id,
+                    triggerId: input.triggerId,
+                    cron: report.schedule.cron,
+                    timezone: report.schedule.timezone,
+                  });
+                } else {
+                  await ctx.app.automation.removeReportSchedule({
+                    projectId: input.projectId,
+                    triggerId: input.triggerId,
+                  });
+                }
+              }
+
+              return redactTriggerForRead(trigger);
+            }),
+        )
+        .query("getTriggerById", (p) =>
+          p
+            .withInput(automationApiTriggerScopeSchema)
+            .withOutput(triggerSchema.nullable())
+            .withPermission("triggers:view")
+            .handle(async ({ input, ctx }) => {
+              const trigger = await ctx.app.automation.tryGetById({
+                triggerId: input.triggerId,
                 projectId: input.projectId,
-                ...data,
-                deleted: false,
-                active: true,
-                lastRunAt: new Date(),
-                notificationCadence: resolveCadenceForCreate(
+              });
+              // Never return the encrypted bot token to the browser (ADR-041).
+              return trigger ? redactTriggerForRead(trigger) : trigger;
+            }),
+        )
+
+        /**
+         * List the Slack channels a bot token can see, to populate the channel
+         * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
+         */
+        .mutation("listSlackChannels", (p) =>
+          p
+            .withInput(automationApiListSlackChannelsInputSchema)
+            .withOutput(slackChannelListingSchema)
+            .withPermission("triggers:update")
+            .handle(async ({ input, ctx }) => {
+              let token = input.botToken?.trim() || null;
+              if (!token && input.automationId) {
+                const saved = await ctx.app.automation.tryGetById({
+                  triggerId: input.automationId,
+                  projectId: input.projectId,
+                });
+                token = ports.providers.decryptSlackBotToken(saved?.actionParams ?? {});
+              }
+              if (!token) return { channels: [], error: "no_token" as string, gaps: [] };
+              return ports.listSlackChannels(token);
+            }),
+        )
+        .mutation("updateTriggerFilters", (p) =>
+          p
+            .withInput(automationApiUpdateTriggerFiltersInputSchema)
+            .withOutput(triggerSchema)
+            .withPermission("triggers:update")
+            .handle(async ({ ctx, input }) => {
+              const { sanitized, unknownFields } = partitionFilterFields(input.filters);
+
+              if (unknownFields.length > 0 && Object.keys(sanitized).length === 0) {
+                throw new AutomationFiltersUnsupportedError(unknownFields);
+              }
+
+              // Editing is the other way to end up with a match-everything automation:
+              // create it with a real condition, then clear it here. The rule — which
+              // the REST family enforces too — is the application's.
+              if (!hasActionableTriggerFilters(sanitized)) {
+                const existing = await ctx.app.automation.requireById({
+                  triggerId: input.triggerId,
+                  projectId: input.projectId,
+                });
+                ctx.app.automation.assertConditionSurvivesEdit({ existing, filters: sanitized });
+              }
+
+              const trigger = await ctx.app.automation.update({
+                id: input.triggerId,
+                projectId: input.projectId,
+                filters: sanitized,
+              });
+
+              return redactTriggerForRead(trigger);
+            }),
+        )
+        .mutation("testFireTemplate", (p) =>
+          p
+            .withInput(automationApiTestFireInputSchema)
+            .withOutput(testFireResultSchema)
+            .withPermission("triggers:update")
+            .handle(async ({ ctx, input }) => {
+              // ADR-031: test fire is no longer an open relay. The client-supplied
+              try {
+                // The webhook channel ships dark (ADR-040 §7): the type picker is
+                // flag-gated client-side, and the server refuses the channel too so
+                // the flag can't be bypassed by calling the API directly.
+                if (input.channel === "webhook") {
+                  await ctx.app.automation.assertWebhookChannelEnabled({
+                    projectId: input.projectId,
+                    userId: ctx.actor().id,
+                  });
+                }
+                // Email shares the mail provider; webhook fires at an ARBITRARY
+                // customer URL from our worker IPs, so an uncapped test button would
+                // be an outbound request-flood primitive (ADR-040 §4). Slack stays
+                // exempt: its destination is host-pinned to hooks.slack.com.
+                if (input.channel === "email" || input.channel === "webhook") {
+                  const limit = await ports.rateLimit({
+                    key: `testfire:${ctx.actor().id}`,
+                    windowSeconds: 60,
+                    max: 10,
+                  });
+                  if (!limit.allowed) {
+                    throw new TestFireRateLimitedError(
+                      buildRetryAfterMessage({
+                        prefix: "Too many test fires.",
+                        resetAt: limit.resetAt,
+                      }),
+                      limit.resetAt,
+                    );
+                  }
+                }
+                let recipients: string[] = [];
+                if (input.channel === "email") {
+                  const email = ctx.session?.user.email;
+                  if (!email) {
+                    throw new TestFireUnavailableError(
+                      "email",
+                      "Your account has no email address to send a test fire to.",
+                    );
+                  }
+                  recipients = [email];
+                }
+                // Resolve the Slack bot destination: the freshly-typed token, or the
+                // saved automation's stored (encrypted) token when it was kept on edit.
+                let botDestination: { token: string; channel: string } | null = null;
+                if (input.channel === "slack" && input.botDestination) {
+                  const channel = input.botDestination.channelId.trim();
+                  let token = input.botDestination.botToken?.trim() || null;
+                  if (!token && input.automationId) {
+                    const saved = await ctx.app.automation.tryGetById({
+                      triggerId: input.automationId,
+                      projectId: input.projectId,
+                    });
+                    token = ports.providers.decryptSlackBotToken(saved?.actionParams ?? {});
+                  }
+                  if (!token || !channel) {
+                    throw new TestFireUnavailableError(
+                      "slack",
+                      "Add a Slack bot token and channel before sending a test fire.",
+                    );
+                  }
+                  botDestination = { token, channel };
+                }
+
+                // ADR-040 §3: header secrets never reach the client, so a saved
+                let webhookDestination: TestFireWebhookDestination | null | undefined =
+                  input.webhookDestination;
+                if (
+                  webhookDestination &&
+                  Object.values(webhookDestination.headers).includes(WEBHOOK_HEADER_VALUE_KEPT)
+                ) {
+                  let saved: Record<string, string> = {};
+                  if (input.automationId) {
+                    const row = await ctx.app.automation.tryGetById({
+                      triggerId: input.automationId,
+                      projectId: input.projectId,
+                    });
+                    const stored = (row?.actionParams ?? {}) as AutomationWebhookStoredParams;
+                    if (stored?.url !== webhookDestination.url) {
+                      throw new TestFireUnavailableError(
+                        "webhook",
+                        "Re-enter webhook header values after changing the destination URL.",
+                      );
+                    }
+                    saved = ports.providers.decryptWebhookHeaders(stored);
+                  }
+                  webhookDestination = {
+                    ...webhookDestination,
+                    headers: resolveKeptWebhookHeaders(webhookDestination.headers, saved),
+                  };
+                }
+
+                // The signing secret is a stored secret too, so the browser never has
+                // it and cannot send it. Resolve it from the saved trigger so a test
+                // fire signs exactly as a real one does, which is the only way an
+                // author can point the button at their receiver's verification.
+                if (webhookDestination && input.automationId) {
+                  const row = await ctx.app.automation.tryGetById({
+                    triggerId: input.automationId,
+                    projectId: input.projectId,
+                  });
+                  const signingSecrets = ports.providers.decryptWebhookSigningSecrets(
+                    (row?.actionParams ?? {}) as AutomationWebhookStoredParams,
+                  );
+                  if (signingSecrets.length > 0) {
+                    webhookDestination = { ...webhookDestination, signingSecrets };
+                  }
+                }
+
+                const project = await ctx.app.automation.getProjectIdentity(input.projectId);
+                return await ctx.app.automation.testFire({
+                  channel: input.channel,
+                  trigger: input.trigger,
+                  project,
+                  draft: input.draft,
+                  recipients,
+                  webhook: input.webhook,
+                  botDestination,
+                  webhookDestination,
+                  graphAlert: input.graphAlert,
+                  report: input.report,
+                });
+              } catch (err) {
+                raiseAsHandled(err);
+              }
+            }),
+        )
+        .mutation("upsert", (p) =>
+          p
+            .withInput(automationApiUpsertInputSchema)
+            .withOutput(triggerSchema)
+            .withPermission("triggers:update")
+            .handle(async ({ ctx, input }) => {
+              const isGraphAlert = !!input.customGraphId;
+              const isReport = !isGraphAlert && !!input.report;
+              let parsedActionParams: Record<string, unknown> = {};
+              try {
+                ctx.app.automation.validateTemplateDraft(input.templates);
+                // The webhook channel ships dark (ADR-040 §7): gate the save route as
+                // well as the picker, so the flag can't be bypassed via the API.
+                if (input.action === TriggerAction.SEND_WEBHOOK) {
+                  await ctx.app.automation.assertWebhookChannelEnabled({
+                    projectId: input.projectId,
+                    userId: ctx.actor().id,
+                  });
+                }
+                if (isGraphAlert) {
+                  // Graph alerts only support notify channels — there is no
+                  // "ADD_TO_DATASET on a metric crossing a threshold" UX.
+                  if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
+                    throw new GraphAlertChannelUnsupportedError();
+                  }
+                  if (!input.graphAlert) {
+                    throw new GraphAlertThresholdRequiredError();
+                  }
+                  if (!input.alertType) {
+                    throw new GraphAlertSeverityRequiredError();
+                  }
+                  // The graph must belong to the calling project — multitenancy
+                  // gate. Without this a hostile client could attach a trigger to
+                  // a graph from another tenant. The rule is the application's, so
+                  // a second writing door cannot forget it.
+                  await ctx.app.automation.requireCustomGraphInProject({
+                    customGraphId: input.customGraphId ?? "",
+                    projectId: input.projectId,
+                  });
+                }
+                // A report sends a rendered notification on a schedule — notify
+                // channels only, like alerts.
+                if (
+                  isReport &&
+                  input.action !== TriggerAction.SEND_EMAIL &&
+                  input.action !== TriggerAction.SEND_SLACK_MESSAGE
+                ) {
+                  throw new ReportChannelUnsupportedError();
+                }
+                // Per-action shape validation: the provider registry's per-action Zod schema is the
+                // authoritative shape for actionParams. The contract's
+                // `automationApiActionParamsSchema` accepts the union for the wire format; this
+                // pass narrows by action, so a SEND_EMAIL upsert can't accidentally save a dataset
+                // config (and ADD_TO_DATASET can't persist an empty datasetId, etc.).
+                const perAction = ports.providers.actionParamsSchemaFor(input.action);
+                const perActionParsed = perAction.safeParse(input.actionParams);
+                if (!perActionParsed.success) {
+                  throw new InvalidActionParamsError(
+                    `Invalid actionParams for ${input.action}: ${perActionParsed.error.issues[0]?.message ?? "validation failed"}`,
+                    input.action,
+                  );
+                }
+                // Persist the PARSED params, not the wire object: Zod strips keys the
+                // action doesn't declare, so a Slack secret typed before switching the
+                // channel to Email can't ride along and land in the row in plaintext
+                // (where the Slack-only encrypt/redact passes would never touch it).
+                parsedActionParams = perActionParsed.data as Record<string, unknown>;
+                if (
+                  input.action === TriggerAction.SEND_EMAIL &&
+                  input.actionParams.members &&
+                  input.actionParams.members.length > 0
+                ) {
+                  validateEmailRecipientFormats(input.actionParams.members);
+                }
+                // Slack webhook / bot-channel presence is enforced by the per-action
+                // schema's superRefine above. The bot-token presence check (which must
+                // allow "kept" on edit) runs after this block — it needs the saved row.
+                if (
+                  input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+                  (!input.actionParams.annotators || input.actionParams.annotators.length === 0)
+                ) {
+                  throw new MissingAnnotatorError();
+                }
+              } catch (err) {
+                raiseAsHandled(err);
+              }
+
+              // ADR-043 Subject facet: normalise + validate the trace-filter query
+              // before persisting. Empty/whitespace collapses to null (the legacy
+              // `filters` path). A non-empty query is dry-run through the compiler so a
+              // malformed query is rejected here with author feedback rather than
+              // silently failing closed (matching nothing) at dispatch time.
+              const filterQuery =
+                input.filterQuery && input.filterQuery.trim() !== ""
+                  ? input.filterQuery.trim()
+                  : null;
+              if (filterQuery !== null) {
+                try {
+                  ports.assertTraceFilterQueryCompiles({
+                    query: filterQuery,
+                    projectId: input.projectId,
+                  });
+                } catch (err) {
+                  throw new AutomationTraceFilterInvalidError(
+                    err instanceof Error ? err.message : "could not parse the query",
+                  );
+                }
+              }
+
+              // A trace automation must say which traces it is about. Checked after
+              // the query is normalised, so a whitespace-only query counts as absent
+              // exactly as it does everywhere else. Graph alerts and reports are
+              // exempt: an alert's condition is its threshold and a report's is its
+              // schedule, and both persist `filters: {}` by construction.
+              if (
+                !isGraphAlert &&
+                !isReport &&
+                filterQuery === null &&
+                !hasActionableTriggerFilters(input.filters)
+              ) {
+                throw new TriggerFiltersRequiredError();
+              }
+
+              // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
+              // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
+              const storedActionParams = await ports.providers.persistActionParamsFor(
+                input.action,
+                {
+                  incoming: parsedActionParams,
+                  loadExisting: async () =>
+                    input.triggerId
+                      ? (
+                          await ctx.app.automation.tryGetById({
+                            triggerId: input.triggerId,
+                            projectId: input.projectId,
+                          })
+                        )?.actionParams
+                      : undefined,
+                },
+              );
+
+              // Annotation-queue dispatch attributes created queue items to a user and skips the
+              // action when `createdByUserId` is absent. The drawer's provider slice doesn't carry
+              // it, so stamp the caller here — same as the legacy create mutation — or an edit
+              // would silently strip it and disable dispatch for the trigger. Force createdByUserId
+              // to the session user — never trust the client (builder5015-002).
+              const actionParams: Record<string, unknown> =
+                input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
+                  ? {
+                      ...(storedActionParams as Record<string, unknown>),
+                      createdByUserId: ctx.actor().id,
+                    }
+                  : { ...(storedActionParams as Record<string, unknown>) };
+
+              // Graph alerts: route the row shape through the SSOT builder so it's byte-identical
+              // to what `graphs.updateById` writes on the dashboard path (N1 — the sweep fixed
+              // graphs.ts but automations.ts was still hand-rolling the row). The dispatcher only
+              // knows one shape; drift between the two writers silently breaks dispatch for
+              // whichever format loses.
+              let data: Omit<
+                CreateTriggerCommand,
+                "id" | "projectId" | "lastRunAt" | "notificationCadence" | "traceDebounceMs"
+              >;
+              if (isGraphAlert && input.graphAlert && input.customGraphId) {
+                const graphAlert: GraphAlertActionParams = input.graphAlert;
+                const builderInput = {
+                  id: input.triggerId ?? ksuid(TRIGGER_KSUID_RESOURCE).toString(),
+                  name: input.name,
+                  projectId: input.projectId,
+                  action: input.action,
+                  alertType: input.alertType ?? "INFO",
+                  customGraphId: input.customGraphId,
+                  actionParams: {
+                    ...actionParams,
+                    ...graphAlert,
+                  },
+                };
+                const built = buildGraphAlertTriggerData({
+                  ...builderInput,
+                  action: notifyingActionOr(builderInput.action, "graph alert"),
+                });
+                data = {
+                  name: built.name,
+                  action: built.action,
+                  triggerKind: "ALERT",
+                  alertType: built.alertType,
+                  filters: z.record(z.string(), z.unknown()).parse(built.filters),
+                  // Graph alerts never carry a trace-filter query; clear it so a kind
+                  // conversion can't leave a stale one behind.
+                  filterQuery: null,
+                  customGraphId: built.customGraphId,
+                  actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
+                  slackTemplateType: input.templates.slackTemplateType ?? null,
+                  slackTemplate: input.templates.slackTemplate ?? null,
+                  emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+                  emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+                };
+              } else if (isReport && input.report) {
+                const built = buildReportTriggerData({
+                  id: input.triggerId ?? ksuid(TRIGGER_KSUID_RESOURCE).toString(),
+                  name: input.name,
+                  projectId: input.projectId,
+                  action: notifyingActionOr(input.action, "report"),
+                  actionParams: { ...actionParams, ...input.report },
+                });
+                data = {
+                  name: built.name,
+                  action: built.action,
+                  triggerKind: "REPORT",
+                  filters: z.record(z.string(), z.unknown()).parse(built.filters),
+                  // Converting an existing graph alert into a report must release the
+                  // graph: a left-behind `customGraphId` re-arms the row as a threshold
+                  // alert on the heartbeat path, so the report fires as an alert too.
+                  customGraphId: null,
+                  // A trace-query report sends the traces matching the author's Subject
+                  // query — without this the report would only ever send the newest
+                  // traces in the window. A graph/dashboard report has no trace query,
+                  // so the column is cleared (a source change can't strand a stale one).
+                  filterQuery: input.report.source.kind === "traceQuery" ? filterQuery : null,
+                  actionParams: z.record(z.string(), z.unknown()).parse(built.actionParams),
+                  slackTemplateType: input.templates.slackTemplateType ?? null,
+                  slackTemplate: input.templates.slackTemplate ?? null,
+                  emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+                  emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+                };
+              } else {
+                data = {
+                  name: input.name,
+                  action: input.action,
+                  triggerKind: "AUTOMATION",
+                  alertType: input.alertType ?? null,
+                  // A trace-subject automation supersedes the structured `filters` with
+                  // its liqe query; persist an empty `{}` so the legacy matcher is a
+                  // no-op and the dispatcher reads `filterQuery` instead.
+                  filters: filterQuery !== null ? {} : input.filters,
+                  filterQuery,
+                  customGraphId: input.customGraphId ?? null,
+                  actionParams,
+                  slackTemplateType: input.templates.slackTemplateType ?? null,
+                  slackTemplate: input.templates.slackTemplate ?? null,
+                  emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+                  emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+                };
+              }
+
+              let trigger;
+              if (input.triggerId) {
+                const cadenceUpdate = resolveCadenceForUpdate(
                   input.action,
                   input.notificationCadence,
                   isGraphAlert,
-                ),
-                traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-              });
-            } else {
-              trigger = await ctx.app.automation.create({
-                id: ksuid(TRIGGER_KSUID_RESOURCE).toString(),
-                projectId: input.projectId,
-                lastRunAt: new Date(),
-                notificationCadence: resolveCadenceForCreate(
-                  input.action,
-                  input.notificationCadence,
-                  isGraphAlert,
-                ),
-                traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-                ...data,
-              });
-            }
-          }
+                );
+                trigger = await ctx.app.automation.update({
+                  id: input.triggerId,
+                  projectId: input.projectId,
+                  ...data,
+                  ...(cadenceUpdate !== undefined ? { notificationCadence: cadenceUpdate } : {}),
+                  ...(input.traceDebounceMs !== undefined
+                    ? { traceDebounceMs: input.traceDebounceMs }
+                    : {}),
+                });
+              } else {
+                // A graph alert owns its custom-graph's unique `customGraphId` slot. `deleteById`
+                // soft-deletes (keeps the row and its @unique customGraphId occupied), so a fresh
+                // `create` for a graph that ever had an alert would violate the unique index — an
+                // unhandled P2002 → 500, with no UI path to recover since the soft-deleted row is
+                // hidden.
+                const existingForGraph =
+                  isGraphAlert && input.customGraphId
+                    ? await ctx.app.automation.tryGetByCustomGraphId({
+                        projectId: input.projectId,
+                        customGraphId: input.customGraphId,
+                      })
+                    : null;
+                if (existingForGraph) {
+                  trigger = await ctx.app.automation.update({
+                    id: existingForGraph.id,
+                    projectId: input.projectId,
+                    ...data,
+                    deleted: false,
+                    active: true,
+                    lastRunAt: new Date(),
+                    notificationCadence: resolveCadenceForCreate(
+                      input.action,
+                      input.notificationCadence,
+                      isGraphAlert,
+                    ),
+                    traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+                  });
+                } else {
+                  trigger = await ctx.app.automation.create({
+                    id: ksuid(TRIGGER_KSUID_RESOURCE).toString(),
+                    projectId: input.projectId,
+                    lastRunAt: new Date(),
+                    notificationCadence: resolveCadenceForCreate(
+                      input.action,
+                      input.notificationCadence,
+                      isGraphAlert,
+                    ),
+                    traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+                    ...data,
+                  });
+                }
+              }
 
-          if (isReport && input.report) {
-            // Wire the report onto the calendar scheduler (ADR-044): its trigger
-            // id is the scheduler targetId; publishWake nudges every pod's loop.
-            await ctx.app.automation.syncReportSchedule({
-              projectId: input.projectId,
-              triggerId: trigger.id,
-              cron: input.report.schedule.cron,
-              timezone: input.report.schedule.timezone,
-            });
-          } else {
-            // Editing a report into a trace automation or graph alert must retire
-            // its calendar entry — otherwise the ScheduledJob keeps waking forever
-            // and the report handler repeatedly loads a now-non-report trigger,
-            // fails to parse its actionParams, and skips every cadence. Idempotent,
-            // so a trigger that was never a report costs one no-op deactivate.
-            await ctx.app.automation.removeReportSchedule({
-              projectId: input.projectId,
-              triggerId: trigger.id,
-            });
-          }
+              if (isReport && input.report) {
+                // Wire the report onto the calendar scheduler (ADR-044): its trigger
+                // id is the scheduler targetId; publishWake nudges every pod's loop.
+                await ctx.app.automation.syncReportSchedule({
+                  projectId: input.projectId,
+                  triggerId: trigger.id,
+                  cron: input.report.schedule.cron,
+                  timezone: input.report.schedule.timezone,
+                });
+              } else {
+                // Editing a report into a trace automation or graph alert must retire
+                // its calendar entry — otherwise the ScheduledJob keeps waking forever
+                // and the report handler repeatedly loads a now-non-report trigger,
+                // fails to parse its actionParams, and skips every cadence. Idempotent,
+                // so a trigger that was never a report costs one no-op deactivate.
+                await ctx.app.automation.removeReportSchedule({
+                  projectId: input.projectId,
+                  triggerId: trigger.id,
+                });
+              }
 
-          await ctx.app.automation.invalidate(input.projectId);
-          return redactTriggerForRead(trigger);
-        },
-      ),
-    });
+              await ctx.app.automation.invalidate(input.projectId);
+              return redactTriggerForRead(trigger);
+            }),
+        )
+        .build()
+    );
   }
 }

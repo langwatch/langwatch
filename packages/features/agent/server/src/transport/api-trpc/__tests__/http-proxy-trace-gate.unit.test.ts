@@ -18,6 +18,7 @@ function harness() {
     {
       protected: trpc.procedure,
       policy: () => (procedure) => procedure,
+      validateOutput: true,
     },
     {
       postStudioEvent: async (_request, { projectId, event, onEvent }) => {

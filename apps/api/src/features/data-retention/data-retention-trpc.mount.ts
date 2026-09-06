@@ -36,6 +36,7 @@ export function createDataRetentionTrpcRouter<
   const service = createTrpcApiService(options);
   return DataRetentionTrpcApi.create(options.root, {
     protected: service.protected,
+    validateOutput: service.validateOutput,
     authz: {
       permission: service.policy,
       inResolver: (enforces: EnforcedScopeFields) =>

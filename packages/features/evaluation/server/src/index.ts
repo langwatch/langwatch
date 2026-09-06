@@ -73,7 +73,6 @@ export {
   type EvaluationTrpcContext,
   type EvaluationTrpcPorts,
   type EvaluationRunOutcome,
-  type EvaluatorUnavailability,
 } from "./transport/api-trpc/evaluation.api";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service";
 export {

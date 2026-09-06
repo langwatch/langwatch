@@ -54,7 +54,13 @@ export type TrpcServiceProcedures<
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /**
+   * Optional: a surface whose every procedure declares `withCustomPermission`
+   * never asks the process to resolve a declaration, and passing an identity
+   * function to satisfy the type only hides that. `withPermission` on a
+   * surface that supplied none refuses by name.
+   */
+  policy?(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
 }>;
 
 /** What `createTrpcService` is given. */
@@ -189,11 +195,19 @@ export interface TrpcProcedureChain<
     policy: TrpcPolicyDecorator,
     reason: string,
   ): TrpcProcedureChain<TContext, TKind, TInput, TOutput, true>;
-  /** The handler. Its `input` is the parsed value of the declared schema. */
+  /**
+   * The handler. Its `input` is the parsed value of the declared schema, and
+   * `signal` is tRPC's own request signal — `AbortSignal | undefined`, exactly
+   * as tRPC types it — which is what a stream stops on when the client leaves.
+   */
   handle<TResult>(
     this: ReadyChain<TContext, TKind, TInput, TOutput, TDeclared>,
     handler: (
-      opts: Readonly<{ ctx: TContext; input: HandlerInput<TInput> }>,
+      opts: Readonly<{
+        ctx: TContext;
+        input: HandlerInput<TInput>;
+        signal: AbortSignal | undefined;
+      }>,
     ) => TResult | Promise<TResult>,
   ): BuiltProcedure<TKind, TInput, OutputOf<TKind, TResult>>;
 }
@@ -263,6 +277,16 @@ export interface TrpcService<
     TRoot,
     WithProcedure<TProcedures, TName, BuiltProcedure<"subscription", TInput, TOutput>>
   >;
+  /**
+   * A child router under `name`, already built — its own `createTrpcService`,
+   * or a router the process composed. The nesting is the record's, so the
+   * client's inferred shape is exactly what hand-writing `router({ name })`
+   * produced.
+   */
+  router<TName extends string, TRouter extends TRPCCreateRouterOptions[string]>(
+    name: TName,
+    child: TRouter,
+  ): TrpcService<TContext, TOptions, TRoot, WithProcedure<TProcedures, TName, TRouter>>;
   /** The router the process mounts, built by the root's own factory. */
   build(): TRPCBuiltRouter<TRoot, TRPCDecorateCreateRouterOptions<TProcedures>>;
 }
@@ -381,7 +405,7 @@ function createChain<
   kind: TKind;
   state: ChainState;
   procedure: BuildableProcedure;
-  policy: (access: AuthzPermission | AuthzDeclaration) => TrpcPolicyDecorator;
+  policy: ((access: AuthzPermission | AuthzDeclaration) => TrpcPolicyDecorator) | undefined;
   validateOutput: boolean;
 }): TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared> {
   const next = <
@@ -398,7 +422,15 @@ function createChain<
     withoutInput: () => next({ ...context.state }),
     withOutput: (schema) => next({ ...context.state, output: schema }),
     withoutOutput: () => next({ ...context.state }),
-    withPermission: (access) => next({ ...context.state, policy: context.policy(access) }),
+    withPermission: (access) => {
+      if (!context.policy) {
+        throw new Error(
+          `tRPC procedure "${context.name}" declares withPermission, but the ` +
+            `surface was opened with no policy; pass one to createTrpcService`,
+        );
+      }
+      return next({ ...context.state, policy: context.policy(access) });
+    },
     withCustomPermission: (policy) => next({ ...context.state, policy }),
     handle: (handler) =>
       buildProcedure({
@@ -472,6 +504,7 @@ export function createTrpcService<
           }),
         ),
       }),
+    router: (name, child) => service({ ...record, [name]: child as never }),
     build: () =>
       config.root.router(record) as TRPCBuiltRouter<
         TRoot,
@@ -480,4 +513,65 @@ export function createTrpcService<
   });
 
   return service<TrpcNoProcedures>({});
+}
+
+/** What {@link createTrpcProcedure} is given: no root, because it builds no router. */
+export type TrpcProcedureConfig<
+  TContext extends object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+> = Readonly<{
+  procedures: TrpcServiceProcedures<TContext, TOptions, TRoot>;
+  /** @see TrpcServiceConfig.validateOutput */
+  validateOutput?: boolean;
+}>;
+
+/** One procedure the process mounts by name, with no router around it. */
+export interface TrpcBareProcedure<TContext extends object> {
+  query<TInput extends ChainInput, TOutput>(
+    name: string,
+    define: (
+      chain: TrpcProcedureChain<TContext, "query">,
+    ) => BuiltProcedure<"query", TInput, TOutput>,
+  ): BuiltProcedure<"query", TInput, TOutput>;
+  mutation<TInput extends ChainInput, TOutput>(
+    name: string,
+    define: (
+      chain: TrpcProcedureChain<TContext, "mutation">,
+    ) => BuiltProcedure<"mutation", TInput, TOutput>,
+  ): BuiltProcedure<"mutation", TInput, TOutput>;
+  subscription<TInput extends ChainInput, TOutput>(
+    name: string,
+    define: (
+      chain: TrpcProcedureChain<TContext, "subscription">,
+    ) => BuiltProcedure<"subscription", TInput, TOutput>,
+  ): BuiltProcedure<"subscription", TInput, TOutput>;
+}
+
+/**
+ * The same chain for a surface that IS one procedure, mounted at the root
+ * beside routers rather than inside one. `name` is what an output refusal
+ * names; it does not decide where the process mounts it.
+ */
+export function createTrpcProcedure<
+  TContext extends object,
+  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
+  TRoot extends AnyTRPCRootTypes,
+>(config: TrpcProcedureConfig<TContext, TOptions, TRoot>): TrpcBareProcedure<TContext> {
+  const procedure = config.procedures.protected as unknown as BuildableProcedure;
+  const chain = (name: string, kind: ProcedureKind) =>
+    createChain({
+      name,
+      kind,
+      state: {},
+      procedure,
+      policy: config.procedures.policy,
+      validateOutput: config.validateOutput ?? false,
+    });
+
+  return {
+    query: (name, define) => define(chain(name, "query") as never),
+    mutation: (name, define) => define(chain(name, "mutation") as never),
+    subscription: (name, define) => define(chain(name, "subscription") as never),
+  };
 }

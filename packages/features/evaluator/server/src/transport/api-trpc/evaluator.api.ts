@@ -21,7 +21,7 @@
  * specs/monitors/replicate-monitor-to-project.feature.
  */
 import { PermissionDeniedError } from "@langwatch/authz-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type {
   EvaluatorApiCreateOutput,
   EvaluatorApiDeleteOutput,
@@ -29,6 +29,7 @@ import type {
   EvaluatorApiGetByIdOutput,
   EvaluatorApiUpdateOutput,
 } from "@langwatch/evaluator-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
   evaluatorApiCopyInputSchema,
   evaluatorApiCreateInputSchema,
@@ -38,6 +39,15 @@ import {
   evaluatorApiPushToCopiesInputSchema,
   evaluatorApiSlugInputSchema,
   evaluatorApiUpdateInputSchema,
+  evaluatorCascadeArchiveSchema,
+  evaluatorCopySchema,
+  evaluatorHistoryEntrySchema,
+  evaluatorPushToCopiesSchema,
+  evaluatorRelatedEntitiesSchema,
+  evaluatorSchema,
+  evaluatorSyncFromSourceSchema,
+  evaluatorWithFieldsSchema,
+  evaluatorWorkflowFieldsSchema,
 } from "@langwatch/evaluator-contract";
 import {
   TRPCError,
@@ -81,7 +91,9 @@ type EvaluatorTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -158,275 +170,337 @@ export class EvaluatorTrpcApi {
       deleteReplicatedWorkflow: (input) => ports.deleteReplicatedWorkflow(ctx, input),
     });
 
-    return trpc.router({
-      /**
-       * Gets all evaluators for a project with computed fields.
-       * Fields include required/optional inputs derived from evaluator type.
-       */
-      getAll: policy("evaluations:view")(procedure.input(evaluatorApiProjectInputSchema)).query(
-        async ({ ctx, input }): Promise<EvaluatorApiGetAllOutput> => {
-          return await ctx.app.evaluatorApp.getAllWithFields({
-            projectId: input.projectId,
-          });
-        },
-      ),
-
-      /**
-       * Gets a single evaluator by ID with computed fields.
-       * Fields include required/optional inputs derived from evaluator type.
-       */
-      getById: policy("evaluations:view")(
-        procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).query(async ({ ctx, input }): Promise<EvaluatorApiGetByIdOutput> => {
-        return await ctx.app.evaluatorApp.tryGetByIdWithFields({
-          id: input.id,
-          projectId: input.projectId,
-        });
-      }),
-
-      /** Gets a single evaluator by slug. */
-      getBySlug: policy("evaluations:view")(procedure.input(evaluatorApiSlugInputSchema)).query(
-        async ({ ctx, input }) => {
-          return await ctx.app.evaluatorApp.tryGetBySlug({
-            slug: input.slug,
-            projectId: input.projectId,
-          });
-        },
-      ),
-
-      /** Creates a new evaluator. */
-      create: policy("evaluations:manage")(procedure.input(createInputSchema)).mutation(
-        async ({ ctx, input }): Promise<EvaluatorApiCreateOutput> => {
-          // If workflowId is provided, check if an evaluator already exists for this workflow
-          if (input.workflowId) {
-            const existingEvaluator = await ctx.app.evaluatorApp.tryGetByWorkflow({
-              workflowId: input.workflowId,
-              projectId: input.projectId,
-            });
-
-            if (existingEvaluator) {
-              // Still a transport error, deliberately. The contract already
-              // names this refusal — `EvaluatorWorkflowAlreadyAssignedError` —
-              // but at 409, and this surface has answered 400 since it shipped.
-              // Converting would move the status a client branches on, so the
-              // handled error waits for a decision to change it.
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * Gets all evaluators for a project with computed fields.
+         * Fields include required/optional inputs derived from evaluator type.
+         */
+        .query("getAll", (p) =>
+          p
+            .withInput(evaluatorApiProjectInputSchema)
+            .withOutput(evaluatorWithFieldsSchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }): Promise<EvaluatorApiGetAllOutput> => {
+              return await ctx.app.evaluatorApp.getAllWithFields({
+                projectId: input.projectId,
               });
-            }
-          }
+            }),
+        )
 
-          return await ctx.app.evaluatorApp.create({
-            id: input.id,
-            projectId: input.projectId,
-            name: input.name,
-            type: input.type,
-            config: input.config,
-            workflowId: input.workflowId,
-          });
-        },
-      ),
+        /**
+         * Gets a single evaluator by ID with computed fields.
+         * Fields include required/optional inputs derived from evaluator type.
+         */
+        .query("getById", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorIdInputSchema)
+            .withOutput(evaluatorWithFieldsSchema.nullable())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }): Promise<EvaluatorApiGetByIdOutput> => {
+              return await ctx.app.evaluatorApp.tryGetByIdWithFields({
+                id: input.id,
+                projectId: input.projectId,
+              });
+            }),
+        )
 
-      /** Updates an existing evaluator. */
-      update: policy("evaluations:manage")(procedure.input(evaluatorApiUpdateInputSchema)).mutation(
-        async ({ ctx, input }): Promise<EvaluatorApiUpdateOutput> => {
-          return await ctx.app.evaluatorApp.update({
-            id: input.id,
-            projectId: input.projectId,
-            data: {
-              ...(input.name !== undefined && { name: input.name }),
-              ...(input.type !== undefined && { type: input.type }),
-              ...(input.config !== undefined && {
+        /** Gets a single evaluator by slug. */
+        .query("getBySlug", (p) =>
+          p
+            .withInput(evaluatorApiSlugInputSchema)
+            .withOutput(evaluatorSchema.nullable())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              return await ctx.app.evaluatorApp.tryGetBySlug({
+                slug: input.slug,
+                projectId: input.projectId,
+              });
+            }),
+        )
+
+        /** Creates a new evaluator. */
+        .mutation("create", (p) =>
+          p
+            .withInput(createInputSchema)
+            .withOutput(evaluatorSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }): Promise<EvaluatorApiCreateOutput> => {
+              // If workflowId is provided, check if an evaluator already exists for this workflow
+              if (input.workflowId) {
+                const existingEvaluator = await ctx.app.evaluatorApp.tryGetByWorkflow({
+                  workflowId: input.workflowId,
+                  projectId: input.projectId,
+                });
+
+                if (existingEvaluator) {
+                  // Still a transport error, deliberately. The contract already
+                  // names this refusal — `EvaluatorWorkflowAlreadyAssignedError` —
+                  // but at 409, and this surface has answered 400 since it shipped.
+                  // Converting would move the status a client branches on, so the
+                  // handled error waits for a decision to change it.
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
+                  });
+                }
+              }
+
+              return await ctx.app.evaluatorApp.create({
+                id: input.id,
+                projectId: input.projectId,
+                name: input.name,
+                type: input.type,
                 config: input.config,
-              }),
-              ...(input.workflowId !== undefined && {
                 workflowId: input.workflowId,
-              }),
-            },
-          });
-        },
-      ),
+              });
+            }),
+        )
 
-      /**
-       * Gets entities related to an evaluator for cascade archive warning.
-       * Returns linked workflow and monitors that would be affected.
-       */
-      getRelatedEntities: policy("evaluations:view")(
-        procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const evaluator = await ctx.app.evaluatorApp.tryGetById({
-          id: input.id,
-          projectId: input.projectId,
-        });
+        /** Updates an existing evaluator. */
+        .mutation("update", (p) =>
+          p
+            .withInput(evaluatorApiUpdateInputSchema)
+            .withOutput(evaluatorSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }): Promise<EvaluatorApiUpdateOutput> => {
+              return await ctx.app.evaluatorApp.update({
+                id: input.id,
+                projectId: input.projectId,
+                data: {
+                  ...(input.name !== undefined && { name: input.name }),
+                  ...(input.type !== undefined && { type: input.type }),
+                  ...(input.config !== undefined && {
+                    config: input.config,
+                  }),
+                  ...(input.workflowId !== undefined && {
+                    workflowId: input.workflowId,
+                  }),
+                },
+              });
+            }),
+        )
 
-        // Find the linked workflow (if any)
-        const workflow = evaluator?.workflowId
-          ? await ports.findLinkedWorkflow(ctx, {
-              workflowId: evaluator.workflowId,
-              projectId: input.projectId,
-            })
-          : null;
+        /**
+         * Gets entities related to an evaluator for cascade archive warning.
+         * Returns linked workflow and monitors that would be affected.
+         */
+        .query("getRelatedEntities", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorIdInputSchema)
+            .withOutput(evaluatorRelatedEntitiesSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              const evaluator = await ctx.app.evaluatorApp.tryGetById({
+                id: input.id,
+                projectId: input.projectId,
+              });
 
-        // Find monitors using this evaluator
-        const monitors = await ports.findMonitorsUsingEvaluator(ctx, {
-          evaluatorId: input.id,
-          projectId: input.projectId,
-        });
+              // Find the linked workflow (if any)
+              const workflow = evaluator?.workflowId
+                ? await ports.findLinkedWorkflow(ctx, {
+                    workflowId: evaluator.workflowId,
+                    projectId: input.projectId,
+                  })
+                : null;
 
-        return { workflow, monitors };
-      }),
+              // Find monitors using this evaluator
+              const monitors = await ports.findMonitorsUsingEvaluator(ctx, {
+                evaluatorId: input.id,
+                projectId: input.projectId,
+              });
 
-      /**
-       * Archives an evaluator and all related entities in a transaction.
-       * - Archives linked workflow
-       * - Deletes monitors using this evaluator (hard delete)
-       */
-      cascadeArchive: policy("evaluations:manage")(
-        procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const evaluator = await ctx.app.evaluatorApp.getById({
-          id: input.id,
-          projectId: input.projectId,
-        });
-        const deletedMonitors = await ports.deleteMonitorsUsingEvaluator(ctx, {
-          evaluatorId: input.id,
-          projectId: input.projectId,
-        });
-        const archivedEvaluator = await ctx.app.evaluatorApp.archive({
-          id: input.id,
-          projectId: input.projectId,
-        });
+              return { workflow, monitors };
+            }),
+        )
 
-        let archivedWorkflow = null;
-        if (evaluator.workflowId) {
-          archivedWorkflow = await ports.archiveLinkedWorkflow(ctx, {
-            workflowId: evaluator.workflowId,
-            projectId: input.projectId,
-          });
-        }
-        return {
-          evaluator: archivedEvaluator,
-          archivedWorkflow,
-          deletedMonitorsCount: deletedMonitors.count,
-        };
-      }),
+        /**
+         * Archives an evaluator and all related entities in a transaction.
+         * - Archives linked workflow
+         * - Deletes monitors using this evaluator (hard delete)
+         */
+        .mutation("cascadeArchive", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorIdInputSchema)
+            .withOutput(evaluatorCascadeArchiveSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const evaluator = await ctx.app.evaluatorApp.getById({
+                id: input.id,
+                projectId: input.projectId,
+              });
+              const deletedMonitors = await ports.deleteMonitorsUsingEvaluator(ctx, {
+                evaluatorId: input.id,
+                projectId: input.projectId,
+              });
+              const archivedEvaluator = await ctx.app.evaluatorApp.archive({
+                id: input.id,
+                projectId: input.projectId,
+              });
 
-      /** Soft deletes an evaluator. */
-      delete: policy("evaluations:manage")(
-        procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).mutation(async ({ ctx, input }): Promise<EvaluatorApiDeleteOutput> => {
-        return await ctx.app.evaluatorApp.archive({
-          id: input.id,
-          projectId: input.projectId,
-        });
-      }),
+              let archivedWorkflow = null;
+              if (evaluator.workflowId) {
+                archivedWorkflow = await ports.archiveLinkedWorkflow(ctx, {
+                  workflowId: evaluator.workflowId,
+                  projectId: input.projectId,
+                });
+              }
+              return {
+                evaluator: archivedEvaluator,
+                archivedWorkflow,
+                deletedMonitorsCount: deletedMonitors.count,
+              };
+            }),
+        )
 
-      /**
-       * Gets workflow fields for a workflow-based evaluator.
-       * Returns the entry node outputs from the linked workflow.
-       * These represent the fields that need to be mapped from trace data.
-       */
-      getWorkflowFields: policy("evaluations:view")(
-        procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).query(async ({ ctx, input }) => {
-        // Fetch the evaluator first, then scope its workflow to the same project.
-        return ctx.app.evaluatorApp.getWorkflowFields(input);
-      }),
+        /** Soft deletes an evaluator. */
+        .mutation("delete", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorIdInputSchema)
+            .withOutput(evaluatorSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }): Promise<EvaluatorApiDeleteOutput> => {
+              return await ctx.app.evaluatorApp.archive({
+                id: input.id,
+                projectId: input.projectId,
+              });
+            }),
+        )
 
-      /** Get copies of an evaluator (replicas in other projects) for push selection. */
-      getCopies: policy("evaluations:view")(
-        procedure.input(evaluatorApiEvaluatorInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const copies = await ctx.app.evaluatorApp.getCopies(input);
+        /**
+         * Gets workflow fields for a workflow-based evaluator.
+         * Returns the entry node outputs from the linked workflow.
+         * These represent the fields that need to be mapped from trace data.
+         */
+        .query("getWorkflowFields", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorIdInputSchema)
+            .withOutput(evaluatorWorkflowFieldsSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              // Fetch the evaluator first, then scope its workflow to the same project.
+              return ctx.app.evaluatorApp.getWorkflowFields(input);
+            }),
+        )
 
-        const authorizedCopies = await Promise.all(
-          copies.map(async (c) => ({
-            copy: c,
-            hasPermission: await ctx.can("evaluations:view", { projectId: c.projectId }),
-          })),
-        ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
+        /** Get copies of an evaluator (replicas in other projects) for push selection. */
+        .query("getCopies", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorInputSchema)
+            .withOutput(evaluatorCopySchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              const copies = await ctx.app.evaluatorApp.getCopies(input);
 
-        return authorizedCopies;
-      }),
+              const authorizedCopies = await Promise.all(
+                copies.map(async (c) => ({
+                  copy: c,
+                  hasPermission: await ctx.can("evaluations:view", { projectId: c.projectId }),
+                })),
+              ).then((results) => results.filter((r) => r.hasPermission).map((r) => r.copy));
 
-      /** Copy (replicate) an evaluator to another project. */
-      copy: policy("evaluations:manage")(procedure.input(copyInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const hasSourcePermission = await ctx.can("evaluations:manage", {
-            projectId: input.sourceProjectId,
-          });
-          if (!hasSourcePermission) {
-            // Still a transport error, deliberately. `PermissionDeniedError`
-            // is a 403 and this refusal has answered 401 since it shipped;
-            // 401 for "authenticated but not permitted" is wrong, but fixing
-            // it is a wire change and not this pass's to make.
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to manage evaluations in the source project",
-            });
-          }
+              return authorizedCopies;
+            }),
+        )
 
-          return await EvaluatorReplicationApi.create(replicationPorts(ctx)).copyToProject({
-            evaluators: ctx.app.evaluatorApp.evaluatorService,
-            evaluatorId: input.evaluatorId,
-            sourceProjectId: input.sourceProjectId,
-            targetProjectId: input.projectId,
-            newEvaluatorId: input.newEvaluatorId,
-          });
-        },
-      ),
+        /** Copy (replicate) an evaluator to another project. */
+        .mutation("copy", (p) =>
+          p
+            .withInput(copyInputSchema)
+            .withOutput(evaluatorSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const hasSourcePermission = await ctx.can("evaluations:manage", {
+                projectId: input.sourceProjectId,
+              });
+              if (!hasSourcePermission) {
+                // Still a transport error, deliberately. `PermissionDeniedError`
+                // is a 403 and this refusal has answered 401 since it shipped;
+                // 401 for "authenticated but not permitted" is wrong, but fixing
+                // it is a wire change and not this pass's to make.
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to manage evaluations in the source project",
+                });
+              }
 
-      /** Push source evaluator config to selected copies (replicas). */
-      pushToCopies: policy("evaluations:manage")(
-        procedure.input(evaluatorApiPushToCopiesInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const copies = await ctx.app.evaluatorApp.getCopies(input);
-        const copiesToPush = input.copyIds
-          ? copies.filter((copy) => input.copyIds!.includes(copy.id))
-          : copies;
-        const allowedProjectIds: string[] = [];
-        for (const copy of copiesToPush) {
-          const hasPermission = await ctx.can("evaluations:manage", {
-            projectId: copy.projectId,
-          });
-          if (hasPermission) allowedProjectIds.push(copy.projectId);
-        }
-        return ctx.app.evaluatorApp.pushToCopies({ ...input, allowedProjectIds });
-      }),
+              return await EvaluatorReplicationApi.create(replicationPorts(ctx)).copyToProject({
+                evaluators: ctx.app.evaluatorApp.evaluatorService,
+                evaluatorId: input.evaluatorId,
+                sourceProjectId: input.sourceProjectId,
+                targetProjectId: input.projectId,
+                newEvaluatorId: input.newEvaluatorId,
+              });
+            }),
+        )
 
-      /** Sync a copied evaluator from its source. */
-      syncFromSource: policy("evaluations:manage")(
-        procedure.input(evaluatorApiEvaluatorInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const { source } = await ctx.app.evaluatorApp.getCopySource(input);
+        /** Push source evaluator config to selected copies (replicas). */
+        .mutation("pushToCopies", (p) =>
+          p
+            .withInput(evaluatorApiPushToCopiesInputSchema)
+            .withOutput(evaluatorPushToCopiesSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const copies = await ctx.app.evaluatorApp.getCopies(input);
+              const copiesToPush = input.copyIds
+                ? copies.filter((copy) => input.copyIds!.includes(copy.id))
+                : copies;
+              const allowedProjectIds: string[] = [];
+              for (const copy of copiesToPush) {
+                const hasPermission = await ctx.can("evaluations:manage", {
+                  projectId: copy.projectId,
+                });
+                if (hasPermission) allowedProjectIds.push(copy.projectId);
+              }
+              return ctx.app.evaluatorApp.pushToCopies({ ...input, allowedProjectIds });
+            }),
+        )
 
-        const hasSourcePermission = await ctx.can("evaluations:manage", {
-          projectId: source.projectId,
-        });
-        if (!hasSourcePermission) {
-          throw new PermissionDeniedError({
-            permission: "evaluations:manage",
-            scope: { type: "project", id: source.projectId },
-            denialReason: "no-binding",
-          });
-        }
+        /** Sync a copied evaluator from its source. */
+        .mutation("syncFromSource", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorInputSchema)
+            .withOutput(evaluatorSyncFromSourceSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ ctx, input }) => {
+              const { source } = await ctx.app.evaluatorApp.getCopySource(input);
 
-        return ctx.app.evaluatorApp.syncFromSource(input);
-      }),
+              const hasSourcePermission = await ctx.can("evaluations:manage", {
+                projectId: source.projectId,
+              });
+              if (!hasSourcePermission) {
+                throw new PermissionDeniedError({
+                  permission: "evaluations:manage",
+                  scope: { type: "project", id: source.projectId },
+                  denialReason: "no-binding",
+                });
+              }
 
-      /**
-       * Returns recent audit log history for a specific evaluator.
-       * Used by the "View History" drawer on the evaluators page.
-       */
-      getHistory: policy("evaluations:view")(
-        procedure.input(evaluatorApiEvaluatorInputSchema),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.evaluatorApp.getHistory({
-          evaluatorId: input.evaluatorId,
-          projectId: input.projectId,
-        });
-      }),
-    });
+              return ctx.app.evaluatorApp.syncFromSource(input);
+            }),
+        )
+
+        /**
+         * Returns recent audit log history for a specific evaluator.
+         * Used by the "View History" drawer on the evaluators page.
+         */
+        .query("getHistory", (p) =>
+          p
+            .withInput(evaluatorApiEvaluatorInputSchema)
+            .withOutput(evaluatorHistoryEntrySchema.array())
+            .withPermission("evaluations:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.evaluatorApp.getHistory({
+                evaluatorId: input.evaluatorId,
+                projectId: input.projectId,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

@@ -190,6 +190,7 @@ describe("ClickHouseEvaluationRepository", () => {
     }
   });
 
+  /** @scenario A fallback read is floored at the tenant's retention horizon */
   it("uses the tenant retention floor and an open upper bound after both resolver probes miss", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));

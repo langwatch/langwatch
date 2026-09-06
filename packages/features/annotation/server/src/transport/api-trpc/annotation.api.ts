@@ -31,6 +31,7 @@
  *
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
   annotationApiAnnotationScopeSchema,
   annotationApiByTraceIdInputSchema,
@@ -46,17 +47,26 @@ import {
   annotationApiQueueListInputSchema,
   annotationApiQueueConfigurationInputSchema,
   annotationApiUpdateInputSchema,
+  annotationQueueDetailSchema,
+  annotationQueueItemsDeletedSchema,
+  annotationQueueListEntrySchema,
+  annotationQueuePendingCountSchema,
+  annotationQueueRecordSchema,
+  annotationSchema,
+  annotationWithFullUserSchema,
+  annotationWithUserSummarySchema,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
   type AnnotationQueueDetail,
   type AnnotationQueueListEntry,
   type AnnotationQueueRecord,
 } from "@langwatch/annotation-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Trace } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import type { AnnotationApp } from "#app/annotation.app";
 
 const logger = createLogger("langwatch:api:annotation");
@@ -92,7 +102,9 @@ type AnnotationTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The review-page filter, as the reviewer chose it. */
@@ -444,417 +456,496 @@ export class AnnotationTrpcApi {
       }));
     };
 
-    return trpc.router({
-      create: policy("annotations:create")(
-        procedure.input(annotationApiCreateInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .mutation("create", (p) =>
+          p
+            .withInput(annotationApiCreateInputSchema)
+            .withOutput(annotationSchema)
+            .withPermission("annotations:create")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
 
-        await carrySuggestionToOverlay({
-          ctx,
-          ports,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          expectedOutput: input.expectedOutput,
-          userId: actor.id,
-          anchorKind: input.anchorKind,
-          anchorId: input.anchorId,
-          anchorPath: input.anchorPath,
-        });
+              await carrySuggestionToOverlay({
+                ctx,
+                ports,
+                projectId: input.projectId,
+                traceId: input.traceId,
+                expectedOutput: input.expectedOutput,
+                userId: actor.id,
+                anchorKind: input.anchorKind,
+                anchorId: input.anchorId,
+                anchorPath: input.anchorPath,
+              });
 
-        const createdAnnotation = await ctx.app.annotations.create(
-          {
-            id: nanoid(),
-            projectId: input.projectId,
-            traceId: input.traceId,
-            comment: input.comment ?? "",
-            isThumbsUp: input.isThumbsUp ?? null,
-            scoreOptions: input.scoreOptions ?? {},
-            expectedOutput: input.expectedOutput ?? null,
-            anchorKind: input.anchorKind,
-            anchorId: input.anchorId,
-            anchorPath: input.anchorPath,
-          },
-          actor,
-        );
+              const createdAnnotation = await ctx.app.annotations.create(
+                {
+                  id: nanoid(),
+                  projectId: input.projectId,
+                  traceId: input.traceId,
+                  comment: input.comment ?? "",
+                  isThumbsUp: input.isThumbsUp ?? null,
+                  scoreOptions: input.scoreOptions ?? {},
+                  expectedOutput: input.expectedOutput ?? null,
+                  anchorKind: input.anchorKind,
+                  anchorId: input.anchorId,
+                  anchorPath: input.anchorPath,
+                },
+                actor,
+              );
 
-        // Best-effort trace sync: the annotation store is the source of
-        // truth. Failures are logged but don't fail the mutation — the
-        // backfill task can reconcile any missed syncs.
-        //
-        // Anchored comments sync too. This is what answers "has a human
-        // touched this trace", which the has-annotation filter in search
-        // reads, and a comment on one of its spans means yes.
-        try {
-          await ports.recordAnnotationOnTrace(ctx, {
-            tenantId: input.projectId,
-            traceId: input.traceId,
-            annotationId: createdAnnotation.id,
-            occurredAt: Date.now(),
-          });
-        } catch (error) {
-          logger.error(
-            { error, traceId: input.traceId, projectId: input.projectId },
-            "Failed to sync annotation to ClickHouse",
-          );
-        }
+              // Best-effort trace sync: the annotation store is the source of
+              // truth. Failures are logged but don't fail the mutation — the
+              // backfill task can reconcile any missed syncs.
+              //
+              // Anchored comments sync too. This is what answers "has a human
+              // touched this trace", which the has-annotation filter in search
+              // reads, and a comment on one of its spans means yes.
+              try {
+                await ports.recordAnnotationOnTrace(ctx, {
+                  tenantId: input.projectId,
+                  traceId: input.traceId,
+                  annotationId: createdAnnotation.id,
+                  occurredAt: Date.now(),
+                });
+              } catch (error) {
+                logger.error(
+                  { error, traceId: input.traceId, projectId: input.projectId },
+                  "Failed to sync annotation to ClickHouse",
+                );
+              }
 
-        return createdAnnotation;
-      }),
+              return createdAnnotation;
+            }),
+        )
+        .mutation("updateByTraceId", (p) =>
+          p
+            .withInput(annotationApiUpdateInputSchema)
+            .withOutput(annotationSchema)
+            .withPermission("annotations:update")
+            .handle(async ({ ctx, input }) => {
+              const actor = ctx.actor();
+              const annotations = ctx.app.annotations;
 
-      updateByTraceId: policy("annotations:update")(
-        procedure.input(annotationApiUpdateInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        const annotations = ctx.app.annotations;
+              // The suggestion the annotation held before this save is what tells a
+              // real edit apart from a form re-sending what it loaded, so it is read
+              // before the row moves. The anchor comes from the same read rather
+              // than from the input: editing a comment changes what it says, never
+              // what it is about, so re-anchoring is a delete and a create.
+              const existing = await annotations.getById({
+                id: input.id,
+                projectId: input.projectId,
+              });
 
-        // The suggestion the annotation held before this save is what tells a
-        // real edit apart from a form re-sending what it loaded, so it is read
-        // before the row moves. The anchor comes from the same read rather
-        // than from the input: editing a comment changes what it says, never
-        // what it is about, so re-anchoring is a delete and a create.
-        const existing = await annotations.getById({
-          id: input.id,
-          projectId: input.projectId,
-        });
+              await carrySuggestionToOverlay({
+                ctx,
+                ports,
+                projectId: input.projectId,
+                traceId: input.traceId,
+                expectedOutput: input.expectedOutput,
+                previousExpectedOutput: existing.expectedOutput,
+                userId: actor.id,
+                anchorKind: existing.anchorKind,
+                anchorId: existing.anchorId,
+                anchorPath: existing.anchorPath,
+              });
 
-        await carrySuggestionToOverlay({
-          ctx,
-          ports,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          expectedOutput: input.expectedOutput,
-          previousExpectedOutput: existing.expectedOutput,
-          userId: actor.id,
-          anchorKind: existing.anchorKind,
-          anchorId: existing.anchorId,
-          anchorPath: existing.anchorPath,
-        });
+              return annotations.update({
+                id: input.id,
+                projectId: input.projectId,
+                traceId: input.traceId,
+                comment: input.comment ?? "",
+                isThumbsUp: input.isThumbsUp,
+                scoreOptions: input.scoreOptions ?? {},
+                // A save that does not carry the field leaves the suggestion where
+                // it is, the same way it leaves the trace's correction alone. Only
+                // an explicit null or empty text withdraws it.
+                expectedOutput: input.expectedOutput,
+              });
+            }),
+        )
 
-        return annotations.update({
-          id: input.id,
-          projectId: input.projectId,
-          traceId: input.traceId,
-          comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp,
-          scoreOptions: input.scoreOptions ?? {},
-          // A save that does not carry the field leaves the suggestion where
-          // it is, the same way it leaves the trace's correction alone. Only
-          // an explicit null or empty text withdraws it.
-          expectedOutput: input.expectedOutput,
-        });
-      }),
+        /**
+         * The comments on one trace. Defaults to every comment, anchored ones
+         * included: this is the read behind a trace's own comment list, where a
+         * comment about one of its spans belongs. A caller answering a question
+         * about the trace as a whole asks for `anchor: "trace"` instead.
+         */
+        .query("getByTraceId", (p) =>
+          p
+            .withInput(annotationApiByTraceIdInputSchema)
+            .withOutput(annotationWithUserSummarySchema.array())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
+                projectId: input.projectId,
+                traceIds: [input.traceId],
+                anchor: input.anchor,
+                order: "asc",
+              });
+              return annotationsWithUsers.map(withReadableAnnotationAnchor);
+            }),
+        )
 
-      /**
-       * The comments on one trace. Defaults to every comment, anchored ones
-       * included: this is the read behind a trace's own comment list, where a
-       * comment about one of its spans belongs. A caller answering a question
-       * about the trace as a whole asks for `anchor: "trace"` instead.
-       */
-      getByTraceId: policy("annotations:view")(
-        procedure.input(annotationApiByTraceIdInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
-          projectId: input.projectId,
-          traceIds: [input.traceId],
-          anchor: input.anchor,
-          order: "asc",
-        });
-        return annotationsWithUsers.map(withReadableAnnotationAnchor);
-      }),
+        /** Same contract as `getByTraceId`, for a page of traces. */
+        .query("getByTraceIds", (p) =>
+          p
+            .withInput(annotationApiByTraceIdsInputSchema)
+            .withOutput(annotationWithUserSummarySchema.array())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
+                projectId: input.projectId,
+                traceIds: input.traceIds,
+                anchor: input.anchor,
+                order: "asc",
+              });
+              return annotationsWithUsers.map(withReadableAnnotationAnchor);
+            }),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(annotationApiAnnotationScopeSchema)
+            .withOutput(annotationSchema.nullable())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              return await ctx.app.annotations.tryGetById({
+                id: input.annotationId,
+                projectId: input.projectId,
+              });
+            }),
+        )
+        .mutation("deleteById", (p) =>
+          p
+            .withInput(annotationApiAnnotationScopeSchema)
+            .withOutput(annotationSchema)
+            .withPermission("annotations:delete")
+            .handle(async ({ ctx, input }) => {
+              const deletedAnnotation = await ctx.app.annotations.delete({
+                id: input.annotationId,
+                projectId: input.projectId,
+              });
 
-      /** Same contract as `getByTraceId`, for a page of traces. */
-      getByTraceIds: policy("annotations:view")(
-        procedure.input(annotationApiByTraceIdsInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const annotationsWithUsers = await ctx.app.annotations.listWithUserSummaries({
-          projectId: input.projectId,
-          traceIds: input.traceIds,
-          anchor: input.anchor,
-          order: "asc",
-        });
-        return annotationsWithUsers.map(withReadableAnnotationAnchor);
-      }),
+              // Best-effort trace sync (see the create mutation comment above).
+              try {
+                await ports.removeAnnotationFromTrace(ctx, {
+                  tenantId: input.projectId,
+                  traceId: deletedAnnotation.traceId,
+                  annotationId: deletedAnnotation.id,
+                  occurredAt: Date.now(),
+                });
+              } catch (error) {
+                logger.error(
+                  {
+                    error,
+                    traceId: deletedAnnotation.traceId,
+                    projectId: input.projectId,
+                  },
+                  "Failed to sync annotation removal to ClickHouse",
+                );
+              }
 
-      getById: policy("annotations:view")(
-        procedure.input(annotationApiAnnotationScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        return await ctx.app.annotations.tryGetById({
-          id: input.annotationId,
-          projectId: input.projectId,
-        });
-      }),
+              return deletedAnnotation;
+            }),
+        )
 
-      deleteById: policy("annotations:delete")(
-        procedure.input(annotationApiAnnotationScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const deletedAnnotation = await ctx.app.annotations.delete({
-          id: input.annotationId,
-          projectId: input.projectId,
-        });
-
-        // Best-effort trace sync (see the create mutation comment above).
-        try {
-          await ports.removeAnnotationFromTrace(ctx, {
-            tenantId: input.projectId,
-            traceId: deletedAnnotation.traceId,
-            annotationId: deletedAnnotation.id,
-            occurredAt: Date.now(),
-          });
-        } catch (error) {
-          logger.error(
-            {
-              error,
-              traceId: deletedAnnotation.traceId,
-              projectId: input.projectId,
-            },
-            "Failed to sync annotation removal to ClickHouse",
-          );
-        }
-
-        return deletedAnnotation;
-      }),
-
-      /**
-       * The project's annotations list, and the export taken from it. One row
-       * per comment, anchored ones included: a reviewer who marked six spans
-       * of one trace said six things, and a list that showed none of them
-       * answered with silence. Each row carries its anchor, which is what
-       * keeps them readable.
-       */
-      getAll: policy("annotations:view")(procedure.input(annotationApiListAllInputSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.listWithFullUsers({
-            projectId: input.projectId,
-            anchor: "all",
-            order: "desc",
-            startDate: input.startDate,
-            endDate: input.endDate,
-          }),
-      ),
-
-      createOrUpdateQueue: policy("annotations:create")(
-        procedure.input(annotationApiQueueConfigurationInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.annotations.assertQueueConfigurationReferences({
-          projectId: input.projectId,
-          userIds: input.userIds,
-          scoreTypeIds: input.scoreTypeIds,
-        });
-
-        const slug = ports.toQueueSlug(input.name);
-        ctx.app.annotations.requireUnreservedQueueSlug(slug);
-
-        const queue = {
-          projectId: input.projectId,
-          name: input.name,
-          slug,
-          description: input.description,
-          userIds: input.userIds,
-          scoreTypeIds: input.scoreTypeIds,
-        };
-
-        if (input.queueId) {
-          return ports.queues(ctx).updateQueue({ ...queue, queueId: input.queueId });
-        }
-
-        if (await ports.queues(ctx).queueSlugExists({ projectId: input.projectId, slug })) {
-          throw ctx.app.annotations.queueNameTaken(slug);
-        }
-        return ports.queues(ctx).createQueue(queue);
-      }),
-
-      getQueues: policy("annotations:view")(
-        procedure.input(annotationApiQueueListInputSchema),
-      ).query(async ({ ctx, input }) =>
-        ports.queues(ctx).listQueues({
-          projectId: input.projectId,
-          ...(input.reachableOnly === true ? { reachableOnly: true, userId: ctx.actor().id } : {}),
-        }),
-      ),
-
-      getQueueItems: policy("annotations:view")(
-        procedure.input(annotationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.organizationOf({
-          projectId: input.projectId,
-        });
-        const queueItems = await ports.queues(ctx).listQueueItems({
-          projectId: input.projectId,
-          organizationId,
-        });
-
-        const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-        const traces = await ports.loadTraces(ctx, {
-          projectId: input.projectId,
-          traceIds,
-        });
-        const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-
-        return queueItems.map((item) => ({
-          ...item,
-          trace: traceMap.get(item.traceId) ?? null,
-        }));
-      }),
-
-      getPendingItemsCount: policy("annotations:view")(
-        procedure.input(annotationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) =>
-        ports.queues(ctx).countPendingItems({
-          projectId: input.projectId,
-          userId: ctx.actor().id,
-        }),
-      ),
-
-      getAssignedItemsCount: policy("annotations:view")(
-        procedure.input(annotationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) =>
-        ports.queues(ctx).countAssignedItems({
-          projectId: input.projectId,
-          userId: ctx.actor().id,
-        }),
-      ),
-
-      getQueueItemsCounts: policy("annotations:view")(
-        procedure.input(annotationApiProjectScopeSchema),
-      ).query(async ({ ctx, input }) =>
-        ports.queues(ctx).listMemberQueuePendingCounts({
-          projectId: input.projectId,
-          userId: ctx.actor().id,
-        }),
-      ),
-
-      createQueueItem: policy("annotations:create")(
-        procedure.input(annotationApiCreateQueueItemInputSchema),
-      ).mutation(async ({ ctx, input }) =>
-        ports.queueTracesForAnnotation(ctx, {
-          traceIds: input.traceIds,
-          projectId: input.projectId,
-          annotators: input.annotators,
-          userId: ctx.actor().id,
-        }),
-      ),
-
-      /**
-       * Takes queue items out of the reviewer's queue for good. What it is for
-       * is an item there is nothing to review on: its trace no longer
-       * resolves, so it can neither be read nor annotated nor finished, and
-       * leaving it there keeps the queue from ever reading as complete.
-       *
-       * Scoped to the items the caller is responsible for, the same reach as
-       * marking and clearing marks: removing a teammate's item would take work
-       * off a queue that is not the caller's to empty.
-       */
-      deleteQueueItems: policy("annotations:update")(
-        procedure.input(annotationApiDeleteQueueItemsInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.organizationOf({
-          projectId: input.projectId,
-        });
-        const deleted = await ports.queues(ctx).deleteQueueItems({
-          projectId: input.projectId,
-          organizationId,
-          userId: ctx.actor().id,
-          queueItemIds: input.queueItemIds,
-        });
-        return { deleted };
-      }),
-
-      /**
-       * Marks a queue item as reviewed. Scoped to the items the caller is
-       * responsible for, the same reach as marking and removing: finishing a
-       * teammate's item would clear work off a queue that is not the caller's.
-       */
-      markQueueItemDone: policy("annotations:update")(
-        procedure.input(annotationApiMarkQueueItemDoneInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.organizationOf({
-          projectId: input.projectId,
-        });
-        const marked = await ports.queues(ctx).markQueueItemDone({
-          projectId: input.projectId,
-          organizationId,
-          userId: ctx.actor().id,
-          queueItemId: input.queueItemId,
-        });
-        if (!marked.matched) {
-          throw ctx.app.annotations.queueItemNotFound(input.queueItemId);
-        }
-        return marked.item;
-      }),
-
-      getQueueBySlugOrId: policy("annotations:view")(
-        procedure.input(annotationApiQueueBySlugOrIdInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const organizationId = await ctx.app.annotations.organizationOf({
-          projectId: input.projectId,
-        });
-        return ports.queues(ctx).findQueue({
-          projectId: input.projectId,
-          organizationId,
-          slug: input.slug,
-          queueId: input.queueId,
-        });
-      }),
-
-      getOptimizedAnnotationQueues: policy("annotations:view")(
-        procedure.input(annotationApiOptimizedQueuesInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const userId = ctx.actor().id;
-        const organizationId = await ctx.app.annotations.organizationOf({
-          projectId: input.projectId,
-        });
-
-        const { totalCount, items } = await ports.queues(ctx).listQueueItemsPage({
-          projectId: input.projectId,
-          organizationId,
-          userId,
-          status:
-            input.selectedAnnotations === "pending"
-              ? "pending"
-              : input.selectedAnnotations === "completed"
-                ? "completed"
-                : "all",
-          queueId: input.queueId,
-          ...(input.queueIds && input.queueIds.length > 0
-            ? { pickedQueueIds: input.queueIds }
-            : {}),
-          includeMemberQueues: input.showQueueAndUser === true,
-          startDate: input.startDate,
-          endDate: input.endDate,
-          pageSize: input.pageSize,
-          pageOffset: input.pageOffset,
-          allQueueItems: input.allQueueItems === true,
-        });
-
-        const queueIds = [
-          ...new Set(
-            items.flatMap((item) =>
-              item.annotationQueueId === null ? [] : [item.annotationQueueId],
+        /**
+         * The project's annotations list, and the export taken from it. One row
+         * per comment, anchored ones included: a reviewer who marked six spans
+         * of one trace said six things, and a list that showed none of them
+         * answered with silence. Each row carries its anchor, which is what
+         * keeps them readable.
+         */
+        .query("getAll", (p) =>
+          p
+            .withInput(annotationApiListAllInputSchema)
+            .withOutput(annotationWithFullUserSchema.array())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) =>
+              ctx.app.annotations.listWithFullUsers({
+                projectId: input.projectId,
+                anchor: "all",
+                order: "desc",
+                startDate: input.startDate,
+                endDate: input.endDate,
+              }),
             ),
-          ),
-        ];
+        )
+        .mutation("createOrUpdateQueue", (p) =>
+          p
+            .withInput(annotationApiQueueConfigurationInputSchema)
+            .withOutput(annotationQueueRecordSchema)
+            .withPermission("annotations:create")
+            .handle(async ({ ctx, input }) => {
+              await ctx.app.annotations.assertQueueConfigurationReferences({
+                projectId: input.projectId,
+                userIds: input.userIds,
+                scoreTypeIds: input.scoreTypeIds,
+              });
 
-        const queues = await ports.queues(ctx).listQueuesWithItems({
-          projectId: input.projectId,
-          organizationId,
-          queueIds,
-        });
+              const slug = ports.toQueueSlug(input.name);
+              ctx.app.annotations.requireUnreservedQueueSlug(slug);
 
-        const enrichedQueueItems = await enrichQueueItems(ctx, input.projectId, items);
-        const enrichedById = new Map(enrichedQueueItems.map((item) => [item.id, item] as const));
+              const queue = {
+                projectId: input.projectId,
+                name: input.name,
+                slug,
+                description: input.description,
+                userIds: input.userIds,
+                scoreTypeIds: input.scoreTypeIds,
+              };
 
-        const processedQueues = queues.map((queue) => ({
-          ...queue,
-          AnnotationQueueItems: enrichedInListOrder(queue.AnnotationQueueItems, enrichedById),
-        }));
+              if (input.queueId) {
+                return ports.queues(ctx).updateQueue({ ...queue, queueId: input.queueId });
+              }
 
-        return {
-          assignedQueueItems: enrichedQueueItems,
-          queues: processedQueues,
-          totalCount,
-        };
-      }),
-    });
+              if (await ports.queues(ctx).queueSlugExists({ projectId: input.projectId, slug })) {
+                throw ctx.app.annotations.queueNameTaken(slug);
+              }
+              return ports.queues(ctx).createQueue(queue);
+            }),
+        )
+        .query("getQueues", (p) =>
+          p
+            .withInput(annotationApiQueueListInputSchema)
+            .withOutput(annotationQueueListEntrySchema.array())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) =>
+              ports.queues(ctx).listQueues({
+                projectId: input.projectId,
+                ...(input.reachableOnly === true
+                  ? { reachableOnly: true, userId: ctx.actor().id }
+                  : {}),
+              }),
+            ),
+        )
+        .query("getQueueItems", (p) =>
+          p
+            .withInput(annotationApiProjectScopeSchema)
+            .withoutOutput(
+              "the page assembles the process's own queue rows with the traces it enriched them from; naming a shape here would narrow what the review page is handed",
+            )
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              const organizationId = await ctx.app.annotations.organizationOf({
+                projectId: input.projectId,
+              });
+              const queueItems = await ports.queues(ctx).listQueueItems({
+                projectId: input.projectId,
+                organizationId,
+              });
+
+              const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
+              const traces = await ports.loadTraces(ctx, {
+                projectId: input.projectId,
+                traceIds,
+              });
+              const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+              return queueItems.map((item) => ({
+                ...item,
+                trace: traceMap.get(item.traceId) ?? null,
+              }));
+            }),
+        )
+        .query("getPendingItemsCount", (p) =>
+          p
+            .withInput(annotationApiProjectScopeSchema)
+            .withOutput(z.number())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) =>
+              ports.queues(ctx).countPendingItems({
+                projectId: input.projectId,
+                userId: ctx.actor().id,
+              }),
+            ),
+        )
+        .query("getAssignedItemsCount", (p) =>
+          p
+            .withInput(annotationApiProjectScopeSchema)
+            .withOutput(z.number())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) =>
+              ports.queues(ctx).countAssignedItems({
+                projectId: input.projectId,
+                userId: ctx.actor().id,
+              }),
+            ),
+        )
+        .query("getQueueItemsCounts", (p) =>
+          p
+            .withInput(annotationApiProjectScopeSchema)
+            .withOutput(annotationQueuePendingCountSchema.array())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) =>
+              ports.queues(ctx).listMemberQueuePendingCounts({
+                projectId: input.projectId,
+                userId: ctx.actor().id,
+              }),
+            ),
+        )
+        .mutation("createQueueItem", (p) =>
+          p
+            .withInput(annotationApiCreateQueueItemInputSchema)
+            .withoutOutput(
+              "queueing traces answers with the process's own queue-item rows, generic in this feature",
+            )
+            .withPermission("annotations:create")
+            .handle(async ({ ctx, input }) =>
+              ports.queueTracesForAnnotation(ctx, {
+                traceIds: input.traceIds,
+                projectId: input.projectId,
+                annotators: input.annotators,
+                userId: ctx.actor().id,
+              }),
+            ),
+        )
+
+        /**
+         * Takes queue items out of the reviewer's queue for good. What it is for
+         * is an item there is nothing to review on: its trace no longer
+         * resolves, so it can neither be read nor annotated nor finished, and
+         * leaving it there keeps the queue from ever reading as complete.
+         *
+         * Scoped to the items the caller is responsible for, the same reach as
+         * marking and clearing marks: removing a teammate's item would take work
+         * off a queue that is not the caller's to empty.
+         */
+        .mutation("deleteQueueItems", (p) =>
+          p
+            .withInput(annotationApiDeleteQueueItemsInputSchema)
+            .withOutput(annotationQueueItemsDeletedSchema)
+            .withPermission("annotations:update")
+            .handle(async ({ ctx, input }) => {
+              const organizationId = await ctx.app.annotations.organizationOf({
+                projectId: input.projectId,
+              });
+              const deleted = await ports.queues(ctx).deleteQueueItems({
+                projectId: input.projectId,
+                organizationId,
+                userId: ctx.actor().id,
+                queueItemIds: input.queueItemIds,
+              });
+              return { deleted };
+            }),
+        )
+
+        /**
+         * Marks a queue item as reviewed. Scoped to the items the caller is
+         * responsible for, the same reach as marking and removing: finishing a
+         * teammate's item would clear work off a queue that is not the caller's.
+         */
+        .mutation("markQueueItemDone", (p) =>
+          p
+            .withInput(annotationApiMarkQueueItemDoneInputSchema)
+            .withoutOutput(
+              "the marked item is the process's own queue-item row, declared `unknown` on the store port",
+            )
+            .withPermission("annotations:update")
+            .handle(async ({ ctx, input }) => {
+              const organizationId = await ctx.app.annotations.organizationOf({
+                projectId: input.projectId,
+              });
+              const marked = await ports.queues(ctx).markQueueItemDone({
+                projectId: input.projectId,
+                organizationId,
+                userId: ctx.actor().id,
+                queueItemId: input.queueItemId,
+              });
+              if (!marked.matched) {
+                throw ctx.app.annotations.queueItemNotFound(input.queueItemId);
+              }
+              return marked.item;
+            }),
+        )
+        .query("getQueueBySlugOrId", (p) =>
+          p
+            .withInput(annotationApiQueueBySlugOrIdInputSchema)
+            .withOutput(annotationQueueDetailSchema.nullable())
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              const organizationId = await ctx.app.annotations.organizationOf({
+                projectId: input.projectId,
+              });
+              return ports.queues(ctx).findQueue({
+                projectId: input.projectId,
+                organizationId,
+                slug: input.slug,
+                queueId: input.queueId,
+              });
+            }),
+        )
+        .query("getOptimizedAnnotationQueues", (p) =>
+          p
+            .withInput(annotationApiOptimizedQueuesInputSchema)
+            .withoutOutput(
+              "the page assembles the process's own queue rows with the traces it enriched them from; naming a shape here would narrow what the review page is handed",
+            )
+            .withPermission("annotations:view")
+            .handle(async ({ ctx, input }) => {
+              const userId = ctx.actor().id;
+              const organizationId = await ctx.app.annotations.organizationOf({
+                projectId: input.projectId,
+              });
+
+              const { totalCount, items } = await ports.queues(ctx).listQueueItemsPage({
+                projectId: input.projectId,
+                organizationId,
+                userId,
+                status:
+                  input.selectedAnnotations === "pending"
+                    ? "pending"
+                    : input.selectedAnnotations === "completed"
+                      ? "completed"
+                      : "all",
+                queueId: input.queueId,
+                ...(input.queueIds && input.queueIds.length > 0
+                  ? { pickedQueueIds: input.queueIds }
+                  : {}),
+                includeMemberQueues: input.showQueueAndUser === true,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                pageSize: input.pageSize,
+                pageOffset: input.pageOffset,
+                allQueueItems: input.allQueueItems === true,
+              });
+
+              const queueIds = [
+                ...new Set(
+                  items.flatMap((item) =>
+                    item.annotationQueueId === null ? [] : [item.annotationQueueId],
+                  ),
+                ),
+              ];
+
+              const queues = await ports.queues(ctx).listQueuesWithItems({
+                projectId: input.projectId,
+                organizationId,
+                queueIds,
+              });
+
+              const enrichedQueueItems = await enrichQueueItems(ctx, input.projectId, items);
+              const enrichedById = new Map(
+                enrichedQueueItems.map((item) => [item.id, item] as const),
+              );
+
+              const processedQueues = queues.map((queue) => ({
+                ...queue,
+                AnnotationQueueItems: enrichedInListOrder(queue.AnnotationQueueItems, enrichedById),
+              }));
+
+              return {
+                assignedQueueItems: enrichedQueueItems,
+                queues: processedQueues,
+                totalCount,
+              };
+            }),
+        )
+        .build()
+    );
   }
 }

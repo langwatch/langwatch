@@ -22,6 +22,7 @@ function harness(update: (input: Record<string, unknown>) => Promise<unknown>) {
     {
       protected: trpc.procedure,
       policy: () => (procedure) => procedure,
+      validateOutput: true,
     },
     {
       rateLimit: async () => ({ allowed: true, resetAt: 0 }),
@@ -45,7 +46,34 @@ describe("automation.toggleTrigger", () => {
     describe("when the customer re-enables it", () => {
       /** @scenario "Resuming a paused automation clears the pause reason" */
       it("clears the pause reason and pause time in the same write", async () => {
-        const update = vi.fn().mockResolvedValue({ id: "trigger-1", active: true });
+        const update = vi.fn().mockResolvedValue({
+          id: "trigger-1",
+          projectId: "project-1",
+          name: "Nightly digest",
+          action: "SEND_EMAIL",
+          triggerKind: "AUTOMATION",
+          actionParams: {},
+          filters: {},
+          filterQuery: null,
+          active: true,
+          deleted: false,
+          pausedReason: null,
+          pausedAt: null,
+          message: null,
+          alertType: null,
+          customGraphId: null,
+          notificationCadence: "immediate",
+          traceDebounceMs: 0,
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: null,
+          },
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          lastRunAt: null,
+        });
 
         await harness(update).toggleTrigger({
           projectId: "project-1",

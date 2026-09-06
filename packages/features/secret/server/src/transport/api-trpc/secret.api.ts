@@ -13,7 +13,8 @@
  * arrive in `create`/`update` input and are never read back out — nothing here
  * logs, echoes, or copies one, and the host's audit trail redacts the field.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import {
   createSecretInputSchema,
@@ -21,7 +22,9 @@ import {
   listSecretsInputSchema,
   secretIdSchema,
   secretProjectIdSchema,
+  secretSchema,
   secretValueSchema,
+  secretWriteAcknowledgedSchema,
 } from "@langwatch/secret-contract";
 import { z } from "zod";
 import type { SecretApp } from "#app/secret.app";
@@ -101,6 +104,8 @@ type SecretTrpcProcedures<
    * through `ctx.authorize` instead.
    */
   policy?: SecretTrpcPolicy;
+  /** @see the mount field of the same name. */
+  validateOutput?: boolean;
 }>;
 
 const legacyUpdateInputSchema = z
@@ -124,32 +129,62 @@ export class SecretTrpcApi {
   ) {
     const { protected: procedure, policy = contextAuthorizePolicy } = procedures;
 
-    return trpc.router({
-      list: policy("secrets:view")(procedure.input(listSecretsInputSchema)).query(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          return ctx.app.secrets.list(input);
-        },
-      ),
-      create: policy("secrets:manage")(
-        procedure.input(createSecretInputSchema.omit({ actorId: true })),
-      ).mutation(async ({ ctx, input }) => ctx.app.secrets.create(input, ctx.actor())),
-      update: policy("secrets:manage")(procedure.input(legacyUpdateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.secrets.update(
-            { projectId: input.projectId, id: input.secretId, value: input.value },
-            ctx.actor(),
-          );
-          return { success: true };
-        },
-      ),
-      delete: policy("secrets:manage")(procedure.input(legacyDeleteInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          ctx.actor();
-          await ctx.app.secrets.delete({ projectId: input.projectId, id: input.secretId });
-          return { success: true };
-        },
-      ),
-    });
+    // Every procedure here declares one permission, so the chain's access
+    // argument is always a bare permission string; a declaration would have no
+    // host policy to apply it with.
+    const chainPolicy = (access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator => {
+      if (typeof access !== "string") {
+        throw new Error("the secret tRPC surface declares single permissions only");
+      }
+      return policy(access);
+    };
+
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy: chainPolicy },
+      validateOutput: procedures.validateOutput ?? false,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(listSecretsInputSchema)
+          .withOutput(secretSchema.array())
+          .withPermission("secrets:view")
+          .handle(async ({ ctx, input }) => {
+            ctx.actor();
+            return ctx.app.secrets.list(input);
+          }),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(createSecretInputSchema.omit({ actorId: true }))
+          .withOutput(secretSchema)
+          .withPermission("secrets:manage")
+          .handle(async ({ ctx, input }) => ctx.app.secrets.create(input, ctx.actor())),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(legacyUpdateInputSchema)
+          .withOutput(secretWriteAcknowledgedSchema)
+          .withPermission("secrets:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.secrets.update(
+              { projectId: input.projectId, id: input.secretId, value: input.value },
+              ctx.actor(),
+            );
+            return { success: true };
+          }),
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(legacyDeleteInputSchema)
+          .withOutput(secretWriteAcknowledgedSchema)
+          .withPermission("secrets:manage")
+          .handle(async ({ ctx, input }) => {
+            ctx.actor();
+            await ctx.app.secrets.delete({ projectId: input.projectId, id: input.secretId });
+            return { success: true };
+          }),
+      )
+      .build();
   }
 }

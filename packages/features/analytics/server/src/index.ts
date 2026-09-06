@@ -2,7 +2,6 @@ export { AnalyticsAdapter } from "./adapters/analytics.adapter";
 export {
   AnalyticsApp,
   type AnalyticsAppDependencies,
-  type AnalyticsFilterOption,
   type AnalyticsFilterOptionsLookup,
   type AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app";
@@ -25,8 +24,6 @@ export {
   LangWatchQLTrpcApi,
   type LangWatchQLTrpcContext,
   type LangWatchQLTrpcPorts,
-  type LangWatchQLAvailability,
-  type LangWatchQLUnavailableReason,
 } from "./transport/api-trpc/langwatch-ql.api";
 export {
   createAnalyticsRestApp,
@@ -109,7 +106,7 @@ export {
   type LangWatchQLRestPorts,
 } from "./transport/api-rest/langwatch-ql.api";
 /** The one door for raw LangWatchQL: `/api/v1/query`. */
-export { createQueryRestApp, registerQueryRoutes } from "./transport/api-rest/query.api";
+export { createQueryRestApp } from "./transport/api-rest/query.api";
 export type { SavedWorkbenchChartRestService } from "./services/langwatch-ql-route-guards.service";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at

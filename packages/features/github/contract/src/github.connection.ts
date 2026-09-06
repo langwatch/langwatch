@@ -6,32 +6,41 @@
  * connection exists is not shown the repository names it reaches, only how
  * many of them a "selected" install covers.
  */
-export type GithubInstallationSummary = {
-  installationId: string;
-  accountLogin: string;
-  accountType: string;
-  repositorySelection: string;
-  /** Known only for a "selected" install; "all" resolves live. */
-  repositoryCount: number | null;
-  suspended: boolean;
-  /** GitHub can only be uninstalled on GitHub, so this deep-links there. */
-  uninstallUrl: string;
-};
+import { z } from "zod";
+import { githubPullRequestLiveStatusSchema } from "./github";
 
-export type GithubConnectionStatus = {
+export const githubInstallationSummarySchema = z.object({
+  installationId: z.string(),
+  accountLogin: z.string(),
+  accountType: z.string(),
+  repositorySelection: z.string(),
+  /** Known only for a "selected" install; "all" resolves live. */
+  repositoryCount: z.number().nullable(),
+  suspended: z.boolean(),
+  /** GitHub can only be uninstalled on GitHub, so this deep-links there. */
+  uninstallUrl: z.string(),
+});
+export type GithubInstallationSummary = z.infer<typeof githubInstallationSummarySchema>;
+
+export const githubConnectionStatusSchema = z.object({
   /** Whether this instance can start an installation at all. */
-  configured: boolean;
-  connected: boolean;
-  installations: GithubInstallationSummary[];
+  configured: z.boolean(),
+  connected: z.boolean(),
+  installations: z.array(githubInstallationSummarySchema),
   /** Where an install starts, or null on an instance that cannot start one. */
-  installUrl: string | null;
-};
+  installUrl: z.string().nullable(),
+});
+export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 
 /**
  * GitHub cannot be uninstalled through the API, so disconnecting hands back
  * the deep link a human follows; the webhook removes the local row once
  * GitHub confirms.
  */
-export type GithubDisconnectResult = {
-  uninstallUrl: string;
-};
+export const githubDisconnectResultSchema = z.object({ uninstallUrl: z.string() });
+export type GithubDisconnectResult = z.infer<typeof githubDisconnectResultSchema>;
+
+/** What the live pull-request read answers with, for a page of refs. */
+export const githubPullRequestLiveStatusesSchema = z.object({
+  statuses: z.array(githubPullRequestLiveStatusSchema),
+});

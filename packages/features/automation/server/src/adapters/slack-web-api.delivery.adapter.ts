@@ -1,4 +1,9 @@
-import type { SlackPayload } from "@langwatch/automation-contract";
+import type {
+  SlackChannel,
+  SlackChannelListGap,
+  SlackChannelListing,
+  SlackPayload,
+} from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
@@ -170,36 +175,6 @@ async function postSlackChatMessage(
         }
       : {}),
   });
-}
-
-export interface SlackChannel {
-  id: string;
-  name: string;
-  isPrivate: boolean;
-}
-
-/**
- * Why a channel listing is short of the workspace. A listing can succeed and
- * still be incomplete, and the two are indistinguishable to the caller unless
- * we say so — which is the whole reason this type exists.
- *
- *   - `page_cap` — the walk stopped before Slack ran out of channels. Slack
- *     documents that "it's possible to receive fewer results than your
- *     specified limit, even when there are additional results to retrieve", so
- *     a page can carry a fraction of what we ask for. The real ceiling is
- *     therefore well under `pages x limit`, varies by workspace, and cannot be
- *     predicted from the page size — which is why the cap has to be reported
- *     rather than reasoned about.
- *   - `private_channels_hidden` — the app has no `groups:read`, so the listing
- *     fell back to public channels only.
- */
-export type SlackChannelListGap = "page_cap" | "private_channels_hidden";
-
-export interface SlackChannelListing {
-  channels: SlackChannel[];
-  error: string | null;
-  /** Empty when the listing covers the whole workspace. */
-  gaps: SlackChannelListGap[];
 }
 
 interface SlackConversationsResponse {

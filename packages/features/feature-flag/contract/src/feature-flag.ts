@@ -389,7 +389,23 @@ export const FEATURE_FLAGS = [
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
-export const FEATURE_FLAG_FAMILIES: readonly FeatureFlagFamily[] = [];
+export const FEATURE_FLAG_FAMILIES: readonly FeatureFlagFamily[] = [
+  // Event-sourcing pipeline component kill switches, generated as
+  // `es-<aggregate>-<componentType>-<componentName>-killswitch` (see
+  // `generateKillSwitchKey` in @langwatch/eventing). The default is false —
+  // absence of a row means "let the component run" — and the family exists so
+  // a generated key resolves SYSTEM without an explicit registry entry per
+  // component, which would be one entry per projection, command and subscriber.
+  {
+    keyPrefix: "es-",
+    keySuffix: "-killswitch",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Per-component kill switch for an event-sourcing projection, map projection, command or subscriber. Setting it to true stops that component for the tenants the rules name, cluster-wide.",
+    family: "Event sourcing",
+  },
+];
 
 /**
  * Union of every flag key the application can resolve at runtime.
@@ -398,7 +414,14 @@ export const FEATURE_FLAG_FAMILIES: readonly FeatureFlagFamily[] = [];
  * compiler keeps unregistered flags out of the build.
  */
 export type RegisteredFeatureFlagKey = (typeof FEATURE_FLAGS)[number]["key"];
-export type FeatureFlagKey = RegisteredFeatureFlagKey;
+
+/**
+ * The generated event-sourcing kill-switch family, as a type. Registered
+ * through {@link FEATURE_FLAG_FAMILIES} rather than one entry per component,
+ * so the key union has to admit the shape the generator produces.
+ */
+export type EsKillSwitchKey = `es-${string}-${string}-${string}-killswitch`;
+export type FeatureFlagKey = RegisteredFeatureFlagKey | EsKillSwitchKey;
 
 const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
   FEATURE_FLAGS.map((f) => [f.key, f]),

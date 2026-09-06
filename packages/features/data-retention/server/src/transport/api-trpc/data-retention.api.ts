@@ -1,6 +1,11 @@
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission, EnforcedScopeFields } from "@langwatch/authz-contract";
 import {
   INDEFINITE_RETENTION_DAYS,
+  resolvedRetentionSchema,
+  retentionPolicySchema,
+  retroactiveMutationProgressSchema,
+  retroactiveRetentionUpdateResultSchema,
   killRetroactiveMutationInputSchema,
   retentionCategorySchema,
   retentionDaysInputSchema,
@@ -51,8 +56,8 @@ export type DataRetentionTrpcContext = Readonly<{
  *     sweep counts as covered.
  */
 export type DataRetentionTrpcAuthz = Readonly<{
-  permission(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
-  inResolver(enforces: EnforcedScopeFields): <TProcedure>(procedure: TProcedure) => TProcedure;
+  permission(permission: AuthzPermission): TrpcPolicyDecorator;
+  inResolver(enforces: EnforcedScopeFields): TrpcPolicyDecorator;
 }>;
 
 /**
@@ -106,6 +111,8 @@ type DataRetentionTrpcProcedures<
   /** The process's authorization, audit, error, logging and tracing chain. */
   authz: DataRetentionTrpcAuthz;
   policy: DataRetentionTrpcPolicy<TSnapshot, TStorageUsage>;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const scopeInput = z.object({
@@ -138,190 +145,232 @@ export class DataRetentionTrpcApi {
     const authz = procedures.authz;
     const policy = procedures.policy;
 
-    return trpc.router({
-      /**
-       * The retention settings snapshot for a project: effective per-category
-       * retention, the readable override rules, and the writable scopes for the
-       * chip picker. Read access is project:view; the snapshot RBAC-filters what
-       * it returns.
-       */
-      getRules: authz
-        .permission("project:view")(procedure.input(z.object({ projectId: z.string() })))
-        .query(async ({ ctx, input }) => {
-          ctx.actor();
-          return policy.getPolicySnapshot(ctx, { projectId: input.projectId });
-        }),
-
-      /**
-       * Set one category's retention at one scope. Authorizes write on the target
-       * scope (organization:manage / team:manage / project:update) — a project
-       * member can edit their own project's retention but cannot push a policy up
-       * to the org. `projectId` is deliberately not acted on: the authorized
-       * target is `scope`, and both policy checks below run against the scope's
-       * own organization.
-       */
-      setForScope: authz
-        .inResolver({
-          projectId:
-            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionWriteAllowed run against the scope's own organization",
-        })(
-          procedure.input(
-            z.object({
-              projectId: z.string(),
-              scope: scopeInput,
-              category: retentionCategorySchema,
-              retentionDays: retentionDaysInputSchema,
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy: authz.permission },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * The retention settings snapshot for a project: effective per-category
+         * retention, the readable override rules, and the writable scopes for the
+         * chip picker. Read access is project:view; the snapshot RBAC-filters what
+         * it returns.
+         */
+        .query("getRules", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string() }))
+            .withoutOutput(
+              "the settings snapshot is the process's own shape, generic in this feature: naming one here would narrow what the browser is handed",
+            )
+            .withPermission("project:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return policy.getPolicySnapshot(ctx, { projectId: input.projectId });
             }),
-          ),
         )
-        .mutation(async ({ ctx, input }) => {
-          ctx.actor();
-          await policy.assertCanWriteScope(ctx, input.scope);
-          // Plan-gate against the scope's owning org, not the caller-supplied
-          // projectId (the two can belong to different orgs). Resolves the org +
-          // plan once, then applies the free gate AND the value gate: paid plans
-          // may persist only their fixed presets; enterprise/self-hosted keep the
-          // full range + custom (>=49). No-ops on the indefinite sentinel so the
-          // platform-admin check below still runs. The write-path prevention — the
-          // UI menu is a mirror, not the enforcement.
-          await policy.assertWriteAllowed(ctx, input.scope, input.retentionDays);
-          // Disabling retention (indefinite/keep-forever) is platform-admin only.
-          // The schema accepts the 0 sentinel structurally; this is where the
-          // capability is actually authorized — independent of org/team RBAC.
-          if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
-            policy.assertCanDisableRetention(ctx);
-          }
-          try {
-            return await ctx.app.dataRetention.setForScope({
-              scope: input.scope,
-              category: input.category,
-              retentionDays: input.retentionDays,
-            });
-          } catch (error) {
-            if (error instanceof ScopeTargetNotFoundError) {
-              throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-            }
-            throw error;
-          }
-        }),
 
-      /**
-       * Preview the retention each category would fall back to if the scope's
-       * override were removed — the cascade value (next tier, or the platform
-       * default) the data would land on. Powers the remove-confirmation dialog so
-       * the user sees the real post-removal number, never a guessed one. Read-only;
-       * gated by the same write-on-scope check as the removal it previews, so the
-       * resolved org-default never leaks to a caller who couldn't remove the rule.
-       */
-      previewScopeRemoval: authz
-        .inResolver({
-          projectId:
-            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope gates the preview exactly like the removal it previews",
-        })(procedure.input(z.object({ projectId: z.string(), scope: scopeInput })))
-        .query(async ({ ctx, input }) => {
-          ctx.actor();
-          await policy.assertCanWriteScope(ctx, input.scope);
-          return ctx.app.dataRetention.previewScopeRemoval({ scope: input.scope });
-        }),
-
-      /** Remove one category's override at one scope; the next tier then applies. */
-      removeForScope: authz
-        .inResolver({
-          projectId:
-            "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionPlanForScope run against the scope's own organization",
-        })(
-          procedure.input(
-            z.object({
-              projectId: z.string(),
-              scope: scopeInput,
-              category: retentionCategorySchema,
+        /**
+         * Set one category's retention at one scope. Authorizes write on the target
+         * scope (organization:manage / team:manage / project:update) — a project
+         * member can edit their own project's retention but cannot push a policy up
+         * to the org. `projectId` is deliberately not acted on: the authorized
+         * target is `scope`, and both policy checks below run against the scope's
+         * own organization.
+         */
+        .mutation("setForScope", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                scope: scopeInput,
+                category: retentionCategorySchema,
+                retentionDays: retentionDaysInputSchema,
+              }),
+            )
+            .withOutput(retentionPolicySchema)
+            .withCustomPermission(
+              authz.inResolver({
+                projectId:
+                  "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionWriteAllowed run against the scope's own organization",
+              }),
+              "the authorized target is `scope`, not the project id the input names; the declaration the process built carries what enforces each field",
+            )
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await policy.assertCanWriteScope(ctx, input.scope);
+              // Plan-gate against the scope's owning org, not the caller-supplied
+              // projectId (the two can belong to different orgs). Resolves the org +
+              // plan once, then applies the free gate AND the value gate: paid plans
+              // may persist only their fixed presets; enterprise/self-hosted keep the
+              // full range + custom (>=49). No-ops on the indefinite sentinel so the
+              // platform-admin check below still runs. The write-path prevention — the
+              // UI menu is a mirror, not the enforcement.
+              await policy.assertWriteAllowed(ctx, input.scope, input.retentionDays);
+              // Disabling retention (indefinite/keep-forever) is platform-admin only.
+              // The schema accepts the 0 sentinel structurally; this is where the
+              // capability is actually authorized — independent of org/team RBAC.
+              if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
+                policy.assertCanDisableRetention(ctx);
+              }
+              try {
+                return await ctx.app.dataRetention.setForScope({
+                  scope: input.scope,
+                  category: input.category,
+                  retentionDays: input.retentionDays,
+                });
+              } catch (error) {
+                if (error instanceof ScopeTargetNotFoundError) {
+                  throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+                }
+                throw error;
+              }
             }),
-          ),
         )
-        .mutation(async ({ ctx, input }) => {
-          ctx.actor();
-          await policy.assertCanWriteScope(ctx, input.scope);
-          await policy.assertPlanForScope(ctx, input.scope);
-          await ctx.app.dataRetention.removeForScope({
-            scope: input.scope,
-            category: input.category,
-          });
-        }),
 
-      triggerRetroactiveUpdate: authz
-        .permission("project:update")(procedure.input(triggerRetroactiveMutationInputSchema))
-        .mutation(async ({ ctx, input }) => {
-          ctx.actor();
-          await policy.assertPlanForProject(ctx, input.projectId);
-          // Resolve the retention value server-side. Trusting a client-supplied
-          // newRetentionDays would let a project:update caller rewrite existing
-          // rows to any value, irreversibly contracting data without a matching
-          // saved rule. The cascade-aware resolver is the only legitimate
-          // source: PROJECT > TEAM > ORGANIZATION > platform default. When the
-          // caller saves an org-wide override but a closer project override
-          // already wins, the resolved value REMAINS the project's existing
-          // value — so retroactive rewrite uses that, not the broader scope's
-          // value. We return `appliedRetentionDays` to the UI so it can show
-          // the truth (the dialog previously named the form value, which
-          // could differ silently from what got applied).
-          const effective = await ctx.app.dataRetention.getResolvedForProject({
-            projectId: input.projectId,
-          });
-          const category = input.category;
-          const newRetentionDays = effective[category];
-          if (newRetentionDays === undefined) {
-            throw new TRPCError({
-              code: "PRECONDITION_FAILED",
-              message: `No effective retention is resolvable for category ${category}.`,
-            });
-          }
-          const result = await ctx.app.dataRetention.triggerRetroactiveUpdate({
-            projectId: input.projectId,
-            category,
-            newRetentionDays,
-          });
-          return { ...result, appliedRetentionDays: newRetentionDays };
-        }),
-
-      getMutationProgress: authz
-        .permission("traces:view")(procedure.input(retroactiveMutationProjectInputSchema))
-        .query(async ({ ctx, input }) => {
-          ctx.actor();
-          return ctx.app.dataRetention.getRetroactiveMutationProgress({
-            projectId: input.projectId,
-          });
-        }),
-
-      killMutation: authz
-        .permission("project:update")(procedure.input(killRetroactiveMutationInputSchema))
-        .mutation(async ({ ctx, input }) => {
-          ctx.actor();
-          await policy.assertPlanForProject(ctx, input.projectId);
-          await ctx.app.dataRetention.killRetroactiveMutation({
-            projectId: input.projectId,
-            mutationId: input.mutationId,
-          });
-        }),
-
-      /**
-       * Total stored bytes for the projects the scope selector resolves to, summed
-       * across every in-scope project the caller can read. Lets the Data Storage
-       * card reflect the chosen scope (organization / team / project) instead of
-       * always showing only the current project. RBAC-filtering happens inside the
-       * resolver against the scope's owning org, so a wider scope never leaks a
-       * project's storage the caller couldn't see.
-       */
-      getScopeStorageUsage: authz
-        .permission("traces:view")(
-          procedure.input(z.object({ projectId: z.string(), scope: scopeInput })),
+        /**
+         * Preview the retention each category would fall back to if the scope's
+         * override were removed — the cascade value (next tier, or the platform
+         * default) the data would land on. Powers the remove-confirmation dialog so
+         * the user sees the real post-removal number, never a guessed one. Read-only;
+         * gated by the same write-on-scope check as the removal it previews, so the
+         * resolved org-default never leaks to a caller who couldn't remove the rule.
+         */
+        .query("previewScopeRemoval", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), scope: scopeInput }))
+            .withOutput(resolvedRetentionSchema)
+            .withCustomPermission(
+              authz.inResolver({
+                projectId:
+                  "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope gates the preview exactly like the removal it previews",
+              }),
+              "the authorized target is `scope`, not the project id the input names; the declaration the process built carries what enforces each field",
+            )
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await policy.assertCanWriteScope(ctx, input.scope);
+              return ctx.app.dataRetention.previewScopeRemoval({ scope: input.scope });
+            }),
         )
-        .query(async ({ ctx, input }) => {
-          ctx.actor();
-          return policy.getScopeStorageUsage(ctx, {
-            projectId: input.projectId,
-            scope: input.scope,
-          });
-        }),
-    });
+
+        /** Remove one category's override at one scope; the next tier then applies. */
+        .mutation("removeForScope", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                scope: scopeInput,
+                category: retentionCategorySchema,
+              }),
+            )
+            .withoutOutput("removal answers with nothing")
+            .withCustomPermission(
+              authz.inResolver({
+                projectId:
+                  "not acted on — the authorized target is `scope`: assertCanWriteRetentionScope + assertRetentionPlanForScope run against the scope's own organization",
+              }),
+              "the authorized target is `scope`, not the project id the input names; the declaration the process built carries what enforces each field",
+            )
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await policy.assertCanWriteScope(ctx, input.scope);
+              await policy.assertPlanForScope(ctx, input.scope);
+              await ctx.app.dataRetention.removeForScope({
+                scope: input.scope,
+                category: input.category,
+              });
+            }),
+        )
+        .mutation("triggerRetroactiveUpdate", (p) =>
+          p
+            .withInput(triggerRetroactiveMutationInputSchema)
+            .withOutput(retroactiveRetentionUpdateResultSchema)
+            .withPermission("project:update")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await policy.assertPlanForProject(ctx, input.projectId);
+              // Resolve the retention value server-side. Trusting a client-supplied
+              // newRetentionDays would let a project:update caller rewrite existing
+              // rows to any value, irreversibly contracting data without a matching
+              // saved rule. The cascade-aware resolver is the only legitimate
+              // source: PROJECT > TEAM > ORGANIZATION > platform default. When the
+              // caller saves an org-wide override but a closer project override
+              // already wins, the resolved value REMAINS the project's existing
+              // value — so retroactive rewrite uses that, not the broader scope's
+              // value. We return `appliedRetentionDays` to the UI so it can show
+              // the truth (the dialog previously named the form value, which
+              // could differ silently from what got applied).
+              const effective = await ctx.app.dataRetention.getResolvedForProject({
+                projectId: input.projectId,
+              });
+              const category = input.category;
+              const newRetentionDays = effective[category];
+              if (newRetentionDays === undefined) {
+                throw new TRPCError({
+                  code: "PRECONDITION_FAILED",
+                  message: `No effective retention is resolvable for category ${category}.`,
+                });
+              }
+              const result = await ctx.app.dataRetention.triggerRetroactiveUpdate({
+                projectId: input.projectId,
+                category,
+                newRetentionDays,
+              });
+              return { ...result, appliedRetentionDays: newRetentionDays };
+            }),
+        )
+        .query("getMutationProgress", (p) =>
+          p
+            .withInput(retroactiveMutationProjectInputSchema)
+            .withOutput(retroactiveMutationProgressSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return ctx.app.dataRetention.getRetroactiveMutationProgress({
+                projectId: input.projectId,
+              });
+            }),
+        )
+        .mutation("killMutation", (p) =>
+          p
+            .withInput(killRetroactiveMutationInputSchema)
+            .withoutOutput("the kill answers with nothing")
+            .withPermission("project:update")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              await policy.assertPlanForProject(ctx, input.projectId);
+              await ctx.app.dataRetention.killRetroactiveMutation({
+                projectId: input.projectId,
+                mutationId: input.mutationId,
+              });
+            }),
+        )
+
+        /**
+         * Total stored bytes for the projects the scope selector resolves to, summed
+         * across every in-scope project the caller can read. Lets the Data Storage
+         * card reflect the chosen scope (organization / team / project) instead of
+         * always showing only the current project. RBAC-filtering happens inside the
+         * resolver against the scope's owning org, so a wider scope never leaks a
+         * project's storage the caller couldn't see.
+         */
+        .query("getScopeStorageUsage", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), scope: scopeInput }))
+            .withoutOutput(
+              "the storage rollup is the process's own shape, generic in this feature: naming one here would narrow what the browser is handed",
+            )
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              ctx.actor();
+              return policy.getScopeStorageUsage(ctx, {
+                projectId: input.projectId,
+                scope: input.scope,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

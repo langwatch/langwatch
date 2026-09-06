@@ -23,7 +23,8 @@
  * declarations arrive as decorators the process built — the sentence naming
  * what enforces each field belongs where those assertions live.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
   dataPrivacyConfigSchema,
   DATA_PRIVACY_SCOPE_TYPES,
@@ -50,9 +51,6 @@ import { z } from "zod";
  */
 export type DataPrivacyTrpcContext = object;
 
-/** One procedure, wrapped in the process's policy chain. */
-type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
-
 type DataPrivacyTrpcProcedures<
   TContext extends DataPrivacyTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -69,7 +67,7 @@ type DataPrivacyTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): ProcedureDecorator;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
   /**
    * The same chain around the process's own resolver-authorized declaration
    * for a rule WRITE.
@@ -81,9 +79,11 @@ type DataPrivacyTrpcProcedures<
    * assertions live; restating it here would be a copy that can go stale
    * silently, and the declaration sweep reads it as a claim.
    */
-  scopeWritePolicy: ProcedureDecorator;
+  scopeWritePolicy: TrpcPolicyDecorator;
   /** The same, for a rule REMOVAL — a different act, so a different claim. */
-  scopeRemovalPolicy: ProcedureDecorator;
+  scopeRemovalPolicy: TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -199,44 +199,74 @@ export class DataPrivacyTrpcApi {
   ) {
     const { protected: procedure, policy, scopeWritePolicy, scopeRemovalPolicy } = procedures;
 
-    return trpc.router({
-      /**
-       * `project:view`: reading the screen is a project read. The snapshot
-       * filters the rules and the writable scopes it returns by what the
-       * caller may actually see, so a wider gate here would not widen the
-       * answer.
-       */
-      getSnapshot: policy("project:view")(procedure.input(projectInputSchema)).query(
-        ({ ctx, input }) => ports.getSnapshot(ctx, { projectId: input.projectId }),
-      ),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * `project:view`: reading the screen is a project read. The snapshot
+         * filters the rules and the writable scopes it returns by what the
+         * caller may actually see, so a wider gate here would not widen the
+         * answer.
+         */
+        .query("getSnapshot", (p) =>
+          p
+            .withInput(projectInputSchema)
+            .withoutOutput(
+              "the snapshot and the written rule are the process's own shapes, generic in this feature: naming one here would narrow what the browser is handed",
+            )
+            .withPermission("project:view")
+            .handle(({ ctx, input }) => ports.getSnapshot(ctx, { projectId: input.projectId })),
+        )
 
-      /**
-       * Authorized on the TARGET scope, not on the project the request names —
-       * ORGANIZATION and DEPARTMENT need `organization:manage`, TEAM needs
-       * `team:manage`, PROJECT needs `project:update` — so a project member
-       * cannot push a rule up to the organization.
-       */
-      setForScope: scopeWritePolicy(procedure.input(setForScopeInputSchema)).mutation(
-        ({ ctx, input }) =>
-          answering(() =>
-            ports.setForScope(ctx, {
-              projectId: input.projectId,
-              scope: input.scope,
-              personalOnly: input.personalOnly,
-              config: input.config,
-            }),
-          ),
-      ),
+        /**
+         * Authorized on the TARGET scope, not on the project the request names —
+         * ORGANIZATION and DEPARTMENT need `organization:manage`, TEAM needs
+         * `team:manage`, PROJECT needs `project:update` — so a project member
+         * cannot push a rule up to the organization.
+         */
+        .mutation("setForScope", (p) =>
+          p
+            .withInput(setForScopeInputSchema)
+            .withoutOutput(
+              "the snapshot and the written rule are the process's own shapes, generic in this feature: naming one here would narrow what the browser is handed",
+            )
+            .withCustomPermission(
+              scopeWritePolicy,
+              "the write is authorized on the TARGET scope's own tier, which the process's resolver anchors to the project's organization first",
+            )
+            .handle(({ ctx, input }) =>
+              answering(() =>
+                ports.setForScope(ctx, {
+                  projectId: input.projectId,
+                  scope: input.scope,
+                  personalOnly: input.personalOnly,
+                  config: input.config,
+                }),
+              ),
+            ),
+        )
 
-      /** Removes the rule at one target; the next tier up then applies. */
-      removeForScope: scopeRemovalPolicy(procedure.input(removeForScopeInputSchema)).mutation(
-        ({ ctx, input }) =>
-          ports.removeForScope(ctx, {
-            projectId: input.projectId,
-            scope: input.scope,
-            personalOnly: input.personalOnly,
-          }),
-      ),
-    });
+        /** Removes the rule at one target; the next tier up then applies. */
+        .mutation("removeForScope", (p) =>
+          p
+            .withInput(removeForScopeInputSchema)
+            .withoutOutput("removal answers with nothing")
+            .withCustomPermission(
+              scopeRemovalPolicy,
+              "the removal is authorized on the TARGET scope's own tier, the same way the write is",
+            )
+            .handle(({ ctx, input }) =>
+              ports.removeForScope(ctx, {
+                projectId: input.projectId,
+                scope: input.scope,
+                personalOnly: input.personalOnly,
+              }),
+            ),
+        )
+        .build()
+    );
   }
 }

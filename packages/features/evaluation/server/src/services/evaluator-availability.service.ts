@@ -2,7 +2,7 @@
  * Which evaluators this particular install can actually run. Moved from the platform app's
  * `server/evaluations/installedEvaluators.ts` unchanged.
  */
-import type { EvaluatorUnavailability } from "../transport/api-trpc/evaluation.api";
+import type { EvaluatorUnavailability } from "@langwatch/evaluation-contract";
 
 export const PRESIDIO_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_PRESIDIO";
 export const LINGUA_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_LINGUA";

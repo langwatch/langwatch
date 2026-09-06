@@ -58,6 +58,7 @@ export function createDataPrivacyTrpcRouter<
     mount.root,
     {
       protected: service.protected,
+      validateOutput: service.validateOutput,
       policy: service.policy,
       scopeWritePolicy: service.custom(mount.checks.write),
       scopeRemovalPolicy: service.custom(mount.checks.removal),

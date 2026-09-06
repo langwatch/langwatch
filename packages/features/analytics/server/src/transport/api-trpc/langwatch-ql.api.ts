@@ -28,8 +28,10 @@
  *
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
+  langWatchQLAvailabilitySchema,
   langWatchQLQueryResultSchema,
   langWatchQLSchema,
   type LangWatchQLCaller,
@@ -68,25 +70,10 @@ type LangWatchQLTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
-
-/**
- * Which gate closed, when one did.
- *
- * `disabled` is the project's own switch being off, which its administrator can
- * change; `unprovisioned` is a deployment with no LangWatchQL identity to run
- * as, which they cannot. They read as different refusals, so the page has to be
- * able to tell them apart.
- */
-export type LangWatchQLUnavailableReason = "disabled" | "unprovisioned";
-
-export interface LangWatchQLAvailability {
-  /** What the navigation entry and the page gate on. */
-  readonly available: boolean;
-  /** Absent when available. */
-  readonly reason?: LangWatchQLUnavailableReason;
-}
 
 /**
  * The host capabilities this transport needs that are not Analytics' own.
@@ -163,75 +150,98 @@ export class LangWatchQLTrpcApi {
     const { protected: procedure, policy } = procedures;
     const { requireWorkbenchEnabled } = ports;
 
-    return trpc.router({
-      /**
-       * Separate from `schema` because the schema is answerable without an
-       * executor (it is the catalog), so a deployment with no LangWatchQL
-       * identity would describe a surface it cannot run. The navigation gates
-       * on this, never on the schema.
-       *
-       * One object with an optional reason rather than a union, so a consumer
-       * that only cares whether the surface is on keeps reading `available` and
-       * nothing else.
-       */
-      availability: policy("analytics:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }): Promise<LangWatchQLAvailability> => {
-          const enabled = await ports.isWorkbenchEnabled(ctx, {
-            projectId: input.projectId,
-          });
-          if (!enabled) return { available: false, reason: "disabled" };
+    /**
+     * The declared `analytics:view` check, then the workbench rollout gate:
+     * a caller is placed by AuthZ first and gated by the experiment second, so
+     * a member who may not touch the project never learns from the answer
+     * whether the experiment is switched on for it.
+     */
+    const gatedPolicy: TrpcPolicyDecorator = (proc) =>
+      requireWorkbenchEnabled(policy("analytics:view")(proc));
 
-          if (!ctx.app.analytics.langWatchQLAvailable) {
-            return { available: false, reason: "unprovisioned" };
-          }
-          return { available: true };
-        },
-      ),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * Separate from `schema` because the schema is answerable without an
+         * executor (it is the catalog), so a deployment with no LangWatchQL
+         * identity would describe a surface it cannot run. The navigation gates
+         * on this, never on the schema.
+         */
+        .query("availability", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(langWatchQLAvailabilitySchema)
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const enabled = await ports.isWorkbenchEnabled(ctx, {
+                projectId: input.projectId,
+              });
+              if (!enabled) return { available: false, reason: "disabled" as const };
 
-      /** The datasets and columns this member's permissions unlock. */
-      schema: requireWorkbenchEnabled(policy("analytics:view")(procedure.input(projectScopeSchema)))
-        .output(langWatchQLSchema)
-        .query(async ({ ctx, input }) =>
-          ctx.app.analytics.describeLangWatchQLSchema({
-            protections: await ports.resolveProtections(ctx, { projectId: input.projectId }),
-          }),
-        ),
-
-      query: requireWorkbenchEnabled(
-        policy("analytics:view")(
-          procedure.input(
-            projectScopeSchema.extend({
-              // Deliberately not `.trim()`: the statement the database runs
-              // must be the one that was submitted.
-              sql: z.string().min(1).max(ports.maxStatementLength),
-              parameters: z.record(z.string(), parameterValueSchema).optional(),
-              timeWindow: ports.timeWindowSchema.optional(),
-              /**
-               * The datapoint step for a statement that declares
-               * `{period_granularity_seconds:UInt32}`, in seconds.
-               */
-              granularitySeconds: ports.granularityStepSchema.optional(),
+              if (!ctx.app.analytics.langWatchQLAvailable) {
+                return { available: false, reason: "unprovisioned" as const };
+              }
+              return { available: true };
             }),
-          ),
-        ),
-      )
-        .output(langWatchQLQueryResultSchema)
-        .mutation(async ({ ctx, input }) => {
-          const { project, protections } = await ports.resolveRunCaller(ctx, {
-            projectId: input.projectId,
-          });
+        )
+        /** The datasets and columns this member's permissions unlock. */
+        .query("schema", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(langWatchQLSchema)
+            .withCustomPermission(
+              gatedPolicy,
+              "analytics:view, then the deployment's workbench rollout gate, in that order",
+            )
+            .handle(async ({ ctx, input }) =>
+              ctx.app.analytics.describeLangWatchQLSchema({
+                protections: await ports.resolveProtections(ctx, { projectId: input.projectId }),
+              }),
+            ),
+        )
+        .mutation("query", (p) =>
+          p
+            .withInput(
+              projectScopeSchema.extend({
+                // Deliberately not `.trim()`: the statement the database runs
+                // must be the one that was submitted.
+                sql: z.string().min(1).max(ports.maxStatementLength),
+                parameters: z.record(z.string(), parameterValueSchema).optional(),
+                timeWindow: ports.timeWindowSchema.optional(),
+                /**
+                 * The datapoint step for a statement that declares
+                 * `{period_granularity_seconds:UInt32}`, in seconds.
+                 */
+                granularitySeconds: ports.granularityStepSchema.optional(),
+              }),
+            )
+            .withOutput(langWatchQLQueryResultSchema)
+            .withCustomPermission(
+              gatedPolicy,
+              "analytics:view, then the deployment's workbench rollout gate, in that order",
+            )
+            .handle(async ({ ctx, input }) => {
+              const { project, protections } = await ports.resolveRunCaller(ctx, {
+                projectId: input.projectId,
+              });
 
-          return ctx.app.analytics.executeLangWatchQL({
-            project,
-            protections,
-            sql: input.sql,
-            ...(input.parameters ? { parameters: input.parameters } : {}),
-            ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
-            ...(input.granularitySeconds === undefined
-              ? {}
-              : { granularitySeconds: input.granularitySeconds }),
-          });
-        }),
-    });
+              return ctx.app.analytics.executeLangWatchQL({
+                project,
+                protections,
+                sql: input.sql,
+                ...(input.parameters ? { parameters: input.parameters } : {}),
+                ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+                ...(input.granularitySeconds === undefined
+                  ? {}
+                  : { granularitySeconds: input.granularitySeconds }),
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

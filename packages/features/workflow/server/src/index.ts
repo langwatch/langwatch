@@ -65,6 +65,13 @@ export {
   type WorkflowNlpDispatchResponse,
   type WorkflowRowDraft,
 } from "./ports/workflow.port";
+export {
+  WorkflowAiCallPort,
+  WorkflowCommitMessageModelPort,
+  type WorkflowAiCallFeature,
+} from "./ports/workflow-commit-message.port";
+export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service";
+export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-message.rules";
 export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service";
 export {
   WorkflowStudioCopyService,

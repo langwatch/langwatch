@@ -1,3 +1,4 @@
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   authenticatedFeatureFlagTargetInputSchema,
@@ -56,7 +57,18 @@ type FeatureFlagTrpcProcedures<
   TRoot extends AnyTRPCRootTypes,
 > = Readonly<{
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
+  /** @see the mount field of the same name. */
+  validateOutput?: boolean;
 }>;
+
+/**
+ * The access declaration for this whole surface arrives ALREADY APPLIED, on
+ * the procedure the mount hands over: every procedure here authorizes the
+ * exact tenant target inside this package's own resolver, and that target is
+ * not the scope id the input carries. So the mount states the
+ * service-authorized claim once, for all seven, rather than seven times.
+ */
+const DECLARED_BY_THE_MOUNT: TrpcPolicyDecorator = (procedure) => procedure;
 
 const legacyFlagInputSchema = z
   .object({
@@ -301,93 +313,133 @@ export class FeatureFlagTrpcApi {
   ) {
     const procedure = procedures.protected;
 
-    return trpc.router({
-      isEnabled: procedure
-        .input(legacyFlagInputSchema)
-        .output(enabledOutputSchema)
-        .query(async ({ ctx, input }) => {
-          const target = await authorizeLegacyTarget(ctx, input);
-          const enabled = await ctx.app.featureFlags.isEnabled(input.flag, target);
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy: () => DECLARED_BY_THE_MOUNT },
+      validateOutput: procedures.validateOutput ?? false,
+    })
+      .query("isEnabled", (p) =>
+        p
+          .withInput(legacyFlagInputSchema)
+          .withOutput(enabledOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const target = await authorizeLegacyTarget(ctx, input);
+            const enabled = await ctx.app.featureFlags.isEnabled(input.flag, target);
 
-          return { enabled };
-        }),
+            return { enabled };
+          }),
+      )
+      .query("isEnabledForAnyOrganization", (p) =>
+        p
+          .withInput(organizationFlagsInputSchema)
+          .withOutput(enabledOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const byOrganization = await resolveForMemberOrganizations({
+              ctx,
+              flag: input.flag,
+              organizationIds: input.organizationIds,
+            });
 
-      isEnabledForAnyOrganization: procedure
-        .input(organizationFlagsInputSchema)
-        .output(enabledOutputSchema)
-        .query(async ({ ctx, input }) => {
-          const byOrganization = await resolveForMemberOrganizations({
-            ctx,
-            flag: input.flag,
-            organizationIds: input.organizationIds,
-          });
+            return { enabled: Object.values(byOrganization).some(Boolean) };
+          }),
+      )
+      .query("isEnabledForEachOrganization", (p) =>
+        p
+          .withInput(organizationFlagsInputSchema)
+          .withOutput(enabledByOrganizationOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const enabledByOrganizationId = await resolveForMemberOrganizations({
+              ctx,
+              flag: input.flag,
+              organizationIds: input.organizationIds,
+            });
 
-          return { enabled: Object.values(byOrganization).some(Boolean) };
-        }),
+            return { enabledByOrganizationId };
+          }),
+      )
+      .query("resolve", (p) =>
+        p
+          .withInput(targetInputSchema)
+          .withOutput(resolvedFlagsOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const target = await authorizeTarget(ctx, input.target);
+            const flags = await ctx.app.featureFlags.resolveFrontendFlags(target);
 
-      isEnabledForEachOrganization: procedure
-        .input(organizationFlagsInputSchema)
-        .output(enabledByOrganizationOutputSchema)
-        .query(async ({ ctx, input }) => {
-          const enabledByOrganizationId = await resolveForMemberOrganizations({
-            ctx,
-            flag: input.flag,
-            organizationIds: input.organizationIds,
-          });
+            return { flags };
+          }),
+      )
+      .query("experiments", (p) =>
+        p
+          .withInput(targetInputSchema)
+          .withOutput(experimentsOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const target = await authorizeTarget(ctx, input.target);
+            const entries = await ctx.app.featureFlags.resolveExperimentCatalogue(target);
+            const experiments = await stripUnauthorizedPolicies(ctx, target, entries);
 
-          return { enabledByOrganizationId };
-        }),
+            return { experiments };
+          }),
+      )
+      .mutation("setExperimentEnrolment", (p) =>
+        p
+          .withInput(enrolmentInputSchema)
+          .withOutput(mutationOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const target = await authorizeTarget(ctx, input.target);
+            await ctx.app.featureFlags.setUserExperimentEnrolment({
+              flagKey: input.flag,
+              target,
+              enrolled: input.enrolled,
+            });
 
-      resolve: procedure
-        .input(targetInputSchema)
-        .output(resolvedFlagsOutputSchema)
-        .query(async ({ ctx, input }) => {
-          const target = await authorizeTarget(ctx, input.target);
-          const flags = await ctx.app.featureFlags.resolveFrontendFlags(target);
+            return { ok: true } as const;
+          }),
+      )
+      .mutation("setExperimentTenantPolicy", (p) =>
+        p
+          .withInput(tenantPolicyInputSchema)
+          .withOutput(mutationOutputSchema)
+          .withCustomPermission(
+            DECLARED_BY_THE_MOUNT,
+            "the service-authorized claim is applied once by the mount, to the procedure it hands over: every procedure here authorizes the exact tenant target inside this package's own resolver",
+          )
+          .handle(async ({ ctx, input }) => {
+            const actorId = ctx.actor().id;
+            await authorizeTenantPolicyChange(ctx, input.scope);
+            await ctx.app.featureFlags.setExperimentTenantPolicy({
+              flagKey: input.flag,
+              scope: input.scope,
+              policy: input.policy,
+              changedByUserId: actorId,
+            });
 
-          return { flags };
-        }),
-
-      experiments: procedure
-        .input(targetInputSchema)
-        .output(experimentsOutputSchema)
-        .query(async ({ ctx, input }) => {
-          const target = await authorizeTarget(ctx, input.target);
-          const entries = await ctx.app.featureFlags.resolveExperimentCatalogue(target);
-          const experiments = await stripUnauthorizedPolicies(ctx, target, entries);
-
-          return { experiments };
-        }),
-
-      setExperimentEnrolment: procedure
-        .input(enrolmentInputSchema)
-        .output(mutationOutputSchema)
-        .mutation(async ({ ctx, input }) => {
-          const target = await authorizeTarget(ctx, input.target);
-          await ctx.app.featureFlags.setUserExperimentEnrolment({
-            flagKey: input.flag,
-            target,
-            enrolled: input.enrolled,
-          });
-
-          return { ok: true } as const;
-        }),
-
-      setExperimentTenantPolicy: procedure
-        .input(tenantPolicyInputSchema)
-        .output(mutationOutputSchema)
-        .mutation(async ({ ctx, input }) => {
-          const actorId = ctx.actor().id;
-          await authorizeTenantPolicyChange(ctx, input.scope);
-          await ctx.app.featureFlags.setExperimentTenantPolicy({
-            flagKey: input.flag,
-            scope: input.scope,
-            policy: input.policy,
-            changedByUserId: actorId,
-          });
-
-          return { ok: true } as const;
-        }),
-    });
+            return { ok: true } as const;
+          }),
+      )
+      .build();
   }
 }

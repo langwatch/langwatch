@@ -249,3 +249,15 @@ export function resolveRetention(input: {
   }
   return resolved;
 }
+
+/**
+ * What a retroactive rewrite answers with: the tables it touched, plus the
+ * retention the cascade actually resolved — which can differ from the value
+ * the form named when a closer override still wins.
+ */
+export const retroactiveRetentionUpdateResultSchema = z
+  .object({
+    tables: z.array(z.string()),
+    appliedRetentionDays: z.number(),
+  })
+  .strict();

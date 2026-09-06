@@ -81,7 +81,11 @@ function createCaller(presence: TestPresenceService) {
     if (!ctx.session) throw new Error("unauthenticated");
     return next({ ctx: { session: { user: ctx.session.user } } });
   });
-  const router = PresenceTrpcApi.create(root, { protected: authenticated, policy });
+  const router = PresenceTrpcApi.create(root, {
+    protected: authenticated,
+    policy,
+    validateOutput: true,
+  });
 
   return { authorize, actor, emitters, caller: router.createCaller(context), router };
 }
@@ -292,7 +296,11 @@ describe("PresenceTrpcApi", () => {
       };
       const root = TrpcRootDefinition.forContext<PresenceTrpcContext>().create({});
       const { policy } = createTestPolicy();
-      const router = PresenceTrpcApi.create(root, { protected: root.procedure, policy });
+      const router = PresenceTrpcApi.create(root, {
+        protected: root.procedure,
+        policy,
+        validateOutput: true,
+      });
       return { repository, caller: router.createCaller(context) };
     }
 

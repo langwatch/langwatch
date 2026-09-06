@@ -63,3 +63,17 @@ export const storedObjectsInternalRpc = {
     permission: "project:view",
   },
 } as const satisfies Record<string, StoredObjectsInternalRpcProcedure<ZodTypeAny, ZodTypeAny>>;
+
+/**
+ * The tri-state an existence probe answers with, matching what
+ * `/api/files/:id` reports:
+ *  - `available` — row exists and storage has the bytes
+ *  - `missing`   — row exists but the blob is gone
+ *  - `not_found` — no row matches
+ */
+export const storedObjectHeadSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("available"), mediaType: z.string() }).strict(),
+  z.object({ status: z.literal("missing"), mediaType: z.string() }).strict(),
+  z.object({ status: z.literal("not_found") }).strict(),
+]);
+export type StoredObjectHead = z.infer<typeof storedObjectHeadSchema>;

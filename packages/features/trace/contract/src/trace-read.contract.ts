@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { evaluationResultSchema, evaluationSchema, traceSchema } from "./trace-format.schemas";
 import type {
   ChatMessage,
   Evaluation,
@@ -140,3 +142,59 @@ export type TraceLegacyListInput = TraceLegacyFilterInput & {
   scrollId?: string | null;
   updatedAt?: number;
 };
+
+// ---------------------------------------------------------------------------
+// The same results, as parsers the tRPC surface declares its answers with.
+// ---------------------------------------------------------------------------
+
+/**
+ * A trace as the list/search read returns it: the stored trace plus the two
+ * things that read joins on — the guardrail that blocked it, if one did, and
+ * whether it carries annotations.
+ */
+export const traceWithGuardrailSchema = traceSchema.extend({
+  lastGuardrail: evaluationResultSchema.and(z.object({ name: z.string().optional() })).optional(),
+  annotations: z.object({ hasAnnotation: z.boolean(), count: z.number() }).optional(),
+});
+
+export const tracesForProjectResultSchema = z.object({
+  groups: z.array(z.array(traceWithGuardrailSchema)),
+  totalHits: z.number(),
+  traceChecks: z.record(z.string(), z.array(evaluationSchema)),
+  scrollId: z.string().optional(),
+  updatedThrough: z.number().optional(),
+});
+
+export const topicCountsResultSchema = z.object({
+  topicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
+  subtopicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
+});
+
+/** The named topic and subtopic counts the trace filters render. */
+export const namedTopicCountsSchema = z.object({
+  topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
+  subtopicCounts: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      count: z.number(),
+      parentId: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+export const customersAndLabelsResultSchema = z.object({
+  customers: z.array(z.string()),
+  labels: z.array(z.string()),
+});
+
+const fieldNameSchema = z.object({ key: z.string(), label: z.string() });
+
+export const distinctFieldNamesResultSchema = z.object({
+  spanNames: z.array(fieldNameSchema),
+  metadataKeys: z.array(fieldNameSchema),
+  evaluationNames: z.array(fieldNameSchema),
+});
+
+/** One sampled trace, flagged with whether it met the evaluator's conditions. */
+export const sampledTraceSchema = traceSchema.extend({ passesPreconditions: z.boolean() });

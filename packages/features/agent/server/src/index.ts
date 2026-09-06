@@ -13,15 +13,9 @@ export { type AgentListRow } from "./rules/agent-view.rules";
 export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.api";
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
 export { LinkedWorkflowCopyPort } from "./ports/linked-workflow-copy.port";
-export {
-  AgentTestPort,
-  type AgentTestActor,
-  type AgentTestRunResult,
-  type AgentTestTurnResult,
-} from "./ports/agent-test.port";
+export { AgentTestPort, type AgentTestActor } from "./ports/agent-test.port";
 export {
   HttpProxyTrpcApi,
-  type HttpProxyResult,
   type HttpProxyTrpcContext,
   type HttpProxyTrpcPorts,
   type HttpProxyTrpcRequest,

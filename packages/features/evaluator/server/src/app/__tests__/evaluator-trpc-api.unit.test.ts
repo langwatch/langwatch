@@ -80,7 +80,11 @@ function harness({
         return options.next();
       }) as TProcedure;
 
-  const router = EvaluatorTrpcApi.create(trpc, { protected: trpc.procedure, policy }, featurePorts);
+  const router = EvaluatorTrpcApi.create(
+    trpc,
+    { protected: trpc.procedure, policy, validateOutput: true },
+    featurePorts,
+  );
 
   return {
     policySawInput,
@@ -98,7 +102,7 @@ describe("EvaluatorTrpcApi", () => {
       const trpc = initTRPC.context<TestContext>().create();
       const router = EvaluatorTrpcApi.create(
         trpc,
-        { protected: trpc.procedure, policy: () => (procedure) => procedure },
+        { protected: trpc.procedure, policy: () => (procedure) => procedure, validateOutput: true },
         ports(),
       );
 

@@ -11,7 +11,15 @@
  * Transport only: gates, viewer-scoped redaction and delegation to the
  * canonical `CodingAgentService`.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import {
+  codingAgentPersonalPullRequestUsageWithConnectionSchema,
+  codingAgentPullRequestDetailSchema,
+  codingAgentSessionListRowSchema,
+  codingAgentSessionSchema,
+  codingAgentUsageTotalsSchema,
+} from "@langwatch/coding-agent-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { CodingAgentApp } from "#app/coding-agent.app";
@@ -52,7 +60,9 @@ type CodingAgentTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** What a single viewer may see of one project. */
@@ -168,119 +178,146 @@ export class CodingAgentTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      /**
-       * The "at a glance" usage totals for a project's coding-agent sessions in a
-       * window — cost, tokens, active time and session count, plus what the
-       * sessions produced. Metric-only sessions are included.
-       */
-      usageTotals: policy(CODING_AGENT_PERMISSION)(procedure.input(usageTotalsInputSchema)).query(
-        async ({ ctx, input }) => {
-          const toMs = input.toMs ?? Date.now();
-          const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-          return ctx.app.codingAgentApp.getUsageTotals({
-            projectId: input.projectId,
-            fromMs,
-            toMs,
-          });
-        },
-      ),
-
-      /**
-       * The project's recent coding-agent sessions in a window, newest first —
-       * the list behind the personal usage surface. Each row is counters, bounded
-       * sets and ids only (no prompt/reply/tool content).
-       */
-      recentSessions: policy(CODING_AGENT_PERMISSION)(
-        procedure.input(recentSessionsInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const toMs = input.toMs ?? Date.now();
-        const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-        return ctx.app.codingAgentApp.listRecent({
-          projectId: input.projectId,
-          fromMs,
-          toMs,
-          limit: input.limit ?? 50,
-        });
-      }),
-
-      /**
-       * The Sessions screen's list: the project's coding-agent sessions of the
-       * last ninety days, each named by the title its agent generated, priced, and
-       * carrying the pull requests it drove.
-       *
-       * Its own read rather than a shape on `recentSessions`, which answers with
-       * the stored row verbatim for the personal usage card. This one is a display
-       * projection: it drops the columns no column of the table shows, and it
-       * joins the organization's pull-request mapping onto the page.
-       *
-       * The title is the one conversation-derived value on the row, so it follows
-       * the project's content visibility; the cost follows `cost:view`, like every
-       * other spend on the platform.
-       */
-      sessionsList: policy(CODING_AGENT_PERMISSION)(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const visibility = await ports.readViewerVisibility(ctx, {
-            projectId: input.projectId,
-          });
-          const rows = await ctx.app.codingAgentApp.listForProject({
-            projectId: input.projectId,
-          });
-          return gateSessionListCost({
-            rows: gateSessionListTitles({
-              rows,
-              canReadCapturedContent: visibility.canReadCapturedContent,
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * The "at a glance" usage totals for a project's coding-agent sessions in a
+         * window — cost, tokens, active time and session count, plus what the
+         * sessions produced. Metric-only sessions are included.
+         */
+        .query("usageTotals", (p) =>
+          p
+            .withInput(usageTotalsInputSchema)
+            .withOutput(codingAgentUsageTotalsSchema)
+            .withPermission(CODING_AGENT_PERMISSION)
+            .handle(async ({ ctx, input }) => {
+              const toMs = input.toMs ?? Date.now();
+              const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
+              return ctx.app.codingAgentApp.getUsageTotals({
+                projectId: input.projectId,
+                fromMs,
+                toMs,
+              });
             }),
-            canSeeCosts: visibility.canSeeCosts,
-          });
-        },
-      ),
+        )
 
-      /**
-       * What each of the project's pull requests cost, plus the branches whose
-       * pull request has not been opened (or mapped) yet, plus whether GitHub is
-       * connected at all, in one query, because the page needs all three to decide
-       * what to render, and three round trips would show it in three stages.
-       *
-       * The rows the caller's own project discovers are priced across every
-       * project the caller may read, so a shared pull request reports its whole
-       * price rather than one person's share of it.
-       */
-      pullRequestUsage: policy(CODING_AGENT_PERMISSION)(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.codingAgentApp.getPersonalProjectPullRequestUsage(
-            { projectId: input.projectId },
-            ctx.actor(),
-          ),
-      ),
-
-      /**
-       * One pull request in full: its totals, who worked on it, what each model
-       * consumed, and the sessions that ran. Same permission cut as the list.
-       *
-       * Each session is named by the title its agent generated, and that title is
-       * resolved against the visibility of the project the session ran in: the
-       * detail spans an organization, and a reader can be trusted with one
-       * project's conversations and not another's. Only the projects that actually
-       * contributed a session are resolved, so the cost is bounded by what the
-       * detail lists rather than by the size of the organization.
-       */
-      pullRequestDetail: policy(CODING_AGENT_PERMISSION)(
-        procedure.input(pullRequestDetailInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const detail = await ctx.app.codingAgentApp.getPullRequestDetail(input, ctx.actor());
-        return {
-          ...detail,
-          sessions: gatePullRequestSessionTitles({
-            sessions: detail.sessions,
-            contentProjectIds: await contentProjectIdsFor({
-              ports,
-              request: ctx,
-              projectIds: detail.sessions.map((session) => session.projectId),
+        /**
+         * The project's recent coding-agent sessions in a window, newest first —
+         * the list behind the personal usage surface. Each row is counters, bounded
+         * sets and ids only (no prompt/reply/tool content).
+         */
+        .query("recentSessions", (p) =>
+          p
+            .withInput(recentSessionsInputSchema)
+            .withOutput(codingAgentSessionSchema.array())
+            .withPermission(CODING_AGENT_PERMISSION)
+            .handle(async ({ ctx, input }) => {
+              const toMs = input.toMs ?? Date.now();
+              const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
+              return ctx.app.codingAgentApp.listRecent({
+                projectId: input.projectId,
+                fromMs,
+                toMs,
+                limit: input.limit ?? 50,
+              });
             }),
-          }),
-        };
-      }),
-    });
+        )
+
+        /**
+         * The Sessions screen's list: the project's coding-agent sessions of the
+         * last ninety days, each named by the title its agent generated, priced, and
+         * carrying the pull requests it drove.
+         *
+         * Its own read rather than a shape on `recentSessions`, which answers with
+         * the stored row verbatim for the personal usage card. This one is a display
+         * projection: it drops the columns no column of the table shows, and it
+         * joins the organization's pull-request mapping onto the page.
+         *
+         * The title is the one conversation-derived value on the row, so it follows
+         * the project's content visibility; the cost follows `cost:view`, like every
+         * other spend on the platform.
+         */
+        .query("sessionsList", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(codingAgentSessionListRowSchema.array())
+            .withPermission(CODING_AGENT_PERMISSION)
+            .handle(async ({ ctx, input }) => {
+              const visibility = await ports.readViewerVisibility(ctx, {
+                projectId: input.projectId,
+              });
+              const rows = await ctx.app.codingAgentApp.listForProject({
+                projectId: input.projectId,
+              });
+              return gateSessionListCost({
+                rows: gateSessionListTitles({
+                  rows,
+                  canReadCapturedContent: visibility.canReadCapturedContent,
+                }),
+                canSeeCosts: visibility.canSeeCosts,
+              });
+            }),
+        )
+
+        /**
+         * What each of the project's pull requests cost, plus the branches whose
+         * pull request has not been opened (or mapped) yet, plus whether GitHub is
+         * connected at all, in one query, because the page needs all three to decide
+         * what to render, and three round trips would show it in three stages.
+         *
+         * The rows the caller's own project discovers are priced across every
+         * project the caller may read, so a shared pull request reports its whole
+         * price rather than one person's share of it.
+         */
+        .query("pullRequestUsage", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(codingAgentPersonalPullRequestUsageWithConnectionSchema)
+            .withPermission(CODING_AGENT_PERMISSION)
+            .handle(async ({ ctx, input }) =>
+              ctx.app.codingAgentApp.getPersonalProjectPullRequestUsage(
+                { projectId: input.projectId },
+                ctx.actor(),
+              ),
+            ),
+        )
+
+        /**
+         * One pull request in full: its totals, who worked on it, what each model
+         * consumed, and the sessions that ran. Same permission cut as the list.
+         *
+         * Each session is named by the title its agent generated, and that title is
+         * resolved against the visibility of the project the session ran in: the
+         * detail spans an organization, and a reader can be trusted with one
+         * project's conversations and not another's. Only the projects that actually
+         * contributed a session are resolved, so the cost is bounded by what the
+         * detail lists rather than by the size of the organization.
+         */
+        .query("pullRequestDetail", (p) =>
+          p
+            .withInput(pullRequestDetailInputSchema)
+            .withOutput(codingAgentPullRequestDetailSchema)
+            .withPermission(CODING_AGENT_PERMISSION)
+            .handle(async ({ ctx, input }) => {
+              const detail = await ctx.app.codingAgentApp.getPullRequestDetail(input, ctx.actor());
+              return {
+                ...detail,
+                sessions: gatePullRequestSessionTitles({
+                  sessions: detail.sessions,
+                  contentProjectIds: await contentProjectIdsFor({
+                    ports,
+                    request: ctx,
+                    projectIds: detail.sessions.map((session) => session.projectId),
+                  }),
+                }),
+              };
+            }),
+        )
+        .build()
+    );
   }
 }

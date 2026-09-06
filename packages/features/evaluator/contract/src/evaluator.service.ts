@@ -1,3 +1,5 @@
+import type { z } from "zod";
+import type { evaluatorCopySchema, evaluatorHistoryEntrySchema } from "./evaluator.schemas";
 import type { Evaluator, EvaluatorConfig, EvaluatorField, EvaluatorWithFields } from "./evaluator";
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator";
 import type { SingleEvaluationResult } from "./evaluators.generated";
@@ -21,19 +23,8 @@ export type EvaluatorUpdateInput = {
     config?: EvaluatorConfig;
   };
 };
-export type EvaluatorCopy = {
-  id: string;
-  name: string;
-  projectId: string;
-  fullPath: string;
-};
-export type EvaluatorHistoryEntry = {
-  id: string;
-  action: string;
-  createdAt: Date;
-  args: unknown;
-  user: { id: string; name: string | null; email: string | null } | null;
-};
+export type EvaluatorCopy = z.infer<typeof evaluatorCopySchema>;
+export type EvaluatorHistoryEntry = z.infer<typeof evaluatorHistoryEntrySchema>;
 export type WorkflowEvaluatorFields = {
   workflowId: string;
   workflowName: string;

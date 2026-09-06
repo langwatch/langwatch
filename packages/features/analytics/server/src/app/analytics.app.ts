@@ -24,6 +24,7 @@
  */
 import type {
   AnalyticsFeedbacksResult,
+  AnalyticsFilterOption,
   AnalyticsReadInput,
   AnalyticsService,
   AnalyticsTimeseriesInput,
@@ -36,13 +37,6 @@ import type {
   LangWatchQLSchema,
   LangWatchQLService,
 } from "@langwatch/analytics-contract";
-
-/** One offered value for a filter field, exactly as the picker renders it. */
-export type AnalyticsFilterOption = Readonly<{
-  field: string;
-  label: string;
-  count: number;
-}>;
 
 /**
  * The filter-value read this feature makes on the host's filter registry.

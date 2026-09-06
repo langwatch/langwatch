@@ -31,6 +31,7 @@ export const httpAgentConfigSchema = baseAgentConfigSchema.extend({
   auth: httpAuthSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  sessionPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
   scenarioMappings: z.record(z.string(), agentInputBindingSchema).optional(),
   devTunnel: z

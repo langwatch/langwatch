@@ -16,8 +16,14 @@
  *
  * Transport only: gates, throttles and delegation to `AutomationService`.
  */
-import type { AuthzDeclaration } from "@langwatch/authz-contract";
-import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import {
+  emailSuppressionAcknowledgedSchema,
+  emailSuppressionRowSchema,
+  InvalidUnsubscribeTokenError,
+  unsubscribeViewSchema,
+} from "@langwatch/automation-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -56,7 +62,9 @@ type EmailSuppressionTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs; none of them are automation's. */
@@ -133,108 +141,142 @@ export class EmailSuppressionTrpcApi {
       }
     };
 
-    return trpc.router({
+    const validateOutput = procedures.validateOutput;
+
+    /**
+     * Two audiences, so two services on the one root: the unsubscribe pair
+     * builds on the process's PUBLIC procedure and the operator pair on its
+     * authenticated one. `mergeRouters` puts them back on one wire name, which
+     * is what the client has always called.
+     */
+    const unsubscribe = createTrpcService({
+      root: trpc,
+      procedures: { protected: publicProcedure, policy },
+      validateOutput,
+    })
       /**
        * ADR-031: public token resolution for the `/unsubscribe` page. The token is
        * the authorization — its HMAC binds it to one recipient — so no login is
        * required. Returns masked email + project/trigger names, or NOT_FOUND on an
        * invalid/tampered token or a project that no longer exists.
        */
-      resolveUnsubscribeToken: policy(UNSUBSCRIBE_TOKEN_IS_THE_AUTHORIZATION)(
-        publicProcedure.input(resolveInputSchema),
-      ).query(async ({ input, ctx }) => {
-        await enforceUnsubscribeRateLimit({
-          ip: ports.clientIp(ctx),
-          action: "resolve",
-          max: 30,
-        });
-        const view = await ctx.app.automation.tryResolveUnsubscribeView({
-          token: input.token,
-        });
-        if (!view) {
-          throw new UnsubscribeLinkInvalidError(
-            "This unsubscribe link is invalid or has expired.",
-            404,
-          );
-        }
-        return view;
-      }),
-
+      .query("resolveUnsubscribeToken", (p) =>
+        p
+          .withInput(resolveInputSchema)
+          .withOutput(unsubscribeViewSchema)
+          .withPermission(UNSUBSCRIBE_TOKEN_IS_THE_AUTHORIZATION)
+          .handle(async ({ input, ctx }) => {
+            await enforceUnsubscribeRateLimit({
+              ip: ports.clientIp(ctx),
+              action: "resolve",
+              max: 30,
+            });
+            const view = await ctx.app.automation.tryResolveUnsubscribeView({
+              token: input.token,
+            });
+            if (!view) {
+              throw new UnsubscribeLinkInvalidError(
+                "This unsubscribe link is invalid or has expired.",
+                404,
+              );
+            }
+            return view;
+          }),
+      )
       /** Public one-click / button confirm. Idempotent — the suppression upsert
        *  collapses duplicates. */
-      confirmUnsubscribe: policy(UNSUBSCRIBE_TOKEN_IS_THE_AUTHORIZATION)(
-        publicProcedure.input(confirmInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        await enforceUnsubscribeRateLimit({
-          ip: ports.clientIp(ctx),
-          action: "confirm",
-          max: 10,
-        });
-        try {
-          await ctx.app.automation.confirmUnsubscribe({
-            token: input.token,
-            scope: input.scope,
-          });
-        } catch (err) {
-          // A bad or tampered token is the recipient's problem, and they can
-          // act on it: ask for the link again. A downstream persistence
-          // failure is ours, has no action for them, and is re-raised exactly
-          // as it arrived so it degrades to "unknown" plus a trace id at the
-          // boundary rather than masquerading as an "invalid link".
-          if (err instanceof InvalidUnsubscribeTokenError) {
-            throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid.", 400);
-          }
-          throw err;
-        }
-        return { ok: true };
-      }),
+      .mutation("confirmUnsubscribe", (p) =>
+        p
+          .withInput(confirmInputSchema)
+          .withOutput(emailSuppressionAcknowledgedSchema)
+          .withPermission(UNSUBSCRIBE_TOKEN_IS_THE_AUTHORIZATION)
+          .handle(async ({ input, ctx }) => {
+            await enforceUnsubscribeRateLimit({
+              ip: ports.clientIp(ctx),
+              action: "confirm",
+              max: 10,
+            });
+            try {
+              await ctx.app.automation.confirmUnsubscribe({
+                token: input.token,
+                scope: input.scope,
+              });
+            } catch (err) {
+              // A bad or tampered token is the recipient's problem, and they can
+              // act on it: ask for the link again. A downstream persistence
+              // failure is ours, has no action for them, and is re-raised exactly
+              // as it arrived so it degrades to "unknown" plus a trace id at the
+              // boundary rather than masquerading as an "invalid link".
+              if (err instanceof InvalidUnsubscribeTokenError) {
+                throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid.", 400);
+              }
+              throw err;
+            }
+            return { ok: true };
+          }),
+      )
+      .build();
 
+    const operator = createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
       /** Operator-facing suppression list (ADR-031). Each row is enriched with its
        *  trigger name (null triggerId = project-wide) so the table can render the
        *  scope without a second round-trip. */
-      getAll: policy({ kind: "permission", permission: "triggers:view" })(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        const rows = await ctx.app.automation.getSuppressionsEnriched({
-          projectId: input.projectId,
-        });
-        void ports.recordAudit({
-          userId: ctx.actor().id,
-          projectId: input.projectId,
-          action: "emailSuppression.getAll",
-          args: {
-            recordCount: rows.length,
-            triggerIds: [
-              ...new Set(rows.map((r) => r.triggerId).filter((id): id is string => id != null)),
-            ],
-          },
-        });
-        return rows.map((r) => ({
-          id: r.id,
-          email: r.email,
-          triggerId: r.triggerId,
-          triggerName: r.triggerName,
-          reason: r.reason,
-          createdAt: r.createdAt,
-        }));
-      }),
-
+      .query("getAll", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(emailSuppressionRowSchema.array())
+          .withPermission("triggers:view")
+          .handle(async ({ input, ctx }) => {
+            const rows = await ctx.app.automation.getSuppressionsEnriched({
+              projectId: input.projectId,
+            });
+            void ports.recordAudit({
+              userId: ctx.actor().id,
+              projectId: input.projectId,
+              action: "emailSuppression.getAll",
+              args: {
+                recordCount: rows.length,
+                triggerIds: [
+                  ...new Set(rows.map((r) => r.triggerId).filter((id): id is string => id != null)),
+                ],
+              },
+            });
+            return rows.map((r) => ({
+              id: r.id,
+              email: r.email,
+              triggerId: r.triggerId,
+              triggerName: r.triggerName,
+              reason: r.reason,
+              createdAt: r.createdAt,
+            }));
+          }),
+      )
       /** Removing a suppression resumes delivery — a deliberate operator action. */
-      remove: policy({ kind: "permission", permission: "triggers:manage" })(
-        procedure.input(removeInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        await ctx.app.automation.removeSuppression({
-          projectId: input.projectId,
-          id: input.id,
-        });
-        void ports.recordAudit({
-          userId: ctx.actor().id,
-          projectId: input.projectId,
-          action: "emailSuppression.remove",
-          args: { suppressionId: input.id },
-        });
-        return { ok: true };
-      }),
-    });
+      .mutation("remove", (p) =>
+        p
+          .withInput(removeInputSchema)
+          .withOutput(emailSuppressionAcknowledgedSchema)
+          .withPermission("triggers:manage")
+          .handle(async ({ input, ctx }) => {
+            await ctx.app.automation.removeSuppression({
+              projectId: input.projectId,
+              id: input.id,
+            });
+            void ports.recordAudit({
+              userId: ctx.actor().id,
+              projectId: input.projectId,
+              action: "emailSuppression.remove",
+              args: { suppressionId: input.id },
+            });
+            return { ok: true };
+          }),
+      )
+      .build();
+
+    return trpc.mergeRouters(unsubscribe, operator);
   }
 }

@@ -77,7 +77,7 @@ function harness({
 
   const router = TracesTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: () => policy },
+    { protected: trpc.procedure, policy: () => policy, validateOutput: true },
     {
       filterInputSchema,
       listInputSchema,
@@ -113,7 +113,17 @@ let caller: ReturnType<typeof harness>["caller"];
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAllTracesForProject.mockResolvedValue({
-    groups: [[{ trace_id: "t1" }]],
+    groups: [
+      [
+        {
+          trace_id: "t1",
+          project_id: "project_123",
+          metadata: {},
+          timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
+          spans: [],
+        },
+      ],
+    ],
     totalHits: 1,
     traceChecks: {},
   });

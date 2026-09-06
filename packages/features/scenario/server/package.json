@@ -66,6 +66,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/model-provider-server": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

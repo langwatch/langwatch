@@ -31,13 +31,21 @@
  * surface, the single public trace read ADR-057 allows.
  */
 import { on } from "node:events";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type {
-  Span,
-  Trace,
-  TraceLegacyFilterInput,
-  TraceLegacyListInput,
+import {
+  customersAndLabelsResultSchema,
+  distinctFieldNamesResultSchema,
+  evaluationSchema,
+  namedTopicCountsSchema,
+  sampledTraceSchema,
+  traceSchema,
+  tracesForProjectResultSchema,
+  type Span,
+  type Trace,
+  type TraceLegacyFilterInput,
+  type TraceLegacyListInput,
 } from "@langwatch/trace-contract";
 import {
   TRPCError,
@@ -75,7 +83,9 @@ type TracesTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -202,375 +212,437 @@ export class TracesTrpcApi {
 
     const downloadExtrasSchema = z.object({ includeSpans: z.boolean() });
 
-    return trpc.router({
-      getAllForProject: policy("traces:view")(procedure.input(ports.listInputSchema)).query(
-        async ({ ctx, input }) => {
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .query("getAllForProject", (p) =>
+          p
+            .withInput(ports.listInputSchema)
+            .withOutput(tracesForProjectResultSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-          return ctx.app.traces.listTraces({
-            query: input,
-            protections,
-            options: { scrollId: input.scrollId },
-          });
-        },
-      ),
+              return ctx.app.traces.listTraces({
+                query: input,
+                protections,
+                options: { scrollId: input.scrollId },
+              });
+            }),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(traceScopeSchema.extend({ withEditOverlay: withEditOverlayInput }))
+            .withOutput(traceSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-      getById: policy("traces:view")(
-        procedure.input(traceScopeSchema.extend({ withEditOverlay: withEditOverlayInput })),
-      ).query(async ({ ctx, input }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
+              const trace = await ctx.app.traces.readTrace({
+                projectId: input.projectId,
+                traceId: input.traceId,
+                protections,
+                withEditOverlay: input.withEditOverlay,
+              });
 
-        const trace = await ctx.app.traces.readTrace({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          protections,
-          withEditOverlay: input.withEditOverlay,
-        });
+              if (!trace) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
+              }
 
-        if (!trace) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
-        }
+              return trace;
+            }),
+        )
+        .query("getEvaluations", (p) =>
+          p
+            .withInput(traceScopeSchema)
+            .withOutput(evaluationSchema.array().optional())
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-        return trace;
-      }),
+              const evaluations = await ctx.app.traces.readEvaluations({
+                projectId: input.projectId,
+                traceIds: [input.traceId],
+                protections,
+              });
 
-      getEvaluations: policy("traces:view")(procedure.input(traceScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
+              return evaluations[input.traceId];
+            }),
+        )
 
-          const evaluations = await ctx.app.traces.readEvaluations({
-            projectId: input.projectId,
-            traceIds: [input.traceId],
-            protections,
-          });
+        // Protected (not public-share): the read is keyed by evaluationId, which
+        // is only tenant-scoped, so authorization must be the whole project too.
+        // A public-share token is scoped to a single trace and could otherwise be
+        // used to read any evaluation's inputs in the project by supplying
+        // another evaluationId. Public-shared trace drawers already get inputs
+        // eagerly from the public `getEvaluations`; this lazy fallback stays
+        // project-gated.
+        .query("getEvaluationInputs", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), evaluationId: z.string() }))
+            .withOutput(z.record(z.string(), z.unknown()).nullable())
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.traces.readEvaluationInputs({
+                projectId: input.projectId,
+                evaluationId: input.evaluationId,
+              });
+            }),
+        )
+        .query("getEvaluationsMultiple", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+            .withOutput(z.record(z.string(), evaluationSchema.array()))
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-          return evaluations[input.traceId];
-        },
-      ),
+              return ctx.app.traces.readEvaluations({
+                projectId: input.projectId,
+                traceIds: input.traceIds,
+                protections,
+              });
+            }),
+        )
+        .query("getTopicCounts", (p) =>
+          p
+            .withInput(ports.filterInputSchema)
+            .withOutput(namedTopicCountsSchema)
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const result = await ctx.app.traces.readTopicCounts(input);
 
-      // Protected (not public-share): the read is keyed by evaluationId, which
-      // is only tenant-scoped, so authorization must be the whole project too.
-      // A public-share token is scoped to a single trace and could otherwise be
-      // used to read any evaluation's inputs in the project by supplying
-      // another evaluationId. Public-shared trace drawers already get inputs
-      // eagerly from the public `getEvaluations`; this lazy fallback stays
-      // project-gated.
-      getEvaluationInputs: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), evaluationId: z.string() })),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.traces.readEvaluationInputs({
-          projectId: input.projectId,
-          evaluationId: input.evaluationId,
-        });
-      }),
+              const topicsMap = Object.fromEntries(
+                (await ctx.app.traces.readTopics({ projectId: input.projectId })).map((topic) => [
+                  topic.id,
+                  topic,
+                ]),
+              );
 
-      getEvaluationsMultiple: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) })),
-      ).query(async ({ input, ctx }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
+              const mapBuckets = (
+                buckets: Array<{ key: string; count: number }>,
+                includeParent = false,
+              ) => {
+                return buckets.reduce(
+                  (acc, bucket) => {
+                    const topic = topicsMap[bucket.key];
+                    if (!topic) return acc;
 
-        return ctx.app.traces.readEvaluations({
-          projectId: input.projectId,
-          traceIds: input.traceIds,
-          protections,
-        });
-      }),
-
-      getTopicCounts: policy("traces:view")(procedure.input(ports.filterInputSchema)).query(
-        async ({ input, ctx }) => {
-          const result = await ctx.app.traces.readTopicCounts(input);
-
-          const topicsMap = Object.fromEntries(
-            (await ctx.app.traces.readTopics({ projectId: input.projectId })).map((topic) => [
-              topic.id,
-              topic,
-            ]),
-          );
-
-          const mapBuckets = (
-            buckets: Array<{ key: string; count: number }>,
-            includeParent = false,
-          ) => {
-            return buckets.reduce(
-              (acc, bucket) => {
-                const topic = topicsMap[bucket.key];
-                if (!topic) return acc;
-
-                return [
-                  ...acc,
-                  {
-                    id: bucket.key,
-                    name: topic.name,
-                    count: bucket.count,
-                    ...(includeParent && { parentId: topic.parentId }),
+                    return [
+                      ...acc,
+                      {
+                        id: bucket.key,
+                        name: topic.name,
+                        count: bucket.count,
+                        ...(includeParent && { parentId: topic.parentId }),
+                      },
+                    ];
                   },
-                ];
-              },
-              [] as {
-                id: string;
-                name: string;
-                count: number;
-                parentId?: string | null;
-              }[],
-            );
-          };
+                  [] as {
+                    id: string;
+                    name: string;
+                    count: number;
+                    parentId?: string | null;
+                  }[],
+                );
+              };
 
-          const topicCounts = mapBuckets(result.topicCounts);
-          const subtopicCounts = mapBuckets(result.subtopicCounts, true);
+              const topicCounts = mapBuckets(result.topicCounts);
+              const subtopicCounts = mapBuckets(result.subtopicCounts, true);
 
-          return { topicCounts, subtopicCounts };
-        },
-      ),
+              return { topicCounts, subtopicCounts };
+            }),
+        )
+        .query("getCustomersAndLabels", (p) =>
+          p
+            .withInput(ports.filterInputSchema)
+            .withOutput(customersAndLabelsResultSchema)
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.traces.readCustomersAndLabels(input);
+            }),
+        )
+        .query("getTracesByThreadId", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), threadId: z.string() }))
+            .withOutput(traceSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, threadId } = input;
 
-      getCustomersAndLabels: policy("traces:view")(procedure.input(ports.filterInputSchema)).query(
-        async ({ input, ctx }) => {
-          return ctx.app.traces.readCustomersAndLabels(input);
-        },
-      ),
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-      getTracesByThreadId: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), threadId: z.string() })),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, threadId } = input;
-
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-
-        // Thread-detail read consumes conversation content, so the application
-        // resolves full IO (#4991) rather than the 64 KB preview. Anonymous
-        // shared reads go through the dedicated `sharedTrace.get` surface,
-        // never this endpoint. See ADR-057.
-        return ctx.app.traces.readThreadTraces({ projectId, threadId, protections });
-      }),
-
-      getTracesWithSpans: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceIds: z.array(z.string()),
-            withEditOverlay: withEditOverlayInput,
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, traceIds } = input;
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-
-        return ctx.app.traces.readTracesWithSpans({
-          projectId,
-          traceIds,
-          protections,
-          withEditOverlay: input.withEditOverlay,
-        });
-      }),
-
-      getFormattedSpansDigest: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            traceIds: z.array(z.string()),
-            withEditOverlay: withEditOverlayInput,
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, traceIds } = input;
-        const protections = await ports.getViewerProtections(ctx, { projectId });
-
-        // The digest is one more reading of the same spans the other columns
-        // are mapped from, so the correction is read the same way. Read without
-        // it, the one column that quotes the whole trace would spell out the
-        // very spans the reviewer deleted.
-        //
-        // It stays on previews all the same: this runs over a whole page of
-        // traces at once, and resolving every offloaded value on all of them is
-        // what #4991 kept off the grid. Applying a correction needs none of it.
-        const traces = await ctx.app.traces.readTracesWithSpansPreview({
-          projectId,
-          traceIds,
-          protections,
-          withEditOverlay: input.withEditOverlay,
-        });
-
-        // `as const` is what keeps the answer a `Record<string, string>`: the
-        // `await` between the map and `Object.fromEntries` breaks the
-        // contextual typing that would infer the entry as a two-tuple, so
-        // untupled this lands on the `Iterable<readonly any[]>: any` overload
-        // and erases the procedure's output.
-        return Object.fromEntries(
-          await Promise.all(
-            traces.map(
-              async (t) => [t.trace_id, await ports.formatSpansDigest(t.spans ?? [])] as const,
-            ),
-          ),
-        );
-      }),
-
-      getTracesWithSpansByThreadIds: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            threadIds: z.array(z.string()),
-            withEditOverlay: withEditOverlayInput,
-          }),
-        ),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, threadIds } = input;
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-
-        // Thread reads consume conversation content, so the application
-        // resolves full IO (#4991).
-        return ctx.app.traces.readThreadsTraces({
-          projectId,
-          threadIds,
-          protections,
-          withEditOverlay: input.withEditOverlay,
-        });
-      }),
-
-      // One `.input()` over an intersection rather than two chained calls.
-      // tRPC's second `.input()` merges through a conditional on the input it
-      // already has, and the process supplies these schemas as type
-      // parameters — an unresolved parameter never takes the merging branch,
-      // so the chain resolved to the framework's `TypeError<…>`. The parsed
-      // shape and the published input are the same either way.
-      getSampleTracesDataset: policy("traces:view")(
-        procedure.input(z.intersection(ports.filterInputSchema, sampleExtrasSchema)),
-      ).query(async ({ ctx, input }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-
-        // Dataset builder persists trace content, so the application resolves
-        // full IO (#4991) and truncated rows never corrupt the dataset. The
-        // ID-only list read it draws from stays on the preview.
-        return ctx.app.traces.readSampleTraces({ query: input, protections, pageSize: 10 });
-      }),
-
-      getFieldNames: policy("traces:view")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            startDate: z.number(),
-            endDate: z.number(),
-          }),
-        ),
-      ).query(async ({ ctx, input }) => {
-        return ctx.app.traces.readFieldNames({
-          projectId: input.projectId,
-          startDate: input.startDate,
-          endDate: input.endDate,
-        });
-      }),
-
-      getSampleTraces: policy("traces:view")(
-        procedure.input(z.intersection(ports.filterInputSchema, sampleTracesExtrasSchema)),
-      ).query(async ({ ctx, input }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
-
-        // Sample builder feeds dataset/evaluator content, so the application
-        // resolves full IO (#4991). The ID-only list read it draws from stays
-        // on the preview.
-        const traceWithSpans = await ctx.app.traces.readSampleTraces({
-          query: input,
-          protections,
-          pageSize: 100,
-        });
-
-        const { evaluatorType, preconditions, expectedResults } = input;
-
-        const passedPreconditions = traceWithSpans.filter((trace) => {
-          if (!evaluatorType) return false;
-          const spans = trace.spans ?? [];
-          const requiredFieldsMet = ports.checkEvaluatorRequiredFields({
-            evaluatorType,
-            spans,
-            expectedOutput: trace.expected_output,
-          });
-          if (!requiredFieldsMet) return false;
-          const traceData = ports.buildPreconditionTraceData({ trace, spans });
-          return ports.evaluatePreconditions({ traceData, preconditions });
-        });
-        const passedPreconditionsTraceIds = passedPreconditions?.map((trace) => trace.trace_id);
-
-        let samples = shuffled(passedPreconditions)
-          .slice(0, expectedResults)
-          .map((sample) => ({ ...sample, passesPreconditions: true }));
-        if (samples.length < 10) {
-          samples = samples.concat(
-            shuffled(
-              traceWithSpans.filter(
-                (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
-              ),
+              // Thread-detail read consumes conversation content, so the application
+              // resolves full IO (#4991) rather than the 64 KB preview. Anonymous
+              // shared reads go through the dedicated `sharedTrace.get` surface,
+              // never this endpoint. See ADR-057.
+              return ctx.app.traces.readThreadTraces({ projectId, threadId, protections });
+            }),
+        )
+        .query("getTracesWithSpans", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                traceIds: z.array(z.string()),
+                withEditOverlay: withEditOverlayInput,
+              }),
             )
-              .slice(0, expectedResults - samples.length)
-              .map((sample) => ({ ...sample, passesPreconditions: false })),
-          );
-        }
+            .withOutput(traceSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, traceIds } = input;
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-        return samples;
-      }),
+              return ctx.app.traces.readTracesWithSpans({
+                projectId,
+                traceIds,
+                protections,
+                withEditOverlay: input.withEditOverlay,
+              });
+            }),
+        )
+        .query("getFormattedSpansDigest", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                traceIds: z.array(z.string()),
+                withEditOverlay: withEditOverlayInput,
+              }),
+            )
+            .withOutput(z.record(z.string(), z.string()))
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, traceIds } = input;
+              const protections = await ports.getViewerProtections(ctx, { projectId });
 
-      getAllForDownload: policy("traces:view")(
-        procedure.input(z.intersection(ports.listInputSchema, downloadExtrasSchema)),
-      ).mutation(async ({ ctx, input }) => {
-        const protections = await ports.getViewerProtections(ctx, {
-          projectId: input.projectId,
-        });
+              // The digest is one more reading of the same spans the other columns
+              // are mapped from, so the correction is read the same way. Read without
+              // it, the one column that quotes the whole trace would spell out the
+              // very spans the reviewer deleted.
+              //
+              // It stays on previews all the same: this runs over a whole page of
+              // traces at once, and resolving every offloaded value on all of them is
+              // what #4991 kept off the grid. Applying a correction needs none of it.
+              const traces = await ctx.app.traces.readTracesWithSpansPreview({
+                projectId,
+                traceIds,
+                protections,
+                withEditOverlay: input.withEditOverlay,
+              });
 
-        // A download consumes trace content, so it must never serve the 64 KB
-        // preview (#4991 AC1) — and that holds whether or not spans are
-        // included, because the returned traces carry trace-level
-        // `input`/`output` either way. Gating resolveBlobs on includeSpans (as
-        // this did) silently truncated any offloaded trace in a spans-less
-        // download, the same data-loss bug fixed in ExportService for
-        // summary-mode exports.
-        return ctx.app.traces.listTraces({
-          query: { ...input, pageSize: input.pageSize ?? 10_000 },
-          protections,
-          options: {
-            downloadMode: true,
-            includeSpans: input.includeSpans,
-            resolveBlobs: true,
-            scrollId: input.scrollId,
-          },
-        });
-      }),
+              // `as const` is what keeps the answer a `Record<string, string>`: the
+              // `await` between the map and `Object.fromEntries` breaks the
+              // contextual typing that would infer the entry as a two-tuple, so
+              // untupled this lands on the `Iterable<readonly any[]>: any` overload
+              // and erases the procedure's output.
+              return Object.fromEntries(
+                await Promise.all(
+                  traces.map(
+                    async (t) =>
+                      [t.trace_id, await ports.formatSpansDigest(t.spans ?? [])] as const,
+                  ),
+                ),
+              );
+            }),
+        )
+        .query("getTracesWithSpansByThreadIds", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                threadIds: z.array(z.string()),
+                withEditOverlay: withEditOverlayInput,
+              }),
+            )
+            .withOutput(traceSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, threadIds } = input;
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-      onTraceUpdate: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string() })),
-      ).subscription(async function* (opts) {
-        const { projectId } = opts.input;
-        const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
+              // Thread reads consume conversation content, so the application
+              // resolves full IO (#4991).
+              return ctx.app.traces.readThreadsTraces({
+                projectId,
+                threadIds,
+                protections,
+                withEditOverlay: input.withEditOverlay,
+              });
+            }),
+        )
 
-        logger.info({ projectId }, "SSE subscription started");
+        // One `.input()` over an intersection rather than two chained calls.
+        // tRPC's second `.input()` merges through a conditional on the input it
+        // already has, and the process supplies these schemas as type
+        // parameters — an unresolved parameter never takes the merging branch,
+        // so the chain resolved to the framework's `TypeError<…>`. The parsed
+        // shape and the published input are the same either way.
+        .query("getSampleTracesDataset", (p) =>
+          p
+            .withInput(z.intersection(ports.filterInputSchema, sampleExtrasSchema))
+            .withOutput(traceSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-        try {
-          for await (const eventArgs of on(emitter, "trace_updated", {
-            signal: opts.signal,
-          })) {
-            logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
-            yield eventArgs[0];
-          }
-          logger.info({ projectId }, "SSE subscription ended normally");
-        } finally {
-          logger.debug({ projectId }, "SSE subscription cleanup");
-          opts.ctx.app.traces.cleanupTenantEmitter(projectId);
-        }
-      }),
-    });
+              // Dataset builder persists trace content, so the application resolves
+              // full IO (#4991) and truncated rows never corrupt the dataset. The
+              // ID-only list read it draws from stays on the preview.
+              return ctx.app.traces.readSampleTraces({ query: input, protections, pageSize: 10 });
+            }),
+        )
+        .query("getFieldNames", (p) =>
+          p
+            .withInput(
+              z.object({
+                projectId: z.string(),
+                startDate: z.number(),
+                endDate: z.number(),
+              }),
+            )
+            .withOutput(distinctFieldNamesResultSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.traces.readFieldNames({
+                projectId: input.projectId,
+                startDate: input.startDate,
+                endDate: input.endDate,
+              });
+            }),
+        )
+        .query("getSampleTraces", (p) =>
+          p
+            .withInput(z.intersection(ports.filterInputSchema, sampleTracesExtrasSchema))
+            .withOutput(sampledTraceSchema.array())
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
+
+              // Sample builder feeds dataset/evaluator content, so the application
+              // resolves full IO (#4991). The ID-only list read it draws from stays
+              // on the preview.
+              const traceWithSpans = await ctx.app.traces.readSampleTraces({
+                query: input,
+                protections,
+                pageSize: 100,
+              });
+
+              const { evaluatorType, preconditions, expectedResults } = input;
+
+              const passedPreconditions = traceWithSpans.filter((trace) => {
+                if (!evaluatorType) return false;
+                const spans = trace.spans ?? [];
+                const requiredFieldsMet = ports.checkEvaluatorRequiredFields({
+                  evaluatorType,
+                  spans,
+                  expectedOutput: trace.expected_output,
+                });
+                if (!requiredFieldsMet) return false;
+                const traceData = ports.buildPreconditionTraceData({ trace, spans });
+                return ports.evaluatePreconditions({ traceData, preconditions });
+              });
+              const passedPreconditionsTraceIds = passedPreconditions?.map(
+                (trace) => trace.trace_id,
+              );
+
+              let samples = shuffled(passedPreconditions)
+                .slice(0, expectedResults)
+                .map((sample) => ({ ...sample, passesPreconditions: true }));
+              if (samples.length < 10) {
+                samples = samples.concat(
+                  shuffled(
+                    traceWithSpans.filter(
+                      (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
+                    ),
+                  )
+                    .slice(0, expectedResults - samples.length)
+                    .map((sample) => ({ ...sample, passesPreconditions: false })),
+                );
+              }
+
+              return samples;
+            }),
+        )
+        .mutation("getAllForDownload", (p) =>
+          p
+            .withInput(z.intersection(ports.listInputSchema, downloadExtrasSchema))
+            .withOutput(tracesForProjectResultSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
+
+              // A download consumes trace content, so it must never serve the 64 KB
+              // preview (#4991 AC1) — and that holds whether or not spans are
+              // included, because the returned traces carry trace-level
+              // `input`/`output` either way. Gating resolveBlobs on includeSpans (as
+              // this did) silently truncated any offloaded trace in a spans-less
+              // download, the same data-loss bug fixed in ExportService for
+              // summary-mode exports.
+              return ctx.app.traces.listTraces({
+                query: { ...input, pageSize: input.pageSize ?? 10_000 },
+                protections,
+                options: {
+                  downloadMode: true,
+                  includeSpans: input.includeSpans,
+                  resolveBlobs: true,
+                  scrollId: input.scrollId,
+                },
+              });
+            }),
+        )
+        .subscription("onTraceUpdate", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string() }))
+            .withoutOutput(
+              "the stream carries the process's own trace_updated broadcast payload verbatim, which this feature does not shape",
+            )
+            .withPermission("traces:view")
+            .handle(async function* (opts) {
+              const { projectId } = opts.input;
+              const emitter = opts.ctx.app.traces.getTenantEmitter(projectId);
+
+              logger.info({ projectId }, "SSE subscription started");
+
+              try {
+                for await (const eventArgs of on(emitter, "trace_updated", {
+                  signal: opts.signal,
+                })) {
+                  logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
+                  yield eventArgs[0];
+                }
+                logger.info({ projectId }, "SSE subscription ended normally");
+              } finally {
+                logger.debug({ projectId }, "SSE subscription cleanup");
+                opts.ctx.app.traces.cleanupTenantEmitter(projectId);
+              }
+            }),
+        )
+        .build()
+    );
   }
 }

@@ -1,6 +1,9 @@
+import { z } from "zod";
+
 import type { AlertType } from "./trigger";
 
-export type TestFireChannel = "email" | "slack" | "webhook";
+export const testFireChannelSchema = z.enum(["email", "slack", "webhook"]);
+export type TestFireChannel = z.infer<typeof testFireChannelSchema>;
 
 export interface TestFireTemplateDraft {
   slackTemplateType?: string | null;
@@ -53,11 +56,12 @@ export interface TestFireInput {
   report?: TestFireReport | null;
 }
 
-export interface TestFireResult {
-  channel: TestFireChannel;
-  recipientCount: number;
-  usedDefault: boolean;
-  missingVariables: string[];
-  errors: string[];
-  httpStatus?: number;
-}
+export const testFireResultSchema = z.object({
+  channel: testFireChannelSchema,
+  recipientCount: z.number(),
+  usedDefault: z.boolean(),
+  missingVariables: z.array(z.string()),
+  errors: z.array(z.string()),
+  httpStatus: z.number().optional(),
+});
+export type TestFireResult = z.infer<typeof testFireResultSchema>;

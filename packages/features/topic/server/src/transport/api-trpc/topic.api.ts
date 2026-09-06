@@ -16,8 +16,14 @@
  *
  * Transport only: gates and delegation to `TopicService`.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import {
+  topicClusteringRunHistoryEntrySchema,
+  topicClusteringStatusSchema,
+  topicSchema,
+  type TopicService,
+} from "@langwatch/topic-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -42,7 +48,9 @@ type TopicTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -64,20 +72,40 @@ export class TopicTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      getAll: policy("traces:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => await ctx.app.topics.getAll({ projectId: input.projectId }),
-      ),
-
-      getClusteringStatus: policy("project:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await ctx.app.topics.getClusteringStatus({ projectId: input.projectId }),
-      ),
-
-      getClusteringRunHistory: policy("project:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await ctx.app.topics.getClusteringRunHistory({ projectId: input.projectId }),
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getAll", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(topicSchema.array())
+          .withPermission("traces:view")
+          .handle(
+            async ({ ctx, input }) => await ctx.app.topics.getAll({ projectId: input.projectId }),
+          ),
+      )
+      .query("getClusteringStatus", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(topicClusteringStatusSchema)
+          .withPermission("project:view")
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.topics.getClusteringStatus({ projectId: input.projectId }),
+          ),
+      )
+      .query("getClusteringRunHistory", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(topicClusteringRunHistoryEntrySchema.array())
+          .withPermission("project:view")
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.topics.getClusteringRunHistory({ projectId: input.projectId }),
+          ),
+      )
+      .build();
   }
 }

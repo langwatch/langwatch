@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
     "croner": "^10.0.1",
     "liquidjs": "^10.27.1",
     "marked": "^18.0.5",

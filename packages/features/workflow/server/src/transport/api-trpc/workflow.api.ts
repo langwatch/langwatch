@@ -20,7 +20,8 @@
  *
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
   clearDsl,
   migrateDSLVersion,
@@ -40,6 +41,17 @@ import {
   workflowApiPushToCopiesInputSchema,
   workflowApiRestoreVersionInputSchema,
   workflowApiWorkflowInputSchema,
+  workflowCascadeArchiveSchema,
+  workflowCopyRowSchema,
+  workflowEngineModeSchema,
+  workflowListRowSchema,
+  workflowPushToCopiesSchema,
+  workflowRelatedEntitiesSchema,
+  workflowSchema,
+  workflowVersionHistoryEntrySchema,
+  workflowVersionSchema,
+  workflowWithNewVersionSchema,
+  workflowWithVersionSchema,
   WorkflowNotFoundError,
   WorkflowVersionNotFoundError,
   type StudioWorkflow,
@@ -55,6 +67,7 @@ import {
 } from "@langwatch/workflow-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import type { WorkflowApp } from "#app/workflow.app";
 
 /**
@@ -87,7 +100,9 @@ type WorkflowTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -329,578 +344,651 @@ export class WorkflowTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      /**
-       * Which NLP engine is active for the project. The studio reads this to
-       * hide the (now defunct) Optimize button: optimization was DSPy-only and
-       * the Go engine never shipped DSPy, so with nlpgo the only engine the
-       * button is always hidden. Kept as a procedure rather than a UI constant
-       * so the studio handlers and the UI agree on one source of truth.
-       */
-      engineMode: policy("workflows:view")(procedure.input(workflowApiEngineModeInputSchema)).query(
-        () => {
-          return {
-            engineMode: "go" as const,
-            optimizeEnabled: false as const,
-          };
-        },
-      ),
-
-      create: policy("workflows:create")(procedure.input(workflowApiCreateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const dsl = await ports.prepareDsl(ctx, {
-            projectId: input.projectId,
-            dsl: input.dsl,
-          });
-          const { workflow, version } = await ctx.app.workflows.create(
-            {
-              projectId: input.projectId,
-              dsl,
-              commitMessage: input.commitMessage,
-              publish: input.publish,
-            },
-            ctx.actor(),
-          );
-
-          void ctx.app.workflows
-            .list({ projectId: input.projectId })
-            .then((workflows) => {
-              ports.workflowCreated(ctx, {
-                userId: ctx.actor().id,
-                workflowCount: workflows.length,
-                workflowId: workflow.id,
-                projectId: input.projectId,
-              });
-            })
-            .catch(ports.captureException);
-
-          return { workflow, version };
-        },
-      ),
-
-      /**
-       * Copying reaches into a SECOND project, which the declared check on
-       * `projectId` does not cover — so the caller must also be able to create
-       * workflows in the source project.
-       */
-      copy: policy("workflows:create")(procedure.input(workflowApiCopyInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const hasSourcePermission = await ports.hasProjectPermission(ctx, {
-            projectId: input.sourceProjectId,
-            permission: "workflows:create",
-          });
-
-          if (!hasSourcePermission) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to create workflows in the source project",
-            });
-          }
-
-          const { workflow, version } = await ctx.app.workflows.copy(
-            {
-              sourceWorkflowId: input.workflowId,
-              targetProjectId: input.projectId,
-              sourceProjectId: input.sourceProjectId,
-              copyDatasets: input.copyDatasets,
-              copiedFromWorkflowId: input.workflowId,
-            },
-            ctx.actor(),
-          );
-          return { workflow, version };
-        },
-      ),
-
-      /**
-       * The project's workflows, with copy lineage redacted to what the caller
-       * may see: a source workflow in a project they cannot view is hidden
-       * entirely, and the copy count only counts copies they can view.
-       */
-      getAll: policy("workflows:view")(procedure.input(workflowApiProjectInputSchema)).query(
-        async ({ ctx, input }) => {
-          const workflows = await ports.listWorkflowsWithCopyLineage(ctx, {
-            projectId: input.projectId,
-          });
-
-          const relatedProjectIds = [
-            ...new Set(
-              workflows.flatMap((workflow) => [
-                ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
-                ...workflow.copiedWorkflows.map((copy) => copy.projectId),
-              ]),
-            ),
-          ];
-          const probed = await ports.hasProjectPermissions(ctx, {
-            projectIds: relatedProjectIds.filter((projectId) => projectId !== input.projectId),
-            permission: "workflows:view",
-          });
-          const isVisible = (projectId: string) =>
-            projectId === input.projectId || probed.get(projectId) === true;
-
-          return workflows.map(({ copiedWorkflows, ...workflow }) => {
-            const canSeeSource = workflow.copiedFrom && isVisible(workflow.copiedFrom.projectId);
-            return {
-              ...workflow,
-              copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
-              copiedFrom: canSeeSource ? workflow.copiedFrom : null,
-              _count: {
-                copiedWorkflows: copiedWorkflows.filter((copy) => isVisible(copy.projectId)).length,
-              },
-            };
-          });
-        },
-      ),
-
-      /**
-       * The copies of a workflow the caller could actually push to. A copy in
-       * a project they cannot update is withheld rather than shown greyed out,
-       * because the only action the list offers is a push.
-       */
-      getCopies: policy("workflows:view")(procedure.input(workflowApiWorkflowInputSchema)).query(
-        async ({ ctx, input }) => {
-          const workflow = await ports.tryFindWorkflow(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-          });
-
-          if (!workflow) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Workflow not found",
-            });
-          }
-
-          const hasPermission = await ports.hasProjectPermission(ctx, {
-            projectId: workflow.projectId,
-            permission: "workflows:view",
-          });
-
-          if (!hasPermission) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to view this workflow",
-            });
-          }
-
-          const copies = await ports.tryFindCopiesWithPath(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-          });
-
-          if (!copies) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Workflow not found",
-            });
-          }
-
-          const copiesWithPermissions = await Promise.all(
-            copies.map(async (copy) => {
-              const hasCopyPermission = await ports.hasProjectPermission(ctx, {
-                projectId: copy.projectId,
-                permission: "workflows:update",
-              });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * Which NLP engine is active for the project. The studio reads this to
+         * hide the (now defunct) Optimize button: optimization was DSPy-only and
+         * the Go engine never shipped DSPy, so with nlpgo the only engine the
+         * button is always hidden. Kept as a procedure rather than a UI constant
+         * so the studio handlers and the UI agree on one source of truth.
+         */
+        .query("engineMode", (p) =>
+          p
+            .withInput(workflowApiEngineModeInputSchema)
+            .withOutput(workflowEngineModeSchema)
+            .withPermission("workflows:view")
+            .handle(() => {
               return {
-                id: copy.id,
-                name: copy.name,
-                projectId: copy.projectId,
-                projectName: copy.project.name,
-                teamName: copy.project.team.name,
-                organizationName: copy.project.team.organization.name,
-                fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
-                hasPermission: hasCopyPermission,
+                engineMode: "go" as const,
+                optimizeEnabled: false as const,
               };
             }),
-          );
-
-          // An empty result is the same answer whether there are no copies or
-          // none the caller may update: the page renders "No copies found"
-          // either way rather than naming a project they cannot see.
-          return copiesWithPermissions.filter((copy) => copy.hasPermission);
-        },
-      ),
-
-      getById: policy("workflows:view")(procedure.input(workflowApiGetByIdInputSchema)).query(
-        async ({ ctx, input }): Promise<WorkflowWithVersion> => {
-          let workflow;
-          try {
-            workflow = await ctx.app.workflows.getById({
-              id: input.workflowId,
-              projectId: input.projectId,
-              includeVersion: true,
-            });
-          } catch (error) {
-            if (error instanceof WorkflowNotFoundError) {
-              throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-            }
-            throw error;
-          }
-
-          if (workflow.currentVersion) {
-            workflow.currentVersion.dsl = migrateDSLVersion(workflow.currentVersion.dsl);
-          }
-
-          return workflow;
-        },
-      ),
-
-      getVersions: policy("workflows:view")(
-        procedure.input(workflowApiGetVersionsInputSchema),
-      ).query(async ({ ctx, input }): Promise<WorkflowVersionHistoryEntry[]> => {
-        try {
-          return await ctx.app.workflows.getVersionHistory({
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-            mode:
-              input.returnDSL === true
-                ? "allDsl"
-                : input.returnDSL === "previousVersion"
-                  ? "previousDsl"
-                  : "metadata",
-          });
-        } catch (error) {
-          if (!(error instanceof WorkflowNotFoundError)) throw error;
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Workflow not found",
-          });
-        }
-      }),
-
-      restoreVersion: policy("workflows:update")(
-        procedure.input(workflowApiRestoreVersionInputSchema),
-      ).mutation(async ({ ctx, input }): Promise<WorkflowApiRestoreVersionOutput> => {
-        try {
-          return await ctx.app.workflows.restoreVersion({
-            versionId: input.versionId,
-            projectId: input.projectId,
-          });
-        } catch (error) {
-          if (
-            !(error instanceof WorkflowVersionNotFoundError) &&
-            !(error instanceof WorkflowNotFoundError)
-          ) {
-            throw error;
-          }
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message:
-              error instanceof WorkflowVersionNotFoundError
-                ? "Workflow version not found"
-                : "Workflow not found",
-          });
-        }
-      }),
-
-      autosave: policy("workflows:update")(
-        procedure.input(workflowApiAutosaveInputSchema),
-      ).mutation(async ({ ctx, input }): Promise<WorkflowApiAutosaveOutput> => {
-        return await ports.saveWorkflowVersion(ctx, {
-          projectId: input.projectId,
-          workflowId: input.workflowId,
-          dsl: input.dsl,
-          autoSaved: true,
-          commitMessage: "Autosaved",
-          setAsLatestVersion: input.setAsLatestVersion,
-        });
-      }),
-
-      commitVersion: policy("workflows:update")(
-        procedure.input(workflowApiCommitVersionInputSchema),
-      ).mutation(async ({ ctx, input }): Promise<WorkflowApiCommitVersionOutput> => {
-        return await ports.saveWorkflowVersion(ctx, {
-          projectId: input.projectId,
-          workflowId: input.workflowId,
-          dsl: input.dsl,
-          autoSaved: false,
-          commitMessage: input.commitMessage,
-        });
-      }),
-
-      publish: policy("workflows:update")(procedure.input(workflowApiPublishInputSchema)).mutation(
-        async ({ ctx, input }): Promise<WorkflowApiPublishOutput> => {
-          return ctx.app.workflows.publish(
-            {
-              id: input.workflowId,
-              projectId: input.projectId,
-              versionId: input.versionId,
-            },
-            ctx.actor(),
-          );
-        },
-      ),
-
-      unpublish: policy("workflows:update")(
-        procedure.input(workflowApiWorkflowInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        return ctx.app.workflows.unpublish({
-          id: input.workflowId,
-          projectId: input.projectId,
-        });
-      }),
-
-      /**
-       * Pulls the source workflow's latest graph into this copy as a new
-       * version. The version number continues THIS copy's history, not the
-       * source's, so a copy that has diverged does not jump backwards.
-       */
-      syncFromSource: policy("workflows:update")(
-        procedure.input(workflowApiWorkflowInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const workflow = await ports.tryFindWorkflowWithSource(ctx, {
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-        });
-
-        if (!workflow) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Workflow not found",
-          });
-        }
-
-        if (!workflow.copiedFromWorkflowId || !workflow.copiedFrom) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This workflow is not a copy and has no source to sync from",
-          });
-        }
-
-        if (workflow.copiedFrom.archivedAt) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Source workflow has been archived",
-          });
-        }
-
-        const sourceWorkflow = workflow.copiedFrom;
-
-        if (!sourceWorkflow.latestVersion?.dsl) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Source workflow or its latest version not found",
-          });
-        }
-
-        const hasSourcePermission = await ports.hasProjectPermission(ctx, {
-          projectId: sourceWorkflow.projectId,
-          permission: "workflows:view",
-        });
-
-        if (!hasSourcePermission) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to view workflows in the source project",
-          });
-        }
-
-        const nextVersion = nextMajorVersion(workflow.latestVersion?.version);
-
-        const dsl = cloneDsl(sourceWorkflow.latestVersion.dsl);
-        dsl.workflow_id = workflow.id;
-
-        const version = await ports.saveWorkflowVersion(ctx, {
-          projectId: input.projectId,
-          workflowId: input.workflowId,
-          dsl: { ...dsl, version: nextVersion },
-          autoSaved: false,
-          commitMessage: "Updated from source workflow",
-        });
-
-        return { workflow, version };
-      }),
-
-      /**
-       * Pushes this workflow's latest graph out to its copies. Copies in
-       * projects the caller cannot update are skipped silently; if that leaves
-       * nothing, the whole push is refused rather than reported as a no-op.
-       */
-      pushToCopies: policy("workflows:update")(
-        procedure.input(workflowApiPushToCopiesInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const workflow = await ports.tryFindWorkflowWithCopies(ctx, {
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-        });
-
-        if (!workflow) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Workflow not found",
-          });
-        }
-
-        if (!workflow.latestVersion?.dsl) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This workflow has no latest version to push",
-          });
-        }
-
-        if (workflow.copiedWorkflows.length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This workflow has no copies to push to",
-          });
-        }
-
-        const copyIds = input.copyIds;
-        const copiesToPush = copyIds
-          ? workflow.copiedWorkflows.filter((copy) => copyIds.includes(copy.id))
-          : workflow.copiedWorkflows;
-
-        if (copiesToPush.length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "No valid copies selected to push to",
-          });
-        }
-
-        const dsl = cloneDsl(workflow.latestVersion.dsl);
-
-        const results = [];
-
-        for (const copy of copiesToPush) {
-          const hasCopyPermission = await ports.hasProjectPermission(ctx, {
-            projectId: copy.projectId,
-            permission: "workflows:update",
-          });
-
-          if (!hasCopyPermission) {
-            continue;
-          }
-
-          // Each copy keeps its own version history, so the next number is
-          // read from the copy rather than from the source being pushed.
-          const copyLatest = await ports.tryFindLatestVersionNumber(ctx, {
-            workflowId: copy.id,
-            projectId: copy.projectId,
-          });
-
-          if (!copyLatest) {
-            continue;
-          }
-
-          const nextVersion = nextMajorVersion(copyLatest.version);
-
-          const copyDsl = cloneDsl(dsl);
-          copyDsl.workflow_id = copy.id;
-
-          const version = await ports.saveWorkflowVersion(ctx, {
-            projectId: copy.projectId,
-            workflowId: copy.id,
-            dsl: { ...copyDsl, version: nextVersion },
-            autoSaved: false,
-            commitMessage: "Updated from source workflow",
-          });
-
-          results.push({ copyId: copy.id, copyName: copy.name, version });
-        }
-
-        if (results.length === 0) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission to update any of the copied workflows",
-          });
-        }
-
-        return {
-          pushedTo: results.length,
-          totalCopies: workflow.copiedWorkflows.length,
-          selectedCopies: copiesToPush.length,
-          results,
-        };
-      }),
-
-      /**
-       * What archiving this workflow would take with it — the evaluators and
-       * agents bound to it, and the monitors those evaluators back. Read by
-       * the confirmation dialog before `cascadeArchive` is called.
-       */
-      getRelatedEntities: policy("workflows:view")(
-        procedure.input(workflowApiWorkflowInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const evaluators = (
-          await ctx.app.workflows.listEvaluators({
-            projectId: input.projectId,
-          })
         )
-          .filter((evaluator) => evaluator.workflowId === input.workflowId)
-          .map(({ id, name }) => ({ id, name }));
-
-        // Copied out of the ports' readonly views: the confirmation dialog
-        // these lists feed types them as plain arrays, and a readonly element
-        // type would narrow a client payload that is identical on the wire.
-        const agents = [
-          ...(await ports.listAgentsForWorkflow(ctx, {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-          })),
-        ];
-
-        const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
-        const monitors =
-          evaluatorIds.length > 0
-            ? [
-                ...(await ports.listMonitorsForEvaluators(ctx, {
+        .mutation("create", (p) =>
+          p
+            .withInput(workflowApiCreateInputSchema)
+            .withOutput(workflowWithNewVersionSchema)
+            .withPermission("workflows:create")
+            .handle(async ({ ctx, input }) => {
+              const dsl = await ports.prepareDsl(ctx, {
+                projectId: input.projectId,
+                dsl: input.dsl,
+              });
+              const { workflow, version } = await ctx.app.workflows.create(
+                {
                   projectId: input.projectId,
-                  evaluatorIds,
+                  dsl,
+                  commitMessage: input.commitMessage,
+                  publish: input.publish,
+                },
+                ctx.actor(),
+              );
+
+              void ctx.app.workflows
+                .list({ projectId: input.projectId })
+                .then((workflows) => {
+                  ports.workflowCreated(ctx, {
+                    userId: ctx.actor().id,
+                    workflowCount: workflows.length,
+                    workflowId: workflow.id,
+                    projectId: input.projectId,
+                  });
+                })
+                .catch(ports.captureException);
+
+              return { workflow, version };
+            }),
+        )
+
+        /**
+         * Copying reaches into a SECOND project, which the declared check on
+         * `projectId` does not cover — so the caller must also be able to create
+         * workflows in the source project.
+         */
+        .mutation("copy", (p) =>
+          p
+            .withInput(workflowApiCopyInputSchema)
+            .withOutput(workflowWithNewVersionSchema)
+            .withPermission("workflows:create")
+            .handle(async ({ ctx, input }) => {
+              const hasSourcePermission = await ports.hasProjectPermission(ctx, {
+                projectId: input.sourceProjectId,
+                permission: "workflows:create",
+              });
+
+              if (!hasSourcePermission) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to create workflows in the source project",
+                });
+              }
+
+              const { workflow, version } = await ctx.app.workflows.copy(
+                {
+                  sourceWorkflowId: input.workflowId,
+                  targetProjectId: input.projectId,
+                  sourceProjectId: input.sourceProjectId,
+                  copyDatasets: input.copyDatasets,
+                  copiedFromWorkflowId: input.workflowId,
+                },
+                ctx.actor(),
+              );
+              return { workflow, version };
+            }),
+        )
+
+        /**
+         * The project's workflows, with copy lineage redacted to what the caller
+         * may see: a source workflow in a project they cannot view is hidden
+         * entirely, and the copy count only counts copies they can view.
+         */
+        .query("getAll", (p) =>
+          p
+            .withInput(workflowApiProjectInputSchema)
+            .withOutput(workflowListRowSchema.array())
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }) => {
+              const workflows = await ports.listWorkflowsWithCopyLineage(ctx, {
+                projectId: input.projectId,
+              });
+
+              const relatedProjectIds = [
+                ...new Set(
+                  workflows.flatMap((workflow) => [
+                    ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
+                    ...workflow.copiedWorkflows.map((copy) => copy.projectId),
+                  ]),
+                ),
+              ];
+              const probed = await ports.hasProjectPermissions(ctx, {
+                projectIds: relatedProjectIds.filter((projectId) => projectId !== input.projectId),
+                permission: "workflows:view",
+              });
+              const isVisible = (projectId: string) =>
+                projectId === input.projectId || probed.get(projectId) === true;
+
+              return workflows.map(({ copiedWorkflows, ...workflow }) => {
+                const canSeeSource =
+                  workflow.copiedFrom && isVisible(workflow.copiedFrom.projectId);
+                return {
+                  ...workflow,
+                  copiedFromWorkflowId: canSeeSource ? workflow.copiedFromWorkflowId : null,
+                  copiedFrom: canSeeSource ? workflow.copiedFrom : null,
+                  _count: {
+                    copiedWorkflows: copiedWorkflows.filter((copy) => isVisible(copy.projectId))
+                      .length,
+                  },
+                };
+              });
+            }),
+        )
+
+        /**
+         * The copies of a workflow the caller could actually push to. A copy in
+         * a project they cannot update is withheld rather than shown greyed out,
+         * because the only action the list offers is a push.
+         */
+        .query("getCopies", (p) =>
+          p
+            .withInput(workflowApiWorkflowInputSchema)
+            .withOutput(workflowCopyRowSchema.array())
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }) => {
+              const workflow = await ports.tryFindWorkflow(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              });
+
+              if (!workflow) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Workflow not found",
+                });
+              }
+
+              const hasPermission = await ports.hasProjectPermission(ctx, {
+                projectId: workflow.projectId,
+                permission: "workflows:view",
+              });
+
+              if (!hasPermission) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to view this workflow",
+                });
+              }
+
+              const copies = await ports.tryFindCopiesWithPath(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              });
+
+              if (!copies) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Workflow not found",
+                });
+              }
+
+              const copiesWithPermissions = await Promise.all(
+                copies.map(async (copy) => {
+                  const hasCopyPermission = await ports.hasProjectPermission(ctx, {
+                    projectId: copy.projectId,
+                    permission: "workflows:update",
+                  });
+                  return {
+                    id: copy.id,
+                    name: copy.name,
+                    projectId: copy.projectId,
+                    projectName: copy.project.name,
+                    teamName: copy.project.team.name,
+                    organizationName: copy.project.team.organization.name,
+                    fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
+                    hasPermission: hasCopyPermission,
+                  };
+                }),
+              );
+
+              // An empty result is the same answer whether there are no copies or
+              // none the caller may update: the page renders "No copies found"
+              // either way rather than naming a project they cannot see.
+              return copiesWithPermissions.filter((copy) => copy.hasPermission);
+            }),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(workflowApiGetByIdInputSchema)
+            .withOutput(workflowWithVersionSchema)
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }): Promise<WorkflowWithVersion> => {
+              let workflow;
+              try {
+                workflow = await ctx.app.workflows.getById({
+                  id: input.workflowId,
+                  projectId: input.projectId,
+                  includeVersion: true,
+                });
+              } catch (error) {
+                if (error instanceof WorkflowNotFoundError) {
+                  throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+                }
+                throw error;
+              }
+
+              if (workflow.currentVersion) {
+                workflow.currentVersion.dsl = migrateDSLVersion(workflow.currentVersion.dsl);
+              }
+
+              return workflow;
+            }),
+        )
+        .query("getVersions", (p) =>
+          p
+            .withInput(workflowApiGetVersionsInputSchema)
+            .withOutput(workflowVersionHistoryEntrySchema.array())
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }): Promise<WorkflowVersionHistoryEntry[]> => {
+              try {
+                return await ctx.app.workflows.getVersionHistory({
+                  workflowId: input.workflowId,
+                  projectId: input.projectId,
+                  mode:
+                    input.returnDSL === true
+                      ? "allDsl"
+                      : input.returnDSL === "previousVersion"
+                        ? "previousDsl"
+                        : "metadata",
+                });
+              } catch (error) {
+                if (!(error instanceof WorkflowNotFoundError)) throw error;
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Workflow not found",
+                });
+              }
+            }),
+        )
+        .mutation("restoreVersion", (p) =>
+          p
+            .withInput(workflowApiRestoreVersionInputSchema)
+            .withOutput(workflowVersionSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }): Promise<WorkflowApiRestoreVersionOutput> => {
+              try {
+                return await ctx.app.workflows.restoreVersion({
+                  versionId: input.versionId,
+                  projectId: input.projectId,
+                });
+              } catch (error) {
+                if (
+                  !(error instanceof WorkflowVersionNotFoundError) &&
+                  !(error instanceof WorkflowNotFoundError)
+                ) {
+                  throw error;
+                }
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message:
+                    error instanceof WorkflowVersionNotFoundError
+                      ? "Workflow version not found"
+                      : "Workflow not found",
+                });
+              }
+            }),
+        )
+        .mutation("autosave", (p) =>
+          p
+            .withInput(workflowApiAutosaveInputSchema)
+            .withOutput(workflowVersionSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }): Promise<WorkflowApiAutosaveOutput> => {
+              return await ports.saveWorkflowVersion(ctx, {
+                projectId: input.projectId,
+                workflowId: input.workflowId,
+                dsl: input.dsl,
+                autoSaved: true,
+                commitMessage: "Autosaved",
+                setAsLatestVersion: input.setAsLatestVersion,
+              });
+            }),
+        )
+        .mutation("commitVersion", (p) =>
+          p
+            .withInput(workflowApiCommitVersionInputSchema)
+            .withOutput(workflowVersionSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }): Promise<WorkflowApiCommitVersionOutput> => {
+              return await ports.saveWorkflowVersion(ctx, {
+                projectId: input.projectId,
+                workflowId: input.workflowId,
+                dsl: input.dsl,
+                autoSaved: false,
+                commitMessage: input.commitMessage,
+              });
+            }),
+        )
+        .mutation("publish", (p) =>
+          p
+            .withInput(workflowApiPublishInputSchema)
+            .withOutput(workflowSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }): Promise<WorkflowApiPublishOutput> => {
+              return ctx.app.workflows.publish(
+                {
+                  id: input.workflowId,
+                  projectId: input.projectId,
+                  versionId: input.versionId,
+                },
+                ctx.actor(),
+              );
+            }),
+        )
+        .mutation("unpublish", (p) =>
+          p
+            .withInput(workflowApiWorkflowInputSchema)
+            .withOutput(workflowSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.workflows.unpublish({
+                id: input.workflowId,
+                projectId: input.projectId,
+              });
+            }),
+        )
+
+        /**
+         * Pulls the source workflow's latest graph into this copy as a new
+         * version. The version number continues THIS copy's history, not the
+         * source's, so a copy that has diverged does not jump backwards.
+         */
+        .mutation("syncFromSource", (p) =>
+          p
+            .withInput(workflowApiWorkflowInputSchema)
+            .withoutOutput(
+              "the answer carries the process's own copy-lineage row beside the new version, generic in this feature: naming one here would narrow what the studio is handed",
+            )
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              const workflow = await ports.tryFindWorkflowWithSource(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              });
+
+              if (!workflow) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Workflow not found",
+                });
+              }
+
+              if (!workflow.copiedFromWorkflowId || !workflow.copiedFrom) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "This workflow is not a copy and has no source to sync from",
+                });
+              }
+
+              if (workflow.copiedFrom.archivedAt) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Source workflow has been archived",
+                });
+              }
+
+              const sourceWorkflow = workflow.copiedFrom;
+
+              if (!sourceWorkflow.latestVersion?.dsl) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Source workflow or its latest version not found",
+                });
+              }
+
+              const hasSourcePermission = await ports.hasProjectPermission(ctx, {
+                projectId: sourceWorkflow.projectId,
+                permission: "workflows:view",
+              });
+
+              if (!hasSourcePermission) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to view workflows in the source project",
+                });
+              }
+
+              const nextVersion = nextMajorVersion(workflow.latestVersion?.version);
+
+              const dsl = cloneDsl(sourceWorkflow.latestVersion.dsl);
+              dsl.workflow_id = workflow.id;
+
+              const version = await ports.saveWorkflowVersion(ctx, {
+                projectId: input.projectId,
+                workflowId: input.workflowId,
+                dsl: { ...dsl, version: nextVersion },
+                autoSaved: false,
+                commitMessage: "Updated from source workflow",
+              });
+
+              return { workflow, version };
+            }),
+        )
+
+        /**
+         * Pushes this workflow's latest graph out to its copies. Copies in
+         * projects the caller cannot update are skipped silently; if that leaves
+         * nothing, the whole push is refused rather than reported as a no-op.
+         */
+        .mutation("pushToCopies", (p) =>
+          p
+            .withInput(workflowApiPushToCopiesInputSchema)
+            .withOutput(workflowPushToCopiesSchema)
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }) => {
+              const workflow = await ports.tryFindWorkflowWithCopies(ctx, {
+                workflowId: input.workflowId,
+                projectId: input.projectId,
+              });
+
+              if (!workflow) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Workflow not found",
+                });
+              }
+
+              if (!workflow.latestVersion?.dsl) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "This workflow has no latest version to push",
+                });
+              }
+
+              if (workflow.copiedWorkflows.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "This workflow has no copies to push to",
+                });
+              }
+
+              const copyIds = input.copyIds;
+              const copiesToPush = copyIds
+                ? workflow.copiedWorkflows.filter((copy) => copyIds.includes(copy.id))
+                : workflow.copiedWorkflows;
+
+              if (copiesToPush.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "No valid copies selected to push to",
+                });
+              }
+
+              const dsl = cloneDsl(workflow.latestVersion.dsl);
+
+              const results = [];
+
+              for (const copy of copiesToPush) {
+                const hasCopyPermission = await ports.hasProjectPermission(ctx, {
+                  projectId: copy.projectId,
+                  permission: "workflows:update",
+                });
+
+                if (!hasCopyPermission) {
+                  continue;
+                }
+
+                // Each copy keeps its own version history, so the next number is
+                // read from the copy rather than from the source being pushed.
+                const copyLatest = await ports.tryFindLatestVersionNumber(ctx, {
+                  workflowId: copy.id,
+                  projectId: copy.projectId,
+                });
+
+                if (!copyLatest) {
+                  continue;
+                }
+
+                const nextVersion = nextMajorVersion(copyLatest.version);
+
+                const copyDsl = cloneDsl(dsl);
+                copyDsl.workflow_id = copy.id;
+
+                const version = await ports.saveWorkflowVersion(ctx, {
+                  projectId: copy.projectId,
+                  workflowId: copy.id,
+                  dsl: { ...copyDsl, version: nextVersion },
+                  autoSaved: false,
+                  commitMessage: "Updated from source workflow",
+                });
+
+                results.push({ copyId: copy.id, copyName: copy.name, version });
+              }
+
+              if (results.length === 0) {
+                throw new TRPCError({
+                  code: "UNAUTHORIZED",
+                  message: "You do not have permission to update any of the copied workflows",
+                });
+              }
+
+              return {
+                pushedTo: results.length,
+                totalCopies: workflow.copiedWorkflows.length,
+                selectedCopies: copiesToPush.length,
+                results,
+              };
+            }),
+        )
+
+        /**
+         * What archiving this workflow would take with it — the evaluators and
+         * agents bound to it, and the monitors those evaluators back. Read by
+         * the confirmation dialog before `cascadeArchive` is called.
+         */
+        .query("getRelatedEntities", (p) =>
+          p
+            .withInput(workflowApiWorkflowInputSchema)
+            .withOutput(workflowRelatedEntitiesSchema)
+            .withPermission("workflows:view")
+            .handle(async ({ ctx, input }) => {
+              const evaluators = (
+                await ctx.app.workflows.listEvaluators({
+                  projectId: input.projectId,
+                })
+              )
+                .filter((evaluator) => evaluator.workflowId === input.workflowId)
+                .map(({ id, name }) => ({ id, name }));
+
+              // Copied out of the ports' readonly views: the confirmation dialog
+              // these lists feed types them as plain arrays, and a readonly element
+              // type would narrow a client payload that is identical on the wire.
+              const agents = [
+                ...(await ports.listAgentsForWorkflow(ctx, {
+                  workflowId: input.workflowId,
+                  projectId: input.projectId,
                 })),
-              ]
-            : [];
+              ];
 
-        return { evaluators, agents, monitors };
-      }),
+              const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
+              const monitors =
+                evaluatorIds.length > 0
+                  ? [
+                      ...(await ports.listMonitorsForEvaluators(ctx, {
+                        projectId: input.projectId,
+                        evaluatorIds,
+                      })),
+                    ]
+                  : [];
 
-      /**
-       * Archives the workflow and everything downstream of it in one
-       * transaction: linked evaluators and agents are archived, and the
-       * monitors those evaluators back are deleted outright — a monitor with
-       * no evaluator has nothing to run.
-       */
-      cascadeArchive: policy("workflows:delete")(
-        procedure.input(workflowApiArchiveInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        return await ports.cascadeArchiveWorkflow(ctx, {
-          projectId: input.projectId,
-          workflowId: input.workflowId,
-          unarchive: input.unarchive,
-        });
-      }),
+              return { evaluators, agents, monitors };
+            }),
+        )
 
-      archive: policy("workflows:delete")(procedure.input(workflowApiArchiveInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          return ctx.app.workflows.archive({
-            id: input.workflowId,
-            projectId: input.projectId,
-            unarchive: input.unarchive,
-          });
-        },
-      ),
+        /**
+         * Archives the workflow and everything downstream of it in one
+         * transaction: linked evaluators and agents are archived, and the
+         * monitors those evaluators back are deleted outright — a monitor with
+         * no evaluator has nothing to run.
+         */
+        .mutation("cascadeArchive", (p) =>
+          p
+            .withInput(workflowApiArchiveInputSchema)
+            .withOutput(workflowCascadeArchiveSchema)
+            .withPermission("workflows:delete")
+            .handle(async ({ ctx, input }) => {
+              return await ports.cascadeArchiveWorkflow(ctx, {
+                projectId: input.projectId,
+                workflowId: input.workflowId,
+                unarchive: input.unarchive,
+              });
+            }),
+        )
+        .mutation("archive", (p) =>
+          p
+            .withInput(workflowApiArchiveInputSchema)
+            .withOutput(workflowSchema)
+            .withPermission("workflows:delete")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.workflows.archive({
+                id: input.workflowId,
+                projectId: input.projectId,
+                unarchive: input.unarchive,
+              });
+            }),
+        )
 
-      /**
-       * A short commit message for the change between two graphs.
-       *
-       * Both graphs are normalised the same way first — local configuration
-       * stripped, keys sorted — so a reordering or a transient runtime state
-       * reads as no change at all and never reaches a model.
-       */
-      generateCommitMessage: policy("workflows:update")(
-        procedure.input(workflowApiGenerateCommitMessageInputSchema),
-      ).mutation(async ({ ctx, input }): Promise<WorkflowApiGenerateCommitMessageOutput> => {
-        const previousDsl = comparableDsl(input.prevDsl);
-        const nextDsl = comparableDsl(input.newDsl);
+        /**
+         * A short commit message for the change between two graphs.
+         *
+         * Both graphs are normalised the same way first — local configuration
+         * stripped, keys sorted — so a reordering or a transient runtime state
+         * reads as no change at all and never reaches a model.
+         */
+        .mutation("generateCommitMessage", (p) =>
+          p
+            .withInput(workflowApiGenerateCommitMessageInputSchema)
+            .withOutput(z.string())
+            .withPermission("workflows:update")
+            .handle(async ({ ctx, input }): Promise<WorkflowApiGenerateCommitMessageOutput> => {
+              const previousDsl = comparableDsl(input.prevDsl);
+              const nextDsl = comparableDsl(input.newDsl);
 
-        if (previousDsl === nextDsl) {
-          return "no changes";
-        }
+              if (previousDsl === nextDsl) {
+                return "no changes";
+              }
 
-        return await ports.generateCommitMessage(ctx, {
-          projectId: input.projectId,
-          previousDsl,
-          nextDsl,
-        });
-      }),
-    });
+              return await ports.generateCommitMessage(ctx, {
+                projectId: input.projectId,
+                previousDsl,
+                nextDsl,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

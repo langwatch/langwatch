@@ -18,7 +18,9 @@
  *
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import { annotationScoreSchema } from "@langwatch/annotation-contract";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -52,7 +54,9 @@ type AnnotationScoreTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -99,65 +103,94 @@ export class AnnotationScoreTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      upsert: policy("annotations:manage")(procedure.input(upsertInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const options = (input.radioCheckboxOptions ?? []).map((option) => ({
-            label: option,
-            value: option,
-          }));
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .mutation("upsert", (p) =>
+        p
+          .withInput(upsertInputSchema)
+          .withOutput(annotationScoreSchema)
+          .withPermission("annotations:manage")
+          .handle(async ({ ctx, input }) => {
+            const options = (input.radioCheckboxOptions ?? []).map((option) => ({
+              label: option,
+              value: option,
+            }));
 
-          return ctx.app.annotations.upsertScore({
-            id: input.annotationScoreId || nanoid(),
-            projectId: input.projectId,
-            name: input.name,
-            dataType: input.dataType,
-            description: input.description ?? "",
-            options,
-            defaultValue: {
-              value: input.defaultRadioOption ?? null,
-              options: input.defaultCheckboxOption ?? null,
-            },
-          });
-        },
-      ),
-
-      getAll: policy("annotations:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => ctx.app.annotations.listScores({ projectId: input.projectId }),
-      ),
-
-      getAllActive: policy("annotations:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.listScores({
-            projectId: input.projectId,
-            activeOnly: true,
+            return ctx.app.annotations.upsertScore({
+              id: input.annotationScoreId || nanoid(),
+              projectId: input.projectId,
+              name: input.name,
+              dataType: input.dataType,
+              description: input.description ?? "",
+              options,
+              defaultValue: {
+                value: input.defaultRadioOption ?? null,
+                options: input.defaultCheckboxOption ?? null,
+              },
+            });
           }),
-      ),
-
-      getById: policy("annotations:view")(procedure.input(scoreScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.getScore({
-            id: input.scoreId,
-            projectId: input.projectId,
-          }),
-      ),
-
-      toggle: policy("annotations:update")(procedure.input(toggleInputSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.toggleScore({
-            id: input.scoreId,
-            projectId: input.projectId,
-            active: input.active,
-          }),
-      ),
-
-      delete: policy("annotations:delete")(procedure.input(scoreScopeSchema)).mutation(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.deleteScore({
-            id: input.scoreId,
-            projectId: input.projectId,
-          }),
-      ),
-    });
+      )
+      .query("getAll", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(annotationScoreSchema.array())
+          .withPermission("annotations:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.annotations.listScores({ projectId: input.projectId }),
+          ),
+      )
+      .query("getAllActive", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(annotationScoreSchema.array())
+          .withPermission("annotations:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.annotations.listScores({
+              projectId: input.projectId,
+              activeOnly: true,
+            }),
+          ),
+      )
+      .query("getById", (p) =>
+        p
+          .withInput(scoreScopeSchema)
+          .withOutput(annotationScoreSchema)
+          .withPermission("annotations:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.annotations.getScore({
+              id: input.scoreId,
+              projectId: input.projectId,
+            }),
+          ),
+      )
+      .mutation("toggle", (p) =>
+        p
+          .withInput(toggleInputSchema)
+          .withOutput(annotationScoreSchema)
+          .withPermission("annotations:update")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.annotations.toggleScore({
+              id: input.scoreId,
+              projectId: input.projectId,
+              active: input.active,
+            }),
+          ),
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(scoreScopeSchema)
+          .withOutput(annotationScoreSchema)
+          .withPermission("annotations:delete")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.annotations.deleteScore({
+              id: input.scoreId,
+              projectId: input.projectId,
+            }),
+          ),
+      )
+      .build();
   }
 }

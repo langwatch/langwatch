@@ -1,3 +1,4 @@
+export * from "./automation.responses";
 export * from "./automation";
 export * from "./automation.trpc-schemas";
 export * from "./automation.events";

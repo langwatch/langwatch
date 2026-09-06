@@ -101,3 +101,9 @@ export type MonitorApiPerformanceInput = z.infer<typeof monitorApiPerformanceInp
 export type MonitorApiToggleInput = z.infer<typeof monitorApiToggleInputSchema>;
 export type MonitorApiCopyInput = z.infer<typeof monitorApiCopyInputSchema>;
 export type MonitorApiNameAvailabilityInput = z.infer<typeof monitorApiNameAvailabilityInputSchema>;
+
+/** What `toggle` and `delete` answer with: the write landed. */
+export const monitorWriteAcknowledgedSchema = z.object({ success: z.literal(true) }).strict();
+
+/** Whether a proposed monitor name is free in the project. */
+export const monitorNameAvailabilitySchema = z.object({ available: z.boolean() }).strict();

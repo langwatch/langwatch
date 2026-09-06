@@ -1,19 +1,8 @@
-import type { AgentWithFields } from "@langwatch/agent-contract";
-
-/** What a test turn answered: the adapter's output, how long it took, and the
- * connected instance that served it, when there was one. */
-export type AgentTestTurnResult = {
-  output: unknown;
-  durationMs: number;
-  instance: { hostname: string; label: string | null } | null;
-};
-
-/** The ids a scheduled test run answers with. */
-export type AgentTestRunResult = {
-  scenarioRunId: string;
-  batchRunId: string;
-  setId: string;
-};
+import type {
+  AgentTestRunResult,
+  AgentTestTurnResult,
+  AgentWithFields,
+} from "@langwatch/agent-contract";
 
 /** Who started a test, for the ownership check a connected agent is held to. */
 export type AgentTestActor = { id: string; label: "user" };

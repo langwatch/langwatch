@@ -7,7 +7,9 @@
  *
  * Transport only: gates, input parsing and delegation.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { storedObjectHeadSchema } from "@langwatch/stored-object-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { StoredObjectApp } from "#app/stored-object.app";
@@ -40,9 +42,9 @@ type StoredObjectTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policyAny(
-    ...permissions: readonly [AuthzPermission, ...AuthzPermission[]]
-  ): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policyAny(...permissions: readonly [AuthzPermission, ...AuthzPermission[]]): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const headByIdInputSchema = z.object({
@@ -62,28 +64,46 @@ export class StoredObjectTrpcApi {
   ) {
     const { protected: procedure, policyAny } = procedures;
 
-    return trpc.router({
-      /**
-       * Probes whether a stored object's row AND bytes exist.
-       *
-       * The renderer maps `missing` to the placeholder badge (feature
-       * requirement) and `not_found` to a generic error.
-       *
-       * Auth: `traces:view` OR `scenarios:view` on `projectId`, mirroring the
-       * `/api/files/:id` route's own gate. The same stored object is trace
-       * media for one viewer and scenario media for another, and the two
-       * permissions are separate categories a custom role can hold one of. A
-       * probe narrower than the read it describes leaves a viewer who can
-       * fetch the bytes unable to find out why the player failed, which
-       * strands the renderer in its loading state.
-       */
-      headById: policyAny(
-        "traces:view",
-        "scenarios:view",
-      )(procedure.input(headByIdInputSchema)).query(async ({ ctx, input }) => {
-        const { projectId, id } = input;
-        return ctx.app.storedObjectApp.headById({ projectId, id });
-      }),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: {
+          protected: procedure,
+          // Every procedure here declares its access through `withCustomPermission`
+          // with this feature's own `policyAny`, so the chain's own single-
+          // permission entry point is never reached.
+          policy: () => (p) => p,
+        },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * Probes whether a stored object's row AND bytes exist.
+         *
+         * The renderer maps `missing` to the placeholder badge (feature
+         * requirement) and `not_found` to a generic error.
+         *
+         * Auth: `traces:view` OR `scenarios:view` on `projectId`, mirroring the
+         * `/api/files/:id` route's own gate. The same stored object is trace
+         * media for one viewer and scenario media for another, and the two
+         * permissions are separate categories a custom role can hold one of. A
+         * probe narrower than the read it describes leaves a viewer who can
+         * fetch the bytes unable to find out why the player failed, which
+         * strands the renderer in its loading state.
+         */
+        .query("headById", (p) =>
+          p
+            .withInput(headByIdInputSchema)
+            .withOutput(storedObjectHeadSchema)
+            .withCustomPermission(
+              policyAny("traces:view", "scenarios:view"),
+              "either permission suffices: one stored object is trace media for one viewer and scenario media for another",
+            )
+            .handle(async ({ ctx, input }) => {
+              const { projectId, id } = input;
+              return ctx.app.storedObjectApp.headById({ projectId, id });
+            }),
+        )
+        .build()
+    );
   }
 }

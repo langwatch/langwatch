@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/redis-client": "workspace:*",

@@ -19,7 +19,9 @@
  * Specs: specs/monitors/replicate-monitor-to-project.feature,
  * specs/monitors/online-evaluation-preconditions.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import { onlineEvaluationPerformanceSchema } from "@langwatch/evaluation-contract";
 import {
   monitorApiCopyInputSchema,
   monitorApiCreateInputSchema,
@@ -29,6 +31,10 @@ import {
   monitorApiProjectInputSchema,
   monitorApiToggleInputSchema,
   monitorApiUpdateInputSchema,
+  monitorNameAvailabilitySchema,
+  monitorSchema,
+  monitorWithEvaluatorSchema,
+  monitorWriteAcknowledgedSchema,
   MonitorNotFoundError,
   type MonitorApiPreconditionsParser,
 } from "@langwatch/monitor-contract";
@@ -70,14 +76,16 @@ type MonitorTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
   /**
    * A SECOND declared permission, stacked after the policy chain — the one
    * AND-composition in the codebase. `getPerformanceForProject` reads both a
    * monitor list and its evaluation results, so it requires
    * `evaluations:view` (the declared check) AND `analytics:view`.
    */
-  alsoRequire(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  alsoRequire(permission: AuthzPermission): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -167,160 +175,195 @@ export class MonitorTrpcApi {
     const createInputSchema = monitorApiCreateInputSchema(ports.preconditionsSchema);
     const updateInputSchema = monitorApiUpdateInputSchema(ports.preconditionsSchema);
 
-    return trpc.router({
-      getAllForProject: policy("evaluations:view")(
-        procedure.input(monitorApiProjectInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const { projectId } = input;
-        return ctx.app.monitors.list({ projectId });
-      }),
-
-      getPerformanceForProject: alsoRequire("analytics:view")(
-        policy("evaluations:view")(procedure.input(monitorApiPerformanceInputSchema)),
-      ).query(async ({ input, ctx }) =>
-        ctx.app.monitors.performanceForProject(
-          { projectId: input.projectId, timeZone: input.timeZone },
-          ports.resolvePreviousPeriodStartMs,
-        ),
-      ),
-
-      toggle: policy("evaluations:update")(procedure.input(monitorApiToggleInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return ctx.app.monitors.toggle(input);
-        },
-      ),
-
-      create: policy("evaluations:create")(procedure.input(createInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const {
-            projectId,
-            name,
-            checkType,
-            preconditions,
-            settings: parameters,
-            mappings,
-            sample,
-            executionMode,
-            evaluatorId,
-            level,
-            threadIdleTimeout,
-          } = input;
-          assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
-          return ctx.app.monitors.create({
-            projectId,
-            name,
-            checkType,
-            preconditions,
-            parameters,
-            mappings,
-            sample,
-            executionMode,
-            evaluatorId,
-            level,
-            threadIdleTimeout,
-          });
-        },
-      ),
-
-      copy: policy("evaluations:manage")(procedure.input(monitorApiCopyInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const { monitorId, projectId, sourceProjectId } = input;
-          const hasSourcePermission = await ctx.can("evaluations:manage", {
-            projectId: sourceProjectId,
-          });
-          if (!hasSourcePermission) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to manage evaluations in the source project",
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getAllForProject", (p) =>
+        p
+          .withInput(monitorApiProjectInputSchema)
+          .withOutput(monitorWithEvaluatorSchema.array())
+          .withPermission("evaluations:view")
+          .handle(async ({ input, ctx }) => {
+            const { projectId } = input;
+            return ctx.app.monitors.list({ projectId });
+          }),
+      )
+      .query("getPerformanceForProject", (p) =>
+        p
+          .withInput(monitorApiPerformanceInputSchema)
+          .withOutput(onlineEvaluationPerformanceSchema.array())
+          .withCustomPermission(
+            (proc) => alsoRequire("analytics:view")(policy("evaluations:view")(proc)),
+            "evaluations:view for the monitors, and analytics:view on top because the trend is the analytics page's own comparison window",
+          )
+          .handle(async ({ input, ctx }) =>
+            ctx.app.monitors.performanceForProject(
+              { projectId: input.projectId, timeZone: input.timeZone },
+              ports.resolvePreviousPeriodStartMs,
+            ),
+          ),
+      )
+      .mutation("toggle", (p) =>
+        p
+          .withInput(monitorApiToggleInputSchema)
+          .withOutput(monitorWriteAcknowledgedSchema)
+          .withPermission("evaluations:update")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.monitors.toggle(input);
+          }),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(createInputSchema)
+          .withOutput(monitorSchema)
+          .withPermission("evaluations:create")
+          .handle(async ({ input, ctx }) => {
+            const {
+              projectId,
+              name,
+              checkType,
+              preconditions,
+              settings: parameters,
+              mappings,
+              sample,
+              executionMode,
+              evaluatorId,
+              level,
+              threadIdleTimeout,
+            } = input;
+            assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
+            return ctx.app.monitors.create({
+              projectId,
+              name,
+              checkType,
+              preconditions,
+              parameters,
+              mappings,
+              sample,
+              executionMode,
+              evaluatorId,
+              level,
+              threadIdleTimeout,
             });
-          }
-
-          // What a replication DOES — copying the evaluator across, starting
-          // the replica disabled, and rolling both back when the insert fails
-          // — is the application's. This door supplies the two process
-          // capabilities bound to its own request, and turns a missing source
-          // monitor into the status this transport answers with.
-          try {
-            return await ctx.app.monitors.copy(
-              { monitorId, sourceProjectId, targetProjectId: projectId },
-              {
-                copyEvaluatorToProject: (replicationInput) =>
-                  ports.copyEvaluatorToProject(ctx, replicationInput),
-                deleteReplicatedWorkflow: (replicationInput) =>
-                  ports.deleteReplicatedWorkflow(ctx, replicationInput),
-              },
-            );
-          } catch (error) {
-            if (!(error instanceof MonitorNotFoundError)) throw error;
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Monitor not found",
+          }),
+      )
+      .mutation("copy", (p) =>
+        p
+          .withInput(monitorApiCopyInputSchema)
+          .withOutput(monitorSchema)
+          .withPermission("evaluations:manage")
+          .handle(async ({ input, ctx }) => {
+            const { monitorId, projectId, sourceProjectId } = input;
+            const hasSourcePermission = await ctx.can("evaluations:manage", {
+              projectId: sourceProjectId,
             });
-          }
-        },
-      ),
+            if (!hasSourcePermission) {
+              throw new TRPCError({
+                code: "UNAUTHORIZED",
+                message: "You do not have permission to manage evaluations in the source project",
+              });
+            }
 
-      update: policy("evaluations:update")(procedure.input(updateInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const {
-            id,
-            projectId,
-            name,
-            checkType,
-            preconditions,
-            settings: parameters,
-            sample,
-            enabled,
-            executionMode,
-            mappings,
-            evaluatorId,
-            level,
-            threadIdleTimeout,
-          } = input;
-          assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
-          return ctx.app.monitors.update({
-            id,
-            projectId,
-            name,
-            checkType,
-            preconditions,
-            parameters,
-            mappings,
-            sample,
-            enabled,
-            executionMode,
-            evaluatorId,
-            level,
-            threadIdleTimeout,
-          });
-        },
-      ),
-
-      getById: policy("evaluations:view")(procedure.input(monitorApiMonitorInputSchema)).query(
-        async ({ input, ctx }) => {
-          try {
-            return await ctx.app.monitors.getById(input);
-          } catch (error) {
-            if (!(error instanceof MonitorNotFoundError)) throw error;
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "TraceCheck config not found",
+            // What a replication DOES — copying the evaluator across, starting
+            // the replica disabled, and rolling both back when the insert fails
+            // — is the application's. This door supplies the two process
+            // capabilities bound to its own request, and turns a missing source
+            // monitor into the status this transport answers with.
+            try {
+              return await ctx.app.monitors.copy(
+                { monitorId, sourceProjectId, targetProjectId: projectId },
+                {
+                  copyEvaluatorToProject: (replicationInput) =>
+                    ports.copyEvaluatorToProject(ctx, replicationInput),
+                  deleteReplicatedWorkflow: (replicationInput) =>
+                    ports.deleteReplicatedWorkflow(ctx, replicationInput),
+                },
+              );
+            } catch (error) {
+              if (!(error instanceof MonitorNotFoundError)) throw error;
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Monitor not found",
+              });
+            }
+          }),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(updateInputSchema)
+          .withOutput(monitorSchema)
+          .withPermission("evaluations:update")
+          .handle(async ({ input, ctx }) => {
+            const {
+              id,
+              projectId,
+              name,
+              checkType,
+              preconditions,
+              settings: parameters,
+              sample,
+              enabled,
+              executionMode,
+              mappings,
+              evaluatorId,
+              level,
+              threadIdleTimeout,
+            } = input;
+            assertRunnableCheck(ctx.app.monitors, { checkType, parameters });
+            return ctx.app.monitors.update({
+              id,
+              projectId,
+              name,
+              checkType,
+              preconditions,
+              parameters,
+              mappings,
+              sample,
+              enabled,
+              executionMode,
+              evaluatorId,
+              level,
+              threadIdleTimeout,
             });
-          }
-        },
-      ),
-
-      delete: policy("evaluations:delete")(procedure.input(monitorApiMonitorInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          return ctx.app.monitors.delete(input);
-        },
-      ),
-
-      isNameAvailable: policy("evaluations:view")(
-        procedure.input(monitorApiNameAvailabilityInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        return ctx.app.monitors.isNameAvailable(input);
-      }),
-    });
+          }),
+      )
+      .query("getById", (p) =>
+        p
+          .withInput(monitorApiMonitorInputSchema)
+          .withOutput(monitorWithEvaluatorSchema)
+          .withPermission("evaluations:view")
+          .handle(async ({ input, ctx }) => {
+            try {
+              return await ctx.app.monitors.getById(input);
+            } catch (error) {
+              if (!(error instanceof MonitorNotFoundError)) throw error;
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "TraceCheck config not found",
+              });
+            }
+          }),
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(monitorApiMonitorInputSchema)
+          .withOutput(monitorWriteAcknowledgedSchema)
+          .withPermission("evaluations:delete")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.monitors.delete(input);
+          }),
+      )
+      .mutation("isNameAvailable", (p) =>
+        p
+          .withInput(monitorApiNameAvailabilityInputSchema)
+          .withOutput(monitorNameAvailabilitySchema)
+          .withPermission("evaluations:view")
+          .handle(async ({ input, ctx }) => {
+            return ctx.app.monitors.isNameAvailable(input);
+          }),
+      )
+      .build();
   }
 }

@@ -15,10 +15,15 @@
  *
  * Spec: specs/evaluators/azure-safety-byok-gating.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
+  evaluationRunOutcomeSchema,
+  evaluationWarmupSchema,
+  evaluatorCatalogueSchema,
   isAzureEvaluatorType,
+  type EvaluatorUnavailability,
   type ReportEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import {
@@ -48,14 +53,6 @@ export type EvaluationRunOutcome = SingleEvaluationResult & {
   evaluation_thread_id?: string;
   inputs?: Record<string, unknown>;
 };
-
-/** Why an evaluator cannot run on this install, in the reader's terms. */
-export type EvaluatorUnavailability = Readonly<{
-  /** What is true, in the person's terms. */
-  reason: string;
-  /** What they do about it. */
-  howToEnable: string;
-}>;
 
 type EvaluationApplication = Readonly<{
   /**
@@ -89,7 +86,9 @@ type EvaluationTrpcProcedures<
    * validated input: tRPC runs middlewares in the order they were added, so a
    * check installed before `.input()` would see no input at all.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -194,126 +193,149 @@ export class EvaluationTrpcApi {
       mappings: ports.mappingsSchema,
     });
 
-    return trpc.router({
-      availableEvaluators: policy("evaluations:view")(procedure.input(projectScopeSchema)).query(
-        async ({ input, ctx }) => {
-          // Azure Safety evaluators resolve their credentials solely from the
-          // project's azure_safety Model Provider. There is no process.env
-          // fallback, so an unconfigured provider reports them as missing.
-          // Computed once and reused for all three Azure evaluator types.
-          const azureSafetyEnv = await ports.tryResolveAzureSafetyEnv(ctx, {
-            projectId: input.projectId,
-          });
-          const azureMissingEnvVars = azureSafetyEnv ? [] : [...AZURE_SAFETY_ENV_VARS];
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        .query("availableEvaluators", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(evaluatorCatalogueSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ input, ctx }) => {
+              // Azure Safety evaluators resolve their credentials solely from the
+              // project's azure_safety Model Provider. There is no process.env
+              // fallback, so an unconfigured provider reports them as missing.
+              // Computed once and reused for all three Azure evaluator types.
+              const azureSafetyEnv = await ports.tryResolveAzureSafetyEnv(ctx, {
+                projectId: input.projectId,
+              });
+              const azureMissingEnvVars = azureSafetyEnv ? [] : [...AZURE_SAFETY_ENV_VARS];
 
-          return Object.fromEntries(
-            Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
-              key,
-              {
-                ...evaluator,
-                missingEnvVars: isAzureEvaluatorType(key)
-                  ? azureMissingEnvVars
-                  : ports.missingEnvironmentVariables(evaluator.envVars),
-                // Set when this install does not have the evaluator's code at
-                // all, which is a different thing from it being unconfigured.
-                unavailable: ports.tryEvaluatorUnavailability({ evaluatorType: key }),
-              },
-            ]),
-          );
-        },
-      ),
-
-      availableCustomEvaluators: policy("evaluations:view")(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ input }) => {
-        const customEvaluators = await ports.listCustomEvaluators({
-          projectId: input.projectId,
-        });
-        return customEvaluators;
-      }),
-
-      runEvaluation: policy("evaluations:manage")(
-        procedure.input(runEvaluationInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const result = await ports.runEvaluationForTrace(ctx, {
-          projectId: input.projectId,
-          traceId: input.traceId,
-          evaluatorType: input.evaluatorType as EvaluatorTypes,
-          settings: input.settings,
-          mappings: input.mappings ?? null,
-        });
-
-        // Dispatch to evaluation processing pipeline when flag is ON
-        if (result) {
-          ports.trackEvaluationRan({
-            userId: ctx.actor().id,
-            projectId: input.projectId,
-          });
-        }
-
-        // Dispatch to evaluation processing pipeline
-        if (result) {
-          const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
-          try {
-            await ctx.app.evaluations.reportEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
-              evaluatorId: input.evaluatorType,
-              evaluatorType: input.evaluatorType,
-              traceId: input.traceId,
-              status: result.status,
-              score:
-                result.status === "processed" && typeof result.score === "number"
-                  ? result.score
-                  : undefined,
-              passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
-              label: result.status === "processed" ? (result.label ?? undefined) : undefined,
-              details:
-                result.status === "error"
-                  ? result.details
-                  : result.status === "processed"
-                    ? (result.details ?? undefined)
-                    : undefined,
-              error: result.status === "error" ? result.details : undefined,
-              occurredAt: Date.now(),
-            });
-          } catch (error) {
-            logger.warn(
-              { error, evaluationId, evaluatorType: input.evaluatorType },
-              "Failed to dispatch single re-eval to evaluation processing pipeline",
-            );
-          }
-        }
-
-        return result;
-      }),
-
-      /**
-       * Warm up Lambda instances for evaluations.
-       * Sends multiple parallel health check requests to the backend to keep
-       * Lambda instances warm, improving response times when running evaluations.
-       *
-       * @param count - Number of parallel warmup requests to send (half of concurrency, min 1)
-       */
-      warmupLambda: policy("evaluations:view")(procedure.input(warmupInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const { projectId, count } = input;
-
-          logger.debug({ projectId, count }, "Warming up Lambda instances");
-
-          // Send parallel warmup requests
-          const warmupPromises = Array.from({ length: count }, () =>
-            ports.sendKeepAliveProbe(ctx, { projectId }).catch((error: unknown) => {
-              // Silently ignore errors - this is just warmup
-              logger.debug({ error, projectId }, "Lambda warmup request failed");
+              return Object.fromEntries(
+                Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
+                  key,
+                  {
+                    ...evaluator,
+                    missingEnvVars: isAzureEvaluatorType(key)
+                      ? azureMissingEnvVars
+                      : ports.missingEnvironmentVariables(evaluator.envVars),
+                    // Set when this install does not have the evaluator's code at
+                    // all, which is a different thing from it being unconfigured.
+                    unavailable: ports.tryEvaluatorUnavailability({ evaluatorType: key }),
+                  },
+                ]),
+              );
             }),
-          );
+        )
+        .query("availableCustomEvaluators", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withoutOutput(
+              "a custom evaluator's shape is the process's, generic in this feature: naming one here would narrow what the browser is handed",
+            )
+            .withPermission("evaluations:view")
+            .handle(async ({ input }) => {
+              const customEvaluators = await ports.listCustomEvaluators({
+                projectId: input.projectId,
+              });
+              return customEvaluators;
+            }),
+        )
+        .mutation("runEvaluation", (p) =>
+          p
+            .withInput(runEvaluationInputSchema)
+            .withOutput(evaluationRunOutcomeSchema)
+            .withPermission("evaluations:manage")
+            .handle(async ({ input, ctx }) => {
+              const result = await ports.runEvaluationForTrace(ctx, {
+                projectId: input.projectId,
+                traceId: input.traceId,
+                evaluatorType: input.evaluatorType as EvaluatorTypes,
+                settings: input.settings,
+                mappings: input.mappings ?? null,
+              });
 
-          await Promise.allSettled(warmupPromises);
+              // Dispatch to evaluation processing pipeline when flag is ON
+              if (result) {
+                ports.trackEvaluationRan({
+                  userId: ctx.actor().id,
+                  projectId: input.projectId,
+                });
+              }
 
-          return { success: true, count };
-        },
-      ),
-    });
+              // Dispatch to evaluation processing pipeline
+              if (result) {
+                const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
+                try {
+                  await ctx.app.evaluations.reportEvaluation({
+                    tenantId: input.projectId,
+                    evaluationId,
+                    evaluatorId: input.evaluatorType,
+                    evaluatorType: input.evaluatorType,
+                    traceId: input.traceId,
+                    status: result.status,
+                    score:
+                      result.status === "processed" && typeof result.score === "number"
+                        ? result.score
+                        : undefined,
+                    passed:
+                      result.status === "processed" ? (result.passed ?? undefined) : undefined,
+                    label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+                    details:
+                      result.status === "error"
+                        ? result.details
+                        : result.status === "processed"
+                          ? (result.details ?? undefined)
+                          : undefined,
+                    error: result.status === "error" ? result.details : undefined,
+                    occurredAt: Date.now(),
+                  });
+                } catch (error) {
+                  logger.warn(
+                    { error, evaluationId, evaluatorType: input.evaluatorType },
+                    "Failed to dispatch single re-eval to evaluation processing pipeline",
+                  );
+                }
+              }
+
+              return result;
+            }),
+        )
+
+        /**
+         * Warm up Lambda instances for evaluations.
+         * Sends multiple parallel health check requests to the backend to keep
+         * Lambda instances warm, improving response times when running evaluations.
+         *
+         * @param count - Number of parallel warmup requests to send (half of concurrency, min 1)
+         */
+        .mutation("warmupLambda", (p) =>
+          p
+            .withInput(warmupInputSchema)
+            .withOutput(evaluationWarmupSchema)
+            .withPermission("evaluations:view")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, count } = input;
+
+              logger.debug({ projectId, count }, "Warming up Lambda instances");
+
+              // Send parallel warmup requests
+              const warmupPromises = Array.from({ length: count }, () =>
+                ports.sendKeepAliveProbe(ctx, { projectId }).catch((error: unknown) => {
+                  // Silently ignore errors - this is just warmup
+                  logger.debug({ error, projectId }, "Lambda warmup request failed");
+                }),
+              );
+
+              await Promise.allSettled(warmupPromises);
+
+              return { success: true, count };
+            }),
+        )
+        .build()
+    );
   }
 }

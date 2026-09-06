@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { studioWorkflowSchema } from "./studio-workflow";
+import { workflowSchema, workflowVersionSchema } from "./workflow";
 import type {
   Workflow,
   WorkflowVersion,
@@ -146,3 +147,87 @@ export type WorkflowApiPublishOutput = Workflow;
  * normalise to the same text and no model was asked.
  */
 export type WorkflowApiGenerateCommitMessageOutput = string;
+
+/** What the studio's flag writes answer with: the write landed. */
+export const workflowWriteAcknowledgedSchema = z.object({ success: z.boolean() }).strict();
+
+/** Where a workflow lives, as the copy lists render the path. */
+export const workflowProjectPathSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  team: z.object({
+    id: z.string(),
+    name: z.string(),
+    organization: z.object({ id: z.string(), name: z.string() }),
+  }),
+});
+
+/**
+ * A listed workflow with its copy lineage redacted to what the caller may see.
+ */
+export const workflowListRowSchema = workflowSchema.extend({
+  copiedFrom: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      projectId: z.string(),
+      project: workflowProjectPathSchema,
+    })
+    .nullable(),
+  _count: z.object({ copiedWorkflows: z.number() }),
+});
+
+/** One copy the caller may push to, with the path it lives under. */
+export const workflowCopyRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  projectId: z.string(),
+  projectName: z.string(),
+  teamName: z.string(),
+  organizationName: z.string(),
+  fullPath: z.string(),
+  hasPermission: z.boolean(),
+});
+
+/** A workflow and the version a write created alongside it. */
+export const workflowWithNewVersionSchema = z.object({
+  workflow: workflowSchema,
+  version: workflowVersionSchema,
+});
+
+/** Which NLP engine is active, and whether Optimize is offered. */
+export const workflowEngineModeSchema = z.object({
+  engineMode: z.literal("go"),
+  optimizeEnabled: z.literal(false),
+});
+
+/** A workflow plus the versions the studio reads alongside it. */
+export const workflowWithVersionSchema = workflowSchema.extend({
+  currentVersion: workflowVersionSchema.nullable().optional(),
+  latestVersion: workflowVersionSchema.nullable().optional(),
+});
+
+/** How far a push to the copies reached, and what each one wrote. */
+export const workflowPushToCopiesSchema = z.object({
+  pushedTo: z.number(),
+  totalCopies: z.number(),
+  selectedCopies: z.number(),
+  results: z.array(
+    z.object({ copyId: z.string(), copyName: z.string(), version: workflowVersionSchema }),
+  ),
+});
+
+/** What archiving a workflow would take with it. */
+export const workflowRelatedEntitiesSchema = z.object({
+  evaluators: z.array(z.object({ id: z.string(), name: z.string() })),
+  agents: z.array(z.object({ id: z.string(), name: z.string() })),
+  monitors: z.array(z.object({ id: z.string(), name: z.string(), evaluatorId: z.string() })),
+});
+
+/** What `cascadeArchive` did, in one transaction. */
+export const workflowCascadeArchiveSchema = z.object({
+  workflow: workflowSchema,
+  archivedEvaluatorsCount: z.number(),
+  archivedAgentsCount: z.number(),
+  deletedMonitorsCount: z.number(),
+});
