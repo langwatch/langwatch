@@ -34,7 +34,9 @@ vi.mock("#services/trace-readable-span.service", () => ({
 // and the 422 path are exercised for real) and stub only `compileProjection`.
 const mockCompileProjection = vi.fn();
 vi.mock("#services/trace-projection-compile.service", () => ({
-  compileProjection: (args: unknown) => mockCompileProjection(args),
+  TraceProjectionCompileService: {
+    compileProjection: (args: unknown) => mockCompileProjection(args),
+  },
 }));
 
 const mockGetAllTracesForProject = vi.fn();

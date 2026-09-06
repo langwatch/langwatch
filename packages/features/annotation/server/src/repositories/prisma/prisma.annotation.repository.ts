@@ -80,6 +80,24 @@ const annotationSelect = {
   updatedAt: true,
 } as const;
 
+/**
+ * The trace projections read only the columns the projection DSL exposes plus
+ * the anchor. Selecting the whole row and handing it to the strict projection
+ * schema is what made `listForProjection` throw on every call.
+ */
+const projectionAnnotationSelect = {
+  id: true,
+  traceId: true,
+  isThumbsUp: true,
+  comment: true,
+  expectedOutput: true,
+  scoreOptions: true,
+  createdAt: true,
+  anchorKind: true,
+  anchorId: true,
+  anchorPath: true,
+} as const;
+
 const annotationScoreSelect = {
   id: true,
   projectId: true,
@@ -97,6 +115,27 @@ const annotationScoreSelect = {
 
 function parseRow(row: AnnotationRow): Annotation {
   return annotationSchema.parse({
+    ...row,
+    scoreOptions: row.scoreOptions ?? {},
+  });
+}
+
+function parseProjectionRow(
+  row: Pick<
+    AnnotationRow,
+    | "id"
+    | "traceId"
+    | "isThumbsUp"
+    | "comment"
+    | "expectedOutput"
+    | "scoreOptions"
+    | "createdAt"
+    | "anchorKind"
+    | "anchorId"
+    | "anchorPath"
+  >,
+): ProjectionAnnotation {
+  return projectionAnnotationSchema.parse({
     ...row,
     scoreOptions: row.scoreOptions ?? {},
   });
@@ -229,13 +268,9 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
         ...anchorScopeWhere(parsed.anchor),
       },
       orderBy: { createdAt: "asc" },
-      select: annotationSelect,
+      select: projectionAnnotationSelect,
     });
-    return rows.map((row) =>
-      projectionAnnotationSchema.parse({
-        ...parseRow(row),
-      }),
-    );
+    return rows.map(parseProjectionRow);
   }
 
   async listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {

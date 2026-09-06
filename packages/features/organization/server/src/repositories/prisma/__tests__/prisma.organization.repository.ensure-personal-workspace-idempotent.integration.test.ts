@@ -53,7 +53,9 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
   afterAll(async () => {
     if (!prisma) return;
     await prisma.project.deleteMany({ where: { team: { organizationId } } });
+    await prisma.teamUser.deleteMany({ where: { team: { organizationId } } });
     await prisma.team.deleteMany({ where: { organizationId } });
+    await prisma.organizationUser.deleteMany({ where: { organizationId } });
     await prisma.organization.deleteMany({ where: { id: organizationId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await prisma.$disconnect();

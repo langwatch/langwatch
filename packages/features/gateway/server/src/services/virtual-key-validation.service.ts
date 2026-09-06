@@ -33,6 +33,9 @@ import {
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
+// Joins a guardrail direction to its id in a set key. A NUL can never appear in either half.
+const GUARDRAIL_KEY_SEPARATOR = "\0";
+
 /**
  * The budget a key carries on itself, created in the same transaction as the
  * key. `null` on update removes the cap by archiving. The zod schema is the
@@ -238,14 +241,14 @@ export class VirtualKeyValidationService {
       const set = new Set<string>();
       for (const a of attachments) {
         for (const id of a.guardrailIds) {
-          set.add(`${a.direction} ${id}`);
+          set.add(`${a.direction}${GUARDRAIL_KEY_SEPARATOR}${id}`);
         }
       }
 
       return set;
     };
     const toPair = (key: string): GuardrailPair => {
-      const [direction, guardrailId] = key.split(" ");
+      const [direction, guardrailId] = key.split(GUARDRAIL_KEY_SEPARATOR);
 
       return {
         direction: direction as GuardrailDirection,

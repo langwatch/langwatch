@@ -34,33 +34,38 @@ describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository.setMemberDisabl
   });
 
   let organizationId: string;
+  const organizationIds: string[] = [];
   const userIds: string[] = [];
 
   afterAll(async () => {
     if (!prisma) return;
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.department.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    });
+    await prisma.department.deleteMany({ where: { organizationId: { in: organizationIds } } });
+    await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
 
   async function seedOrg() {
+    const seedNamespace = `${testNamespace}-${nanoid(8)}`;
     const organization = await prisma!.organization.create({
-      data: { name: "Seat Reconciliation Org", slug: `--test-${testNamespace}` },
+      data: { name: "Seat Reconciliation Org", slug: `--test-${seedNamespace}` },
     });
     organizationId = organization.id;
+    organizationIds.push(organizationId);
 
     const department = await prisma!.department.create({
       data: { id: `dept-${nanoid(8)}`, organizationId, name: "Engineering" },
     });
 
     const [admin, secondAdmin, member] = await Promise.all([
-      prisma!.user.create({ data: { email: `admin-${testNamespace}@test.com`, name: "Admin" } }),
+      prisma!.user.create({ data: { email: `admin-${seedNamespace}@test.com`, name: "Admin" } }),
       prisma!.user.create({
-        data: { email: `admin2-${testNamespace}@test.com`, name: "Second Admin" },
+        data: { email: `admin2-${seedNamespace}@test.com`, name: "Second Admin" },
       }),
-      prisma!.user.create({ data: { email: `member-${testNamespace}@test.com`, name: "Member" } }),
+      prisma!.user.create({ data: { email: `member-${seedNamespace}@test.com`, name: "Member" } }),
     ]);
     userIds.push(admin.id, secondAdmin.id, member.id);
 

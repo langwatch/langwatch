@@ -57,5 +57,6 @@ describe("tracked source files", () => {
     });
 
     expect(offenders).toEqual([]);
-  });
+    // Reading ~19k tracked source files takes well over vitest's 5s default.
+  }, 120_000);
 });
