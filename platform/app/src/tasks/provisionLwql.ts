@@ -45,12 +45,11 @@ import {
   lwqlPostgresSchemaFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
+  postgresReaderStatementsFor,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
-  productionPostgresReaderGrantStatements,
   selfHostedClickHouseProvisioningStatements,
-  selfHostedPostgresReaderStatements,
   withLwqlSelfProvisionLock,
   withTenancyOptOut,
 } from "../server/analytics/lwql/provisioning";
@@ -364,27 +363,16 @@ export default async function execute() {
     //     crashloop a default-on feature (a non-superuser DATABASE_URL) or
     //     silently rotate the operator's own reader password.
     const readerMode = lwqlPostgresReaderModeFromEnv();
-    const readerPassword = process.env.LWQL_POSTGRES_READER_PASSWORD;
-    if (readerMode === "manage-role" && readerPassword) {
-      await runPostgresStatements(
-        selfHostedPostgresReaderStatements({
-          schema: postgresSchema,
-          readerPassword,
-        }),
-      );
-    } else {
-      if (readerMode === "manage-role") {
-        logger.warn(
-          "LWQL_MANAGE_POSTGRES_READER is true but LWQL_POSTGRES_READER_PASSWORD is not set — cannot converge the reader role this boot; re-granting the approved views only",
-        );
-      }
-      await runPostgresStatements(
-        productionPostgresReaderGrantStatements({
-          schema: postgresSchema,
-          role: process.env.LWQL_POSTGRES_READER_ROLE,
-        }),
-      );
+    const readerResult = postgresReaderStatementsFor({
+      mode: readerMode,
+      readerPassword: process.env.LWQL_POSTGRES_READER_PASSWORD,
+      schema: postgresSchema,
+      role: process.env.LWQL_POSTGRES_READER_ROLE,
+    });
+    if (readerResult.warningMessage) {
+      logger.warn(readerResult.warningMessage);
     }
+    await runPostgresStatements(readerResult.statements);
   } catch (error) {
     logger.error(
       { error },

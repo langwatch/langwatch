@@ -23,6 +23,7 @@ export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
+export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
 export {
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
