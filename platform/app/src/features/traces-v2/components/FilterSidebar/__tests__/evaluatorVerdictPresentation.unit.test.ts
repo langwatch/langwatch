@@ -38,7 +38,7 @@ describe("evaluator verdict presentation", () => {
           { value: "fail", count: 24 },
           { value: "error", count: 3 },
         ]),
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(
@@ -56,7 +56,7 @@ describe("evaluator verdict presentation", () => {
           { value: "skipped", count: 2 },
           { value: "unknown", count: 1 },
         ]),
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(
@@ -67,7 +67,7 @@ describe("evaluator verdict presentation", () => {
     it("renders the curated palette at full strength rather than dimmed", () => {
       const rows = buildFacetItems({
         cat: verdictSection([{ value: "pass", count: 1 }]),
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(rows.map((r) => r.dimmed)).toEqual([false]);
@@ -82,7 +82,7 @@ describe("evaluator verdict presentation", () => {
           { value: "error", count: 40 },
           { value: "pass", count: 2 },
         ]),
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(rows.map((r) => r.value)).toEqual(["pass", "fail", "error"]);
@@ -95,7 +95,7 @@ describe("evaluator verdict presentation", () => {
           { value: "fail", count: 24 },
           { value: "pass", count: 72 },
         ]),
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(rows.map((r) => r.value)).toEqual(["pass", "fail"]);
@@ -107,7 +107,7 @@ describe("evaluator verdict presentation", () => {
           ...verdictSection([{ value: "pass", count: 1 }]),
           key: "someUncuratedFacet",
         } as CategoricalSection,
-        synthetic: false,
+        isSynthetic: false,
       });
 
       expect(rows[0]?.dotColor).not.toBe("green.solid");

@@ -323,7 +323,7 @@ export function useFilterSidebarData() {
     for (const cat of categoricals) {
       const baseItems = buildFacetItems({
         cat,
-        synthetic: cat.synthetic ?? isSynthetic,
+        isSynthetic: cat.synthetic ?? isSynthetic,
       });
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
@@ -668,10 +668,10 @@ function buildDiscreteFacetItems(
  */
 export function buildFacetItems({
   cat,
-  synthetic,
+  isSynthetic,
 }: {
   cat: CategoricalSection;
-  synthetic: boolean;
+  isSynthetic: boolean;
 }): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
@@ -710,7 +710,7 @@ export function buildFacetItems({
     count: counts.get(value) ?? 0,
     dotColor: dotColorFor(value),
     dimmed,
-    synthetic,
+    synthetic: isSynthetic,
     aggregates: aggregates.get(value),
     eventMetrics: eventMetrics.get(value),
   }));
