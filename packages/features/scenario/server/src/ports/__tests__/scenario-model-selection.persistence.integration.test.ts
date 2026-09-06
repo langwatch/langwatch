@@ -121,9 +121,11 @@ describe.skipIf(!databaseUrl)("Scenario and run-plan model persistence", () => {
   });
 
   beforeEach(async () => {
-    await database().scenarioVersion.deleteMany({ where: { projectId } });
-    await database().scenario.deleteMany({ where: { projectId } });
-    await database().simulationSuite.deleteMany({ where: { projectId } });
+    await cleanupTestRows(database(), [
+      ["scenarioVersion", { projectId }],
+      ["scenario", { projectId }],
+      ["simulationSuite", { projectId }],
+    ]);
   });
 
   afterAll(async () => {

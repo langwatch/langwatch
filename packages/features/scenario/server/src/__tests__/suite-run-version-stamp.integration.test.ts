@@ -196,9 +196,11 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
 
   beforeEach(async () => {
     const db = database();
-    await db.scenarioVersion.deleteMany({ where: { projectId } });
-    await db.scenario.deleteMany({ where: { projectId } });
-    await db.simulationSuite.deleteMany({ where: { projectId } });
+    await cleanupTestRows(db, [
+      ["scenarioVersion", { projectId }],
+      ["scenario", { projectId }],
+      ["simulationSuite", { projectId }],
+    ]);
 
     agents = new Map();
     commands = new CapturingCommands();

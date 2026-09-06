@@ -255,19 +255,23 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
   }, 60_000);
 
   afterAll(async () => {
-    if (!projectId) return;
+    if (!projectId || !organizationId || !teamId || !userId) return;
+    const ids = { organizationId, teamId, userId };
     const providerIds = (
-      await prisma.modelProvider.findMany({ where: { organizationId }, select: { id: true } })
+      await prisma.modelProvider.findMany({
+        where: { organizationId: ids.organizationId },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     await prisma.modelProviderScope.deleteMany({
       where: { modelProviderId: { in: providerIds } },
     });
-    await prisma.modelProvider.deleteMany({ where: { organizationId } });
-    await prisma.modelDefaultConfig.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { teamId } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.modelProvider.deleteMany({ where: { organizationId: ids.organizationId } });
+    await prisma.modelDefaultConfig.deleteMany({ where: { organizationId: ids.organizationId } });
+    await prisma.project.deleteMany({ where: { teamId: ids.teamId } });
+    await prisma.team.deleteMany({ where: { id: ids.teamId } });
+    await prisma.organization.deleteMany({ where: { id: ids.organizationId } });
+    await prisma.user.deleteMany({ where: { id: ids.userId } });
   });
 
   const httpAgent: Agent = {

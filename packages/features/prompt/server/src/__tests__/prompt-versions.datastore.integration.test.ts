@@ -76,13 +76,17 @@ describe.skipIf(!DB_URL)("Feature: Prompt version history", () => {
   });
 
   afterEach(async () => {
-    await prisma.promptTagAssignment.deleteMany({ where: { projectId } });
-    await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId } });
-    await prisma.llmPromptConfig.deleteMany({ where: { projectId } });
-    await prisma.promptTag.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
-    await prisma.team.delete({ where: { id: teamId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
+    if (!organizationId || !teamId || !projectId) {
+      throw new Error("teardown ids were never assigned; beforeEach must have thrown");
+    }
+    const ids = { organizationId, teamId, projectId };
+    await prisma.promptTagAssignment.deleteMany({ where: { projectId: ids.projectId } });
+    await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId: ids.projectId } });
+    await prisma.llmPromptConfig.deleteMany({ where: { projectId: ids.projectId } });
+    await prisma.promptTag.deleteMany({ where: { organizationId: ids.organizationId } });
+    await prisma.project.deleteMany({ where: { id: ids.projectId } });
+    await prisma.team.delete({ where: { id: ids.teamId } });
+    await prisma.organization.delete({ where: { id: ids.organizationId } });
   });
 
   function createPrompt(): Promise<VersionedPrompt> {

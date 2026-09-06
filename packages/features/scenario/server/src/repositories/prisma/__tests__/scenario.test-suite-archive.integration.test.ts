@@ -12,6 +12,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaScenarioRepository } from "../scenario.repository";
 
@@ -94,18 +95,23 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
   });
 
   beforeEach(async () => {
-    await database().scenario.deleteMany({ where: { projectId } });
-    await database().simulationSuite.deleteMany({ where: { projectId } });
+    await cleanupTestRows(database(), [
+      ["scenario", { projectId }],
+      ["simulationSuite", { projectId }],
+    ]);
     repository = PrismaScenarioRepository.create(database());
   });
 
   afterAll(async () => {
-    if (!projectId) return;
-    await database().scenario.deleteMany({ where: { projectId } });
-    await database().simulationSuite.deleteMany({ where: { projectId } });
-    await database().project.delete({ where: { id: projectId } });
-    await database().team.delete({ where: { id: teamId } });
-    await database().organization.delete({ where: { id: organizationId } });
+    if (!projectId || !teamId || !organizationId) return;
+    const ids = { projectId, teamId, organizationId };
+    await cleanupTestRows(database(), [
+      ["scenario", { projectId: ids.projectId }],
+      ["simulationSuite", { projectId: ids.projectId }],
+    ]);
+    await database().project.delete({ where: { id: ids.projectId } });
+    await database().team.delete({ where: { id: ids.teamId } });
+    await database().organization.delete({ where: { id: ids.organizationId } });
   });
 
   describe("given a test suite that has run before", () => {

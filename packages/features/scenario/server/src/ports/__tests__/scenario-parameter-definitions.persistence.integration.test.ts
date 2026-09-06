@@ -108,8 +108,10 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
   });
 
   beforeEach(async () => {
-    await database().scenarioVersion.deleteMany({ where: { projectId } });
-    await database().scenario.deleteMany({ where: { projectId } });
+    await cleanupTestRows(database(), [
+      ["scenarioVersion", { projectId }],
+      ["scenario", { projectId }],
+    ]);
   });
 
   afterAll(async () => {

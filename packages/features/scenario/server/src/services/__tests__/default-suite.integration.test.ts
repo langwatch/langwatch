@@ -130,8 +130,10 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
 
   beforeEach(async () => {
     const db = database();
-    await db.scenario.deleteMany({ where: { projectId } });
-    await db.simulationSuite.deleteMany({ where: { projectId } });
+    await cleanupTestRows(db, [
+      ["scenario", { projectId }],
+      ["simulationSuite", { projectId }],
+    ]);
   });
 
   afterAll(async () => {

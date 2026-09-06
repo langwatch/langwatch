@@ -306,19 +306,24 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
   });
 
   beforeEach(async () => {
-    await database().scenario.deleteMany({ where: { projectId } });
-    await database().simulationSuite.deleteMany({ where: { projectId } });
+    if (!projectId) {
+      throw new Error("teardown ids were never assigned; beforeAll must have thrown");
+    }
+    const ids = { projectId };
+    await database().scenario.deleteMany({ where: { projectId: ids.projectId } });
+    await database().simulationSuite.deleteMany({ where: { projectId: ids.projectId } });
     buildService();
   });
 
   afterAll(async () => {
     try {
-      if (projectId) {
-        await database().scenario.deleteMany({ where: { projectId } });
-        await database().simulationSuite.deleteMany({ where: { projectId } });
-        await database().project.delete({ where: { id: projectId } });
-        await database().team.delete({ where: { id: teamId } });
-        await database().organization.delete({ where: { id: organizationId } });
+      if (projectId && teamId && organizationId) {
+        const ids = { projectId, teamId, organizationId };
+        await database().scenario.deleteMany({ where: { projectId: ids.projectId } });
+        await database().simulationSuite.deleteMany({ where: { projectId: ids.projectId } });
+        await database().project.delete({ where: { id: ids.projectId } });
+        await database().team.delete({ where: { id: ids.teamId } });
+        await database().organization.delete({ where: { id: ids.organizationId } });
       }
     } finally {
       await connection?.closeOnce();

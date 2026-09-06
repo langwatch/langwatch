@@ -68,11 +68,15 @@ describe.skipIf(!DB_URL)("given a prompt handle after the prompt is archived", (
   });
 
   afterAll(async () => {
-    await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId } });
-    await prisma.llmPromptConfig.deleteMany({ where: { projectId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    if (!organizationId || !teamId || !projectId) {
+      throw new Error("teardown ids were never assigned; beforeAll must have thrown");
+    }
+    const ids = { organizationId, teamId, projectId };
+    await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId: ids.projectId } });
+    await prisma.llmPromptConfig.deleteMany({ where: { projectId: ids.projectId } });
+    await prisma.project.deleteMany({ where: { id: ids.projectId } });
+    await prisma.team.deleteMany({ where: { id: ids.teamId } });
+    await prisma.organization.deleteMany({ where: { id: ids.organizationId } });
   });
 
   describe("when a prompt was previously created and then archived", () => {

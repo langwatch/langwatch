@@ -140,9 +140,14 @@ describe.skipIf(!databaseUrl)("The stored test suite vocabulary", () => {
         await database().simulationSuite.deleteMany({ where: { projectId } });
         await database().project.deleteMany({ where: { id: projectId } });
       }
-      if (teamId) await database().team.deleteMany({ where: { id: teamId } });
-      if (organizationId)
-        await database().organization.deleteMany({ where: { id: organizationId } });
+      if (teamId) {
+        const ids = { teamId };
+        await database().team.deleteMany({ where: { id: ids.teamId } });
+      }
+      if (organizationId) {
+        const ids = { organizationId };
+        await database().organization.deleteMany({ where: { id: ids.organizationId } });
+      }
     } finally {
       await connection?.closeOnce();
     }
