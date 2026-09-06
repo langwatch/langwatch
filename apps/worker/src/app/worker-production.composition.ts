@@ -68,9 +68,12 @@ import {
   StripeUsageReportingAdapter,
   BillingTenantOrganizationService,
   PostgresBillingAdapter,
+  PlanLimitsPlanCatalogueAdapter,
   type BillingReportingDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
+import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
+import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
@@ -86,60 +89,64 @@ import {
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer";
-import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer";
-import { AutomationWorkerFeatureInstaller } from "../features/automation/automation-worker-feature.installer";
-import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer";
-import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/coding-agent-worker-feature.installer";
-import { EvaluationWorkerFeatureInstaller } from "../features/evaluation/evaluation-worker-feature.installer";
+import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer.ts";
+import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer.ts";
+import {
+  WorkerAutomationNextStepAdapter,
+  WorkerAutomationOrganizationPricingPort,
+} from "../features/automation/automation-next-step.adapter.ts";
+import { AutomationWorkerFeatureInstaller } from "../features/automation/automation-worker-feature.installer.ts";
+import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer.ts";
+import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/coding-agent-worker-feature.installer.ts";
+import { EvaluationWorkerFeatureInstaller } from "../features/evaluation/evaluation-worker-feature.installer.ts";
 import {
   EventingMaintenanceWorkerFeatureInstaller,
   WorkerBlobSweepPort,
-} from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
-import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer";
-import { GatewaySpendWorkerFeatureInstaller } from "../features/gateway/gateway-spend-worker-feature.installer";
-import { LangyConversationWorkerFeatureInstaller } from "../features/langy/langy-conversation-worker-feature.installer";
-import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer";
-import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer";
-import { GovernanceEventsWorkerFeatureInstaller } from "../features/governance/governance-events-worker-feature.installer";
-import { GovernanceIngestionWorkerFeatureInstaller } from "../features/governance/governance-ingestion-worker-feature.installer";
-import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer";
-import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer";
+} from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
+import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer.ts";
+import { GatewaySpendWorkerFeatureInstaller } from "../features/gateway/gateway-spend-worker-feature.installer.ts";
+import { LangyConversationWorkerFeatureInstaller } from "../features/langy/langy-conversation-worker-feature.installer.ts";
+import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer.ts";
+import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer.ts";
+import { GovernanceEventsWorkerFeatureInstaller } from "../features/governance/governance-events-worker-feature.installer.ts";
+import { GovernanceIngestionWorkerFeatureInstaller } from "../features/governance/governance-ingestion-worker-feature.installer.ts";
+import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer.ts";
+import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer.ts";
 import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
 import { AdminAccessService, type UsageStatsWorkerDatabase } from "@langwatch/ops-server";
-import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer";
-import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer";
-import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer";
-import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer";
-import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
-import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer";
+import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer.ts";
+import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
+import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer.ts";
+import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer.ts";
+import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer.ts";
+import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer.ts";
 import {
   AbsentJoinRequestMail,
   JoinRequestMailAdapter,
-} from "../features/identity/join-request-mail.adapter";
-import { JoinRequestWorkerFeatureInstaller } from "../features/identity/join-request-worker-feature.installer";
-import { ScimSyncWorkerFeatureInstaller } from "../features/identity/scim-sync-worker-feature.installer";
-import { SsoConnectionWorkerFeatureInstaller } from "../features/identity/sso-connection-worker-feature.installer";
-import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer";
-import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer";
-import type { WorkerConfig } from "../platform/config/worker.config";
+} from "../features/identity/join-request-mail.adapter.ts";
+import { JoinRequestWorkerFeatureInstaller } from "../features/identity/join-request-worker-feature.installer.ts";
+import { ScimSyncWorkerFeatureInstaller } from "../features/identity/scim-sync-worker-feature.installer.ts";
+import { SsoConnectionWorkerFeatureInstaller } from "../features/identity/sso-connection-worker-feature.installer.ts";
+import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer.ts";
+import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import {
   WorkerEventingRuntime,
   type WorkerEventingConsumerOptions,
   type WorkerEventingProductionOptions,
-} from "../platform/eventing/worker-eventing.runtime";
+} from "../platform/eventing/worker-eventing.runtime.ts";
 import {
   WorkerInfrastructureAdapter,
   type WorkerInfrastructureAdapterOptions,
-} from "../platform/infrastructure/worker-foundation.adapter";
+} from "../platform/infrastructure/worker-foundation.adapter.ts";
 import {
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../platform/lifecycle/worker-runtime.port";
-import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
-import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer";
-import { WorkerApplication } from "./worker.application";
+} from "../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
+import type { WorkerFeatureInstallerPort } from "../features/worker-feature.installer.ts";
+import { WorkerApplication } from "./worker.application.ts";
 import type { DatasetContentDatabase } from "@langwatch/dataset-server/composition/dataset-content";
 import {
   AutomationGraphActivityPort,
@@ -154,118 +161,118 @@ import {
   ClickHouseTraceStoredSpanReaderAdapter,
   TraceProcessingServerInstallerAdapter,
 } from "@langwatch/trace-server";
-import { createWorkerAnalytics } from "./worker-analytics.composition";
+import { createWorkerAnalytics } from "./worker-analytics.composition.ts";
 import {
   createWorkerReportSchedule,
   createWorkerReportTraceList,
-} from "./worker-report-schedule.composition";
-import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition";
+} from "./worker-report-schedule.composition.ts";
+import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition.ts";
 import {
   createWorkerAnomalyAlertTransport,
   createWorkerGovernanceAnomalySchedule,
-} from "./worker-governance-anomaly.composition";
+} from "./worker-governance-anomaly.composition.ts";
 import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
 import {
   createWorkerTopicRuntime,
   WorkerTopicAbsenceReportPort,
-} from "./worker-topic-clustering.composition";
+} from "./worker-topic-clustering.composition.ts";
 import {
   tryCreateWorkerModelProviders,
   WorkerModelProviderAbsenceReportPort,
-} from "./worker-model-provider.composition";
+} from "./worker-model-provider.composition.ts";
 import {
   tryCreateWorkerTenancy,
   WorkerTenancyAbsenceReportPort,
-} from "./worker-tenancy.composition";
+} from "./worker-tenancy.composition.ts";
 import {
   createWorkerPlanProvider,
   LoggedWorkerEntitlementAbsence,
-} from "./worker-plan-provider.composition";
+} from "./worker-plan-provider.composition.ts";
 import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
-} from "./worker-evaluation-processing.composition";
-import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition";
-import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition";
-import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition";
+} from "./worker-evaluation-processing.composition.ts";
+import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition.ts";
+import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
+import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
 import {
   createWorkerDatasetNormalization,
   createWorkerDatasetWrites,
-} from "./worker-dataset-normalization.composition";
+} from "./worker-dataset-normalization.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
-import { createWorkerFeatureFlags } from "./worker-feature-flags.composition";
-import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition";
-import { createWorkerObjectStorage } from "./worker-object-storage.composition";
-import { createWorkerSpanStorage } from "./worker-span-storage.composition";
-import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter";
+import { createWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
+import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
+import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
+import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
+import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
 import {
   tryCreateWorkerAutomationGraphComposition,
   resolveWorkerStoredSecretCipher,
   WorkerAutomationClock,
   tryCreateWorkerAutomationDelivery,
-} from "./worker-automation-graph.composition";
+} from "./worker-automation-graph.composition.ts";
 import {
   createWorkerAutomationSettlement,
   WorkerAutomationSettlementAbsenceReportPort,
-} from "./worker-automation-settlement.composition";
+} from "./worker-automation-settlement.composition.ts";
 import {
   WorkerAutomationHeartbeat,
   WorkerAutomationSettlementEvaluationReader,
   WorkerAutomationSettlementTraceReader,
   WorkerTraceRecordReader,
-} from "./worker-automation-settlement-reads.composition";
-import { createWorkerTraceSpool } from "./worker-trace-blob.composition";
-import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition";
-import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition";
-import { installWorkerConnectedAgentRuntime } from "./worker-connected-agent-runtime.composition";
+} from "./worker-automation-settlement-reads.composition.ts";
+import { createWorkerTraceSpool } from "./worker-trace-blob.composition.ts";
+import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition.ts";
+import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
+import { installWorkerConnectedAgentRuntime } from "./worker-connected-agent-runtime.composition.ts";
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReportPort,
   type WorkerLangyConversationDatabase,
-} from "./worker-langy-conversation.composition";
-import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition";
+} from "./worker-langy-conversation.composition.ts";
+import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition.ts";
 import {
   createWorkerScenarioProcessing,
   WorkerScenarioAbsenceReportPort,
-} from "./worker-scenario-processing.composition";
+} from "./worker-scenario-processing.composition.ts";
 import {
   createWorkerOps,
   LoggedWorkerOpsAbsence,
   type WorkerOpsAbsenceReportPort,
-} from "./worker-ops.composition";
+} from "./worker-ops.composition.ts";
 import {
   LoggedWorkerRealtimeSessionAbsence,
   tryCreateWorkerRealtimeSessionPoller,
   type WorkerRealtimeSessionAbsenceReportPort,
-} from "./worker-realtime-session.composition";
+} from "./worker-realtime-session.composition.ts";
 import {
   createWorkerScenarioExecution,
   LoggedWorkerScenarioExecutionAbsence,
   resolveWorkerScenarioExecutionPrerequisites,
   type WorkerScenarioExecutionAbsenceReportPort,
-} from "./worker-scenario-execution.composition";
+} from "./worker-scenario-execution.composition.ts";
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReportPort,
   type WorkerGatewaySpendCompositionInput,
-} from "./worker-gateway-spend.composition";
+} from "./worker-gateway-spend.composition.ts";
 import {
   createWorkerWebhookDispatchRateLimiter,
   createWorkerWebhookEgress,
   createWorkerWebhookTransport,
-} from "./worker-webhook-egress.composition";
-import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
-import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition";
-import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition";
+} from "./worker-webhook-egress.composition.ts";
+import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition.ts";
+import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition.ts";
+import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition.ts";
 import {
   WorkerTraceProcessingPipeline,
   type WorkerTraceProcessingCommands,
-} from "./worker-trace-processing-pipeline.composition";
-import { createWorkerTrackedEvents } from "./worker-tracked-event.composition";
+} from "./worker-trace-processing-pipeline.composition.ts";
+import { createWorkerTrackedEvents } from "./worker-tracked-event.composition.ts";
 import {
   tryCreateWorkerMailComposition,
   type WorkerMailComposition,
-} from "./worker-mail.composition";
+} from "./worker-mail.composition.ts";
 
 /** The worker-owned runtime dependencies for the Topic feature. */
 export type WorkerTopicCompositionOptions = {
@@ -1061,6 +1068,27 @@ export class WorkerProductionComposition {
                 },
                 resolveClickHouseClient: (projectId: string) =>
                   options.eventing.resolveClickHouseClient(projectId),
+                // The upgrade line a ceiling notice carries, over the one
+                // PLAN_LIMITS ladder the interactive process quotes from.
+                // Composed exactly when this process holds a plan provider and
+                // the Prisma client the organization's pricing is read on;
+                // without either the notice still sends, naming no upgrade.
+                ...(plans && options.connection
+                  ? {
+                      nextStep: WorkerAutomationNextStepAdapter.create({
+                        projects: tenancy.projects,
+                        plans,
+                        organizations: PrismaAutomationOrganizationPricingAdapter.create(
+                          options.connection.client,
+                        ),
+                        nextStep: PlanNextStepService.create({
+                          catalogue: PlanLimitsPlanCatalogueAdapter.create(),
+                        }),
+                        baseHost: mail.baseHost,
+                        ...(options.observability ? { logger: options.observability.logger } : {}),
+                      }),
+                    }
+                  : {}),
               },
             }
           : {}),
@@ -1855,6 +1883,41 @@ class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeamPort {
       throw new Error(`Organization ${organizationId} has no team to hold its internal project.`);
     }
     return team.id;
+  }
+}
+
+/**
+ * The two organization columns an automation upgrade line is quoted from. Read here
+ * because they are one `findUnique` on the client this process already opened, and
+ * carrying an organization repository into automation's mail to reach two columns
+ * would couple the notice to an aggregate it never otherwise touches.
+ */
+class PrismaAutomationOrganizationPricingAdapter extends WorkerAutomationOrganizationPricingPort {
+  static create(database: {
+    organization: { findUnique: (args: never) => Promise<unknown> };
+  }): PrismaAutomationOrganizationPricingAdapter {
+    return new PrismaAutomationOrganizationPricingAdapter(database);
+  }
+
+  private constructor(
+    private readonly database: { organization: { findUnique: (args: never) => Promise<unknown> } },
+  ) {
+    super();
+  }
+
+  async pricingFor({ organizationId }: { organizationId: string }): Promise<{
+    pricingModel: EntitlementPricingModel | null;
+    currency: "USD" | "EUR";
+  } | null> {
+    const organization = (await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true, currency: true },
+    } as never)) as {
+      pricingModel: EntitlementPricingModel | null;
+      currency: "USD" | "EUR";
+    } | null;
+
+    return organization;
   }
 }
 

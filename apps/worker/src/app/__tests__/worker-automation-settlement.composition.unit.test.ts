@@ -1,4 +1,8 @@
 import { readFileSync } from "node:fs";
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import { describe, expect, it } from "vitest";
 import {
   AutomationClockPort,
@@ -6,13 +10,20 @@ import {
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
+import { PLAN_LIMITS, PlanTypes } from "@langwatch/enterprise-billing-contract";
+import { PlanLimitsPlanCatalogueAdapter } from "@langwatch/enterprise-billing-server";
+import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../../features/automation/automation-notification-delivery.adapter";
+import {
+  WorkerAutomationNextStepAdapter,
+  WorkerAutomationOrganizationPricingPort,
+} from "../../features/automation/automation-next-step.adapter.ts";
+import { WorkerAutomationNotificationDeliveryAdapter } from "../../features/automation/automation-notification-delivery.adapter.ts";
 import {
   createWorkerAutomationSettlement,
   WorkerAutomationSettlementAbsenceReportPort,
-} from "../worker-automation-settlement.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+} from "../worker-automation-settlement.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature
@@ -221,6 +232,13 @@ function prismaDouble(trigger: TriggerRow) {
   };
 }
 
+/** The organization row a quote is read from, standing where Prisma stands. */
+class StubOrganizationPricing extends WorkerAutomationOrganizationPricingPort {
+  async pricingFor(): Promise<{ pricingModel: null; currency: "USD" }> {
+    return { pricingModel: null, currency: "USD" };
+  }
+}
+
 class RecordingMailer {
   defaultFrom(): string {
     return "LangWatch <contact@langwatch.ai>";
@@ -276,6 +294,23 @@ const NARROWED_TRIGGER_ROW: TriggerRow = {
   ...RUNAWAY_TRIGGER_ROW,
   id: "trigger-runaway-2",
   filters: { "traces.origin": ["application"] },
+};
+
+/**
+ * Two more of the same pair, for the notices that carry an upgrade line.
+ *
+ * Separate ids because a notice is claimed once per automation per UTC day and
+ * the claim keyspace outlives one test — two assertions on `trigger-runaway-2`
+ * would leave the second silently unnotified and green.
+ */
+const NEXT_STEP_CEILING_TRIGGER_ROW: TriggerRow = {
+  ...NARROWED_TRIGGER_ROW,
+  id: "trigger-runaway-3",
+};
+
+const NEXT_STEP_PAUSE_TRIGGER_ROW: TriggerRow = {
+  ...RUNAWAY_TRIGGER_ROW,
+  id: "trigger-runaway-4",
 };
 
 /** The same automation, written before the filter-query migration. */
@@ -389,7 +424,11 @@ type ComposeOverrides = {
   /** The evaluation runs this process's own storage answers for the trace. */
   evaluationRuns?: Array<Record<string, unknown>>;
   /** Runaway containment, and how much traffic the project itself carried. */
-  containment?: { projectTraces24h: number };
+  containment?: {
+    projectTraces24h: number;
+    /** Composes the real next-step adapter, as the production root does. */
+    nextStep?: { planType: string };
+  };
 };
 
 function compose(over: ComposeOverrides = {}) {
@@ -468,9 +507,28 @@ function compose(over: ComposeOverrides = {}) {
  * so what these assertions observe is the decision the feature makes, not one
  * written in the test.
  */
-function recordingContainment(input: { projectTraces24h: number }) {
+function recordingContainment(input: {
+  projectTraces24h: number;
+  nextStep?: { planType: string };
+}) {
   return {
     mailer: new RecordingMailer() as never,
+    ...(input.nextStep
+      ? {
+          // The PRODUCTION adapter over the PRODUCTION ladder: the price and
+          // the tier in the assertion below are `PLAN_LIMITS`', so a rung
+          // renamed or repriced there moves this test rather than passing it.
+          nextStep: WorkerAutomationNextStepAdapter.create({
+            projects: { getOrganizationId: async () => "organization-1" },
+            plans: { getActivePlan: async () => ({ type: input.nextStep!.planType }) as never },
+            organizations: new StubOrganizationPricing(),
+            nextStep: PlanNextStepService.create({
+              catalogue: PlanLimitsPlanCatalogueAdapter.create(),
+            }),
+            baseHost: ENVIRONMENT.BASE_HOST,
+          }),
+        }
+      : {}),
     directories: {
       projects: {
         getOrganizationId: async () => "organization-1",
@@ -1079,6 +1137,74 @@ describe("given the automations pipeline this process composes for itself", () =
       // the project's own tenant rather than assumed.
       expect(RECORDED.trafficReads).toEqual([{ tenantId: "project-1" }]);
     });
+
+    /**
+     * The upgrade line, and why it is asserted through the rendered mail.
+     *
+     * The ceiling notice is where an organization on a paid rung finds out its
+     * automations have stopped acting, and the one useful thing to say next is
+     * which tier lifts the ceiling and what it costs. That answer is
+     * `PlanNextStepService`'s over `PLAN_LIMITS`, so the assertion reads the
+     * tier's own name and its own checkout link out of the HTML that actually
+     * left: a composition that quoted a price of its own, or composed no
+     * resolver at all, both fail here.
+     */
+    /** @scenario "A ceiling notice sent from the background process offers the same next tier" */
+    it("offers the next self-serve tier in a ceiling notice sent from this process", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        containment: { projectTraces24h: 1000, nextStep: { planType: "PRO" } },
+        // The ceiling comes from the deployment's free bucket; the quote comes
+        // from the organization's own plan, which the next-step double holds.
+        plan: { type: "FREE", free: true, maxTriggerPersistDispatchesPerDay: 0 },
+        trigger: NEXT_STEP_CEILING_TRIGGER_ROW,
+        summaryAttributes: { "langwatch.origin": "application" },
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        {
+          triggerId: NEXT_STEP_CEILING_TRIGGER_ROW.id,
+          traceIds: ["trace-1"],
+          boundary: 1,
+        } as never,
+        { projectId: "project-1", messageKey: "persist:runaway-3", attempt: 1 } as never,
+      );
+
+      const notice = RECORDED.mail[0];
+      expect(notice?.subject).toBe("Automation reached its daily limit: Error rate");
+      // Pro's own ceiling is 10,000 messages and Launch is the first rung above
+      // it, so Launch is what an organization on Pro is truthfully offered.
+      expect(notice!.html).toContain(PLAN_LIMITS[PlanTypes.LAUNCH].name);
+      expect(notice!.html).toContain(
+        `${ENVIRONMENT.BASE_HOST}/settings/subscription/checkout/${PlanTypes.LAUNCH.toLowerCase()}`,
+      );
+    });
+
+    /** @scenario "A paused runaway automation is never offered the next tier" */
+    it("names no tier in a pause notice even with the resolver composed", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        containment: { projectTraces24h: 1000, nextStep: { planType: "PRO" } },
+        // The ceiling comes from the deployment's free bucket; the quote comes
+        // from the organization's own plan, which the next-step double holds.
+        plan: { type: "FREE", free: true, maxTriggerPersistDispatchesPerDay: 0 },
+        trigger: NEXT_STEP_PAUSE_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: NEXT_STEP_PAUSE_TRIGGER_ROW.id, traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:runaway-4", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.mail[0]!.subject).toBe("Automation paused: Error rate");
+      expect(RECORDED.mail[0]!.html).not.toContain(
+        `${ENVIRONMENT.BASE_HOST}/settings/subscription/checkout/`,
+      );
+    });
   });
 
   describe("when the automation names an annotator the grammar cannot read", () => {
@@ -1135,6 +1261,50 @@ describe("given the automations pipeline this process composes for itself", () =
       expect(RECORDED.queueItems).toEqual([]);
       expect(RECORDED.datasetAppends).toEqual([]);
       expect(RECORDED.lastRunAt).toEqual([]);
+    });
+  });
+});
+
+describe("given the overflow series an operator watches settlement by", () => {
+  describe("when a settlement flushes matches early to stay in bounds", () => {
+    /** @scenario "The worker publishes the settlement overflow series" */
+    it("publishes the flushed count and still names the settlement in the log", async () => {
+      reset();
+      const metrics: RecordingMeterProvider = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        const settlement = build().processManagers.get("triggerSettlement");
+        if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+        await settlement.config.intents.logOverflow!.run(
+          { triggerId: "trigger-1", flushed: 3, totalFlushed: 7 } as never,
+          { projectId: "project-1", messageKey: "overflow:1", attempt: 1 } as never,
+        );
+
+        expect(metrics.valueOf("automation_overflow_flush_total")).toBe(3);
+      } finally {
+        metrics.uninstall();
+      }
+    });
+
+    /** @scenario "The worker publishes the settlement overflow series" */
+    it("counts nothing for a flush of zero", async () => {
+      reset();
+      const metrics: RecordingMeterProvider = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        const settlement = build().processManagers.get("triggerSettlement");
+        if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+        await settlement.config.intents.logOverflow!.run(
+          { triggerId: "trigger-1", flushed: 0, totalFlushed: 0 } as never,
+          { projectId: "project-1", messageKey: "overflow:2", attempt: 1 } as never,
+        );
+
+        expect(metrics.valueOf("automation_overflow_flush_total")).toBe(0);
+      } finally {
+        metrics.uninstall();
+      }
     });
   });
 });

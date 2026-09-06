@@ -2,7 +2,14 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { sendEmail } from "../email-sender.ts";
 import type { EmailDeliveryPort } from "../providers/types.ts";
-import { ActionRow, DataTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout.tsx";
+import {
+  ActionRow,
+  DataTable,
+  EmailLayout,
+  InlineLink,
+  Muted,
+  Paragraph,
+} from "./email-layout.tsx";
 import {
   accountTeamStepSchema,
   meteredNoun,
@@ -22,8 +29,16 @@ export const automationLimitEmailProps = z.object({
   kind: z.enum(automationLimitKinds),
   automationName: z.string().min(1),
   projectName: z.string().min(1),
-  /** Confirmed matches this automation is allowed to act on per day. */
-  dailyCeiling: z.number().int().positive(),
+  /**
+   * Confirmed matches this automation is allowed to act on per day.
+   *
+   * Zero is a real ceiling — a deployment may allow a plan no automation
+   * dispatches at all — and it is exactly the case this mail has to be able to
+   * state. Requiring a positive number here made the render throw on that
+   * ceiling, and the caller swallows a render failure, so the automation was
+   * skipped and nobody was told.
+   */
+  dailyCeiling: z.number().int().nonnegative(),
   /** Confirmed matches it dropped today, at the moment the mail was queued. */
   skippedToday: z.number().int().nonnegative(),
   actionUrl: z.url(),

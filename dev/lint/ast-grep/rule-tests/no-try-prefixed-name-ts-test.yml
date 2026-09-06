@@ -1,0 +1,35 @@
+id: no-try-prefixed-name-ts
+valid:
+  # The answer named as a noun.
+  - |
+    class Organizations {
+      pricingFor(input: { organizationId: string }) {}
+    }
+  # A nullable read named for what it returns.
+  - |
+    class Subscriptions {
+      findByStripeId(id: string) {}
+    }
+  # `try` as a whole word is a statement, not a name.
+  - |
+    function load() {
+      try {
+        run();
+      } catch {}
+    }
+  # A name that merely starts with the letters is not the prefix.
+  - |
+    function tryout() {}
+invalid:
+  - |
+    class Organizations {
+      tryReadPricing(input: { organizationId: string }) {}
+    }
+  - |
+    abstract class Port {
+      abstract tryFindById(id: string): Promise<null>;
+    }
+  - |
+    function tryResolve(id: string) {}
+  - |
+    const tryClaimOnce = (key: string) => key;

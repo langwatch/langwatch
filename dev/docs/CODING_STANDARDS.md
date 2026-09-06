@@ -7,6 +7,11 @@ Write code for the next engineer, not the compiler.
 **Readability is correctness.** Code is read 10x more than it's written. Optimize for understanding.
 
 - **Names reveal intent.** `getUserById` not `get`, `isValidEmail` not `check`
+- **No `try` prefix.** `tryFindById` names the implementation's mood, not the answer. Whether a
+  call returns nothing or throws is the return type's job, and a reader learns it there. Name the
+  answer: `findById`, `pricingFor`, `activate`. Where two calls genuinely differ, put the
+  difference in the noun — `existingUser` versus `requireUser` — never in a hedging verb.
+  Enforced by `dev/lint/ast-grep/rules/no-try-prefixed-name.yml`
 - **Functions do one thing.** If you need "and" to describe it, split it
 - **Small functions.** Extract until you can't name the extraction meaningfully
 - **No side effects.** A function named `validate` shouldn't also modify state
