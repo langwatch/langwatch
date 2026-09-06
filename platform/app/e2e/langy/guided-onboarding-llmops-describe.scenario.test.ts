@@ -23,6 +23,7 @@ import {
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
   listProjectScenarios,
+  pathCompletions,
   queueGuidedKickoff,
   saysVerbatim,
   seedGuidedOrganization,
@@ -140,6 +141,7 @@ describe("Langy takes a description and still reaches for the code", () => {
       expect(status.pendingRequest).not.toBeNull();
       expect(firstRequestId).not.toBe("");
       expect(await listProjectScenarios()).toEqual([]);
+      expect(pathCompletions(langy.state.toolEvents)).toEqual([]);
 
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);

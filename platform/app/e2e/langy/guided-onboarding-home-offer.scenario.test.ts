@@ -23,6 +23,7 @@ import {
   guidedPathContinuationLine,
 } from "~/features/guided-onboarding/kickoff";
 import {
+  assertPathCompletedAfterSkill,
   attachKickoffConversation,
   beginGuidedPath,
   conversationMessages,
@@ -65,7 +66,7 @@ describe("The Home offer continues the guided conversation", () => {
         tourStatus: "none",
       });
       let attachedConversationId = "";
-      let continuationInput: { path: string } | null = null;
+      const continuation: { input: { path: string } | null } = { input: null };
 
       const result = await runScenarioAndLog({
         config: {
@@ -96,6 +97,10 @@ describe("The Home offer continues the guided conversation", () => {
                 organizationId: org.organizationId,
                 path: "coding",
               });
+              assertPathCompletedAfterSkill({
+                events: langy.state.toolEvents,
+                path: "coding",
+              });
               // The Home offer: begin the path, then continue the attached
               // conversation with the path's kickoff.
               const state = await beginGuidedPath({
@@ -104,7 +109,7 @@ describe("The Home offer continues the guided conversation", () => {
               });
               expect(state.conversationId).toBe(attachedConversationId);
               expect(langy.state.conversationId).toBe(attachedConversationId);
-              continuationInput = await queueGuidedKickoff({
+              continuation.input = await queueGuidedKickoff({
                 adapter: langy,
                 org,
                 path: "gateway",
@@ -120,6 +125,10 @@ describe("The Home offer continues the guided conversation", () => {
 
       // The continuation landed in the conversation the organization holds.
       expect(langy.state.conversationId).toBe(attachedConversationId);
+      assertPathCompletedAfterSkill({
+        events: langy.state.toolEvents,
+        path: "gateway",
+      });
       const finalState = await waitForPathDone({
         organizationId: org.organizationId,
         path: "gateway",
@@ -146,7 +155,7 @@ describe("The Home offer continues the guided conversation", () => {
         JSON.stringify(kickoffs.map((k) => k.part?.path)),
       );
       expect(kickoffs.map((k) => k.part?.path)).toEqual(["coding", "gateway"]);
-      expect(continuationInput?.path).toBe("gateway");
+      expect(continuation.input?.path).toBe("gateway");
       expect(
         kickoffs[1]?.text.startsWith(guidedPathContinuationLine("gateway")),
       ).toBe(true);

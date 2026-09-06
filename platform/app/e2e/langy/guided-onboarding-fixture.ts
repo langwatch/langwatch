@@ -12,6 +12,7 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 
+import { expect } from "vitest";
 import {
   buildGuidedKickoffParts,
   type GuidedKickoffInput,
@@ -19,7 +20,7 @@ import {
 } from "~/features/guided-onboarding/kickoff";
 import type { GuidedPath } from "~/features/guided-onboarding/paths";
 import { ADMIN_EMAIL, APP_BASE, PROJECT_ID, useProject } from "./config";
-import type { LangyAdapter } from "./langy-agent";
+import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import { getCliApiKey, openaiKey } from "./local-control-fixture";
 import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
 
@@ -534,4 +535,146 @@ export async function waitForPathDone({
     state = await readGuidedState(organizationId);
   }
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// When the completion ran (the stream's tool frames, not the judge)
+// ---------------------------------------------------------------------------
+
+/**
+ * The tool events of several readers as one trail, in order, each frame once.
+ *
+ * The adapter reads the turns it starts and the watcher reads every turn of
+ * the conversation, so a kickoff turn is on both and a turn the panel started
+ * on its own is on the watcher alone.
+ */
+export function mergeToolEvents(
+  ...trails: ReadonlyArray<readonly LangyToolEvent[]>
+): LangyToolEvent[] {
+  const seen = new Set<string>();
+  const merged: LangyToolEvent[] = [];
+  for (const trail of trails) {
+    for (const event of trail) {
+      const key = `${event.turnId}:${event.phase}:${event.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(event);
+    }
+  }
+  return merged;
+}
+
+/** Every `complete-path` command the trail issued, in order. */
+export function pathCompletions(events: readonly LangyToolEvent[]): string[] {
+  return events
+    .filter(
+      (event) =>
+        event.phase === "start" &&
+        event.command !== null &&
+        /langwatch onboarding complete-path/.test(event.command),
+    )
+    .map((event) => event.command as string);
+}
+
+function describeTrail(events: readonly LangyToolEvent[]): string {
+  return events
+    .map(
+      (event, index) =>
+        `${index} turn ${event.turnId.slice(-6)} ${event.phase} ${event.name}${
+          event.command ? ` ${event.command}` : ""
+        }`,
+    )
+    .join("\n");
+}
+
+/**
+ * The completion was the step the script reached last, not a command batched
+ * into a step with other calls.
+ *
+ * Read on the stream's tool frames, which the worker emits the way pi runs a
+ * step: every call of a step is started before any of them ends, so a
+ * `complete-path` that starts while another call of its turn is still open,
+ * or that has another call start before it ends, was issued in the same step
+ * as that call. When the skill reached the model as a tool call (before the
+ * worker placed it ahead of the brief), the completion also starts only after
+ * that call settled: a completion issued before the script came back was run
+ * on the words of the brief alone. `after` names commands that must have
+ * settled first (the llmops path closes only once the suite run is open).
+ */
+export function assertPathCompletedAfterSkill({
+  events,
+  path,
+  after = [],
+}: {
+  events: readonly LangyToolEvent[];
+  path: GuidedPath;
+  after?: readonly RegExp[];
+}): void {
+  const completionPattern = new RegExp(
+    `langwatch onboarding complete-path ${path}\\b`,
+  );
+  const trail = describeTrail(events);
+  const completion = events.findIndex(
+    (event) =>
+      event.phase === "start" &&
+      event.command !== null &&
+      completionPattern.test(event.command),
+  );
+  expect(
+    completion,
+    `complete-path ${path} was never issued\n${trail}`,
+  ).toBeGreaterThanOrEqual(0);
+  const call = events[completion]!;
+  const before = events.slice(0, completion);
+  const settledBefore = new Set(
+    before
+      .filter((event) => event.turnId === call.turnId && event.phase === "end")
+      .map((event) => event.id),
+  );
+  const openAtStart = before.filter(
+    (event) =>
+      event.turnId === call.turnId &&
+      event.phase === "start" &&
+      !settledBefore.has(event.id),
+  );
+  expect(
+    openAtStart.map((event) => event.name),
+    `complete-path ${path} was issued in the same step as ${openAtStart
+      .map((event) => event.name)
+      .join(", ")}, which had not settled\n${trail}`,
+  ).toEqual([]);
+  const settledAt = events.findIndex(
+    (event, index) =>
+      index > completion && event.phase === "end" && event.id === call.id,
+  );
+  const startedMeanwhile = events
+    .slice(completion + 1, settledAt === -1 ? undefined : settledAt)
+    .filter((event) => event.turnId === call.turnId && event.phase === "start");
+  expect(
+    startedMeanwhile.map((event) => event.name),
+    `complete-path ${path} was issued in the same step as ${startedMeanwhile
+      .map((event) => event.name)
+      .join(", ")}, which started before it settled\n${trail}`,
+  ).toEqual([]);
+  const isGuidedSkillCall = (event: LangyToolEvent) =>
+    event.name === "skill" &&
+    ((event.input as { name?: unknown } | null | undefined)?.name ??
+      "guided-onboarding") === "guided-onboarding";
+  if (events.some(isGuidedSkillCall)) {
+    expect(
+      before.some((event) => event.phase === "end" && isGuidedSkillCall(event)),
+      `complete-path ${path} was issued before the guided-onboarding skill call settled\n${trail}`,
+    ).toBe(true);
+  }
+  for (const pattern of after) {
+    expect(
+      before.some(
+        (event) =>
+          event.phase === "end" &&
+          event.command !== null &&
+          pattern.test(event.command),
+      ),
+      `complete-path ${path} was issued before ${pattern} settled\n${trail}`,
+    ).toBe(true);
+  }
 }

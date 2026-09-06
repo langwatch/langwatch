@@ -26,7 +26,11 @@ import * as net from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { APP_BASE, PROJECT_ID } from "./config";
-import type { LangyAdapter } from "./langy-agent";
+import {
+  type LangyAdapter,
+  type LangyToolEvent,
+  toolEventOf,
+} from "./langy-agent";
 import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -888,6 +892,12 @@ export interface ConversationWatcher {
    * its navigations are readable here and nowhere else.
    */
   navigateHrefs: string[];
+  /**
+   * Every tool frame on the turns the watcher followed, start and end, in
+   * stream order, across every turn including the ones the panel started on
+   * its own. The ordering assertions read this.
+   */
+  toolEvents: LangyToolEvent[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
   /** The turns the panel started on its own, without a message from the test. */
@@ -1100,6 +1110,7 @@ export function watchLangyConversation({
   }> = [];
   const turnIds: string[] = [];
   const navigateHrefs: string[] = [];
+  const toolEvents: LangyToolEvent[] = [];
   const answeredWaits = new Set<string>();
   const watchedTurns = new Set<string>();
   const controller = new AbortController();
@@ -1227,6 +1238,9 @@ export function watchLangyConversation({
             typeof entry.href === "string"
           ) {
             navigateHrefs.push(entry.href);
+          } else if (entry.type === "tool") {
+            const event = toolEventOf({ entry, turnId });
+            if (event) toolEvents.push(event);
           } else if (entry.type === "local_workspace") {
             workspaceEvents.push({
               state: String(entry.state ?? ""),
@@ -1388,6 +1402,7 @@ export function watchLangyConversation({
     },
     workspaceEvents,
     navigateHrefs,
+    toolEvents,
     turnIds,
     turnsStartedWithoutUs: (knownTurnIds) =>
       turnIds.filter((id) => !knownTurnIds.includes(id)),

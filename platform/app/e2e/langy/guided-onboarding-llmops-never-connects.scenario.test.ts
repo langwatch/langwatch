@@ -22,6 +22,7 @@ import {
   type GuidedOrganization,
   listProjectScenarios,
   listProjectSuites,
+  pathCompletions,
   queueGuidedKickoff,
   readGuidedState,
   saysVerbatim,
@@ -127,6 +128,7 @@ describe("Langy offers GitHub when the folder never connects", () => {
       expect(status.pendingRequest?.id).not.toBe(expiredRequestId);
 
       expect(await listProjectScenarios()).toEqual([]);
+      expect(pathCompletions(langy.state.toolEvents)).toEqual([]);
       expect(await listProjectSuites()).toEqual([]);
       expect((await readGuidedState(org.organizationId)).donePaths).toEqual([]);
       expect(

@@ -14,12 +14,14 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  assertPathCompletedAfterSkill,
   attachKickoffConversation,
   GOVERNANCE_SOURCES_PATH,
   GUIDED_LINES,
   GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
+  mergeToolEvents,
   queueGuidedKickoff,
   saysVerbatim,
   seedGuidedOrganization,
@@ -31,7 +33,6 @@ import {
   watchLangyConversation,
 } from "./local-control-fixture";
 import { runScenarioAndLog } from "./scenario-logger";
-import { allAssistantText } from "./scenario-transcript";
 
 const model = openai("gpt-5-mini");
 
@@ -126,14 +127,16 @@ describe("Langy sets up governance from the kickoff", () => {
           /langwatch onboarding complete-path governance/.test(command),
         ),
       ).toBe(true);
+      assertPathCompletedAfterSkill({
+        events: mergeToolEvents(langy.state.toolEvents, watcher.toolEvents),
+        path: "governance",
+      });
       const state = await waitForPathDone({
         organizationId: org.organizationId,
         path: "governance",
       });
       expect(state.donePaths).toContain("governance");
 
-      const text = allAssistantText(result);
-      expect(saysVerbatim(text, GUIDED_LINES.governanceAsk)).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     }, 900_000);

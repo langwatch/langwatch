@@ -43,6 +43,56 @@ export interface PageContextChip {
   label: string;
 }
 
+/**
+ * One tool frame on a turn stream: the call as the agent issued it (`start`)
+ * or as it settled (`end`), in stream order.
+ *
+ * The stored message flattens a turn's calls into one list, so it cannot say
+ * which calls were batched into one step and which waited for a result. The
+ * stream can: a call whose `start` precedes every `end` of its turn was issued
+ * blind, before any tool had answered.
+ */
+export interface LangyToolEvent {
+  turnId: string;
+  phase: "start" | "end";
+  id: string;
+  name: string;
+  /** The command the call ran, when it ran one. */
+  command: string | null;
+  input: unknown;
+}
+
+/** The tool event a stream entry describes, or null for any other entry. */
+export function toolEventOf({
+  entry,
+  turnId,
+}: {
+  entry: Record<string, unknown>;
+  turnId: string;
+}): LangyToolEvent | null {
+  if (entry.type !== "tool") return null;
+  const phase =
+    entry.phase === "start" || entry.phase === "end" ? entry.phase : null;
+  if (!phase) return null;
+  const input = entry.input;
+  const inputCommand = (input as { command?: unknown } | null | undefined)
+    ?.command;
+  const command =
+    typeof inputCommand === "string" && inputCommand
+      ? inputCommand
+      : typeof entry.command === "string" && entry.command
+        ? entry.command
+        : null;
+  return {
+    turnId,
+    phase,
+    id: typeof entry.id === "string" ? entry.id : "",
+    name: typeof entry.name === "string" ? entry.name : "tool",
+    command,
+    input,
+  };
+}
+
 export interface LangySessionState {
   conversationId: string | null;
   /**
@@ -77,6 +127,12 @@ export interface LangySessionState {
    * carried an action.
    */
   toolOutputs: string[];
+  /**
+   * Every tool frame on this session's turn streams, start and end, in
+   * order. The ordering assertions read this: which call was issued after
+   * which result, a fact the settled list above cannot carry.
+   */
+  toolEvents: LangyToolEvent[];
 }
 
 /** Mirror langyChatTransport.ts's message shape: {role, parts: [{type, text}]}. */
@@ -266,6 +322,7 @@ async function streamTurnText({
   onNavigate,
   onNarration,
   onSettledTool,
+  onToolFrame,
   onUiAction,
 }: {
   cookie: string;
@@ -282,6 +339,8 @@ async function streamTurnText({
   onNarration?: (text: string) => void;
   /** Called for each settled tool card on the stream, in order. */
   onSettledTool?: (call: SettledToolCall) => void;
+  /** Called for every tool frame, start and end, in stream order. */
+  onToolFrame?: (event: LangyToolEvent) => void;
   /**
    * Called for each dispatched UI action on the stream, in order.
    *
@@ -348,6 +407,8 @@ async function streamTurnText({
         if (textAfterLastTool.trim() !== "") onNarration?.(textAfterLastTool);
         textAfterLastTool = "";
         sawTool = true;
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
         if (entry.phase === "end") {
           toolSeq += 1;
           onSettledTool?.({
@@ -625,6 +686,7 @@ export function makeLangyAdapter(
     toolCommands: [],
     toolNames: [],
     toolOutputs: [],
+    toolEvents: [],
   };
   let queuedParts: Array<Record<string, unknown>> | null = null;
   const adapter: AgentAdapter = {
@@ -668,6 +730,7 @@ export function makeLangyAdapter(
         params: { projectId: PROJECT_ID, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
         onNarration: (narration) => segments.push({ kind: "text", narration }),
+        onToolFrame: (event) => state.toolEvents.push(event),
         onSettledTool: (call) => {
           settledTools.push(call);
           segments.push({ kind: "tool", call });
@@ -698,6 +761,7 @@ export function makeLangyAdapter(
       state.toolCommands.length = 0;
       state.toolNames.length = 0;
       state.toolOutputs.length = 0;
+      state.toolEvents.length = 0;
     },
     queueNextTurn: ({ parts }: { parts: Array<Record<string, unknown>> }) => {
       queuedParts = parts;

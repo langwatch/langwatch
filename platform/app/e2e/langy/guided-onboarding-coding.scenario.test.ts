@@ -14,6 +14,7 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+  assertPathCompletedAfterSkill,
   attachKickoffConversation,
   conversationTitle,
   GUIDED_LINES,
@@ -96,6 +97,10 @@ describe("Langy sets up coding agent tracking from the kickoff", () => {
           /langwatch onboarding complete-path coding/.test(command),
         ),
       ).toBe(true);
+      assertPathCompletedAfterSkill({
+        events: langy.state.toolEvents,
+        path: "coding",
+      });
       const state = await waitForPathDone({
         organizationId: org.organizationId,
         path: "coding",

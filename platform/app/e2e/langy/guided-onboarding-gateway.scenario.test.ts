@@ -15,6 +15,7 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import {
+  assertPathCompletedAfterSkill,
   attachKickoffConversation,
   GUIDED_LINES,
   GUIDED_TONE_CRITERIA,
@@ -116,6 +117,10 @@ describe("Langy sets up the gateway from the kickoff", () => {
           /langwatch onboarding complete-path gateway/.test(command),
         ),
       ).toBe(true);
+      assertPathCompletedAfterSkill({
+        events: langy.state.toolEvents,
+        path: "gateway",
+      });
       const state = await waitForPathDone({
         organizationId: org.organizationId,
         path: "gateway",
@@ -192,6 +197,10 @@ describe("Langy sets up the gateway from the kickoff", () => {
       expect(saysVerbatim(text, GUIDED_LINES.gatewayLive)).toBe(true);
       expect(text).toMatch(/OPENAI_API_KEY="?[A-Za-z0-9_-]{16,}/);
       expect(saysVerbatim(text, GUIDED_LINES.gatewayClose)).toBe(true);
+      assertPathCompletedAfterSkill({
+        events: langy.state.toolEvents,
+        path: "gateway",
+      });
       const state = await waitForPathDone({
         organizationId: org.organizationId,
         path: "gateway",

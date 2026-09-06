@@ -19,6 +19,7 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  assertPathCompletedAfterSkill,
   attachKickoffConversation,
   conversationMessages,
   GUIDED_LINES,
@@ -27,6 +28,7 @@ import {
   type GuidedOrganization,
   listProjectScenarios,
   listProjectSuites,
+  mergeToolEvents,
   queueGuidedKickoff,
   saysVerbatim,
   seedGuidedOrganization,
@@ -249,6 +251,11 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
             /langwatch onboarding complete-path llmops/.test(c),
           ),
         ).toBe(true);
+        assertPathCompletedAfterSkill({
+          events: mergeToolEvents(langy.state.toolEvents, watcher.toolEvents),
+          path: "llmops",
+          after: [/langwatch test-suite run/],
+        });
         const state = await waitForPathDone({
           organizationId: org.organizationId,
           path: "llmops",
