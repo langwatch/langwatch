@@ -33,7 +33,7 @@ FEATURE_FLAG_FORCE_ENABLE=release_event_sourced_analytics_read,release_event_sou
 
 ```bash
 make quickstart all-local          # local CH + PG + Redis + app + workers
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - **ClickHouse migrations.** This PR ships 00037 (per-span `Cost` +

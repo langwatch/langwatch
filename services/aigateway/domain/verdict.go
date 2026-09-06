@@ -116,6 +116,11 @@ type AITraceParams struct {
 	Usage              Usage
 	RequestType        RequestType
 
+	// RequestedModel is the model name the client sent, when a routing policy
+	// rewrote it into Model. Empty when the caller got what they asked for.
+	// Customer-controlled, like Model, so it stays off the internal span.
+	RequestedModel string
+
 	// VirtualKeyID is the id of the VK that authorized this request. Stamped
 	// on the customer span so the control plane's trace-processing pipeline
 	// can fold per-budget spend back into ClickHouse idempotently.

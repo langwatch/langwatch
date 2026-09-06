@@ -16,7 +16,7 @@
 # no setup step: the first `haven up` bootstraps the machine itself.
 #
 #   make haven install       # go install the binary, then just run `haven ...`
-#   make haven up            # start this worktree's stack (== pnpm dev:haven)
+#   make haven up            # start this worktree's stack
 #   make haven status        # every stack + shared-server health, one shot
 #   make haven               # build ./bin/haven (no subcommand)
 
@@ -52,7 +52,7 @@ haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
 	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
-	@go install $(HAVEN_PKG) && bash scripts/haven-install-path.sh
+	@go install $(HAVEN_PKG) && bash dev/scripts/haven-install-path.sh
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
@@ -75,7 +75,7 @@ observability:
 # Mint a Grafana service-account token and configure the gcx CLI with it so
 # an agent can query the stack. Idempotent. (Not a haven subcommand — a script.)
 observability-connect:
-	@bash scripts/observability/connect.sh
+	@bash dev/scripts/observability/connect.sh
 
 # Tail the stack logs (same tap as every service: haven logs).
 observability-logs:

@@ -51,6 +51,19 @@ type Meta struct {
 	BudgetWarnings       []string
 	CacheMode            string
 	CustomerTraceparent  string
+	// ParamsDropped lists request parameters the parameter policy removed
+	// on a translated lane (drop_tuning_params semantics). Surfaced as the
+	// X-LangWatch-Params-Dropped response header on both sync and stream
+	// lanes so a drop is never silent.
+	ParamsDropped []string
+	// GuardrailsNotApplied names why the key's guardrails did not run on
+	// this request, when they did not. Surfaced as the
+	// X-LangWatch-Guardrails-Not-Applied response header.
+	GuardrailsNotApplied string
+	// RealtimeSessionID is the LangWatch id of the voice session a mint
+	// opened. Surfaced as X-LangWatch-Session-Id so a caller can join its
+	// own session to the spend record without parsing the vendor body.
+	RealtimeSessionID string
 }
 
 // MetaAccumulator is what interceptors write response metadata into. Dispatch
@@ -97,6 +110,7 @@ func (a *MetaAccumulator) Snapshot() Meta {
 	defer a.mu.Unlock()
 	out := a.meta
 	out.BudgetWarnings = slices.Clone(a.meta.BudgetWarnings)
+	out.ParamsDropped = slices.Clone(a.meta.ParamsDropped)
 	return out
 }
 

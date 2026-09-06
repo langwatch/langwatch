@@ -99,7 +99,7 @@ Concretely:
    so the client's handled/unknown logic is identical regardless of transport.
 
 7. **The client is the single place that decides presentation.** A shared reader
-   (`readHandledError`, in `langwatch/src/features/errors`) lifts `data.error`;
+   (`readHandledError`, in `platform/app/src/features/errors`) lifts `data.error`;
    an `explain*`-style mapping keyed on `code` turns it into user-facing copy and
    an optional action/render choice. The server never dictates UI; it emits the
    typed fact, the client renders it. Absence of a domain payload → the generic
@@ -427,11 +427,11 @@ by luck.
 - Code (TS): `packages/handled-error` (`HandledError`,
   `SerializedHandledError`, `NotFoundError`, `ValidationError` — shared
   package, imported directly by the app, MCP server, CLI and SDKs),
-  `langwatch/src/server/handled-error-wiring.ts` (Grafana trace-link wiring),
-  `langwatch/src/server/app-layer/error-remediation.ts` (tips/docs registry),
-  `langwatch/src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
-  `langwatch/src/app/api/middleware/error-handler.ts` (`handleError`),
-  `langwatch/src/features/errors` — in particular
+  `platform/app/src/server/handled-error-wiring.ts` (Grafana trace-link wiring),
+  `platform/app/src/server/app-layer/error-remediation.ts` (tips/docs registry),
+  `platform/app/src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
+  `platform/app/src/app/api/middleware/error-handler.ts` (`handleError`),
+  `platform/app/src/features/errors` — in particular
   `logic/presentation.ts` (the code-keyed customer copy) and `logic/codes.ts`
   (`APP_ERROR_CODES`), alongside `readHandledError`, `showErrorToast`,
   `HandledErrorAlert` and `applyHandledErrorToForm`; `tools/herrgen` +

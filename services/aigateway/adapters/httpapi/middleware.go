@@ -29,7 +29,7 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 			token := extractToken(r)
 			if token == "" {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, or x-goog-api-key header",
+					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header",
 				}))
 				return
 			}
@@ -109,6 +109,23 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 			// so the trace has a real thread id instead of nothing.
 			ctx = customertracebridge.WithClientSessionID(ctx, clientSessionIDFromHeaders(r.Header))
 
+			// External end-user attribution + caller metadata echo. Both are
+			// gateway-consumed control headers: lifted here, deleted so they
+			// never forward upstream (the body `user` param, by contrast, is
+			// forwarded unchanged and read at emit time as the fallback).
+			ctx = customertracebridge.WithEndUserID(ctx, endUserIDFromHeaders(r.Header))
+			if raw := r.Header.Get(headerRequestMetadata); raw != "" {
+				validated := customertracebridge.ValidateRequestMetadataJSON(raw)
+				if validated == "" {
+					clog.Get(r.Context()).Debug("request_metadata_dropped",
+						zap.Int("size", len(raw)))
+				}
+				ctx = customertracebridge.WithRequestMetadataJSON(ctx, validated)
+			}
+			r.Header.Del(headerEndUserID)
+			r.Header.Del(headerEndUserIDLiteLLM)
+			r.Header.Del(headerRequestMetadata)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -150,6 +167,31 @@ func extractToken(r *http.Request) string {
 	// place the SDK would normally put a Google API key.
 	if k := r.Header.Get("X-Goog-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
+	}
+	// xi-api-key — the ElevenLabs SDKs' auth header. The realtime session
+	// mint mirrors that vendor's own path, so an SDK reaches it by base URL
+	// alone; without this header it would also need its auth rewired.
+	if k := r.Header.Get("Xi-Api-Key"); k != "" {
+		return strings.TrimSpace(k)
+	}
+	return ""
+}
+
+const (
+	headerEndUserID        = "X-LangWatch-End-User-Id"
+	headerEndUserIDLiteLLM = "X-Litellm-End-User-Id"
+	headerRequestMetadata  = "X-LangWatch-Metadata"
+)
+
+// endUserIDFromHeaders resolves the caller-declared external end-user id:
+// the native header wins, then the LiteLLM migration alias so existing
+// integrations keep attributing without a client change. Values are
+// sanitized (trim, control-char strip, 256-rune cap) before use.
+func endUserIDFromHeaders(h http.Header) string {
+	for _, name := range []string{headerEndUserID, headerEndUserIDLiteLLM} {
+		if v := customertracebridge.SanitizeEndUserID(h.Get(name)); v != "" {
+			return v
+		}
 	}
 	return ""
 }

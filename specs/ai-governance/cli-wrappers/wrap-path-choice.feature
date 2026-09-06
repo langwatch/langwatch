@@ -81,15 +81,21 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
       Then the wrapper does NOT prompt
       And it proceeds in ingestion mode
 
-  Rule: non-interactive and forced contexts default to the gateway with no prompt
+  Rule: the gateway path is only ever entered by explicit choice
+
+    Routing through the gateway spends money: the model calls go through
+    LangWatch-held provider credentials and are billed to the organization.
+    The only ways in are the prompt, a pinned cfg.tool_mode, `--tool-mode=gateway`,
+    and `LANGWATCH_TOOL_MODE=gateway`. Nothing the wrapper decides on its own,
+    and no failure on the direct OTLP path, may put a run on it.
 
     @unit
-    Scenario: Non-TTY defaults to the gateway
+    Scenario: Non-TTY takes the path that spends nothing
       Given tool_mode.claude is unset
       And stdin is not a TTY
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
-      And it defaults to the gateway path
+      And it proceeds in ingestion mode
 
     @unit
     Scenario: LANGWATCH_AUTO_LOGIN skips the prompt
@@ -97,7 +103,55 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
       And `LANGWATCH_AUTO_LOGIN=1` is exported
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
-      And it defaults to the gateway path
+      And it proceeds in ingestion mode
+
+    @unit
+    Scenario: Cancelling the path prompt cancels the run
+      Given tool_mode.claude is unset
+      And stdin and stdout are a TTY
+      When the user runs `langwatch claude` and aborts the select prompt
+      Then the run is marked aborted and no path is persisted
+      And the wrapper does NOT resolve to the gateway path
+
+  Rule: an expired device session never reroutes the run onto the gateway
+
+    Direct OTLP setup mints a personal ingest key against the control plane, so
+    an expired device session fails it. That is a session problem, not a signal
+    that the user wanted to be billed, so the wrapper says what happened and
+    either recovers the session or stops.
+
+    @unit
+    Scenario: The mint 401 is recognised as an expired session
+      Given the ingestion-key mint returns 401 "Session expired"
+      Then the wrapper classifies the failure as an expired session
+      And a `tool_disabled` policy error is NOT classified as one
+
+    @unit
+    Scenario: On a TTY the wrapper offers the login and stays on direct OTLP
+      Given tool_mode.codex is "ingestion"
+      And the device session has expired
+      And stdin and stdout are a TTY
+      When the user runs `langwatch codex`
+      Then the wrapper explains that the session expired
+      And it asks the user to log in again
+      And on success it retries the direct OTLP path with the refreshed config
+
+    @unit
+    Scenario: Declining the login stops the run instead of starting the tool
+      Given the device session has expired
+      And stdin and stdout are a TTY
+      When the user declines the login prompt
+      Then the wrapper exits non-zero without starting the tool
+
+    @unit
+    Scenario: Without a TTY the wrapper exits and names the login command
+      Given tool_mode.codex is "ingestion"
+      And the device session has expired
+      And stdin is not a TTY
+      When the user runs `langwatch codex`
+      Then the wrapper exits non-zero
+      And the message names `langwatch login --device`
+      And the message says the gateway path was not used
 
   Rule: an explicit override flag or env skips the prompt and is stripped from forwarded args
 

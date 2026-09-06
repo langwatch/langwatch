@@ -163,3 +163,120 @@ Feature: Gateway budget targeting
     Then its budget no longer applies to anything
     And no leftover budget keeps charging against the removed team
     # Cleanup runs in the service layer rather than via a database cascade.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # The MANUAL window and period resets
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @unit
+  Scenario: A MANUAL window never resets on its own
+    Given a budget on the MANUAL window
+    When its next reset instant is computed
+    Then it is the never-resets sentinel
+    And the automatic reset check always answers no
+    # The period is owned by the customer's billing cycle: the boundary
+    # moves only when they say so.
+
+  @unit
+  Scenario: The period floor follows the stored boundary, not the calendar
+    Given a MANUAL budget and a calendar budget reset mid-period
+    When each budget's spend-read floor is computed
+    Then the MANUAL budget always reads from its stored boundary
+    And the reset calendar budget reads from its boundary until the next calendar edge passes
+    And an unreset lifetime budget keeps its whole-bucket read
+    # The rollup fast path answers calendar periods only; a moved boundary
+    # reads the raw ledger bounded by time.
+
+  @integration
+  Scenario: Resetting a budget moves the boundary and never the ledger
+    Given a budget with recorded spend this period
+    When the budget is reset
+    Then its current-period spend reads as zero
+    And every ledger row that existed before the reset still exists
+    # Recorded spend is immutable; reconciliation and billing events are
+    # unaffected by resets, unlike counter-zeroing designs.
+
+  @integration
+  Scenario: Resetting one end-user bucket leaves the template period alone
+    Given an attributed-user template with spend from two end users
+    When one end user's bucket is reset
+    Then that user's current-period spend reads as zero
+    And the other user's spend is unchanged
+    And the template's own boundary did not move
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # A budget reaches the traffic it names
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # Which team and project a request belongs to used to be read entirely
+  # from where its traces land. That answers a different question: a key
+  # shared across a team lands its traces in the organization's governance
+  # inbox unless somebody names a project, so a team-scoped key reported the
+  # governance team, and a budget on the team that owns the key matched
+  # nothing while both sides looked correctly configured.
+
+  @unit
+  Scenario: A key belongs to the teams it is scoped to
+    Given a key scoped to team "platform" whose traces land in another team's project
+    When the key's attribution scopes are resolved
+    Then they include team "platform"
+    And they still include the team its traces land in
+    # Attribution is a set, not a single answer, so making it correct can
+    # only add budgets that now match and can never stop one from matching.
+
+  @integration
+  Scenario: A team budget reaches a team-scoped key's traffic
+    Given team "platform" has a budget and a key scoped to that team
+    When the key completes a request
+    Then the team budget records the spend
+    # The configuration a customer would reach for first, which until now
+    # accrued nothing at all.
+
+  @integration
+  Scenario: A budget no active key can reach is refused when it is created
+    Given an organization whose keys all send traffic elsewhere
+    When an admin creates a budget on a project none of them reach
+    Then the budget is refused as unreachable
+    And the refusal names where the organization's traffic actually goes
+    # A budget that can never accrue is a silent failure with a bill
+    # attached. Say so at the moment it is written. Only the scopes matched
+    # through the key are checked: an organization budget covers every key
+    # by construction, and the rest already refuse a target that does not
+    # exist here.
+
+  @integration
+  Scenario: An admin can still create a budget before any key exists
+    Given an organization with no active keys
+    When an admin creates a budget on one of its projects
+    Then the budget is created
+    # Budget first, key second is the natural setup order, so an empty
+    # organization must never be told its budget is unreachable.
+
+  @integration
+  Scenario: An admin can insist on a budget that nothing reaches yet
+    Given an organization whose keys all send traffic elsewhere
+    When an admin creates an unreachable budget and asks to keep it anyway
+    Then the budget is created
+    # Provisioning ahead of the keys that will use it is legitimate; the
+    # refusal is a guardrail, not a prohibition.
+
+  @integration
+  Scenario: The offer to keep an unreachable budget does not follow the form to another scope
+    Given an admin whose budget was refused as unreachable
+    When they point the form at a different scope
+    Then the offer to keep it anyway is withdrawn
+    And creating it asks the question again for the scope now chosen
+    # "Create it anyway" resubmits the form as it stands. Left on screen
+    # after the scope changes, it would keep a scope the server was never
+    # asked about, which is the guardrail quietly not running on the one
+    # budget the admin had already been warned about.
+
+  @integration
+  Scenario: A budget that nothing reaches says so when it is read back
+    Given a budget on a project no active key sends traffic to
+    When it is read through the API
+    Then it reports its scope as unreachable
+    # Every other field on a budget that never fires reads exactly like one
+    # that was simply never breached. This is the only thing that tells the
+    # two apart, so a customer reconciling by API can see it without
+    # opening the app.

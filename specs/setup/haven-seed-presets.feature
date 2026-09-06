@@ -5,7 +5,9 @@ Feature: Seed presets — a database that is ready to look at
   (an idempotent upsert, nothing dropped); `haven db reset [preset]` is the
   destructive sibling that starts from a fresh database. Presets are
   positional and shared by both: demo, traces, onboarding, post-onboarding,
-  bare (ADR-064).
+  bare, mass (ADR-064). One registry serves the whole CLI — `haven play --seed
+  <preset>` seeds a throwaway PR sandbox from the same list
+  (haven-play.feature).
 
   # Behavior lives in tools/thuishaven `app/db.go` (the seedPresets registry,
   # DBSeed, DBReset, the live-stack ingest steps) plus the seed scripts they
@@ -14,7 +16,7 @@ Feature: Seed presets — a database that is ready to look at
   # tools/thuishaven): `app/db_test.go` (TestDBSeed, TestDBReset). The full
   # ingest-through-the-collector path is only exercised manually, so those
   # scenarios stay `@unimplemented`. The parity checker
-  # (`langwatch/scripts/check-feature-parity.ts`) scans tools/thuishaven's Go
+  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's Go
   # tests: @unit scenarios are bound by `// @scenario` annotations above those
   # test funcs.
 
@@ -52,6 +54,17 @@ Feature: Seed presets — a database that is ready to look at
     Then the identity is seeded past onboarding
     And the command fails explaining the stack must be up for the sample traces
 
+  # The demo content includes a prompt and an HTTP agent pointed at a public
+  # echo service (httpbin.org), so prompt management and HTTP-agent scenario
+  # targets both have something real to open — the agent completes a live
+  # round-trip with no API key. Both are seeded as raw JSON that the app
+  # re-validates on every read; the binding test runs those exact validators.
+  @unit
+  Scenario: The demo preset ships a working prompt and HTTP agent
+    Given the demo preset has been seeded
+    When the prompt and the HTTP agent are opened
+    Then both load the way the product reads them, ready to use
+
   # Cheap variants composed from switches the seed scripts already understand:
   #   traces          — sample traces on top of the identity, no demo content
   #   onboarding      — first-trace flag cleared: land on the onboarding journey
@@ -71,7 +84,7 @@ Feature: Seed presets — a database that is ready to look at
 
   # --- The mass preset ---
   # Months of coherent, backdated activity, implemented in
-  # langwatch/scripts/seed-mass.ts on the pure generators in
+  # platform/app/scripts/seed-mass.ts on the pure generators in
   # scripts/seed-lib/mass-timeline.ts and scripts/seed-lib/mass-metrics.ts.
   # Event-sourced products (scenario simulations, evaluations, experiment
   # runs) are seeded as real commands whose backdated occurredAt the substrate

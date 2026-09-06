@@ -6,12 +6,12 @@ icon: layer-group
 ---
 
 When you run LangWatch alongside another OTel-based SDK, both SDKs may hook
-into the same global `TracerProvider`. This causes **cross-contamination** —
+into the same global `TracerProvider`. This causes **cross-contamination**:
 LLM traces appear in the other tool and application traces appear in LangWatch.
 
 Both LangWatch SDKs support **true provider isolation** using a dedicated
 `TracerProvider`. LangWatch attaches its exporter to the dedicated provider and
-does not touch the global — each SDK operates independently.
+does not touch the global one, so each SDK operates independently.
 
 ## Python
 
@@ -49,7 +49,7 @@ langwatch.setup(api_key="...", tracer_provider=langwatch_provider)
 @langwatch.trace(name="llm-call")
 def chat(user_message: str):
     response = client.chat.completions.create(
-        model="gpt-4.1-nano",
+        model="gpt-5-mini",
         messages=[{"role": "user", "content": user_message}],
     )
     return response.choices[0].message.content
@@ -111,7 +111,7 @@ setupObservability({
 ```
 
 This adds LangWatch's processor to the shared global provider. LangWatch
-receives **all** spans — use the `LangWatchTraceExporter` filter options to
+receives **all** spans, so use the `LangWatchTraceExporter` filter options to
 scope to LLM-only spans. See the
 [TypeScript SDK reference](/integration/typescript/reference) for filter
 configuration.

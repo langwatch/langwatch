@@ -95,7 +95,7 @@ Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>
 
 1. **Header**: name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
 2. **Identity, Activity**: id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero, increments on every `gateway.virtual_key.updated` audit row.
-3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). Clarifies at-a-glance which provider is in the driver's seat and what falls back when it errors.
+3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). It shows which provider serves the request first and the order the others are tried in.
 4. **Configuration summary**: compact read-only view (no drawer needed) of the runtime config that's actually in effect:
    - **Tags**: colored subtle badges, the same strings shown on the list row.
    - **Cache mode**: badge (`respect`, `force`, `disable`) + TTL on force.
@@ -117,11 +117,34 @@ Rotate a VK when you believe the secret may have leaked or as part of routine hy
 4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
 5. After the grace window ends, only the new secret works.
 
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation.
+Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation. Rotation emits `gateway.virtual_key.rotated` to your [webhook endpoints](/features/webhooks#family-gateway), so a provisioning backend can mirror the new secret while the previous one is still inside its grace window.
+
+## Disable and enable: the reversible stop
+
+Disabling a VK stops it without destroying anything: requests on the key are rejected with the **distinct** `virtual_key_disabled` error (`403`) until it is enabled again, so tenant tooling can tell a paused key from a revoked one. Use it as the kill switch for non-payment, abuse, or incident containment, anywhere you may want the key back.
+
+- Budgets, scopes, configuration, key material, and **any rotation grace that was running** stay intact. Enable restores the key exactly as it was.
+- Both calls are idempotent, take an optional `reason` (recorded in the audit log and on the lifecycle event), and propagate to the gateway in seconds through the change feed.
+- `POST /api/gateway/v1/virtual-keys/:id/disable` and `.../enable`, permission `virtualKeys:update`.
+- Each transition emits a webhook event (`gateway.virtual_key.disabled`, `gateway.virtual_key.enabled`) alongside `created` and `revoked`, so a provisioning backend can mirror key state without polling. See [Webhooks](/features/webhooks#family-gateway).
+
+If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
+
+## Expiration
+
+A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
+
+- Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
+- The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
+- The key stops at its date even while the control plane is unreachable. The gateway is told the date on the token it holds and on the key's config, and both of its cache deadlines stop there, so the stale-while-error grace (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, 6 hours by default) never carries a key past its own date.
+- A date you change reaches the gateway within 60 seconds through the change feed. If the change feed is unavailable, the key's config refresh brings the new date on the same 60-second clock, in both directions: a shortened date stops the key, and an extended one keeps it serving. A control plane the gateway cannot reach at all leaves the last date it was told in force.
+- Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
+
+The virtual keys list badges a key past its date as **expired**. The key detail page states the date, and how long is left while the key is still active.
 
 ## Revocation
 
-Revocation immediately invalidates the secret. There is **no grace period** on revoke.
+Revocation immediately invalidates the secret. There is **no grace period** on revoke, and it is one-way: re-activating means minting a new key. Revoking also archives the key's own budgets and discards any rotation grace.
 
 Gateway caches are invalidated within 60 seconds via the `/internal/gateway/changes` long-poll. If you need instant invalidation everywhere (e.g. incident response), restart the gateway pods, the next request that hits them will pull fresh state before serving.
 
@@ -135,7 +158,7 @@ A VK belongs to exactly one **organisation** and carries one or more **scope row
 - **Budget cascade**: every applicable budget at any of the VK's scopes is checked. Hard-block at any scope blocks.
 - **Trace attribution**: the gateway tags spans with the most-specific scope match (PROJECT > TEAM > ORG).
 
-For the full semantics — including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span — see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
+For the full semantics, including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span, see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
 
 Trace attribution on every request:
 
@@ -149,7 +172,7 @@ Trace attribution on every request:
 
 Two flavours, distinguished by whether `principalUserId` is set:
 
-- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on first login.
+- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on the first gateway call, not at login.
 - **Shared VK** (`principalUserId` null): service-account-style credential. Budget cascade runs only through scope-driven budgets. Visibility follows the standard `virtualKeys:view` perm at the VK's scopes.
 
 Both use the same `vk-lw-…` format and the same multi-scope semantics; the principal column is orthogonal to scope.
@@ -164,6 +187,7 @@ Acting on VKs requires the following permissions (2-segment `resource:action`):
 | View another user's personal VK | `virtualKeys:viewOtherPersonal` |
 | Create | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
 | Update config | `virtualKeys:update` |
+| Disable, enable | `virtualKeys:update` |
 | Rotate | `virtualKeys:rotate` |
 | Delete, revoke | `virtualKeys:delete` |
 | All of the above | `virtualKeys:manage` |
@@ -176,7 +200,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.
@@ -185,6 +209,6 @@ This means:
 
 - **First request** on a cold cache: 2-4 ms of control-plane overhead.
 - **Warm request** after first: tens of microseconds of overhead.
-- **Control-plane offline**: gateway continues serving from warm cache until JWT TTL expires (15 min default); with bootstrap mode on, it can serve indefinitely.
+- **Control-plane offline**: gateway continues serving a warm key past its JWT TTL (15 min default) up to the auth-cache hard grace (6 hours by default), and never past the key's own expiration date. A key the pod has never resolved still fails, because the cache is per pod and starts empty.
 
 See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.

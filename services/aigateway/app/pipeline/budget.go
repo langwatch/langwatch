@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -14,7 +15,7 @@ import (
 type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 
 // Budget creates an interceptor that prechecks budget before dispatch.
-// Cost recording is NOT done here — the trace-fold reactor on the control
+// Cost recording is NOT done here — the trace-fold subscriber on the control
 // plane folds OTel span usage attributes into the ClickHouse budget ledger.
 //
 // Provider-filtered budgets (contract §4.6) do not block here: their breach
@@ -24,6 +25,19 @@ type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain
 // BudgetBreachError in both places so the two rejections cannot drift apart.
 func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 	pre := func(ctx context.Context, call *Call) error {
+		// Attributed-user templates enforce per end user, so the checker
+		// needs the request's resolved id; body-derived ids are stashed on
+		// the context so the checker and the spend admission read the SAME
+		// resolution. Fail-closed check runs before the (possibly cached
+		// and fetch-dependent) spend read: a template on the bundle plus no
+		// id is already a rejection, whatever the buckets say.
+		if hasPerUserTemplate(call.Bundle) {
+			endUser := ResolveEndUser(ctx, call)
+			if endUser == "" {
+				return EndUserRequiredError(ctx)
+			}
+			ctx = customertracebridge.WithEndUserID(ctx, endUser)
+		}
 		decision, err := precheck(ctx, call.Bundle)
 		if err != nil {
 			logger.Warn("budget_precheck_error", zap.Error(err))
@@ -68,6 +82,32 @@ func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 			}
 		},
 	}
+}
+
+func hasPerUserTemplate(bundle *domain.Bundle) bool {
+	if bundle == nil {
+		return false
+	}
+	for i := range bundle.Config.Budget.Scopes {
+		s := &bundle.Config.Budget.Scopes[i]
+		if s.PerUser && s.LimitMicroUSD > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// EndUserRequiredError is the fail-closed rejection for requests on a key
+// whose bundle carries an attributed-user template but which arrived with
+// no end-user id anywhere we resolve one. The message names both accepted
+// wire fields so the fix is actionable from the error alone.
+func EndUserRequiredError(ctx context.Context) error {
+	return herr.New(ctx, domain.ErrEndUserRequired, herr.M{
+		"message":  "This key enforces a per-end-user budget, and the request carried no end-user id. Send the OpenAI `user` field or the X-LangWatch-End-User-Id header.",
+		"tips":     []string{"Set `user` in the request body (ai-sdk: the `user` option)", "Or send X-LangWatch-End-User-Id (X-Litellm-End-User-Id is accepted as an alias)"},
+		"docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
+		"fault":    "customer",
+	})
 }
 
 // BudgetBreachError builds the 402 a request rejected on budget receives,
@@ -168,6 +208,8 @@ func budgetScopeNoun(scope string) string {
 		return "personal"
 	case "group":
 		return "group member"
+	case "attributed_user":
+		return "end-user"
 	default:
 		return scope
 	}

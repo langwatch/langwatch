@@ -34,7 +34,7 @@ This is parity with `make dev-full` from the dev tree, but for an end-user, **wi
 | BDD specs                      | `/specs/npx-installer/`                     |
 | CI workflows                   | `/.github/workflows/npx-server-*.yml`       |
 
-Existing `langwatch` (next.js app) becomes a workspace dep of `@langwatch/server`.
+The app — `@langwatch/web` since ADR-076, a Vite app in `langwatch/` — ships inside `@langwatch/server`'s tarball under `app/`, one workspace with the CLI.
 
 ---
 
@@ -285,7 +285,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
-- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `langevals/**/pyproject.toml`, `services/aigateway/**`, `langwatch/package.json`, `langwatch/scripts/**`
+- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
 - `macos-latest` (arm64)
@@ -323,7 +323,7 @@ Steps:
 3. `pnpm --filter @langwatch/server build` (which builds langwatch app + monobinary references)
 4. `pnpm --filter @langwatch/server publish --access public --no-git-checks`
 
-Version is read from `langwatch/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
+Version is read from `platform/app/package.json`. The `@langwatch/server` package version is **always equal** to the langwatch app version. A pre-publish step asserts both versions match the GH release tag, fails fast if not.
 
 ---
 
@@ -338,14 +338,17 @@ Version is read from `langwatch/package.json`. The `@langwatch/server` package v
 | `/.github/workflows/langwatch-server-publish.yml`     | replaced by `npx-server-publish.yml`                |
 | `Makefile` targets `python-build`, `python-install`, `start` | uv/pip flow gone; `start` redundant with new CLI |
 
-**Keep** `.python-version` (used by langwatch_nlp + langevals).
+**Keep** the `.python-version` pin (used by the Python projects). It now lives in each
+one — `sdks/python/`, `services/langevals/`, `mcp/typescript/` — rather than at the repo
+root, because `uv` resolves it by walking up from its working directory and the repo root
+holds no Python of its own.
 
 ---
 
 ## 12. Open questions
 
-- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, compose.dev.yml has it.
-- [ ] Quickwit/Elasticsearch? Currently not in compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
+- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, dev/compose.dev.yml has it.
+- [ ] Quickwit/Elasticsearch? Currently not in dev/compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
 - [ ] Should we ship the langwatch next.js app **prebuilt** in the npm tarball, or build on first run? Prebuilt = faster first-run, larger tarball. **Recommend prebuilt** (build at publish, not at install).
 - [ ] When the user has an `OPENAI_API_KEY` in env, should the CLI propagate it into `~/.langwatch/langwatch.env`? **Yes**, but read-only — don't persist user secrets to disk.
 

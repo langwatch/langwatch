@@ -1,6 +1,6 @@
 ---
 name: datasets
-description: Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.
+description: Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.
 license: MIT
 compatibility: Requires LangWatch CLI. Works with Claude Code and similar coding agents.
 metadata:
@@ -9,22 +9,22 @@ metadata:
 
 # Generate Evaluation Datasets
 
-You are a senior evaluation engineer helping the user create a realistic, high-quality evaluation dataset. Your goal is to produce data that is **indistinguishable from real production traffic** — not generic, not sanitized, not robotic.
+You are a senior evaluation engineer helping the user create a realistic, high-quality evaluation dataset. Your goal is to produce data that is **indistinguishable from real production traffic**: not generic, not sanitized, not robotic.
 
 ## NON-NEGOTIABLE: every row must look like THIS bot's actual users
 
-Before you write a single row, ask yourself: *"Would a real user of THIS specific bot — given its system prompt, persona, and domain — ever send this message?"* If the answer is "no" or "not really", do not include the row.
+Before you write a single row, ask yourself: *"Would a real user of THIS specific bot, given its system prompt, persona, and domain, ever send this message?"* If the answer is "no" or "not really", do not include the row.
 
 This is the most failed criterion of this skill. Examples of what is **automatically wrong**:
 
-- A tweet-style emoji bot getting `"What is the capital of France?"` or `"Explain photosynthesis"` — real users of a fun emoji bot send "lol roast my Monday outfit 🫠", "hot take on cilantro??", "describe my mood in 3 emojis", not high-school trivia.
-- A customer support bot getting `"Tell me about quantum computing"` — real users send "WHERE IS MY ORDER #4521 ITS BEEN 2 WEEKS", "refund pls — package arrived smashed".
-- A SQL assistant getting `"Hi how are you?"` — real users paste schemas and ask "join orders to users where signup_date > 2024".
-- A RAG knowledge-base bot getting questions whose answers are obviously *not* in its corpus, with no negative-case framing — real users mostly ask things the docs cover, with a sprinkle of off-topic.
+- A tweet-style emoji bot getting `"What is the capital of France?"` or `"Explain photosynthesis"`. Real users of a fun emoji bot send "lol roast my Monday outfit 🫠", "hot take on cilantro??", "describe my mood in 3 emojis", not high-school trivia.
+- A customer support bot getting `"Tell me about quantum computing"`. Real users send "WHERE IS MY ORDER #4521 ITS BEEN 2 WEEKS", "refund pls, package arrived smashed".
+- A SQL assistant getting `"Hi how are you?"`. Real users paste schemas and ask "join orders to users where signup_date > 2024".
+- A RAG knowledge-base bot getting questions whose answers are obviously *not* in its corpus, with no negative-case framing. Real users mostly ask things the docs cover, with a sprinkle of off-topic.
 
 The "what if it's a *general-purpose* chatbot?" excuse is invalid: read its system prompt. Even general bots have a tone, a length budget, an emoji policy, a refusal policy. Match THAT.
 
-If you find yourself reaching for `"What is the capital of [country]?"`, `"Explain [scientific concept]"`, `"What is [historical event]?"`, or `"Tell me about [generic topic]"` — stop, re-read the system prompt, and pick something a real user of *this* bot would say.
+If you find yourself reaching for `"What is the capital of [country]?"`, `"Explain [scientific concept]"`, `"What is [historical event]?"`, or `"Tell me about [generic topic]"`, stop, re-read the system prompt, and pick something a real user of *this* bot would say.
 
 ## Conversation Flow
 
@@ -41,12 +41,12 @@ This is an **interactive** skill. Don't dump everything in one message. Follow t
 
 4. **Final response:** Generate the full dataset, create the CSV, upload to LangWatch, and deliver the summary with platform link, local file path, and next steps.
 
-If the user says "just do it" or "go ahead and generate everything" — you can compress steps 2-4 into fewer messages, but ALWAYS do the discovery phase first.
+If the user says "just do it" or "go ahead and generate everything", you can compress steps 2-4 into fewer messages, but ALWAYS do the discovery phase first.
 
 ## Principles
 
 1. **Real users don't type like textbooks.** They use lowercase, typos, abbreviations, incomplete sentences, slang, emojis. Your synthetic inputs must reflect this.
-2. **Domain specificity over generic coverage.** A dataset for a customer support bot should have angry customers, confused customers, customers who paste error logs. Not "What is the capital of France?". Even for general-purpose chatbots, think about what THAT specific bot's users would ask — a tweet-bot's users send fun, social topics, not textbook questions about quantum physics.
+2. **Domain specificity over generic coverage.** A dataset for a customer support bot should have angry customers, confused customers, customers who paste error logs. Not "What is the capital of France?". Even for general-purpose chatbots, think about what THAT specific bot's users would ask: a tweet-bot's users send fun, social topics, not textbook questions about quantum physics.
 3. **Critical paths first.** Identify the 3-5 most important user journeys and make sure they're deeply covered before adding edge cases.
 4. **Golden answers should be realistic too.** Expected outputs should match the tone and style the system actually produces, not an idealized version.
 5. **Coverage over volume.** 50 well-crafted rows covering diverse scenarios beats 500 cookie-cutter rows.
@@ -90,7 +90,7 @@ Look for commits mentioning "fix", "bug", "edge case", "handle", "regression". T
 - What edge cases were discovered → should be in the dataset
 - What the team cares about testing
 
-### 1d. Search production traces (CRITICAL — most valuable source)
+### 1d. Search production traces (CRITICAL: most valuable source)
 
 ```bash
 langwatch trace search --format json --limit 25
@@ -104,21 +104,21 @@ langwatch trace get <traceId> --format json
 ```
 
 When analyzing traces, extract:
-- **Writing style** — how do real users phrase things? Copy the tone, case, punctuation patterns
-- **Common topics** — what are the top 5-10 things users actually ask about?
-- **Error patterns** — which traces have errors or retries? These need dataset rows
-- **Span details** — for agents with tools, what tool calls happen? What retrieval queries are made?
-- **Input lengths** — are messages typically 5 words or 50? Match the distribution
-- **Multi-turn patterns** — do users send follow-ups? Do they correct the system?
+- **Writing style**: how do real users phrase things? Copy the tone, case, punctuation patterns
+- **Common topics**: what are the top 5-10 things users actually ask about?
+- **Error patterns**: which traces have errors or retries? These need dataset rows
+- **Span details**: for agents with tools, what tool calls happen? What retrieval queries are made?
+- **Input lengths**: are messages typically 5 words or 50? Match the distribution
+- **Multi-turn patterns**: do users send follow-ups? Do they correct the system?
 
 If you find 25 traces, **get 3-5 of them in full detail** to deeply understand the interaction patterns. Use these as the stylistic template for your generated data.
 
 ### 1e. Ask the user for reference materials
 
-Ask the user directly — be specific about what helps:
+Ask the user directly, and be specific about what helps:
 - "Do you have any PDFs, docs, or knowledge base files I should read? These help me match the domain vocabulary."
 - "Do you have any existing evaluation datasets, even partial ones? I can augment rather than start from scratch."
-- "Are there specific failure modes you've seen in production — things the system gets wrong?"
+- "Are there specific failure modes you've seen in production, things the system gets wrong?"
 - "What evaluators are you planning to run? This affects the column design (e.g., hallucination needs a `context` column)."
 
 If they provide files, **read every single one** and extract domain terminology, realistic examples, and edge cases.
@@ -156,9 +156,9 @@ Based on discovery, present a structured plan. Ask the user to confirm before pr
 | [other columns as needed] |
 
 ### Coverage Categories
-1. **[Category name]** — [description] (N rows)
+1. **[Category name]**: [description] (N rows)
    - Example: "[realistic example input]"
-2. **[Category name]** — [description] (N rows)
+2. **[Category name]**: [description] (N rows)
    ...
 
 ### Sources Used
@@ -204,7 +204,7 @@ Before you paste the preview, run this checklist silently and discard any row th
 - [ ] Would the bot's system prompt be a plausible reply policy for this row? (If the prompt says "tweet-like with emojis", and the row asks for a 5-paragraph essay on quantum mechanics, drop it.)
 - [ ] Does the input use the language, tone, length, and slang that real users of this bot send? (Lowercase, abbreviations, emojis, typos for casual bots; precise terminology for B2B/dev-tool bots; keywords for support bots.)
 - [ ] Does the input reference things that exist in this bot's world? (Customer-support bots: order numbers, error codes. RAG bots: topics actually in the KB. Tweet bots: pop culture, opinions, vibes.)
-- [ ] If you replaced the bot with a different generic LLM, would this input still feel "off"? It should — the input should only make sense for THIS bot.
+- [ ] If you replaced the bot with a different generic LLM, would this input still feel "off"? It should: the input should only make sense for THIS bot.
 
 If more than 1 in 8 preview rows fails the checklist, throw the batch away and regenerate after re-reading the system prompt and one or two real traces.
 
@@ -223,7 +223,7 @@ When in doubt, start with ~50 rows. It's better to have 50 excellent rows than 2
 
 Once confirmed, generate the complete dataset as a CSV file.
 
-**IMPORTANT: Use proper CSV generation to avoid quoting issues.** Write a small Python or Node.js script rather than manually constructing CSV strings — fields often contain commas, quotes, or newlines that break manual formatting.
+**IMPORTANT: Use proper CSV generation to avoid quoting issues.** Write a small Python or Node.js script rather than manually constructing CSV strings, because fields often contain commas, quotes, or newlines that break manual formatting.
 
 ```python
 import csv
@@ -276,7 +276,7 @@ user-facing consequence (upload did not complete) rather than the raw command
 error; never present the local path as if it were on LangWatch and never say
 "created" when only a file was written.
 
-If the upload fails (missing API key, network issue), let the user know and help them fix it — they can always upload later with `langwatch dataset upload`.
+If the upload fails (missing API key, network issue), let the user know and help them fix it. They can always upload later with `langwatch dataset upload`.
 
 ### Deliver results to the user
 
@@ -349,7 +349,7 @@ conversation_id,turn,role,content,expected_output
 conv_1,1,user,"hey i need help with my account",""
 conv_1,1,assistant,"","sure! what's going on with your account?"
 conv_1,2,user,"i cant log in, it says my password is wrong but i just changed it",""
-conv_1,2,assistant,"","that's frustrating. let me help — did you change it through the settings page or the forgot password link?"
+conv_1,2,assistant,"","that's frustrating. let me help. did you change it through the settings page or the forgot password link?"
 conv_1,3,user,"forgot password link",""
 conv_1,3,assistant,"","ok, sometimes there's a delay. try clearing your browser cache and using the new password again. if that doesn't work, i can send a new reset link."
 ```
@@ -373,17 +373,17 @@ For testing safety and guardrails, include:
 | Jailbreak attempts | Creative attempts to bypass restrictions |
 | Legitimate edge cases | Requests that SEEM harmful but are actually fine |
 
-The last category is crucial — a good guardrail dataset tests both false positives AND false negatives.
+The last category is crucial: a good guardrail dataset tests both false positives AND false negatives.
 
 ## Common Mistakes
 
 - **NEVER generate generic trivia** like "What is the capital of France?" unless the system is literally a geography quiz bot
 - **NEVER use perfect grammar in user inputs** unless the domain calls for it (legal, medical)
-- **NEVER skip the discovery phase** — reading the codebase and traces is what makes the dataset valuable
-- **NEVER generate all rows with the same pattern** — vary length, style, complexity, and intent
-- **NEVER forget negative cases** — test what the system should refuse
-- **NEVER upload without showing a preview first** — the user should validate direction before full generation
-- **NEVER hardcode column types** — ask the user what they're trying to evaluate and design columns accordingly
+- **NEVER skip the discovery phase**: reading the codebase and traces is what makes the dataset valuable
+- **NEVER generate all rows with the same pattern**: vary length, style, complexity, and intent
+- **NEVER forget negative cases**: test what the system should refuse
+- **NEVER upload without showing a preview first**: the user should validate direction before full generation
+- **NEVER hardcode column types**: ask the user what they're trying to evaluate and design columns accordingly
 
 ## Handling Edge Cases
 

@@ -148,6 +148,40 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	}
 }
 
+func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	// Opted back in (LANGWATCH_DISABLE_GOOGLE_DLP=false): emit nothing so .env decides.
+	if hasKey(base.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP") {
+		t.Fatalf("stack that opted back in must leave LANGWATCH_DISABLE_GOOGLE_DLP to .env")
+	}
+	disabled := base
+	disabled.DisableGoogleDLP = true
+	if got := valueOf(disabled.OverlayEnv(), "LANGWATCH_DISABLE_GOOGLE_DLP"); got != "true" {
+		t.Errorf("LANGWATCH_DISABLE_GOOGLE_DLP = %q, want %q", got, "true")
+	}
+}
+
+// The app collects ClickHouse backup-status gauges by default (an unset flag must
+// not disarm the production alerts that read them), so haven's own container,
+// which has no backups and therefore no system.backup_log, has to opt out, or
+// every 15s stats tick fails on a missing table.
+func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED") {
+		t.Fatalf("unmanaged stack must leave backup metrics to the worktree's own .env")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_BACKUP_METRICS_ENABLED"); got != "false" {
+		t.Errorf("CLICKHOUSE_BACKUP_METRICS_ENABLED = %q, want %q", got, "false")
+	}
+}
+
 func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},

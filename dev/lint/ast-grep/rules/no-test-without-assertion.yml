@@ -1,0 +1,37 @@
+id: no-test-without-assertion-ts
+message: >
+  This test asserts nothing, so it passes as long as the code under test does
+  not throw. That is a smoke test wearing a unit test's name — either add an
+  `expect(...)`, or say what it really covers. If the point IS "does not
+  throw", make that explicit with `expect(() => ...).not.toThrow()`.
+severity: warning
+language: TypeScript
+rule:
+  any:
+    - pattern: it($NAME, $FN)
+    - pattern: test($NAME, $FN)
+  # Nothing anywhere under the test call that could fail.
+  not:
+    has:
+      stopBy: end
+      any:
+        - pattern: expect($$$)
+        - pattern: expectTypeOf($$$)
+        - pattern: assertType($$$)
+        - pattern: assert($$$)
+        # A test may delegate to a shared assertion helper. Count only calls
+        # that read as one, or every test "delegates" to the code under test.
+        - kind: call_expression
+          regex: "^(assert|expect|verify|check|shouldReject|shouldThrow)[A-Z_(]"
+constraints:
+  # Only an INLINE body can be judged. `it("...", body)` hands off to a function
+  # declared elsewhere, and its assertions live there — flagging that is noise.
+  FN:
+    any:
+      - kind: arrow_function
+      - kind: function_expression
+files:
+  - "platform/app/**/*.test.ts"
+  - "platform/app/**/*.spec.ts"
+  - "sdks/typescript/**/*.test.ts"
+  - "packages/**/*.test.ts"

@@ -6,7 +6,7 @@ Feature: Explicit application origin for race condition prevention
 
   # All scenarios describe the trace projection's origin tagging during
   # the event-sourcing pipeline. Need targeted unit tests in
-  # `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # `platform/app/src/server/event-sourcing/pipelines/trace-processing/`
   # for the origin-tagging projection. Backend logic is implemented;
   # test cases for these specific race scenarios aren't written yet.
 
@@ -16,14 +16,14 @@ Feature: Explicit application origin for race condition prevention
   #
   # When a trace's child spans arrive before the root span (which carries
   # langwatch.origin), the trace has no origin for up to a minute. The
-  # evaluation trigger reactor fires after 30s, sees empty origin, and the
+  # evaluation trigger subscriber fires after 30s, sees empty origin, and the
   # precondition matcher defaults `data.origin || "application"` — matching
   # traces that are actually evaluations or simulations.
   #
   # Solution has three parts:
   #   1. SDKs explicitly set langwatch.origin = "application" on root spans
   #      for regular traces (NOT experiments), making 95%+ unambiguous
-  #   2. Empty origin = pending (not application) — the reactor and
+  #   2. Empty origin = pending (not application) — the subscriber and
   #      precondition matcher stop treating empty as "application"
   #   3. Origin inference in the fold projection:
   #      - Explicit langwatch.origin attribute → use it (new SDK)
@@ -31,7 +31,7 @@ Feature: Explicit application origin for race condition prevention
   #      - SDK heuristic: sdk.name present but no origin → "application" (old SDK)
   #      All three run on every span arrival, no delay needed.
   #   4. Deferred fallback for pure OTEL traces (no SDK info, no origin):
-  #      The reactor schedules a 5-min deferred check. On fire, re-read fold
+  #      The subscriber schedules a 5-min deferred check. On fire, re-read fold
   #      state from projection store. If still empty → "application".
   #
   # SDK version heuristic:
@@ -83,14 +83,14 @@ Feature: Explicit application origin for race condition prevention
   # Part 2: Empty origin = pending, not application
   # ===========================================================================
 
-  # --- Evaluation trigger reactor guards ---
+  # --- Evaluation trigger subscriber guards ---
 
   @unit
   Scenario: Evaluation trigger skips traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has no langwatch.origin
     And the fold state has no sdk.name (pure OTEL trace)
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then no evaluation commands are dispatched for this trace
     And a deferred check is scheduled for 5 minutes later
 
@@ -98,20 +98,20 @@ Feature: Explicit application origin for race condition prevention
   Scenario: Evaluation trigger runs on traces with explicit application origin
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "application"
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
 
   @unit
   Scenario: Evaluation trigger dispatches for any known origin (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "evaluation"
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
-    Because origin filtering is handled by precondition matchers, not the reactor
+    Because origin filtering is handled by precondition matchers, not the subscriber
 
   # --- SDK version heuristic for old SDK backward compat ---
   # The fold projection infers origin = "application" when sdk.name is present
-  # but no explicit origin or legacy markers exist. By the time the reactor
+  # but no explicit origin or legacy markers exist. By the time the subscriber
   # fires, the fold state already has langwatch.origin set.
 
   @unit @unimplemented
@@ -120,7 +120,7 @@ Feature: Explicit application origin for race condition prevention
     And a trace arrives from an old SDK (sdk.name present, no langwatch.origin)
     When the fold projection processes the span
     Then it sets langwatch.origin = "application" in the fold state
-    And when the evaluation trigger reactor fires at normal debounce
+    And when the evaluation trigger subscriber fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
 
   @unit @unimplemented
@@ -128,7 +128,7 @@ Feature: Explicit application origin for race condition prevention
     Given a trace arrives from an old Python SDK running an experiment
     And the fold state has sdk.name = "langwatch"
     And legacy inference sets langwatch.origin = "evaluation" from instrumentationScope
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then evaluation commands are dispatched with origin "evaluation"
     And precondition matchers filter based on the monitor's configured origin
 
@@ -152,7 +152,7 @@ Feature: Explicit application origin for race condition prevention
 
   # Only traces with NO LangWatch SDK info face the 5-min delay.
   # These are pure OTEL exporters, third-party integrations, etc.
-  # The single reactor handles both phases — no separate deferred reactor.
+  # The single subscriber handles both phases — no separate deferred subscriber.
 
   @unit
   Scenario: Deferred check treats still-empty origin as "application"
@@ -182,7 +182,7 @@ Feature: Explicit application origin for race condition prevention
   @unit
   Scenario: Deferred check deduplicates per trace
     Given a trace receives multiple span batches with no origin or SDK info
-    And each reactor dispatch schedules a deferred check
+    And each subscriber dispatch schedules a deferred check
     When the deferred check fires
     Then only one evaluation check runs for that trace
     And it uses fold state re-read from the projection store (fresh, not captured)
@@ -191,7 +191,7 @@ Feature: Explicit application origin for race condition prevention
   Scenario: No deferred check is scheduled for SDK-instrumented traces
     Given a trace arrives from a LangWatch SDK (old or new)
     And the fold state has sdk.name present
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then no deferred check is scheduled
     Because the SDK heuristic handles origin resolution immediately
 
@@ -268,7 +268,7 @@ Feature: Explicit application origin for race condition prevention
     Given an online evaluation monitor is enabled for the project
     And a trace's child spans arrive first from a new SDK
     And the child spans carry langwatch.origin = "application" (set by SDK on all spans)
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
 
   @integration @unimplemented
@@ -276,7 +276,7 @@ Feature: Explicit application origin for race condition prevention
     Given an online evaluation monitor is enabled for the project
     And a complete trace arrives from a generic OTEL exporter
     And no span has sdk.name or langwatch.origin attributes
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then no evaluation commands are dispatched
     And a deferred check is scheduled for 5 minutes
     When the deferred check fires and re-reads the fold state
@@ -288,7 +288,7 @@ Feature: Explicit application origin for race condition prevention
   Scenario: Pure OTEL evaluation trace is not incorrectly evaluated
     Given an online evaluation monitor is enabled for the project
     And child spans arrive from a pure OTEL exporter with no origin
-    When the evaluation trigger reactor fires at normal debounce
+    When the evaluation trigger subscriber fires at normal debounce
     Then no evaluation commands are dispatched (no SDK, no origin)
     When the root span arrives with evaluation markers (evaluation.run_id)
     And legacy inference sets langwatch.origin = "evaluation"

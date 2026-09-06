@@ -20,7 +20,7 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ### Standard Test Credentials
 
-See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts`, and interactive runs.
+See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `dev/scripts/verify-browser-test.js`, `tests/agentic-e2e/tests/auth.setup.ts`, and interactive runs.
 
 ## Data Seeding
 

@@ -42,6 +42,22 @@ func TestOpenAI_StreamedAutoIncludeUsage(t *testing.T) {
 	runCell(t, openaiCell(t, "streamed_auto_include_usage", chatBody_StreamedNoUsageOption, true))
 }
 
+// The openai lane raw-forwards the body, so the cap reaches OpenAI as
+// sent. These cells close the "accepted but never verified to CAP" gap:
+// max_completion_tokens must verifiably bound the output. gpt-5* counts
+// reasoning tokens inside completion_tokens, so the cap is set high
+// enough (32) to be a meaningful bound while still forcing "length" on a
+// count-to-200 prompt. No max_tokens cells here: gpt-5* rejects the
+// legacy field upstream with a 400 that passes through verbatim, which is
+// the documented v1 pass-through behavior covered by the scenarios above.
+func TestOpenAI_MaxCompletionTokensCap(t *testing.T) {
+	runCapCell(t, openaiCell(t, "cap_max_completion_tokens", nil, false), "max_completion_tokens", 32)
+}
+
+func TestOpenAI_MaxCompletionTokensCapStreamed(t *testing.T) {
+	runCapCell(t, openaiCell(t, "cap_max_completion_tokens_streamed", nil, true), "max_completion_tokens", 32)
+}
+
 func TestOpenAI_ToolCalling(t *testing.T) {
 	runCell(t, openaiCell(t, "tool_calling", chatBody_ToolCalling, false))
 }

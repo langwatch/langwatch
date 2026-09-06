@@ -1,9 +1,9 @@
 # Prompt playground tab switcher — reach any open prompt without scrolling
 #
 # Implementation:
-#   langwatch/src/prompts/prompt-playground/components/prompt-browser/PromptPlaygroundBrowser.tsx  (switcher placement in the tab strip)
-#   langwatch/src/prompts/prompt-playground/components/prompt-browser/ui/DraggableTabsBrowser.tsx  (tab strip compound component)
-#   langwatch/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts   (windows -> tabs state)
+#   platform/app/src/prompts/prompt-playground/components/prompt-browser/PromptPlaygroundBrowser.tsx  (switcher placement in the tab strip)
+#   platform/app/src/prompts/prompt-playground/components/prompt-browser/ui/DraggableTabsBrowser.tsx  (tab strip compound component)
+#   platform/app/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts   (windows -> tabs state)
 #
 # Related specs:
 #   specs/traces-v2/lens-preset-groups.feature — the lens strip that hit the same

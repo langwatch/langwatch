@@ -22,7 +22,7 @@ Feature: Python langwatch_nlp removed — nlpgo is the sole NLP engine
 
   @integration @v1 @unimplemented
   Scenario: the NLP image contains no Python service or framework
-    Given the self-hosted "langwatch_nlp" image is built from Dockerfile.langwatch_nlp
+    Given the self-hosted "langwatch_nlp" image is built from infra/docker/Dockerfile.langwatch_nlp
     When an operator inspects the image
     Then it contains the nlpgo Go binary
     And it contains a python3 interpreter only for the code-block sandbox

@@ -1,0 +1,17 @@
+import { Factory } from "fishery";
+import { nanoid } from "nanoid";
+import type { Team } from "~/generated/prisma/client";
+
+export const teamFactory = Factory.define<Team>(({ sequence }) => ({
+  id: nanoid(),
+  name: `Test Team ${sequence}`,
+  slug: `test-team-${sequence}-${nanoid()}`,
+  organizationId: nanoid(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  archivedAt: null,
+  defaultCustomRoleId: null,
+  isPersonal: false,
+  ownerUserId: null,
+  departmentId: null,
+}));

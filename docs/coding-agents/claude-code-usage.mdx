@@ -1,0 +1,120 @@
+---
+title: Track Your Claude Code Usage
+sidebarTitle: Track your Claude Code usage
+description: "See Claude Code usage per session: what you spent, which model took each turn, how much context came back from cache, and what the agent actually did. Works on Claude Max and Pro plans, and on pay-per-token API keys."
+keywords:
+  - claude code usage
+  - ccusage
+  - claude code cost
+  - claude code token usage
+  - claude code usage tracking
+  - claude max usage
+  - claude code analytics
+---
+
+The Anthropic Console shows a monthly total, with no split by session, model or cache use, and no record of what the agent did. This page connects Claude Code to LangWatch, where each session carries that split and a replay of the conversation.
+
+## Start
+
+```bash
+npx langwatch claude
+```
+
+The first run opens a browser to sign you in, then asks one question:
+
+```
+How should `langwatch claude` run?
+❯ Using a Claude subscription   keep your own plan, send only telemetry to LangWatch
+  Using an API key              route calls through LangWatch with a virtual key
+```
+
+On a Max or Pro plan, take the first answer: Claude Code keeps your plan and your login, and LangWatch receives only the OpenTelemetry that Claude Code already emits. The answer is remembered, so later runs start the agent without asking.
+
+Use Claude Code as usual from here.
+
+If you read local usage with `ccusage`, this is the same accounting with the conversation attached, stored across your machines. Codex, Copilot, Gemini CLI and opencode report the same way.
+
+## Read your sessions
+
+Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
+
+<Frame caption="One row per session. Context and Compactions show which sessions ran heavy, and Pull requests shows what each one shipped.">
+  ![Claude Code sessions list](/images/coding-agents/sessions-list.png)
+</Frame>
+
+## Find where the money went
+
+Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
+
+| Stat | Why it costs you |
+| --- | --- |
+| **Peak context** | The most tokens the session carried into one call. Every later call pays to keep that context alive. |
+| **Cache misses** | Calls that rebuilt the context instead of reading it. A cache write costs more per token than a read, so a miss pays twice for the same tokens. |
+| **Context reused** | Tokens served from cache, billed at a fraction of fresh input. |
+| **Context rebuilt** | Tokens spent writing the cache again. |
+
+<Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache three times, and re-sent 393k tokens on its biggest rebuild.">
+  ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
+</Frame>
+
+Below it, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. The first call pays for the whole context. A tall fresh band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to open in the replay.
+
+To turn this into a decision, run the [context sweet spot investigation](/coding-agents/find-your-context-sweet-spot) over your own sessions.
+
+## Read the session back
+
+The **Terminal** tab replays the session the way it looked in your terminal: your prompts, the agent's replies, every tool run with the time it took, and every file edit as the diff the agent applied.
+
+<Frame caption="The terminal replay. Each tool run carries its duration, and a file edit renders as a diff.">
+  ![Claude Code terminal replay](/images/coding-agents/terminal-replay.png)
+</Frame>
+
+A tool call the agent was denied stays in the replay, marked as denied, so a session that produced no output still shows where it stopped.
+
+## Cost per pull request
+
+**Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
+
+<Frame caption="Cost per pull request, summed across every session and contributor that touched the branch.">
+  ![Cost per pull request](/images/coding-agents/pull-requests-list.png)
+</Frame>
+
+This needs the branch to map to a pull request. See [Repository and pull request attribution](/coding-agents/repository-and-pr-attribution).
+
+## Keep it on without the wrapper
+
+The wrapper wires Claude Code when it starts it, which needs someone at the keyboard. To wire the machine once and then run plain `claude`:
+
+```bash
+npx langwatch instrument claude
+```
+
+That writes the same settings into `~/.claude/settings.json` and exits. `langwatch logout` removes every wiring the command-line tool wrote.
+
+To wire one repository instead of the whole machine, to send the telemetry to a shared project, or to wire a server with no browser, see [Claude Code](/coding-agents/claude-code#per-repository-telemetry), [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
+
+## Ask your own agent where the tokens went
+
+The same command-line tool that captured your sessions reads them back, authenticated by the login you already did. Paste one prompt into Claude Code and it answers which sessions cost the most, which ran above 150k of context, and which subagents used the most. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+You can point it at its own history too, through the [skills directory](https://langwatch.ai/docs/skills/directory) or the [MCP server](https://langwatch.ai/docs/integration/mcp), so the agent finds where it wasted tokens and changes how it works.
+
+## If you pay Anthropic per token
+
+Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
+
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+
+Everything above this section looks the same on either path.
+
+## Troubleshooting
+
+**No session appears after 30 seconds.** Claude Code flushes on an interval, so give the first turn a moment. If it stays empty, run `npx langwatch instrument claude`, which prints the file it wrote and the workspace the telemetry goes to.
+
+**Cost shows $0 while sessions land.** The model name on the span does not match the cost catalog. Current identifiers (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`) price correctly; a legacy alias returns no cost.
+
+**Sessions land in the wrong workspace.** The wrapper binds to whatever workspace you were in when you signed in. Switch workspace in the sidebar, then run `npx langwatch login --device` again.
+
+**Self-hosted, and the device login is refused.** Device login is on by default, so a refusal means one of two things. Either the server predates that default, which `npx @langwatch/server@latest` fixes, or someone switched it off: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0` turns it off for the whole deployment, and an operator-store row turns it off for one organization. Clearing the deployment-wide variable does not lift an organization row, so check both.
+
+**Also check:** [Claude Code](/coding-agents/claude-code) for the full wiring and every environment variable, and [Privacy](/coding-agents/privacy) for what is stored and who can read it.

@@ -238,5 +238,5 @@ Config: `LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS` (default 5000) and
   enforcement), ADR-033 (worker network isolation).
 - Spec: `specs/langy/langy-shutdown-handoff.feature`
 - Code: `services/langyagent/` (serve.go, config.go, adapters/workerpool),
-  `langwatch/src/server/routes/langy.ts`, the `langy-conversation-processing`
-  pipeline, `langwatch/src/server/services/langy/execution/langy-turn.processor.ts`.
+  `platform/app/src/server/routes/langy.ts`, the `langy-conversation-processing`
+  pipeline, `platform/app/src/server/services/langy/execution/langy-turn.processor.ts`.

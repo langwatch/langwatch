@@ -15,7 +15,7 @@ Feature: haven service selection
   Scenario: A fresh worktree starts lean
     Given a worktree that has never been up
     When the developer runs "haven up"
-    Then the stack runs the app (workers in-process), nlp, and gateway
+    Then the stack runs the app (workers in-process), nlp, gateway, and the idp simulator
     And langy is not started
     And the first up prints the selection and how to change it
 
@@ -66,7 +66,7 @@ Feature: haven service selection
     And it names the one command that replaces it, "haven up -nlp"
 
   Scenario: A variable haven never read as a selection does not block a stack
-    Given the developer sets "WORKERS_IN_PROCESS=1", which asks plain "pnpm dev" for a single process
+    Given the developer sets "WORKERS_IN_PROCESS=1", which is what plain "pnpm dev" already sets
     When they run "haven up"
     Then the stack starts normally
 

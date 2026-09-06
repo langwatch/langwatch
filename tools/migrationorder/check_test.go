@@ -70,8 +70,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00041_mine.sql",
 				Problem: "takes key 41, which 00041_theirs.sql already took on main",
-				Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_mine.sql " +
-					"langwatch/src/server/clickhouse/migrations/00042_mine.sql",
+				Fix: "git mv platform/app/src/server/clickhouse/migrations/00041_mine.sql " +
+					"platform/app/src/server/clickhouse/migrations/00042_mine.sql",
 			}},
 		},
 		{
@@ -87,8 +87,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00039_mine.sql",
 				Problem: "is numbered below 42, the newest migration on main, so it runs out of order or not at all",
-				Fix: "git mv langwatch/src/server/clickhouse/migrations/00039_mine.sql " +
-					"langwatch/src/server/clickhouse/migrations/00043_mine.sql",
+				Fix: "git mv platform/app/src/server/clickhouse/migrations/00039_mine.sql " +
+					"platform/app/src/server/clickhouse/migrations/00043_mine.sql",
 			}},
 		},
 		{
@@ -105,8 +105,8 @@ func TestCheck(t *testing.T) {
 				Entry: "20260702090000_mine",
 				Problem: "is numbered below 20260708150000, the newest migration on main, " +
 					"so it runs out of order or not at all",
-				Fix: "git mv langwatch/prisma/migrations/20260702090000_mine " +
-					"langwatch/prisma/migrations/20260708150001_mine",
+				Fix: "git mv platform/app/prisma/migrations/20260702090000_mine " +
+					"platform/app/prisma/migrations/20260708150001_mine",
 			}},
 		},
 		{
@@ -123,15 +123,15 @@ func TestCheck(t *testing.T) {
 					Set:     "Prisma",
 					Entry:   "20260201000000_one",
 					Problem: "shares key 20260201000000 with another migration in this branch",
-					Fix: "git mv langwatch/prisma/migrations/20260201000000_one " +
-						"langwatch/prisma/migrations/20260201000001_one",
+					Fix: "git mv platform/app/prisma/migrations/20260201000000_one " +
+						"platform/app/prisma/migrations/20260201000001_one",
 				},
 				{
 					Set:     "Prisma",
 					Entry:   "20260201000000_two",
 					Problem: "shares key 20260201000000 with another migration in this branch",
-					Fix: "git mv langwatch/prisma/migrations/20260201000000_two " +
-						"langwatch/prisma/migrations/20260201000002_two",
+					Fix: "git mv platform/app/prisma/migrations/20260201000000_two " +
+						"platform/app/prisma/migrations/20260201000002_two",
 				},
 			},
 		},
@@ -149,7 +149,7 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00040_a.sql",
 				Problem: "already merged, and migrations that have run somewhere cannot change",
-				Fix:     "git checkout origin/main -- langwatch/src/server/clickhouse/migrations/00040_a.sql",
+				Fix:     "git checkout origin/main -- platform/app/src/server/clickhouse/migrations/00040_a.sql",
 			}},
 		},
 		{
@@ -177,15 +177,15 @@ func TestCheck(t *testing.T) {
 					Set:     "ClickHouse",
 					Entry:   "00041_one.sql",
 					Problem: "shares key 41 with another migration in this branch",
-					Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_one.sql " +
-						"langwatch/src/server/clickhouse/migrations/00042_one.sql",
+					Fix: "git mv platform/app/src/server/clickhouse/migrations/00041_one.sql " +
+						"platform/app/src/server/clickhouse/migrations/00042_one.sql",
 				},
 				{
 					Set:     "ClickHouse",
 					Entry:   "00041_two.sql",
 					Problem: "shares key 41 with another migration in this branch",
-					Fix: "git mv langwatch/src/server/clickhouse/migrations/00041_two.sql " +
-						"langwatch/src/server/clickhouse/migrations/00043_two.sql",
+					Fix: "git mv platform/app/src/server/clickhouse/migrations/00041_two.sql " +
+						"platform/app/src/server/clickhouse/migrations/00043_two.sql",
 				},
 			},
 		},
@@ -202,8 +202,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00039_$(curl evil).sql",
 				Problem: "is numbered below 40, the newest migration on main, so it runs out of order or not at all",
-				Fix: "git mv 'langwatch/src/server/clickhouse/migrations/00039_$(curl evil).sql' " +
-					"langwatch/src/server/clickhouse/migrations/00041'_$(curl evil).sql'",
+				Fix: "git mv 'platform/app/src/server/clickhouse/migrations/00039_$(curl evil).sql' " +
+					"platform/app/src/server/clickhouse/migrations/00041'_$(curl evil).sql'",
 			}},
 		},
 		{

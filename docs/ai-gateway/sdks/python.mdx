@@ -6,7 +6,7 @@ sidebarTitle: Python
 
 The gateway is designed to be a drop-in replacement for provider base URLs, every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
 
-This page covers the standard setup + how to propagate trace ids through the gateway so you don't double-count cost.
+This page covers the standard setup and how to propagate trace ids through the gateway so you don't double-count cost.
 
 ## OpenAI Python SDK
 
@@ -69,7 +69,7 @@ Every gateway response carries these headers so clients can stitch the span back
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
 | `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
-| `X-LangWatch-Request-Id` | ULID, gateway-scoped. Use this in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets |
 
 ```python
 resp = client.chat.completions.with_raw_response.create(
@@ -124,14 +124,14 @@ These layer on top of `default_headers` without replacing them.
 
 ### Response inspection
 
-Grab the `X-LangWatch-Request-Id` for support tickets or log correlation:
+Grab the `X-LangWatch-Gateway-Request-Id` for support tickets or log correlation:
 
 ```python
 resp = client.chat.completions.with_raw_response.create(
     model="gpt-5-mini",
     messages=[{"role": "user", "content": "Hi"}],
 )
-request_id = resp.http_response.headers["X-LangWatch-Request-Id"]
+request_id = resp.http_response.headers["X-LangWatch-Gateway-Request-Id"]
 print(f"LangWatch request id: {request_id}")
 ```
 

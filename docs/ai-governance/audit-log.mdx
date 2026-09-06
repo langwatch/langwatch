@@ -55,13 +55,9 @@ The four filters compose with AND. Pagination is below the table; **Items per pa
 
 ## Retention
 
-Audit log retention follows the [governance retention class](/ai-gateway/governance/retention) configured for the organization:
+Audit log retention follows your organization's [retention policy](/platform/data-retention), scoped per organization, team, and project. Configuring it requires an Enterprise plan; other plans use the platform default window. Organizations under SOC 2, ISO 27001, or HIPAA obligations usually set a multi-year period here.
 
-- `thirty_days`, Apache 2.0 floor; rows older than 30d are dropped.
-- `one_year`, Enterprise.
-- `seven_years`, Enterprise. Recommended for SOC 2, ISO 27001, and HIPAA orgs that need a multi-year audit trail.
-
-Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table retains forever for fast UI lookups against the most recent ~year. The full retention model is described in [Compliance architecture](/ai-governance/compliance-architecture).
+Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table is kept for fast UI lookups against the most recent year. The full model is described in [Compliance architecture](/ai-governance/compliance-architecture).
 
 ## Common admin questions
 

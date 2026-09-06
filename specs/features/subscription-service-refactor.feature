@@ -4,7 +4,7 @@ Feature: Subscription service refactor
   continues using the old factory until Part 4.
 
   # Parity status: 5 of 6 scenarios bound to existing unit tests in
-  # langwatch/ee/billing/__tests__/subscription.service.unit.test.ts.
+  # platform/app/ee/billing/__tests__/subscription.service.unit.test.ts.
   # The remaining 1 @unimplemented scenario is UPDATE-class per AUDIT_MANIFEST
   # — implementation diverged from the spec wording (no co-existence with old
   # factory; the new class IS the service). Tracked under #3458.

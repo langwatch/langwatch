@@ -5,7 +5,7 @@ description: Use any OpenTelemetry-compatible instrumentor with LangWatch to sta
 keywords: opentelemetry, instrumentation, custom, other, generic, BaseInstrumentor, LangWatch, Python
 ---
 
-LangWatch is designed to be compatible with the broader OpenTelemetry ecosystem. Beyond the specifically documented integrations, you can use LangWatch with any Python library that has an OpenTelemetry instrumentor, provided that the instrumentor adheres to the standard OpenTelemetry Python `BaseInstrumentor` interface.
+LangWatch is compatible with the broader OpenTelemetry ecosystem. Beyond the specifically documented integrations, you can use LangWatch with any Python library that has an OpenTelemetry instrumentor, provided that the instrumentor adheres to the standard OpenTelemetry Python `BaseInstrumentor` interface.
 
 ## Using Custom/Third-Party OpenTelemetry Instrumentors
 
@@ -17,7 +17,7 @@ The key is that the instrumentor should be an instance of a class that inherits 
 
 ### Integration via `langwatch.setup()`
 
-To use such an instrumentor, you simply pass an instance of it to the `instrumentors` list in the `langwatch.setup()` call. LangWatch will then manage its lifecycle (calling its `instrument()` and `uninstrument()` methods appropriately).
+To use such an instrumentor, pass an instance of it to the `instrumentors` list in the `langwatch.setup()` call. LangWatch will then manage its lifecycle (calling its `instrument()` and `uninstrument()` methods appropriately).
 
 Here's a conceptual example using the OpenTelemetry `LoggingInstrumentor`:
 
@@ -101,4 +101,4 @@ You can browse these repositories to find instrumentors for other libraries you 
 3.  **TracerProvider:** LangWatch configures an OpenTelemetry `TracerProvider`. The instrumentor, when activated by LangWatch, will use this provider to create spans. If you are managing your OpenTelemetry setup more directly (e.g., providing your own `TracerProvider` to `langwatch.setup()`), the instrumentor will use that instead.
 4.  **Data Quality:** The quality and detail of the telemetry data captured will depend on how well the custom instrumentor is written.
 
-By leveraging the `BaseInstrumentor` interface, LangWatch remains flexible and extensible, allowing you to bring telemetry from a wide array of Python libraries into your observability dashboard.
+Any library with a `BaseInstrumentor`-compliant instrumentor can send its telemetry to your LangWatch dashboard.

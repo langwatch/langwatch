@@ -83,3 +83,9 @@ Feature: Trace primary input/output extraction
     And the span has langwatch.input = "from langwatch"
     When the service extracts the primary input
     Then the primary input text is "from gen_ai"
+
+  Scenario: AI SDK structured output is surfaced as the primary output
+    Given the span is named "ai.generateText" from the AI SDK
+    And the span has ai.response.object = { "greeting": "Hallo" }
+    When the service extracts the primary output
+    Then the primary output text is "{\"greeting\":\"Hallo\"}"

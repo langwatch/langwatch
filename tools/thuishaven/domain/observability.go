@@ -44,18 +44,31 @@ type ObservabilityEndpoints struct {
 	GrafanaPort  int `json:"grafanaPort"`
 	OTLPHTTPPort int `json:"otlpHttpPort"`
 	OTLPGRPCPort int `json:"otlpGrpcPort"`
+	// PyroscopePort is Pyroscope's HTTP port — both the profile ingest endpoint
+	// services push to and the query API the provisioned Grafana datasource reads.
+	//
+	// The bundle has run Pyroscope since well before the 0.28.0 pin and provisions
+	// a `pyroscope` datasource over it; the port was simply never published, so the
+	// process was running, reachable from Grafana inside the container, and
+	// unreachable from anything on the host that wanted to push it a profile.
+	PyroscopePort int `json:"pyroscopePort"`
 }
 
 // DefaultObservabilityEndpoints is the conventional port set. They are fixed
 // rather than ephemeral because agents and gcx all need to find
 // the stack without asking haven first.
 func DefaultObservabilityEndpoints() ObservabilityEndpoints {
-	return ObservabilityEndpoints{GrafanaPort: 3000, OTLPHTTPPort: 4318, OTLPGRPCPort: 4317}
+	return ObservabilityEndpoints{GrafanaPort: 3000, OTLPHTTPPort: 4318, OTLPGRPCPort: 4317, PyroscopePort: 4040}
 }
 
 // OTLPHTTPURL is the collector endpoint every service exports to.
 func (e ObservabilityEndpoints) OTLPHTTPURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", e.OTLPHTTPPort)
+}
+
+// PyroscopeURL is where services push CPU and heap profiles.
+func (e ObservabilityEndpoints) PyroscopeURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", e.PyroscopePort)
 }
 
 // GrafanaURL is where the UI and the Grafana HTTP API answer.
@@ -96,8 +109,14 @@ type ObservabilityLimits struct {
 // at all and the ceiling is what keeps it from competing with the dev stack it
 // exists to observe.
 func DefaultObservabilityLimits(totalRAMBytes uint64, numCPU int) ObservabilityLimits {
-	memMB := clampInt(int(totalRAMBytes/(1<<20))/8, 1536, 2560)
-	cpus := clampFloat(float64(numCPU)/4, 1, 2)
+	// A sixth of the machine and up to three cores. The previous seventh/2.5
+	// was sized for logs, traces and metrics; Pyroscope now also ingests
+	// continuous CPU and heap profiles from every worktree's app process, and
+	// profile heads plus flame-graph queries are exactly the load that pinned
+	// the old caps — a starved bundle shows up as laggy dashboards at the
+	// moment you are debugging.
+	memMB := clampInt(int(totalRAMBytes/(1<<20))/6, 2048, 4096)
+	cpus := clampFloat(float64(numCPU)/3, 1, 3)
 	return ObservabilityLimits{
 		MemoryMB:        memMB,
 		CPUs:            cpus,
@@ -138,7 +157,10 @@ type ColimaLimits struct {
 // resizing someone's running VM out from under them is not haven's business.
 func DefaultColimaLimits(totalRAMBytes uint64, numCPU int) ColimaLimits {
 	return ColimaLimits{
-		CPUs:      clampInt(numCPU/2, 2, 4),
+		// Ceiling 6, not 4: the VM hosts ClickHouse + the LGTM bundle (+ langy
+		// tiers), whose caps alone add up past 4 cores on a big machine. Only
+		// applied at creation — an existing profile keeps its shape.
+		CPUs:      clampInt(numCPU/2, 2, 6),
 		MemoryGiB: clampInt(int(totalRAMBytes/(1<<30))/4, 4, 8),
 		DiskGiB:   30,
 	}

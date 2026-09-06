@@ -4,6 +4,12 @@
 
 **Status:** Accepted (locked 2026-07-08)
 
+> Forward note (2026-08-16): [ADR-098](098-product-scoped-navigation.md)
+> deviates from this ADR in the navigation-v2 modes only: after the first
+> product visit, the device's per-organization product memory outranks the
+> organization intent, and the intent stays the cold-start default. Legacy
+> mode keeps this ADR's behavior unchanged.
+
 > One-line: New signups pick **Track AI coding agents** or **Monitor & evaluate my LLM app** on **screen 2**; the choice is persisted as a **first-class `Organization.primaryIntent` enum** (editable in org settings) that **always decides the `/` landing** — `AGENT_GOVERNANCE` → `/me`, `LLM_OPS` → `/{project-slug}`, `NULL` (every pre-existing org) → today's resolver behavior unchanged; the governance track goes **straight to CLI setup**; governance goes **GA via flag rollout** with the CLI 403 kept as a flag-armed safety net; **no CLI changes**.
 
 ## Context
@@ -13,7 +19,7 @@ LangWatch has two products behind one front door:
 1. **AI Governance** — track coding-agent usage, spend, and sessions per developer. Setup is three CLI commands (`npm i -g langwatch` → `langwatch login` → `langwatch claude`) and results appear on `/me` in ~30 seconds (docs: `ai-governance/track-your-claude-code-usage`).
 2. **LLMOps** — traces, evaluations, datasets, prompts, experiments. Setup is SDK/MCP integration against a project API key.
 
-The current onboarding (`langwatch/src/features/onboarding/`) is 100% LLMOps-shaped: the desires screen lists nine LLMOps options and zero governance options, and the flavour screen's "Via Coding Agent" card — the card a governance-intent user will obviously click — sets up **tracing of your application**, not coding-agent usage tracking. Governance users answer a long questionnaire about a product they didn't come for and end up in the traces surface (customer feedback: Obsidian `Articles/governance/feedback/onboarding.md`).
+The current onboarding (`platform/app/src/features/onboarding/`) is 100% LLMOps-shaped: the desires screen lists nine LLMOps options and zero governance options, and the flavour screen's "Via Coding Agent" card — the card a governance-intent user will obviously click — sets up **tracing of your application**, not coding-agent usage tracking. Governance users answer a long questionnaire about a product they didn't come for and end up in the traces surface (customer feedback: Obsidian `Articles/governance/feedback/onboarding.md`).
 
 For existing customers, enabling `release_ui_ai_governance_enabled` engages the persona home resolver (`specs/ai-gateway/governance/persona-home-resolver.feature`, `ee/governance/services/personaResolver.service.ts`), whose Persona-2 default (personal VK + project membership → `/me`) reroutes users who never asked to move — a mess for users with multiple projects and organizations.
 

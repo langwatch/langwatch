@@ -24,7 +24,7 @@ export type PortAllocation = {
 
 // `npx @langwatch/server` ships the production Hono build, so the langwatch
 // app is a single port (5560) with workers in-process — no separate vite or
-// API split, no separate worker metrics port. See langwatch/scripts/start.sh:
+// API split, no separate worker metrics port. See platform/app/scripts/start.sh:
 // "In production, only the API server runs on PORT (default 5560)".
 export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation {
   const infra = base + PORT_INFRA_OFFSET;

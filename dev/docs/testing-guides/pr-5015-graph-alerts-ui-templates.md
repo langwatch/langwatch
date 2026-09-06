@@ -58,7 +58,7 @@ hardcoded format until the flag flips.
 
 ```bash
 make quickstart all-local          # local CH + PG + Redis + app + workers
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - All prior PR migrations must be applied (PR #4498's `ReactorOutbox`

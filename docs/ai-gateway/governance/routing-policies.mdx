@@ -1,182 +1,223 @@
 ---
 title: Routing policies
-description: Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+description: An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
 sidebarTitle: Routing policies
 ---
 
-A **routing policy** answers: "when one of my organization's users
-wants to call a model, which providers can serve it, in what order,
-under what allowlist?"
+A routing policy is one decision, written down. It says which
+providers serve a request, and in which order. It says which model
+names a client can send.
 
-Until v1.x, this was embedded in every virtual key's config — every
-service VK had its own copy of "Anthropic primary, OpenAI fallback,
-allow these models." That worked for service VKs created by hand.
-It does not scale to a thousand personal VKs, where the answer is
-the same for every dev.
-
-Routing policies pull that decision out of the credential. A VK
-references a policy by ID; the policy holds the strategy.
+An admin writes the policy one time. Each virtual key points to the
+policy. To change the routing of many keys, change the policy. Do
+not change each key.
 
 ## Shape
 
 ```ts
 RoutingPolicy {
-  id:             string
-  organizationId: string
-  scope:          'organization' | 'team' | 'project'
-  scopeId:        string
-  name:           string             // unique within (org, scope, scopeId)
-  description?:   string
-  providerCredentialIds: string[]    // ordered preference
-  modelAllowlist?:        string[]   // glob-supported, e.g. "claude-3-5-*"
-  strategy:               'priority' | 'cost' | 'latency' | 'round_robin'
-  isDefault:              boolean    // exactly one default per (org, scope, scopeId)
+  id:               string
+  organizationId:   string
+  name:             string
+  description?:     string
+
+  // The providers this policy routes through, in order. The gateway
+  // tries the first provider. If the request fails in a way that a
+  // different provider can answer, the gateway tries the next one.
+  modelProviderIds: string[]
+
+  // Model name mapping. The key is the name the client sends. The
+  // value is the model that serves the request. The three tier names
+  // are entries in this map.
+  modelAliases:     Record<string, string>
+
+  // The model that serves a tier when the map has no entry for it.
+  // Applies only to the three tier names.
+  defaultModel?:    string
+
+  // What a request can reach. Four groups: tools, mcp, urls, models.
+  // Each group has a deny list and an allow list.
+  policyRules:      { tools: {...}, mcp: {...}, urls: {...}, models: {...} }
+
+  isDefault:        boolean
+  scopes:           { scopeType: 'ORGANIZATION' | 'TEAM' | 'PROJECT', scopeId: string }[]
 }
 ```
 
-## Strategy variants
+A policy can apply in more than one place. Each entry in `scopes`
+adds one organization, one team, or one project.
 
-<Tabs>
-  <Tab title="priority (default)">
-    Try `providerCredentialIds[0]` first. On retryable error, try
-    `[1]`, then `[2]`, …. This matches the v1 fallback chain
-    semantics.
+## Model tiers
 
-    Use when: you have a clearly-preferred provider (Anthropic
-    native), and want a cheaper/legacy provider as backup
-    (Bedrock, in case Anthropic 5xx's).
-  </Tab>
-  <Tab title="cost">
-    For every request, pick the provider with the lowest
-    LangWatch-tracked unit cost for the resolved model.
+A client can send a tier name in the `model` field. The policy maps
+the tier name to a model. When you move to a newer model, you change
+the policy. The client code does not change.
 
-    Use when: providers serve overlapping models (gpt-4o-mini on
-    OpenAI vs Azure OpenAI) and you want the cheaper one
-    automatically.
-  </Tab>
-  <Tab title="latency">
-    Pick the provider with the lowest p50 latency for this model
-    over the last 5 minutes.
+The gateway knows three tier names:
 
-    Use when: latency-sensitive workloads (interactive completions),
-    multiple equivalent providers.
-  </Tab>
-  <Tab title="round_robin">
-    Round-robin across providers per request. Within a request,
-    fallback works as `priority` if a provider errors.
+| Tier | Use |
+| --- | --- |
+| `complex` | The strongest model you have. Use it when quality is more important than cost. |
+| `reasoning` | A model that thinks before it answers. Use it for plans, analysis, and difficult debugging. |
+| `fast` | A small model for high volumes. Use it for classification, extraction, routing, and short replies. |
 
-    Use when: load-balancing identical providers (e.g. multiple
-    Bedrock regions) for throughput.
-  </Tab>
-</Tabs>
+The client sends the tier name where a model name goes:
 
-All strategies still respect the model-aware filter: providers that
-can't serve the resolved model are excluded before the strategy
-runs.
-
-## Cascading defaults
-
-The gateway resolves a VK's effective policy at issuance time using
-the most-specific `isDefault=true` policy:
-
-```
-PROJECT default  >  TEAM default  >  ORG default
+```json
+{
+  "model": "complex"
+}
 ```
 
-Concretely: when a personal VK is auto-issued for a user (member of
-some team in their org), the gateway picks:
+Set a model for each tier in the policy. A tier without a model uses
+`defaultModel`. A tier without a model and without `defaultModel` is
+not a known name. The gateway refuses a request that sends it.
 
-1. Is there a `PROJECT`-scoped default for their personal project?
-   No — personal projects don't carry their own routing policies.
-2. Is there a `TEAM`-scoped default for the user's team? Maybe.
-3. If not, fall back to the `ORG`-scoped default for their
-   organization.
+`defaultModel` applies only to the three tier names. A model name
+with a typo in it still gets a refusal. The gateway does not put the
+default model in its place.
 
-Override at the team level by creating a `TEAM`-scoped policy and
-marking it default. Members of that team automatically inherit it
-without their VK changing.
+Write a full model id, for example `openai/gpt-5-mini`. Do not write
+a name that changes over time, for example `openai/latest`. The
+gateway reads the value as one literal model name, so it would call
+a model named `latest`. The app refuses to save such a name.
 
-## Model allowlist
+`GET /v1/models` lists each tier that has a model. The tier shows in
+a model picker with the other names. If you set `defaultModel`, the
+list has all three tiers. A tier without a model and without
+`defaultModel` is not in the list, because the gateway refuses it.
 
-`modelAllowlist` is an array of glob patterns. Empty/absent =
-all models allowed. Each pattern supports `*` wildcards:
+## Model name mapping
 
-```js
-["claude-3-5-*", "gpt-4o*", "gemini-2.5-flash"]
-// Allows claude-3-5-sonnet, claude-3-5-haiku, gpt-4o, gpt-4o-mini,
-// gemini-2.5-flash. Denies gpt-3.5-turbo, claude-3-opus, etc.
+`modelAliases` also maps usual model names. Use it to point an old
+name to its replacement. Use it to give a model the name your teams
+already use.
+
+```json
+{
+  "gpt-4o": "openai/gpt-5-mini",
+  "coding": "anthropic/claude-haiku-4-5"
+}
 ```
 
-Allowlists compose with the gateway's per-VK `models_allowed`
-config — a request must satisfy both to be allowed.
+A mapping cannot reach a model that the key is not permitted to use.
+The gateway examines the model that the mapping points to, not the
+name that the client sent.
 
-## Model-aware dispatch
+## Restrictions
 
-A VK that can use Anthropic + OpenAI + Gemini behind it doesn't
-waste fallback budget when the user asks for an OpenAI-only model.
-The gateway dispatcher filters the credential chain to providers
-that can serve the resolved model **before** applying the
-strategy:
+`policyRules` has four groups of patterns. Each group has a deny
+list and an allow list.
 
-- Resolved provider explicit (e.g. `anthropic/claude-3-5-sonnet`):
-  filter to matching providers.
-- Resolved provider implicit (`gpt-4o-mini`): infer from the model
-  name prefix (`gpt-`, `o[1|3|4]-` → OpenAI; `claude-` → Anthropic;
-  `gemini-` → Gemini) and filter accordingly.
-- Filter empties the chain (e.g. user asked for a Bedrock-only
-  model but the policy doesn't include Bedrock): fall back to
-  trying the original chain so the user gets a clear Bifrost
-  "model not available" error rather than an opaque "no providers".
+- `tools`: the name of each tool in the request.
+- `mcp`: the name and the address of each MCP server in the request.
+- `urls`: each address in the request. This includes messages,
+  system prompts, and tool arguments.
+- `models`: the model that the request resolves to.
 
-For the rationale and the curated prefix table, see the
-implementation in `services/aigateway/app/eligible.go`.
+The gateway refuses a request that matches a deny pattern. The
+refusal comes before the request costs money. If a group has one or
+more allow patterns, a request must match one of them. Deny wins
+over allow.
 
-## Manage via the UI
+The gateway applies the `models` group after the name mapping. A
+mapping cannot go around it.
 
-**AI Gateway → Routing Policies** lists all policies in your
-org. Click **New policy** to create one; the drawer lets you:
+## Provider order
 
-- Pick the scope (Organization / Team / Project).
-- Drag-reorder provider credentials (the drag-handle is the order in
-  the resolved chain).
-- Add allowlist patterns one at a time.
-- Pick a strategy.
-- Mark as default (atomically swaps any current default at that
-  scope; warns if you're about to override).
+`modelProviderIds` is an ordered list. The gateway tries the first
+provider. If the request fails in a way that a different provider
+can answer, the gateway tries the next one.
 
-## Manage via tRPC
+The gateway does not call a provider that cannot serve the model. A
+chain across two vendors only moves over for models that the two
+vendors serve. To give one model a backup, map its name to a model
+from each vendor, or point a tier to a model from each vendor.
+
+The gateway also removes a provider that the key cannot reach. This
+occurs, for example, when an admin removes the provider from the
+key's scope.
+
+A model name that contains a provider, for example
+`openai/gpt-5-mini`, runs only on that provider. If the key cannot
+reach the provider, the gateway refuses the request. It does not
+send the request to a different vendor. A tier or a mapping that
+points to a removed provider gets the same refusal, and
+`GET /v1/models` stops listing it.
+
+## Defaults
+
+One policy in each scope can be the default. When you make a policy
+the default, the app clears the flag on the other policies in the
+same scope. This occurs in one step. Two policies are never both the
+default for one scope.
+
+A key routes through the policy that it names. The default policy is
+the one the app offers first when someone makes a key in that scope.
+
+## Manage in the app
+
+Open **AI Gateway → Routing Policies**. The page lists your policies
+by where they apply. Select **New policy**, or open the actions menu
+on a policy and select **Edit**.
+
+In the editor you can:
+
+- Give the policy a name and a description.
+- Select where it applies.
+- Select the providers and put them in order.
+- Select a model for each tier, and a default model.
+- Map other model names.
+- Add restrictions.
+
+The editor has its own address. A link to a policy opens that
+policy.
+
+## Manage with tRPC
 
 ```ts
-// List policies in scope
+// List the policies in an organization.
+trpc.routingPolicy.list.useQuery({ organizationId });
+
+// List only the policies a scope can select.
 trpc.routingPolicy.list.useQuery({
   organizationId,
-  scope: 'organization', // optional filter
+  selectableForScope: { scopeType: "TEAM", scopeId: teamId },
 });
 
-// Create
+// Read one policy.
+trpc.routingPolicy.get.useQuery({ organizationId, id });
+
+// Suggest models for a tier.
+trpc.routingPolicy.tierSuggestions.useQuery({
+  organizationId,
+  tier: "complex",
+  boundProviderTypes: ["openai", "anthropic"],
+});
+
 trpc.routingPolicy.create.useMutation();
-
-// Update
 trpc.routingPolicy.update.useMutation();
-
-// Atomic default swap (also un-marks any sibling default)
 trpc.routingPolicy.setDefault.useMutation();
+trpc.routingPolicy.delete.useMutation();
 ```
 
-Auth: `routing_policy:manage` permission for create/update/delete;
-`routing_policy:view` to list. Both are part of the standard
-`organization:admin` role.
+`create`, `update`, `setDefault`, and `delete` need the
+`routingPolicies:manage` permission. `list`, `get`, and
+`tierSuggestions` need `routingPolicies:view`.
 
-## Migration from embedded VK config
+## Keys that name no policy
 
-Existing service VKs continue to work. Their `routingPolicyId` is
-`null`, so the gateway uses the legacy embedded `config.fallback`
-chain. To migrate a VK to a policy:
+A key that names no policy uses its own routing mode. `NONE` sends
+the request to one provider and returns that provider's answer.
+`FALLBACK_ALL` tries the providers that the key can reach, in a set
+order.
 
-1. Create a `RoutingPolicy` matching the VK's existing config.
-2. Update the VK's `routingPolicyId` to the new policy ID.
-3. Verify with `langwatch claude` that requests still route
-   correctly.
+To move a key to a policy:
 
-The recommended path for new VKs is to always reference a policy.
-Embedding config inline is supported but considered legacy.
+1. Make a policy with the providers that the key uses.
+2. Set the key's routing policy.
+3. Send a request. Make sure that it reaches the provider you
+   expect.
+
+Point new keys to a policy. Then the routing decision stays in one
+place.

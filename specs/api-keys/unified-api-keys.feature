@@ -32,7 +32,8 @@ Feature: Unified API Keys
   # An ingestion key is an ApiKey row with ingestSourceType set non-null: a
   # project-scoped, ingest-only write credential the `langwatch <tool>` CLI
   # mints. Regular API / service keys have ingestSourceType == null. The page
-  # renders the two kinds in two labeled sections, Datadog-style.
+  # renders the regular keys under the page heading and the ingestion keys in
+  # their own labeled section below.
 
   Scenario: Ingestion keys render in their own labeled section
     Given the organization has an ingestion key with source "claude_code"
@@ -41,7 +42,7 @@ Feature: Unified API Keys
     Then I see an "Ingestion keys" section heading
     And the ingestion key row shows its source "claude_code"
     And the ingestion key row has a revoke button but no permissions editor
-    And I see an "API keys" section heading containing "CI Pipeline"
+    And the regular key "CI Pipeline" renders above that section
 
   Scenario: No ingestion section when no ingestion keys exist
     Given the organization has only regular API keys
@@ -49,11 +50,20 @@ Feature: Unified API Keys
     Then I do not see an "Ingestion keys" section heading
     And the regular API keys render exactly as before
 
-  Scenario: API keys render above ingestion keys
+  Scenario: The page carries a single title and subtitle
     Given the organization has an ingestion key with source "claude_code"
     And I have a regular API key named "CI Pipeline"
     When I navigate to Settings > API Keys
-    Then the "API keys" section renders above the "Ingestion keys" section
+    Then the only page-level title is "API Keys"
+    And it is followed by a single subtitle
+    And the regular keys table carries no heading of its own
+    And the "Do not share your API keys" warning still shows
+
+  Scenario: Deep link opens the page on a specific key
+    Given I have a regular API key named "CI Pipeline"
+    When I open "/settings/api-keys#api-key-<id of CI Pipeline>"
+    Then the row for "CI Pipeline" carries that anchor id
+    And it is scrolled into view once the keys have loaded
 
   Scenario: Legacy project key row names its project
     Given the project has a legacy per-project service key
@@ -342,3 +352,86 @@ Feature: Unified API Keys
     When a request is authenticated via an API key
     Then the lastUsedAt timestamp is updated on the key
     And the API key ID is available in the request context for downstream logging
+
+  # ── Naming a single key ────────────────────────────────────────
+
+  # `apiKey.list` is admin-gated for the whole organization, so anywhere a key
+  # is merely REFERENCED by id (the trace drawer's `langwatch.api_key.id` row)
+  # most of the team would see a raw row id. `apiKey.nameById` answers that one
+  # question for one id the caller already holds, and nothing more: no lookup
+  # id, no secret, no owner, no bindings, no list. Anyone who can read the
+  # trace can already see the id stamped on it, and a name reveals less.
+  #
+  # It is not an enumeration surface: it takes a whole id rather than a prefix
+  # or filter, answers one at a time, and cannot distinguish "no such key" from
+  # "a key in a different organization".
+
+  @unit
+  Scenario: Any organization member can name a key they can already see
+    Given an API key belonging to my organization
+    When I look it up by its id
+    Then I get the key's name
+
+  @unit
+  Scenario: A revoked key still resolves to its name
+    Given an API key in my organization that has been revoked
+    When I look it up by its id
+    Then I get the key's name, marked as revoked
+
+  @unit
+  Scenario: A non-member cannot name a key in an organization they are outside
+    Given an organization I am not a member of
+    When I look up a key id against that organization
+    Then the request is rejected before any key is read
+
+  @unit
+  Scenario: An unresolvable key id returns nothing rather than an error
+    Given a key id that is unknown, or belongs to another organization
+    When I look it up against my own organization
+    Then I get nothing back, so the two cases are indistinguishable
+
+  # ── The grants have to land before the key is handed out ───────
+
+  # A key row is a plain insert and its grants are ledger commands, so the two
+  # cannot share a transaction. The key is written revoked and un-revoked last,
+  # once its grants are readable. "Readable" is the part that was missing: a
+  # durable append whose projection had not landed yet counted as a grant, and
+  # the mutation answered with a live key that every route then refused.
+
+  @unit
+  Scenario: A key whose grants did not become readable is never activated
+    Given the grant write is durable but its projection has not landed
+    When I create an API key
+    Then the create fails with "authz_grant_not_confirmed"
+    And the key row is left revoked
+    And no token is returned
+
+  @unit
+  Scenario: A key whose custom role did not become readable is never activated
+    Given a restricted key whose role definition has not landed in the projection
+    When I create the API key
+    Then the create fails with "authz_grant_not_confirmed"
+    And the key row is left revoked
+
+  @unit
+  Scenario: A key whose grants are readable is activated and returned
+    Given the grant write lands in the projection
+    When I create an API key
+    Then the key row is activated
+    And the token is returned
+
+  @unit
+  Scenario: Replacing a key's grants keeps the old ones when the new ones do not land
+    Given an API key with grants
+    And the grant write is durable but its projection has not landed
+    When I replace its grants
+    Then the update fails with "authz_grant_not_confirmed"
+    And nothing the key already held is revoked
+
+  @unit
+  Scenario: Replacing a key's grants leaves its metadata alone when the new ones do not land
+    Given an API key with grants
+    And the grant write is durable but its projection has not landed
+    When I replace its grants and its permission mode in one edit
+    Then the update fails with "authz_grant_not_confirmed"
+    And the key still reads with the name and permission mode it had

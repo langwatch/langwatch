@@ -50,6 +50,14 @@ Rule: Span tab activation
     Then the span becomes a pinned span tab that survives selecting a different span
     And selecting another span opens a separate ephemeral span tab alongside the pinned one
 
+  # Pinning is a thing tabs do, and it only reads as one on the tab it acts on.
+  # On a waterfall row the same icon said nothing about tabs, so the row no
+  # longer offers it or reports it.
+  Scenario: A waterfall row neither pins a span nor says whether it is pinned
+    Given a span is pinned as a tab
+    And the user is in the Waterfall view
+    Then that span's row carries no pin action and no pinned mark
+
   Scenario: Many pinned spans collapse into a "+N more" overflow menu
     Given more than 4 spans are pinned as tabs
     Then the first 3 pinned spans render inline and the rest collapse into a "+N more" dropdown

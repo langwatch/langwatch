@@ -68,7 +68,7 @@ deliberately-separated follow-up with a data precondition.
 ### 1. One surface — `queryWindowed` on the resilient client
 
 **The resilient ClickHouse client
-(`langwatch/src/server/app-layer/clients/clickhouse/`) owns the windowed-read
+(`platform/app/src/server/app-layer/clients/clickhouse/`) owns the windowed-read
 pattern.** This is the surface that already owns retries, query-error
 translation, and cold-scan detection — the fallback belongs next to the thing
 that can already see a cold scan, not scattered across repositories.

@@ -122,6 +122,36 @@ func TestConfigWireProvidersAllowedAndRoutingMode(t *testing.T) {
 	})
 }
 
+// The gateway is told, per provider it will not dispatch to, WHY: dropped by
+// the routing policy, or outside the key's provider access. The kind rides the
+// wire (not just the row id) because a request resolves to a provider kind and
+// these rows are absent from providers[]. This pins the {id, type} decode and
+// the block-reason classification so a rename cannot leave the gateway unable
+// to name the reason.
+func TestConfigWireProviderExclusions(t *testing.T) {
+	body := []byte(`{
+		"routing_excluded_providers": [{"id": "mp_anthropic", "type": "anthropic"}],
+		"access_excluded_providers": [{"id": "mp_gemini", "type": "google_gemini"}],
+		"routing_policy_name": "Cheap models"
+	}`)
+	var wire configWire
+	require.NoError(t, json.Unmarshal(body, &wire))
+	cfg := wire.toDomain()
+
+	require.Len(t, cfg.RoutingExcludedProviders, 1)
+	assert.Equal(t, "mp_anthropic", cfg.RoutingExcludedProviders[0].ID)
+	assert.Equal(t, domain.ProviderAnthropic, cfg.RoutingExcludedProviders[0].ProviderID)
+
+	require.Len(t, cfg.AccessExcludedProviders, 1)
+	// google_gemini normalizes to the canonical gemini kind, same as a credential.
+	assert.Equal(t, domain.ProviderGemini, cfg.AccessExcludedProviders[0].ProviderID)
+
+	assert.Equal(t, "Cheap models", cfg.RoutingPolicyName)
+	assert.Equal(t, domain.ProviderBlockRouting, cfg.BlockedProviderReason(domain.ProviderAnthropic))
+	assert.Equal(t, domain.ProviderBlockAccess, cfg.BlockedProviderReason(domain.ProviderGemini))
+	assert.Equal(t, domain.ProviderBlockNone, cfg.BlockedProviderReason(domain.ProviderOpenAI))
+}
+
 // The other half of the bundle contract lives in the control plane's
 // materializer module. Reading it here keeps a TypeScript-side rename from
 // silently stripping the provider filter (or the routing mode) off the
@@ -135,6 +165,9 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 		`principal_id`,
 		`providers_allowed: config.providersAllowed`,
 		`routing_mode: routingModeToWire(vk.routingMode)`,
+		`routing_excluded_providers: routingExcluded.map(providerExclusionWire)`,
+		`access_excluded_providers: accessExcluded.map(providerExclusionWire)`,
+		`routing_policy_name: vk.routingPolicy?.name ?? null`,
 	} {
 		if !strings.Contains(src, needle) {
 			t.Errorf("config.materialiser.ts no longer emits %q: the bundle contract has drifted", needle)
@@ -169,11 +202,13 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	}
 }
 
-// The debit attribution seam: the gateway stamps the dispatched provider on
-// the customer span; the control plane's accumulation allowlist and the
-// trace-fold reactor read the same key. If either side renames it,
-// provider-filtered budgets stop accruing, and the failure is silent: every request
-// still succeeds. This test makes the drift loud.
+// The provider attribution seam. The gateway names the dispatched provider
+// twice: on the customer span, which the control plane's accumulation
+// allowlist must carry into the fold for the usage views, and on the spend
+// commands, which is what actually debits. Both are the same ModelProvider
+// row id. If either side renames it, provider-filtered budgets stop
+// accruing, and the failure is silent: every request still succeeds. This
+// test makes the drift loud.
 func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 	require.Equal(t, "langwatch.model_provider_id", customertracebridge.AttrModelProviderID,
 		"the Go constant is the wire name the control plane reads")
@@ -185,9 +220,22 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}
 
-	reactor := readControlPlaneSource(t, "ee", "governance", "reactors", "gatewayBudgetSync.reactor.ts")
-	if !strings.Contains(reactor, `attributes["`+customertracebridge.AttrModelProviderID+`"]`) {
-		t.Error("gatewayBudgetSync.reactor.ts no longer reads langwatch.model_provider_id off the fold state")
+	// The span attribute is the command field under the reserved prefix.
+	const commandField = "model_provider_id"
+	require.True(t, strings.HasSuffix(customertracebridge.AttrModelProviderID, commandField),
+		"the span attribute and the spend command field must name the same thing")
+
+	commands := readControlPlaneSource(t,
+		"src", "server", "event-sourcing", "pipelines", "gateway-spend-processing",
+		"schemas", "commands.ts")
+	if !strings.Contains(commands, commandField+": z.string()") {
+		t.Error("the spend command schema no longer declares model_provider_id, so no debit can name a provider")
+	}
+
+	debits := readControlPlaneSource(t,
+		"ee", "governance", "process-manager", "gatewayDebits.process.ts")
+	if !strings.Contains(debits, "payload."+commandField) {
+		t.Error("gatewayDebits.process.ts no longer reads model_provider_id, so provider-filtered budgets stop accruing")
 	}
 }
 

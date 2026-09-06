@@ -7,7 +7,7 @@ Feature: Unified Reasoning Form Field
   # functions are bound via existing `reasoningBoundary.unit.test.ts`.
   # The remaining @unimplemented scenarios cover form-schema validation
   # and form-to-save-params helpers that need targeted unit tests in
-  # `langwatch/src/prompts/utils/__tests__/llmPromptConfigUtils.test.ts`
+  # `platform/app/src/prompts/utils/__tests__/llmPromptConfigUtils.test.ts`
   # — which exercises the same family of converters but not these
   # specific reasoning-field invariants.
 

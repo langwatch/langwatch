@@ -2,7 +2,53 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted
+**Status:** Accepted — amended 2026-08-20 and 2026-08-31, see below
+
+## Amendment (2026-08-20): PostHog removed from the resolver
+
+PR #7194 deleted `FeatureFlagServicePostHog` and the PostHog branch of `featureFlagService.isEnabled`. **Both scopes now resolve identically**, and PostHog is not consulted for any flag:
+
+```text
+SYSTEM and PRODUCT:  env override -> FEATURE_FLAG_FORCE_ENABLE -> postgres store (targeting rules, then row value) -> registry default
+```
+
+Three consequences the rest of this document predates:
+
+- **Targeting is scope-independent.** `FeatureFlagStorePostgres.get` evaluates `rules` against the caller's `{ projectId, organizationId }` without reading `scope`, so a SYSTEM flag takes per-project and per-org rules exactly like a PRODUCT one. The claim below that "SYSTEM flags ignore `projectId` / `organizationId`" no longer holds.
+- **Scope is now a classification, not a resolver switch.** It survives because `/ops/feature-flags` groups and badges by it, and because it records who owns the lever: SYSTEM means the internal flag store is the only administration point (usually paired with `envOverridable: false`). It no longer implies anything about *how* the value is fetched.
+- **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
+
+Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
+
+## Amendment (2026-08-31): targeting by organization age ("New users")
+
+A rollout aimed at new signups cannot be written as a list of organization ids
+— the organizations it is for do not exist yet, and re-editing the list on
+every signup is not a rollout. A rule may therefore name a date instead:
+
+```json
+{ "match": { "organizationCreatedAfter": "2026-06-01" }, "enabled": true }
+```
+
+It matches every organization created **on or after** that instant, and nobody
+else: organizations created before it are left on whatever the rest of the
+rules and the flag's own value already said. `/ops/feature-flags`
+writes it as the **New users** scope in the targeting-rules dialog, where the
+field beside the picker becomes a date.
+
+Two properties are load-bearing:
+
+- **It fails closed.** A read whose organization creation date is unknown — an
+  opted-out organization scope, a failed lookup — matches no age rule, and
+  neither does a stored date that cannot be parsed. Treating an unreadable
+  condition as *no* condition would turn one bad rule into a fleet-wide
+  switch, since a rule with no conditions matches everyone.
+- **No call site carries the date.** `FeatureFlagStorePostgres` resolves the
+  organization's `createdAt` itself, lazily, and only for a flag whose own
+  rules ask for it (`rulesTargetOrganizationAge`), memoised per organization
+  for ten minutes. A creation date never changes, and a flag with no age rule
+  — every kill switch on the per-event hot path — reads exactly what it read
+  before, with no extra query.
 
 ## Context
 
@@ -47,7 +93,7 @@ PostHog is **never** called on the SYSTEM path. PRODUCT keeps PostHog as the sou
 ### Adding a new flag
 
 1. Add a `FEATURE_FLAGS` entry with `scope: "SYSTEM" | "PRODUCT"`, `defaultValue`, `description`. For SYSTEM flags migrated from an existing env variable, set `legacyEnvVar` so the old name keeps working.
-2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, defaultValue?, projectId?, organizationId?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected.
+2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, projectId, organizationId, defaultValue?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected. `projectId` and `organizationId` are required: a rule that names a scope the read left out can never match, so an omitted field would turn a rollout into a silent no-op. A caller with no such scope passes `NOT_TARGETED` (`src/server/featureFlag/targeting.ts`).
 3. Flip from `/ops/feature-flags` at runtime without a redeploy. For PRODUCT flags, prefer flipping in PostHog directly so user targeting rules apply.
 
 ### Adding a new family
@@ -86,20 +132,35 @@ FeatureFlagService                                 env override
                     fallback to FeatureFlagStorePostgres on PostHog error
 ```
 
-## Targeting via personProperties
+## Targeting
 
-PRODUCT flags target users / projects / orgs through PostHog `personProperties`:
+Rules on a flag row name a project, an organization, or an organization
+creation date (see the 2026-08-31 amendment). The read states both ids, so a
+rule written for either one can match:
 
 ```typescript
 await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {
   distinctId: userId,
-  defaultValue: false,
   projectId: "proj_123",
   organizationId: "org_456",
+  defaultValue: false,
 });
 ```
 
-PostHog receives these as `personProperties.project_id` and `personProperties.organization_id` for release condition evaluation. SYSTEM flags ignore `projectId` / `organizationId` since they're cluster-wide.
+Both fields are required. A surface that has no such scope states the opt-out instead, and no rule naming that scope can match it:
+
+```typescript
+await featureFlagService.isEnabled("release_ui_ai_governance_enabled", {
+  distinctId: userId,
+  projectId: NOT_TARGETED, // an organization page holds no project
+  organizationId: "org_456",
+  defaultValue: false,
+});
+```
+
+The same rule holds on the client: `useFeatureFlag(flag, { projectId, organizationId, enabled? })` requires both ids. `undefined` is legal for an id that is still loading, and pairs with `enabled: false`. The tRPC input carries both fields as required and uses `null` for "no such scope", because JSON has no `undefined`.
+
+The server never derives one id from the other. A read that wants the organization of a project resolves it at the call site (`resolveOrganizationId`), so the context stays explicit.
 
 ## Environment Overrides
 

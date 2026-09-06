@@ -9,7 +9,7 @@ Feature: Lite member access restrictions
   certain resources or debug individual traces.
 
   # Several scenarios in this file are bound to existing JSDOM
-  # render tests under `langwatch/src/{tests,components}/...`:
+  # render tests under `platform/app/src/{tests,components}/...`:
   #   * TraceDetails-liteMember.integration.test.tsx
   #   * MessageHoverActions-liteMember.integration.test.tsx
   #   * datasets.lite-member.integration.test.tsx

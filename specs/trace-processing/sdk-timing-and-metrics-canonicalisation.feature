@@ -68,12 +68,12 @@ Feature: SDK timing and metrics canonicalisation
       When the span is canonicalised
       Then the canonical attributes keep gen_ai.usage.input_tokens 200
 
-  Rule: An explicit or provider-reported cost beats the registry estimate
-    A span that carries an authoritative total cost — the SDK's metrics.cost
-    or a provider's own billed figure such as Claude Code's cost_usd — is
-    costed from that number, not from a token times registry estimate. The
-    registry is the fallback for spans that never reported a cost. Per-token
-    enrichment rates remain the most specific override and still rank first.
+  Rule: An explicit cost on the span beats the registry estimate
+    An application that works out its own total cost and reports it through
+    the SDK's metrics.cost is costed from that number, not from a token times
+    registry estimate. The registry is the fallback for spans that never
+    reported a cost. Per-token enrichment rates remain the most specific
+    override and still rank first.
 
     Scenario: Explicit cost wins for a known model with tokens
       Given a span for a known registry model with prompt and completion tokens
@@ -81,9 +81,9 @@ Feature: SDK timing and metrics canonicalisation
       When the span cost is computed
       Then the computed cost is 0.042, not the registry estimate
 
-    Scenario: Provider-reported cost wins for an on-table Claude model
-      Given a Claude Code turn for an on-table Anthropic model with tokens
-      And the turn reports Anthropic's own cost_usd of 0.123
+    Scenario: Explicit cost wins for an on-table Anthropic model
+      Given a span for an on-table Anthropic model with prompt and completion tokens
+      And the span carries an explicit cost of 0.123
       When the span cost is computed
       Then the computed cost is 0.123, not the registry estimate
 

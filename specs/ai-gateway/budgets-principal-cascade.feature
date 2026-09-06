@@ -74,17 +74,19 @@ Feature: AI Gateway — Per-user (PRINCIPAL) budgets in the strictest-wins casca
     And `scopes` contains 4 entries (org, team, project, virtual_key) with NO principal entry
 
   # ============================================================================
-  # Trace-fold attribution
+  # Debit attribution
   # ============================================================================
 
-  @bdd @phase-1b @principal-cascade @trace-fold
-  Scenario: Trace-fold reactor writes one ledger row per applicable budget INCLUDING PRINCIPAL
+  @bdd @phase-1b @principal-cascade @spend-debits
+  Scenario: The debits process writes one ledger row per applicable budget INCLUDING PRINCIPAL
     Given alice has a $50/month PRINCIPAL budget
     And the org/team/project/VK budgets in the background apply
-    When a finalised trace is processed for an alice-attributed request costing $0.42
-    Then the trace-fold reactor writes 5 rows to `gateway_budget_ledger_events`
+    When an alice-attributed request costing $0.42 confirms
+    Then the debits process writes 5 rows to `gateway_budget_ledger_events`
     And each row carries the same `GatewayRequestId` (idempotency key)
     And the PRINCIPAL row has `BudgetId` matching alice's principal budget and `SpendUSD = 0.42`
+    # The principal rides the spend command: the ingest seam reads it off
+    # the key row, so a debit names the seat without any trace.
 
   # ============================================================================
   # Multi-scope VK — budget cascade with refactored VK shape

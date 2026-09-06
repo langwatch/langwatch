@@ -1,0 +1,150 @@
+/**
+ * Cheap-model title generator for Langy conversations.
+ *
+ * Reads the recent transcript from the operational message repository and asks a CHEAP model
+ * (gpt-5-mini by default) for a short, specific title.
+ *
+ * Two different failures, two different answers. Null means there is NOTHING to
+ * title — an empty transcript, no model configured for the project, an empty
+ * answer from the model — and no amount of retrying changes that. Anything else
+ * (a disabled provider, a rate limit, a provider blip, an unreachable network)
+ * is a failure of this attempt only, and it THROWS so the process outbox
+ * retries it with backoff. Swallowing those left the conversation on the raw
+ * first message as its title forever: a filmed run lost four of six titles to
+ * transient model failures, and nothing ever tried again.
+ *
+ * Throwing does not affect the turn. This runs in the process outbox, out of
+ * band from the turn that scheduled it.
+ *
+ * Injected into the Langy process-outbox effect port at the composition root,
+ * so the event-sourcing core stays free of model-provider and transcript-read
+ * dependencies.
+ *
+ * @see specs/langy/langy-conversation-title.feature
+ */
+
+import { LANGY_TITLE_GENERATION } from "@langwatch/langy";
+import { createLogger } from "@langwatch/observability";
+import { generateText } from "ai";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { getVercelAIModel } from "~/server/modelProviders/utils";
+import type { LangyTrustedMessageReader } from "./langy-message.service";
+import { normalizeLangyConversationTitle } from "./langyConversationTitle";
+
+const logger = createLogger("langwatch:langy:title-generator");
+
+/** Application-owned title capability used by the process effect adapter. */
+export type LangyTitleGenerator = (args: {
+  projectId: string;
+  conversationId: string;
+}) => Promise<{ title: string; model: string } | null>;
+
+/**
+ * Feature key the title model resolves against (role FAST — the platform's
+ * "cheap / background" model tier). A project can point FAST at a cheap
+ * provider (e.g. Bedrock) while keeping DEFAULT on Anthropic/OpenAI, or set a
+ * per-feature override for this exact key. See modelProviders/featureRegistry.
+ */
+const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
+
+const TITLE_SYSTEM_PROMPT = [
+  "You write a very short, specific title for a chat between a user and the",
+  "LangWatch assistant. Summarize what the user is trying to do.",
+  `Rules: at most ${LANGY_TITLE_GENERATION.MAX_TITLE_CHARS} characters;`,
+  "sentence case, so only the first word starts with a capital, apart from",
+  "product and proper names such as LangWatch, GitHub or Python; no",
+  "surrounding quotes; no trailing period; no prefix like",
+  '"Title:". Output ONLY the title, nothing else.',
+].join(" ");
+
+/** Render the recent transcript into a compact prompt block. */
+function buildTranscript(
+  messages: { role: string; content: string }[],
+): string {
+  return messages
+    .map((m) => ({
+      role: m.role,
+      content: (m.content ?? "").trim(),
+    }))
+    .filter((m) => m.content.length > 0)
+    .slice(-LANGY_TITLE_GENERATION.PROMPT_MESSAGE_LIMIT)
+    .map(
+      (m) =>
+        `${m.role}: ${m.content.slice(0, LANGY_TITLE_GENERATION.PROMPT_CHARS_PER_MESSAGE)}`,
+    )
+    .join("\n");
+}
+
+/**
+ * Resolve the cheap title model. Prefers the project's configured FAST-role
+ * model (so titles can run on e.g. Bedrock independently of the DEFAULT chat
+ * model); if no FAST model is configured, falls back to the cheap default so
+ * titles still work out of the box.
+ */
+async function resolveTitleModel(
+  projectId: string,
+  resolveModel: typeof getVercelAIModel,
+) {
+  try {
+    return await resolveModel({
+      projectId,
+      featureKey: LANGY_TITLE_FEATURE_KEY,
+    });
+  } catch (error) {
+    if (!(error instanceof ModelNotConfiguredError)) throw error;
+    // No cheap model configured for this project — use the sensible default.
+    return await resolveModel({
+      projectId,
+      model: LANGY_TITLE_GENERATION.MODEL,
+    });
+  }
+}
+
+/**
+ * Build the process-outbox title generator. `resolveModel` is injectable for
+ * tests; it defaults to the real project model-provider path
+ * (`getVercelAIModel`), resolving the FAST (cheap) role.
+ */
+export function createLangyConversationTitleGenerator(deps: {
+  messages: LangyTrustedMessageReader;
+  resolveModel?: typeof getVercelAIModel;
+}): LangyTitleGenerator {
+  const resolveModel = deps.resolveModel ?? getVercelAIModel;
+
+  return async ({ projectId, conversationId }) => {
+    const records = await deps.messages.getRecordsByConversation({
+      conversationId,
+      projectId,
+    });
+    const transcript = buildTranscript(records);
+    if (!transcript) return null;
+
+    let model: Awaited<ReturnType<typeof getVercelAIModel>>;
+    try {
+      model = await resolveTitleModel(projectId, resolveModel);
+    } catch (error) {
+      if (error instanceof ModelNotConfiguredError) {
+        // Nothing to retry: this project has no model to ask.
+        logger.warn(
+          { projectId, conversationId },
+          "no cheap model configured for Langy titles — leaving title unchanged",
+        );
+        return null;
+      }
+      throw error;
+    }
+
+    const { text } = await generateText({
+      model,
+      system: TITLE_SYSTEM_PROMPT,
+      prompt: `Conversation so far:\n\n${transcript}\n\nTitle:`,
+      temperature: 0.2,
+      maxRetries: 1,
+    });
+
+    const title = normalizeLangyConversationTitle(text);
+    if (!title) return null;
+    // Record the model that actually produced the title, not the request key.
+    return { title, model: model.modelId };
+  };
+}

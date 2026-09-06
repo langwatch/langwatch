@@ -85,7 +85,12 @@ func setupStack(t *testing.T) *stack {
 
 // executorAdapter is a copy of cmd.engineAdapter — kept inline so the
 // integration test doesn't depend on the cmd package (avoids forcing
-// the test binary to also pull in os.Args parsing).
+// the test binary to also pull in os.Args parsing). It is a hand copy, not a
+// shared implementation, so it can drift from prod (it already had once:
+// UntilNodeID went unset here while cmd/engine_adapter.go set it, silently
+// mistranslating a "run until here" request and leaving the planner's
+// WithUntilNode exemption uncovered at this API-surface level — #3198 review).
+// A future change to cmd.engineAdapter should be checked against this copy too.
 type executorAdapter struct {
 	eng *engine.Engine
 }
@@ -106,6 +111,7 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 		ProjectID:         req.ProjectID,
 		ThreadID:          req.ThreadID,
 		NodeID:            req.NodeID,
+		UntilNodeID:       req.UntilNodeID,
 		Type:              req.Type,
 		RunID:             req.RunID,
 		WorkflowVersionID: req.WorkflowVersionID,
@@ -144,6 +150,7 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 		ProjectID:         req.ProjectID,
 		ThreadID:          req.ThreadID,
 		NodeID:            req.NodeID,
+		UntilNodeID:       req.UntilNodeID,
 		Type:              req.Type,
 		RunID:             req.RunID,
 		WorkflowVersionID: req.WorkflowVersionID,

@@ -2,7 +2,7 @@
   "name": "@langwatch/langy",
   "version": "0.1.0",
   "private": true,
-  "description": "Langy's shared contract: the CARD vocabulary (every kind of card the panel can draw, the closed derived-safe allowlist a model may write, the CLI verb registry, digest and handled-error), the inline ```langy-card channel, and the conversation-projection contract (event payload schemas, the pure turn fold, the turn-phase machine, the event cursor) — imported by the LangWatch server pipeline, the browser panel and the CLI so a turn renders identically everywhere (ADR-059, ADR-060).",
+  "description": "Langy's shared contract: the CARD vocabulary (every kind of card the panel can draw, the closed derived-safe allowlist a model may write, the CLI verb registry, digest and handled-error), the inline ```langy-card channel, and the conversation-projection contract (event payload schemas, the pure turn fold, the turn-phase machine, the event cursor) \u2014 imported by the LangWatch server pipeline, the browser panel and the CLI so a turn renders identically everywhere (ADR-059, ADR-060).",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -29,12 +29,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "peerDependencies": {
-    "zod": ">=3.25.0 <5"
+  "dependencies": {
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vitest": "^4.1.9",
-    "zod": "^3.25.76"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
   }
 }

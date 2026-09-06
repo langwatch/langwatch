@@ -46,6 +46,41 @@ func TestExtractInputMessages_RequestTypeResponses_missing(t *testing.T) {
 	assert.Empty(t, extractInputMessages(body, domain.RequestTypeResponses))
 }
 
+// @scenario "The captured input includes Responses API instructions"
+func TestExtractInputMessages_RequestTypeResponses_prependsInstructionsAsSystem(t *testing.T) {
+	body := []byte(`{"instructions":"You are codex.","input":"hello world","model":"gpt-5.5"}`)
+	got := extractInputMessages(body, domain.RequestTypeResponses)
+	assert.JSONEq(t, `[{"role":"system","content":"You are codex."},{"role":"user","content":"hello world"}]`, got)
+}
+
+// @scenario "The captured input includes an Anthropic system prompt"
+func TestExtractInputMessages_RequestTypeMessages_prependsStringSystem(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","system":"You are a helpful bot.",` +
+		`"messages":[{"role":"user","content":"hi"}]}`)
+	got := extractInputMessages(body, domain.RequestTypeMessages)
+	assert.JSONEq(t, `[{"role":"system","content":"You are a helpful bot."},{"role":"user","content":"hi"}]`, got)
+}
+
+// @scenario "The captured input includes an Anthropic system prompt"
+func TestExtractInputMessages_RequestTypeMessages_flattensBlockArraySystem(t *testing.T) {
+	// The block-array shape is what callers use to set cache_control on
+	// the system prompt; the text parts join, the markers stay off the trace.
+	body := []byte(`{"model":"claude-sonnet-4-5",` +
+		`"system":[{"type":"text","text":"You are a helpful bot.","cache_control":{"type":"ephemeral"}},` +
+		`{"type":"text","text":"Answer in French."}],` +
+		`"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
+	got := extractInputMessages(body, domain.RequestTypeMessages)
+	assert.JSONEq(t, `[{"role":"system","content":"You are a helpful bot.\nAnswer in French."},`+
+		`{"role":"user","content":[{"type":"text","text":"hi"}]}]`, got)
+}
+
+func TestExtractInputMessages_RequestTypeMessages_keepsMessagesVerbatimWithoutSystem(t *testing.T) {
+	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"},` +
+		`{"role":"assistant","content":[{"type":"text","text":"hello"}]}]}`)
+	got := extractInputMessages(body, domain.RequestTypeMessages)
+	assert.JSONEq(t, `[{"role":"user","content":"hi"},{"role":"assistant","content":[{"type":"text","text":"hello"}]}]`, got)
+}
+
 func TestExtractOutputMessages_RequestTypeResponses_syncJSON(t *testing.T) {
 	body := []byte(`{
 		"output":[

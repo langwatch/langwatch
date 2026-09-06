@@ -1,0 +1,109 @@
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { getApp } from "~/server/app-layer/app";
+import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
+import { prisma } from "~/server/db";
+
+export async function collectUsageStats({
+  instanceId,
+  repository = getApp().usageStats.instance,
+}: {
+  instanceId: string;
+  /** Defaults to the repository the composition root built. */
+  repository?: InstanceUsageStatsRepository;
+}) {
+  const organizationId = instanceId.split("__")[1];
+
+  if (!organizationId) {
+    throw new Error("Invalid instance ID");
+  }
+
+  const projects = await prisma.project.findMany({
+    where: {
+      team: { organizationId },
+    },
+    select: {
+      id: true,
+    },
+  });
+  const projectIds = projects.map((p) => p.id);
+
+  // Get total counts for each table that has projectId
+  const [
+    annotationCount,
+    annotationQueueCount,
+    annotationQueueItemCount,
+    annotationScoreCount,
+    batchEvaluationCount,
+    customGraphCount,
+    datasetCount,
+    datasetRecordCount,
+    experimentCount,
+    triggerCount,
+    workflowCount,
+  ] = await Promise.all([
+    // Every comment, whether it is about a whole trace or about one part of it:
+    // this counts the reviewing that happened, not what was said about traces.
+    prisma.annotation.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationQueue.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationQueueItem.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationScore.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.batchEvaluation.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    // Builder charts only, so the figure keeps meaning what it has always
+    // meant. Saved workbench charts share the table but are a different
+    // product; folding them in would show as growth in chart-builder usage.
+    prisma.customGraph.count({
+      where: { projectId: { in: projectIds }, kind: BUILDER_CHART_KIND },
+    }),
+    prisma.dataset.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.datasetRecord.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.experiment.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.trigger.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.workflow.count({
+      where: { projectId: { in: projectIds } },
+    }),
+  ]);
+
+  const totalTraces = await repository.findTraceCount({
+    organizationId,
+    projectIds,
+  });
+  const totalScenarioEvents = await repository.findScenarioRunCount({
+    organizationId,
+    projectIds,
+  });
+
+  return {
+    totalTraces,
+    totalScenarioEvents,
+    annotations: annotationCount,
+    annotationQueues: annotationQueueCount,
+    annotationQueueItems: annotationQueueItemCount,
+    annotationScores: annotationScoreCount,
+    batchEvaluations: batchEvaluationCount,
+    customGraphs: customGraphCount,
+    datasets: datasetCount,
+    datasetRecords: datasetRecordCount,
+    experiments: experimentCount,
+    triggers: triggerCount,
+    workflows: workflowCount,
+    timestamp: new Date().toISOString(),
+  };
+}

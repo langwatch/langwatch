@@ -1,0 +1,65 @@
+---
+title: Coding Agent Quickstart
+sidebarTitle: Quickstart
+description: Connect Claude Code, Codex, Copilot, Gemini CLI or opencode to LangWatch with one command.
+keywords:
+  - claude code quickstart
+  - codex cli telemetry
+  - connect coding agent
+  - track coding agent usage
+  - langwatch cli
+---
+
+Run your agent through the LangWatch wrapper. This will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more.
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    npx langwatch claude
+    ```
+  </Tab>
+  <Tab title="Codex">
+    ```bash
+    npx langwatch codex
+    ```
+  </Tab>
+  <Tab title="GitHub Copilot">
+    ```bash
+    npx langwatch copilot
+    ```
+  </Tab>
+  <Tab title="Gemini CLI">
+    ```bash
+    npx langwatch gemini
+    ```
+  </Tab>
+  <Tab title="OpenCode">
+    ```bash
+    npx langwatch opencode
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+  </Tab>
+</Tabs>
+
+Each agent's page covers the first-run setup in full, for example [Claude Code](/coding-agents/claude-code).
+
+## What you see now
+
+Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
+
+<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it created.">
+  ![Sessions list](/images/coding-agents/sessions-list.png)
+</Frame>
+
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation.
+- Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
+- Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
+
+## Expand from here
+
+- **Run plain commands with reporting on.** `langwatch instrument <tool>` writes the connection and exits, so `claude` without the wrapper reports too. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
+- **Send a machine to a team project** with `--project`, or wire servers and CI with no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
+- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
+- **Control what gets stored.** [Privacy](/coding-agents/privacy) states who can read your sessions, and you can drop the conversation content while keeping the cost and token counts.

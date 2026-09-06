@@ -1,6 +1,6 @@
 ---
 name: haven-setup
-description: "Bring up the LangWatch dev stack via thuishaven (pnpm dev:haven) — one-time proxy/CA setup, reusing existing local ClickHouse/Postgres/Redis, WSL2/no-colima fallback for langyagent, and the known gotchas that silently break it."
+description: "Bring up the LangWatch dev stack via thuishaven (make haven up) — one-time proxy/CA setup, reusing existing local ClickHouse/Postgres/Redis, WSL2/no-colima fallback for langyagent, and the known gotchas that silently break it."
 user-invocable: true
 argument-hint: "[--with-observability] [--managed-db] [--foreground]"
 ---
@@ -34,14 +34,14 @@ Empty output (while `resolvectl query` for the same name works — see Gotcha 4)
 ## Step 1: Bring the stack up
 
 ```bash
-pnpm dev:haven
+make haven up
 ```
 
 There is no separate setup step any more (ADR-064 deleted `haven setup`): `up` installs/verifies the `portless` proxy and trusts its CA itself, as an idempotent preflight (needs port 443 + a one-time sudo prompt — see Gotcha 3 if this hangs non-interactively).
 
 ## Step 2: Decide which services haven should manage
 
-Read `langwatch/.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
+Read `platform/app/.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
 
 ```bash
 LANGWATCH_HAVEN_CH=0     # reuse local ClickHouse (.env CLICKHOUSE_URL)
@@ -72,8 +72,8 @@ This runs the langyagent worker as a bare host process instead of inside the col
 **If you use `LANGY_UNSAFE_HOST_ACCESS=1`, you also need the `opencode` binary on `$PATH`** — normally baked into the colima container image, absent on the bare host. Symptom if missing: `POST /worker/create` in the logs shows `error=start opencode`, `.cause=exec: "opencode"`. Fix (pin version + hash to whatever `Dockerfile.langyagent` currently specifies — don't hardcode a version here, it drifts):
 
 ```bash
-v=$(grep -oP 'ARG OPENCODE_VERSION=\K.*' Dockerfile.langyagent)
-sha=$(grep -oP 'OPENCODE_SHA256_AMD64=\K[0-9a-f]+' Dockerfile.langyagent)  # or ARM64 on arm hosts
+v=$(grep -oP 'ARG OPENCODE_VERSION=\K.*' infra/docker/Dockerfile.langyagent)
+sha=$(grep -oP 'OPENCODE_SHA256_AMD64=\K[0-9a-f]+' infra/docker/Dockerfile.langyagent)  # or ARM64 on arm hosts
 cd /tmp
 curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz" -o opencode.tar.gz
 echo "${sha}  opencode.tar.gz" | sha256sum -c -
@@ -99,10 +99,10 @@ Add it to the Step 5 command alongside `LANGY_UNSAFE_HOST_ACCESS=1`. Verify by s
 
 ## Step 4: Check `.env` for stale k8s/Minikube overrides
 
-`resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`langwatch/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
+`resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`platform/app/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
 
 ```bash
-grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" langwatch/.env
+grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" platform/app/.env
 ```
 
 If either is set to a `minikube`/`docker.internal`-style host and you're running under haven (not actually inside that k8s pod), comment both out (don't delete — the user may switch back to the k8s workflow later) with a one-line note why. Confirm the fix by checking for `lookup host.minikube.internal ... no such host` in the logs after a restart — that error should disappear.
@@ -110,11 +110,11 @@ If either is set to a `minikube`/`docker.internal`-style host and you're running
 ## Step 5: Bring it up
 
 ```bash
-cd langwatch
+cd platform/app
 LANGWATCH_HAVEN_CH=0 LANGWATCH_HAVEN_PG=0 LANGWATCH_HAVEN_REDIS=0 \
 LANGWATCH_HAVEN_OBS=0 LANGY_UNSAFE_HOST_ACCESS=1 HAVEN_AGENT=1 \
 LANGY_EGRESS_REQUIRE_TLS=false \
-pnpm dev:haven
+make haven up
 ```
 
 (Adjust the CH/PG/REDIS/OBS/HOST_ACCESS flags per Steps 2-3's findings; always keep `HAVEN_AGENT=1` when observability is off; `LANGY_EGRESS_REQUIRE_TLS=false` is only needed alongside `LANGY_UNSAFE_HOST_ACCESS=1` — see the note under Step 3 — omit it if running the sandboxed/colima tier.) Run via the Bash tool with `run_in_background: true` — this is a long-running dev server, never foreground. Wait for readiness with a Monitor/until-loop polling the app URL for `200`, not a blind `sleep`.
@@ -123,7 +123,7 @@ pnpm dev:haven
 
 Verify with the same port-aware curl from Step 0. If DNS resolution itself fails (not just connection refused) — for `*.langwatch.localhost` generally, not only your slug — see Gotcha 4 before assuming the stack is broken.
 
-To sign in for a browser check (Playwright or otherwise), use the fixed local-dev seed identity — documented in `langwatch/prisma/seed.ts`'s own header comment, not a secret:
+To sign in for a browser check (Playwright or otherwise), use the fixed local-dev seed identity — documented in `platform/app/prisma/seed.ts`'s own header comment, not a secret:
 
 ```
 Email:    admin@haven.localhost
@@ -134,7 +134,7 @@ Password: LocalHavenAdmin!2026
 
 ## Gotcha 3: portless proxy daemon dies independently of your dev-server process
 
-The `portless` proxy is a separate persistent daemon bound to privileged port 443 (started with a one-time sudo elevation). It normally outlives individual `haven up` restarts — but a harness session/task-boundary teardown can kill it too, not just your foreground `pnpm dev:haven`. When it restarts without an interactive TTY for the sudo password, it falls back to port 1355 — and if an **earlier privileged run left root-owned state files** (`~/.portless/proxy.tls`, `~/.portless/ca.srl`), the unprivileged fallback ALSO fails with `EACCES: permission denied, open '.../proxy.tls'`, and the whole stack refuses to start (`haven: could not start the portless proxy automatically`).
+The `portless` proxy is a separate persistent daemon bound to privileged port 443 (started with a one-time sudo elevation). It normally outlives individual `haven up` restarts — but a harness session/task-boundary teardown can kill it too, not just your foreground `make haven up`. When it restarts without an interactive TTY for the sudo password, it falls back to port 1355 — and if an **earlier privileged run left root-owned state files** (`~/.portless/proxy.tls`, `~/.portless/ca.srl`), the unprivileged fallback ALSO fails with `EACCES: permission denied, open '.../proxy.tls'`, and the whole stack refuses to start (`haven: could not start the portless proxy automatically`).
 
 Diagnose:
 
@@ -147,10 +147,10 @@ ls -la ~/.portless/    # look for files NOT owned by your user
 
 ```bash
 rm -f ~/.portless/proxy.tls ~/.portless/ca.srl
-pnpm dev:haven   # up re-installs and re-trusts the CA by itself
+make haven up   # up re-installs and re-trusts the CA by itself
 ```
 
-It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo *elevation* itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `pnpm dev:haven` still fails after clearing these files.
+It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo *elevation* itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `make haven up` still fails after clearing these files.
 
 ## Gotcha 4: `*.langwatch.localhost` stops resolving (WSL2 resolv.conf drift)
 

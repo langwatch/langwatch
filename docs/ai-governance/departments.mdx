@@ -45,7 +45,7 @@ The **departments page** itself only creates, renames, and archives departments,
 
 ### Managing departments
 
-Open the departments page under **Settings → AI Governance → Departments** to:
+Open the departments page under **Governance → People** (`/governance/people`) to:
 
 - **Create** a department by name (Engineering, Marketing, ...).
 - **Edit** a department's name.
@@ -91,8 +91,9 @@ Every underlying query is tenant-isolated: a department rollup for your org cont
 
 ## Permissions
 
-- Creating, renaming, and archiving departments requires `organization:manage` (granted to ADMIN by default).
-- Assigning people, teams, and projects to a department happens on the respective surfaces under the same admin permission.
+- Reading the department list requires `governance:view`, which is also what opens the page.
+- Creating, renaming, and archiving departments requires `governance:manage` (granted to ADMIN by default). Without it, the page shows the list and hides the write controls.
+- Assigning people, teams, and projects to a department happens on the respective surfaces under the same `governance:manage` permission.
 - Departments never appear in any access-control decision. They are an accounting dimension only.
 
 ## Where to next

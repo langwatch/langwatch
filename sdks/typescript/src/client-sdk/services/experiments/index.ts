@@ -1,0 +1,107 @@
+/**
+ * Experiments API
+ *
+ * Run batch experiments over datasets with automatic tracing,
+ * parallel execution, and built-in evaluator support.
+ *
+ * @example SDK-defined experiment
+ * ```typescript
+ * const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
+ * const experiment = await langwatch.experiments.init('my-experiment');
+ *
+ * await experiment.run(dataset, async ({ item, index, span }) => {
+ *   const response = await myAgent(item.question);
+ *   experiment.log('accuracy', { index, score: 0.95 });
+ * });
+ * ```
+ *
+ * @example Platform-configured experiment (Experiments Workbench)
+ * ```typescript
+ * const langwatch = new LangWatch();
+ * const result = await langwatch.experiments.run("my-experiment-slug");
+ * result.printSummary();
+ * ```
+ */
+
+export { Experiment } from "./experiment";
+export { ExperimentsFacade } from "./experiments.facade";
+export {
+  ExperimentsApiService,
+  ExperimentsApiServiceError,
+} from "./experiments-api.service";
+export type {
+  ExperimentRunStartResponse,
+  ExperimentRunStartRequest,
+  ExperimentRunStatusResponse,
+  ExperimentV3RunStatusResponse,
+  ExperimentSummary,
+  ExperimentListResponse,
+  ExperimentListPagination,
+  ExperimentRunSummaryEntry,
+  ExperimentRunsListResponse,
+  ExperimentRunDatasetEntry,
+  ExperimentRunEvaluation,
+  ExperimentRunResultsResponse,
+} from "./experiments-api.service";
+
+export { mapRunResultsToRows } from "./mapResults";
+
+// SDK-defined experiment types
+export type {
+  EvaluationStatus,
+  TargetType,
+  TargetMetadata,
+  TargetInfo,
+  EvaluationResult,
+  BatchEntry,
+  Batch,
+  ComparisonMetric,
+  ComparisonOptions,
+  ComparisonStatus,
+  ComparisonVerdict,
+  ExperimentInitOptions,
+  LogOptions,
+  EvaluateOptions,
+  RunOptions,
+  RunCallback,
+  RunContext,
+  TargetContext,
+  TargetCallback,
+  TargetResult,
+  TargetExecutionContext,
+} from "./types";
+
+export {
+  ExperimentError,
+  ExperimentInitError,
+  ExperimentApiError,
+  TargetMetadataConflictError,
+  ComparisonError,
+  EvaluatorError,
+} from "./errors";
+
+// Platform experiment types (Experiments Workbench)
+export type {
+  ExperimentRunSummary,
+  RunExperimentOptions,
+  ExperimentRunResult,
+  RunWithResultsOptions,
+  ExperimentRowResult,
+  ExperimentRunWithResults,
+} from "./platformTypes";
+
+// Run polling
+export {
+  pollExperimentRun,
+  DEFAULT_POLL_INTERVAL,
+  DEFAULT_POLL_TIMEOUT,
+} from "./run-status";
+export type { PollRunStatus, PollExperimentRunResult } from "./run-status";
+
+export {
+  ExperimentsError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+} from "./platformErrors";

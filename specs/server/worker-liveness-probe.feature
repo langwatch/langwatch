@@ -37,6 +37,7 @@ Feature: Worker liveness probe endpoint
 
   Rule: /healthz answers unauthenticated, in every auth configuration
 
+    @unit
     Scenario: Default install — no metrics API key in production
       Given the worker is running in production mode
       And no metrics API key is configured
@@ -44,29 +45,34 @@ Feature: Worker liveness probe endpoint
       Then the response status is 200
       # The case that would otherwise crash-loop every default install.
 
+    @unit
     Scenario: Key configured, probe still sends nothing
       Given a metrics API key is configured
       When the kubelet requests "/healthz" without an Authorization header
       Then the response status is 200
       # Covers secretKeyRef delivery: the probe never needs the key at all.
 
+    @unit
     Scenario: The liveness endpoint leaks no telemetry
       When the kubelet requests "/healthz"
       Then the response body does not contain any metric samples
 
   Rule: /metrics keeps its bearer gate unchanged
 
+    @unit
     Scenario: Metrics still require the bearer when a key is set
       Given a metrics API key is configured
       When a caller requests "/metrics" without an Authorization header
       Then the response status is 401
 
+    @unit
     Scenario: Metrics still fail closed in production without a key
       Given the worker is running in production mode
       And no metrics API key is configured
       When a caller requests "/metrics" with any credentials
       Then the response status is 500
 
+    @unit
     Scenario: Metrics are served to a correctly authenticated caller
       Given a metrics API key is configured
       When a caller requests "/metrics" with the matching bearer token
@@ -75,12 +81,50 @@ Feature: Worker liveness probe endpoint
 
   Rule: Unknown paths stay 404
 
+    @unit
     Scenario: An unrelated path is not served
       When a caller requests "/not-a-real-path"
       Then the response status is 404
 
+  Rule: Liveness answers even while the main event loop is saturated
+
+    # A worker saturated with legitimate queue catch-up can pin the Node event
+    # loop for over a minute; when /healthz shared that loop, Kubernetes
+    # killed exactly the busiest pods and requeued their in-flight work.
+    # Liveness is served from a dedicated thread that judges the main loop by
+    # a shared heartbeat instead.
+
+    @unit
+    Scenario: A busy-but-alive main loop still passes liveness
+      Given the main loop's heartbeat is fresher than the stall budget
+      When the kubelet requests "/healthz"
+      Then the response status is 200
+
+    @unit
+    Scenario: A main loop stalled past the budget fails liveness
+      Given the main loop's heartbeat is older than the stall budget
+      When the kubelet requests "/healthz"
+      Then the response status is 503
+      # A genuinely wedged worker is still restarted — the budget separates
+      # "saturated for a minute" from "dead".
+
+    @unit
+    Scenario: Metrics proxy through to the main thread
+      Given the liveness thread is serving the metrics port
+      When a caller requests "/metrics" and the main thread replies
+      Then the reply is served with the main thread's status and body
+
+    @unit
+    Scenario: A metrics request fails when the main thread never replies
+      Given the liveness thread is serving the metrics port
+      And the main thread is stalled and never answers the proxy
+      When a caller requests "/metrics"
+      Then the response status is 503
+      # A stalled loop fails the scrape, never the probe.
+
   Rule: The chart probes the liveness endpoint, not the metrics endpoint
 
+    @e2e @unimplemented
     Scenario: Worker probes target /healthz with no credentials
       Given the Helm chart renders the workers Deployment
       Then the startup probe performs an HTTP GET on "/healthz"

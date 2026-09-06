@@ -2,7 +2,7 @@
 # Covers: event firing, event schema, debounce rules, localStorage storage, FIFO cap, data gating, migration path, privacy
 #
 # STATUS as of 2026-05-01: Not yet implemented.
-#   - No `trackLensEvent` function exists anywhere under `langwatch/src/features/traces-v2/`.
+#   - No `trackLensEvent` function exists anywhere under `platform/app/src/features/traces-v2/`.
 #   - No PostHog / analytics calls fire from the lens / column / grouping / formatting flows.
 #   - No `langwatch:lensAnalytics:{projectId}` localStorage key is written.
 #   - Conditional formatting itself (referenced in some scenarios) is also unimplemented,

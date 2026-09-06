@@ -190,6 +190,7 @@ Rule: Query syntax
   Scenario: Free text search in quotes
     When the user searches for "refund policy"
     Then traces with "refund policy" in their input or output content are shown
+    And traces whose trace name or any span name contains "refund policy" are shown
 
   Scenario: Negation with NOT
     When the user searches for "NOT @status:error"
@@ -235,6 +236,94 @@ Rule: Query syntax
   Scenario: Unquoted free text is treated as full-text search
     When the user types "timeout" without quotes or @ prefix
     Then it is treated as a full-text search across trace content
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FREE TEXT REACHES SPAN NAMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Free text used to match only ComputedInput and ComputedOutput, so a trace
+# whose span name was the only place the query appeared was invisible to the
+# search box. Searching "codex" returned nothing even though Codex traces
+# existed, because the tool name lives on the span, not in the captured I/O.
+# Span names are now part of the same free-text clause: the trace's own name
+# (the root span's name, held on trace_summaries) plus every span name in
+# stored_spans, matched as a case-insensitive substring the way the I/O
+# columns already are.
+Rule: Free text matches span names as well as captured I/O
+  When a query is answered from stored data, a free-text term is looked for in
+  the trace input, the trace output, the trace name, and the names of the
+  trace's spans. Any one of them matching surfaces the trace. The in-memory
+  evaluator that automation dispatch uses is narrower, and the last scenario
+  in this rule pins how.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: A term that appears only in a span name still finds the trace
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term that appears only in the trace name still finds the trace
+    Given a trace is named "codex exec" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: Span name matching is case-insensitive substring matching
+    Given a trace has a span named "Codex.Exec"
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term in no field at all does not match
+    Given a trace has no occurrence of "codex" in its input, output, trace name, or any span name
+    When the user searches for "codex"
+    Then that trace is not in the results
+
+  Scenario: Negated free text excludes a span-name match
+    Given a trace has a span named "codex"
+    When the user searches for "NOT codex"
+    Then that trace is not in the results
+
+  # Both free-text paths carry the same promise: the traces-v2 search bar
+  # (which is also what Langy searches through) and the legacy messages list
+  # and public search endpoint.
+  Scenario: The legacy messages list search also reaches span names
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the same term is searched through the legacy messages list search
+    Then that trace is in the results
+
+  # Ranking is deliberately unchanged. Neither free-text path scores results:
+  # they are boolean SQL filters and the list stays ordered newest-first, so
+  # "prioritising" a span-name match means including it in the match set at
+  # all rather than assigning it a relevance weight.
+  Scenario: Results stay in chronological order
+    Given several traces match "codex" by span name and by input content
+    When the user searches for "codex"
+    Then the results are ordered newest first, not by which field matched
+
+  # The one place the two sides of the query language do not agree. A trigger's
+  # filter is re-checked in memory at dispatch time against the settled fold
+  # state, which carries the trace name but no span rows. Treating the missing
+  # spans as unknown and failing the tag closed would stop every negated
+  # free-text trigger from matching, so the narrower answer is the deliberate
+  # choice: it can miss a match that only a span name would have made. A
+  # dispatcher that starts deriving spans becomes exact with no change needed.
+  @unit
+  Scenario: A trigger's in-memory re-check cannot see span names
+    Given an automation whose filter is the free text "codex"
+    And a trace whose only occurrence of "codex" is a span name
+    When the filter is re-checked in memory at dispatch time, with no span rows loaded
+    Then the trace does not match
+    But the same filter run against stored data does surface that trace
+
+  @unit
+  Scenario: The in-memory re-check still matches on the trace name
+    Given an automation whose filter is the free text "codex"
+    And a trace named "codex exec" with no occurrence of "codex" in its input or output
+    When the filter is re-checked in memory at dispatch time
+    Then the trace matches, because the trace name travels with the fold state
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1811,6 +1900,147 @@ Rule: Dynamic prefix sidebar parity
   Scenario: Event attributes section lives in the Trace group alongside event names
     Then an "Event attributes" section appears in the Trace group
     And toggling a value writes "@event.attribute.<key>:<value>" into the search bar
+
+
+Rule: Attribute sections list values from their own attribute store
+  Each attribute flavour is backed by a different ClickHouse column
+  (trace.attribute → trace_summaries.Attributes, span.attribute →
+  stored_spans.SpanAttributes, event.attribute → stored_spans.Events.Attributes).
+  Expanding a key must list values read from that flavour's own store — a
+  span- or event-attribute key whose values only exist on spans/events must
+  not come back empty because the lookup went to the trace-level map.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with trace, span, and event attributes
+
+  Scenario: Expanding an event-attribute key lists values observed on events
+    Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
+    And no trace-level attribute named "event.metrics.vote" exists
+    When the user expands the "event.metrics.vote" key in the Event attributes section
+    Then the value list shows "1" and "-1"
+
+  Scenario: Expanding a span-attribute key lists values observed on spans
+    Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
+    And no trace-level attribute named "gen_ai.request.model" exists
+    When the user expands the "gen_ai.request.model" key in the Span attributes section
+    Then the value list shows "gpt-5-mini"
+
+  Scenario: A listed event-attribute value round-trips verbatim into the filter
+    Given events carry the attribute "event.metrics.vote" with the stored string "1"
+    When the user toggles the listed value "1" under "event.metrics.vote"
+    Then the search bar shows "event.attribute.event.metrics.vote:1"
+    And the filter value is the stored string unmodified — never reformatted
+
+
+Rule: Event filtering is reachable on the default sidebar
+  A fresh profile lands on comfortable density; the Event name section and
+  the Event attributes section must be part of that default set so feedback
+  events (thumbs_up_down and friends) are filterable without configuration.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the user has never changed density
+    And the project has traces with events carrying attributes
+
+  Scenario: Event name and Event attributes sections show on the comfortable default
+    Given the user has never changed facet visibility
+    Then the sidebar shows the "Event name" section
+    And the sidebar shows the "Event attributes" section
+
+  Scenario: Span attributes stays behind the facet picker on comfortable density
+    Given the user has never changed facet visibility
+    And the project has traces with span attributes
+    Then the sidebar does not show the "Span attributes" section
+    But the facet picker still offers "Span attributes"
+
+  Scenario: Users who previously hid the Event name section keep it hidden
+    Given the user explicitly hid the "Event name" section earlier
+    And no event filter is active in the query
+    Then the sidebar does not show the "Event name" section
+
+
+Rule: Event rows drill down into their metric values
+  Each event-name row in the Event name section expands inline — like the
+  evaluator drilldown — to show the metric values observed for that event
+  type, with counts, sourced from the same discover payload (no extra query
+  per click).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
+
+  Scenario: Expanding the thumbs_up_down row shows its vote values with counts
+    When the user expands the "thumbs_up_down" row in the Event name section
+    Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
+    And no additional facet query is fired by the expansion
+
+  # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
+  # Only the label is humanised — the value the filter carries stays the
+  # stored string, so the round-trip is unaffected. Every other metric,
+  # named by whoever sent it, has no such mapping and shows as stored.
+  # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
+  # record of string to number — so "as stored" always means a decimal.)
+  Scenario: A metric with no human name shows its stored value
+    Given "checkout_survey" events carry "event.metrics.stars" with value "4"
+    When the user expands the "checkout_survey" row in the Event name section
+    Then the drilldown lists that value as "4"
+
+  Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
+    Given "event:thumbs_up_down" is already an active filter
+    When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
+    Then the search bar shows "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1"
+    And no additional "event" clause is added to the query
+
+  # Without the event anchor, "event.attribute.event.metrics.vote:-1" alone
+  # would match a trace carrying that value under a completely different
+  # event type — a metric that never happened on "thumbs_up_down" would still
+  # pass. Adding the anchor keeps the picked value scoped to the row the user
+  # actually expanded.
+  Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
+    Given the "thumbs_up_down" row is not yet an active filter
+    When the user expands the row and clicks the vote value shown as "thumbs down"
+    Then the search bar shows "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1"
+
+  # Known limitation, accepted: the anchor added above is not taken back when
+  # the metric clause is cleared. A click on an inactive row adds TWO clauses
+  # but the value's include/exclude/off cycle only ever removes ONE, so
+  # clearing the metric leaves "event:thumbs_up_down" behind — an event
+  # filter the user never picked directly. Withdrawing it safely means
+  # tracking that WE added it and that no other metric under that event is
+  # still active; until then the leftover clause stays visible as an active
+  # Event name row and one click clears it. This matches how the evaluator
+  # drilldown already behaves: buildGroupClause always emits the anchor first
+  # and returns it bare when every sub-condition is gone
+  # (evaluatorGroup.ts:216,229), so a cleared evaluator group leaves
+  # "evaluator:X" behind in the same way.
+  #
+  # NOTE ON QUOTING: the strings above carry no "@" prefix, unlike most
+  # scenarios in this file. "@" is an input sigil only — normalizeQueryString
+  # strips it at token start (parse.ts:153-156) and `serialize` never re-adds
+  # it (parse.ts:98), so a facet click yields "event:x", not "@event:x". The
+  # bound tests already assert the un-prefixed form (filterStore.unit.test.ts
+  # :94-96 expects "(origin:sample OR origin:application)"). The "@" spellings
+  # elsewhere in this file are inaccurate and predate this Rule.
+  @integration
+  Scenario: Clearing the metric leaves the event anchor it added behind
+    Given the user clicked a vote value on the inactive "thumbs_up_down" row
+    When the user cycles that same vote value back off
+    Then the search bar still shows "event:thumbs_up_down"
+
+  # Known limitation, accepted: once TWO DIFFERENT events are both active,
+  # each one's attribute clause still ANDs as an independent trace-scoped
+  # subquery — they may match different events in the same trace. Same-event
+  # pairing would need new filter grammar and is out of scope here.
+  @integration @unimplemented
+  Scenario: The drilldown filter is trace-scoped, not same-event-scoped
+    Given a trace has a "thumbs_up_down" event with vote "1" and another event with vote "-1"
+    When the user clicks the vote value "-1" in the thumbs_up_down drilldown
+    Then that trace still matches the resulting query
+
+  Scenario: An event type with no metrics shows no drilldown affordance
+    Given the project has "custom_marker" events carrying no event.metrics attributes
+    Then the "custom_marker" row shows no expand affordance
 
 
 Rule: Unknown field handling for typo'd prefixes

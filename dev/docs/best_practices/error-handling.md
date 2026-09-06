@@ -48,17 +48,17 @@ forget:
 1. **The subclass**, in a per-domain `errors.ts` next to the code that throws
    it, with a stable `code`.
 2. **The code**, added to `APP_ERROR_CODES` in
-   `langwatch/src/features/errors/logic/codes.ts` — **kept sorted**, because a
+   `platform/app/src/features/errors/logic/codes.ts` — **kept sorted**, because a
    test asserts the ordering so the next insertion lands where the reader looks
    for it.
 3. **The customer copy**, as that code's entry in
-   `langwatch/src/features/errors/logic/presentation.ts`. The registry is
+   `platform/app/src/features/errors/logic/presentation.ts`. The registry is
    exhaustive over the enumerated codes, so step 2 without step 3 fails
    `pnpm typecheck`, and step 1 without step 2 fails
    `logic/__tests__/codes.unit.test.ts`. Both directions are checked: a code in
    the list that nothing raises is dead copy and fails too.
 
-`langwatch/src/server/app-layer/evaluations/errors.ts` is a worked example:
+`platform/app/src/server/app-layer/evaluations/errors.ts` is a worked example:
 
 ```ts
 export class EvaluationNotFoundError extends NotFoundError {
@@ -88,7 +88,7 @@ Each field earns its place:
 | `reasons` | The cause chain. Non-handled links serialise as `{ code: "unknown" }` automatically — safe to pass an internal error here. |
 
 `tips` and `docsUrl` are centralised in
-`langwatch/src/server/app-layer/error-remediation.ts`. Add remediation copy there,
+`platform/app/src/server/app-layer/error-remediation.ts`. Add remediation copy there,
 not inline at the throw site.
 
 ### `meta` is a contract, not a scratchpad
@@ -111,7 +111,7 @@ This is the part that trips people up, so be precise about it:
 
 | | source |
 |---|---|
-| What a customer reads **in the app** | The **client presentation registry**, keyed by `code` — `langwatch/src/features/errors/logic/presentation.ts` |
+| What a customer reads **in the app** | The **client presentation registry**, keyed by `code` — `platform/app/src/features/errors/logic/presentation.ts` |
 | `HandledError.message` | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy |
 | The wire `message` field | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides *alongside* the code. SSE sends the code with the serialised payload beside it |
 | Server-authored dynamic prose | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose *we* wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
@@ -242,7 +242,7 @@ in order of how often they are violated:
 6. **Unhandled errors get one calm generic state** plus the copyable error id —
    never the raw text.
 
-Everything lives in `langwatch/src/features/errors`:
+Everything lives in `platform/app/src/features/errors`:
 
 | export | use it for |
 |---|---|
@@ -386,12 +386,12 @@ Not every transport carries the identical shape yet. Know which one you are on:
 
 - [ADR-045](../adr/045-domain-errors-handled-boundary.md) — the boundary decision
 - `packages/handled-error` — `HandledError`, `NotFoundError`, `ValidationError`
-- `langwatch/src/features/errors/logic/presentation.ts` — **the presentation
+- `platform/app/src/features/errors/logic/presentation.ts` — **the presentation
   registry**: every customer-facing title and description, keyed by `code`
-- `langwatch/src/features/errors/logic/codes.ts` — `APP_ERROR_CODES`, the
+- `platform/app/src/features/errors/logic/codes.ts` — `APP_ERROR_CODES`, the
   enumerated app codes the registry must be exhaustive over
-- `langwatch/src/server/app-layer/error-remediation.ts` — `tips` / `docsUrl` registry
-- `langwatch/src/app/api/middleware/error-handler.ts` — the REST boundary, and
+- `platform/app/src/server/app-layer/error-remediation.ts` — `tips` / `docsUrl` registry
+- `platform/app/src/app/api/middleware/error-handler.ts` — the REST boundary, and
   the reason `message` must be customer-safe
 - `specs/features/domain-error-contract.feature` — the boundary contract
 - `specs/features/handled-error-presentation.feature` — what the customer reads

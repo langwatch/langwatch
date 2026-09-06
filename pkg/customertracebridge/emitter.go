@@ -261,12 +261,10 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
-	// cost calc prices each bucket once. Fall back to the full prompt if a
-	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
-	if freshInput < 0 {
-		freshInput = params.Usage.PromptTokens
-	}
+	// cost calc prices each bucket once. The spend record reports the same
+	// remainder from the same helper, which is what keeps a trace and its bill
+	// on one number.
+	freshInput := params.Usage.BillableInputTokens()
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
@@ -276,11 +274,39 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
+	if params.RequestedModel != "" {
+		attrs = append(attrs, attribute.String(AttrRequestedModel, params.RequestedModel))
+	}
+	// Audio tokens ride beside the text totals, not inside them, so the cost
+	// pipeline can price them at the audio rate. Reporting them inside
+	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at
+	// the text rate, which is why a trace and its budget disagreed on every
+	// audio call.
+	if params.Usage.InputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputAudioTokens, params.Usage.InputAudioTokens))
+	}
+	if params.Usage.OutputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
+	}
+	// Image tokens ride beside the text totals for the same reason the audio
+	// ones do, and the image count is what a per-image price is applied to.
+	if params.Usage.InputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputImageTokens, params.Usage.InputImageTokens))
+	}
+	if params.Usage.OutputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputImageTokens, params.Usage.OutputImageTokens))
+	}
+	if params.Usage.ImageCount > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageImageCount, params.Usage.ImageCount))
+	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
+	}
+	if params.Usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate1h, params.Usage.CacheCreation1hTokens))
 	}
 	// Audio usage: TTS reports the characters synthesized, STT the seconds
 	// transcribed. Character- and duration-priced audio models have no token
@@ -316,6 +342,17 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// traces group under a stable thread instead of having no thread id at all.
 	if sessionID := clientSessionID(ctx, params); sessionID != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIConversationID, sessionID))
+	}
+	// External end-user attribution: the header-resolved id (middleware) wins,
+	// else the OpenAI `user` body param. The trace fold copies this into
+	// per-request spend events and attributed-user budget buckets key on it.
+	if endUser := endUserID(ctx, params); endUser != "" {
+		attrs = append(attrs, attribute.String(AttrEndUserID, endUser))
+	}
+	// The caller's metadata echo, validated at the edge; round-tripped
+	// verbatim into billing spend events as their join key.
+	if md := RequestMetadataJSON(ctx); md != "" {
+		attrs = append(attrs, attribute.String(AttrRequestMetadata, md))
 	}
 
 	// When the request failed upstream, stamp the provider's HTTP status +
@@ -365,9 +402,14 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// calls that structurally never carry completion tokens or extracted
 	// output: TTS spans (binary audio response), duration-priced STT spans
 	// (scribe reports seconds, not tokens), and embeddings.
+	// Audio tokens count as output here even though they are carried out of
+	// the completion total: an audio-native model answers entirely in audio
+	// tokens, so reading the completion field alone would drop a real answer
+	// as an empty probe.
+	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
 	isProbeShape := params.RequestType == domain.RequestTypeChat ||
 		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
@@ -461,6 +503,43 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 	return tid, sid
 }
 
+// endUserID resolves the external end-user id for attribution: the
+// middleware-lifted header value wins (already sanitized), else the OpenAI
+// `user` body param on the request shapes that carry one. Both paths land in
+// SanitizeEndUserID so the stamped value is source-independent.
+func endUserID(ctx context.Context, params domain.AITraceParams) string {
+	if id := EndUserID(ctx); id != "" {
+		return id
+	}
+	switch params.RequestType {
+	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
+		domain.RequestTypeResponses, domain.RequestTypeSpeech,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		return EndUserIDFromBody(params.RequestBody)
+	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
+		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
+		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
+		// messages body carries attribution under metadata.user_id, passthrough
+		// bodies are provider-shaped and forwarded verbatim, transcription
+		// arrives as multipart form data rather than JSON, and a realtime mint
+		// declares a socket rather than a completion. The image edit route is
+		// also multipart and still reads the field above, because its
+		// synthesized body states it.
+	}
+	return ""
+}
+
+// EndUserIDFromBody reads the OpenAI-wire top-level `user` string (the
+// abuse-attribution param, forwarded upstream unchanged) and sanitizes it.
+// Shared by the span emitter and the spend emitter so both attribute the
+// same request to the same id.
+func EndUserIDFromBody(body []byte) string {
+	if user := gjson.GetBytes(body, "user").String(); user != "" {
+		return SanitizeEndUserID(user)
+	}
+	return ""
+}
+
 // clientSessionID resolves the wrapped tool's own session / conversation id.
 // Header first (stashed on the context by the gateway middleware: claude-code
 // X-Claude-Code-Session-Id, opencode X-Session-Affinity, codex Session-Id),
@@ -486,10 +565,13 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 			return sid
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription:
-		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all); the header lifted above (when present) is
-		// the only source.
+		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+		domain.RequestTypeRealtimeSession:
+		// No inline session id on these request shapes (audio and image bodies
+		// carry no session field at all, and a realtime mint's session id is
+		// the one the gateway itself hands back); the header lifted above
+		// (when present) is the only source.
 	}
 	return ""
 }
@@ -520,11 +602,30 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
+	case domain.RequestTypeMessages:
+		// Anthropic /v1/messages: the system prompt lives in a
+		// top-level `system` field, not inside `messages`, so reading
+		// only `messages` drops it from the trace. Prepend it as a
+		// system message and keep the caller's messages verbatim.
+		return anthropicBodyAsMessages(body)
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the prompt is the meaningful input, rendered as a single
+		// user message so the trace viewer shows it like any chat. The source
+		// images of an edit stay out: they are megabytes of binary that no
+		// span should carry.
+		if in := gjson.GetBytes(body, "prompt"); in.Exists() && in.String() != "" {
+			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		}
+		return ""
 	case domain.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
-		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		// Two field names because two wires reach this shape: the OpenAI one
+		// calls it input, and ElevenLabs' own route calls it text.
+		for _, field := range []string{"input", "text"} {
+			if in := gjson.GetBytes(body, field); in.Exists() && in.String() != "" {
+				return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+			}
 		}
 		return ""
 	default:
@@ -542,18 +643,30 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 // ([{role:"user", content:[{type:"input_text", text:"..."}]}]). Both
 // shapes land here and get flattened to the same renderable form so
 // codex traces show the same input cell as OpenAI chat / Anthropic.
+// The system prompt travels in a top-level `instructions` field, so it
+// is prepended as a system message; reading `input` alone drops it.
 func responsesInputAsMessages(body []byte) string {
+	var msgs []string
+	if instr := gjson.GetBytes(body, "instructions"); instr.Type == gjson.String && instr.String() != "" {
+		msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(instr.String())))
+	}
 	input := gjson.GetBytes(body, "input")
 	if !input.Exists() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if input.Type == gjson.String {
-		return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(input.String()))
+		msgs = append(msgs, fmt.Sprintf(`{"role":"user","content":%s}`, jsonString(input.String())))
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if !input.IsArray() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
-	var msgs []string
 	input.ForEach(func(_, m gjson.Result) bool {
 		role := m.Get("role").String()
 		if role == "" {
@@ -589,6 +702,59 @@ func responsesInputAsMessages(body []byte) string {
 		return ""
 	}
 	return "[" + strings.Join(msgs, ",") + "]"
+}
+
+// anthropicBodyAsMessages renders an Anthropic /v1/messages request as
+// a chat-style messages array. When the top-level `system` field is
+// present it becomes a leading {"role":"system"} message; the caller's
+// `messages` array is kept verbatim either way.
+func anthropicBodyAsMessages(body []byte) string {
+	msgs := gjson.GetBytes(body, "messages")
+	sys := anthropicSystemText(body)
+	if sys == "" {
+		if !msgs.Exists() {
+			return ""
+		}
+		return msgs.Raw
+	}
+	sysMsg := fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(sys))
+	if !msgs.Exists() || !msgs.IsArray() {
+		return "[" + sysMsg + "]"
+	}
+	inner := strings.TrimSpace(msgs.Raw)
+	inner = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(inner, "["), "]"))
+	if inner == "" {
+		return "[" + sysMsg + "]"
+	}
+	return "[" + sysMsg + "," + inner + "]"
+}
+
+// anthropicSystemText flattens Anthropic's top-level `system` field to
+// plain text. The wire accepts a bare string or an array of content
+// blocks (used when the caller sets cache_control on the prompt); the
+// blocks' `text` parts join with newlines, mirroring joinGeminiPartsText.
+func anthropicSystemText(body []byte) string {
+	sys := gjson.GetBytes(body, "system")
+	if !sys.Exists() {
+		return ""
+	}
+	if sys.Type == gjson.String {
+		return sys.String()
+	}
+	if !sys.IsArray() {
+		return ""
+	}
+	var out strings.Builder
+	sys.ForEach(func(_, blk gjson.Result) bool {
+		if t := blk.Get("text"); t.Exists() {
+			if out.Len() > 0 {
+				out.WriteByte('\n')
+			}
+			out.WriteString(t.String())
+		}
+		return true
+	})
+	return out.String()
 }
 
 // geminiContentsAsMessages flattens Gemini's `systemInstruction` +
@@ -699,6 +865,14 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 		// non-JSON body) renders as empty rather than as raw bytes.
 		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
 			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+		}
+		return ""
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the response body is base64 image data, megabytes of it,
+		// which must never land on a span. The model's rewritten prompt is
+		// the one renderable part, when the provider states one.
+		if p := gjson.GetBytes(body, "data.0.revised_prompt"); p.Exists() && p.String() != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(p.String()))
 		}
 		return ""
 	default:

@@ -8,7 +8,7 @@ description: Continuously score and monitor your LLM's production traffic for qu
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-Online evaluation lets you continuously score your LLM's production traffic. Unlike [experiments](/evaluations/experiments/overview) which test before deployment, online evaluation monitors your live application to catch quality issues, detect regressions, and ensure safety.
+Online evaluation lets you continuously score your LLM's production traffic. It monitors your live application to catch quality issues, detect regressions, and ensure safety. To test before deployment instead, see [experiments](/evaluations/experiments/overview).
 
 <Info>
 In the LangWatch platform, online evaluation is implemented through **Monitors** - automated rules that score incoming traces based on evaluators you configure.
@@ -108,7 +108,7 @@ trace.end();
 
 ### 3. View Results
 
-Once enabled, scores will appear on:
+Once enabled, scores appear on:
 - **Traces** - Individual trace scores visible in trace details
 - **Analytics** - Aggregate metrics over time
 - **Alerts** - Configure automations for low scores

@@ -151,7 +151,7 @@ func TestClickHouseLimitsEnvWiring(t *testing.T) {
 }
 
 // haven's own knobs (LANGWATCH_HAVEN_CH, LANGY_UNSAFE_HOST_ACCESS, …) resolve
-// from langwatch/.env as well as the shell, so a machine-level preference like
+// from platform/app/.env as well as the shell, so a machine-level preference like
 // "this laptop runs native ClickHouse, never provision one" is pinned next to
 // the CLICKHOUSE_URL it belongs with and travels into every new worktree.
 func TestResolveKnob(t *testing.T) {
@@ -225,7 +225,7 @@ func TestResolveKnob(t *testing.T) {
 }
 
 // The ENVIRONMENT help text promises that haven's knobs resolve from
-// langwatch/.env, and names the ones that do not. That promise is only as good
+// platform/app/.env, and names the ones that do not. That promise is only as good
 // as its exclusion list: a knob added on plain os.Getenv without being listed
 // reads, to anyone following the docs, as configurable from .env when it
 // silently is not. Derive the real list from the source so the two cannot part.
@@ -259,7 +259,7 @@ func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
 
 // onlyRemovedKnobSet clears every removed selection variable, then sets one.
 // rejectRemovedSelectionEnv reports the FIRST variable that applies, and it
-// resolves through langwatch/.env as well as the environment — so without this
+// resolves through platform/app/.env as well as the environment — so without this
 // a developer whose own .env still carries one of these would see these tests
 // assert against the wrong variable's error.
 func onlyRemovedKnobSet(t *testing.T, name, value string) {

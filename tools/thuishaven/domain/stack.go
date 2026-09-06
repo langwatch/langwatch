@@ -9,6 +9,16 @@ type Service struct {
 	Hostname string `json:"hostname"`
 	URL      string `json:"url"`
 	Port     int    `json:"port"`
+	// DNSPort is the IdP simulator's verification nameserver, and is zero for
+	// every other service.
+	//
+	// It is a port haven allocates rather than the simulator's own default,
+	// because the default is a fixed well-known one: a second stack finds it
+	// busy, falls back to an ephemeral port, and says so in a log nobody
+	// reads — leaving the app pointed at the FIRST stack's nameserver, which
+	// answers confidently for somebody else's domains. Allocated here, the
+	// two sides are told the same number and there is nothing to collide.
+	DNSPort int `json:"dnsPort,omitempty"`
 	// IsFallback is true when this worktree does not run the service itself and the
 	// hostname resolves to a shared baseline stack's copy instead. The hostname is
 	// always defined; only the backing port differs.
@@ -51,6 +61,18 @@ type Stack struct {
 	// responses, the Langy "view trace" link, and anywhere else a developer wants to
 	// jump straight to the failing trace.
 	ObservabilityGrafanaPort int `json:"observabilityGrafanaPort,omitempty"`
+	// ObservabilityPyroscopePort is the shared Pyroscope's loopback port while the
+	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv name a
+	// profiling endpoint, so a worktree's processes profile themselves exactly when
+	// there is somewhere to push to — and pay nothing for the profiler otherwise.
+	ObservabilityPyroscopePort int `json:"observabilityPyroscopePort,omitempty"`
+	// ObservabilityGrafanaURL is the proxied browser address of the same Grafana
+	// (observability.langwatch.localhost) while the portless proxy is up, and ""
+	// when it is not. When set, OverlayEnv prefers it over the loopback port for
+	// GRAFANA_BASE_URL: the links it feeds are followed by a browser, and the
+	// stable hostname survives a Grafana port change and reads like every other
+	// haven surface.
+	ObservabilityGrafanaURL string `json:"observabilityGrafanaUrl,omitempty"`
 	// ObservabilityConsoleLevel, when set, is injected as LOG_CONSOLE_LEVEL while the
 	// stack is up — muting the console to this floor (default "warn") because the
 	// full info/debug stream is in Grafana. Empty is the opt-out: the console is left
@@ -59,6 +81,14 @@ type Stack struct {
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`
+	// DisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true, turning the Google
+	// DLP PII check off. True by default for haven stacks: local dev never wants to
+	// ship trace text to Google, and switching the check off also keeps the
+	// @google-cloud/dlp SDK (grpc + generated protos, one of the heaviest
+	// dependencies we have) out of the process entirely. False is how you opt back
+	// in to running DLP: nothing is emitted, so .env governs the check — for the
+	// rare case of exercising DLP locally against real credentials.
+	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`
@@ -72,7 +102,15 @@ type Stack struct {
 	// sandboxed. It decides whether the worker runs in colima or on the host and
 	// which callback URLs the overlay hands the control plane.
 	LangyTier LangyTier `json:"langyTier,omitempty"`
-	Services  []Service `json:"services"`
+	// PortlessDisabled marks a stack provisioned with PORTLESS=0: every service
+	// serves plain HTTP on its own loopback port instead of routing through the
+	// portless proxy. The zero value is false (portless enabled, the historical
+	// behavior), so a stack persisted before this field existed reads back as it
+	// always behaved. `up` compares it against the requested run so flipping
+	// PORTLESS between runs restarts the stack onto the requested mode instead of
+	// silently keeping the old one (see reconcileRunningStack).
+	PortlessDisabled bool      `json:"portlessDisabled,omitempty"`
+	Services         []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -87,23 +125,37 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
+	{"idp", "IdP simulator (Go)"},
 }
 
-// BaselinePort finds a live baseline stack that runs `service` locally (not itself
-// a fallback), so a worktree that opts out of the service can route its hostname
-// there. alive reports whether a launcher pid is still running.
-func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+// BaselineService finds a live baseline stack that runs `service` locally (not
+// itself a fallback), so a worktree that opts out of the service can route its
+// hostname there. alive reports whether a launcher pid is still running.
+//
+// The whole service is returned rather than its port alone, because a
+// fallback has to inherit every endpoint the real one has: an idp resolved
+// this way answers OIDC on the baseline's HTTP port AND domain proofs on the
+// baseline's nameserver, and taking only the first would point the app at a
+// nameserver that is not running.
+func BaselineService(stacks []Stack, service string, alive func(pid int) bool) (Service, bool) {
 	for _, st := range stacks {
 		if !st.IsBaseline || !alive(st.LauncherPID) {
 			continue
 		}
 		for _, s := range st.Services {
 			if s.Name == service && !s.IsFallback && s.Port != 0 {
-				return s.Port, true
+				return s, true
 			}
 		}
 	}
-	return 0, false
+	return Service{}, false
+}
+
+// BaselinePort is BaselineService's port alone, for the callers that route a
+// hostname and need nothing else.
+func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+	svc, ok := BaselineService(stacks, service, alive)
+	return svc.Port, ok
 }
 
 // Stale reports whether the stack's heartbeat is older than ttl (ttl <= 0

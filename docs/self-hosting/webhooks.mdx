@@ -1,0 +1,77 @@
+---
+title: Webhooks & Billing Events
+description: Operating the webhook endpoints platform on a self-hosted deployment, egress policy, local receivers, the license flag, and billing settlement tuning.
+sidebarTitle: Webhooks & Billing
+keywords: self-hosted webhooks, SSRF, egress, license, billing events, settlement window
+---
+
+The [webhook endpoints platform](/features/webhooks) and the [billing events surface](/ai-gateway/billing-events) run unchanged on self-hosted deployments. The operator controls the license flag, the outbound egress policy, local receivers for development and internal networks, and billing settlement tuning.
+
+## License
+
+Webhook endpoints and the billing pull APIs are gated by the `webhookEndpointsEnabled` flag on your enterprise license. Without it, the REST surfaces answer `403`, delivery does not register, and **Settings > Webhooks** shows the upgrade state. Adding the license to a running deployment enables the surfaces without a migration, the same flow as every enterprise flag (see [Compliance](/self-hosting/compliance)).
+
+## Outbound egress and SSRF policy
+
+Webhook URLs are customer-supplied and fired from your control-plane workers, so the sender is fenced:
+
+- **HTTPS only.** Plain `http://` URLs are rejected at save time.
+- **Private and loopback addresses are always blocked**, including IP literals and bracketed IPv6, regardless of the deployment-wide `BLOCK_LOCAL_HTTP_CALLS` setting. A delivery must never reach `10.x`, `192.168.x`, `localhost`, or link-local addresses.
+- **Redirects are never followed.** A `3xx` from a receiver is a terminal delivery failure, not a hop.
+- Response sizes and timeouts are capped; the receiver's status, latency, and a response excerpt land in the delivery log.
+
+If your network requires an egress allowlist at the firewall, the platform's deliveries originate from the control-plane worker pods; route them like any other outbound HTTPS from those pods.
+
+## Local and internal receivers
+
+Development setups and some internal architectures legitimately need receivers on private addresses. The escape hatch:
+
+```
+WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
+```
+
+With the flag set, endpoint URLs may use `http://` and resolve to private or loopback addresses. **Only** the local-address fence is relaxed: size caps, timeouts, no-redirects, and signing all stay in force. Leave this unset in production unless your receivers are deliberately internal; it is the difference between "our workers can only call out" and "our workers can reach anything on the pod network".
+
+## Amazon SQS destinations and whose credentials they use
+
+An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([how it works](/features/webhooks#delivering-to-an-amazon-sqs-queue)). A queue endpoint normally carries credentials of its own: a role LangWatch assumes with a generated ExternalId, or an encrypted static key pair.
+
+It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
+
+```
+WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
+```
+
+With the flag set, an endpoint may name a queue and supply no credentials, and deliveries are written with whatever AWS identity the workers run as.
+
+<Warning>
+Leave this unset on any deployment serving more than one organization. With it on, anyone who can create a webhook endpoint can name **any queue this deployment's role is allowed to write to**, including another tenant's, and the platform writes to it. It is safe only on a single-tenant install whose queues are its own, and in local development.
+</Warning>
+
+The queue URL never passes through the SSRF fence above because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL, so they always match the queue.
+
+## Authentication model
+
+Webhook and billing REST surfaces authenticate with an **organization API key** and organization-tier permissions (`webhookEndpoints:view|manage`, `gatewaySpend:view|manage`). These permissions are organization-exclusive: a team- or project-scoped role binding can never grant them, so a project-level credential cannot register an endpoint that streams org-wide events out. Grant them through org roles or a custom org-scoped role; see [RBAC](/ai-gateway/rbac).
+
+## Billing settlement window
+
+A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#settled-events-and-supersession)). The default grace is **30 minutes**. Tune it with:
+
+```
+LW_SPEND_SETTLEMENT_GRACE_MS=1800000
+```
+
+Shorter windows surface stuck requests to your billing sooner but settle more requests that were merely slow; a later confirmation always supersedes the settled event either way, so the trade is about how much churn your settled work queue sees, not about correctness.
+
+## Retention
+
+- **Spend records**: fixed 13 months, declared in the table's own migration, deliberately outside both tenant retention policies and the cold-storage TTL reconciler. Do not add `gateway_spend` to retention configs; a unit test pins the exemption.
+- **Delivery log**: 30 days, matching the automations webhook log.
+
+## See also
+
+- [Webhooks](/features/webhooks): the platform reference.
+- [Billing & spend events](/ai-gateway/billing-events): the money contract and reconciliation.
+- [Data retention](/platform/data-retention): tenant retention and the billing exemption.
+- [Self-hosting security](/self-hosting/security): network boundaries and secrets.

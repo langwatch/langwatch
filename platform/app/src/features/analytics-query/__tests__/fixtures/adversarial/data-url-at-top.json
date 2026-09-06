@@ -1,0 +1,7 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"url": "https://exfiltrate.example/rows.json"
+	},
+	"mark": "bar"
+}

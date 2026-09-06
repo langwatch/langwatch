@@ -118,8 +118,72 @@ Feature: Fold projections read back their own state
     Then the fold recognises every event as already applied
     And the stored state is unchanged
 
+  # The cache is what gives a fold back its own last write, so a cache that
+  # cannot be read is the one moment the durable read may be behind. We answer
+  # from the durable store anyway, because refusing to fold while the cache is
+  # unwell would turn a cache outage into a processing outage. The trade is
+  # deliberate and it is counted, so it can be seen rather than assumed.
+  Scenario: an unreadable fold cache is answered from the durable store, and counted apart from a miss
+    Given a fold whose cache read fails rather than reporting no entry
+    When the next event for that aggregate is folded
+    Then the fold continues from the durable store rather than failing the delivery
+    And the fallback is counted as its own outcome rather than as a cache miss
+
+  # A rejected cache write is the quietest of the three ways a cache answer can
+  # mean something other than an expiry: no entry is ever created, so the next
+  # read reports nothing and looks exactly like a settled aggregate. The write
+  # is where it can still be seen, so that is where it is counted.
+  Scenario: a rejected fold cache write is counted where it happens, not where it shows
+    Given a fold whose durable write succeeded but whose cache write was rejected
+    When that aggregate is read back
+    Then the rejected write is counted against the cache's write errors
+    And the read reports a plain cache miss, which no expiry preceded
+
   Scenario: the event log is read only for a deliberate rebuild
     Given a projection whose logic version has changed
     When an operator replays the projection
     Then the fold rebuilds from the event log
     But live delivery never reads the event log to fold
+
+  # For a fold to treat a missing row as proof that nothing was committed, the
+  # store must never decline to write a state it was handed. Otherwise absence
+  # means either "new" or "declined" and proves neither. So a state with only a
+  # dimension, or with no identity of its own, still gets a row; readers that
+  # want only aggregates carrying real signal filter on what the row records
+  # rather than on whether it exists.
+  #
+  # This binds the folds whose row is the only durable home of their working
+  # state, which is what makes a declined write a lost classification. A fold
+  # that still declines one is making the narrower claim that what it declines
+  # holds nothing it would ever need back, and it reads its own absence as
+  # proof of that and nothing more.
+
+  Scenario: absence is authoritative because nothing is ever gated out
+    Given a fold whose row is the only durable home of its working state
+    And an aggregate whose only signal so far is a dimension attached to it
+    When the fold commits that state
+    Then a row is written for it, flagged as carrying no signal of its own
+    And a reader asking for aggregates with real signal does not see it
+    And a missing row therefore proves the aggregate was never committed
+
+  Scenario: no state is unwritable, identity falls back to the aggregate id
+    Given a fold whose row is the only durable home of its working state
+    And a committed state that carries no identity of its own
+    When the fold commits it
+    Then the row is written under the aggregate's id
+    And no state is ever dropped for lacking an identity
+
+  Scenario: the redelivery watermark survives the write path
+    Given a fold that persists its applied-event set durably next to its state
+    When it commits a state after folding a batch
+    Then the applied-event set is stored alongside the row, not only in the cache
+
+  Scenario: the watermark round-trips through the read-back
+    Given a committed state whose applied-event set was stored with it
+    When the fold reads that state back from its store
+    Then it recovers the same applied-event set it committed
+
+  Scenario: the watermark survives the eval write path too
+    Given an evaluation fold that persists its applied-event set next to its state
+    When it commits a state after folding a batch
+    Then the applied-event set is stored alongside the row exactly as the trace fold's is
