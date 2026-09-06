@@ -242,6 +242,19 @@ describe("WelcomeScreen in the guided variant", () => {
         screen.getByText("How large is your company?"),
       ).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "Cloud" })).toBeInTheDocument();
+      expect(next()).toBeDisabled();
+    });
+
+    /** @scenario "A company cannot leave the tailor step before its size and deploy plan are picked" */
+    it("keeps Next disabled for a company until the size and the deploy plan are picked", async () => {
+      await reachTailorStep();
+      fireEvent.click(usageRadio("Company"));
+      expect(next()).toBeDisabled();
+
+      fireEvent.click(screen.getByRole("radio", { name: "1-10" }));
+      expect(next()).toBeDisabled();
+
+      fireEvent.click(screen.getByRole("radio", { name: "Cloud" }));
       expect(next()).toBeEnabled();
     });
   });
@@ -258,6 +271,7 @@ describe("WelcomeScreen in the guided variant", () => {
       await reachTailorStep();
       fireEvent.click(usageRadio("Company"));
       fireEvent.click(screen.getByRole("radio", { name: "11-50" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Cloud" }));
       fireEvent.click(next());
 
       expect(initializeOrganization).toHaveBeenCalledTimes(1);
@@ -294,6 +308,8 @@ describe("WelcomeScreen in the guided variant", () => {
       );
       await reachTailorStep();
       fireEvent.click(usageRadio("Company"));
+      fireEvent.click(screen.getByRole("radio", { name: "1-10" }));
+      fireEvent.click(screen.getByRole("radio", { name: "Cloud" }));
       fireEvent.click(next());
 
       expect(showErrorToast).toHaveBeenCalledWith(

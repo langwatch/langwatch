@@ -62,6 +62,16 @@ Feature: Guided welcome flow and takeover screens
     Then I am asked for my phone number, my company size and how I plan to deploy LangWatch
 
   @integration
+  Scenario: A company cannot leave the tailor step before its size and deploy plan are picked
+    Given I am on the tailor step
+    When I pick Company
+    Then Next stays disabled
+    When I pick my company size
+    Then Next stays disabled
+    When I pick how I plan to deploy LangWatch
+    Then Next is enabled
+
+  @integration
   Scenario: Leaving the tailor step creates the organization and the project with the variant recorded
     Given I am on the tailor step
     When I answer it and click Next

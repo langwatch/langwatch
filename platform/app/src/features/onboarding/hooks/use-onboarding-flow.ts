@@ -101,6 +101,12 @@ export const useOnboardingFlow = () => {
         const showFields = usageStyle !== "For myself";
         if (!showFields) return true;
 
+        // The guided variant asks a company for its size and its deploy
+        // plan before Langy takes over; the phone number stays optional.
+        if (guided && (companySize === void 0 || solutionType === void 0)) {
+          return false;
+        }
+
         return !(phoneHasValue && !phoneIsValid);
       }
 
