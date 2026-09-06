@@ -11,7 +11,9 @@ import {
   type PersonalTeam,
   type PersonalWorkspaceHostPort,
 } from "@langwatch/user-web/screens/personal-workspace";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useMemo, type ReactNode } from "react";
+import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import {
@@ -33,13 +35,23 @@ import {
  * The deployment shape, read once. No config means a self-hosted
  * deployment with none stated, not a broken one — the install copy falls back to the CLI's own default.
  */
-function readDeployment(): { isSaas: boolean; appBaseUrl: string; passkeysEnabled: boolean } {
+/** The grant and the release the assistant hand-off is behind, as the shell reads them. */
+const LANGY_CREATE_PERMISSION = "langy:create";
+const LANGY_RELEASE_FLAG = "release_langy_enabled";
+
+function readDeployment(): {
+  isSaas: boolean;
+  appBaseUrl: string;
+  passkeysEnabled: boolean;
+  demoProjectSlug?: string;
+} {
   try {
     const config = readPublicAppConfig();
     return {
       isSaas: config.deployment === "saas",
       appBaseUrl: config.appBaseUrl,
       passkeysEnabled: config.passkeys,
+      ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
     };
   } catch {
     // A shell with no configuration is a self-hosted one with no stated
@@ -109,6 +121,23 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
+  /**
+   * The assistant, as a screen's hand-off needs it. The gate is the shell's own:
+   * the grant, the release flag, and never the shared demo project — the same
+   * three the command bar reads before offering the same hand-off.
+   */
+  const askLangy = useLangyStore((store) => store.askLangy);
+  const canAskLangy =
+    session.hasPermission(LANGY_CREATE_PERMISSION) &&
+    session.featureFlag(LANGY_RELEASE_FLAG) === true &&
+    !isLangyDemoProject({
+      projectSlug: resolvePersonalWorkspaceProject({
+        projectId: scope.projectId,
+        organizations: organizationsWithTeamIds,
+      })?.slug,
+      demoProjectSlug: readDeployment().demoProjectSlug,
+    });
+
   const host = useMemo<PersonalWorkspaceHostPort>(
     () => ({
       scope: () => scope,
@@ -145,10 +174,14 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
       // front door.
       linkSignInMethod: (provider) =>
         linkUiSignInMethod(provider, { callbackUrl: "/settings/authentication" }),
+      canAskAssistant: () => canAskLangy,
+      askAssistant: (prompt) => askLangy(prompt),
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
     }),
     [
+      askLangy,
+      canAskLangy,
       scope,
       actor,
       organizationsWithTeamIds,

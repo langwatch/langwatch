@@ -3,9 +3,12 @@
  * The application's answer to a licence refusal, from a real transport error to
  * the modal. UX: specs/licensing/license-failure-modal.feature.
  */
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import { TRPCClientError } from "@trpc/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { BrowserUiFeedback } from "../../../../behavior/ui-feedback";
 
 import {
   isHandledByGlobalLicenseHandler,
@@ -39,7 +42,32 @@ function failedCall(data: Record<string, unknown>): Error {
 
 afterEach(() => {
   useUpgradeModalStore.getState().close();
+  setUiFeedbackHost(void 0);
+  vi.clearAllMocks();
 });
+
+/** A limit refusal on the wire, as the server serialises one. */
+function limitRefusal(limitType: string): Error {
+  return failedCall({
+    code: "FORBIDDEN",
+    httpStatus: 403,
+    cause: { limitType, current: 3, max: 3 },
+  });
+}
+
+/**
+ * The application's real toaster, over a recording target — so what is asserted
+ * is what a reader would have seen, not what a stub decided to record.
+ */
+function recordingToaster() {
+  const created: Array<{ title: string }> = [];
+  const feedback = BrowserUiFeedback.create({
+    create: (notice: { title: string }) => void created.push(notice),
+    dismiss: () => undefined,
+  } as never);
+  setUiFeedbackHost(feedback);
+  return { created, feedback };
+}
 
 describe("licensingFailures", () => {
   describe("when a call is refused because the organization is at a seat limit", () => {
@@ -131,6 +159,57 @@ describe("licensingFailures", () => {
     /** @scenario A refusal the licence does not explain is left to the screen */
     it("answers that it reported nothing, so the screen still can", () => {
       expect(licensingFailures(new Error("network down"), host)).toBe(false);
+      expect(useUpgradeModalStore.getState().isOpen).toBe(false);
+    });
+  });
+
+  describe("when a creation form's own catch reports a refusal the modal already answered", () => {
+    /** @scenario "Workflow creation error toast suppressed when license modal shown" */
+    it("says nothing over the workflow limit dialog", () => {
+      const { created, feedback } = recordingToaster();
+      const error = limitRefusal("workflows");
+
+      expect(licensingFailures(error, host)).toBe(true);
+      feedback.failed({ error, fallbackTitle: "Couldn't create workflow" });
+
+      expect(created).toEqual([]);
+      expect(useUpgradeModalStore.getState().variant).toMatchObject({
+        mode: "limit",
+        limitType: "workflows",
+      });
+    });
+
+    /** @scenario "Workflow agent creation error toast suppressed when license modal shown" */
+    it("says nothing over the dialog when the workflow agent form reports", () => {
+      const { created } = recordingToaster();
+      const error = limitRefusal("workflows");
+
+      expect(licensingFailures(error, host)).toBe(true);
+      showErrorToast({ error, fallbackTitle: "Couldn't create workflow agent" });
+
+      expect(created).toEqual([]);
+    });
+
+    /** @scenario "Workflow evaluator creation error toast suppressed when license modal shown" */
+    it("says nothing over the dialog when the workflow evaluator form reports", () => {
+      const { created } = recordingToaster();
+      const error = limitRefusal("workflows");
+
+      expect(licensingFailures(error, host)).toBe(true);
+      showErrorToast({ error, fallbackTitle: "Couldn't create workflow evaluator" });
+
+      expect(created).toEqual([]);
+    });
+
+    /** @scenario "Non-license errors still show toast" */
+    it("still reports a failure the licence does not explain", () => {
+      const { created } = recordingToaster();
+      const error = new Error("network down");
+
+      expect(licensingFailures(error, host)).toBe(false);
+      showErrorToast({ error, fallbackTitle: "Couldn't create workflow" });
+
+      expect(created).toHaveLength(1);
       expect(useUpgradeModalStore.getState().isOpen).toBe(false);
     });
   });

@@ -137,7 +137,7 @@ afterEach(() => {
 describe("creating a workflow agent", () => {
   describe("given the organization is already at its workflow limit", () => {
     /** @scenario "Creating workflow agent checks workflows limit first" */
-      it("opens the upgrade dialog on workflows and never reaches the agent", async () => {
+    it("opens the upgrade dialog on workflows and never reaches the agent", async () => {
       calls.createWorkflow.mockImplementation(
         answeredElsewhere(limitRefusal({ limitType: "workflows", current: 3, max: 3 })),
       );

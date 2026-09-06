@@ -16,6 +16,7 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "@langwatch/ui-host/capabilities";
+import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;
@@ -180,6 +181,13 @@ export class BrowserUiFeedback extends UiFeedbackPort {
   }
 
   failed(failure: UiFailureNotice): void {
+    // A failure an installed interceptor already answered — a licence limit
+    // that opened the upgrade dialog, say — is reported. A toast on top of it
+    // is a second, weaker account of the same refusal. `showErrorToast` asks
+    // the same question for the screens that report through it; this door is
+    // for the hosts a feature reports through directly.
+    if (isHandledByGlobalHandler(failure.error)) return;
+
     const copy = resolveUiFailureCopy(failure);
     this.target.create({
       ...(failure.id ? { id: failure.id } : {}),

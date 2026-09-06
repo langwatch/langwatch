@@ -4,6 +4,10 @@
  */
 
 import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
+import { SeatProrationPreview } from "@langwatch/enterprise-billing-web/surfaces/seat-proration-preview";
 import type { UiSlotComponents } from "@langwatch/ui-host/slots";
 
-export const billingUiSlots: UiSlotComponents = { contactSales: ContactSalesBlock };
+export const billingUiSlots: UiSlotComponents = {
+  contactSales: ContactSalesBlock,
+  seatProrationPreview: SeatProrationPreview,
+};

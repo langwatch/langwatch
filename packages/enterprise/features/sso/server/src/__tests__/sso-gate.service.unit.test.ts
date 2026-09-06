@@ -246,4 +246,24 @@ describe("SsoGateService", () => {
       expect.stringContaining("cannot mount"),
     );
   });
+
+  /** Every plain OIDC provider rides the same gate as auth0: with no genuine
+   *  license the deployment reports email, so the sign-in page never offers
+   *  federation and the provider is not reachable.
+   *  @scenario "Without a license the provider is not offered" */
+  it.each(["cognito", "onelogin", "oidc"] as const)(
+    "reports email rather than %s when nothing licenses federation",
+    async (provider) => {
+      const service = create({
+        ...baseConfiguration(),
+        provider,
+        auth0ClientId: "client",
+        auth0ClientSecret: "secret",
+        auth0Issuer: "https://acme.example.com",
+      });
+
+      expect(await service.platformAllowed()).toBe(false);
+      expect(await service.resolveProvider()).toBe("email");
+    },
+  );
 });

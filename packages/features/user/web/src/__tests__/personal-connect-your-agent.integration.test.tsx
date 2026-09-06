@@ -150,6 +150,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 import {
   EXPLORE_USAGE_AGENT_PROMPT,
   EXPLORE_USAGE_DOCS_PATH,
+  EXPLORE_USAGE_LANGY_PROMPT,
 } from "../ui/sections/connect-your-agent-button";
 import { PersonalOverviewScreen } from "../screens/personal-workspace/personal-overview.screen";
 import {
@@ -160,17 +161,17 @@ import {
 
 let host: FakePersonalWorkspaceHost;
 
-function renderPage() {
-  host = fakePersonalWorkspaceHost();
+function renderPage(options: { canAskAssistant?: boolean } = {}) {
+  host = fakePersonalWorkspaceHost(options);
   return renderWithPersonalWorkspaceHost(<PersonalOverviewScreen />, { host });
 }
 
 const connectButton = () => screen.queryByRole("button", { name: /connect your agent/i });
 
 /** Renders the page and hands the menu trigger back for the test to assert on. */
-function renderMenuTrigger() {
+function renderMenuTrigger(options: { canAskAssistant?: boolean } = {}) {
   const user = userEvent.setup();
-  renderPage();
+  renderPage(options);
   return { user, trigger: connectButton() };
 }
 
@@ -208,9 +209,7 @@ describe("the /me usage home's Connect your agent button, given a personal proje
     expect(connectButton()).not.toBeNull();
   });
 
-  // NOT tagged to "the menu offers Langy exploration, a coding-agent prompt,
-  // and the guide": the menu offers two of the three now, and a tag on a test
-  // that no longer proves its scenario is worse than an honest gap.
+  /** @scenario readers who cannot ask Langy keep the prompt and guide routes */
   it("offers the coding-agent prompt and the guide, and no Langy route", async () => {
     const { user, trigger } = renderMenuTrigger();
     expect(trigger).not.toBeNull();
@@ -258,5 +257,31 @@ describe("the docs guide", () => {
     );
     const contents = readFileSync(docsFile, "utf-8");
     expect(contents).toContain(EXPLORE_USAGE_AGENT_PROMPT);
+  });
+});
+
+describe("the /me usage home's Connect your agent button, given a reader who can ask the assistant", () => {
+  /** @scenario the menu offers Langy exploration, a coding-agent prompt, and the guide */
+  it("offers all three exploration routes", async () => {
+    const { user, trigger } = renderMenuTrigger({ canAskAssistant: true });
+    expect(trigger).not.toBeNull();
+    await user.click(trigger!);
+
+    await screen.findByText("Explore via Langy");
+    screen.getByText("Ask Langy where your tokens went");
+    screen.getByText("Explore via your coding agent");
+    screen.getByText(/copy a prompt so claude code can inspect/i);
+    const guide = screen.getByText("Read the guide");
+    expect(guide.closest("a")?.getAttribute("href")).toContain(EXPLORE_USAGE_DOCS_PATH);
+  });
+
+  /** @scenario Explore via Langy hands Langy a usage-exploration prompt */
+  it("hands the assistant the usage-exploration question", async () => {
+    const { user, trigger } = renderMenuTrigger({ canAskAssistant: true });
+    await user.click(trigger!);
+    await user.click(await screen.findByText("Explore via Langy"));
+
+    expect(host.recording.assistantPrompts).toEqual([EXPLORE_USAGE_LANGY_PROMPT]);
+    expect(EXPLORE_USAGE_LANGY_PROMPT).toMatch(/where did my tokens go/i);
   });
 });

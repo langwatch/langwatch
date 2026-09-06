@@ -6,6 +6,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useOptionalUiCapabilities } from "./capabilities";
+import type { UpgradeModalSeatsVariant } from "./upgrade-modal-store";
 
 /**
  * What a screen hands the block it asked for — the CORE side of the contract,
@@ -20,6 +21,16 @@ export type UiSlotProps = {
   managedModelProviderAlert: { provider: string; error?: string };
   /** The store-driven upgrade/limit dialog, mounted once at the app root. */
   globalUpgradeModal: Record<never, never>;
+  /**
+   * The body of the seat-update dialog: what the change costs, and the button
+   * that confirms it. Priced by whoever bills, which is why the dialog asks for
+   * it rather than pricing the change itself.
+   */
+  seatProrationPreview: {
+    variant: UpgradeModalSeatsVariant;
+    open: boolean;
+    onClose: () => void;
+  };
 };
 
 /** The blocks a screen may ask for. */

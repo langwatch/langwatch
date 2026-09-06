@@ -1,71 +1,45 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { LIMIT_TYPE_LABELS } from "@langwatch/enterprise-licensing-contract";
+import { UiSlot } from "@langwatch/ui-host/slots";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import { Link } from "../../ui/elements/link";
-import { planManagementUrl } from "./plan-management-url";
+import { LimitContent } from "./limit-content";
+import { LiteMemberRestrictionContent } from "./lite-member-restriction-content";
 
 /**
- * Seat allowances are the limits an admin runs into while doing the opposite
- * of upgrading: freeing a seat by disabling a membership instead.
- */
-const SEAT_LIMIT_TYPES = new Set(["members", "membersLite"]);
-
-/**
- * Store-driven mount for the upgrade/limit dialog. Only "limit" renders
- * today — "seats" and "liteMemberRestriction" still render nothing, same
- * as before. specs/licensing/proration-preview.feature.
+ * Store-driven mount for the upgrade/limit dialog. One dialog, three things a
+ * customer can be stopped by: a plan limit, a seat change waiting to be
+ * confirmed, and a feature their seat does not open.
+ *
+ * The seat body is a SLOT rather than a component here: what a seat change
+ * costs is priced by whoever bills the account, and licensing does not bill.
+ * A deployment with no billing fills nothing and reads the fallback.
+ * specs/licensing/proration-preview.feature.
  */
 export function GlobalUpgradeModal({ isSaaS }: { isSaaS: boolean }) {
   const { isOpen, variant, close } = useUpgradeModalStore();
-  if (!variant || variant.mode !== "limit") return null;
-
-  const buttonLabel = isSaaS ? "Upgrade Plan" : "Upgrade License";
-  const href = planManagementUrl(isSaaS);
+  if (!variant) return null;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(event) => !event.open && close()}>
       <Dialog.Content bg="bg">
         <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Upgrade Required</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="start">
-            {typeof variant.max === "number" ? (
-              <>
-                <Text>
-                  You've reached the limit of {variant.max} {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
-                  on your current plan.
-                </Text>
-                <Text color="gray.500">
-                  Current usage: {variant.current} / {variant.max}
-                </Text>
-              </>
-            ) : (
-              <Text>
-                You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on your current
-                plan.
-              </Text>
-            )}
-            {SEAT_LIMIT_TYPES.has(variant.limitType) && (
-              <Text color="gray.500">
-                To free a seat instead, disable a membership from the members page. That is
-                reversible, and it keeps their role and everything they did.
-              </Text>
-            )}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="ghost" onClick={close}>
-            Cancel
-          </Button>
-          <Button asChild colorPalette="blue">
-            <Link href={href} onClick={close}>
-              {buttonLabel}
-            </Link>
-          </Button>
-        </Dialog.Footer>
+        {variant.mode === "limit" && (
+          <LimitContent variant={variant} isSaaS={isSaaS} onClose={close} />
+        )}
+        {variant.mode === "seats" && (
+          <UiSlot
+            name="seatProrationPreview"
+            props={{ variant, open: isOpen, onClose: close }}
+            fallback={
+              <Dialog.Body>
+                <Text>Seat management is not available in this deployment.</Text>
+              </Dialog.Body>
+            }
+          />
+        )}
+        {variant.mode === "liteMemberRestriction" && (
+          <LiteMemberRestrictionContent onClose={close} />
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );

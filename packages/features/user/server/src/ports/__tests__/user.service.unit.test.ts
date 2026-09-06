@@ -340,6 +340,7 @@ describe("given a signed-in user on their profile settings", () => {
 
   describe("when they upload an image over the maximum size", () => {
     /** @scenario "An oversized image is rejected" */
+    /** @scenario "A refused upload never reaches storage or the account record" */
     it("refuses by code and leaves the stored avatar untouched", async () => {
       const { service, repository, avatarStorage } = createService();
 
@@ -354,6 +355,7 @@ describe("given a signed-in user on their profile settings", () => {
 
   describe("when they upload a file that is not an allowed image type", () => {
     /** @scenario "A non-image file is rejected" */
+    /** @scenario "A refused upload never reaches storage or the account record" */
     it("refuses by code and leaves the stored avatar untouched", async () => {
       const { service, repository, avatarStorage } = createService();
 

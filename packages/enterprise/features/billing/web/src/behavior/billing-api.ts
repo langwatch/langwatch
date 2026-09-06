@@ -219,6 +219,25 @@ export type BillingApiMap = {
       };
     };
 
+    /**
+     * What a seat change costs before it is confirmed: the prorated amount
+     * taken today, the recurring total from the next invoice, and the instant
+     * the quote was priced so the charge can reproduce it.
+     */
+    previewProration: {
+      query: {
+        input: OrganizationScope & { newTotalSeats: number };
+        output: {
+          amountDueCents: number;
+          formattedAmountDue: string;
+          formattedCreditApplied: string | null;
+          formattedRecurringTotal: string;
+          billingInterval: string;
+          quotedAt: number;
+        };
+      };
+    };
+
     /** Opens the Stripe billing portal. */
     manage: {
       mutation: { input: OrganizationScope & { baseUrl: string }; output: CheckoutRedirect };

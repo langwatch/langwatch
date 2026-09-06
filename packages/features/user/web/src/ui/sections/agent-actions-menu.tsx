@@ -1,23 +1,15 @@
 /**
  * The hand-this-to-an-agent menu the personal usage header carries.
  *
- * A family-local copy of the two entries `platform/app`'s `AgentActionsMenu`
- * offers this surface: copy a prompt for the reader's own coding agent, and
- * open the guide. The prop shape is the platform component's for those two, so
- * the call site is the line it was.
+ * Three routes: hand the question to the assistant, copy a prompt for the
+ * reader's own coding agent, or read the guide. The assistant entry is offered
+ * only where the application answers that this reader can reach one — whether
+ * they may, which release the deployment is on and which project is open are
+ * the host's facts, so the menu asks rather than deciding.
  *
- * WHAT DID NOT TRAVEL, and it is a real loss on this button: the "Explore via
- * Langy" entry. Langy is application state — `useLangyStore`'s `askLangy` opens
- * the assistant panel with a prompt, and `useCanAskLangy` reads whether the
- * reader may — and neither is reachable from a feature-web package, nor is
- * there a capability for it in `apps/ui`. So the menu offers the two routes it
- * can still take and never a third that would do nothing. Recorded in
- * `dev/docs/plans/ui-family-move-manifests.md`; it comes back with an assistant
- * capability.
- *
- * The skill-body fetch did not travel either, and that one costs nothing here:
- * it only ever ran for a caller that named a `skill`, and this surface names
- * none — it copies its own prompt.
+ * The skill-body fetch did not travel from `platform/app`, and that one costs
+ * nothing here: it only ever ran for a caller that named a `skill`, and this
+ * surface names none — it copies its own prompt.
  */
 
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
@@ -56,6 +48,7 @@ function AgentMenuOption({
 export function AgentActionsMenu({
   triggerLabel,
   size = "sm",
+  assistant,
   copy,
   docs,
 }: {
@@ -63,6 +56,13 @@ export function AgentActionsMenu({
   triggerLabel?: string;
   /** Match the sibling buttons of the surface this sits in. */
   size?: "sm" | "md";
+  /** The hand-off to the assistant, where this reader has one. */
+  assistant?: {
+    prompt: string;
+    label: string;
+    hint: string;
+    ask: (prompt: string) => void;
+  };
   copy: {
     prompt: string;
     label: string;
@@ -99,6 +99,15 @@ export function AgentActionsMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="300px" padding={1}>
+        {assistant && (
+          <Menu.Item
+            value="ask-assistant"
+            paddingY={2}
+            onClick={() => assistant.ask(assistant.prompt)}
+          >
+            <AgentMenuOption icon={LuSparkles} label={assistant.label} hint={assistant.hint} />
+          </Menu.Item>
+        )}
         <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
           <AgentMenuOption icon={LuTerminal} label={copy.label} hint={copy.hint} />
         </Menu.Item>

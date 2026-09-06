@@ -3,69 +3,12 @@
  * on (D06/D07). Both default off, so the check imports the instance under each setting
  * rather than trusting one that happens to pass because nothing was ever turned on.
  */
-import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it } from "vitest";
-import {
-  createBetterAuthTransport,
-  type BetterAuthDeploymentConfiguration,
-} from "../better-auth.api";
-
-function deployment(
-  overrides: Partial<BetterAuthDeploymentConfiguration> = {},
-): BetterAuthDeploymentConfiguration {
-  return {
-    baseUrl: "https://app.langwatch.test",
-    secret: "test-secret",
-    emailPasswordEnabled: true,
-    mfaEnrollmentOpen: false,
-    passkeysEnabled: false,
-    passkeyHandleSecret: "test-passkey-secret",
-    socialProviders: {},
-    genericOAuthConfigs: [],
-    ...overrides,
-  };
-}
+import type { BetterAuthDeploymentConfiguration } from "../better-auth.api";
+import { betterAuthTransportFor } from "./better-auth-transport.test-helpers";
 
 function pluginIdsFor(overrides: Partial<BetterAuthDeploymentConfiguration>): string[] {
-  const auth = createBetterAuthTransport({
-    auth: {} as never,
-    database: {} as never,
-    storage: {
-      adapter: () => memoryAdapter({ user: [], session: [], account: [], verification: [] }),
-    } as never,
-    deployment: deployment(overrides),
-    federation: {
-      federationCapable: () => false,
-      resolveSignInMethodPolicy: async () => ({}) as never,
-      platformSsoAllowed: async () => false,
-    } as never,
-    identity: {
-      beforeUserDelete: async () => undefined,
-      tryBeforeAccountCreate: async () => undefined,
-      beforeAccountDelete: async () => undefined,
-    } as never,
-    invites: {
-      tryFindPendingByOrganizationAndEmail: async () => null,
-      applyInvite: async () => undefined,
-    } as never,
-    announcements: {
-      trackServerEvent: () => undefined,
-      reportError: () => undefined,
-      announceSignup: () => undefined,
-      ssoAutoAddNurturing: () => undefined,
-      sessionNurturing: () => undefined,
-    } as never,
-    shadow: {
-      mode: () => "off",
-      route: async () => undefined,
-      resolveAuthProvider: async () => "credential",
-    } as never,
-    authzGrants: {} as never,
-    sendResetPassword: async () => undefined,
-    redis: null,
-    signUpVerification: { requestVerification: async () => undefined } as never,
-    users: {} as never,
-  });
+  const auth = betterAuthTransportFor(overrides);
   return ((auth.options?.plugins ?? []) as Array<{ id?: string }>).map((p) => p.id ?? "");
 }
 

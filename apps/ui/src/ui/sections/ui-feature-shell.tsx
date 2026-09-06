@@ -21,6 +21,7 @@ import {
   type UiCapabilityInstall,
   type UiSessionPort,
 } from "@langwatch/ui-host/capabilities";
+import { shouldRetryQuery } from "@langwatch/ui-host/query-retry";
 import { UiSlot } from "@langwatch/ui-host/slots";
 import {
   createUiFeatureApiClient,
@@ -134,6 +135,9 @@ export function createUiFeatureShell({
     const [ownQueryClient] = useState(
       () =>
         new QueryClient({
+          // A refusal the customer can act on is shown at once; only a failure
+          // a replay could fix is replayed.
+          defaultOptions: { queries: { retry: shouldRetryQuery } },
           mutationCache: new MutationCache({
             onError: (error) => reportFailure({ error, failures, host: failureHost.current }),
           }),

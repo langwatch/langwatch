@@ -272,6 +272,19 @@ export abstract class PersonalWorkspaceHostPort {
    */
   abstract linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome>;
 
+  /**
+   * Whether this reader can hand a question to the assistant.
+   *
+   * The gate is the application's, not this package's: it turns on a grant, a
+   * release flag and which project is open, and none of those are facts a
+   * feature screen holds. A composition that mounts no assistant answers
+   * false, and the screens that offer the hand-off simply do not.
+   */
+  abstract canAskAssistant(): boolean;
+
+  /** Opens the assistant with a question already in it. */
+  abstract askAssistant(prompt: string): void;
+
   abstract succeeded(notice: PersonalSuccessNotice): void;
 
   abstract failed(failure: PersonalFailureNotice): void;

@@ -50,6 +50,11 @@ export type ShowErrorToastOptions = {
  * from a feature screen.
  */
 export function showErrorToast({ error, ...options }: ShowErrorToastOptions): void {
+  // A failure a global interceptor already answered — a licence limit that
+  // opened the upgrade dialog, say — is reported. Toasting it again puts a
+  // second, weaker account of the same refusal on top of the first.
+  if (isHandledByGlobalHandler(error)) return;
+
   const host = currentUiFeedbackHost();
   if (!host) {
     // oxlint-disable-next-line no-console

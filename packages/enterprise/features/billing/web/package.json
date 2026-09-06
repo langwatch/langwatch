@@ -16,6 +16,10 @@
     "./surfaces/contact-sales": {
       "types": "./src/surfaces/contact-sales/index.ts",
       "default": "./src/surfaces/contact-sales/index.ts"
+    },
+    "./surfaces/seat-proration-preview": {
+      "types": "./src/surfaces/seat-proration-preview/index.ts",
+      "default": "./src/surfaces/seat-proration-preview/index.ts"
     }
   },
   "scripts": {

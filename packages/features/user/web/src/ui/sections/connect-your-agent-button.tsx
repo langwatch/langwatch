@@ -1,4 +1,5 @@
 import { api } from "../../behavior/personal-workspace-api";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
 import { docsUrl } from "@langwatch/config/docs-url";
 import { AgentActionsMenu } from "./agent-actions-menu";
 
@@ -49,6 +50,7 @@ export function ConnectYourAgentButton({
   /** The personal project whose first-traces flag gates the button. */
   projectId: string | null;
 }) {
+  const host = usePersonalWorkspaceHost();
   const hasFirstMessage = api.project.getHasFirstMessage.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId, refetchOnWindowFocus: false },
@@ -61,6 +63,16 @@ export function ConnectYourAgentButton({
   return (
     <AgentActionsMenu
       triggerLabel="Connect your agent"
+      {...(host.canAskAssistant()
+        ? {
+            assistant: {
+              prompt: EXPLORE_USAGE_LANGY_PROMPT,
+              label: "Explore via Langy",
+              hint: "Ask Langy where your tokens went",
+              ask: (prompt: string) => host.askAssistant(prompt),
+            },
+          }
+        : {})}
       copy={{
         prompt: EXPLORE_USAGE_AGENT_PROMPT,
         label: "Explore via your coding agent",

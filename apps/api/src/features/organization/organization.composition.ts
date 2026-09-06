@@ -924,7 +924,7 @@ function refusingOrganizationApp(): OrganizationApp {
  * The seat licence, over the SAME plan provider and the SAME membership counts every
  * other allowance in this process reads.
  */
-class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
+export class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
   static create(options: {
     plans: Pick<PlanProvider, "getActivePlan">;
     memberships: UsageMembershipPort;

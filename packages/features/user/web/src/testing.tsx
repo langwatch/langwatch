@@ -69,6 +69,8 @@ export type PersonalHostRecording = {
   queries: Array<{ next: PersonalQuery; replace: boolean }>;
   successes: PersonalSuccessNotice[];
   failures: PersonalFailureNotice[];
+  /** The questions a screen handed to the assistant. */
+  assistantPrompts: string[];
 };
 
 /**
@@ -125,6 +127,8 @@ export type FakePersonalHostOptions = {
   params?: Readonly<Record<string, string | undefined>>;
   /** The query string the screen opens on. */
   query?: PersonalQuery;
+  /** Whether this reader may hand a question to the assistant. */
+  canAskAssistant?: boolean;
   /** The passkeys the account holds, as the ceremonies leave them. */
   passkeys?: readonly HeldPasskey[];
   /** How the next passkey ceremony ends. Success unless a test says otherwise. */
@@ -145,6 +149,7 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
         queries: [],
         successes: [],
         failures: [],
+        assistantPrompts: [],
       },
       query: options.query ?? {},
     });
@@ -279,6 +284,14 @@ export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
   async linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
     this.recording.linkedProviders.push(provider);
     return this.options.linkOutcome ?? { ok: true };
+  }
+
+  canAskAssistant(): boolean {
+    return this.options.canAskAssistant ?? false;
+  }
+
+  askAssistant(prompt: string): void {
+    this.recording.assistantPrompts.push(prompt);
   }
 
   succeeded(notice: PersonalSuccessNotice): void {

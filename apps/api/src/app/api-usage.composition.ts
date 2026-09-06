@@ -24,6 +24,7 @@ import {
 import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
+  InProcessUsageCache,
   PrismaUsageMembershipRepository,
   UsageMeterPolicyService,
   USAGE_UNKNOWN,
@@ -185,12 +186,21 @@ export function composeApiUsageEnforcement(
     traceCounter: ApiTraceVolumeCounter.create(billing),
     eventCounter: ApiEventVolumeCounter.create(billing),
     planResolver: (organizationId) => options.plans.getActivePlan({ organizationId }),
+    // Enforcement asks the month's volume of every ingested batch, and the
+    // answer moves in minutes rather than in seconds. Without a cache each
+    // batch re-runs the rollup; with one the reading is taken every five
+    // minutes and the rest are map lookups.
+    countCache: new InProcessUsageCache(USAGE_COUNT_CACHE_TTL_MS),
+    decisionCache: new InProcessUsageCache(USAGE_COUNT_CACHE_TTL_MS),
     deployment: {
       isSaas: options.isSaas,
       ...(options.baseHost ? { baseHost: options.baseHost } : {}),
     },
   });
 }
+
+/** How long a month's volume and its meter decision stand before being re-read. */
+const USAGE_COUNT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** What the usage reading is composed from. */
 export type ApiUsageStatsOptions = Readonly<{

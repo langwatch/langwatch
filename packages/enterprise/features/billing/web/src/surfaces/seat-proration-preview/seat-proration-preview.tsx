@@ -101,7 +101,11 @@ function PreviewBody({
  * licensing, the price belongs to billing, and this is where the two meet.
  * specs/licensing/proration-preview.feature.
  */
-export function SeatProrationPreview({ variant, open, onClose }: UiSlotProps["seatProrationPreview"]) {
+export function SeatProrationPreview({
+  variant,
+  open,
+  onClose,
+}: UiSlotProps["seatProrationPreview"]) {
   const [isConfirming, setIsConfirming] = useState(false);
 
   const preview = billingApi.subscription.previewProration.useQuery(

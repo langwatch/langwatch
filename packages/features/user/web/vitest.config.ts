@@ -16,6 +16,23 @@ export default defineConfig({
       "@langwatch/coding-agent-web/surfaces/activity": fileURLToPath(
         new URL("../../coding-agent/web/src/activity.ts", import.meta.url),
       ),
+      // Ahead of the bare package alias below, which is a PREFIX match and
+      // would otherwise rewrite this subpath to `…/src/index.ts/surfaces/…`.
+      "@langwatch/coding-agent-web/surfaces/agent-identity": fileURLToPath(
+        new URL("../../coding-agent/web/src/surfaces/agent-identity.ts", import.meta.url),
+      ),
+      "@langwatch/coding-agent-web/surfaces/agent-metrics": fileURLToPath(
+        new URL("../../coding-agent/web/src/surfaces/agent-metrics.ts", import.meta.url),
+      ),
+      "@langwatch/coding-agent-web/surfaces/agent-traces": fileURLToPath(
+        new URL("../../coding-agent/web/src/surfaces/agent-traces.ts", import.meta.url),
+      ),
+      "@langwatch/coding-agent-web/surfaces/pull-requests": fileURLToPath(
+        new URL("../../coding-agent/web/src/surfaces/pull-requests.ts", import.meta.url),
+      ),
+      "@langwatch/coding-agent-web/surfaces/session-table": fileURLToPath(
+        new URL("../../coding-agent/web/src/surfaces/session-table.ts", import.meta.url),
+      ),
       "@langwatch/coding-agent-web": fileURLToPath(
         new URL("../../coding-agent/web/src/index.ts", import.meta.url),
       ),
