@@ -43,10 +43,15 @@ function readPid(pidPath: string): number | undefined {
 	return Number.isInteger(pid) && pid > 0 ? pid : undefined;
 }
 
-async function waitUntil(
-	condition: () => boolean,
-	{ timeoutMs, what }: { timeoutMs: number; what: string },
-): Promise<void> {
+async function waitUntil({
+	condition,
+	timeoutMs,
+	what,
+}: {
+	condition: () => boolean;
+	timeoutMs: number;
+	what: string;
+}): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		if (condition()) return;
@@ -64,62 +69,63 @@ function killIfRunning(pid: number | undefined): void {
 	}
 }
 
-describe("given a killed test worker that was running Claude Code", () => {
-	// The lifecycle guard uses process groups, which Windows does not have.
-	/** @scenario "No Claude Code process outlives the test harness" */
-	it.skipIf(process.platform === "win32")(
-		"stops Claude Code and everything it started",
-		async () => {
-			const workingDirectory = createSkillTestWorkDir("no-orphan-");
-			const binDir = path.join(workingDirectory, "bin");
-			fs.mkdirSync(binDir, { recursive: true });
-			fs.writeFileSync(
-				path.join(binDir, "claude"),
-				fakeClaudeScript(workingDirectory),
-				{ mode: 0o755 },
-			);
-
-			const harness = spawn(
-				process.execPath,
-				["--import", "tsx", harnessPath, workingDirectory],
-				{ cwd: skillsRoot, stdio: "ignore" },
-			);
-
-			let claudePid: number | undefined;
-			let claudeChildPid: number | undefined;
-			try {
-				await waitUntil(
-					() => {
-						claudePid = readPid(path.join(workingDirectory, "claude.pid"));
-						claudeChildPid = readPid(
-							path.join(workingDirectory, "claude-child.pid"),
-						);
-						return claudePid !== undefined && claudeChildPid !== undefined;
-					},
-					{ timeoutMs: 120_000, what: "the agent to spawn Claude Code" },
+describe("given a test worker is running Claude Code", () => {
+	describe("when the worker is killed", () => {
+		// The lifecycle guard uses process groups, which Windows does not have.
+		/** @scenario "No Claude Code process outlives the test harness" */
+		it.skipIf(process.platform === "win32")(
+			"stops Claude Code and everything it started",
+			async () => {
+				const workingDirectory = createSkillTestWorkDir("no-orphan-");
+				const binDir = path.join(workingDirectory, "bin");
+				fs.mkdirSync(binDir, { recursive: true });
+				fs.writeFileSync(
+					path.join(binDir, "claude"),
+					fakeClaudeScript(workingDirectory),
+					{ mode: 0o755 },
 				);
 
-				expect(isRunning(claudePid as number)).toBe(true);
-				expect(isRunning(claudeChildPid as number)).toBe(true);
+				const harness = spawn(
+					process.execPath,
+					["--import", "tsx", harnessPath, workingDirectory],
+					{ cwd: skillsRoot, stdio: "ignore" },
+				);
 
-				harness.kill("SIGKILL");
+				let claudePid: number | undefined;
+				let claudeChildPid: number | undefined;
+				try {
+					await waitUntil({
+						condition: () => {
+							claudePid = readPid(path.join(workingDirectory, "claude.pid"));
+							claudeChildPid = readPid(
+								path.join(workingDirectory, "claude-child.pid"),
+							);
+							return claudePid !== undefined && claudeChildPid !== undefined;
+						},
+						timeoutMs: 120_000,
+						what: "the agent to spawn Claude Code",
+					});
 
-				await waitUntil(
-					() =>
-						!isRunning(claudePid as number) &&
-						!isRunning(claudeChildPid as number),
-					{
+					expect(isRunning(claudePid as number)).toBe(true);
+					expect(isRunning(claudeChildPid as number)).toBe(true);
+
+					harness.kill("SIGKILL");
+
+					await waitUntil({
+						condition: () =>
+							!isRunning(claudePid as number) &&
+							!isRunning(claudeChildPid as number),
 						timeoutMs: 30_000,
 						what: "Claude Code and its child to stop after the worker was killed",
-					},
-				);
-			} finally {
-				harness.kill("SIGKILL");
-				killIfRunning(claudeChildPid);
-				killIfRunning(claudePid);
-				removeSkillTestWorkDir(workingDirectory);
-			}
-		},
-		180_000,
-	);
+					});
+				} finally {
+					harness.kill("SIGKILL");
+					killIfRunning(claudeChildPid);
+					killIfRunning(claudePid);
+					removeSkillTestWorkDir(workingDirectory);
+				}
+			},
+			180_000,
+		);
+	});
 });
