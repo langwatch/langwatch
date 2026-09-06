@@ -105,7 +105,9 @@ const Harness = ({
         getValueState={getValueState}
         onToggle={onToggle}
         onExclude={vi.fn()}
-        renderActiveRowExtras={withDrilldown ? renderActiveRowExtras : undefined}
+        renderActiveRowExtras={
+          withDrilldown ? renderActiveRowExtras : undefined
+        }
         renderInactiveRowExtras={
           withDrilldown ? renderInactiveRowExtras : undefined
         }
