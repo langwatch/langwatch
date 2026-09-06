@@ -17,6 +17,7 @@ import {
   atCanonicalPaths,
   generateOpenApiDocument,
   withUnstatedBodiesLeftUnstated,
+  type AccessPolicyExtension,
   type GeneratedOpenApiDocument,
   type OpenApiDocument,
 } from "../openapi-document.generator";
@@ -465,6 +466,132 @@ describe("given routes that declare a media type and no schema", () => {
     });
   });
 });
+
+describe("given the access policy every mounted route declares", () => {
+  describe("when the description is generated", () => {
+    /** @scenario "Every published operation carries its access policy" */
+    it("states an access policy on every published operation", () => {
+      const withoutPolicy: string[] = [];
+      const unknownKind: string[] = [];
+      for (const { operationKey, policy } of publishedPolicies()) {
+        if (!policy) {
+          withoutPolicy.push(operationKey);
+          continue;
+        }
+        if (!POLICY_KINDS.includes(policy.kind))
+          unknownKind.push(`${operationKey}: ${policy.kind}`);
+        expect(policy.credential.length).toBeGreaterThan(0);
+      }
+
+      expect(withoutPolicy).toEqual([]);
+      expect(unknownKind).toEqual([]);
+    });
+
+    /** @scenario "An operation requiring a permission publishes the permission" */
+    it("publishes the permission a route requires beside its credential class", () => {
+      expect(policyOf("GET /api/v1/prompts")).toEqual({
+        kind: "permission",
+        credential: ["project_api_key"],
+        permission: "prompts:view",
+      });
+      expect(policyOf("GET /api/v1/api-keys")).toEqual({
+        kind: "permission",
+        credential: ["organization_api_key"],
+        permission: "organization:view",
+      });
+    });
+
+    /** @scenario "An unauthenticated operation says it is public" */
+    it("says a public route is public, and admits no credential", () => {
+      expect(policyOf("GET /api/v1/evaluations/list")).toEqual({
+        kind: "public",
+        credential: ["none"],
+      });
+    });
+
+    /**
+     * @scenario "A handler gating on something other than a permission publishes an empty list"
+     */
+    it("publishes an empty permission list rather than omitting it", () => {
+      const policy = policyOf("POST /api/v1/dataset/direct-upload");
+
+      expect(policy?.kind).toBe("handlerManaged");
+      expect(policy).toHaveProperty("permissions");
+      expect(policy?.permissions).toEqual([]);
+    });
+
+    /** @scenario "A route reachable by two credentials names both" */
+    it("names both credential classes a handler-managed route answers", () => {
+      expect(policyOf("POST /api/v1/dataset/direct-upload")?.credential).toEqual([
+        "project_api_key",
+        "session",
+      ]);
+    });
+
+    /** @scenario "The published policy carries data and nothing else" */
+    it("publishes data only — no function, no closure, no reviewer prose", () => {
+      const prose: string[] = [];
+      const unserialisable: string[] = [];
+      for (const { operationKey, policy } of publishedPolicies()) {
+        if (!policy) continue;
+        // A function, a closure or a class instance does not survive the
+        // round trip; the reviewer's `reason` describes how a handler is
+        // built and never belongs in a document a customer reads.
+        if (JSON.stringify(JSON.parse(JSON.stringify(policy))) !== JSON.stringify(policy)) {
+          unserialisable.push(operationKey);
+        }
+        if (Object.keys(policy).some((member) => !PUBLISHED_POLICY_MEMBERS.includes(member))) {
+          prose.push(`${operationKey}: ${Object.keys(policy).join(", ")}`);
+        }
+      }
+
+      expect(unserialisable).toEqual([]);
+      expect(prose).toEqual([]);
+    });
+  });
+});
+
+/** The eight kinds a route may declare. */
+const POLICY_KINDS = [
+  "permission",
+  "apiKeyPermission",
+  "projectPermission",
+  "teamPermission",
+  "anyAuthenticated",
+  "public",
+  "internal",
+  "handlerManaged",
+] as const;
+
+/** Every member the extension is allowed to publish. `reason` is not one. */
+const PUBLISHED_POLICY_MEMBERS = ["kind", "credential", "permission", "param", "permissions"];
+
+/** Every published operation's `x-access-policy`, keyed the way the registry keys it. */
+function* publishedPolicies(): Generator<{
+  operationKey: string;
+  policy: AccessPolicyExtension | undefined;
+}> {
+  for (const [path, item] of Object.entries(generated.document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(item)) {
+      if (!OPERATION_MEMBERS.includes(method)) continue;
+      yield {
+        operationKey: `${method.toUpperCase()} ${path}`,
+        policy: (operation as { "x-access-policy"?: AccessPolicyExtension })["x-access-policy"],
+      };
+    }
+  }
+}
+
+/** The Path Item members that are operations. */
+const OPERATION_MEMBERS = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+
+/** One operation's published policy, by `METHOD /path`. */
+function policyOf(operationKey: string): AccessPolicyExtension | undefined {
+  for (const published of publishedPolicies()) {
+    if (published.operationKey === operationKey) return published.policy;
+  }
+  return undefined;
+}
 
 /** Writes a stand-in frozen document and hands back its path. */
 async function writeFrozen(document: OpenApiDocument): Promise<string> {

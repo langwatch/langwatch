@@ -168,3 +168,59 @@ Feature: The published OpenAPI document tracks the surface the API process serve
       When the description is generated
       Then only the media type with no schema is dropped
       And the status keeps its description
+
+  Rule: every published operation states the access decision its route declares
+
+    # Every route mounted through the secured app builder declares exactly one
+    # access policy, and until now the document kept none of it: an operation
+    # published the security scheme a caller presents and said nothing about
+    # what that credential has to hold. An integrator reading the description
+    # could see that a call takes a project API key and not that the key needs
+    # a particular permission, and an auditor could not answer "what does this
+    # endpoint demand?" from the published artifact at all.
+    #
+    # The policy is published as an `x-access-policy` extension carrying the
+    # declared kind, the credential classes admitted, the permission where the
+    # policy names one, and the permissions a self-enforcing handler checks.
+    # It carries no `reason`: that prose describes how a handler is built, and
+    # the document is read by customers.
+
+    @unit
+    Scenario: Every published operation carries its access policy
+      Given the description of every mounted family
+      When the description is generated
+      Then every operation states the access policy its route declares
+      And the policy names one of the declared policy kinds
+
+    @unit
+    Scenario: An operation requiring a permission publishes the permission
+      Given a route that requires an RBAC permission
+      When the description is generated
+      Then the operation publishes that permission beside its credential class
+
+    @unit
+    Scenario: An unauthenticated operation says it is public
+      Given a route declared public
+      When the description is generated
+      Then the operation states the public kind
+      And it admits no credential
+
+    @unit
+    Scenario: A handler gating on something other than a permission publishes an empty list
+      Given a route whose handler enforces access itself without an RBAC permission
+      When the description is generated
+      Then the operation states the handler-managed kind
+      And its permission list is published as empty rather than omitted
+
+    @unit
+    Scenario: A route reachable by two credentials names both
+      Given a handler-managed route that answers an API key and a browser session
+      When the description is generated
+      Then the operation names both credential classes
+
+    @unit
+    Scenario: The published policy carries data and nothing else
+      Given the description of every mounted family
+      When the description is generated
+      Then no published policy carries a function or a closure
+      And no published policy carries the reviewer's prose reason

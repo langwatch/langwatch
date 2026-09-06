@@ -14,7 +14,9 @@ import {
   documentedPathOf,
   isHttpMethod,
   securityForCredentialClass,
+  type AccessPolicy,
   type CredentialClass,
+  type RegisteredRoute,
 } from "../../app-rest";
 import {
   composeOpenApiDocumentSurface,
@@ -93,7 +95,7 @@ const DOCUMENT_SERVERS = [{ url: "https://app.langwatch.ai" }] as const;
 /**
  * The document-wide default. Every operation the registry knows overrides it;
  * this is what an operation with no registered route would inherit, and
- * {@link stampSecurityFromRegistry} refuses to leave one on it.
+ * {@link stampAccessFromRegistry} refuses to leave one on it.
  */
 const DOCUMENT_SECURITY = [{ project_api_key: [] }] as const;
 
@@ -220,7 +222,7 @@ export async function generateOpenApiDocument({
   const stamped = normalizeExclusiveBounds(
     hoistEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(generated)),
   );
-  const unpublishable = stampSecurityFromRegistry(stamped);
+  const unpublishable = stampAccessFromRegistry(stamped);
   const document = withUnstatedBodiesLeftUnstated(atCanonicalPaths(withoutEmptyPaths(stamped)));
 
   await mkdir(dirname(outputPath), { recursive: true });
@@ -278,18 +280,85 @@ export function operationKeysOf(document: OpenApiDocument): string[] {
 }
 
 /**
- * Give every documented operation the security requirement its route actually enforces,
- * and DELETE the ones no requirement can express. The document declares one top-level
- * default, and a default is a claim about every operation that does not override it.
+ * The declared access decision, as an operation publishes it. Structured
+ * members only: a policy's `reason` is prose about how a handler is built
+ * ("ingestion API key resolved in-handler"), which stays in the registry
+ * rather than reaching a document a customer reads.
  */
-export function stampSecurityFromRegistry(document: OpenApiDocument): UnpublishableOperation[] {
+export type AccessPolicyExtension = Readonly<{
+  /** Which of the eight policy kinds the route declares. */
+  kind: AccessPolicy["kind"];
+  /** Every credential class a caller may present to reach the operation. */
+  credential: readonly CredentialClass[];
+  /** The RBAC permission the policy names, for the kinds that name one. */
+  permission?: string;
+  /** The route parameter the permission resolves against. */
+  param?: string;
+  /** What a handler-managed route enforces itself; `[]` when the gate is not RBAC. */
+  permissions?: readonly string[];
+}>;
+
+/**
+ * The `x-access-policy` value for one route: its declared policy, serialised.
+ *
+ * `credential` is the class the builder derived from the app and the policy,
+ * widened by the one case where a single route admits two: a handler-managed
+ * route declaring `"both"` answers a session as well as an API key.
+ */
+export function accessPolicyExtension({
+  policy,
+  credentialClass,
+}: {
+  policy: AccessPolicy;
+  credentialClass: CredentialClass;
+}): AccessPolicyExtension {
+  const credential = admittedCredentialClasses({ policy, credentialClass });
+  switch (policy.kind) {
+    case "permission":
+    case "apiKeyPermission":
+      return { kind: policy.kind, credential, permission: policy.permission };
+    case "projectPermission":
+    case "teamPermission":
+      return {
+        kind: policy.kind,
+        credential,
+        permission: policy.permission,
+        param: policy.param,
+      };
+    case "handlerManaged":
+      return { kind: policy.kind, credential, permissions: [...policy.permissions] };
+    case "anyAuthenticated":
+    case "public":
+    case "internal":
+      return { kind: policy.kind, credential };
+  }
+}
+
+/** @see accessPolicyExtension, where the widening is explained. */
+function admittedCredentialClasses({
+  policy,
+  credentialClass,
+}: {
+  policy: AccessPolicy;
+  credentialClass: CredentialClass;
+}): readonly CredentialClass[] {
+  if (policy.kind !== "handlerManaged" || policy.credential !== "both") return [credentialClass];
+  return [...new Set<CredentialClass>([credentialClass, "session"])];
+}
+
+/**
+ * Give every documented operation the security requirement its route actually enforces
+ * and the access policy it declares, and DELETE the ones no requirement can express. The
+ * document declares one top-level default, and a default is a claim about every operation
+ * that does not override it; the policy beside it says what that credential has to hold.
+ */
+export function stampAccessFromRegistry(document: OpenApiDocument): UnpublishableOperation[] {
   const registry = indexRegistryByOperation();
   const unpublishable: UnpublishableOperation[] = [];
 
   for (const { routePath, method, operationKey, operation } of documentedOperations(document)) {
-    const credentialClass =
-      registry.byOperation.get(operationKey) ?? registry.byAnyMethodPath.get(routePath);
-    if (!credentialClass) {
+    const route = registry.byOperation.get(operationKey) ?? registry.byAnyMethodPath.get(routePath);
+    if (!route) {
       // A family that declares its own `security` on the operation is not inheriting
       // anything, and that is the only failure this guards: the versioned secret family
       // states `project_api_key` at the service builder, so its routes carry a
@@ -302,14 +371,22 @@ export function stampSecurityFromRegistry(document: OpenApiDocument): Unpublisha
       );
     }
     try {
-      operation.security = securityForCredentialClass({ operationKey, credentialClass });
+      operation.security = securityForCredentialClass({
+        operationKey,
+        credentialClass: route.credentialClass,
+      });
     } catch (error) {
       unpublishable.push({
         operation: operationKey,
         because: error instanceof Error ? error.message : String(error),
       });
       delete document.paths?.[routePath]?.[method];
+      continue;
     }
+    operation["x-access-policy"] = accessPolicyExtension({
+      policy: route.policy,
+      credentialClass: route.credentialClass,
+    });
   }
 
   return unpublishable;
@@ -325,7 +402,7 @@ function* documentedOperations(document: OpenApiDocument): Generator<{
   routePath: string;
   method: string;
   operationKey: string;
-  operation: { security?: unknown };
+  operation: { security?: unknown; "x-access-policy"?: AccessPolicyExtension };
 }> {
   for (const [routePath, item] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of operationsOf(item)) {
@@ -339,9 +416,11 @@ function* documentedOperations(document: OpenApiDocument): Generator<{
  * shape: a Path Item also holds `servers` and `parameters`, both arrays, and an array is
  * an object to `typeof`.
  */
-function operationsOf(item: Record<string, unknown>): Array<[string, { security?: unknown }]> {
+function operationsOf(
+  item: Record<string, unknown>,
+): Array<[string, { security?: unknown; "x-access-policy"?: AccessPolicyExtension }]> {
   return Object.entries(item).filter(
-    (entry): entry is [string, { security?: unknown }] =>
+    (entry): entry is [string, { security?: unknown; "x-access-policy"?: AccessPolicyExtension }] =>
       isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
   );
 }
@@ -350,18 +429,18 @@ function operationsOf(item: Record<string, unknown>): Array<[string, { security?
  * The route registry keyed the way a document path is spelled.
  */
 function indexRegistryByOperation(): {
-  byOperation: Map<string, CredentialClass>;
-  byAnyMethodPath: Map<string, CredentialClass>;
+  byOperation: Map<string, RegisteredRoute>;
+  byAnyMethodPath: Map<string, RegisteredRoute>;
 } {
-  const byOperation = new Map<string, CredentialClass>();
-  const byAnyMethodPath = new Map<string, CredentialClass>();
+  const byOperation = new Map<string, RegisteredRoute>();
+  const byAnyMethodPath = new Map<string, RegisteredRoute>();
   for (const route of allRegisteredRoutes()) {
     const documented = documentedPathOf(route.path);
     if (route.method === "ALL") {
-      byAnyMethodPath.set(documented, route.credentialClass);
+      byAnyMethodPath.set(documented, route);
       continue;
     }
-    byOperation.set(`${route.method} ${documented}`, route.credentialClass);
+    byOperation.set(`${route.method} ${documented}`, route);
   }
   return { byOperation, byAnyMethodPath };
 }
