@@ -1,8 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { z } from "zod";
-import { walkFiles } from "./files";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import type { ArchitectureViolation } from "./types";
 
 /**
  * The typed Prisma seam.
@@ -72,41 +71,6 @@ const baselineSchema = z
     }
   });
 
-function workspacePath(root: string, file: string): string {
-  return relative(root, file).split(sep).join("/");
-}
-
-function isFeatureServerSource(pkg: ClassifiedPackage, file: string): boolean {
-  if (pkg.kind !== "server") return false;
-  const relative = file.slice(pkg.root.length);
-  if (!relative.startsWith(`${sep}src${sep}`)) return false;
-  if (relative.includes(`${sep}__tests__${sep}`)) return false;
-  if (relative.includes(`${sep}dist${sep}`)) return false;
-  return /\.ts$/.test(file) && !/\.(?:test|spec)\.tsx?$/.test(file);
-}
-
-function isRepositoryOrAdapter(file: string): boolean {
-  return (
-    /\/src\/repositories\/prisma\/.+\.repository\.ts$/.test(file) ||
-    /\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/.test(file)
-  );
-}
-
-const AS_PRISMA_CLIENT = /\bas\s+PrismaClient\b/;
-// Match `database: object` when it sits directly in a `create(` argument list.
-// The rule is deliberately narrow: `object` is a load-bearing type in TypeScript
-// (it excludes primitives), and only its use as the seam for a Prisma client is
-// what we forbid.
-const DATABASE_OBJECT_ARG =
-  /\.create\s*\([^)]*\bdatabase\s*:\s*object\b|\bstatic\s+create\s*\([^)]*\bdatabase\s*:\s*object\b/;
-
-function findings(source: string): readonly ("cast" | "database-object")[] {
-  const results: ("cast" | "database-object")[] = [];
-  if (AS_PRISMA_CLIENT.test(source)) results.push("cast");
-  if (DATABASE_OBJECT_ARG.test(source)) results.push("database-object");
-  return results;
-}
-
 export function readTypedPrismaSeamBaselineFile(file: string): {
   exists: boolean;
   files: readonly string[];
@@ -156,54 +120,6 @@ export function readTypedPrismaSeamBaselineFile(file: string): {
 
 function baselineFile(root: string): string {
   return join(root, "packages/architecture-lint/src", BASELINE_FILE);
-}
-
-export function lintTypedPrismaSeam(
-  root: string,
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
-  const baseline = readTypedPrismaSeamBaselineFile(baselineFile(root));
-  const baselined = new Set(baseline.files);
-  const violations: ArchitectureViolation[] = [...baseline.violations];
-
-  const seen = new Set<string>();
-  for (const pkg of packages) {
-    for (const file of walkFiles(
-      pkg.root,
-      (path) => isFeatureServerSource(pkg, path) && isRepositoryOrAdapter(path),
-    )) {
-      const source = readFileSync(file, "utf8");
-      const hits = findings(source);
-      if (hits.length === 0) continue;
-      const workspace = workspacePath(root, file);
-      seen.add(workspace);
-      if (baselined.has(workspace)) continue;
-      for (const kind of hits) {
-        violations.push({
-          policy: "typed-prisma-seam",
-          file,
-          message:
-            kind === "cast"
-              ? "`as PrismaClient` is not permitted: the composition adapter takes a typed PrismaClient and hands it to the repository."
-              : "`database: object` in a `.create(` argument list forces a cast at the seam: type the parameter as PrismaClient and take it from the composition root.",
-          allowed:
-            "See dev/docs/best_practices/service-repository-adapter-port.md. The Postgres adapter takes `prisma: PrismaClient`, hands it to the repository (also typed), and returns the service.",
-        });
-      }
-    }
-  }
-
-  // Baseline entries that no longer name a file with a finding: silently
-  // shrink. A ratchet the other way (add a new file to the baseline) is what
-  // the JSON schema's `superRefine` refuses.
-  for (const entry of baseline.files) {
-    if (seen.has(entry)) continue;
-    // Missing entries are fine — the file may have been fixed and moved off
-    // the baseline. If it was renamed, the sweep will find it under the new
-    // name and either re-baseline (rejected on new PRs) or fail on the change.
-  }
-
-  return violations;
 }
 
 export function lintTypedPrismaSeamBaseline(

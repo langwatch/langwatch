@@ -1,5 +1,31 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  collectCommentBlocks,
+  commentBlockSizeMessage,
+  isExemptBlock,
+  marksGeneratedHeader,
+  marksLicenseHeader,
+  mayContainReviewBlock,
+  rootCovers,
+} from "./src/comment-block-policy.mjs";
+import {
+  CONTRACT_ARTIFACT,
+  CONTRACT_ARTIFACT_SUFFIX,
+  PROCESS_MANAGER_SERVICE_PATTERN,
+  PURE_VALUE_CONSTRUCTORS,
+  RULES_PATTERN,
+  SERVER_ONLY_CONTRACT_ARTIFACT,
+  SERVER_PATTERNS,
+  SUBJECT_ARTIFACT,
+  TEST_DIRECTORY,
+  claimedSubjects,
+  claimsSubject,
+  isLowerKebabFilename,
+  isStrictServerFilename,
+} from "./src/feature-layout-policy.mjs";
+import { isOverengineeringSource, overengineeringFindings } from "./src/overengineering-policy.mjs";
 
 const workspaceCache = new Map();
 const featureLayoutCache = new Map();
@@ -1769,7 +1795,772 @@ const conditionShapeRule = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Comment blocks (policy `comment-block-size`).
+//
+// A block of 6 to 8 lines warns, 9 or more errors, and a comment line wider
+// than 100 columns errors. The CLI keeps the 4-5 line review queue and the
+// `comment-block-roots.json` burn-down checks; the block grammar itself is
+// the shared module both import.
+
+const COMMENT_EXCLUDED_DIRECTORIES = new Set([
+  ".git",
+  ".next",
+  ".next-saas",
+  "build",
+  "coverage",
+  "dist",
+  "generated",
+  "node_modules",
+  "vendor",
+]);
+
+export const COMMENT_BLOCK_WARN_LINES = 6;
+export const COMMENT_BLOCK_ERROR_LINES = 9;
+export const MAX_COMMENT_COLUMNS = 100;
+
+const changedFilesCache = new Map();
+const commentBlockRootsCache = new Map();
+
+function gitOutput(cwd, arguments_) {
+  try {
+    return execFileSync("git", ["-C", cwd, ...arguments_], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function gitPaths(cwd, arguments_) {
+  return (gitOutput(cwd, arguments_) ?? "").split("\0").filter((path) => path.length > 0);
+}
+
+function mergeBase(cwd) {
+  for (const reference of ["@{upstream}", "origin/main", "main"]) {
+    const base = gitOutput(cwd, ["merge-base", "HEAD", reference])?.trim();
+    if (base) return base;
+  }
+  return gitOutput(cwd, ["rev-parse", "HEAD^"])?.trim();
+}
+
+/**
+ * Files introduced since the branch base, modified locally, or untracked, as
+ * workspace-relative paths. `undefined` outside a git checkout, where every
+ * file counts as changed — the same fallback the CLI takes.
+ */
+function changedFiles(cwd) {
+  if (changedFilesCache.has(cwd)) return changedFilesCache.get(cwd);
+  let changed;
+  if (gitOutput(cwd, ["rev-parse", "--is-inside-work-tree"])) {
+    changed = new Set([
+      ...gitPaths(cwd, ["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]),
+      ...gitPaths(cwd, ["ls-files", "--others", "--exclude-standard", "-z"]),
+    ]);
+    const base = mergeBase(cwd);
+    if (base) {
+      for (const path of gitPaths(cwd, [
+        "diff",
+        "--name-only",
+        "-z",
+        "--diff-filter=ACMR",
+        `${base}...HEAD`,
+      ])) {
+        changed.add(path);
+      }
+    }
+  }
+  changedFilesCache.set(cwd, changed);
+  return changed;
+}
+
+function commentBlockRoots(cwd) {
+  if (commentBlockRootsCache.has(cwd)) return commentBlockRootsCache.get(cwd);
+  const file = join(cwd, "packages", "architecture-lint", "src", "comment-block-roots.json");
+  let entries = [];
+  if (existsSync(file)) {
+    try {
+      const value = JSON.parse(readFileSync(file, "utf8"));
+      if (value.version === 0 && Array.isArray(value.roots)) entries = value.roots;
+    } catch {
+      entries = [];
+    }
+  }
+  commentBlockRootsCache.set(cwd, entries);
+  return entries;
+}
+
+function workspacePathOf(context) {
+  return relative(context.cwd, normalizedFilename(context)).split(sep).join("/");
+}
+
+function isCommentScannedPath(workspacePath) {
+  if (workspacePath.startsWith("../")) return false;
+  if (workspacePath.split("/").some((segment) => COMMENT_EXCLUDED_DIRECTORIES.has(segment))) {
+    return false;
+  }
+  return !/\.(?:generated|gen)\.[cm]?[jt]sx?$/.test(workspacePath);
+}
+
+/**
+ * Whether the burn-down allowlist still covers this file. A changed file is
+ * never covered: new commentary is held to the limit wherever it lands.
+ */
+function isCoveredByAllowedRoot(context, workspacePath) {
+  const changed = changedFiles(context.cwd);
+  if (!changed || changed.has(workspacePath)) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return commentBlockRoots(context.cwd).some((entry) => rootCovers(entry, workspacePath, today));
+}
+
+function commentRangesOf(program) {
+  return (program.comments ?? [])
+    .filter((comment) => comment.type !== "Shebang")
+    .map((comment) => ({ pos: comment.start, end: comment.end }))
+    .sort((left, right) => left.pos - right.pos || left.end - right.end);
+}
+
+function commentBlocksOf(context, program) {
+  const source = context.sourceCode.text;
+  if (marksGeneratedHeader(source) || marksLicenseHeader(source)) return [];
+  if (!mayContainReviewBlock(source)) return [];
+  const blocks = collectCommentBlocks({ source, ranges: commentRangesOf(program) });
+  const lines = source.split(/\r?\n/);
+  return blocks.filter((block) => {
+    const text = lines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
+    return !isExemptBlock(text);
+  });
+}
+
+function commentBlockRuleSetup(context) {
+  const workspacePath = workspacePathOf(context);
+  if (!isCommentScannedPath(workspacePath)) return undefined;
+  if (isCoveredByAllowedRoot(context, workspacePath)) return undefined;
+  return workspacePath;
+}
+
+const commentBlockSizeRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      commentColumns: `Wrap this comment at ${MAX_COMMENT_COLUMNS} columns`,
+    },
+  },
+  create(context) {
+    if (!commentBlockRuleSetup(context)) return {};
+
+    return {
+      Program(program) {
+        const source = context.sourceCode.text;
+        for (const block of commentBlocksOf(context, program)) {
+          if (block.lines < COMMENT_BLOCK_ERROR_LINES) continue;
+          context.report({
+            loc: { line: block.line, column: 0 },
+            message: commentBlockSizeMessage(block.lines),
+          });
+        }
+        if (marksGeneratedHeader(source) || marksLicenseHeader(source)) return;
+        const lines = source.split(/\r?\n/);
+        const reported = new Set();
+        for (const range of commentRangesOf(program)) {
+          const start = source.slice(0, range.pos).split(/\r?\n/).length;
+          const end = source.slice(0, Math.max(range.pos, range.end - 1)).split(/\r?\n/).length;
+          for (let line = start; line <= end; line += 1) {
+            if (reported.has(line)) continue;
+            if ((lines[line - 1]?.length ?? 0) <= MAX_COMMENT_COLUMNS) continue;
+            reported.add(line);
+            context.report({
+              loc: { line, column: 0 },
+              messageId: "commentColumns",
+            });
+          }
+        }
+      },
+    };
+  },
+};
+
+const commentBlockSizeWarningRule = {
+  meta: { type: "suggestion", messages: {} },
+  create(context) {
+    if (!commentBlockRuleSetup(context)) return {};
+
+    return {
+      Program(program) {
+        for (const block of commentBlocksOf(context, program)) {
+          if (block.lines < COMMENT_BLOCK_WARN_LINES) continue;
+          if (block.lines >= COMMENT_BLOCK_ERROR_LINES) continue;
+          context.report({
+            loc: { line: block.line, column: 0 },
+            message: commentBlockSizeMessage(block.lines),
+          });
+        }
+      },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Result contracts (policy `fallible-result-naming`).
+
+const FALLIBLE_RESULT_MODULE = /\.(?:service|port|repository|store)\.ts$/;
+
+function promiseTypeArgument(node) {
+  if (node.type !== "TSTypeReference") return undefined;
+  if (node.typeName?.type !== "Identifier" || node.typeName.name !== "Promise") return undefined;
+  const parameters = node.typeArguments?.params ?? [];
+  return parameters.length === 1 ? parameters[0] : undefined;
+}
+
+function containsNullableType(node) {
+  if (!node) return false;
+  if (node.type === "TSUndefinedKeyword" || node.type === "TSNullKeyword") return true;
+  if (node.type === "TSParenthesizedType") return containsNullableType(node.typeAnnotation);
+  if (node.type === "TSUnionType") return node.types.some(containsNullableType);
+  const promiseArgument = promiseTypeArgument(node);
+  if (promiseArgument) return containsNullableType(promiseArgument);
+  return false;
+}
+
+const NON_NULLABLE_TYPES = new Set([
+  "TSStringKeyword",
+  "TSNumberKeyword",
+  "TSBooleanKeyword",
+  "TSBigIntKeyword",
+  "TSSymbolKeyword",
+  "TSObjectKeyword",
+  "TSVoidKeyword",
+  "TSTypeLiteral",
+  "TSArrayType",
+  "TSTupleType",
+  "TSFunctionType",
+]);
+
+function definitelyNonNullableType(node) {
+  if (!node) return false;
+  if (node.type === "TSParenthesizedType") return definitelyNonNullableType(node.typeAnnotation);
+  if (node.type === "TSUnionType") return node.types.every(definitelyNonNullableType);
+  const promiseArgument = promiseTypeArgument(node);
+  if (promiseArgument) return definitelyNonNullableType(promiseArgument);
+  if (node.type === "TSLiteralType") return node.literal?.type !== "NullLiteral";
+  return NON_NULLABLE_TYPES.has(node.type);
+}
+
+function isFallibleResultModule(context) {
+  const file = classifyFile(normalizedFilename(context), context.cwd);
+  if (file.role !== "contract" && file.role !== "server") return false;
+  if (file.layoutVersion !== 0) return false;
+  if (!file.relative?.startsWith("src/")) return false;
+  return FALLIBLE_RESULT_MODULE.test(file.relative);
+}
+
+const fallibleResultNamingRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      requirePrefix: "Capability {{name}} uses the redundant require prefix.",
+      noResultType:
+        "Capability {{name}} has no explicit result type, so its absence contract cannot be enforced.",
+      untriedAbsence: "Capability {{name}} exposes absence without the try prefix.",
+      tryWithoutAbsence: "Optional capability {{name}} cannot express absence.",
+    },
+  },
+  create(context) {
+    if (!isFallibleResultModule(context)) return {};
+
+    const check = (node) => {
+      if (node.kind !== "method" || node.computed) return;
+      if (node.key?.type !== "Identifier") return;
+      if (node.accessibility === "private") return;
+      const name = JSON.stringify(node.key.name);
+      // `requireById` — the imperative — is the redundant one: an ordinary
+      // method already returns a value or throws. `required` is an adjective
+      // the boolean-name policy allows, so it is not this.
+      if (/^require[A-Z]/.test(node.key.name)) {
+        context.report({ node: node.key, messageId: "requirePrefix", data: { name } });
+      }
+      const returnType = node.value?.returnType?.typeAnnotation;
+      if (!returnType) {
+        context.report({ node: node.key, messageId: "noResultType", data: { name } });
+        return;
+      }
+      const optional = node.key.name.startsWith("try");
+      if (containsNullableType(returnType) && !optional) {
+        context.report({ node: node.key, messageId: "untriedAbsence", data: { name } });
+        return;
+      }
+      if (!containsNullableType(returnType) && optional && definitelyNonNullableType(returnType)) {
+        context.report({ node: node.key, messageId: "tryWithoutAbsence", data: { name } });
+      }
+    };
+
+    return {
+      MethodDefinition: check,
+      TSAbstractMethodDefinition: check,
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// The per-file half of the strict feature layout grammar (policies
+// `feature-source-filename`, `feature-source-layout`, `feature-source-subject`).
+// What needs the whole package graph — a package's missing service module,
+// a rules module's import closure, private runtime exports — stays in the CLI.
+
+/** A strict feature source file, as `{ role, sourcePath, name }`. */
+function strictFeatureSource(context) {
+  const file = classifyFile(normalizedFilename(context), context.cwd);
+  if (file.role !== "contract" && file.role !== "server" && file.role !== "web") return undefined;
+  if (file.layoutVersion !== 0) return undefined;
+  if (!file.relative?.startsWith("src/")) return undefined;
+  const sourcePath = file.relative.slice("src/".length);
+  if (TEST_DIRECTORY.test(sourcePath)) return undefined;
+  return {
+    feature: file.feature,
+    enterprise: file.enterprise,
+    role: file.role,
+    sourcePath,
+    name: sourcePath.slice(sourcePath.lastIndexOf("/") + 1),
+  };
+}
+
+const featureSourceFilenameRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      filename:
+        "Strict feature source filename {{name}} is not lower-case kebab case with dotted architectural qualifiers.",
+    },
+  },
+  create(context) {
+    const source = strictFeatureSource(context);
+    if (!source) return {};
+    if (!/\.[cm]?[jt]sx?$/.test(source.name)) return {};
+    const valid =
+      source.role === "server"
+        ? isStrictServerFilename(source.name)
+        : isLowerKebabFilename(source.name);
+    if (valid) return {};
+
+    return {
+      Program(node) {
+        context.report({
+          node,
+          messageId: "filename",
+          data: { name: JSON.stringify(source.name) },
+        });
+      },
+    };
+  },
+};
+
+const featureSourceLayoutRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      contractMissingSubject: "Contract artifact {{name}} is missing its subject.",
+      contractServerArtifact: "Server artifact {{name}} cannot live in contract source.",
+      contractFilename: "Contract artifact filename {{name}} is not lower-case kebab case.",
+      processManagerService: "Process manager source {{path}} cannot masquerade as a service.",
+      rulesImpurity:
+        "Rules module {{path}} may only export functions and constants (found {{found}}).",
+      serverPath: "Server source path {{path}} is not part of strict layout version 0.",
+    },
+  },
+  create(context) {
+    const source = strictFeatureSource(context);
+    if (!source) return {};
+    const { name, sourcePath, role } = source;
+
+    if (role === "contract") {
+      if (name === "index.ts") return {};
+      const report = (messageId) => ({
+        Program(node) {
+          context.report({ node, messageId, data: { name: JSON.stringify(name) } });
+        },
+      });
+      if (/^(?:commands|errors|events|queries|service)\.ts$/.test(name)) {
+        return report("contractMissingSubject");
+      }
+      if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
+      if (
+        CONTRACT_ARTIFACT_SUFFIX.test(name) &&
+        !CONTRACT_ARTIFACT.test(name) &&
+        isLowerKebabFilename(name)
+      ) {
+        return report("contractFilename");
+      }
+      return {};
+    }
+
+    if (role !== "server") return {};
+
+    if (PROCESS_MANAGER_SERVICE_PATTERN.test(sourcePath)) {
+      return {
+        Program(node) {
+          context.report({
+            node,
+            messageId: "processManagerService",
+            data: { path: JSON.stringify(sourcePath) },
+          });
+        },
+      };
+    }
+
+    if (RULES_PATTERN.test(sourcePath)) {
+      let reported = false;
+      const report = (node, found) => {
+        if (reported) return;
+        reported = true;
+        context.report({
+          node,
+          messageId: "rulesImpurity",
+          data: { path: JSON.stringify(sourcePath), found },
+        });
+      };
+      return {
+        ClassDeclaration(node) {
+          report(node, "a class");
+        },
+        ClassExpression(node) {
+          report(node, "a class");
+        },
+        NewExpression(node) {
+          if (node.callee?.type === "Identifier" && PURE_VALUE_CONSTRUCTORS.has(node.callee.name)) {
+            return;
+          }
+          report(node, "a `new` expression");
+        },
+      };
+    }
+
+    if (SERVER_PATTERNS.some((pattern) => pattern.test(sourcePath))) return {};
+
+    return {
+      Program(node) {
+        context.report({
+          node,
+          messageId: "serverPath",
+          data: { path: JSON.stringify(sourcePath) },
+        });
+      },
+    };
+  },
+};
+
+const subjectOwnerCache = new Map();
+
+/**
+ * Which feature owns each subject, for the features that have a physical
+ * package. Dormant catalogue entries are migration intent, not a demand for
+ * placeholder packages, so they own nothing yet.
+ */
+function subjectOwners(cwd) {
+  if (subjectOwnerCache.has(cwd)) return subjectOwnerCache.get(cwd);
+  const owners = new Map();
+  const file = join(cwd, "packages", "features", "catalogue.json");
+  const migrated = new Set();
+  for (const pkg of loadWorkspace(cwd).packages.values()) migrated.add(pkg.feature);
+  if (existsSync(file)) {
+    try {
+      const value = JSON.parse(readFileSync(file, "utf8"));
+      for (const entry of value.features ?? []) {
+        if (!migrated.has(entry.id)) continue;
+        for (const subject of entry.subjects ?? []) owners.set(subject, entry.id);
+      }
+    } catch {
+      owners.clear();
+    }
+  }
+  subjectOwnerCache.set(cwd, owners);
+  return owners;
+}
+
+const featureSourceSubjectRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      foreignSubject:
+        "Source module {{path}} claims {{subject}}, which belongs to the singular {{owner}} feature.",
+    },
+  },
+  create(context) {
+    const source = strictFeatureSource(context);
+    if (!source || (source.role !== "contract" && source.role !== "server")) return {};
+    if (source.sourcePath === "index.ts") return {};
+    if (!SUBJECT_ARTIFACT.test(source.sourcePath)) return {};
+
+    const owners = subjectOwners(context.cwd);
+    const foreign = claimedSubjects(source.sourcePath).flatMap((candidate) =>
+      [...owners].filter(
+        ([subject, owner]) =>
+          owner !== source.feature && claimsSubject(candidate, source.feature, subject),
+      ),
+    );
+    if (foreign.length === 0) return {};
+    const [subject, owner] = foreign[0];
+
+    return {
+      Program(node) {
+        context.report({
+          node,
+          messageId: "foreignSubject",
+          data: {
+            path: JSON.stringify(source.sourcePath),
+            subject: JSON.stringify(subject),
+            owner: JSON.stringify(owner),
+          },
+        });
+      },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Prisma containment (policy `prisma-containment`) and the typed seam
+// (policy `typed-prisma-seam`).
+
+const PRISMA_ROOT = "@langwatch/prisma-client";
+const PRISMA_GENERATED = "@langwatch/prisma-client/generated";
+const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
+
+/**
+ * The package a file belongs to, for the boundary rules that ask what kind
+ * of package they are standing in. Mirrors the CLI's classification for the
+ * roots those rules police, and reports nothing anywhere else.
+ */
+function prismaPackageOf(filename, cwd) {
+  const workspacePath = relative(cwd, filename).split(sep).join("/");
+  const feature = workspacePath.match(
+    /^packages\/(enterprise\/)?features\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
+  );
+  if (feature) {
+    return { kind: feature[3], feature: feature[2], relative: feature[4], workspacePath };
+  }
+  const application = workspacePath.match(/^apps\/([^/]+)\/src\/(.+)$/);
+  if (application && APPLICATION_ROOTS.has(application[1])) {
+    return { kind: "application", relative: application[2], workspacePath };
+  }
+  const composition = workspacePath.match(
+    /^packages\/enterprise\/composition\/(api|worker)\/src\/(.+)$/,
+  );
+  if (composition) {
+    return { kind: "enterprise-composition", relative: composition[2], workspacePath };
+  }
+  const shared = workspacePath.match(/^packages\/(config|design-system)\/src\/(.+)$/);
+  if (shared) return { kind: shared[1], relative: shared[2], workspacePath };
+  return undefined;
+}
+
+function isPrismaProductionSource(relativePath) {
+  if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(relativePath)) return false;
+  const segments = relativePath.split("/");
+  return !segments.includes("__tests__") && !segments.includes("__mocks__");
+}
+
+function isCompositionPrismaSeam(relativePath) {
+  if (/\.composition\.ts$/.test(relativePath)) return true;
+  if (/\.mount\.ts$/.test(relativePath)) return true;
+  if (/\.adapter\.ts$/.test(relativePath)) return true;
+  return relativePath.startsWith("platform/infrastructure/");
+}
+
+function isStrictPrismaAdapter(pkg) {
+  if (pkg.kind === "application" || pkg.kind === "enterprise-composition") {
+    return isCompositionPrismaSeam(pkg.relative);
+  }
+  if (pkg.kind !== "server") return false;
+  if (pkg.relative.startsWith("repositories/prisma/")) return true;
+  return /^adapters\/postgres\.[^/]+\.adapter\.ts$/.test(pkg.relative);
+}
+
+function importedSpecifier(node) {
+  if (node.type === "ImportExpression") {
+    return node.source?.type === "Literal" ? node.source.value : undefined;
+  }
+  return typeof node.source?.value === "string" ? node.source.value : undefined;
+}
+
+const prismaContainmentRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      generatedPrisma:
+        "Generated Prisma may only be imported by a repository under server/src/repositories/prisma or the Postgres composition adapter (server/src/adapters/postgres.<subject>.adapter.ts).",
+      featurePrismaClient: "Feature packages cannot own Prisma connection or lifecycle services.",
+    },
+  },
+  create(context) {
+    const pkg = prismaPackageOf(normalizedFilename(context), context.cwd);
+    if (!pkg || !isPrismaProductionSource(pkg.relative)) return {};
+    const adapter = isStrictPrismaAdapter(pkg);
+
+    const check = (node) => {
+      const specifier = importedSpecifier(node);
+      if (typeof specifier !== "string") return;
+      const generated =
+        specifier === PRISMA_GENERATED || specifier.startsWith(`${PRISMA_GENERATED}/`);
+      if (generated && !adapter) {
+        context.report({ node, messageId: "generatedPrisma" });
+      }
+      if (pkg.feature && specifier === PRISMA_ROOT) {
+        context.report({ node, messageId: "featurePrismaClient" });
+      }
+    };
+
+    return {
+      ImportDeclaration: check,
+      ImportExpression: check,
+      ExportAllDeclaration: check,
+      ExportNamedDeclaration: check,
+    };
+  },
+};
+
+const AS_PRISMA_CLIENT = /\bas\s+PrismaClient\b/;
+// `database: object` when it sits directly in a `create(` argument list.
+// Narrow on purpose: `object` is a load-bearing type in TypeScript, and only
+// its use as the seam for a Prisma client is forbidden.
+const DATABASE_OBJECT_ARG =
+  /\.create\s*\([^)]*\bdatabase\s*:\s*object\b|\bstatic\s+create\s*\([^)]*\bdatabase\s*:\s*object\b/;
+
+const typedPrismaSeamBaselineCache = new Map();
+
+function typedPrismaSeamBaseline(cwd) {
+  if (typedPrismaSeamBaselineCache.has(cwd)) return typedPrismaSeamBaselineCache.get(cwd);
+  const file = join(cwd, "packages", "architecture-lint", "src", "typed-prisma-seam-baseline.json");
+  let files = new Set();
+  if (existsSync(file)) {
+    try {
+      const value = JSON.parse(readFileSync(file, "utf8"));
+      if (value.version === 0 && Array.isArray(value.files)) files = new Set(value.files);
+    } catch {
+      files = new Set();
+    }
+  }
+  typedPrismaSeamBaselineCache.set(cwd, files);
+  return files;
+}
+
+const typedPrismaSeamRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      cast: "`as PrismaClient` is not permitted: the composition adapter takes a typed PrismaClient and hands it to the repository.",
+      databaseObject:
+        "`database: object` in a `.create(` argument list forces a cast at the seam: type the parameter as PrismaClient and take it from the composition root.",
+    },
+  },
+  create(context) {
+    const filename = normalizedFilename(context);
+    const workspacePath = relative(context.cwd, filename).split(sep).join("/");
+    const seam =
+      /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/repositories\/prisma\/.+\.repository\.ts$/.test(
+        workspacePath,
+      ) ||
+      /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/.test(
+        workspacePath,
+      );
+    if (!seam) return {};
+    if (typedPrismaSeamBaseline(context.cwd).has(workspacePath)) return {};
+
+    return {
+      Program() {
+        const source = context.sourceCode.text;
+        for (const [pattern, messageId] of [
+          [AS_PRISMA_CLIENT, "cast"],
+          [DATABASE_OBJECT_ARG, "databaseObject"],
+        ]) {
+          const match = pattern.exec(source);
+          if (!match) continue;
+          context.report({
+            loc: { line: source.slice(0, match.index).split(/\r?\n/).length, column: 0 },
+            messageId,
+          });
+        }
+      },
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Over-abstraction (policies `layer-class`, `overload-by-literal`,
+// `conditional-type-depth`). The detectors are the shared module the CLI's
+// baseline check also imports; here they gate on the same baseline file.
+
+const overengineeringBaselineCache = new Map();
+
+function overengineeringBaseline(cwd) {
+  if (overengineeringBaselineCache.has(cwd)) return overengineeringBaselineCache.get(cwd);
+  const file = join(cwd, "packages", "architecture-lint", "src", "overengineering-baseline.json");
+  let sites = new Set();
+  if (existsSync(file)) {
+    try {
+      const value = JSON.parse(readFileSync(file, "utf8"));
+      if (Array.isArray(value.sites)) sites = new Set(value.sites);
+    } catch {
+      sites = new Set();
+    }
+  }
+  overengineeringBaselineCache.set(cwd, sites);
+  return sites;
+}
+
+const overengineeringFindingCache = new Map();
+
+function overengineeringFor(context, policy) {
+  const filename = normalizedFilename(context);
+  const workspacePath = relative(context.cwd, filename).split(sep).join("/");
+  if (workspacePath.startsWith("../")) return [];
+  if (!isOverengineeringSource(workspacePath)) return [];
+  const source = context.sourceCode.text;
+  const key = `${filename}|${source.length}|${policy}`;
+  const cached = overengineeringFindingCache.get(key);
+  const findings =
+    cached ??
+    overengineeringFindings({ path: filename, source }).filter((f) => f.policy === policy);
+  overengineeringFindingCache.set(key, findings);
+  if (overengineeringBaseline(context.cwd).has(`${policy}|${workspacePath}`)) return [];
+  return findings;
+}
+
+function overengineeringRule(policy) {
+  return {
+    meta: { type: "problem", messages: {} },
+    create(context) {
+      return {
+        Program() {
+          for (const finding of overengineeringFor(context, policy)) {
+            context.report({
+              loc: { line: finding.line, column: 0 },
+              message: finding.message,
+            });
+          }
+        },
+      };
+    },
+  };
+}
+
+const layerClassRule = overengineeringRule("layer-class");
+const overloadByLiteralRule = overengineeringRule("overload-by-literal");
+const conditionalTypeDepthRule = overengineeringRule("conditional-type-depth");
+
 export const rules = {
+  "api-context-services": apiContextServicesRule,
+  "comment-block-size": commentBlockSizeRule,
+  "comment-block-size-warning": commentBlockSizeWarningRule,
+  "conditional-type-depth": conditionalTypeDepthRule,
+  "fallible-result-naming": fallibleResultNamingRule,
+  "feature-source-filename": featureSourceFilenameRule,
+  "feature-source-layout": featureSourceLayoutRule,
+  "feature-source-subject": featureSourceSubjectRule,
+  "layer-class": layerClassRule,
+  "overload-by-literal": overloadByLiteralRule,
+  "prisma-containment": prismaContainmentRule,
+  "typed-prisma-seam": typedPrismaSeamRule,
   "api-context-services": apiContextServicesRule,
   "cognitive-complexity": cognitiveComplexityRule,
   "condition-shape": conditionShapeRule,

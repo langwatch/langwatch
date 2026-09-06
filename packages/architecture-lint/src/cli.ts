@@ -56,7 +56,7 @@ const baselineBoundaryEdges = baselineDiscovery
   ? boundaryEdgesFromViolations(
       [
         ...lintManifests(baselineDiscovery.packages),
-        ...lintFeatureLayouts(root, baselineDiscovery.packages, baselineDiscovery.catalogue),
+        ...lintFeatureLayouts(root, baselineDiscovery.packages),
       ].map((violation) => ({ ...violation, file: relative(root, violation.file) })),
     )
   : [];
@@ -89,20 +89,17 @@ const changedFiles = changedSourceFiles(root);
 const allCommentBlocks = process.argv.includes("--all-comment-blocks");
 const commentBlocks = allCommentBlocks
   ? lintCommentBlocks(root, { files: void 0 })
-  : lintCommentBlocks(root, { changedFiles, allowedRoots: commentBlockRoots.entries });
+  : lintCommentBlocks(root, { changedFiles });
 
 function fullWorkspaceViolations(): ArchitectureViolation[] {
-  const workspaceViolations = lintWorkspace(
-    {
-      root,
-      changedFiles,
-      declarations: !process.argv.includes("--no-declarations"),
-      legacyApplicationMigration: !process.argv.includes("--no-legacy-application-migration"),
-      legacyFeatureFragments: !process.argv.includes("--no-legacy-feature-fragments"),
-      serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
-    },
-    commentBlocks,
-  );
+  const workspaceViolations = lintWorkspace({
+    root,
+    changedFiles,
+    declarations: !process.argv.includes("--no-declarations"),
+    legacyApplicationMigration: !process.argv.includes("--no-legacy-application-migration"),
+    legacyFeatureFragments: !process.argv.includes("--no-legacy-feature-fragments"),
+    serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
+  });
   // `lintWorkspace` already relativized `file`, so its cross-feature/private-runtime-export
   // violations are the current edges as-is.
   const boundaryEdges = lintBoundaryEdgeBaseline(
@@ -118,7 +115,7 @@ function fullWorkspaceViolations(): ArchitectureViolation[] {
 }
 
 const violations = reviewCommentBlocks
-  ? commentBlocks.violations
+  ? []
   : reviewTestQuality
     ? lintTestQuality(root, { files: changedFiles })
     : baselinePolicyViolations

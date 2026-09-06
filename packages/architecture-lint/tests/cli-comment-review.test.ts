@@ -20,10 +20,10 @@ function writeFixture(root: string, file: string, source: string): void {
 }
 
 describe("comment-block review CLI", () => {
-  it("reports the review queue and only fails hard comment blocks", () => {
+  it("reports the review queue and leaves oversized blocks to langwatch/comment-block-size", () => {
     const root = mkdtempSync(join(tmpdir(), "comment-review-cli-"));
     writeFixture(root, "src/review.ts", lineComments(5));
-    writeFixture(root, "src/hard.ts", lineComments(6));
+    writeFixture(root, "src/hard.ts", lineComments(9));
 
     const result = spawnSync(
       tsx,
@@ -31,11 +31,11 @@ describe("comment-block review CLI", () => {
       { encoding: "utf8" },
     );
 
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(0);
     expect(result.stdout).toContain("comment-block review queue");
     expect(result.stdout).toContain("src/review.ts:1");
-    expect(result.stderr).toContain("[comment-block-size] src/hard.ts:1");
-    expect(result.stderr).not.toContain("feature-catalogue");
+    expect(result.stdout).not.toContain("src/hard.ts");
+    expect(result.stderr).not.toContain("comment-block-size");
   });
 
   it("prints the 4-5 line warn tier on stderr for a changed file on a plain run (R1)", () => {

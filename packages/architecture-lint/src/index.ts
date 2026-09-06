@@ -13,11 +13,8 @@ import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
 import { lintGlobalAppAccess } from "./global-app-access";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments";
 import { lintManifests } from "./manifests";
-import { lintOverengineering } from "./overengineering";
-import { lintPrismaBoundaries } from "./prisma-boundaries";
-import { lintTypedPrismaSeam } from "./typed-prisma-seam";
+import { lintOverengineeringBaseline } from "./overengineering";
 import { lintStrictPortModules } from "./port-modules";
-import { lintServiceResultContracts } from "./service-results";
 import { lintServiceQuality } from "./service-quality";
 import { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 import { lintTestQuality } from "./test-quality";
@@ -118,14 +115,13 @@ export {
 export {
   collectOverengineering,
   formatOverengineeringBaseline,
-  lintOverengineering,
+  lintOverengineeringBaseline,
 } from "./overengineering";
 export { lintStrictPortModules } from "./port-modules";
 export { lintStrictPortBaseline } from "./port-modules";
 export { readStrictPortBaselineFile } from "./port-modules";
 export { collectStrictPortBaseline } from "./port-modules";
 export { formatStrictPortBaseline } from "./port-modules";
-export { lintTypedPrismaSeam } from "./typed-prisma-seam";
 export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam";
 export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam";
 export {
@@ -135,17 +131,13 @@ export {
 } from "./filename-migration";
 export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration";
 
-export function lintWorkspace(
-  options: LintWorkspaceOptions,
-  commentBlocks?: ReturnType<typeof lintCommentBlocks>,
-): ArchitectureViolation[] {
+export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);
   const changedFiles = options.changedFiles ?? changedSourceFiles(root);
-  const resolvedCommentBlocks = commentBlocks ?? lintCommentBlocks(root, { files: changedFiles });
   const discovery = discoverClassifiedPackages(root);
   const violations = [
     ...discovery.violations,
-    ...lintFeatureLayouts(root, discovery.packages, discovery.catalogue),
+    ...lintFeatureLayouts(root, discovery.packages),
     ...lintFrontendUiBoundaries(root, discovery.packages),
     ...lintGlobalAppAccess(root),
     ...(options.legacyFeatureFragments === false
@@ -156,19 +148,15 @@ export function lintWorkspace(
     ...lintStrictContractBuildConfigs(root, discovery.packages),
     ...lintStrictPortModules(root, discovery.packages),
     ...lintManifests(discovery.packages),
-    ...lintOverengineering(root, discovery.packages),
+    ...lintOverengineeringBaseline(root, discovery.packages),
     ...lintApplicationBoundaries(root, discovery.packages, {
       legacyMigration: options.legacyApplicationMigration !== false,
     }),
     ...lintApiTransportBoundaries(root, discovery.packages),
     ...lintApiTransportFramework(root, discovery.packages),
-    ...lintPrismaBoundaries(discovery.packages),
-    ...lintTypedPrismaSeam(root, discovery.packages),
-    ...lintServiceResultContracts(discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
     ...lintServiceQuality(root, discovery.packages, options.serviceQualityBaselineReference),
     ...lintCycles(discovery.packages),
-    ...resolvedCommentBlocks.violations,
     ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
   ];

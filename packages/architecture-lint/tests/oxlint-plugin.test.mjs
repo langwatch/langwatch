@@ -1,4 +1,7 @@
-import { dirname, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
@@ -1123,4 +1126,640 @@ tester.run("condition-shape", plugin.rules["condition-shape"], {
       errors: [{ messageId: "nameCondition" }],
     },
   ],
+});
+
+// ---------------------------------------------------------------------------
+// Policies that moved out of the architecture-lint CLI, so a reader sees them
+// while typing rather than at the end of a whole-workspace run.
+
+/** @scenario "A capability communicates absence through its name" */
+tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
+  valid: [
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract tryGetById(): Promise<string | null>; }",
+    },
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract getById(): Promise<string>; }",
+    },
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export class EvaluationPreconditionService { requiredFieldsArePresent(): boolean { return true; } }",
+    },
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "export class ProjectService { getById(): Promise<string> { return Promise.resolve('project'); } private map(row: string | null): string | null { return row; } }",
+    },
+    {
+      filename: "packages/features/project/server/src/app/project.app.ts",
+      code: "export class ProjectApp { findById() { return null; } }",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract findById(): Promise<string | null>; }",
+      errors: [{ messageId: "untriedAbsence" }],
+    },
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract requireById(): Promise<string>; }",
+      errors: [{ messageId: "requirePrefix" }],
+    },
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract tryGetById(): Promise<string>; }",
+      errors: [{ messageId: "tryWithoutAbsence" }],
+    },
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "export class ProjectService { requireById() { return 'project'; } tryGetById() { return null; } }",
+      errors: [
+        { messageId: "requirePrefix" },
+        { messageId: "noResultType" },
+        { messageId: "noResultType" },
+      ],
+    },
+    {
+      filename: "packages/features/project/server/src/ports/project.port.ts",
+      code: "export abstract class ProjectRepositoryPort { abstract findById(): Promise<string | null>; }",
+      errors: [{ messageId: "untriedAbsence" }],
+    },
+  ],
+});
+
+tester.run("feature-source-filename", plugin.rules["feature-source-filename"], {
+  valid: [
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename:
+        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename:
+        "packages/features/project/server/src/services/__tests__/projectService.unit.test.ts",
+      code: "export const value = 1;",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/project/server/src/services/projectService.service.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "filename" }],
+    },
+    {
+      filename: "packages/features/project/web/src/ui/ProjectPanel.tsx",
+      code: "export const value = 1;",
+      errors: [{ messageId: "filename" }],
+    },
+    {
+      filename: "packages/features/project/server/src/repositories/prisma-project.repository.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "filename" }],
+    },
+  ],
+});
+
+/** @scenario Server artifacts have canonical homes and names */
+/** @scenario Contract artifacts remain portable and named */
+/** @scenario "A rules/ module is a pure package of functions" */
+tester.run("feature-source-layout", plugin.rules["feature-source-layout"], {
+  valid: [
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename: "packages/features/project/contract/src/index.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename: "packages/features/project/server/src/transport/api-rest/project.api.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      code: "export const registry = new Map<string, string>();",
+    },
+    {
+      filename: "packages/features/project/server/src/services/__tests__/project.unit.test.ts",
+      code: "export class Helper {}",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/project/contract/src/service.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "contractMissingSubject" }],
+    },
+    {
+      filename: "packages/features/project/contract/src/project.port.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "contractServerArtifact" }],
+    },
+    {
+      filename: "packages/features/project/server/src/helpers/project-helper.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "serverPath" }],
+    },
+    {
+      // A test outside a `__tests__` directory is still a server source path.
+      filename: "packages/features/project/server/src/services/project.service.unit.test.ts",
+      code: "export const covered = true;",
+      errors: [{ messageId: "serverPath" }],
+    },
+    {
+      filename:
+        "packages/features/project/server/src/repositories/prisma/prisma.project.extra.repository.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "serverPath" }],
+    },
+    {
+      filename: "packages/features/project/server/src/services/project-process.service.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "processManagerService" }],
+    },
+    {
+      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      code: "export class ProjectRules {}",
+      errors: [{ messageId: "rulesImpurity" }],
+    },
+    {
+      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      code: "import { Client } from './client'; export const client = new Client();",
+      errors: [{ messageId: "rulesImpurity" }],
+    },
+  ],
+});
+
+/** @scenario "Every production subject has exactly one owner" */
+/** @scenario "A broad feature cannot silently acquire a new subject" */
+tester.run("feature-source-subject", plugin.rules["feature-source-subject"], {
+  valid: [
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename: "packages/features/project/server/src/index.ts",
+      code: "export const value = 1;",
+    },
+    {
+      filename: "packages/features/project/server/src/ports/notification.port.ts",
+      code: "export const value = 1;",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/project/server/src/services/notification.service.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "foreignSubject" }],
+    },
+    {
+      filename: "packages/features/evaluator/server/src/adapters/prisma.audit-log.adapter.ts",
+      code: "export const value = 1;",
+      errors: [{ messageId: "foreignSubject" }],
+    },
+  ],
+});
+
+tester.run("prisma-containment", plugin.rules["prisma-containment"], {
+  valid: [
+    {
+      filename:
+        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
+    },
+    {
+      filename: "packages/features/project/server/src/adapters/postgres.project.adapter.ts",
+      code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
+    },
+    {
+      filename: "apps/api/src/app/api-production.composition.ts",
+      code: "import { prisma } from '@langwatch/prisma-client'; export { prisma };",
+    },
+    {
+      filename: "apps/api/src/features/project/project.mount.ts",
+      code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
+      errors: [{ messageId: "generatedPrisma" }],
+    },
+    {
+      filename: "packages/features/project/contract/src/project.service.ts",
+      code: "export { PrismaClient } from '@langwatch/prisma-client/generated';",
+      errors: [{ messageId: "generatedPrisma" }],
+    },
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "import { prisma } from '@langwatch/prisma-client'; export { prisma };",
+      errors: [{ messageId: "featurePrismaClient" }],
+    },
+    {
+      filename: "apps/api/src/services/project-reader.ts",
+      code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
+      errors: [{ messageId: "generatedPrisma" }],
+    },
+  ],
+});
+
+tester.run("typed-prisma-seam", plugin.rules["typed-prisma-seam"], {
+  valid: [
+    {
+      filename:
+        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      code: "export class R { static create(prisma: PrismaClient) { return new R(prisma); } }",
+    },
+    {
+      filename: "packages/features/project/server/src/services/project.service.ts",
+      code: "export const db = client as PrismaClient;",
+    },
+    {
+      // Already on the shrink-only baseline, so the sweep owns it, not the run.
+      filename: "packages/features/automation/server/src/adapters/postgres.automation.adapter.ts",
+      code: "export const db = client as PrismaClient;",
+    },
+  ],
+  invalid: [
+    {
+      filename:
+        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      code: "export const db = client as PrismaClient;",
+      errors: [{ messageId: "cast" }],
+    },
+    {
+      filename: "packages/features/project/server/src/adapters/postgres.project.adapter.ts",
+      code: "export class A { static create(database: object) { return new A(); } }",
+      errors: [{ messageId: "databaseObject" }],
+    },
+  ],
+});
+
+const layerFilename = "packages/features/project/server/src/services/example.service.ts";
+
+tester.run("layer-class", plugin.rules["layer-class"], {
+  valid: [
+    {
+      // An anti-corruption layer converts on the way through, so deleting it
+      // would move the conversion to every caller.
+      filename: layerFilename,
+      code: `export class ExampleAdapter {
+  a(input: In): Out { return this.inner.a(this.toInner(input)); }
+  b(input: In): Out { return this.inner.b(this.toInner(input)); }
+  c(input: In): Out { return this.inner.c(this.toInner(input)); }
+  d(input: In): Out { return this.inner.d(this.toInner(input)); }
+  e(input: In): Out { return this.inner.e(this.toInner(input)); }
+}`,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  a(input: In): Out { this.guard(input); return this.inner.a(input); }
+  b(input: In): Out { return this.inner.findB(input); }
+  c(input: In): Out { return this.inner.c(input); }
+  d(input: In): Out { return transform(this.inner.d(input)); }
+  e(input: In): Out { return this.inner.e(input); }
+}`,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  a(input: In): Out { return this.policy.a(input); }
+  b(input: In): Out { return this.catalog.b(input); }
+  c(input: In): Out { return this.lifecycle.c(input); }
+  d(input: In): Out { return this.tokens.d(input); }
+  e(input: In): Out { return this.visibility.e(input); }
+}`,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  private constructor(private readonly repository: ExampleRepository) {}
+  a(input: In): Out { return this.repository.a(input); }
+  b(input: In): Out { return this.repository.b(input); }
+  c(input: In): Out { return this.repository.c(input); }
+  d(input: In): Out { return this.repository.d(input); }
+  e(input: In): Out { return this.repository.e(input); }
+}`,
+    },
+    {
+      filename: "packages/features/project/server/src/app/example.app.ts",
+      code: `export class ExampleApp {
+  a(input: In): Out { return this.deps.example.a(input); }
+  b(input: In): Out { return this.deps.example.b(input); }
+  c(input: In): Out { return this.deps.example.c(input); }
+  d(input: In): Out { return this.deps.example.d(input); }
+  e(input: In): Out { return this.deps.example.e(input); }
+}`,
+    },
+    {
+      filename:
+        "packages/features/project/server/src/repositories/routed/routed.example.repository.ts",
+      code: `export class RoutedExampleRepository {
+  a(input: In): Out { return this.primary.a(input); }
+  b(input: In): Out { return this.primary.b(input); }
+  c(input: In): Out { return this.primary.c(input); }
+  d(input: In): Out { return this.primary.d(input); }
+  e(input: In): Out { return this.primary.e(input); }
+}`,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  a(input: In): Out { return this.inner.a(input); }
+  b(input: In): Out { return this.inner.b(input); }
+}`,
+    },
+  ],
+  invalid: [
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  constructor(private readonly inner: Inner) {}
+  a(input: In): Out { return this.inner.a(input); }
+  b(input: In): Out { return this.inner.b(input); }
+  c(input: In): Out { return this.inner.c(input); }
+  d(input: In): Out { return this.inner.d(input); }
+  e(input: In): Out { return this.inner.e(input); }
+}`,
+      errors: [
+        {
+          message:
+            "ExampleService forwards 5 of its 5 public methods to a method of the same name on `this.inner`.",
+        },
+      ],
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleFacade {
+  readonly a: Contract["a"] = (...args) => this.inner.a(...args);
+  readonly b: Contract["b"] = (...args) => this.inner.b(...args);
+  readonly c: Contract["c"] = (...args) => this.inner.c(...args);
+  readonly d: Contract["d"] = (...args) => this.inner.d(...args);
+  e = (input: In): Out => this.inner.e(input);
+}`,
+      errors: 1,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  async a(input: In): Promise<Out> { return await this.deps.inner.a(input); }
+  async b(input: In): Promise<Out> { return await this.deps.inner.b(input); }
+  async c(input: In): Promise<Out> { return await this.deps.inner.c(input); }
+  async d(input: In): Promise<Out> { return await this.deps.inner.d(input); }
+  async e(input: In): Promise<Out> { return await this.deps.inner.e(input); }
+}`,
+      errors: 1,
+    },
+    {
+      filename: layerFilename,
+      code: `export class ExampleService {
+  private constructor(private readonly catalog: ExampleCatalogService) {}
+  a(input: In): Out { return this.catalog.a(input); }
+  b(input: In): Out { return this.catalog.b(input); }
+  c(input: In): Out { return this.catalog.c(input); }
+  d(input: In): Out { return this.catalog.d(input); }
+  e(input: In): Out { return this.catalog.e(input); }
+}`,
+      errors: 1,
+    },
+  ],
+});
+
+tester.run("conditional-type-depth", plugin.rules["conditional-type-depth"], {
+  valid: [
+    {
+      filename: layerFilename,
+      code: "export type Resolve<T> = T extends A ? 1 : T extends B ? 2 : 3;",
+    },
+  ],
+  invalid: [
+    {
+      filename: layerFilename,
+      code: `export type Resolve<T> = T extends A
+  ? 1
+  : T extends B
+    ? 2
+    : T extends C
+      ? 3
+      : T extends D
+        ? 4
+        : 5;`,
+      errors: [{ message: "Type Resolve nests 4 conditional types; the maximum is 3." }],
+    },
+  ],
+});
+
+tester.run("overload-by-literal", plugin.rules["overload-by-literal"], {
+  valid: [
+    {
+      filename: layerFilename,
+      code: `export function create(options: SchemaOptions): Config;
+export function create(options: DefinitionOptions): Config;
+export function create(options: SchemaOptions | DefinitionOptions): Config {
+  return build(options);
+}`,
+    },
+  ],
+  invalid: [
+    {
+      filename: layerFilename,
+      code: `export function configUrl(options?: { env?: string; optional?: false }): Leaf<string>;
+export function configUrl(options: { env?: string; optional: true }): Leaf<string | undefined>;
+export function configUrl(options?: { env?: string; optional?: boolean }): Leaf<string | undefined> {
+  return leaf(options);
+}`,
+      errors: [
+        {
+          message:
+            "configUrl carries overloads that differ only by `optional: true` versus `optional: false`.",
+        },
+      ],
+    },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// Comment blocks. The fixtures need a cwd of their own: the rule reads the
+// burn-down allowlist and the changed-file set from the workspace it is
+// linting, and a temporary directory is the only way to state both.
+
+function lineComments(lines) {
+  return Array.from({ length: lines }, () => "// comment").join("\n");
+}
+
+function blockComment(lines) {
+  if (lines === 1) return "/* comment */";
+  return ["/*", ...Array.from({ length: lines - 2 }, () => " * comment"), " */"].join("\n");
+}
+
+function fixtureRoot(prefix) {
+  return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+}
+
+function writeFixture(root, file, source) {
+  const path = join(root, file);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${source}\n`);
+}
+
+function fixtureTester(root) {
+  return new RuleTester({ cwd: root, languageOptions: { sourceType: "module" } });
+}
+
+const looseRoot = fixtureRoot("comment-block-loose-");
+const looseTester = fixtureTester(looseRoot);
+const longCommentLine = `// ${"long".repeat(30)}`;
+
+looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
+  valid: [
+    { filename: "src/five.ts", code: blockComment(5) },
+    { filename: "src/eight.ts", code: blockComment(8) },
+    { filename: "src/code.ts", code: lineComments(3) },
+    {
+      filename: "src/separated.ts",
+      code: `${lineComments(5)}\n\n${lineComments(5)}`,
+    },
+    {
+      filename: "src/trailing.ts",
+      code: Array.from({ length: 9 }, (_, index) => `const value${index} = 1; // comment`).join(
+        "\n",
+      ),
+    },
+    {
+      filename: "src/scenario.ts",
+      code: [
+        "/**",
+        ' * @scenario "A definition map becomes a JSON Schema object"',
+        " * Extra line one.",
+        " * Extra line two.",
+        " * Extra line three.",
+        " * Extra line four.",
+        " * Extra line five.",
+        " * Extra line six.",
+        " */",
+      ].join("\n"),
+    },
+    {
+      filename: "src/directives.ts",
+      code: [
+        "// eslint-disable-next-line no-console",
+        "// oxlint-disable-next-line no-unused-vars",
+        "// @ts-expect-error legacy shape",
+        "// eslint-disable-next-line max-len",
+        "// oxlint-disable-next-line no-empty",
+        "// @ts-ignore third-party types",
+        "// eslint-disable-next-line no-shadow",
+        "// oxlint-disable-next-line no-void",
+        "// @ts-expect-error second legacy shape",
+        "export const value = 1;",
+      ].join("\n"),
+    },
+    {
+      filename: "src/licensed.ts",
+      code: `// SPDX-License-Identifier: Apache-2.0\n${lineComments(9)}`,
+    },
+    {
+      filename: "src/generated-header.ts",
+      code: `// Code generated by test. DO NOT EDIT.\n${lineComments(9)}`,
+    },
+    { filename: "src/schema.generated.ts", code: lineComments(9) },
+    { filename: "dist/build.ts", code: lineComments(9) },
+  ],
+  invalid: [
+    {
+      filename: "src/nine.ts",
+      code: blockComment(9),
+      errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+    },
+    {
+      filename: "apps/api/src/app/example.composition.ts",
+      code: blockComment(12),
+      errors: [{ message: "Comment block has 12 lines; the maximum is 5." }],
+    },
+    {
+      filename: "src/wide.ts",
+      code: `${longCommentLine}\nexport const value = 1;`,
+      errors: [{ messageId: "commentColumns" }],
+    },
+  ],
+});
+
+looseTester.run("comment-block-size-warning", plugin.rules["comment-block-size-warning"], {
+  valid: [
+    { filename: "src/five.ts", code: blockComment(5) },
+    { filename: "src/nine.ts", code: blockComment(9) },
+    { filename: "src/three.ts", code: lineComments(3) },
+    { filename: "src/wide.ts", code: `${longCommentLine}\nexport const value = 1;` },
+  ],
+  invalid: [
+    {
+      filename: "src/six.ts",
+      code: blockComment(6),
+      errors: [{ message: "Comment block has 6 lines; the maximum is 5." }],
+    },
+    {
+      filename: "src/eight.ts",
+      code: blockComment(8),
+      errors: [{ message: "Comment block has 8 lines; the maximum is 5." }],
+    },
+  ],
+});
+
+describe("the comment-block burn-down allowlist", () => {
+  function allowlistRoot({ expires }) {
+    const root = fixtureRoot("comment-block-allowlist-");
+    const git = (...arguments_) =>
+      execFileSync("git", ["-C", root, ...arguments_], { stdio: "ignore" });
+    git("init", "--quiet", "--initial-branch=main");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "Architecture Lint Test");
+    git("config", "commit.gpgsign", "false");
+    writeFixture(root, "packages/legacy/src/nine.ts", blockComment(9));
+    writeFixture(root, "packages/other/src/nine.ts", blockComment(9));
+    writeFixture(
+      root,
+      "packages/architecture-lint/src/comment-block-roots.json",
+      JSON.stringify({
+        version: 0,
+        roots: [{ root: "packages/legacy", blocks: 1, expires }],
+      }),
+    );
+    git("add", ".");
+    git("commit", "--quiet", "-m", "baseline");
+    return root;
+  }
+
+  const liveRoot = allowlistRoot({ expires: "2099-01-01" });
+  fixtureTester(liveRoot).run("comment-block-size", plugin.rules["comment-block-size"], {
+    valid: [{ filename: "packages/legacy/src/nine.ts", code: blockComment(9) }],
+    invalid: [
+      {
+        filename: "packages/other/src/nine.ts",
+        code: blockComment(9),
+        errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+      },
+    ],
+  });
+
+  const expiredRoot = allowlistRoot({ expires: "2020-01-01" });
+  fixtureTester(expiredRoot).run("comment-block-size", plugin.rules["comment-block-size"], {
+    valid: [],
+    invalid: [
+      {
+        filename: "packages/legacy/src/nine.ts",
+        code: blockComment(9),
+        errors: [{ message: "Comment block has 9 lines; the maximum is 5." }],
+      },
+    ],
+  });
 });

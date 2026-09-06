@@ -17,6 +17,17 @@
     "langwatch/condition-shape": "error",
     "no-nested-ternary": "error",
     "langwatch/api-context-services": "error",
+    "langwatch/comment-block-size": "error",
+    "langwatch/comment-block-size-warning": "warn",
+    "langwatch/conditional-type-depth": "error",
+    "langwatch/fallible-result-naming": "error",
+    "langwatch/feature-source-filename": "error",
+    "langwatch/feature-source-layout": "error",
+    "langwatch/feature-source-subject": "error",
+    "langwatch/layer-class": "error",
+    "langwatch/overload-by-literal": "error",
+    "langwatch/prisma-containment": "error",
+    "langwatch/typed-prisma-seam": "error",
     "langwatch/environment-boundaries": "error",
     "langwatch/package-boundaries": "error",
     "langwatch/feature-module-classes": "error",
@@ -471,9 +482,7 @@
       }
     },
     {
-      "files": [
-        "packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx"
-      ],
+      "files": ["packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx"],
       "rules": {
         "complexity": ["error", { "max": 220 }]
       }
@@ -1549,7 +1558,6 @@
         "langwatch/cognitive-complexity": ["error", { "max": 220 }]
       }
     },
-
 
     // ------------------------------------------------------------------
     // NESTED TERNARIES. A ternary inside a ternary is a decision tree
