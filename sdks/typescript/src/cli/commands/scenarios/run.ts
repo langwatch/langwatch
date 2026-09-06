@@ -6,11 +6,7 @@ import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
-import {
-  parseRepeat,
-  parseTargets,
-  parseWait,
-} from "../run-plans/scopeFlags";
+import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
 
 export interface RunScenarioOptions extends RawOutputFlags {
@@ -24,13 +20,8 @@ export interface RunScenarioOptions extends RawOutputFlags {
 }
 
 /**
- * Runs one scenario against one or more targets.
- *
- * This is a run plan scoped to a single scenario: one request, no test suite
- * created for it and none deleted afterwards. The platform files the run under
- * a plan named after the scenario and the target unless `--name` says
- * otherwise.
- *
+ * Runs one scenario against one or more targets: a run plan scoped to a
+ * single scenario, no test suite created or deleted for it.
  * @see specs/features/scenario-cli.feature
  */
 export const runScenarioCommand = async (

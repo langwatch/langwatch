@@ -56,15 +56,9 @@ function tunnelUrlWithPreviousPath({
 }
 
 /**
- * The write-back: config with `url` REPLACED by the tunnel URL carrying the
- * previous URL's path, and the previous URL stashed under `devTunnel` so exit
- * can restore it. Replace, never append. When a crashed session left a
- * `devTunnel` behind, the original `previousUrl` is kept: the current `url`
- * is a dead tunnel, and restoring to it would restore nothing.
- *
- * With `secret` set, the dev-secret header row is written too, replacing any
- * existing row with that key, never appending a duplicate. Without a secret
- * (`--no-auth`), any stale dev-secret row is removed.
+ * The write-back: config with `url` REPLACED by the tunnel URL, and the
+ * previous URL stashed under `devTunnel` so exit can restore it. A crashed
+ * session's stash is kept rather than overwritten with the dead tunnel.
  */
 export function applyDevTunnel({
   config,
@@ -96,10 +90,9 @@ export function applyDevTunnel({
 }
 
 /**
- * The heartbeat: config with `devTunnel.heartbeatAt` refreshed and everything
- * else untouched. Returns null when the config carries no `devTunnel` (the
- * session's write-back is gone, e.g. someone restored the agent in the UI),
- * so the caller skips the PATCH instead of recreating the marker.
+ * The heartbeat: config with `devTunnel.heartbeatAt` refreshed. Returns null
+ * when the config carries no `devTunnel`, so the caller skips the PATCH
+ * instead of recreating the marker.
  */
 export function touchDevTunnel({
   config,
@@ -117,10 +110,9 @@ export function touchDevTunnel({
 }
 
 /**
- * The restore: config with the previous URL back in place, the `devTunnel`
- * stash dropped, and the dev-secret header row removed. Returns null when the
- * config carries no `devTunnel`, meaning nothing to restore, so the caller can skip
- * the PATCH entirely (idempotence: a second restore is a no-op).
+ * The restore: config with the previous URL back, `devTunnel` dropped, and
+ * the dev-secret header removed. Null when there is no `devTunnel` to
+ * restore, so a second restore is a no-op.
  */
 export function restoreDevTunnel({
   config,
@@ -142,16 +134,9 @@ export function restoreDevTunnel({
 }
 
 /**
- * The project testing page, derived from the agent's `platformUrl`
- * (`https://…/<project-slug>/agents?…`): same origin, same project slug,
- * `/simulations` path.
- *
- * Two interfaces show the same runs, and which one a project reads is decided
- * by a release rule the CLI cannot read. `/simulations` is the address that
- * opens in both: a project on Agent Testing is sent to
- * `/agent-testing/results`, and a project kept on the Simulations pages
- * renders them. Naming `/agent-testing` here would answer "this page does not
- * exist" to everyone kept on the older interface.
+ * The project testing page, derived from the agent's `platformUrl`: same
+ * origin and project slug, `/simulations` path — the address that resolves
+ * on both interfaces a project might be released onto.
  */
 export function deriveSimulationsUrl(platformUrl: string | undefined): string | undefined {
   if (!platformUrl) return undefined;

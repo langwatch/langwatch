@@ -1,10 +1,7 @@
 /**
  * The loop of a shared folder: a call arrives, the policy decides, the call
  * runs or the panel is asked, and the answer goes back on the same socket.
- *
- * Everything that decides is somewhere else. This module only sequences:
- * which call is waiting for which answer, which command is still running, and
- * what happens on Ctrl-C.
+ * Everything that decides is elsewhere — this module only sequences.
  */
 
 import {
@@ -26,19 +23,8 @@ import {
   type TerminalApproval,
 } from "./approval";
 import { failureCode, failureMessage } from "./errors";
-import {
-  startCommand,
-  timeoutSecondsFor,
-  type RunningCommand,
-} from "./executor";
-import {
-  editFile,
-  findFiles,
-  grep,
-  listDirectory,
-  readFile,
-  writeFile,
-} from "./fs-ops";
+import { startCommand, timeoutSecondsFor, type RunningCommand } from "./executor";
+import { editFile, findFiles, grep, listDirectory, readFile, writeFile } from "./fs-ops";
 import { decide } from "./policy";
 import { RelayClient } from "./relay-client";
 import { conversationLink, createUi, settledLine, type LangyUi } from "./ui";
@@ -195,9 +181,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         command: call.params.command,
         root,
         callId: call.callId,
-        ...(call.params.timeout === undefined
-          ? {}
-          : { timeout: call.params.timeout }),
+        ...(call.params.timeout === undefined ? {} : { timeout: call.params.timeout }),
         ...(call.params.background === true ? { background: true } : {}),
       });
     } catch (error) {
@@ -262,9 +246,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     }
     if (decision.kind === "ask") {
       const timeoutSeconds =
-        call.tool === "local_bash"
-          ? timeoutSecondsFor(call.params.timeout)
-          : undefined;
+        call.tool === "local_bash" ? timeoutSecondsFor(call.params.timeout) : undefined;
       pending.set(call.callId, {
         call,
         summary: decision.summary,
@@ -278,9 +260,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         pattern: decision.pattern,
         reason: decision.reason,
         skipOffered: true,
-        ...(decision.segments === undefined
-          ? {}
-          : { segments: decision.segments }),
+        ...(decision.segments === undefined ? {} : { segments: decision.segments }),
         // Only a command runs under a time limit, so only a command carries one.
         ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
       });
@@ -297,13 +277,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
   };
 
   /**
-   * Puts the ask to this terminal as well as to the card.
-   *
-   * The transcript is held while the selector owns the bottom of the screen,
-   * so a call that answers itself in the meantime does not scroll the box
-   * away; the held lines are printed the moment the question is gone. Two
-   * calls that both need an answer wait their turn rather than drawing two
-   * boxes over each other, and one the card settled first never opens.
+   * Puts the ask to this terminal as well as to the card. The transcript is
+   * held while the selector owns the screen so it isn't scrolled away; two
+   * calls needing an answer wait their turn rather than drawing two boxes.
    */
   const askInTerminal = (ask: {
     call: LocalCall;
@@ -337,9 +313,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         summary: ask.summary,
         reason: ask.reason,
         patterns: ask.patterns,
-        ...(ask.timeoutSeconds === undefined
-          ? {}
-          : { timeoutSeconds: ask.timeoutSeconds }),
+        ...(ask.timeoutSeconds === undefined ? {} : { timeoutSeconds: ask.timeoutSeconds }),
       }),
     );
     waiting.closeSelector = open.close;
@@ -399,13 +373,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     });
   };
 
-  const onPermission = ({
-    callId,
-    decision,
-  }: {
-    callId: string;
-    decision: string;
-  }): void => {
+  const onPermission = ({ callId, decision }: { callId: string; decision: string }): void => {
     const waiting = pending.get(callId);
     // The terminal already answered, so the call has run or been refused and
     // the card is only reporting what it settled on.
@@ -440,13 +408,8 @@ export function startLangySession(options: LangySessionOptions): LangySession {
 
   /**
    * Everything this session is holding, let go of: the questions on the
-   * screen, the questions waiting for one, and the commands still running in
-   * the folder.
-   *
-   * A folder stops being shared in four ways, and only Ctrl-C used to clear
-   * the work. A disconnect from the panel closed the socket and left the
-   * commands it had started running, writing files and reaching the network
-   * long after the panel said the folder was gone.
+   * screen, the questions waiting for one, and the commands still running
+   * in the folder. A folder stops being shared in four ways, all of them.
    */
   const stopEverything = (): void => {
     askQueue.length = 0;
@@ -480,9 +443,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     sessionKey: options.sessionKey,
     workspace: options.workspace,
     ...(options.transport === undefined ? {} : { transport: options.transport }),
-    ...(options.socketFactory === undefined
-      ? {}
-      : { socketFactory: options.socketFactory }),
+    ...(options.socketFactory === undefined ? {} : { socketFactory: options.socketFactory }),
     ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
     handlers: {
       onRegistered: (frame) => {
@@ -498,8 +459,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         });
         ui.connected({
           root,
-          conversationTitle:
-            frame.conversation.title || options.conversation.title,
+          conversationTitle: frame.conversation.title || options.conversation.title,
           conversationUrl: conversationHref,
         });
         if (options.withoutGit === true) ui.noGitRepository();
@@ -556,18 +516,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
 }
 
 /**
- * What Langy is told when the developer says no.
- *
- * The frame carries no reason, so the reason travels in the call result the
- * CLI writes itself. With nothing typed, the refusal still says who refused.
+ * What Langy is told when the developer says no. The frame carries no
+ * reason, so it travels in the call result the CLI writes itself.
  */
-function denialMessage({
-  summary,
-  reason,
-}: {
-  summary: string;
-  reason?: string;
-}): string {
+function denialMessage({ summary, reason }: { summary: string; reason?: string }): string {
   if (reason === undefined || reason === "") {
     return `The developer denied ${summary}. Do not run it again in this turn; say what you needed it for.`;
   }
@@ -575,13 +527,7 @@ function denialMessage({
 }
 
 /** One file tool, as its text answer. */
-function runFileTool({
-  call,
-  root,
-}: {
-  call: LocalCall;
-  root: string;
-}): string {
+function runFileTool({ call, root }: { call: LocalCall; root: string }): string {
   switch (call.tool) {
     case "local_read":
       return readFile({ params: call.params, root });

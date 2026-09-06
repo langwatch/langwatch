@@ -75,12 +75,9 @@ function rememberedAgentForDirectory(): string | undefined {
 }
 
 /**
- * Resolve which registered HTTP agent this session repoints:
- *
- *   1. `--agent <id|name>`: an exact id, else a name match over HTTP agents.
- *   2. The agent remembered for this directory from a previous run.
- *   3. An interactive picker over the project's HTTP agents (TTY only), which
- *      offers to create one when the project has none yet.
+ * Resolve which registered HTTP agent this session repoints: `--agent
+ * <id|name>`, else the agent remembered for this directory, else an
+ * interactive picker (TTY only) offering to create one.
  */
 export async function resolveTargetAgent({
   service,
@@ -160,9 +157,7 @@ const CREATE_INSTRUCTIONS =
 
 /**
  * The project has no HTTP agents yet: offer to create one on the spot (TTY
- * only). The created agent points at the local server, so after the session
- * restores it, its URL states what it targeted; edit it in the UI when the
- * agent gets a deployed address.
+ * only), pointed at the local server for now.
  */
 async function createHttpAgentInteractively({
   service,

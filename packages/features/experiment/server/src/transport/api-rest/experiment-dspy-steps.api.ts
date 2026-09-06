@@ -328,9 +328,9 @@ const hashOf = (data: object): string =>
   createHash("md5").update(JSON.stringify(data)).digest("hex");
 
 /**
- * A DSPy LLM call's `response` is a JSON dump of an arbitrary Python object, so the contract types it
- * as an opaque record. Cost accounting reads only the OpenAI chat-completion fields below, and reads
- * them through this schema so a malformed dump produces no cost rather than a wrong one.
+ * A DSPy LLM call's `response` is a JSON dump of an arbitrary Python object,
+ * so the contract types it as an opaque record. Cost accounting reads only
+ * the OpenAI chat-completion fields below through this schema.
  */
 const llmCallCostFieldsSchema = z.object({
   model: z.string().optional(),

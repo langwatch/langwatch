@@ -23,12 +23,8 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
 }
 
 /**
- * Runs a configuration under a name.
- *
- * The name is the plan's identity: an existing name takes this configuration
- * and the run joins that plan's history, a new name creates the plan, and no
- * name lets the platform derive one from the scope and the targets.
- *
+ * Runs a configuration under a name: an existing name joins that plan's
+ * history, a new name creates the plan, no name lets the platform derive one.
  * @see specs/features/run-plan-cli.feature
  */
 export const runRunPlanCommand = async (options: RunPlanRunOptions): Promise<void> => {

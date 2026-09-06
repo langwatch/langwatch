@@ -1,14 +1,7 @@
 /**
- * How a scheduled run reads, on the terminal and on the wire.
- *
- * The three run commands (`run-plan run`, `test-suite run`, `scenario run`) all end
- * in the same answer: a plan, a batch, a job count, and whatever the platform
- * refused to schedule. Printing that in one place is what keeps them from
- * drifting into three different reports of the same event.
- *
- * `emitRunResult` below is that one place. It also owns the `--wait` branch, so
- * every run command answers a machine caller with exactly ONE document,
- * whichever way the run ends.
+ * How a scheduled run reads, on the terminal and on the wire. `emitRunResult`
+ * is the one place the three run commands report through, and it owns
+ * `--wait`, so a machine caller always gets exactly ONE document.
  */
 
 import chalk from "chalk";
@@ -72,12 +65,8 @@ export interface EmitRunResultParams {
 
 /**
  * Says what the run did: one document under a machine format, the existing
- * blocks for a person.
- *
- * Under `--wait` the document is printed after the poll and carries the
- * outcome, the tallies and the per-run results. A timeout and a dead status
- * endpoint end on that same document, so a caller that parses stdout always
- * gets an answer rather than an empty stream.
+ * blocks for a person. Under `--wait` the document carries the outcome,
+ * tallies and per-run results, even on a timeout or dead status endpoint.
  */
 export async function emitRunResult({
   result,

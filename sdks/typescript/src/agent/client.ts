@@ -1,14 +1,7 @@
 /**
- * One shared connection per process to `/api/v1/agents/connect`.
- *
- * The client holds every agent the process defined, registers them all on
- * one socket, answers `call` frames by running the agent's function, and
- * reconnects with backoff when the platform goes away. Nothing in here throws
- * into customer code: every frame is handled under a catch that logs, and a
- * failure on the LangWatch side produces one warning that names the fix and
- * leaves the application running as if the wrapper were absent.
- *
- * @see dev/docs/adr/128-connected-agents.md
+ * One shared connection per process to `/api/v1/agents/connect`. Registers
+ * every agent, answers `call` frames, and reconnects with backoff. Nothing
+ * here throws into customer code.
  */
 
 import { context, propagation, trace } from "@opentelemetry/api";
@@ -186,7 +179,7 @@ export class AgentClient {
     return this.registered;
   }
 
-  /** True once the client gave up: refused, or no socket implementation. No timer is left behind. */
+  /** True once the client gave up: refused, or no socket implementation available. */
   get isStopped(): boolean {
     return this.stopped;
   }
@@ -627,14 +620,9 @@ export class AgentClient {
   }
 
   /**
-   * Exports the spans of the call now instead of at the exporter's next
-   * schedule. The judge reads the agent's spans right after the last turn,
-   * and a batch exporter would otherwise hold them for seconds, which is what
-   * made the judge report the spans missing.
-   *
-   * The call awaits this before it sends its result or its error: the frame is
-   * what tells the platform the turn is over, so a frame that goes out first
-   * lets the judge read the call while its spans are still in the exporter.
+   * Exports the spans of the call now, since a batch exporter would
+   * otherwise hold them for seconds after the judge reads them. Awaited
+   * before the result or error frame goes out.
    */
   private async flushSpans(): Promise<void> {
     const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };

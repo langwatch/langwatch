@@ -1,29 +1,7 @@
 /**
- * Public REST API for experiments.
- *
- * Exposes the two endpoints that complement the existing
- * `/api/experiments/{slug}/run` and `/runs/{runId}` routes:
- *
- *   GET  /api/experiments
- *   GET  /api/experiments/{slug}
- *   POST /api/experiments
- *
- * The workbench endpoints an integrator uses to read and write one
- * experiment's setup live in `server/routes/experiments-v3.ts`, which serves
- * the rest of the `/api/experiments` namespace. Create lives HERE rather than
- * next to them because both apps publish into one OpenAPI document and the
- * generator replaces a path wholesale per app: a second app declaring the bare
- * `/api/experiments` path would drop the list operation from the document.
- *
- * Auth: standard project API key (X-Auth-Token / Bearer / Basic).
- *
- * Routes go through the feature's application, which arrives as an argument —
- * no direct Prisma access here, and none of the process's composition either.
- * Experiment runs are joined in via aggregate metadata so each summary
- * includes a run count and latest run timestamp without loading run history.
- * What an experiment nobody has run aggregates to, and what a create with no
- * setup starts from, are the application's answers, so the tRPC surface gives
- * the same ones.
+ * Public REST API for experiments: `GET /api/experiments`, `GET
+ * /api/experiments/{slug}`, `POST /api/experiments`. Auth: standard project
+ * API key. Routes go through the feature's application.
  */
 
 import { requires } from "@langwatch/api";

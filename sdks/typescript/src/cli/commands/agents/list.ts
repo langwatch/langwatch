@@ -11,11 +11,8 @@ import type { CommandResult } from "../../utils/output";
 
 /**
  * Who a personal or host-scoped agent belongs to, empty for a shared one.
- *
- * A personal agent of another person is listed like every other, because two
- * agents of one name are told apart by this column alone. It reads "owner
- * only" so the difference between "you can run this" and "you can see this"
- * is on the row rather than in a later refusal.
+ * Reads "owner only" so "you can run this" versus "you can see this" is on
+ * the row rather than in a later refusal.
  */
 export const agentOwnerLabel = (agent: AgentResponse): string => {
   const owner = agent.owner?.name ?? agent.hostLabel ?? "";
@@ -41,11 +38,8 @@ export const agentStatusColor = (value: string): string => {
 };
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). The `table` closure
- * is the human form.
- *
- * @see specs/typescript-sdk/cli-agents.feature
+ * Returns the listing rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
  */
 export const listAgentsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

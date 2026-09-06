@@ -1,22 +1,7 @@
 /**
- * `POST /api/experiment/init` — the first call an SDK run makes.
- *
- * It takes a slug the caller chose, hands back the experiment that slug names,
- * and creates it if the slug is free. Every subsequent write in the run —
- * `POST /api/evaluations/batch/log_results`, the DSPy step log, the workbench
- * reads — addresses rows by the experiment this call resolved, which is what
- * makes repeated runs under one slug group together in the app rather than
- * landing as strangers.
- *
- * That is also why the resolution is a SERVICE and not a rule this file
- * states: the batch log resolves the same slug through the same
- * `ExperimentFindOrCreateService`, so an SDK cannot get one experiment from
- * the init door and a second one from the door it reports to.
- *
- * The family resolves its own project key rather than going through the
- * framework chain, because the refusals it publishes are the ones an SDK
- * already parses: a bare `{ message }` at 401, `{ error: <sentence> }` at 400,
- * and the handled ceiling payload at 403.
+ * `POST /api/experiment/init` — the first call an SDK run makes. Resolves a
+ * caller-chosen slug through `ExperimentFindOrCreateService`, the same
+ * service the batch log uses, so repeated runs under one slug group together.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import {
@@ -90,10 +75,8 @@ type ExperimentInitCaller = Readonly<{
 }>;
 
 /**
- * The caller the middleware resolved, read off the handler's own context. A
- * structural reader rather than a widened variables map: the service's map is
- * the framework's, and a family adding one key to it would have to restate the
- * whole thing.
+ * The caller the middleware resolved, read off the handler's own context: a
+ * structural reader rather than widening the framework's own variables map.
  */
 function callerOf(c: {
   get(key: typeof INIT_CALLER): ExperimentInitCaller | undefined;
@@ -106,12 +89,9 @@ function callerOf(c: {
 }
 
 /**
- * The body, as the door has always accepted it.
- *
  * `experiment_slug` and `experiment_id` are individually optional and jointly
- * required, which is what the refine says. The three types are the ones an SDK
- * sends; `EVALUATIONS_V3` is deliberately NOT among them — that is the
- * workbench's own type, written through the workbench's own doors.
+ * required. `EVALUATIONS_V3` is deliberately not among the accepted types —
+ * that is the workbench's own type, written through the workbench's doors.
  */
 const experimentInitBodySchema = z
   .object({

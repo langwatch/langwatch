@@ -1,7 +1,7 @@
 /**
- * Everything a run writes to ClickHouse and the evaluation pipeline as it executes: the run-started/run-completed dispatches, and the
- * per-event `record` that mirrors each target and evaluator result. Also owns the per-(row, target) caches Phase 2 comparison cells read
- * (outputs, scores, which keys this run actually produced) and the traceId lookup evaluator results reference.
+ * Everything a run writes to ClickHouse as it executes: the run lifecycle
+ * dispatches, the per-event `record`, and the per-(row, target) caches
+ * Phase 2 comparison cells read.
  */
 
 import { generate } from "@langwatch/ksuid";
@@ -95,7 +95,7 @@ export class ExperimentRunStorageService {
     return this.producedTargetKeys.has(key);
   }
 
-  /** Dispatches the run's start to ClickHouse. Throws on failure, having already logged and counted it. */
+  /** Dispatches the run's start to ClickHouse. Throws on failure, after logging and counting it. */
   async startRun({
     projectId,
     runId,
@@ -130,7 +130,7 @@ export class ExperimentRunStorageService {
     }
   }
 
-  /** Dispatches the run's completion to ClickHouse. Never throws — a failure here is logged and counted, not fatal. */
+  /** Dispatches the run's completion to ClickHouse. Never throws: failures are logged. */
   async completeRun({
     projectId,
     runId,

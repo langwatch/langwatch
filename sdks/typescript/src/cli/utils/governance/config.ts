@@ -1,8 +1,7 @@
 /**
- * Persists langwatch CLI governance credentials at
- * ~/.langwatch/config.json. The file is mode 0600 (atomic rename
- * on save). The shape mirrors what `POST /api/auth/cli/exchange`
- * returns plus a few client-side fields.
+ * Persists langwatch CLI governance credentials at ~/.langwatch/config.json
+ * (mode 0600, atomic rename on save), mirroring `POST /api/auth/cli/exchange`
+ * plus a few client-side fields.
  */
 
 import * as fs from "node:fs";
@@ -29,13 +28,9 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
-   * The user's personal workspace project on this control plane, delivered
-   * by `POST /api/auth/cli/exchange` at device-login time (or lazily via
-   * `GET /api/auth/cli/personal-project` for sessions minted before the
-   * field existed). Its `api_key` is what API-calling commands authenticate
-   * with when no `LANGWATCH_API_KEY` is set anywhere, so `langwatch trace
-   * search` etc. just work after `langwatch login`.
-   * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+   * The user's personal workspace project, delivered at login. `api_key`
+   * is what API-calling commands authenticate with when no
+   * `LANGWATCH_API_KEY` is set anywhere.
    */
   personal_project?: {
     id?: string;
@@ -44,25 +39,16 @@ export interface GovernanceConfig {
     api_key?: string;
     /**
      * Unix epoch (seconds) the device session was last confirmed live for
-     * this cached key. The key is a long-lived Project.apiKey, so using it
-     * unconditionally would outlive a revoked device (a stolen config would
-     * work forever). The resolver only trusts the cache within a short
-     * revalidation window; past it, it re-confirms liveness through the
-     * session-authenticated endpoint and drops the key when the session is
-     * gone. See cli/utils/apiKey.ts resolveSessionProjectKey.
+     * this cached key, so a stolen config can't work forever. See
+     * cli/utils/apiKey.ts resolveSessionProjectKey.
      */
     validated_at?: number;
   };
 
   /**
-   * The user-scoped API key minted for this login by
-   * `POST /api/auth/cli/exchange`, in the `sk-lw-{lookupId}_{secret}` shape.
-   * It reaches every project the user picked on the authorize screen, so data
-   * and management commands use it instead of the personal project's own key
-   * and `--project <id|slug>` can point them at another project. Absent when
-   * the server predates the feature; the resolver then falls back to
-   * `personal_project.api_key`, exactly as before.
-   * Spec: specs/typescript-sdk/cli-cross-project-access.feature
+   * The user-scoped API key minted for this login, reaching every project
+   * picked on the authorize screen. Absent for a legacy server; the
+   * resolver falls back to `personal_project.api_key`.
    */
   cli_api_key?: string;
 
@@ -83,39 +69,16 @@ export interface GovernanceConfig {
   };
 
   /**
-   * Personal ingest keys (write-only ingest ApiKeys in the
-   * `ik-lw-{lookupId}_{secret}` shape minted by
-   * `/api/auth/cli/governance/ingestion-key`), keyed by the tool's
-   * source_type slug (`claude_code` / `codex` / `gemini` / `opencode`).
-   * One key per source so different wrapped tools surface as their own
-   * ingestion source in /me + /traces.
-   *
-   * When the right key is present for a wrapped tool, the
-   * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER
-   * env vars pointing at the OTLP endpoint with this key as the
-   * Authorization bearer (reusing the cache instead of re-minting).
-   *
-   * A secret that does not parse as an `ik-lw-` token is treated as
-   * user-pinned: the wrapper uses it as-is and never probes, re-mints,
-   * or overwrites it. Prefer `langwatch instrument <tool> --key` for
-   * that case; it stores the key under `tool_project_keys` instead.
-   *
-   * Unset until the wrapper's first auto-mint for that tool.
+   * Personal ingest keys (write-only, `ik-lw-{lookupId}_{secret}`), keyed by
+   * the tool's source_type slug so each wrapped tool surfaces as its own
+   * ingestion source. A secret that doesn't parse as `ik-lw-` is user-pinned.
    */
   default_personal_ingest_keys?: Record<string, { id?: string; secret?: string; prefix?: string }>;
 
   /**
-   * Per-tool project scope. Written by `langwatch instrument <tool>
-   * --project/--key` and `langwatch <tool> --project`; removed by
-   * `--personal`, and by `langwatch logout`, which drops the whole config
-   * file along with the wiring it describes. While an entry exists the
-   * tool's telemetry wiring uses
-   * this ingest key and endpoint, and the personal ingest-key path for
-   * the tool is not consulted or rewritten. `project_id` / `project_slug`
-   * are absent when the key was pasted (`--key`) rather than minted.
-   * `endpoint` overrides the config's control plane for this tool only
-   * (set by `instrument --endpoint`, e.g. a headless machine
-   * instrumented against another instance).
+   * Per-tool project scope, written by `instrument <tool> --project/--key`
+   * and removed by `--personal`/`logout`. `project_id`/`project_slug` are
+   * absent when pasted (`--key`) rather than minted.
    */
   tool_project_keys?: Record<
     string,
@@ -128,106 +91,64 @@ export interface GovernanceConfig {
   >;
 
   /**
-   * Persistent answer to the post-login "save export block to your
-   * shell rc?" prompt. `skip` = user picked "never", stay quiet
-   * forever. `undefined` = ask each login that lands in an
-   * unconfigured shell. The "not now" answer doesn't persist — it
-   * lets the next login re-ask on its own.
+   * Persistent answer to the post-login "save export block to your shell
+   * rc?" prompt. `skip` = never ask again; undefined = ask each login. The
+   * "not now" answer doesn't persist.
    */
   shell_rc_preference?: "skip";
 
   /**
-   * Unix epoch (seconds) of the last failed attempt to install the LangWatch
-   * Claude Code plugin. Suppresses the next attempt for a day: a `claude` that
-   * could not install it once is overwhelmingly likely to fail the same way
-   * again, and retrying on every wrapped session would spend a subprocess and a
-   * repository clone each time to learn that. Cleared by a successful install.
-   * Absent = never failed, or the last attempt succeeded.
+   * Unix epoch (seconds) of the last failed plugin-install attempt.
+   * Suppresses retrying for a day. Cleared by a successful install; absent
+   * means never failed or last attempt succeeded.
    */
   claude_plugin_last_failure?: number;
 
   /**
-   * Unix epoch (seconds) of the last time a wrapped run checked whether the
-   * installed LangWatch Claude Code plugin is still the published version.
-   * Claude Code leaves auto-update off for third-party marketplaces, so the
-   * wrapper does the checking, and it holds the check to once a day: every run
-   * in between reads this field and stops, which is what keeps a launch from
-   * paying for a repository fetch it almost never needs. Stamped whether the
-   * check found an update or not. Absent = never checked.
+   * Unix epoch (seconds) of the last plugin-update check. Claude Code
+   * leaves auto-update off for third-party marketplaces, so the wrapper
+   * checks at most once a day. Absent = never checked.
    */
   claude_plugin_last_update_check?: number;
 
   /**
-   * Per-wrapped-tool routing mode answer.
-   *
-   *   "gateway"   — Path A: route the tool's HTTP calls through
-   *                  the AI Gateway via base-URL swap (full server-
-   *                  side I/O + cost capture, no client OTel).
-   *   "ingestion" — Path B: enable the tool's native OTel exporter
-   *                  pointed at /api/otel with the tool's ingest
-   *                  credential (project pin or personal `ik-lw-` key).
-   *                  For codex this also writes the [otel] block to
-   *                  ~/.codex/config.toml automatically.
-   *   "ask"       — re-prompt on the next `langwatch <tool>`. The
-   *                  default when this key is absent.
-   *
-   * The two modes are mutually exclusive per the no-double-trace
-   * rule — gateway capture + OTel emission on the same call would
-   * double-count both traces and cost. The wrapper picks Path A
-   * by default when a personal VK is configured, and falls back
-   * to Path B when no VK + the user opts in.
+   * Per-wrapped-tool routing mode: "gateway" routes HTTP calls through the
+   * AI Gateway; "ingestion" enables the tool's native OTel exporter; "ask"
+   * re-prompts (default). Mutually exclusive per the no-double-trace rule.
    */
   tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
 
   /**
-   * Per-(org, tool) path policy cached from the login bootstrap
-   * (`/api/auth/cli/bootstrap` → `toolPolicies`). The `langwatch
-   * <tool>` wrapper gates path selection on this map so it only
-   * offers the paths the org admin permits. Absent for a legacy /
-   * offline CLI that never cached it; `resolvePlatformToolPolicy`
-   * then falls back to the hardcoded defaults.
+   * Per-(org, tool) path policy cached from login bootstrap, gating which
+   * paths the wrapper offers. Absent for a legacy/offline CLI;
+   * `resolvePlatformToolPolicy` then falls back to hardcoded defaults.
    */
   tool_policies?: PlatformToolPolicyMap;
 
   /**
-   * Persistent opt-out from the background command daemon, written by
-   * `langwatch config set daemon off`. Absent = on. `LANGWATCH_NO_DAEMON`
-   * (per-invocation) takes precedence when both are set.
-   *
-   * Also read DIRECTLY from this file by cli/daemon/eligibility.ts
-   * (`isDaemonDisabledByConfig`), which must stay dependency-free — keep the
-   * field name in sync.
+   * Persistent opt-out from the background command daemon. Absent = on;
+   * `LANGWATCH_NO_DAEMON` takes precedence when both are set. Also read
+   * directly by cli/daemon/eligibility.ts — keep the field name in sync.
    */
   daemon?: "on" | "off";
 
   /**
-   * The agent last chosen by `langwatch agent tunnel`, keyed by the project
-   * directory (absolute path) the command ran in, so the next run in the
-   * same folder skips the picker. `--agent` always overrides. The field name
-   * on disk is fixed as `agent_dev_agents`: changing it would drop every
-   * user's remembered agents.
+   * The agent last chosen by `langwatch agent tunnel`, keyed by project
+   * directory, so the next run in the same folder skips the picker.
+   * `--agent` always overrides.
    */
   agent_dev_agents?: Record<string, string>;
 }
 
 function defaults(): GovernanceConfig {
-  // Note: the single source of truth for endpoint resolution at command
-  // boundaries is `resolveControlPlaneEndpoint()` in resolveEndpoint.ts.
-  // This function only seeds the *initial* GovernanceConfig shape when
-  // no file exists yet — at boot, before the user has logged in.
-  // `LANGWATCH_URL` legacy alias intentionally NOT read (was undocumented;
-  // dropped per rchaves directive 2026-05-05).
+  // This only seeds the initial shape when no config file exists yet, at
+  // boot before login; `resolveControlPlaneEndpoint()` in resolveEndpoint.ts
+  // is the source of truth at command boundaries.
   const cp = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
   const explicitGw = process.env.LANGWATCH_GATEWAY_URL;
-  // Self-hosted detection: when the user pointed `LANGWATCH_ENDPOINT` at
-  // localhost (the standard `make dev` shape) and didn't override the
-  // gateway URL, default to the local AI gateway port (5563 per
-  // langwatch/CLAUDE.md `make service svc=aigateway`). Without this,
-  // `langwatch login` + `whoami` printed the production gateway URL on
-  // self-hosted installs and the user's `langwatch claude` calls would
-  // route at the wrong place (Ariana QA — same shape as the /me tile
-  // base-URL bug Sergey c45e69987 / Alexis 30e52a718 fixed on the
-  // control-plane side).
+  // Self-hosted detection: a localhost LANGWATCH_ENDPOINT with no gateway
+  // override defaults to the local AI gateway port (see langwatch/CLAUDE.md
+  // `make service svc=aigateway`), so self-hosted installs route locally.
   const gw =
     explicitGw ??
     (/^https?:\/\/(localhost|127\.0\.0\.1)/.test(cp)
@@ -237,11 +158,9 @@ function defaults(): GovernanceConfig {
 }
 
 /**
- * Canonical personal-VK secret prefix. Mirrors the control plane's
- * `vk-lw-<ULID>` minting format (langwatch virtualKey.crypto.ts). The
- * gateway rejects anything else as malformed_key before any DB lookup,
- * so a config carrying a legacy-format secret (older `lw_vk_live_*`
- * logins) routes every `langwatch <tool>` call straight to a 401.
+ * Canonical personal-VK secret prefix, mirroring the control plane's
+ * `vk-lw-<ULID>` minting format. The gateway rejects anything else as
+ * malformed_key, so a legacy-format secret 401s every `langwatch <tool>` call.
  */
 const VK_SECRET_PREFIX = "vk-lw-";
 
@@ -285,11 +204,8 @@ export function configPath(): string {
 
 /**
  * Read the config from disk, merging in defaults for missing keys.
- *
- * Deliberately re-read on EVERY call, with no in-process cache: the daemon's
- * logged-in single-identity boundary depends on it (see "THE LOGGED-IN
- * SINGLE-IDENTITY BOUNDARY" in cli/daemon/identity.ts). A cached credential
- * here would outlive a logout inside a long-lived daemon.
+ * Deliberately re-read on EVERY call, with no in-process cache — see
+ * cli/daemon/identity.ts.
  */
 export function loadConfig(): GovernanceConfig {
   const p = configPath();
@@ -298,20 +214,12 @@ export function loadConfig(): GovernanceConfig {
     const text = fs.readFileSync(p, "utf8");
     const parsed = JSON.parse(text) as Partial<GovernanceConfig>;
     const cfg = { ...defaults(), ...parsed };
-    // Drop a legacy-format personal VK secret on load. Keeping it would
-    // route every `langwatch <tool>` call to a malformed_key 401; once
-    // dropped, the wrapper preflight tells the user to re-login and the
-    // next login persists a fresh `vk-lw-` secret. A valid canonical
-    // secret is never touched, so this won't wipe a working credential.
+    // Drop a legacy-format personal VK secret on load; the next login
+    // persists a fresh `vk-lw-` one. Canonical secrets are never touched.
     if (cfg.default_personal_vk && !isCanonicalVkSecret(cfg.default_personal_vk.secret)) {
       delete cfg.default_personal_vk;
     }
-    // Same reasoning for a hand-edited project pin. `secret` is the one
-    // required field on the entry, and the doc above invites people to paste
-    // keys here, so an entry that carries a project name and no secret is a
-    // realistic edit. Kept, it would hand `Bearer undefined` to every reader
-    // that trusts the type; dropped, the tool falls back to the personal path
-    // and `instrument --project` writes a working pin again.
+    // Same reasoning for a hand-edited project pin missing its `secret`.
     if (cfg.tool_project_keys) {
       cfg.tool_project_keys = Object.fromEntries(
         Object.entries(cfg.tool_project_keys).filter(
@@ -319,13 +227,8 @@ export function loadConfig(): GovernanceConfig {
         ),
       );
     }
-    // A blank or non-string `cli_api_key` is a hand-edit, not a credential.
-    // Kept, it would win over the personal-project key in the resolver and
-    // send `Basic base64(projectId:undefined)` at every command; dropped, the
-    // resolver degrades to the pre-feature path and the next login writes a
-    // working key again. The scope goes with it: it describes a key that is
-    // no longer there, and `whoami` would otherwise report a reach the CLI
-    // cannot use.
+    // A blank or non-string `cli_api_key` is a hand-edit, not a credential;
+    // drop it and its scope so the resolver degrades to the personal-project path.
     if (typeof cfg.cli_api_key !== "string" || cfg.cli_api_key.trim() === "") {
       delete cfg.cli_api_key;
       delete cfg.cli_api_key_scope;

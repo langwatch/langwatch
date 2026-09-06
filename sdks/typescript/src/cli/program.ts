@@ -1738,12 +1738,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // A live, human-only session: it never returns a CommandResult, and it never
-  // prints a table either. Registered as rendering its own result so the
-  // auto-detected agent mode does not warn that a table nobody printed is not
-  // machine-readable; the command then refuses a real structured-output
-  // request itself, naming the reason instead of the generic "no structured
-  // output yet".
+  // A live, human-only session that never returns a CommandResult or prints
+  // a table. Registered as rendering its own result so agent mode does not
+  // warn about a table nobody printed; the command refuses `-o json` itself.
   rendersOwnResult(
     program
       .command("langy")
@@ -1851,13 +1848,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // A live, human-only session: it never returns a CommandResult, so it is
-  // registered with a plain action and the format gate honestly refuses
-  // `-o json` instead of accepting a format the command never renders.
-  //
-  // `agent dev` is the same command under its earlier name. Commander cannot
-  // hide an alias from help, so it is registered as its own hidden command
-  // that runs the same action.
+  // A live, human-only session: never returns a CommandResult, so the format
+  // gate honestly refuses `-o json`. `agent dev` is the same command under
+  // its earlier name, registered as its own hidden command since Commander
+  // cannot hide an alias from help.
   interface AgentTunnelFlags {
     port?: string;
     url?: string;

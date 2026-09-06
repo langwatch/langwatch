@@ -1,44 +1,7 @@
 /**
- * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
- * of every session.
- *
- * Coding agents know exactly which repository, branch and worktree a session is
- * working in and export none of it over telemetry. Each of the three that can
- * run our code inside a session reaches this same command, and each hands it
- * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
- *
- *   - Claude Code and Codex call it directly as a command hook.
- *   - opencode has no command hooks, so the plugin the CLI installs subscribes
- *     to its session event bus and spawns this command with the same payload.
- *
- * The session id each seam reports is the one that agent puts on its own
- * telemetry, so the record this posts joins the session the agent is already
- * describing. So the command runs git itself and posts one small OTLP log
- * record, which is what lets a session's traces be joined to the code they were
- * working on.
- *
- * Where that record goes is `resolveTarget` below, and it is deliberately not
- * the environment alone: Claude Code hands its child processes an environment
- * with every `OTEL_*` variable removed, and Codex hands its hooks one with no
- * exporter variables either, so a hook that trusted them would never send
- * anything from a real session.
- *
- * Two constraints shape every branch below.
- *
- *   - NOTHING ON STDOUT, EVER. A SessionStart hook's stdout is injected into
- *     the user's session context, so one stray line would land in the
- *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
- *     contains "langwatch" (the CLI's existing debug convention).
- *   - ALWAYS EXIT ZERO, AND SOON. Unparseable input, no repository, no
- *     telemetry configured, a collector that refuses the post: every one of
- *     them returns quietly. Every wait is bounded, stdin included, so a seam
- *     that never closes a pipe cannot leave the hook alive for the rest of the
- *     session. A hook is never allowed to be why a session broke.
- *
- * A failed post deliberately leaves the fingerprint file alone, so the next
- * hook in the same session retries instead of assuming the context landed.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * `langwatch ingest hook <tool>`: posts one small OTLP log record joining a
+ * coding session's traces to the code it worked on. NOTHING ON STDOUT EVER;
+ * ALWAYS EXIT ZERO.
  */
 
 import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
@@ -57,10 +20,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import {
-  type HealOutcome,
-  healRevokedIngestKey,
-} from "@/cli/utils/governance/ingest-key-heal";
+import { type HealOutcome, healRevokedIngestKey } from "@/cli/utils/governance/ingest-key-heal";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
 import {
   defaultClaudeSessionRegistryDir,
@@ -75,24 +35,9 @@ import {
 } from "@/cli/utils/governance/session-context";
 
 /**
- * What each accepted tool argument means: the agent the record declares, plus
- * the environment variables that agent publishes about the running session.
- * Anything else is a silent no-op.
- *
- * Both variables are per-agent rather than read unconditionally, because a
- * hook process inherits whatever its ancestors exported. A Codex session
- * started from inside a Claude Code session sees `CLAUDE_CODE_SESSION_ID` and
- * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
- * wrong session, on the wrong checkout, under the wrong agent.
- *
- * The payload's `cwd` beats `projectDirVar`. Claude Code's payload `cwd` is
- * the harness's own working directory: a `cd` inside the Bash tool never moves
- * it, and a native worktree switch (EnterWorktree) does. `CLAUDE_PROJECT_DIR`
- * stays pinned to the directory the session was launched in, so preferring it
- * would keep reporting the launch checkout after the session moved into a
- * worktree to work on another branch. It remains the fallback for a payload
- * with no `cwd`. Codex and opencode publish no such variable, and their
- * payload `cwd` is already the session's own directory.
+ * What each accepted tool argument means: the agent, plus the environment
+ * variables it publishes. The payload's `cwd` beats `projectDirVar`, which
+ * stays pinned to the launch directory.
  */
 const TOOLS: Record<string, { agent: string; sessionIdVar?: string; projectDirVar?: string }> = {
   claude_code: {
@@ -136,9 +81,8 @@ export interface HookCommandOptions {
 
 /**
  * The part of the device config the hook needs to reach a collector. Both
- * fields are optional here even though the config type requires the control
- * plane: a CLI that was never signed in has neither, and that is the
- * "no telemetry configured" case rather than an error.
+ * fields are optional here: a CLI never signed in has neither, which is
+ * "no telemetry configured" rather than an error.
  */
 export type CliTelemetryConfig = Partial<
   Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys">
@@ -296,8 +240,7 @@ async function runHook({
     stateDir,
     now,
     post: async (payload) =>
-      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl }))
-        .ok,
+      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl })).ok,
   });
 }
 
@@ -312,35 +255,14 @@ const REVOKED_NOTICE =
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
 
-function healStateFile({
-  stateDir,
-  agent,
-}: {
-  stateDir: string;
-  agent: string;
-}): string {
+function healStateFile({ stateDir, agent }: { stateDir: string; agent: string }): string {
   return path.join(stateDir, `heal-${agent}.json`);
 }
 
 /**
- * Take this agent's heal window, or report that another attempt holds it.
- *
- * The window is claimed before the mint and with an exclusive create, so two
- * sessions that start together and read the same 401 cannot both ask the
- * platform to replace the same dead key: the second finds the first one's
- * claim and stands down.
- *
- * A claim older than the window belonged to a run that died mid-heal, and
- * replacing it is a delete followed by a create, which two hooks holding the
- * same stale reading could interleave into two winners. So the right to
- * replace it is itself an exclusive create: whoever lands the takeover marker
- * does the delete, and the hooks that lose the marker stand down instead of
- * racing it. The marker is held across two filesystem calls rather than the
- * whole heal, so a run has to die inside those to strand one, and its own
- * staleness is bounded by the same window.
- *
- * A state directory that cannot be written claims nothing and costs one extra
- * attempt, the same trade the fingerprints make.
+ * Take this agent's heal window, or report another attempt holds it, via an
+ * exclusive create so two sessions reading the same 401 can't both re-mint.
+ * A stale claim is replaced through its own exclusive takeover marker.
  */
 function claimHealWindow({
   stateDir,
@@ -359,9 +281,7 @@ function claimHealWindow({
       fs.writeFileSync(at, claim, { flag: "wx" });
       return "claimed";
     } catch (error) {
-      return (error as NodeJS.ErrnoException).code === "EEXIST"
-        ? "taken"
-        : "unwritable";
+      return (error as NodeJS.ErrnoException).code === "EEXIST" ? "taken" : "unwritable";
     }
   };
 
@@ -408,13 +328,7 @@ function claimTakeover({
 }
 
 /** Whether the claim on disk is young enough to still stand for its run. */
-function standingClaimIsFresh({
-  file,
-  now,
-}: {
-  file: string;
-  now: () => number;
-}): boolean {
+function standingClaimIsFresh({ file, now }: { file: string; now: () => number }): boolean {
   try {
     const raw = fs.readFileSync(file, "utf8");
     const attemptedAt = Number((JSON.parse(raw) as { attemptedAt?: number }).attemptedAt);
@@ -425,13 +339,7 @@ function standingClaimIsFresh({
 }
 
 /** Hand the window back, for an outcome that never reached the platform. */
-function releaseHealWindow({
-  stateDir,
-  agent,
-}: {
-  stateDir: string;
-  agent: string;
-}): void {
+function releaseHealWindow({ stateDir, agent }: { stateDir: string; agent: string }): void {
   try {
     fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
   } catch {
@@ -585,22 +493,9 @@ interface OwnContextOutcome {
 }
 
 /**
- * Where to post the record, and what to authenticate it with.
- *
- * The environment is the first source, per the OTel exporter spec, and the
- * only one when the hook is driven by something other than an agent the CLI
- * signed in. It cannot be the only one: Claude Code strips every `OTEL_*`
- * variable from the processes it spawns, hooks included, so a session
- * exporting perfectly well hands its hooks an environment with no endpoint in
- * it at all.
- *
- * The fallback is the CLI's own device config, written by `langwatch login`
- * and `langwatch ingest install`: the control plane the CLI is signed in to,
- * and the ingest key minted for this agent. Null when neither source can name
- * a collector, which is the "no telemetry configured" no-op.
- *
- * Shared with `langwatch ingest context`, which posts the same record from
- * the same sources when the agent declares its context itself.
+ * Where to post the record. The environment is the first source, but can't
+ * be the only one: Claude Code strips `OTEL_*` from hooks it spawns. Falls
+ * back to the CLI's own device config; null when neither names a collector.
  */
 export function resolveTarget({
   env,

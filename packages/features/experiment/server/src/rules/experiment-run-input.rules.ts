@@ -30,7 +30,10 @@ import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-di
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service";
 
-/** Everything the run loop reaches outside itself, injected as one bag rather than threaded per-signature or read off a process singleton. */
+/**
+ * Everything the run loop reaches outside itself, injected as one bag
+ * rather than threaded per-signature or read off a process singleton.
+ */
 export type ExperimentRunPorts = {
   /** The studio engine each cell is dispatched to. */
   studio: ExperimentStudioDispatchPort;

@@ -54,10 +54,9 @@ export interface AuthProxy {
 }
 
 /**
- * The path a forwarded request uses on the local server. The platform posts
- * the agent's real path (the write-back keeps it on the tunnel URL), so a
- * non-root incoming path is forwarded verbatim; a bare request falls back to
- * the target URL's own path (`--url` with a path).
+ * The path a forwarded request uses on the local server: a non-root
+ * incoming path is forwarded verbatim; a bare request falls back to the
+ * target URL's own path.
  */
 function joinProxyPath(targetPath: string, incoming: string): string {
   if (incoming === "/" || incoming === "") {
@@ -68,13 +67,9 @@ function joinProxyPath(targetPath: string, incoming: string): string {
 }
 
 /**
- * The local auth proxy: an ephemeral-port HTTP server that forwards every
- * request to the target local URL and rejects requests that do not carry the
- * session secret in the dev-secret header with 401. The tunnel points at this
- * proxy, so only the platform (which got the secret via the agent config)
- * can reach the local agent through the public URL.
- *
- * `upstreamTimeoutMs` is injectable for tests; sessions use the default.
+ * The local auth proxy: forwards every request to the target local URL,
+ * rejecting requests missing the session secret with 401. `upstreamTimeoutMs`
+ * is injectable for tests.
  */
 export function startAuthProxy({
   targetUrl,

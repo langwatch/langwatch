@@ -1,42 +1,7 @@
 /**
- * The project's experiments over a host's tRPC transport.
- *
- *   saveExperiment:                 the batch-evaluation wizard's save, which
- *                                   also writes the workflow version behind it.
- *   saveEvaluationsV3:              the evaluations workbench autosave, with an
- *                                   optional compare-and-set on the version.
- *   getEvaluationsV3BySlug:         the workbench state a page opens on.
- *   getWorkbenchVersion:            the cheap staleness probe: the version alone.
- *   onExperimentUpdate:             the freshness signal a second tab follows.
- *   listWorkbenchVersions:          the version history drawer.
- *   commitWorkbenchVersion:         naming the current state a version.
- *   restoreWorkbenchVersion:        going back to one.
- *   saveAsMonitor:                  turning a wizard experiment into a monitor.
- *   getExperimentBySlugOrId:        one experiment, however the page names it.
- *   getExperimentWithDSLBySlug:     one experiment plus the workflow DSL.
- *   getAllByProjectId:              every active experiment.
- *   getAllForEvaluationsList:       the evaluations list page.
- *   getExperimentDSPyRuns:          the optimization runs on an experiment.
- *   getExperimentDSPyStep:          one optimization step, in the wire shape.
- *   getExperimentBatchEvaluationRuns / …Run: the run list and one run.
- *   deleteExperiment:               archive, cascading to workflow and monitor.
- *   copy:                           the same experiment in another project.
- *   getLastExperiment:              whether the last one is still a draft.
- *
- * Reading takes `experiments:view`; the workbench writes take
- * `experiments:update`; the wizard writes, which create a workflow, take
- * `workflows:create`, and archiving takes `workflows:delete`. `copy` takes
- * `evaluations:manage` on the target AND is probed for the same on the source,
- * because the declared check only ever covers the project in the input.
- *
- * Transport only: policy, error translation, and delegation to
- * `ExperimentApp`. The workflow, dataset, monitor and broadcast collaborators
- * an experiment reaches are that application's dependencies; what still
- * arrives as a host port is the work the host does per request — the workflow
- * writes, the monitor upsert, the permission probe and the author-name lookup
- * — while those verticals are drained.
- *
- * Spec: packages/features/experiment/specs/experiment-service.feature.
+ * The project's experiments over a host's tRPC transport. Transport only:
+ * policy, error translation, and delegation to `ExperimentApp`. Spec:
+ * packages/features/experiment/specs/experiment-service.feature.
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -81,15 +46,9 @@ import { z } from "zod";
 import type { ExperimentApp } from "#app/experiment.app";
 
 /**
- * The host supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the host's application this feature reaches, not the
- * feature's application itself, because a tRPC root is shared by every feature
- * mounted on it and so carries all of them. The REST family, built per mount,
- * holds {@link ExperimentApp} directly. The workflow, dataset, monitor and
- * broadcast collaborators an experiment reaches are that application's
- * dependencies rather than four more keys here, so a REST door can reach every
- * one of them too.
+ * The host supplies authentication; authorization arrives as `policy`. `app`
+ * is the slice of the host's application this feature reaches, not the
+ * feature's application itself — a tRPC root is shared by every feature.
  */
 export type ExperimentTrpcContext = Readonly<{
   app: Readonly<{ experiments: ExperimentApp }>;
@@ -104,13 +63,9 @@ type ExperimentTrpcProcedures<
   /** The host's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The host's tracing, logging, error, scope-lineage, authorization and audit
-   * policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * The host's tracing, logging, error, scope-lineage, authorization and
+   * audit policy for one declared permission. Applied AFTER this feature's
+   * own input parser, since the check reads its scope id from the input.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
   /**
@@ -121,11 +76,9 @@ type ExperimentTrpcProcedures<
 }>;
 
 /**
- * The host capabilities this transport needs that are not Experiment's own.
- *
- * All of them are the workflow, monitor and identity verticals an experiment
- * still reaches through the application; each is handed the request context so
- * the host resolves the caller exactly as it always did.
+ * The host capabilities this transport needs that are not Experiment's own:
+ * the workflow, monitor and identity verticals an experiment still reaches
+ * through the application.
  */
 export type ExperimentTrpcPorts<TWorkbenchState> = Readonly<{
   /**
@@ -233,10 +186,8 @@ export type ExperimentTrpcPorts<TWorkbenchState> = Readonly<{
 
 /**
  * Maps experiment domain errors to `TRPCError` using the code discriminant.
- *
- * Only the two that have to change shape are listed. Every other handled error
- * travels on unchanged, which is what keeps its code and its meta reaching the
- * client instead of being flattened into prose here.
+ * Only the two that have to change shape are listed; every other handled
+ * error travels on unchanged, keeping its code and meta intact.
  */
 const mapExperimentError = (error: unknown): never => {
   if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
@@ -399,10 +350,9 @@ export class ExperimentTrpcApi {
               experimentId: z.string().optional(),
               state: persistedEvaluationsV3StateSchema,
               /**
-               * The version the client last read. Sending it turns the save into
-               * a compare-and-set: a save on top of someone else's newer state is
-               * refused instead of overwriting it. Omitted means last-write-wins,
-               * which is what the existing autosave does until it tracks versions.
+               * The version the client last read. Sending it turns the save
+               * into a compare-and-set, refusing a save on top of someone
+               * else's newer state; omitted means last-write-wins.
                */
               expectedVersion: z.number().int().optional(),
             }),
@@ -502,10 +452,9 @@ export class ExperimentTrpcApi {
       )
 
       /**
-       * SSE subscription pushing `experiment_updated` signals when a workbench
-       * save lands, whoever wrote it: the editor's own autosave, a Langy backend
-       * write, or the REST API. Signal-then-refetch; the payload never carries
-       * state.
+       * SSE subscription pushing `experiment_updated` signals when a
+       * workbench save lands. Signal-then-refetch; the payload never
+       * carries state.
        */
 
       .subscription("onExperimentUpdate", (p) =>
@@ -854,23 +803,9 @@ export class ExperimentTrpcApi {
       )
 
       /**
-       * Archives an experiment (and cascades archive to its workflow + monitor).
-       *
-       * Previously this procedure hard-deleted the Postgres rows AND issued
-       * DELETE FROM on `experiment_runs`, `experiment_run_items`, `dspy_steps`
-       * in ClickHouse plus a deleteByQuery against the Elasticsearch
-       * `batch_evaluation` index. Every such delete writes a lightweight-delete
-       * mask onto every cold-tier S3 part containing matching rows, then the
-       * background merges rewrite those parts to actually purge. At ~3-45 user
-       * deletes/day across prod, that workload was costing ~$200/mo in S3
-       * requests alone and tripping AWS Cost Anomaly Detection on heavy days.
-       *
-       * The Experiment model now matches the pattern used everywhere else in
-       * this schema: archive via `archivedAt`, hide from list queries, leave the
-       * historical data in place.
-       *
-       * The tRPC name remains `deleteExperiment` so the UI does not need to
-       * change; the user-visible behaviour is identical.
+       * Archives an experiment (and cascades archive to its workflow +
+       * monitor) via `archivedAt`, leaving historical data in place. The
+       * tRPC name stays `deleteExperiment` for the UI's sake.
        */
 
       .mutation("deleteExperiment", (p) =>
@@ -1133,10 +1068,8 @@ export class ExperimentTrpcApi {
 }
 
 /**
- * Copies an EVALUATIONS_V3 experiment to another project.
- *
- * V3 experiments store their state in `workbenchState` and have no workflow, so
- * the copy is the state plus, optionally, the saved datasets it references.
+ * Copies an EVALUATIONS_V3 experiment to another project: the state in
+ * `workbenchState` plus, optionally, the saved datasets it references.
  */
 const copyEvaluationsV3Experiment = async ({
   app,

@@ -7,11 +7,7 @@ import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { resolveSuiteId } from "./resolveSuite";
-import {
-  parseRepeat,
-  parseTargets,
-  parseWait,
-} from "../run-plans/scopeFlags";
+import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
 
 export interface RunTestSuiteOptions extends RawOutputFlags {
@@ -28,12 +24,7 @@ export interface RunTestSuiteOptions extends RawOutputFlags {
 
 /**
  * Runs every scenario filed in a test suite against the targets given here.
- *
- * The suite holds no targets and no configuration, so both travel with the
- * request. The platform files the run under a run plan named after the suite
- * and its target unless `--name` says otherwise.
- *
- * @see specs/features/test-suite-cli.feature
+ * The suite holds no targets or configuration, so both travel with the request.
  */
 export const runTestSuiteCommand = async ({
   reference,

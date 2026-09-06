@@ -1,11 +1,7 @@
 /**
  * `langwatch agent tunnel` (hidden alias `agent dev`): expose a local agent
- * server through a public tunnel and repoint a registered HTTP agent at it,
- * so platform scenarios run against the local process. Ctrl-C restores the
- * previous URL.
- *
- * The session phases live in `./tunnel/`: input resolution, the local auth
- * proxy, quick-tunnel provisioning, and the config write-back / restore.
+ * through a public tunnel and repoint a registered HTTP agent at it. Ctrl-C
+ * restores the previous URL. Session phases live in `./tunnel/`.
  */
 
 import * as crypto from "node:crypto";
@@ -39,10 +35,8 @@ const HEALTH_INTERVAL_MS = 30_000;
 const HEALTH_FAILURE_THRESHOLD = 3;
 
 /**
- * How long one probe may take. A half-open socket at the edge is exactly the
- * failure the monitor looks for, and it is also the case where `fetch` never
- * settles. The next check is chained off the current one, so an unbounded
- * probe would stop the monitor for the rest of the session.
+ * How long one probe may take. A half-open socket is exactly the failure
+ * being monitored for, and also the case where `fetch` never settles.
  */
 const HEALTH_PROBE_TIMEOUT_MS = 10_000;
 
@@ -403,13 +397,9 @@ export async function startAgentTunnelSession(
 export const agentTunnelCommand = async (options: AgentTunnelOptions): Promise<void> => {
   const session = await startAgentTunnelSession(options);
 
-  // A session is event-driven, and with `--tunnel-url` there is neither a
-  // tunnel child process nor a local auth proxy to hold the event loop open —
-  // the health monitor's timer is unref'd on purpose so it can never wedge a
-  // shutdown. Without a ref'd handle the process ran out of work right after
-  // printing the banner and exited, leaving the agent pointing at the caller's
-  // tunnel with the real URL still stashed under devTunnel. Hold the loop for
-  // exactly as long as the session runs.
+  // With `--tunnel-url` there is no tunnel child process or auth proxy to
+  // hold the event loop open (the health monitor's timer is unref'd), so a
+  // ref'd keep-alive holds it for exactly as long as the session runs.
   const keepAlive = setInterval(() => undefined, KEEP_ALIVE_INTERVAL_MS);
 
   let shutdownRequested = false;

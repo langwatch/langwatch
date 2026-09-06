@@ -630,11 +630,8 @@ export interface IngestionKeyDescription {
 }
 
 /**
- * What became of one of the caller's own personal ingestion keys. The hook's
- * self-heal asks this before it re-mints a key the collector rejected: a key
- * a person revoked from the API-keys page is left dead, one the cap retired or
- * a rotation replaced is re-minted. A server from before this route answers
- * 404, which reads as `unknown`, so an older platform heals as it always did.
+ * What became of one of the caller's own personal ingestion keys. A
+ * person's revoke is left dead; a cap/rotation revoke is re-minted.
  */
 export async function describeIngestionKey(
   cfg: GovernanceConfig,

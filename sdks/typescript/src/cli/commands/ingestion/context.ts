@@ -1,34 +1,7 @@
 /**
- * `langwatch ingest context`: the agent declares the repository and branch it
- * is working on, itself, from inside the checkout.
- *
- * The hooks report the directory the agent PROCESS runs in, which is correct
- * until the agent works somewhere else: a claude session that only `cd`s
- * inside its shell tool, or a codex agent that lives for weeks in a scratch
- * directory and reviews one checkout after another. Codex records its
- * directory once at session start and nothing moves it, so a standing agent
- * reports no repository, no branch and no pull request, however much it
- * works. This command is the way out: run from inside a checkout, it posts
- * the same session-context record the hooks post, for the session the agent
- * is running in, and the always-loaded guidance the CLI installs tells every
- * session to run it when it switches.
- *
- * Which session that is is decided in `context-session.ts`.
- *
- * Unlike the hooks this command talks to whoever ran it: its stdout is the
- * agent's tool result, so it says in one line what it declared or why it
- * declared nothing. It still never exits non-zero and never throws, because
- * the caller is a live session and a broken declaration must cost the agent
- * one line, not the turn.
- *
- * Fingerprint state is shared with the hooks and the codex turn harvest, so
- * a declaration a hook already made posts nothing, and the titles ride along
- * exactly as each agent's own seam sends them, or the fingerprints could
- * never match. After a declaration, the next hook may re-post the process's
- * own directory once; the platform folds branches by appending, so that is
- * expected and harmless.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * `langwatch ingest context`: the agent declares its repository and branch
+ * from inside the checkout, fixing a standing agent whose hooks only ever
+ * report its launch directory. Never exits non-zero or throws.
  */
 
 import { loadConfig } from "@/cli/utils/governance/config";

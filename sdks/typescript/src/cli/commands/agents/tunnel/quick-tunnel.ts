@@ -20,10 +20,8 @@ const CLOUDFLARE_TERMS_URL = "https://www.cloudflare.com/website-terms/";
 const CLOUDFLARED_RELEASE = "2026.8.2";
 
 /**
- * SHA-256 of each raw-binary asset of {@link CLOUDFLARED_RELEASE}, from the
- * GitHub release's own asset digests, keyed `platform-arch`. macOS ships a
- * tarball whose digest covers the archive, not the extracted binary, so the
- * darwin platforms are not listed and rely on the pinned tag over TLS.
+ * SHA-256 of each raw-binary asset of {@link CLOUDFLARED_RELEASE}, keyed
+ * `platform-arch`. Darwin platforms are not listed (see UNVERIFIED_PLATFORMS).
  */
 const CLOUDFLARED_SHA256: Record<string, string> = {
   "linux-x64": "fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2",
@@ -75,13 +73,8 @@ function verifyBinary(binPath: string): void {
 
 /**
  * Provision the Cloudflare quick tunnel via the `cloudflared` package,
- * downloading the pinned binary release on first use (with the Cloudflare
- * terms notice printed before the download) and verifying its checksum.
- * Resolves with the public URL and a handle to stop the tunnel; rejects when
- * no URL arrives within the timeout.
- *
- * The import is lazy on purpose: only tunnel-provisioning runs pay for it,
- * and `--tunnel-url` sessions never load it (CLI boot-graph rule).
+ * downloading the pinned binary release on first use and verifying its
+ * checksum. The import is lazy so `--tunnel-url` sessions never load it.
  */
 export async function startQuickTunnel({
   localUrl,

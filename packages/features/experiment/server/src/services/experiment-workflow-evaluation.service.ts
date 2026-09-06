@@ -69,9 +69,8 @@ const WORKFLOW_TARGET_ID = "workflow-target";
 const WORKFLOW_DATASET_ID = "workflow-dataset";
 
 /**
- * Runs a studio workflow as an evaluations-v3 evaluation. It resolves the committed version, ensures the workflow's backing experiment
- * exists, loads the dataset (the workflow's attached dataset, or caller-supplied data / dataset id / parameters), and starts the v3
- * orchestrator, returning the run id and a results URL. This is the single backend execution path, shared with the evaluations-v3 run API.
+ * Runs a studio workflow as an evaluations-v3 evaluation. The single
+ * backend execution path, shared with the evaluations-v3 run API.
  */
 export type WorkflowEvaluationDependencies = {
   experiments: ExperimentService;
@@ -356,7 +355,7 @@ export class WorkflowEvaluationService {
     };
   }
 
-  /** The workflow's own dataset, by id when it is saved and inline when the entry node carries it. */
+  /** The workflow's own dataset: by id when saved, inline when the entry node carries it. */
   private static attachedDataset({
     entry,
     workflowName,
