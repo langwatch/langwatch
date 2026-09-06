@@ -419,6 +419,39 @@ describe("the local workspace tools", () => {
       );
       expect(text).toContain("npx langwatch@latest langy --share-control");
       expect(text).toContain("END YOUR TURN");
+      expect(text).toContain("Say in one line what you will change");
+    });
+
+    /** @scenario "With the describe offer the turn ends on the card without a word" */
+    it("ends the turn without a word when the describe option is offered", async () => {
+      fakeApp({
+        "/api/langy/local/workspace": [
+          {
+            connected: false,
+            codeAccessPreference: null,
+            github: { installed: false },
+          },
+        ],
+        "/api/langy/local/requests": [
+          {
+            request: { id: "req_2", expiresAt: "2026-09-03T10:00:00.000Z" },
+            command: "npx langwatch@latest langy --share-control",
+          },
+        ],
+      });
+
+      const text = textOf(
+        await registeredTools()
+          .get(CODE_ACCESS_TOOL_NAME)!
+          .execute("t10", { reason: "wire tracing in", offer_describe: true }),
+      );
+
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(
+        true,
+      );
+      expect(text).toContain("END YOUR TURN now, without another word");
+      expect(text).not.toContain("Say in one line");
+      expect(text).toContain("would rather describe the agent");
     });
   });
 });

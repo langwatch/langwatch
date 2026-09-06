@@ -275,6 +275,22 @@ Feature: Langy guides the first setup after sign-up
       When the next turn begins
       Then the model reads that the user would rather describe the agent
 
+    # The prototype shows the opener and then the card. An ordinary code
+    # access ask tells the model to say in one line what it will change; on
+    # the guided kickoff the opener has already said it, and that line read as
+    # a third sentence between the opener and the card.
+    @unit
+    Scenario: With the describe offer the turn ends on the card without a word
+      Given a code access call whose input offers describing the agent instead
+      When the tool shows the card
+      Then it tells the model to end the turn without another word
+      And it names the describe pick among the ways the next turn starts
+
+    @unit
+    Scenario: The opener is followed by the card and nothing else
+      When the compiled guided-onboarding skill is read
+      Then it says nothing goes between the opener and the code access card
+
   # ===========================================================================
   # The skill and its routing
   # ===========================================================================

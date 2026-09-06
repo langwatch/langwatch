@@ -374,8 +374,14 @@ export async function runLocalCall({
 /** What `code_access` returns, in the three states the folder can be in. */
 export async function readCodeAccess({
   signal,
+  offerDescribe = false,
 }: {
   signal?: AbortSignal;
+  /**
+   * The card also offers "I'd rather describe it". A skill that asks for it
+   * has already said its opener, so the turn ends on the card without a word.
+   */
+  offerDescribe?: boolean;
 }): Promise<string> {
   const conversation = conversationId();
   let status: WorkspaceStatus;
@@ -415,9 +421,13 @@ export async function readCodeAccess({
   return [
     "The code access card is shown to the user.",
     `The card shows this command: ${created.command}`,
-    "Say in one line what you will change and that you can do it on their machine or through GitHub, then END YOUR TURN.",
+    offerDescribe
+      ? "END YOUR TURN now, without another word: the card already says what happens next."
+      : "Say in one line what you will change and that you can do it on their machine or through GitHub, then END YOUR TURN.",
     "Do not list manual steps.",
-    "The next turn starts when the folder connects or when the user picks GitHub.",
+    offerDescribe
+      ? "The next turn starts when the folder connects, when the user picks GitHub, or when they would rather describe the agent."
+      : "The next turn starts when the folder connects or when the user picks GitHub.",
   ].join("\n");
 }
 
@@ -537,9 +547,14 @@ export function createLocalWorkspaceExtension({
         description:
           "Ask for a way to reach the user's code before you change their program. Call it once, before the first edit. It answers at once when a folder is already shared or when the user remembered GitHub. If it does not, it shows a card and you must end your turn.",
         parameters: codeAccessParams,
-        async execute(_toolCallId, _params, signal) {
+        async execute(_toolCallId, params, signal) {
           try {
-            return textResult(await readCodeAccess({ signal }));
+            return textResult(
+              await readCodeAccess({
+                signal,
+                offerDescribe: params.offer_describe === true,
+              }),
+            );
           } catch (error) {
             if (error instanceof CallCancelledError) throw error;
             return textResult(STATUS_UNAVAILABLE_PUSHBACK);

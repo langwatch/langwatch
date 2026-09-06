@@ -88,6 +88,13 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain("without `offer_describe`");
     });
 
+    /** @scenario "The opener is followed by the card and nothing else" */
+    it("puts nothing between the opener and the code access card", () => {
+      expect(rendered).toContain(
+        "Nothing goes between the opener and the card: when the tool waits for the user, the turn is over, so say nothing more.",
+      );
+    });
+
     it("marks the chat option quiet and asks before creating anything", () => {
       expect(rendered).toContain('"Chat about this", quiet');
       expect(rendered).toContain("Do not create it yet.");
