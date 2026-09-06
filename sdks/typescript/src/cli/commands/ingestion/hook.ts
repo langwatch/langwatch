@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
  * of every session.
@@ -660,6 +661,7 @@ export async function postSessionContext({
       method: "POST",
       headers: {
         ...target.headers,
+        ...buildSdkIdentityHeaders("cli"),
         // Last, so a headers variable carrying its own content-type cannot
         // mislabel a body we know the encoding of.
         "content-type": "application/json",

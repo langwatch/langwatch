@@ -15,6 +15,7 @@ import type { EvaluationSummary } from "./utils/format-evaluations.js";
 export const MCP_IDENTITY_HEADERS: Record<string, string> = {
   "User-Agent": `langwatch-mcp/${packageJson.version}`,
   "X-LangWatch-SDK-Name": "langwatch-mcp",
+  "X-LangWatch-SDK-Language": "typescript",
   "X-LangWatch-SDK-Version": packageJson.version,
 };
 

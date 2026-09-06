@@ -671,6 +671,7 @@ describe("langwatch-api", () => {
       expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe(
         "langwatch-mcp"
       );
+      expect(calledOptions.headers["X-LangWatch-SDK-Language"]).toBe("typescript");
       expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(
         /^\d+\.\d+\.\d+/
       );

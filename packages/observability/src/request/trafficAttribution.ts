@@ -1,3 +1,5 @@
+import { canonicalOtlpPath } from "./otlp-path";
+
 /**
  * Traffic attribution: the two request dimensions the tenant-usage view
  * slices by, derived once at the logging boundary. The tenant itself comes
@@ -42,13 +44,6 @@ export interface RequestAttribution extends ClientAttribution {
   endpointClass: EndpointClass;
 }
 
-/**
- * The three root-level OTLP paths a misconfigured exporter posts to. They are
- * served by the API (src/server/routes/otel-path-aliases.ts), so they class
- * with the canonical `/api/otel/v1/*` paths rather than with "other".
- */
-const ROOT_OTLP_ALIASES = new Set(["/v1/traces", "/v1/logs", "/v1/metrics"]);
-
 const under = (path: string, prefix: string): boolean =>
   path === prefix || path.startsWith(`${prefix}/`);
 
@@ -63,7 +58,7 @@ export function endpointClassOf(pathname: string): EndpointClass {
       ? pathname.slice(0, -1)
       : pathname;
 
-  if (under(path, "/api/otel") || ROOT_OTLP_ALIASES.has(path)) return "otlp";
+  if (under(path, "/api/otel") || canonicalOtlpPath(path) !== null) return "otlp";
   if (path === "/api/collector") return "collector";
   if (under(path, "/api/rum")) return "rum";
   if (under(path, "/api/trpc")) return "dashboard";
@@ -79,7 +74,8 @@ export function endpointClassOf(pathname: string): EndpointClass {
     path === "/messages" ||
     path === "/sse/messages" ||
     under(path, "/oauth") ||
-    path.startsWith("/.well-known/oauth")
+    under(path, "/.well-known/oauth-protected-resource") ||
+    under(path, "/.well-known/oauth-authorization-server")
   ) {
     return "mcp";
   }

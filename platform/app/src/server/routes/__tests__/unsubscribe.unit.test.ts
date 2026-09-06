@@ -6,7 +6,8 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

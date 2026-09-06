@@ -66,8 +66,8 @@ export function runWithCredentialHolder<T>(fn: () => T): T {
  * Same as `runWithCredentialHolder`, but marks the fresh holder as a CLI
  * request before running `fn`. Used at the CLI's two request boundaries
  * (the in-process fallback in cli/daemon/dispatch.ts, and per-request in
- * cli/daemon/execution.ts) so `createLangWatchApiClient` can tell CLI traffic
- * apart from a plain SDK embed and attach the `x-langwatch-surface: cli`
+ * cli/daemon/execution.ts) so the shared request-header builders can tell CLI
+ * traffic apart from a plain SDK embed and attach the `x-langwatch-surface: cli`
  * header the platform's traffic-attribution reads.
  */
 export function runWithCliCredentialHolder<T>(fn: () => T): T {
@@ -118,7 +118,7 @@ export function scopedProjectId(): string | undefined {
 
 /**
  * Mark the current request's holder as a CLI request. Read by
- * `createLangWatchApiClient` to decide whether to attach the surface header.
+ * the shared request-header builders when attaching the surface header.
  */
 export function setScopedSurface(surface: "cli"): void {
   currentHolder().surface = surface;

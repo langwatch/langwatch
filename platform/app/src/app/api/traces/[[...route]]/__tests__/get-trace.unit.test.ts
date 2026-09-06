@@ -48,7 +48,8 @@ vi.mock("~/server/traces/trace-formatting", () => ({
     .mockReturnValue("Input: hello\nOutput: world"),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

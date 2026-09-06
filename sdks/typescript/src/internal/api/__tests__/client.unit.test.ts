@@ -36,40 +36,45 @@ describe("createLangWatchApiClient", () => {
     vi.restoreAllMocks();
   });
 
-  describe("given a CLI request scope", () => {
-    /** @scenario The CLI declares itself on every request */
-    it("sends x-langwatch-surface: cli alongside the SDK identity headers", () => {
-      createClientCalls.length = 0;
+  describe("when creating an API client", () => {
+    describe("given a CLI request scope", () => {
+      /** @scenario The CLI declares itself on every request */
+      it("sends x-langwatch-surface: cli alongside the SDK identity headers", () => {
+        createClientCalls.length = 0;
 
-      runWithCliCredentialHolder(() => {
-        createLangWatchApiClient();
+        runWithCliCredentialHolder(() => {
+          createLangWatchApiClient();
+        });
+
+        expect(createClientCalls).toHaveLength(1);
+        const config = createClientCalls[0];
+        expect(config?.headers?.[CLI_SURFACE_HEADER]).toBe(CLI_SURFACE_VALUE);
+        expect(config?.headers?.["x-langwatch-sdk-name"]).toBeDefined();
       });
-
-      const config = createClientCalls[0];
-      expect(config?.headers?.[CLI_SURFACE_HEADER]).toBe(CLI_SURFACE_VALUE);
-      expect(config?.headers?.["x-langwatch-sdk-name"]).toBeDefined();
-    });
-  });
-
-  describe("given no CLI request scope", () => {
-    it("sends no surface header outside any holder scope", () => {
-      createClientCalls.length = 0;
-
-      createLangWatchApiClient();
-
-      const config = createClientCalls[0];
-      expect(config?.headers?.[CLI_SURFACE_HEADER]).toBeUndefined();
     });
 
-    it("sends no surface header for a plain SDK holder scope", () => {
-      createClientCalls.length = 0;
+    describe("given no CLI request scope", () => {
+      it("sends no surface header outside any holder scope", () => {
+        createClientCalls.length = 0;
 
-      runWithCredentialHolder(() => {
         createLangWatchApiClient();
+
+        expect(createClientCalls).toHaveLength(1);
+        const config = createClientCalls[0];
+        expect(config?.headers?.[CLI_SURFACE_HEADER]).toBeUndefined();
       });
 
-      const config = createClientCalls[0];
-      expect(config?.headers?.[CLI_SURFACE_HEADER]).toBeUndefined();
+      it("sends no surface header for a plain SDK holder scope", () => {
+        createClientCalls.length = 0;
+
+        runWithCredentialHolder(() => {
+          createLangWatchApiClient();
+        });
+
+        expect(createClientCalls).toHaveLength(1);
+        const config = createClientCalls[0];
+        expect(config?.headers?.[CLI_SURFACE_HEADER]).toBeUndefined();
+      });
     });
   });
 });

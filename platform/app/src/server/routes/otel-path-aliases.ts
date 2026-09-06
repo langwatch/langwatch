@@ -1,3 +1,4 @@
+import { canonicalOtlpPath } from "@langwatch/observability";
 /**
  * Serves the OTLP paths a misconfigured exporter produces from the canonical
  * handlers in `./otel`.
@@ -28,7 +29,6 @@
 
 import { Hono } from "hono";
 import {
-  canonicalOtlpPath,
   stampCorrectedPath,
 } from "~/server/otel/otlpPathCanonicalisation";
 import { app as otelApp } from "./otel";

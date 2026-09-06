@@ -1,20 +1,11 @@
 import openApiCreateClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "../generated/openapi/api-client";
-import { version } from "../../../package.json";
-import {
-  LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_NAME_OBSERVABILITY,
-  LANGWATCH_SDK_RUNTIME,
-  LANGWATCH_SDK_VERSION,
-} from "../constants";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   scopedApiKey,
   scopedProjectId,
-  scopedSurface,
 } from "@/internal/credentialContext";
-import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
-import { buildAuthHeaders } from "./auth";
+import { buildRequestHeaders } from "./request-headers";
 import { handledErrorFrom } from "./errors";
 import { langwatchFetch } from "../http/langwatchFetch";
 
@@ -97,20 +88,8 @@ export const createLangWatchApiClient = (
     baseUrl: resolveEndpoint(endpoint),
     fetch: langwatchFetch,
     headers: {
-      ...buildAuthHeaders({ apiKey, projectId }),
+      ...buildRequestHeaders({ apiKey, projectId }),
       "content-type": "application/json",
-      "user-agent": `langwatch-sdk-node/${version}`,
-      "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
-      "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
-      "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-      "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
-      // The request-scoped surface (set at the CLI's request boundaries,
-      // internal/credentialContext.ts) lets the platform's traffic
-      // attribution tell CLI traffic apart from a plain SDK embed, which
-      // scopes nothing and sends none of this.
-      ...(scopedSurface() === "cli"
-        ? { [CLI_SURFACE_HEADER]: CLI_SURFACE_VALUE }
-        : {}),
     },
   });
 

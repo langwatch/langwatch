@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { readFileSync, statSync } from "node:fs";
 import chalk from "chalk";
 import { createCommandEvents } from "../telemetry/events";
@@ -190,6 +191,7 @@ export const reportCommand = async (
     response = await langwatchFetch(`${endpoint}/api/bug-reports`, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders("cli"),
         "content-type": "application/json",
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },

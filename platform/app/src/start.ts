@@ -71,7 +71,7 @@ async function loadDevHttpsCredentials(
 }
 
 import { getRequestListener } from "@hono/node-server";
-import { createLogger } from "@langwatch/observability";
+import { canonicalOtlpPath, createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
@@ -103,7 +103,6 @@ import {
   normalizeMetricsPath,
 } from "./server/metrics";
 import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
-import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";

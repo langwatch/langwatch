@@ -1,11 +1,12 @@
 /**
  * specs/otlp/endpoint-path-canonicalisation.feature — the routing.
  * The path mapping itself is covered in
- * src/server/otel/otlpPathCanonicalisation.unit.test.ts.
+ * packages/observability/src/__tests__/otlp-path.unit.test.ts.
  */
 
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loggerMiddleware } from "~/app/api/middleware/logger";
 
 const mockCheckLimit = vi.fn();
 const mockHandleTraces = vi.fn();
@@ -14,7 +15,10 @@ const mockHandleMetrics = vi.fn();
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
 const mockExtractCredentials = vi.fn();
-const mockWarn = vi.fn();
+const { mockWarn, mockInfo } = vi.hoisted(() => ({
+  mockWarn: vi.fn(),
+  mockInfo: vi.fn(),
+}));
 
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
@@ -55,7 +59,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
     ...actual,
     createLogger: vi.fn(() => ({
       warn: mockWarn,
-      info: vi.fn(),
+      info: mockInfo,
       error: vi.fn(),
       debug: vi.fn(),
     })),
@@ -73,6 +77,7 @@ const { stampCorrectedPath } = await import(
 
 // Mount order mirrors api-router.ts: the canonical routes get first refusal.
 const testApp = new Hono();
+testApp.use("*", loggerMiddleware());
 testApp.route("/", otelApp);
 testApp.route("/", otelPathAliasApp);
 
@@ -186,6 +191,22 @@ describe("OTLP endpoint path canonicalisation", () => {
       expect(response.status).toBe(200);
       expect(mockHandleTraces).toHaveBeenCalledTimes(1);
     });
+  });
+
+  describe("when an OTLP alias is logged before its internal rewrite", () => {
+    /** @scenario Telemetry ingestion paths are classed as ingestion surfaces */
+    it.each(["/api/v1/traces", "/api/collector/v1/traces"])(
+      "logs %s once as OTLP traffic with the original URL",
+      async (path) => {
+        const response = await post({ path, payload: tracePayload });
+
+        expect(response.status).toBe(200);
+        expect(mockInfo).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ endpointClass: "otlp", url: `http://localhost${path}` }),
+          "request handled",
+        );
+      },
+    );
   });
 
   describe("given an exporter configured with the site root as its base", () => {

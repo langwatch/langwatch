@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Pre-exec budget probe + Screen-8 ASCII renderer for the langwatch
  * wrappers (`langwatch claude` / `codex` / `cursor` / `gemini`).
@@ -46,6 +47,7 @@ export async function checkBudget(
     res = await f(url, {
       method: "GET",
       headers: {
+        ...buildSdkIdentityHeaders("cli"),
         Authorization: `Bearer ${cfg.access_token}`,
         Accept: "application/json",
       },

@@ -37,6 +37,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
+import { z } from "zod";
 import { tryGetApp } from "../server/app-layer/app";
 import { prisma } from "../server/db";
 import type { NextApiRequest } from "../types/next-stubs";
@@ -173,6 +174,7 @@ function noteLogFields(
 interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
+  projectId?: string;
   /**
    * The OAuth-flowing user — populated when the session was minted via the
    * /api/mcp/authorize PKCE flow, absent for direct-apiKey-as-Bearer sessions.
@@ -187,8 +189,24 @@ interface SessionState {
 interface SseSessionState {
   transport: SSEServerTransport;
   apiKey: string;
+  projectId: string;
   userId?: string;
   lastActivityAt: number;
+}
+
+const storedSessionSchema = z.object({
+  encryptedApiKey: z.string(),
+  projectId: z.string().optional(),
+});
+
+interface AuthenticatedCredential {
+  apiKey: string;
+  projectId: string;
+}
+
+interface SessionCredential {
+  apiKey: string;
+  projectId?: string;
 }
 
 /** OAuth token entry stored in memory and Redis. */
@@ -606,7 +624,7 @@ export function createMcpHandler(): McpHandler {
   async function authenticateRequest(
     req: IncomingMessage,
     res: ServerResponse,
-  ): Promise<string | null> {
+  ): Promise<AuthenticatedCredential | null> {
     const token = extractBearerToken(req);
     if (!token) {
       send401(res, "Authorization required");
@@ -632,7 +650,7 @@ export function createMcpHandler(): McpHandler {
     // instead, under the same key the mixin uses everywhere else.
     noteLogFields(res, { projectId: project.id });
 
-    return apiKey;
+    return { apiKey, projectId: project.id };
   }
 
   // -------------------------------------------------------------------------
@@ -702,11 +720,13 @@ export function createMcpHandler(): McpHandler {
   async function storeSessionInRedis(
     sessionId: string,
     apiKey: string,
+    projectId: string,
   ): Promise<void> {
     if (!redis) return;
     try {
       const data = JSON.stringify({
         encryptedApiKey: encrypt(apiKey),
+        projectId,
         createdAt: Date.now(),
       });
       await redis.set(
@@ -749,16 +769,14 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  /** Look up session metadata from Redis (returns apiKey or null). */
-  async function getSessionFromRedis(
-    sessionId: string,
-  ): Promise<string | null> {
+  /** Look up the credential and tenant saved by the session owner. */
+  async function getSessionFromRedis(sessionId: string): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SESSION_PREFIX}${sessionId}`);
       if (!data) return null;
-      const stored = JSON.parse(data) as { encryptedApiKey: string };
-      return decrypt(stored.encryptedApiKey);
+      const stored = storedSessionSchema.parse(JSON.parse(data));
+      return { apiKey: decrypt(stored.encryptedApiKey), projectId: stored.projectId };
     } catch (err) {
       logger.error({ error: err }, "Redis session lookup failed");
       return null;
@@ -883,6 +901,7 @@ export function createMcpHandler(): McpHandler {
   async function storeSseSessionInRedis(
     sessionId: string,
     apiKey: string,
+    projectId: string,
   ): Promise<void> {
     if (!redis) return;
     const setKey = `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`;
@@ -890,6 +909,7 @@ export function createMcpHandler(): McpHandler {
       `${REDIS_SSE_SESSION_PREFIX}${sessionId}`,
       JSON.stringify({
         encryptedApiKey: encrypt(apiKey),
+        projectId,
         createdAt: Date.now(),
       }),
       "EX",
@@ -919,15 +939,13 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function getSseSessionFromRedis(
-    sessionId: string,
-  ): Promise<string | null> {
+  async function getSseSessionFromRedis(sessionId: string): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
       if (!data) return null;
-      const stored = JSON.parse(data) as { encryptedApiKey: string };
-      return decrypt(stored.encryptedApiKey);
+      const stored = storedSessionSchema.parse(JSON.parse(data));
+      return { apiKey: decrypt(stored.encryptedApiKey), projectId: stored.projectId };
     } catch (err) {
       logger.error({ error: err }, "Redis SSE session lookup failed");
       return null;
@@ -1330,9 +1348,11 @@ export function createMcpHandler(): McpHandler {
     incomingToken: string | null;
     callerApiKey: string;
   }): Promise<SessionState | null> {
-    const redisApiKey = await getSessionFromRedis(sessionId);
-    if (!redisApiKey) return null;
-    if (redisApiKey !== callerApiKey) return null;
+    const credential = await getSessionFromRedis(sessionId);
+    if (!credential || credential.apiKey !== callerApiKey) return null;
+    const redisApiKey = credential.apiKey;
+    // Older replicas wrote no tenant. Resolve it once when recovering locally.
+    const projectId = credential.projectId ?? (await validateApiKey(redisApiKey))?.id;
 
     // WORKAROUND: The SDK transport starts uninitialized — we patch its
     // inner state so it accepts non-init requests with the existing
@@ -1369,6 +1389,7 @@ export function createMcpHandler(): McpHandler {
     const session: SessionState = {
       transport,
       apiKey: redisApiKey,
+      projectId,
       userId: recoveredCtx?.userId,
       lastActivityAt: Date.now(),
     };
@@ -1439,6 +1460,7 @@ export function createMcpHandler(): McpHandler {
           return;
         }
 
+        noteLogFields(res, { projectId: session.projectId });
         session.lastActivityAt = Date.now();
         touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
         await handleWithSessionConfig(session.apiKey, () =>
@@ -1457,12 +1479,13 @@ export function createMcpHandler(): McpHandler {
         return;
       }
 
-      const apiKey = await authenticateRequest(req, res);
-      if (!apiKey) return; // 401 already sent
+      const credential = await authenticateRequest(req, res);
+      if (!credential) return; // 401 already sent
+      const { apiKey, projectId } = credential;
 
       // Re-resolve the token to recover the OAuth-flowing userId (if any)
-      // for governance MCP tool attribution. authenticateRequest only
-      // returns the apiKey, but resolveSessionContext is cheap and the
+      // for governance MCP tool attribution. authenticateRequest
+      // returns the project credential, but resolveSessionContext is cheap and the
       // entry was just populated.
       const initialCtx = incomingToken
         ? await resolveSessionContext(incomingToken)
@@ -1483,10 +1506,11 @@ export function createMcpHandler(): McpHandler {
           sessions.set(id, {
             transport,
             apiKey,
+            projectId,
             userId,
             lastActivityAt: Date.now(),
           });
-          storeSessionInRedis(id, apiKey).catch(() => {});
+          storeSessionInRedis(id, apiKey, projectId).catch(() => {});
         },
       });
 
@@ -1583,6 +1607,7 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
+    noteLogFields(res, { projectId: session.projectId });
     session.lastActivityAt = Date.now();
     touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
     await handleWithSessionConfig(session.apiKey, () =>
@@ -1610,6 +1635,7 @@ export function createMcpHandler(): McpHandler {
         return;
       }
 
+      noteLogFields(res, { projectId: session.projectId });
       await session.transport.close();
       sessions.delete(sessionId);
       removeSessionFromRedis(sessionId, session.apiKey).catch(() => {});
@@ -1677,12 +1703,10 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function handleSseConnect(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
-    const apiKey = await authenticateRequest(req, res);
-    if (!apiKey) return;
+  async function handleSseConnect(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const credential = await authenticateRequest(req, res);
+    if (!credential) return;
+    const { apiKey, projectId } = credential;
 
     const sseToken = extractBearerToken(req);
     const sseCtx = sseToken ? await resolveSessionContext(sseToken) : null;
@@ -1702,6 +1726,7 @@ export function createMcpHandler(): McpHandler {
     const session: SseSessionState = {
       transport,
       apiKey,
+      projectId,
       userId: sseUserId,
       lastActivityAt: Date.now(),
     };
@@ -1710,7 +1735,7 @@ export function createMcpHandler(): McpHandler {
     // Published before the stream opens: a client can post its first message
     // to another replica the instant it reads the endpoint event.
     try {
-      await storeSseSessionInRedis(sessionId, apiKey);
+      await storeSseSessionInRedis(sessionId, apiKey, projectId);
     } catch (err) {
       logger.error({ error: err }, "Failed to record MCP SSE session in Redis");
     }
@@ -1767,6 +1792,7 @@ export function createMcpHandler(): McpHandler {
         send401(res, "Bearer token does not match session");
         return;
       }
+      noteLogFields(res, { projectId: localSession.projectId });
       localSession.lastActivityAt = Date.now();
       touchSseSessionInRedis(sessionId, localSession.apiKey).catch(() => {});
 
@@ -1782,14 +1808,21 @@ export function createMcpHandler(): McpHandler {
     // The stream lives on another replica. Hand the message over rather than
     // reject it: the load balancer has no session affinity, so most messages
     // of a healthy session arrive on a replica that does not hold it.
-    const sessionApiKey = await getSseSessionFromRedis(sessionId);
-    if (!sessionApiKey) {
+    const credential = await getSseSessionFromRedis(sessionId);
+    if (!credential) {
       sendJson(res, 404, { error: "Session not found" });
       return;
     }
+    const sessionApiKey = credential.apiKey;
     if (apiKey !== sessionApiKey) {
       send401(res, "Bearer token does not match session");
       return;
+    }
+
+    const projectId = credential.projectId ?? (await validateApiKey(apiKey))?.id;
+    noteLogFields(res, { projectId });
+    if (!credential.projectId && projectId) {
+      await storeSseSessionInRedis(sessionId, apiKey, projectId).catch(() => {});
     }
 
     const body = await readJsonBody(req, res);

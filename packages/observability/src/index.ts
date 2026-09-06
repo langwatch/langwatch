@@ -45,3 +45,5 @@ export {
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta";
+
+export { canonicalOtlpPath } from "./request/otlp-path";

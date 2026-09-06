@@ -100,7 +100,7 @@ Feature: Traffic attribution on request logs
   Scenario: Telemetry ingestion paths are classed as ingestion surfaces
     When requests arrive on the collector, OTLP and browser telemetry paths
     Then each is classed as its own ingestion surface
-    And the root-level OTLP aliases class the same as the canonical paths
+    And all supported OTLP aliases class the same as the canonical paths
 
   @unit
   Scenario: The dashboard's own calls are classed as dashboard traffic

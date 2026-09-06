@@ -169,7 +169,7 @@ export function withExecutionContext<T>(
   // reaches the shared env where a concurrent request could pick it up
   // (internal/credentialContext.ts). The "Cli" variant also marks the
   // holder's surface, so every request this daemon-served command makes
-  // through createLangWatchApiClient carries the CLI surface header.
+  // through the shared request-header builders carries the CLI surface header.
   return storage.run(context, () =>
     withOutputScope(() => runWithCliCredentialHolder(fn)),
   );

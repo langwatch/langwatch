@@ -222,10 +222,16 @@ describe("endpointClassOf", () => {
     });
 
     /** @scenario Telemetry ingestion paths are classed as ingestion surfaces */
-    it("classes the root-level OTLP aliases the same as the canonical paths", () => {
+    it("classes all supported OTLP aliases the same as the canonical paths", () => {
       expect(endpointClassOf("/v1/traces")).toBe("otlp");
       expect(endpointClassOf("/v1/logs")).toBe("otlp");
       expect(endpointClassOf("/v1/metrics")).toBe("otlp");
+      expect(endpointClassOf("/api/v1/traces")).toBe("otlp");
+      expect(endpointClassOf("/api/collector/v1/logs")).toBe("otlp");
+      expect(endpointClassOf("/api/collector/api/otel/v1/traces/v1/metrics")).toBe("otlp");
+      expect(endpointClassOf("/api/collector//v1/traces//")).toBe("otlp");
+      expect(endpointClassOf("/api/collector/v1/profiles")).toBe("api");
+      expect(endpointClassOf("/api/unrelated/v1/traces")).toBe("api");
     });
   });
 
@@ -252,6 +258,16 @@ describe("endpointClassOf", () => {
       expect(endpointClassOf("/mcp")).toBe("mcp");
       expect(endpointClassOf("/mcp/health")).toBe("mcp");
       expect(endpointClassOf("/oauth/token")).toBe("mcp");
+      expect(
+        endpointClassOf("/.well-known/oauth-protected-resource"),
+      ).toBe("mcp");
+      expect(
+        endpointClassOf("/.well-known/oauth-protected-resource/mcp"),
+      ).toBe("mcp");
+      expect(endpointClassOf("/.well-known/oauth-anything")).toBe("other");
+      expect(
+        endpointClassOf("/.well-known/oauth-authorization-server-extra"),
+      ).toBe("other");
       expect(
         endpointClassOf("/.well-known/oauth-authorization-server/mcp"),
       ).toBe("mcp");

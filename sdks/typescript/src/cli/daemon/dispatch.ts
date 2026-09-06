@@ -151,7 +151,7 @@ async function runInProcess(argv: string[]): Promise<void> {
   // in the process, but keeping the wrapper here means both paths behave
   // identically and the resolver never has to touch process.env for the key.
   // The "Cli" variant also marks the holder's surface, so every request this
-  // command makes through createLangWatchApiClient carries the CLI surface
-  // header, matching the daemon-served path.
+  // command makes through the shared request-header builders carries the CLI
+  // surface header, matching the daemon-served path.
   await runWithCliCredentialHolder(() => buildProgram().parseAsync(argv));
 }

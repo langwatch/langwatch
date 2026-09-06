@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * The one-line identity notice: which credential a command is about to run
  * as, said once, on stderr, and then kept quiet.
@@ -131,6 +132,7 @@ async function fetchProjectName(
       `${normalizeEndpoint(endpoint)}/api/me/project`,
       {
         headers: {
+          ...buildSdkIdentityHeaders("cli"),
           Authorization: `Bearer ${apiKey}`,
           Accept: "application/json",
         },

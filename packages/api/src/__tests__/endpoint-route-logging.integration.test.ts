@@ -94,7 +94,7 @@ describe("the endpoint a request matched", () => {
 
   describe("given a request from an identified client", () => {
     describe("when the request is logged", () => {
-      /** @scenario The request log line carries the attribution fields */
+      /** @scenario "The request log line carries the attribution fields" */
       it("carries the endpoint class and the client attribution", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
           .version("2026-08-07", (v) => {

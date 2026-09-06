@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Thin REST client for governance endpoints used by the
  * `langwatch governance ...` CLI namespace.
@@ -24,7 +25,6 @@ import {
   refreshSessionIfExpired,
   type SessionRefreshDeps,
 } from "./session-refresh";
-import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
 
 export interface IngestionSourceSummary {
   id: string;
@@ -217,6 +217,7 @@ async function getJSON<T>(
     (token) => ({
       method: "GET",
       headers: {
+        ...buildSdkIdentityHeaders("cli"),
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
@@ -493,7 +494,7 @@ export async function getBudgetOverview(
 // ── Public REST: /api/governance/* ─────────────────────────────────────────
 //
 // IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.
-// All mutating calls send X-LangWatch-Surface: cli per @audit-uniform.
+// All calls send X-LangWatch-Surface: cli per @audit-uniform.
 
 export interface IngestionTemplateRow {
   id: string;
@@ -515,7 +516,7 @@ async function requestREST<T>(
   cfg: GovernanceConfig,
   method: RestMethod,
   path: string,
-  options: { body?: unknown; mutating?: boolean } & CliApiOptions = {},
+  options: { body?: unknown } & CliApiOptions = {},
 ): Promise<T> {
   if (!cfg.access_token) {
     throw new GovernanceCliError(
@@ -527,12 +528,10 @@ async function requestREST<T>(
   const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const buildInit = (token: string): RequestInit => {
     const headers: Record<string, string> = {
+      ...buildSdkIdentityHeaders("cli"),
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };
-    if (options.mutating) {
-      headers[CLI_SURFACE_HEADER] = CLI_SURFACE_VALUE;
-    }
     if (options.body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
@@ -614,7 +613,7 @@ export async function mintIngestionKey(
     cfg,
     "POST",
     "/api/auth/cli/governance/ingestion-key",
-    { ...options, body: { source_type: sourceType }, mutating: true },
+    { ...options, body: { source_type: sourceType } },
   );
 }
 
@@ -646,7 +645,6 @@ export async function mintProjectIngestionKey(
       project,
       ...(deviceLabel ? { device_label: deviceLabel } : {}),
     },
-    mutating: true,
   });
 }
 
@@ -664,7 +662,6 @@ export async function issuePersonalVirtualKey(
   return requestREST(cfg, "POST", "/api/auth/cli/virtual-key", {
     ...options,
     body: deviceLabel ? { device_label: deviceLabel } : {},
-    mutating: true,
   });
 }
 
@@ -799,7 +796,7 @@ export async function createIngestionTemplate(
     cfg,
     "POST",
     "/api/governance/ingestion-templates",
-    { ...options, body: input, mutating: true },
+    { ...options, body: input },
   );
   return body.ingestion_template;
 }
@@ -814,7 +811,7 @@ export async function updateIngestionTemplateOttlRules(
     cfg,
     "PATCH",
     `/api/governance/ingestion-templates/${encodeURIComponent(id)}/ottl-rules`,
-    { ...options, body: { ottl_rules: ottlRules }, mutating: true },
+    { ...options, body: { ottl_rules: ottlRules } },
   );
   return body.ingestion_template;
 }
@@ -828,7 +825,7 @@ export async function archiveIngestionTemplate(
     cfg,
     "DELETE",
     `/api/governance/ingestion-templates/${encodeURIComponent(id)}`,
-    { ...options, mutating: true },
+    { ...options },
   );
 }
 
@@ -844,8 +841,7 @@ export async function cloneIngestionTemplateFromPlatform(
     {
       ...options,
       body: { source_template_id: sourceTemplateId },
-      mutating: true,
-    },
+      },
   );
   return body.ingestion_template;
 }

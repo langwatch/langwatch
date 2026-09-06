@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * exec wrapper helper for `langwatch claude` / `codex` / `cursor` /
  * `gemini`. Loads the persisted device-flow config, optionally
@@ -184,6 +185,7 @@ export async function preflightWrapper(
 	const timeoutMs = opts.timeoutMs ?? 3000;
 	try {
 		const res = await f(`${gw}/healthz`, {
+			headers: buildSdkIdentityHeaders("cli"),
 			method: "GET",
 			signal: AbortSignal.timeout(timeoutMs),
 		});
