@@ -68,3 +68,53 @@ Feature: Group Queue framework boundary
     Given the Group Queue package dependency graph
     Then it contains no import from Eventing, the platform app or enterprise code
     And only declared public subpaths can be imported by consumers
+
+  Rule: A dedup id squashes concurrent stages to exactly one job
+
+    @integration
+    Scenario: A dedup TOCTOU race between concurrent stages squashes to exactly one job
+      Given ten concurrent stage calls sharing one dedup id
+      When they all resolve
+      Then exactly one job remains in the group
+      And the dedup key names that survivor
+      And exactly one of the ten calls reports itself as new
+
+    @integration
+    Scenario: A stage racing a dispatch of its own dedup key never double-counts pending
+      Given a dedup'd job staged and due for dispatch
+      When a dispatch of that job and a new stage on the same dedup id settle concurrently
+      Then the total-pending counter still equals the group's actual staged jobs
+
+  Rule: A dedup squash transfers its blob lease atomically, never leaving a phantom or an early reclaim
+
+    @integration
+    Scenario: Concurrent squashes on one dedup id never leave more than the winner's lease live
+      Given several concurrent stages racing to squash the same dedup id, each holding its own blob lease
+      When every squash settles
+      Then exactly one contender's lease is live
+      And no lease is taken for any losing contender
+
+    @integration
+    Scenario: A squash racing a sibling's release never double-releases or resurrects a lease
+      Given a squash displacing a lease while a sibling holder concurrently releases its own lease on the same blob
+      When the squash and the release settle
+      Then the lease set holds only tokens that were staged or released, never a phantom
+      And the replacement value's lease is live
+
+  Rule: A displaced blob ref never crosses tenant boundaries
+
+    @integration
+    Scenario: A squash never reclaims or touches a displaced blob ref belonging to another tenant
+      Given a dedup squash that displaces a value whose blob ref names another tenant
+      When the squash resolves
+      Then the foreign tenant's lease and blob are left untouched
+
+  Rule: A stale heartbeat after a retry cannot resurrect the pre-retry lock or schedule
+
+    @integration
+    Scenario: A stale heartbeat after a retry never extends the retry's backoff lock or ready score
+      Given a job dispatched and then retried under a new staged id
+      When a heartbeat for the retired staged id lands after the retry
+      Then the heartbeat is refused
+      And the retry's backoff TTL is not extended
+      And the ready score still reflects the retry's schedule, not a fresh active window
