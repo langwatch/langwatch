@@ -20,6 +20,21 @@ Content:  application/json
 
 Self-hosted: replace the base with your control plane's DNS.
 
+Virtual keys, budgets and cache rules authenticate with a project API key. Spend authenticates with an organization API key.
+
+## Permissions
+
+Each resource needs its own permission on the key:
+
+| Resource | Read | Write |
+|---|---|---|
+| Virtual keys | `virtualKeys:view` | `virtualKeys:create`, `virtualKeys:update`, `virtualKeys:rotate`, `virtualKeys:delete` |
+| Budgets | `gatewayBudgets:view` | `gatewayBudgets:create`, `gatewayBudgets:update`, `gatewayBudgets:delete` |
+| Cache rules | `gatewayCacheRules:view` | `gatewayCacheRules:create`, `gatewayCacheRules:update`, `gatewayCacheRules:delete` |
+| Spend | `gatewaySpend:view` | `gatewaySpend:manage` |
+
+A legacy project key passes every check. A scoped API key is checked against its role bindings.
+
 ## Paging
 
 Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim, and keep going until it comes back `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
