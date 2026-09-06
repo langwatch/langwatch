@@ -230,6 +230,52 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
     });
   });
 
+  describe("when reading DepartmentMembershipHistory links open on a day", () => {
+    it("does NOT throw — the department-on-day read names its organization", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org_1",
+              userId: { in: ["user_1", "user_2"] },
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when closing an open DepartmentMembershipHistory link by row id", () => {
+    it("does NOT throw — id is the tenancy proof for a single-row update", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "update",
+          args: {
+            where: { id: "dmh_1" },
+            data: { validTo: new Date() },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when running findMany on DepartmentMembershipHistory without a tenancy key", () => {
+    it("THROWS — a userId filter alone would read another tenant's history", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "findMany",
+          args: { where: { userId: "user_1", validTo: null } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
   describe("when resolving an ApiKey by its globally-unique lookupId", () => {
     it("does NOT throw — lookupId is the auth-path single-org resolver", async () => {
       await expect(

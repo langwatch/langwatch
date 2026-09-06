@@ -315,6 +315,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // organization's queue, so organizationId covers every access — there is no
   // cross-tenant shape here, unlike the two snapshot loaders below.
   IdentityMatchSuggestion: {},
+  // Dated department links (ADR-128 §13). Assignment writes and the
+  // department-on-day read both name their organization, and the one update
+  // that closes an open link addresses it by row id.
+  DepartmentMembershipHistory: {},
   // Which governance tenants an organization has ever written rows under.
   //
   // Two shapes need more than organizationId. `tenantId` is a project id —
