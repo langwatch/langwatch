@@ -18,8 +18,7 @@
       "@langwatch/gateway-web/surfaces/budget-overview": [
         "../../gateway/web/src/surfaces/budget-overview/index.ts"
       ],
-      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
-      "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]

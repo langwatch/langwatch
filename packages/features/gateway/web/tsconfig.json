@@ -16,8 +16,7 @@
       ],
       "@langwatch/enterprise-billing-web/surfaces/contact-sales": [
         "../../../enterprise/features/billing/web/src/surfaces/contact-sales/index.ts"
-      ],
-      "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
+      ]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]

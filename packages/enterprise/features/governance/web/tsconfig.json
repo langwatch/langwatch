@@ -12,8 +12,7 @@
       "@langwatch/authz-web/surfaces/scope-picker": [
         "../../../../features/authz/web/src/surfaces/scope-picker/index.ts"
       ],
-      "@langwatch/coding-agent-web": ["../../../../features/coding-agent/web/src/index.ts"],
-      "@langwatch/platform-api-client": ["../../../../platform-api-client/src/index.ts"]
+      "@langwatch/coding-agent-web": ["../../../../features/coding-agent/web/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
