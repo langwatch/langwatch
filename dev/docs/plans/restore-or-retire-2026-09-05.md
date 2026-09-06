@@ -85,4 +85,6 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 | `specs/api-reference` run-plans and test-suites "A dated … path and the bare alias both answer" | 2 | the tests assert 404 on purpose for the four v1 families the /api twinning leaves alone (771069e998); spec and code disagree |
 | `specs/navigation/shared-section-navigation-layout.feature` narrow viewport | 1 | needs a real browser lane; jsdom cannot evaluate media queries |
 
+| `specs/licensing/license-router.feature` "Rejects request for unauthorized organization", `subscription-handler-integration.feature` "getLicenseHandler returns same instance" | 2 | name a license router and a getLicenseHandler singleton the branch replaced with composition; asserting instance identity of a thing that no longer exists is vacuous |
+
 Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
