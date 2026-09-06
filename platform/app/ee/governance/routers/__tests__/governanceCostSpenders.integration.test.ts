@@ -273,9 +273,11 @@ describe("governanceCost.spenders — router integration", () => {
     /** @scenario The spender breakdown stays behind the identity screen's permission */
     it("refuses the breakdown while the cost lanes still answer", async () => {
       const caller = callerFor(costOnlyUserId);
+      // RBAC denials are UNAUTHORIZED in this codebase, not FORBIDDEN — see
+      // checkOrganizationPermission in rbac.ts.
       await expect(
         caller.governanceCost.spenders({ organizationId, windowDays: 30 }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 
       // The same caller's cost permission still buys the figures.
       const summary = await caller.governanceCost.summary({
