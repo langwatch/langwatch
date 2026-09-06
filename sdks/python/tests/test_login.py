@@ -5,10 +5,6 @@ import pytest
 
 from langwatch.__version__ import __version__
 from langwatch.login import login
-from langwatch.state import (  # noqa: F401 # Assuming these are directly importable for patching
-    get_api_key,
-    get_endpoint,
-)
 
 # Test cases
 # 1. Already logged in, no relogin
