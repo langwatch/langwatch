@@ -2,7 +2,13 @@
 
 **Date:** 2026-06-10
 
-**Status:** Accepted
+**Status:** Accepted — **renamed by [ADR-098](./098-post-event-work-subscribers-and-process-managers.md).**
+
+The decision below stands unchanged: a pure, synchronous predicate gates the
+enqueue, and a throwing predicate fails open. Only the vocabulary moved. Read
+"reactor" as "subscriber", `shouldReact` as `shouldDispatch`, and
+`dispatchToReactors` as `dispatchToSubscribers`. The `es_reactor_total`
+counter this ADR names is deliberately unrenamed — dashboards key on it.
 
 ## Context
 
@@ -35,7 +41,7 @@ dispatch. The exact value a predicate sees at enqueue time is the value
 can change between the two, so a decision made at dispatch cannot be
 invalidated by execution-time drift.
 
-See [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+See [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)
 for the behavioural contract this decision supports.
 
 ## Decision
@@ -129,10 +135,11 @@ that condition belongs in `handle()`.
 - Related ADRs: [ADR-023](./023-orphan-sweep-reactor-chain.md) (reactor
   infrastructure background; its orphan-sweep reactor was since removed,
   see [ADR-025](./025-remove-orphan-sweep.md)),
-  [ADR-021](./021-lean-fold-cache.md) and
-  [ADR-022](./022-event-log-source-of-truth.md) (fold-state caching —
-  the `toCacheable` lean-cache hook must preserve every field the fold's
-  `apply` reads, and reactors receive the post-apply state, so predicates
-  reading `foldState.attributes` see the same values the handler does
-  even on cache-rehydrated paths)
-- Spec: [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+  [ADR-066](./066-projection-clickhouse-cached-store.md) and
+  [ADR-022](./022-event-log-source-of-truth.md) (fold-state storage and
+  cache leanness — the `toCacheable` lean-cache hook must preserve every
+  field the fold's `apply` reads, and reactors receive the post-apply
+  state, so predicates reading `foldState.attributes` see the same values
+  the handler does even on cache-rehydrated paths; ADR-021 held this
+  before being superseded)
+- Spec: [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)

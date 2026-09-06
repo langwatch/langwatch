@@ -1,0 +1,439 @@
+import {
+  Box,
+  HStack,
+  Icon,
+  IconButton,
+  Popover,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
+import { Markdown } from "~/components/Markdown";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
+import { useTargetName } from "../hooks/useTargetName";
+import type { TargetConfig } from "../types";
+import {
+  explainEvaluatorDomainError,
+  MISSING_MODEL_API_KEY_EXPLANATION,
+} from "../utils/explainEvaluatorDomainError";
+import {
+  labelNamesVariant,
+  resolveVerdictLabel,
+} from "../utils/normalizeComparison";
+
+/**
+ * How long a clicked winner's column stays highlighted before it
+ * auto-clears. Click-only (not hover) — scrolling/highlighting on mere
+ * hover was too eager as you read down the rows, so this is a deliberate
+ * "look here" flash the user asks for explicitly, not a passive preview.
+ */
+const CLICK_HIGHLIGHT_DURATION_MS = 2000;
+
+/**
+ * Pending auto-clear for the click-triggered highlight. Module-scoped, not
+ * a per-`ComparisonCell`-instance ref: the highlight itself
+ * (highlightedVariantTargetId) is a single, global piece of store state, but
+ * every row renders its own ComparisonCell. If the same variant wins two
+ * different rows and both winners are clicked within the highlight window,
+ * a per-instance ref can't see the OTHER row's pending timer — the earlier
+ * row's timer fires on schedule and clears a highlight the later click
+ * expected to still be showing, up to CLICK_HIGHLIGHT_DURATION_MS early.
+ * A shared timer means the latest click always wins.
+ */
+let clickHighlightClearTimer: ReturnType<typeof setTimeout> | undefined;
+
+type ComparisonCellProps = {
+  result: unknown;
+  isLoading?: boolean;
+  variantTargets: (TargetConfig | undefined)[];
+  onRun?: () => void;
+};
+
+/**
+ * Judge emits per-call debug markers like
+ *   "Call 1 (candidates in order X, Y, Z): ..."
+ * Useful for bias-correction debugging but noisy in the cell preview.
+ * Strip when present, preserve everything else.
+ */
+function stripBiasPreamble(details: string | undefined): string | undefined {
+  if (!details) return details;
+  return details.replace(/^Call \d+ \([^)]*\):\s*/i, "").trim();
+}
+
+function friendlyError(details: string | undefined): {
+  headline: string;
+  hint?: string;
+  raw?: string;
+} {
+  const raw = details?.trim();
+  if (!raw) return { headline: "Comparison failed" };
+
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("authenticationerror") ||
+    lower.includes("api key") ||
+    lower.includes("api_key")
+  ) {
+    return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
+  }
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("ratelimit") ||
+    lower.includes("429")
+  ) {
+    return {
+      headline: "Judge model rate-limited",
+      hint: "Slow the run down (lower concurrency) or try a different model.",
+      raw,
+    };
+  }
+  if (
+    lower.includes("model not found") ||
+    lower.includes("invalid model") ||
+    lower.includes("does not exist")
+  ) {
+    return {
+      headline: "Judge model not available",
+      hint: "Pick a different model in the evaluator config.",
+      raw,
+    };
+  }
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return {
+      headline: "Judge call timed out",
+      hint: "Re-run, or try a faster model.",
+      raw,
+    };
+  }
+  if (
+    lower.includes("waiting on") ||
+    lower.includes("no output for this row") ||
+    lower.includes("missingvariantoutput")
+  ) {
+    const dashIdx = raw.indexOf("—");
+    if (dashIdx > 0) {
+      return {
+        headline: raw.slice(0, dashIdx).trim(),
+        hint: raw.slice(dashIdx + 1).trim(),
+      };
+    }
+    return { headline: raw };
+  }
+  if (lower.includes("missing candidate output")) {
+    return {
+      headline: "One of the candidates is blank",
+      hint: "Its prompt returned an empty string — re-run that prompt or check what it's returning.",
+      raw,
+    };
+  }
+  const lines = raw.split(/\r?\n/);
+  return { headline: lines[0]!, raw: lines.length > 1 ? raw : undefined };
+}
+
+/**
+ * Renders one variant's name, but only when the judge named it the winner.
+ * The cell states the winner alone rather than a "A vs B vs C" chain — with
+ * ten candidates the chain buries the one name the reader is looking for.
+ *
+ * The judge returns the winner's candidate id, which for prompt-typed
+ * variants is the prompt HANDLE (e.g. "concise-support-v2"), not the
+ * variant's internal target id. Resolving that handle needs `useTargetName`,
+ * a hook — so every variant renders this component (keeping hook order
+ * stable) and each decides for itself whether it is the winner, rather than
+ * the parent resolving names inside a `.map()`.
+ */
+function WinnerLabel({
+  target,
+  fallback,
+  label,
+  onClickPreview,
+}: {
+  target: TargetConfig | undefined;
+  fallback: string;
+  label: string | undefined;
+  onClickPreview: (targetId: string) => void;
+}) {
+  const resolved = useTargetName(
+    target ?? (PLACEHOLDER_TARGET as TargetConfig),
+  );
+  const isWinner =
+    !!target &&
+    !!label &&
+    labelNamesVariant({ label, target, resolvedName: resolved });
+  if (!isWinner) return null;
+
+  return (
+    <Text
+      as="button"
+      fontSize="13px"
+      fontWeight="semibold"
+      color="green.fg"
+      cursor="pointer"
+      _hover={{ textDecoration: "underline" }}
+      onClick={(e: MouseEvent) => {
+        e.stopPropagation();
+        onClickPreview(target.id);
+      }}
+      onDoubleClick={(e: MouseEvent) => e.stopPropagation()}
+      data-testid="comparison-winner"
+    >
+      {resolved || fallback}
+    </Text>
+  );
+}
+
+/** A prompt target that resolves to nothing — keeps hook order stable. */
+const PLACEHOLDER_TARGET = {
+  id: "",
+  type: "prompt",
+  mappings: {},
+} as const;
+
+export function ComparisonCell({
+  result,
+  isLoading = false,
+  variantTargets,
+  onRun,
+}: ComparisonCellProps) {
+  const parsed = parseEvaluationResult(result);
+
+  const setHighlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.setHighlightedVariantTargetId,
+  );
+
+  // Clicking a winner's name highlights its column and scrolls it into
+  // view (it's often off-screen to the right of the Comparison column),
+  // then auto-clears after a brief flash rather than requiring a second
+  // click to dismiss. Uses the module-level clickHighlightClearTimer (not a
+  // per-instance ref) so a click in one row correctly cancels a pending
+  // clear scheduled by a click in a DIFFERENT row — see that variable's
+  // comment for the cross-row race this avoids.
+  const highlightVariantFromClick = (targetId: string) => {
+    if (clickHighlightClearTimer) clearTimeout(clickHighlightClearTimer);
+    setHighlightedVariantTargetId(targetId, "won");
+    scrollToTargetColumn(targetId);
+    clickHighlightClearTimer = setTimeout(() => {
+      // Only clear if this variant is still the one highlighted — a
+      // second click may have already picked a different winner by now.
+      const current =
+        useEvaluationsV3Store.getState().ui.highlightedVariantTargetId;
+      if (current === targetId) {
+        setHighlightedVariantTargetId(undefined);
+      }
+    }, CLICK_HIGHLIGHT_DURATION_MS);
+  };
+
+  const withRunAction = (content: ReactNode) => {
+    if (!onRun || isLoading || parsed.status === "running") return content;
+    return (
+      <HStack align="start" justify="space-between" gap={2}>
+        <Box minWidth={0} flex="1">
+          {content}
+        </Box>
+        <IconButton
+          aria-label="Run comparison for this row"
+          size="2xs"
+          variant="ghost"
+          flexShrink={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRun();
+          }}
+        >
+          <Play size={12} />
+        </IconButton>
+      </HStack>
+    );
+  };
+
+  if (isLoading || parsed.status === "running") {
+    return (
+      <Text fontSize="13px" color="fg.muted">
+        Comparing...
+      </Text>
+    );
+  }
+
+  if (parsed.status === "pending") {
+    return withRunAction(
+      <Text fontSize="13px" color="fg.subtle">
+        No verdict yet
+      </Text>,
+    );
+  }
+
+  if (parsed.status === "error") {
+    const domainExplanation = parsed.domainError
+      ? explainEvaluatorDomainError(parsed.domainError)
+      : null;
+    const { headline, hint, raw } = domainExplanation
+      ? {
+          ...domainExplanation,
+          raw: parsed.details?.trim(),
+        }
+      : friendlyError(parsed.details);
+    return withRunAction(
+      <Box
+        p={2}
+        bg="red.subtle"
+        color="red.fg"
+        borderRadius="md"
+        fontSize="13px"
+      >
+        <HStack gap={1.5} align="start">
+          <Icon as={CircleAlert} boxSize="14px" marginTop="2px" />
+          <VStack align="stretch" gap={0.5}>
+            <Text fontWeight="medium">{headline}</Text>
+            {hint ? (
+              <Text fontSize="12px" color="fg.muted">
+                {hint}
+              </Text>
+            ) : null}
+            {raw ? (
+              <Popover.Root>
+                <Popover.Trigger asChild>
+                  <Box
+                    as="button"
+                    textAlign="left"
+                    color="fg.muted"
+                    textDecoration="underline"
+                    fontSize="11px"
+                  >
+                    show details
+                  </Box>
+                </Popover.Trigger>
+                <Popover.Positioner>
+                  <Popover.Content maxWidth="460px">
+                    <Popover.Arrow />
+                    <Popover.Body
+                      fontSize="12px"
+                      whiteSpace="pre-wrap"
+                      data-testid="comparison-error-details"
+                    >
+                      {raw}
+                    </Popover.Body>
+                  </Popover.Content>
+                </Popover.Positioner>
+              </Popover.Root>
+            ) : null}
+          </VStack>
+        </HStack>
+      </Box>,
+    );
+  }
+
+  // Verdicts stored before the pairwise/N-way merge carry a slot letter
+  // ("A" / "B") rather than the winning candidate's identifier. Resolve those
+  // against the variant order so an old run still names its winner instead of
+  // rendering "No verdict yet".
+  const label = parsed.label
+    ? resolveVerdictLabel({
+        label: parsed.label,
+        variants: variantTargets.map((t) => t?.id ?? ""),
+      })
+    : parsed.label;
+  const reasoning = stripBiasPreamble(parsed.details);
+  const reasoningPreview = reasoning ? truncateReasoning(reasoning) : undefined;
+
+  if (label === "tie") {
+    return withRunAction(
+      <VStack align="stretch" gap={1.5}>
+        <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
+          <Icon as={Equal} color="fg.muted" boxSize="14px" />
+          <Text fontWeight="medium">Tie</Text>
+        </HStack>
+        {reasoning ? (
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <Box
+                as="button"
+                textAlign="left"
+                color="fg.muted"
+                _hover={{ color: "fg" }}
+              >
+                <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
+                  {reasoningPreview}
+                </Text>
+              </Box>
+            </Popover.Trigger>
+            <Popover.Positioner>
+              <Popover.Content
+                maxWidth="560px"
+                maxHeight="420px"
+                overflowY="auto"
+              >
+                <Popover.Arrow />
+                <Popover.Body fontSize="13px">
+                  <Markdown>{reasoning}</Markdown>
+                </Popover.Body>
+              </Popover.Content>
+            </Popover.Positioner>
+          </Popover.Root>
+        ) : null}
+      </VStack>,
+    );
+  }
+
+  if (!label) {
+    return withRunAction(
+      <Text fontSize="13px" color="fg.subtle">
+        No verdict yet
+      </Text>,
+    );
+  }
+
+  return withRunAction(
+    <VStack align="stretch" gap={1.5}>
+      <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
+        <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
+        {variantTargets.map((t, i) => (
+          <WinnerLabel
+            key={t?.id ?? i}
+            target={t}
+            fallback={t?.id ?? `Candidate ${i + 1}`}
+            label={label}
+            onClickPreview={highlightVariantFromClick}
+          />
+        ))}
+      </HStack>
+      {reasoning ? (
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <Box
+              as="button"
+              textAlign="left"
+              color="fg.muted"
+              _hover={{ color: "fg" }}
+            >
+              <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
+                {reasoningPreview}
+              </Text>
+            </Box>
+          </Popover.Trigger>
+          <Popover.Positioner>
+            <Popover.Content
+              maxWidth="560px"
+              maxHeight="420px"
+              overflowY="auto"
+            >
+              <Popover.Arrow />
+              <Popover.Body fontSize="13px">
+                <Markdown>{reasoning}</Markdown>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Positioner>
+        </Popover.Root>
+      ) : null}
+    </VStack>,
+  );
+}
+
+function truncateReasoning(reasoning: string): string {
+  const normalized = reasoning.replace(/\s+/g, " ").trim();
+  return normalized.length > 220
+    ? `${normalized.slice(0, 217).trimEnd()}...`
+    : normalized;
+}

@@ -1,0 +1,56 @@
+---
+title: What counts as a billable event
+description: "The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works"
+sidebarTitle: Billable events
+keywords: billable event, events, pricing, span, evaluation, experiment, simulation, metering, deduplication
+---
+
+LangWatch Cloud bills on **ingested events per billing period**. The list below is complete, so you can predict a bill from your own workload rather than from a sample.
+
+<Note>
+Self-hosted deployments are not metered and send no usage data to LangWatch. This page applies to LangWatch Cloud. See [Editions and licensing](/self-hosting/licensing).
+</Note>
+
+## The complete list
+
+These are the only events that increment your count. Everything else the platform does is free.
+
+| What you did | Billable event | Counted |
+|---|---|---|
+| Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
+| An evaluation produced a result | `lw.evaluation.reported` | One per evaluation result |
+| An experiment run started | `lw.experiment_run.started` | One per run |
+| An experiment recorded a target's output | `lw.experiment_run.target_result` | One per target result |
+| An experiment recorded an evaluator's score | `lw.experiment_run.evaluator_result` | One per evaluator result |
+| A scenario simulation started | `lw.simulation_run.started` | One per run |
+| A simulation recorded a conversation snapshot | `lw.simulation_run.message_snapshot` | One per snapshot |
+
+Spans dominate the count whenever your app sends traces. A single trace of an agent turn typically contains several spans, one per step.
+
+### Reading an experiment's cost
+
+An experiment counts one event per step, not one for the whole run. A run over 100 dataset rows with 2 evaluators produces roughly `1 started + 100 target results + 200 evaluator results`, so around 301 events. This is worth knowing before a large sweep.
+
+### Reading a simulation's cost
+
+A scenario run produces one `started` event plus one snapshot per conversation turn, so a 10-turn simulation is about 11 events.
+
+## What is never billed
+
+- Reading your data: dashboards, the trace explorer, analytics queries, and search.
+- Anything you create: prompts, evaluators, scenarios, agents, datasets, dashboards, custom graphs, automations, projects, or teams.
+- Users. Seats are priced separately from events, not metered as events.
+- Retries and replays of an event you already sent (see deduplication below).
+- Platform-internal work: projections, rollups, queue processing, and background jobs.
+
+## Deduplication
+
+Events carry an idempotency key, and the meter counts **distinct keys** per billing period. A retry from your SDK, a redelivery inside our queues, or a replay of a projection all collapse to the single unit you were already charged for. You are billed for what you sent, not for how many times it moved through the system.
+
+## Checking your own usage
+
+Your current billing-period count is on **Settings → Usage** in the platform. It reflects the same deduplicated count the invoice is built from.
+
+## Retention
+
+The event count and how long events are kept are separate levers. Each plan includes a default retention window; extending it is available on Enterprise plans or with a self-hosted license. See [Pricing](/pricing#custom-data-retention).

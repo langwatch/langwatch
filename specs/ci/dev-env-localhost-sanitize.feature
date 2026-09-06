@@ -3,13 +3,13 @@ Feature: Dev launchers strip stale localhost-pinned NEXTAUTH_URL / BASE_HOST
   I need `make quickstart` (and `make dev*`) to pick a dynamic port without 403ing on login
   So I don't have to manually re-export NEXTAUTH_URL every time port 5560 is busy.
 
-  Background: tracking lw#3453. compose.dev.yml interpolates
+  Background: tracking lw#3453. dev/compose.dev.yml interpolates
   NEXTAUTH_URL/BASE_HOST with `${VAR:-http://localhost:${APP_PORT}}` — but
   any *exported* `http://localhost:5560` (from a prior session, zsh helper,
   etc.) wins over the dynamic-port fallback, and login then 403s because
   the cookie origin no longer matches the host port.
 
-  The launchers source scripts/lib/sanitize-dev-env.sh, which rewrites
+  The launchers source dev/scripts/lib/sanitize-dev-env.sh, which rewrites
   stale localhost values to the current APP_PORT but leaves real proxy /
   tunnel overrides (https://*.boxd.sh, ngrok URLs, 127.0.0.1, etc.) alone.
 

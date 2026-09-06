@@ -14,15 +14,31 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// Dimensions a request can be denied on.
+const (
+	DimensionRPM = "rpm"
+	DimensionRPD = "rpd"
+)
+
+// DenialMetrics counts denials by the ceiling that tripped. Declared here
+// rather than imported so the limiter stays free of a metrics dependency;
+// the gateway's Prometheus recorder satisfies it.
+type DenialMetrics interface {
+	RecordRateLimitDenied(dimension, vkID string)
+}
+
 // Limiter enforces per-VK rate limits. Implements app.RateLimiter.
 type Limiter struct {
-	cache *lru.Cache[string, *buckets]
-	mu    sync.Mutex
+	cache   *lru.Cache[string, *buckets]
+	metrics DenialMetrics
+	mu      sync.Mutex
 }
 
 // Options configures the limiter.
 type Options struct {
 	MaxVKs int // LRU size (default 50000)
+	// Metrics counts denials by dimension. Optional; nil skips counting.
+	Metrics DenialMetrics
 }
 
 // New creates a Limiter.
@@ -34,7 +50,13 @@ func New(opts Options) (*Limiter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Limiter{cache: c}, nil
+	return &Limiter{cache: c, metrics: opts.Metrics}, nil
+}
+
+func (l *Limiter) recordDenial(dimension, vkID string) {
+	if l.metrics != nil {
+		l.metrics.RecordRateLimitDenied(dimension, vkID)
+	}
 }
 
 // Allow returns nil if the request is permitted, or an error if the VK's
@@ -54,6 +76,7 @@ func (l *Limiter) Allow(_ context.Context, vkID string, limits domain.RateLimits
 		rpmRes = r
 		if !r.OK() || r.DelayFrom(now) > 0 {
 			r.CancelAt(now)
+			l.recordDenial(DimensionRPM, vkID)
 			return fmt.Errorf("rpm %d exceeded", limits.RPM)
 		}
 	}
@@ -66,6 +89,7 @@ func (l *Limiter) Allow(_ context.Context, vkID string, limits domain.RateLimits
 			if rpmRes != nil {
 				rpmRes.CancelAt(now)
 			}
+			l.recordDenial(DimensionRPD, vkID)
 			return fmt.Errorf("rpd %d exceeded", limits.RPD)
 		}
 	}

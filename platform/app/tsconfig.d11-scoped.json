@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.tsgo.tests.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-d11-scoped.tsbuildinfo"
+  },
+  "include": [
+    "./src/**/*.d.ts",
+    "./ee/**/*.d.ts",
+    "next-env.d.ts",
+    "src/server/invites/**/*.ts",
+    "src/server/api/trpc.ts",
+    "src/server/api/routers/organization.ts",
+    "src/server/api/routers/__tests__/organization.acceptInvite.unit.test.ts",
+    "src/server/api/routers/__tests__/organization.invites.integration.test.ts",
+    "src/server/license-enforcement/license-enforcement.repository.ts",
+    "src/features/errors/logic/codes.ts",
+    "src/features/errors/logic/presentation.ts",
+    "src/hooks/useInviteActions.ts",
+    "src/components/members/**/*",
+    "src/components/settings/InviteMemberDrawer.tsx",
+    "src/pages/settings/members.tsx"
+  ]
+}

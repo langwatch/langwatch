@@ -1,0 +1,330 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Tests for PromptPlaygroundChat component ref methods.
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearStoreInstances,
+  getStoreForTesting,
+  type TabData,
+} from "../../../prompt-playground-store/DraggableTabsBrowserStore";
+import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
+import {
+  PromptPlaygroundChat,
+  persistedMessagesKey,
+} from "../PromptPlaygroundChat";
+import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
+import { SyncedChatInput } from "../SyncedChatInput";
+
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+
+vi.stubGlobal("localStorage", localStorageMock);
+
+const TEST_PROJECT_ID = "test-project";
+const TEST_TAB_ID = "test-tab-123";
+
+// Mock useOrganizationTeamProject
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: TEST_PROJECT_ID },
+    projectId: TEST_PROJECT_ID,
+  }),
+}));
+
+// Captures the render props PromptPlaygroundChat passes to CopilotChat so
+// tests can drive the AssistantMessage render prop directly.
+const captured = vi.hoisted(() => ({
+  chatProps: null as Record<string, any> | null,
+}));
+
+// Mock CopilotKit components since they require complex setup
+vi.mock("@copilotkit/react-ui", () => ({
+  CopilotChat: (props: Record<string, any>) => {
+    captured.chatProps = props;
+    return <div data-testid="copilot-chat" />;
+  },
+  AssistantMessage: (props: Record<string, any>) => (
+    <div data-testid="assistant-message">
+      {props.rawData?.content?.toString() ?? ""}
+    </div>
+  ),
+  UserMessage: () => <div data-testid="user-message" />,
+}));
+
+vi.mock("@copilotkit/react-core", () => ({
+  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useCopilotChat: () => ({
+    setMessages: vi.fn(),
+    visibleMessages: [],
+  }),
+}));
+
+vi.mock("@copilotkit/runtime-client-gql", () => ({
+  useCopilotContext: () => ({
+    setMessages: vi.fn(),
+    messages: [],
+  }),
+}));
+
+// TraceMessage pulls in tRPC + trace drawer hooks; stub it so tests can
+// assert on its presence/absence only.
+vi.mock("~/components/copilot-kit/TraceMessage", () => ({
+  TraceMessage: ({ traceId }: { traceId: string }) => (
+    <div data-testid="trace-message" data-trace-id={traceId} />
+  ),
+}));
+
+vi.mock("~/components/simulations/utils/convert-scenario-messages", () => ({
+  convertScenarioMessagesToCopilotKit: vi.fn(() => []),
+}));
+
+/**
+ * Helper to create a minimal TabData object for testing
+ */
+const createTabData = (overrides?: Partial<TabData>): TabData => ({
+  chat: {
+    initialMessagesFromSpanData: [],
+  },
+  form: {
+    currentValues: {},
+  },
+  meta: {
+    title: null,
+    versionNumber: undefined,
+    scope: undefined,
+  },
+  variableValues: {},
+  ...overrides,
+});
+
+describe("PromptPlaygroundChat ref methods", () => {
+  let store: ReturnType<typeof getStoreForTesting>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    store = getStoreForTesting(TEST_PROJECT_ID);
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+  });
+
+  describe("focusInput", () => {
+    it("focuses textarea with matching data-tab-id", () => {
+      // Create a textarea in the document with the expected data-tab-id
+      const textarea = document.createElement("textarea");
+      textarea.setAttribute("data-tab-id", TEST_TAB_ID);
+      document.body.appendChild(textarea);
+
+      // Spy on the focus method
+      const focusSpy = vi.spyOn(textarea, "focus");
+
+      // Simulate what focusInput does
+      const foundTextarea = document.querySelector<HTMLTextAreaElement>(
+        `textarea[data-tab-id="${TEST_TAB_ID}"]`,
+      );
+      foundTextarea?.focus();
+
+      expect(focusSpy).toHaveBeenCalled();
+
+      // Cleanup
+      document.body.removeChild(textarea);
+    });
+
+    it("does not throw when textarea not found", () => {
+      // Simulate what focusInput does with missing textarea
+      const foundTextarea = document.querySelector<HTMLTextAreaElement>(
+        `textarea[data-tab-id="non-existent"]`,
+      );
+
+      // This should not throw
+      expect(() => foundTextarea?.focus()).not.toThrow();
+    });
+  });
+
+  // Regression: prior dedup keyed only on message IDs. The latest
+  // assistant message kept its ID stable across streaming chunks, so
+  // the persistence effect skipped every content delta and the snapshot
+  // saved to the tab store had its content stuck at empty. On refresh,
+  // `convertScenarioMessagesToCopilotKit` dropped empty-content rows
+  // and the latest assistant reply vanished from the chat. Key must
+  // include content length so streaming deltas re-trigger persistence.
+  describe("persistedMessagesKey (refresh persistence)", () => {
+    it("changes when a message's content grows even if IDs are unchanged", () => {
+      const placeholder = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey there" },
+        { id: "a-1", role: "assistant", content: "" },
+      ]);
+      const streamed = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey there" },
+        { id: "a-1", role: "assistant", content: "Your name is Bob." },
+      ]);
+      expect(placeholder).not.toBe(streamed);
+    });
+
+    it("is stable when nothing has changed", () => {
+      const messages = [
+        { id: "u-1", role: "user" as const, content: "hey" },
+        { id: "a-1", role: "assistant" as const, content: "hi" },
+      ];
+      expect(persistedMessagesKey(messages)).toBe(
+        persistedMessagesKey(messages),
+      );
+    });
+
+    it("changes when a new message is appended", () => {
+      const before = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey" },
+        { id: "a-1", role: "assistant", content: "hi" },
+      ]);
+      const after = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey" },
+        { id: "a-1", role: "assistant", content: "hi" },
+        { id: "u-2", role: "user", content: "ok" },
+      ]);
+      expect(before).not.toBe(after);
+    });
+  });
+
+  describe("given a rendered assistant message", () => {
+    const renderAssistantMessage = ({
+      content,
+      isLoading = false,
+      isGenerating = false,
+    }: {
+      content: string;
+      isLoading?: boolean;
+      isGenerating?: boolean;
+    }) => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      captured.chatProps = null;
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TabIdProvider tabId={tabId!}>
+            <PromptPlaygroundChat formValues={{} as never} />
+          </TabIdProvider>
+        </ChakraProvider>,
+      );
+
+      // Re-widen: the `= null` above narrows the property to `null`, and the
+      // render that repopulates it is opaque to control-flow analysis.
+      const chatProps = captured.chatProps as Record<string, any> | null;
+      const AssistantMessageProp =
+        chatProps?.AssistantMessage as unknown as React.ComponentType<
+          Record<string, unknown>
+        >;
+      expect(AssistantMessageProp).toBeDefined();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AssistantMessageProp
+            isLoading={isLoading}
+            isGenerating={isGenerating}
+            rawData={{ id: "msg-1", content }}
+          />
+        </ChakraProvider>,
+      );
+    };
+
+    describe("when the message content starts with [ERROR]", () => {
+      it("renders the error alert without reciting the provider's message", () => {
+        // `api_error` is the PROVIDER's discriminant, not one of ours, and
+        // "boom" is its own sentence. This asserted that "boom" rendered,
+        // which is how a provider's prose — and anything it quotes, including
+        // the API key it just rejected — reached the playground. The type is
+        // narrowed to `unknown` at the parse boundary now and the customer
+        // reads the registry's copy.
+        renderAssistantMessage({
+          content: '[ERROR]{"type":"api_error","message":"boom"}',
+        });
+
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+        expect(screen.getByText(/We've been notified/i)).toBeInTheDocument();
+        expect(screen.queryByTestId("trace-message")).not.toBeInTheDocument();
+      });
+
+      it("renders our own copy for a failure class it recognises", () => {
+        renderAssistantMessage({
+          content:
+            '[ERROR]{"type":"auth","message":"Incorrect API key provided: sk-proj-NOT-A-REAL-KEY"}',
+        });
+
+        expect(
+          screen.getByText(/rejected our credentials/i),
+        ).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain("sk-proj-");
+      });
+    });
+
+    describe("when the message is a finished non-error reply", () => {
+      it("renders the trace link for the message", () => {
+        renderAssistantMessage({ content: "The answer is 42." });
+
+        expect(screen.getByTestId("trace-message")).toHaveAttribute(
+          "data-trace-id",
+          "msg-1",
+        );
+      });
+    });
+
+    describe("when the message is still streaming", () => {
+      it("does not render the trace link yet", () => {
+        renderAssistantMessage({ content: "The answer", isGenerating: true });
+
+        expect(screen.queryByTestId("trace-message")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("data-tab-id attribute", () => {
+    it("SyncedChatInput renders with data-tab-id", () => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TabIdProvider tabId={tabId!}>
+            <PromptPlaygroundChatProvider>
+              <SyncedChatInput
+                inProgress={false}
+                onSend={vi.fn().mockResolvedValue(undefined)}
+                isVisible={true}
+                onStop={vi.fn()}
+              />
+            </PromptPlaygroundChatProvider>
+          </TabIdProvider>
+        </ChakraProvider>,
+      );
+
+      const textarea = screen.getByPlaceholderText(
+        /type your message/i,
+      ) as HTMLTextAreaElement;
+      expect(textarea).toHaveAttribute("data-tab-id", tabId);
+    });
+  });
+});

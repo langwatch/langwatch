@@ -6,6 +6,8 @@
 
 **Supersedes:** [ADR-002](./002-event-sourcing.md)
 
+**Hardened by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — projection storage (the ClickHouse-cached read-back store) makes this ADR's "fold state = stored data" and "`store.get()` loads last state" the mandatory, non-optional contract, and retires the `refoldOnStoreMiss` / `refoldOnOutOfOrder` accretions that had drifted from it.
+
 ## Context
 
 LangWatch uses event sourcing for traces, evaluations, experiment runs, and simulations. ADR-002 established the core principle — immutable events, derived projections, branded TenantId. This ADR documents the full architecture after the fold/map projection refactoring, which replaced the earlier handler/checkpoint system with a simpler model.
@@ -131,7 +133,36 @@ Command → CommandHandler → Event[] → EventStore.store()
                                   ProjectionRegistry.dispatch()  (global projections)
 ```
 
+## Amendment: Redis-loss circuit breaker for named pipelines (2026-08-17)
+
+The web-role rule ("only dispatches commands and events to queues") holds in
+normal operation for every pipeline. For **explicitly named pipelines**, a
+Redis outage must not take the product's critical operations down with it —
+and the answer is deliberately NOT inline pipeline processing. When Redis is
+unhealthy, a named pipeline's breaker guarantees exactly this much:
+
+- Appends still land: the event store is ClickHouse, and the append is
+  waited, so the fact is durable whether or not a queue job could be staged.
+- Operations that cannot wait (a named pipeline's revocation class) apply
+  their sanctioned direct projection write on the calling path, so the
+  outcome holds even though the fold has not run.
+- Everything else waits. The fold, the subscribers, and any replay simply do
+  not run while Redis is down — no in-memory processor, no in-process
+  drain. Projections catch up when Redis returns. Replays are never
+  attempted during an outage; they complicate the failure mode for no
+  product benefit.
+
+Named pipelines: `authz_grants` (ADR-092 §13 — grant writes per day, not
+traces per second; its revocation class is defined there). The identity
+pipeline was expected to join under its own deliverable (identity programme
+D02); **that deliverable was withdrawn on 2026-08-24** — identity takes
+ADR-110's position instead (every write through the group queue, no inline
+fold), so no amendment applies to it. No other pipeline gets this:
+high-volume pipelines stall and drain, which is the correct behavior for
+them.
+
 ## References
 
 - [ADR-002](./002-event-sourcing.md) — original event sourcing decision (superseded)
 - [ADR-006](./006-redis-cluster-bullmq-hash-tags.md) — Redis cluster hash tags for BullMQ
+- [ADR-092](./092-unified-authorization-engine.md) §13 — the grants ledger pipeline. Its instant-enforcement revocation write is a plain service-level Postgres write on the request path, NOT inline pipeline processing, so the web-role rule above holds unchanged; the exception it does carry (a direct write to a projection table) is owned and named by ADR-092's "one writer" doctrine, not by this ADR.

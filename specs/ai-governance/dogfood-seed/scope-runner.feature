@@ -8,7 +8,7 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
   So that the same code path runs in dev and prod with structurally
   bounded blast radius, no fork to drift, and one source of truth.
 
-  The harness lives at langwatch/scripts/dogfood/governance/. Dev runs
+  The harness lives at platform/app/scripts/dogfood/governance/. Dev runs
   it directly via `pnpm tsx scripts/dogfood/governance/seed-demo.ts`.
   Prod runs it via the existing K8s CronJob pattern in
   langwatch-saas/infrastructure/cronjobs.tf: a scheduled job inside

@@ -10,7 +10,6 @@ const ctx: RuntimeContext = {
   predeps: {},
   envFile: paths.envFile,
   version: "3.1.0",
-  bullboard: false,
 };
 
 describe("placeholder runtime", () => {

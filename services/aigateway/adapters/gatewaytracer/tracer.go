@@ -6,10 +6,11 @@ import (
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
 // Middleware creates a chi middleware that wraps each request in a gateway span.
@@ -27,27 +28,49 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 			}
 
 			// Always start a fresh root — never inherit client traceparent.
-			// Our ops trace ID is ours; the customer's trace is separate.
-			ctx, span := tracer.Start(r.Context(), name,
+			// The customer's inbound trace (if they propagated one) is
+			// OBSERVED — kept distinct from our own new-root ops trace below.
+			observedSC := trace.SpanContextFromContext(
+				otelapi.GetTextMapPropagator().Extract(
+					r.Context(), propagation.HeaderCarrier(r.Header),
+				),
+			)
+
+			// Our ops trace ID is ours; the customer's trace is separate. Preserve
+			// the causal relationship as a span link, though: this lets Grafana jump
+			// between a Langy/app trace and the gateway-owned trace without trusting
+			// an externally supplied trace ID as the parent of internal telemetry.
+			spanOptions := []trace.SpanStartOption{
 				trace.WithNewRoot(),
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
-					attribute.String(AttrOrigin, OriginGateway),
+					attribute.String(otelsetup.AttrLangWatchOrigin, OriginGateway),
 					attribute.String("http.request.method", r.Method),
 					attribute.String("url.path", r.URL.Path),
 				),
-			)
+			}
+			if observedSC.IsValid() {
+				spanOptions = append(spanOptions,
+					trace.WithLinks(trace.Link{SpanContext: observedSC}),
+					trace.WithAttributes(
+						attribute.String(clog.FieldObservedTraceID, observedSC.TraceID().String()),
+						attribute.String(clog.FieldObservedSpanID, observedSC.SpanID().String()),
+					),
+				)
+			}
+
+			ctx, span := tracer.Start(r.Context(), name, spanOptions...)
 			sc := span.SpanContext()
 			if sc.IsValid() {
 				w.Header().Set(HeaderTraceID, sc.TraceID().String())
 				w.Header().Set(HeaderSpanID, sc.SpanID().String())
-
-				// Stamp trace/span on the context logger for all downstream logs.
-				ctx = clog.With(ctx,
-					zap.String("trace_id", sc.TraceID().String()),
-					zap.String("span_id", sc.SpanID().String()),
-				)
 			}
+			// Stamp our own trace_id/span_id (WithSpanContext reads the active
+			// span) plus the customer's observed.trace_id/observed.span_id on
+			// the context logger, so every downstream log line carries the
+			// correlation.
+			ctx = clog.WithSpanContext(ctx)
+			ctx = clog.WithObserved(ctx, observedSC)
 
 			rec := &statusRecorder{ResponseWriter: w, status: 200}
 			defer func() {

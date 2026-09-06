@@ -1,9 +1,13 @@
 package controlplane
 
 import (
+	"encoding/json"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -170,4 +174,299 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 		})
 		assert.Empty(t, cred.Extra["base_url"])
 	})
+}
+
+// The control-plane writes aliases in "provider/model" form, which is a
+// routing instruction rather than a model ID. Keeping the prefix on Model
+// sends the provider a model name it has never heard of, and drops the
+// provider the alias was pointing at.
+//
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestToDomain_ModelAliases(t *testing.T) {
+	cfg := (&configWire{
+		ModelAliases: map[string]string{
+			"chat":     "openai/gpt-5-mini",
+			"thinking": "anthropic/claude-haiku-4-5-20251001",
+			"local":    "custom/qwen3-14b",
+			"bare":     "gpt-5-mini",
+		},
+	}).toDomain()
+
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"}, cfg.ModelAliases["chat"])
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderAnthropic, Model: "claude-haiku-4-5-20251001"}, cfg.ModelAliases["thinking"])
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderCustom, Model: "qwen3-14b"}, cfg.ModelAliases["local"])
+	assert.Equal(t, domain.ModelAlias{Model: "gpt-5-mini"}, cfg.ModelAliases["bare"],
+		"an unqualified target carries no provider and resolves against the credential chain")
+}
+
+// The trace-export project id and its OTLP token are materialized together by
+// the control plane and must survive decoding as a pair. Dropping project_id
+// here is what forced the middleware to reach for the auth JWT's project id
+// instead — a field on a different refresh clock, whose skew exported one
+// project's prompts and completions under another project's ingest token.
+func TestConfigWire_TraceProjectIDTravelsWithToken(t *testing.T) {
+	var wire configWire
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"project_id":"proj-trace","project_otlp_token":"tok-trace"}`),
+		&wire,
+	))
+
+	cfg := wire.toDomain()
+
+	assert.Equal(t, "proj-trace", cfg.TraceProjectID)
+	assert.Equal(t, "tok-trace", cfg.ProjectOTLPToken)
+}
+
+// A null project_id (org without an internal_governance project) must decode to
+// empty rather than to some other project's id — the middleware fails closed on
+// empty and exports nothing, which is the safe outcome.
+func TestConfigWire_AbsentTraceProjectIDIsEmpty(t *testing.T) {
+	var wire configWire
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"project_id":null,"project_otlp_token":"tok"}`),
+		&wire,
+	))
+	cfg := wire.toDomain()
+
+	assert.Empty(t, cfg.TraceProjectID)
+}
+
+// VK tags ride the bundle so the gateway can stamp them on customer spans
+// (langwatch.labels) and match cache-rule vk_tags. Before this field existed
+// BundleConfig.VKTags was permanently nil and both consumers were dead.
+func TestConfigWire_VKTags(t *testing.T) {
+	var w configWire
+	require.NoError(t, json.Unmarshal([]byte(`{"vk_tags":["app=nexttrace","team=offsecops"]}`), &w))
+	cfg := w.toDomain()
+	assert.Equal(t, []string{"app=nexttrace", "team=offsecops"}, cfg.VKTags)
+}
+
+// failure_mode used to be decoded off the wire and then dropped when the
+// domain config was built, so RequestFailOpen and ResponseFailOpen were never
+// assigned and read false forever. That is invisible while nothing consults
+// them, and becomes a lie the moment something does: a guardrail an operator
+// set to FAIL_OPEN would block traffic on any evaluator error while the UI
+// still described it as fail-open. See #6157.
+func TestBuildGuardrails_FailureModeReachesTheDataPlane(t *testing.T) {
+	t.Run("a fail-open guardrail opts its direction into failing open", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii", FailureMode: "fail_open"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.True(t, got.RequestFailOpen, "fail_open on the wire must reach the pipeline")
+	})
+
+	t.Run("a fail-closed guardrail keeps its direction failing closed", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii", FailureMode: "fail_closed"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("an absent failure_mode fails closed", func(t *testing.T) {
+		// FAIL_CLOSED is the Prisma default and the only opt-out is the
+		// operator explicitly choosing FAIL_OPEN, so an older control plane
+		// that omits the field must not be read as permission to proceed.
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("one fail-closed guardrail makes the whole direction fail closed", func(t *testing.T) {
+		// The flag is per direction because a direction is one call, and an
+		// unreachable control plane returns no per-guardrail verdicts. The
+		// strictest guardrail on the direction therefore decides.
+		got := buildGuardrails(
+			[]guardrailWire{
+				{ID: "open", EvaluatorSlug: "a", FailureMode: "fail_open"},
+				{ID: "closed", EvaluatorSlug: "b", FailureMode: "fail_closed"},
+			},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"open", "closed"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("the directions are decided independently", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{
+				{ID: "pre-open", EvaluatorSlug: "a", FailureMode: "fail_open"},
+				{ID: "post-closed", EvaluatorSlug: "b", FailureMode: "fail_closed"},
+			},
+			[]guardrailAttachmentWire{
+				{Direction: "pre", GuardrailIDs: []string{"pre-open"}},
+				{Direction: "post", GuardrailIDs: []string{"post-closed"}},
+			},
+		)
+		assert.True(t, got.RequestFailOpen)
+		assert.False(t, got.ResponseFailOpen)
+	})
+
+	t.Run("a direction with no guardrails is vacuously fail-open", func(t *testing.T) {
+		// Nothing to bypass, so an error on an empty direction must not stop
+		// a request that the other direction's guardrails still govern.
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "post-closed", EvaluatorSlug: "b", FailureMode: "fail_closed"}},
+			[]guardrailAttachmentWire{{Direction: "post", GuardrailIDs: []string{"post-closed"}}},
+		)
+		assert.True(t, got.RequestFailOpen)
+		assert.False(t, got.ResponseFailOpen)
+	})
+}
+
+// The materialiser (config.materialiser.ts, gemini branch) emits project_id
+// and region on a Gemini credential exactly when it names the Agent
+// Platform door, and the router's door detection reads exactly those two
+// Extra fields (credentialIsAgentPlatform). This is the contract test for
+// that pair surviving the wire decoder: dropping either field silently
+// reroutes an Agent Platform key to generativelanguage.googleapis.com,
+// where its own restrictions refuse it.
+//
+// Spec: specs/model-providers/google-agent-platform.feature
+func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
+	t.Run("gemini slot preserves the agent-platform pair", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:   "mp-gap",
+			Type: "gemini",
+			Credentials: map[string]interface{}{
+				"api_key":    "AQ.agent-platform-key",
+				"project_id": "acme-123",
+				"region":     "us-central1",
+			},
+		})
+		assert.Equal(t, domain.ProviderGemini, cred.ProviderID)
+		assert.Equal(t, "AQ.agent-platform-key", cred.APIKey)
+		assert.Equal(t, "acme-123", cred.Extra["project_id"])
+		assert.Equal(t, "us-central1", cred.Extra["region"])
+	})
+
+	t.Run("bare gemini slot carries no pair", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:          "mp-gem",
+			Type:        "gemini",
+			Credentials: map[string]interface{}{"api_key": "AIza-studio"},
+		})
+		assert.Equal(t, domain.ProviderGemini, cred.ProviderID)
+		assert.Equal(t, "AIza-studio", cred.APIKey)
+		assert.Empty(t, cred.Extra["project_id"])
+		assert.Empty(t, cred.Extra["region"])
+	})
+
+	t.Run("half a pair is dropped, not forwarded", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:   "mp-half",
+			Type: "gemini",
+			Credentials: map[string]interface{}{
+				"api_key":    "k",
+				"project_id": "acme-123",
+			},
+		})
+		assert.Empty(t, cred.Extra["project_id"])
+	})
+}
+
+// The older side of a half-done deploy still sends "on" and "timeout_ms".
+// Neither was ever read, so ignoring them has to be a decode-time non-event:
+// the key keeps the attempt budget its operator configured, and the request is
+// served. Refusing the payload instead would take traffic down for the window
+// where the two sides disagree.
+//
+// @scenario "A key keeps serving while a deploy is half done"
+func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
+	payload := []byte(`{
+		"routing_mode": "fallback_all",
+		"fallback": {
+			"on": ["5xx", "timeout", "rate_limit_exceeded"],
+			"chain": ["pc_openai", "pc_anthropic"],
+			"timeout_ms": 30000,
+			"max_attempts": 3
+		}
+	}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 3, cfg.Fallback.MaxAttempts)
+	assert.Equal(t, []string{"pc_openai", "pc_anthropic"}, wire.Fallback.Chain)
+}
+
+// A control plane that has already dropped the keys is the other direction of
+// the same deploy, and must decode identically.
+func TestConfigWire_FallbackWithoutRetiredKeysDecodes(t *testing.T) {
+	payload := []byte(`{"routing_mode":"fallback_all","fallback":{"chain":["pc_openai"],"max_attempts":2}}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 2, cfg.Fallback.MaxAttempts)
+}
+
+// The key's own expiration date on the config wire. Three answers have to stay
+// apart, because two of them look the same to a decoder that only reads a
+// zero value: a key that never expires, and a control plane older than the field
+// that said nothing. Collapsing them lifts the expiry cap off a key whose own
+// token says it expires.
+//
+// Spec: specs/ai-gateway/auth-cache.feature, Rule "A changed expiration date
+// reaches the gateway on the config channel".
+//
+// @scenario "the config wire tells a null date apart from a missing one"
+func TestConfigWire_KeyExpiry(t *testing.T) {
+	decode := func(t *testing.T, payload string) *configWire {
+		t.Helper()
+		var wire configWire
+		require.NoError(t, json.Unmarshal([]byte(payload), &wire))
+		return &wire
+	}
+
+	t.Run("a unix timestamp is the date the key stops", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":1734568790}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known)
+		assert.True(t, at.Equal(time.Unix(1734568790, 0)), "got %s", at)
+	})
+
+	t.Run("an explicit null is a key that never expires", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":null}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known, "the control plane answered about expiry; the answer is that there is none")
+		assert.True(t, at.IsZero(), "no date, which is what the zero value means downstream")
+	})
+
+	t.Run("a missing field says nothing about expiry", func(t *testing.T) {
+		at, known, err := decode(t, `{"models_allowed":["gpt-5-mini"]}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.False(t, known, "the caller has to keep the date it already holds")
+		assert.True(t, at.IsZero())
+	})
+
+	t.Run("a field that is neither is a malformed response", func(t *testing.T) {
+		_, _, err := decode(t, `{"expires_at":"2026-09-01T00:00:00Z"}`).keyExpiry()
+
+		require.Error(t, err, "a date the gateway cannot read must fail the fetch, not move the key's end date")
+	})
+}
+
+// The control-plane half of the same contract. A rename or a unit change here
+// reads as "an older control plane" on the gateway side, which is tolerated by
+// design and therefore silent: the cap would quietly stop following a changed
+// date. Pin both the field and its unit.
+func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
+	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+
+	// Whitespace-tolerant: a formatter may break the expression across lines
+	// without breaking the contract it expresses.
+	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+	}
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+	}
 }

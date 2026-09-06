@@ -8,7 +8,7 @@ Feature: LangWatch MCP setup content is safe to paste into Gemini CLI
     And Gemini CLI is my coding agent
 
   # 2 of 3 scenarios are bound to existing tests in
-  # langwatch/src/features/onboarding/components/sections/code-prompts.unit.test.ts.
+  # platform/app/src/features/onboarding/components/sections/code-prompts.unit.test.ts.
   # The remaining 1 @unimplemented scenario is UPDATE-class per AUDIT_MANIFEST
   # — implementation diverged from the spec wording — and needs the scenario
   # rewritten before binding (tracked under #3458):

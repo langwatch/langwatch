@@ -54,9 +54,122 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     Then the span records no cache-read or cache-write tokens
     And the input-token count is the full prompt
 
+  # A streamed response reaches the gateway as a sequence of network reads,
+  # and a read boundary can land in the middle of the provider's usage
+  # report. The report must survive that split: the input and cache counts
+  # arrive exactly once, at the very start of the stream, so losing them
+  # meters and bills the whole call at zero input.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A usage report split across stream reads still counts
+    Given a streamed response whose usage report arrives split across two reads
+    When the stream completes
+    Then the span records the full input-token count
+    And the cache-read and cache-write token counts from that report
+
+  # A cache write is priced by how long its entry lives: Anthropic charges twice
+  # the input rate for an hour-long entry against 1.25 times for a five-minute
+  # one, and states which is which only in its own `usage.cache_creation`
+  # breakdown. The Anthropic-native lanes read that breakdown off the provider's
+  # body and put it on the span. Every other lane goes through a normalized usage
+  # struct carrying one flat cache-write count, so its writes stay priced
+  # short-lived; that is a known gap, and the session totals a coding agent
+  # reports for itself are where it would show.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A cache write bought for an hour is recorded as such on the span
+    Given an Anthropic-bound request whose response states its writes bought an hour-long entry
+    When the gateway completes the request
+    Then the span records how many tokens were written to an hour-long cache
+    And they are recorded alongside, not instead of, the total written
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A cache write whose lifetime the provider did not state is left unqualified
+    Given a response that reports cache writes without saying how long they live
+    When the gateway completes the request
+    Then the span records no hour-long cache write count
+    And those writes are priced short-lived, as they were before
+
+  # The raw-forward lane returns the provider's bytes verbatim while taking its
+  # usage from the normalized struct, so the write total and the hour-long split
+  # arrive from two different sources and the normalized struct reports no
+  # writes at all. The span derives fresh input by subtracting the write total,
+  # so leaving the pair unreconciled bills the same tokens as fresh input and
+  # again as an hour-long write.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: An hour-long write count never exceeds the write total it is part of
+    Given a response whose hour-long writes are larger than the reported write total
+    When the usage is reconciled
+    Then the write total covers the hour-long writes
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: An hour-long cache write is not also counted as fresh input
+    Given a lane that reports hour-long writes with no write total of its own
+    When the gateway completes the request
+    Then the span's input-token count excludes those written tokens
+    And they are recorded once, as an hour-long cache write
+
+  # ==========================================================================
+  # Making caching happen: provider defaults, no configuration required
+  # ==========================================================================
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Anthropic-bound requests get a prompt-cache breakpoint by default
+    Given a request routed to an Anthropic model with no cache rules configured
+    And the client sent no cache markers of its own
+    When the gateway forwards the request
+    Then the forwarded request carries a cache breakpoint covering the prompt prefix
+    And an immediate follow-up in the same conversation is served from the provider's cache
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A client's own cache markers are never overridden by the default
+    Given a request that already carries a cache marker the provider will honor
+    When the gateway forwards the request
+    Then the body is forwarded with the client's markers untouched
+    And no additional breakpoint is injected
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Markers the translated lane cannot forward do not block caching
+    Given an OpenAI-dialect request whose per-message cache markers are dropped in translation
+    When the gateway forwards the request to an Anthropic model
+    Then the request still gets the default prompt-cache breakpoint
+    And the follow-up is served from the provider's cache
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Providers that cache automatically are left alone
+    Given a request routed to a provider that caches long prompts on its own
+    When the gateway forwards the request
+    Then the body is forwarded unchanged
+
+  # ==========================================================================
+  # Codex lane: the bundled-account lane reports its cached share too
+  # ==========================================================================
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A codex-lane response's cached prompt share is captured
+    Given a codex-backed request whose response reports part of the prompt as cached
+    When the gateway completes the request
+    Then the span records the number of tokens read from the cache
+    And the fresh input-token count excludes the cached share
+
   # ==========================================================================
   # Cost: cache reads priced cheap, not as fresh input
   # ==========================================================================
+
+  # Two surfaces price the same request: the trace, from the span the gateway
+  # emits, and the budget, from the spend record it emits. Both feed the same
+  # rate table, so they can only disagree when the two records state different
+  # quantities. They did: the span took the cached tokens out of its input
+  # count and the spend record did not, so the Usage page and the budget
+  # reported different money for the same virtual key.
+
+  @bdd @cost @cache-telemetry @unit
+  Scenario: The trace and the bill price a cached request at the same number
+    Given one cached request's usage as the gateway measured it
+    When the trace surface and the spend surface each price it
+    Then both arrive at the same cost
+    And an input count that still holds the cached tokens costs more than both
 
   @bdd @cost @cache-telemetry @integration
   Scenario: Cost reflects cache pricing, not the full input price

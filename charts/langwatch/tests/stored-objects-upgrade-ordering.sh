@@ -1,0 +1,644 @@
+#!/usr/bin/env bash
+#
+# Renders the chart and asserts that an upgrade of a local-filesystem install
+# keeps the workers off the shared stored-objects volume while the app rolls.
+#
+# Why this matters. In local-filesystem mode the app Deployment and the workers
+# Deployment mount the same ReadWriteOnce PVC. A ReadWriteOnce volume attaches
+# to one node, so every consumer has to sit on that node. A helm upgrade rolls
+# both Deployments at once and nothing orders them, so on a cluster with more
+# than one node the new pod of one Deployment can be scheduled on a fresh node
+# while the old pod of the other still holds the attachment on the old node.
+# Both wedge in ContainerCreating with a multi-attach error (issue #7191).
+#
+# The chart answers with two hooks: a pre-upgrade Job that scales the workers to
+# 0 and waits for their pods to go away, and a post-upgrade Job that stands them
+# down again (helm's apply restores the count) until the app rollout finishes.
+# Everything about them is a Go template over several values: which installs
+# they render for, how long they wait, what they are allowed to touch. A gate
+# written the wrong way round, a wait shorter than the workers' own shutdown
+# budget, or an RBAC rule that grew wider are all invisible in the template
+# source and visible only in the rendered output.
+# See specs/setup/helm-stored-objects-upgrade-ordering.feature.
+#
+# Scenario bindings use the same `@scenario` token as the bats suites,
+# expressed as a hash-comment above the test function it verifies. The next
+# line that is neither blank nor a comment must be that function.
+#
+# Usage (from charts/langwatch):
+#   helm dependency build .
+#   ./tests/stored-objects-upgrade-ordering.sh
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+readonly HOOK_TEMPLATE="langwatch/templates/app/stored-objects-serialize-upgrade.yaml"
+readonly STORED_OBJECTS_PVC_TEMPLATE="langwatch/templates/app/stored-objects-pvc.yaml"
+readonly WORKERS_DEPLOYMENT="lw-workers"
+readonly APP_DEPLOYMENT="lw-app"
+readonly PRE_JOB="lw-stored-objects-upgrade-pre"
+readonly POST_JOB="lw-stored-objects-upgrade-post"
+
+# The workers' default grace period. The waits have to outlast it, because a
+# terminating pod keeps its volume attached to its node until it is fully gone.
+readonly DEFAULT_GRACE_SECONDS=55
+
+# Secret autogen, so the chart's own secret validation lets a bare render
+# through. Matches the other suites in this directory.
+readonly BASE="--set autogen.enabled=true"
+
+# Minimum flags that make S3 the active stored-objects backend. The chart
+# already defaults app.dataplane.provider to awsS3 and names a bucket, so the
+# switch is the only thing to set. There is no app.dataplane.s3 key.
+readonly DATAPLANE="--set app.dataplane.enabled=true --set app.dataplane.provider=awsS3 --set app.dataplane.bucket=langwatch-dataset"
+
+failures=0
+
+fail() {
+  echo "FAIL [$1]: $2"
+  failures=$((failures + 1))
+}
+
+# Renders a profile, aborting on a render error rather than letting an empty
+# result satisfy a "renders nothing" assertion.
+render() {
+  local out
+  # shellcheck disable=SC2086
+  if ! out=$(helm template lw . $BASE $1 2>&1); then
+    echo "RENDER ERROR for flags '$1':" >&2
+    printf '%s\n' "$out" | head -n 20 >&2
+    exit 2
+  fi
+  printf '%s\n' "$out"
+}
+
+# Prints only the documents the hook template produced, so a value from another
+# template can never satisfy an assertion.
+hook_block() {
+  render "$1" | awk -v want="$HOOK_TEMPLATE" '
+    /^# Source: / { grab = ($3 == want) }
+    grab { print }
+  '
+}
+
+# Prints the one document of a given kind out of a hook block on stdin.
+hook_doc() {
+  awk -v want="$1" '
+    /^# Source: / {
+      if (kind == want) { printf "%s", buf }
+      buf = ""; kind = ""; next
+    }
+    /^kind: / { kind = $2 }
+    { buf = buf $0 "\n" }
+    END { if (kind == want) printf "%s", buf }
+  '
+}
+
+# Prints the one document with a given metadata.name out of a hook block on
+# stdin. The two Jobs share a kind, so the name is what tells them apart.
+hook_doc_named() {
+  awk -v want="$1" '
+    /^# Source: / {
+      if (name == want) { printf "%s", buf }
+      buf = ""; name = ""; next
+    }
+    /^  name: / && name == "" { name = $2 }
+    { buf = buf $0 "\n" }
+    END { if (name == want) printf "%s", buf }
+  '
+}
+
+# Prints the exact `helm.sh/hook` value of a rendered document. Matched whole,
+# because a substring test for "pre-upgrade" passes just as happily against
+# "pre-upgrade,pre-rollback" and against "pre-upgrade" alone, and the whole
+# point of these assertions is which lifecycle events are covered.
+hook_events_of() {
+  printf '%s\n' "$1" | awk -F': ' '/helm.sh\/hook:/ { gsub(/ /, "", $2); print $2; exit }'
+}
+
+# Prints one component Deployment, the same way workers-shutdown.sh does.
+render_component() {
+  render "$2" | awk -v want="langwatch/templates/$1/deployment.yaml" '
+    /^# Source: / { grab = ($3 == want) }
+    grab { print }
+  '
+}
+
+# Asserts a profile renders no hook at all, and says which profile.
+expect_no_hook() {
+  local label="$1" flags="$2" block
+  block=$(hook_block "$flags")
+  if [ -n "$block" ]; then
+    fail "$label" "the upgrade hooks rendered where no volume is shared"
+    return
+  fi
+  echo "ok   [$label] no upgrade hooks rendered"
+}
+
+expect_contains() {
+  local label="$1" haystack="$2" needle="$3"
+  case "$haystack" in
+    *"$needle"*) return 0 ;;
+  esac
+  fail "$label" "expected to find: ${needle}"
+  return 1
+}
+
+expect_absent() {
+  local label="$1" haystack="$2" needle="$3"
+  case "$haystack" in
+    *"$needle"*)
+      fail "$label" "must not contain: ${needle}"
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+# Fails unless EVERY named value is a whole number. Validating them one by one
+# matters: concatenating two values and testing the result would let an empty
+# one hide behind a numeric one, and the arithmetic comparison that follows
+# would then error out, which `if` reads as false and the suite reports as ok.
+# Call as: expect_numbers <label> name=value name=value ...
+expect_numbers() {
+  local label="$1" pair name value
+  shift
+  for pair in "$@"; do
+    name=${pair%%=*}
+    value=${pair#*=}
+    case "$value" in
+      '' | *[!0-9-]* | -*-* | -)
+        fail "$label" "${name} did not render as a number (got '${value:-<absent>}')"
+        return 1
+        ;;
+    esac
+  done
+  return 0
+}
+
+# @scenario "A local-filesystem install gets a pre-upgrade step"
+test_default_install_renders_the_hook() {
+  local block pre app_block workers_block
+  block=$(hook_block "")
+  if [ -z "$block" ]; then
+    fail "default hook" "the default local-filesystem install rendered no upgrade hooks"
+    return
+  fi
+
+  pre=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  if [ -z "$pre" ]; then
+    fail "default hook" "the hooks rendered no ${PRE_JOB} Job"
+    return
+  fi
+  local pre_events
+  pre_events=$(hook_events_of "$pre")
+  if [ "$pre_events" != "pre-upgrade,pre-rollback" ]; then
+    fail "default hook" "the drain Job runs on '${pre_events:-<absent>}', expected pre-upgrade,pre-rollback"
+    return
+  fi
+
+  # The ordering claim, stated as the two facts a render can show: the Job is a
+  # pre-upgrade hook (helm runs those before it applies anything), and neither
+  # Deployment is a hook, so both are ordinary release resources that helm only
+  # touches afterwards. The RBAC carries a lower weight than the Job, so the
+  # ServiceAccount exists before the Job needs it.
+  app_block=$(render_component "app" "")
+  workers_block=$(render_component "workers" "")
+  expect_absent "default hook" "$app_block" "helm.sh/hook" || return 0
+  expect_absent "default hook" "$workers_block" "helm.sh/hook" || return 0
+
+  local job_weight rbac_weight
+  job_weight=$(printf '%s\n' "$pre" | awk -F'"' '/helm.sh\/hook-weight/ { print $2; exit }')
+  rbac_weight=$(printf '%s\n' "$block" | hook_doc Role | awk -F'"' '/helm.sh\/hook-weight/ { print $2; exit }')
+  expect_numbers "default hook" "the Job's weight=${job_weight}" "the Role's weight=${rbac_weight}" || return 0
+  if [ "$rbac_weight" -ge "$job_weight" ]; then
+    fail "default hook" \
+      "the Role's weight (${rbac_weight}) must be below the Job's (${job_weight}), or the Job can start without its permissions"
+    return
+  fi
+  echo "ok   [default hook] pre-upgrade Job at weight ${job_weight}, RBAC at ${rbac_weight}, Deployments are not hooks"
+}
+
+# @scenario "The pre-upgrade step scales the workers to zero and waits for the pods"
+test_hook_scales_workers_to_zero_and_waits() {
+  local pre
+  pre=$(hook_block "" | hook_doc_named "$PRE_JOB")
+
+  # The scale target, the count, and the wait all have to name the workers.
+  # Asserting only that the script says "replicas":0 would pass just as happily
+  # if it scaled the app.
+  expect_contains "scale and wait" "$pre" "deploy=\"${WORKERS_DEPLOYMENT}\"" || return 0
+  expect_contains "scale and wait" "$pre" '--subresource=scale' || return 0
+  expect_contains "scale and wait" "$pre" 'scale_workers 0' || return 0
+  expect_contains "scale and wait" "$pre" '--for=delete pod' || return 0
+  expect_contains "scale and wait" "$pre" \
+    "selector=\"app.kubernetes.io/name=${WORKERS_DEPLOYMENT},app.kubernetes.io/instance=lw\"" || return 0
+  echo "ok   [scale and wait] the pre-upgrade Job scales ${WORKERS_DEPLOYMENT} to 0 and waits for its pods to be deleted"
+}
+
+wait_seconds_of() {
+  printf '%s' "$1" | awk -F'=' '/^ *timeout=/ { gsub(/ /, "", $2); print $2; exit }'
+}
+
+deadline_seconds_of() {
+  printf '%s' "$1" | awk '/activeDeadlineSeconds:/ { print $2; exit }'
+}
+
+# Asserts one profile's wait outlasts the grace period that profile grants.
+expect_wait_outlasts_grace() {
+  local label="$1" flags="$2" grace="$3" job wait deadline
+  job=$(hook_block "$flags" | hook_doc_named "$PRE_JOB")
+  if [ -z "$job" ]; then
+    fail "$label" "rendered no ${PRE_JOB} Job"
+    return
+  fi
+  wait=$(wait_seconds_of "$job")
+  deadline=$(deadline_seconds_of "$job")
+  expect_numbers "$label" "the wait=${wait}" "activeDeadlineSeconds=${deadline}" || return 0
+  if [ "$wait" -le "$grace" ]; then
+    fail "$label" \
+      "the hook waits ${wait}s, which does not outlast the ${grace}s the workers may take to exit"
+    return
+  fi
+  # A deadline at or below the wait would kill the Job while the wait it was
+  # sized for is still running, which reads as "the pods never went away".
+  if [ "$deadline" -le "$wait" ]; then
+    fail "$label" \
+      "activeDeadlineSeconds is ${deadline}s, which cuts the ${wait}s wait short"
+    return
+  fi
+  echo "ok   [$label] waits ${wait}s for a ${grace}s grace period, with a ${deadline}s Job deadline"
+}
+
+# @scenario "The wait outlasts the time the workers may take to shut down"
+test_wait_outlasts_the_grace_period() {
+  expect_wait_outlasts_grace "wait vs grace" "" "$DEFAULT_GRACE_SECONDS"
+  # An operator who gives the workers a slower drain must not be left with a
+  # wait sized for the old one.
+  expect_wait_outlasts_grace "wait vs raised grace" \
+    "--set workers.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=120" \
+    120
+}
+
+# @scenario "The workers come back only after the app pod that holds the volume is running"
+test_workers_come_back_after_the_app_rollout() {
+  local block post replicas app_wait deadline
+  block=$(hook_block "")
+  post=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+  if [ -z "$post" ]; then
+    fail "post hook" "the hooks rendered no ${POST_JOB} Job"
+    return
+  fi
+  local post_events
+  post_events=$(hook_events_of "$post")
+  if [ "$post_events" != "post-upgrade,post-rollback" ]; then
+    fail "post hook" "the restore Job runs on '${post_events:-<absent>}', expected post-upgrade,post-rollback"
+    return
+  fi
+
+  # Stand the workers down again: helm's apply restored the count, and the new
+  # workers pod can follow the still-terminating old app pod back to the node
+  # the app is leaving.
+  expect_contains "post hook" "$post" 'scale_workers 0' || return 0
+  expect_contains "post hook" "$post" '--for=delete pod' || return 0
+
+  # Wait for the app, by name, before giving the workers back.
+  expect_contains "post hook" "$post" "app=\"${APP_DEPLOYMENT}\"" || return 0
+  expect_contains "post hook" "$post" 'wait_for_app_rollout "$app_timeout"' || return 0
+
+  # "Rolled out" has to mean the NEW pod. readyReplicas counts ready pods
+  # across every ReplicaSet, so a check built on it alone passes while the old
+  # pod is still the ready one, and the workers come back against the node the
+  # app is leaving. That is the wedge this hook exists to prevent, so assert on
+  # the fields that distinguish the generations.
+  local field
+  for field in updatedReplicas observedGeneration availableReplicas; do
+    expect_contains "post hook" "$post" ".status.${field}" || return 0
+  done
+  expect_absent "post hook" "$post" ".status.readyReplicas" || return 0
+  # No old pod may be left: status.replicas has to equal updatedReplicas.
+  expect_contains "post hook" "$post" '[ "$current" -eq "$updated" ]' || return 0
+  expect_contains "post hook" "$post" '[ "$available" -ge "$updated" ]' || return 0
+
+  # And then restore the count the release names, not a hardcoded 1.
+  replicas=$(printf '%s' "$post" | awk -F'=' '/^ *replicas=/ { gsub(/ /, "", $2); print $2; exit }')
+  if [ "$replicas" != "1" ]; then
+    fail "post hook" "the post-upgrade Job restores '${replicas:-<absent>}' replicas, expected the chart's workers.replicaCount of 1"
+    return
+  fi
+  expect_contains "post hook" "$post" 'scale_workers "$replicas"' || return 0
+
+  # The Job deadline has to cover both waits, or it kills itself before it can
+  # bring the workers back.
+  app_wait=$(printf '%s' "$post" | awk -F'=' '/^ *app_timeout=/ { gsub(/ /, "", $2); print $2; exit }')
+  deadline=$(deadline_seconds_of "$post")
+  expect_numbers "post hook" "app_timeout=${app_wait}" "activeDeadlineSeconds=${deadline}" || return 0
+  if [ "$deadline" -le "$app_wait" ]; then
+    fail "post hook" "activeDeadlineSeconds is ${deadline}s, which cuts the ${app_wait}s app wait short"
+    return
+  fi
+  echo "ok   [post hook] stands the workers down, waits up to ${app_wait}s for ${APP_DEPLOYMENT}, then restores ${replicas}"
+}
+
+# Prints the shell script a hook Job runs, dedented out of the rendered YAML
+# literal block and cut before the body, so the variables and the function
+# definitions can be sourced and driven directly.
+hook_script_prelude() {
+  printf '%s\n' "$1" | awk '
+    /^            - \|$/ { grab = 1; next }
+    !grab { next }
+    /^$/ { print ""; next }
+    /^              / {
+      line = substr($0, 15)
+      if (line ~ /^if ! deployment_exists/) { exit }
+      print line
+      next
+    }
+    { exit }
+  '
+}
+
+# The rollout check decides when the workers may come back, and getting it
+# wrong reintroduces the wedge silently. Asserting that the script mentions
+# `updatedReplicas` would pass just as happily if the comparison were
+# backwards, so this one runs the function against a fake kubectl and reads its
+# answer. See specs/setup/helm-stored-objects-upgrade-ordering.feature.
+#
+# @scenario "The workers come back only after the app pod that holds the volume is running"
+test_rollout_check_waits_for_the_new_pod() {
+  local post prelude workdir got
+  post=$(hook_block "" | hook_doc_named "$POST_JOB")
+  prelude=$(hook_script_prelude "$post")
+  if ! printf '%s\n' "$prelude" | grep -q 'app_rollout_done()'; then
+    fail "rollout check" "could not extract app_rollout_done from the rendered ${POST_JOB} Job"
+    return
+  fi
+
+  workdir=$(mktemp -d)
+  printf '%s\n' "$prelude" > "$workdir/lib.sh"
+  # A kubectl that answers with whatever the case under test holds.
+  printf '#!/bin/sh\nprintf %%s "$FAKE_STATE"\n' > "$workdir/kubectl"
+  chmod +x "$workdir/kubectl"
+
+  # generation|observedGeneration|spec.replicas|updatedReplicas|status.replicas|availableReplicas|
+  local label state want bad=0
+  local cases='settled on the new spec;5|5|1|1|1|1|;done
+controller has not seen the new spec;5|4|1|1|1|1|;waiting
+old pod still ready, new one not created;5|5|1||1|1|;waiting
+old pod still present beside the new one;5|5|1|1|2|2|;waiting
+new pod created but not yet available;5|5|1|1|1||;waiting
+nothing reported at all;||||||;waiting
+kubectl returned nothing;;waiting
+two replicas, only one updated;5|5|2|1|2|2|;waiting
+two replicas, one updated and no old pod left;5|5|2|1|1|1|;waiting
+two replicas, both updated and available;5|5|2|2|2|2|;done
+an app parked at zero replicas;5|5|0|||;done'
+
+  while IFS=';' read -r label state want; do
+    [ -z "$label" ] && continue
+    if PATH="$workdir:$PATH" FAKE_STATE="$state" \
+       bash -c ". '$workdir/lib.sh' >/dev/null 2>&1; app_rollout_done"; then
+      got=done
+    else
+      got=waiting
+    fi
+    if [ "$got" != "$want" ]; then
+      fail "rollout check" "'${label}' reported ${got}, expected ${want} (state '${state}')"
+      bad=1
+    fi
+  done <<EOF
+$cases
+EOF
+
+  rm -rf "$workdir"
+  [ "$bad" -eq 0 ] || return 0
+  echo "ok   [rollout check] the rollout is only done once every replica is from the new spec and available"
+}
+
+# @scenario "An install with object storage gets no upgrade steps"
+test_dataplane_renders_no_hook() {
+  expect_no_hook "dataplane" "$DATAPLANE"
+  # Anchor the reason: with S3 active there is no stored-objects PVC either, so
+  # nothing is shared and nothing needs ordering. Matched by template source,
+  # because the bundled datastores render PersistentVolumeClaims of their own.
+  local out
+  out=$(render "$DATAPLANE")
+  expect_absent "dataplane" "$out" "$STORED_OBJECTS_PVC_TEMPLATE" || return 0
+  echo "ok   [dataplane] no stored-objects PVC and no hooks"
+}
+
+# @scenario "An install without workers gets no upgrade steps"
+test_no_workers_renders_no_hook() {
+  expect_no_hook "workers off" "--set workers.enabled=false"
+}
+
+# @scenario "An operator can turn the upgrade steps off"
+test_knob_off_renders_no_hook() {
+  local flags="--set app.storedObjects.localFilesystem.serializeUpgrades=false"
+  expect_no_hook "knob off" "$flags"
+  # The knob orders the rollout, it does not change the storage mode: the PVC
+  # and the workers' mount of it have to survive.
+  local out workers_block
+  out=$(render "$flags")
+  expect_contains "knob off" "$out" "$STORED_OBJECTS_PVC_TEMPLATE" || return 0
+  workers_block=$(render_component "workers" "$flags")
+  expect_contains "knob off" "$workers_block" "claimName: lw-stored-objects" || return 0
+  echo "ok   [knob off] the PVC and the workers' mount of it are unchanged"
+}
+
+# @scenario "The steps may touch only the two Deployments and the pods beside them"
+test_hook_rbac_is_scoped() {
+  local block role
+  block=$(hook_block "")
+  role=$(printf '%s\n' "$block" | hook_doc Role)
+  if [ -z "$role" ]; then
+    fail "rbac scope" "the hooks rendered no Role"
+    return
+  fi
+
+  # Namespaced only. A ClusterRole here would hand the hooks every namespace.
+  expect_absent "rbac scope" "$block" "kind: ClusterRole" || return 0
+  expect_absent "rbac scope" "$block" "kind: ClusterRoleBinding" || return 0
+
+  # Named targets. Without resourceNames the hooks could scale any Deployment
+  # in the namespace.
+  expect_contains "rbac scope" "$role" "resourceNames: [\"${WORKERS_DEPLOYMENT}\", \"${APP_DEPLOYMENT}\"]" || return 0
+  expect_contains "rbac scope" "$role" "resourceNames: [\"${WORKERS_DEPLOYMENT}\"]" || return 0
+  local named_rules
+  named_rules=$(printf '%s\n' "$role" | grep -c 'resourceNames:' || true)
+  if [ "$named_rules" -ne 2 ]; then
+    fail "rbac scope" "expected both Deployment rules to name their targets, found ${named_rules} resourceNames"
+    return
+  fi
+
+  # Write access is the workers' scale subresource only. A patch on
+  # `deployments` itself could rewrite the image or the environment, and the app
+  # Deployment must not be writable at all.
+  expect_contains "rbac scope" "$role" 'resources: ["deployments"]' || return 0
+  expect_contains "rbac scope" "$role" 'resources: ["deployments/scale"]' || return 0
+  local deployment_verbs scale_verbs pod_verbs
+  deployment_verbs=$(printf '%s\n' "$role" | awk '/resources: \["deployments"\]/ { want=1 } want && /verbs:/ { print; exit }')
+  scale_verbs=$(printf '%s\n' "$role" | awk '/resources: \["deployments\/scale"\]/ { want=1 } want && /verbs:/ { print; exit }')
+  pod_verbs=$(printf '%s\n' "$role" | awk '/resources: \["pods"\]/ { want=1 } want && /verbs:/ { print; exit }')
+
+  expect_contains "rbac scope" "$deployment_verbs" 'verbs: ["get"]' || return 0
+  expect_contains "rbac scope" "$scale_verbs" 'verbs: ["get", "patch"]' || return 0
+  expect_contains "rbac scope" "$pod_verbs" 'verbs: ["get", "list", "watch"]' || return 0
+
+  # Nothing that can destroy or create work.
+  local verb
+  for verb in create delete deletecollection update; do
+    expect_absent "rbac scope" "$role" "\"${verb}\"" || return 0
+  done
+  echo "ok   [rbac scope] a namespaced Role: get on both Deployments, patch on the workers' scale, read on pods"
+}
+
+# @scenario "A first install is not blocked by the steps"
+test_hook_is_upgrade_only_and_tolerates_a_missing_deployment() {
+  local block pre post guard_exit
+  block=$(hook_block "")
+  pre=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  post=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+
+  # pre-install would run these on a fresh install, where there is no old pod
+  # holding the volume and no Deployment to scale.
+  expect_absent "first install" "$block" "pre-install" || return 0
+  expect_absent "first install" "$block" "post-install" || return 0
+
+  # ArgoCD and Flux map these phases to PreSync and PostSync and run them on the
+  # first sync anyway, so both scripts have to leave without an error.
+  local job label
+  for label in pre post; do
+    if [ "$label" = "pre" ]; then job="$pre"; else job="$post"; fi
+    expect_contains "first install" "$job" 'if ! deployment_exists; then' || return 0
+    guard_exit=$(printf '%s\n' "$job" | awk '/deployment_exists; then/ { want=1 } want && /^ *exit / { print $2; exit }')
+    if [ "$guard_exit" != "0" ]; then
+      fail "first install" "the ${label} Job must exit 0 when the Deployment is missing, it exits '${guard_exit:-<absent>}'"
+      return
+    fi
+  done
+  echo "ok   [first install] never an install phase, and both Jobs exit 0 when the Deployment is missing"
+}
+
+# A rollback moves both Deployments the same way an upgrade does, and helm
+# fires its own pair of events for it. A Job registered for the upgrade events
+# alone simply does not run there, silently, which is the worst shape this bug
+# can take: the operator is already recovering from a bad rollout.
+#
+# @scenario "A rollback is ordered the same way an upgrade is"
+test_rollback_runs_the_same_steps() {
+  local block doc name events want
+  block=$(hook_block "")
+  if [ -z "$block" ]; then
+    fail "rollback" "the default local-filesystem install rendered no upgrade hooks"
+    return
+  fi
+
+  # The two Jobs each need their own half of the rollback lifecycle.
+  doc=$(printf '%s\n' "$block" | hook_doc_named "$PRE_JOB")
+  events=$(hook_events_of "$doc")
+  if [ "$events" != "pre-upgrade,pre-rollback" ]; then
+    fail "rollback" "the drain Job runs on '${events:-<absent>}', expected pre-upgrade,pre-rollback"
+    return
+  fi
+  doc=$(printf '%s\n' "$block" | hook_doc_named "$POST_JOB")
+  events=$(hook_events_of "$doc")
+  if [ "$events" != "post-upgrade,post-rollback" ]; then
+    fail "rollback" "the restore Job runs on '${events:-<absent>}', expected post-upgrade,post-rollback"
+    return
+  fi
+
+  # The ServiceAccount, the Role and the RoleBinding need all four events, or a
+  # Job runs during a rollback with no identity and no permissions.
+  local kind
+  for kind in ServiceAccount Role RoleBinding; do
+    doc=$(printf '%s\n' "$block" | hook_doc "$kind")
+    if [ -z "$doc" ]; then
+      fail "rollback" "rendered no ${kind}"
+      return
+    fi
+    events=$(hook_events_of "$doc")
+    want="pre-upgrade,pre-rollback,post-upgrade,post-rollback"
+    if [ "$events" != "$want" ]; then
+      fail "rollback" "the ${kind} runs on '${events:-<absent>}', expected ${want}"
+      return
+    fi
+  done
+
+  # Count as well as sample, so a document added later cannot quietly skip the
+  # rollback events.
+  local rollback_docs doc_count
+  rollback_docs=$(printf '%s\n' "$block" | grep -c 'helm.sh/hook: .*rollback' || true)
+  doc_count=$(printf '%s\n' "$block" | grep -c '^# Source: ' || true)
+  if [ "$rollback_docs" -ne "$doc_count" ]; then
+    fail "rollback" "${doc_count} hook documents but only ${rollback_docs} cover a rollback"
+    return
+  fi
+  echo "ok   [rollback] all ${doc_count} hook documents cover the rollback events too"
+}
+
+# @scenario "A slow or broken app never leaves the workers switched off"
+test_post_hook_restores_workers_even_when_the_app_is_slow() {
+  local post tail_of_script
+  post=$(hook_block "" | hook_doc_named "$POST_JOB")
+
+  # The wait is wrapped in an if/else that reports the problem and carries on,
+  # rather than exiting. The scale back up therefore runs on both branches.
+  expect_contains "post hook resilience" "$post" 'if wait_for_app_rollout "$app_timeout"; then' || return 0
+  expect_contains "post hook resilience" "$post" 'Bringing the workers back anyway' || return 0
+
+  # Nothing between the wait and the scale-up may exit, or a slow app would
+  # leave the workers at 0.
+  tail_of_script=$(printf '%s\n' "$post" | awk '/waiting up to %ss for the %s rollout/ { want=1 } want && /scale_workers "\$replicas"/ { exit } want { print }')
+  if [ -z "$tail_of_script" ]; then
+    fail "post hook resilience" "could not find the rollout wait ahead of the scale back up"
+    return
+  fi
+  expect_absent "post hook resilience" "$tail_of_script" "exit 1" || return 0
+  echo "ok   [post hook resilience] a rollout that does not finish warns and still brings the workers back"
+}
+
+# @scenario "A failed step does not block the next upgrade"
+test_failed_hook_does_not_block_the_next_upgrade() {
+  local block policies
+  block=$(hook_block "")
+  policies=$(printf '%s\n' "$block" | grep 'helm.sh/hook-delete-policy' | sort -u)
+  if [ -z "$policies" ]; then
+    fail "delete policy" "the hooks declare no hook-delete-policy, so a failed Job blocks the next upgrade with AlreadyExists"
+    return
+  fi
+  # Every document needs it, not just one of the five.
+  local policy_count doc_count
+  policy_count=$(printf '%s\n' "$block" | grep -c 'helm.sh/hook-delete-policy' || true)
+  doc_count=$(printf '%s\n' "$block" | grep -c '^# Source: ' || true)
+  if [ "$policy_count" -ne "$doc_count" ]; then
+    fail "delete policy" "${doc_count} hook documents but only ${policy_count} carry a hook-delete-policy"
+    return
+  fi
+  expect_contains "delete policy" "$policies" "before-hook-creation" || return 0
+  # hook-failed would delete the evidence the operator needs to read.
+  expect_absent "delete policy" "$policies" "hook-failed" || return 0
+  echo "ok   [delete policy] all ${doc_count} hook documents replace themselves before the next attempt and keep a failed Job"
+}
+
+test_default_install_renders_the_hook
+test_hook_scales_workers_to_zero_and_waits
+test_wait_outlasts_the_grace_period
+test_workers_come_back_after_the_app_rollout
+test_rollout_check_waits_for_the_new_pod
+test_dataplane_renders_no_hook
+test_no_workers_renders_no_hook
+test_knob_off_renders_no_hook
+test_hook_rbac_is_scoped
+test_hook_is_upgrade_only_and_tolerates_a_missing_deployment
+test_rollback_runs_the_same_steps
+test_post_hook_restores_workers_even_when_the_app_is_slow
+test_failed_hook_does_not_block_the_next_upgrade
+
+if [ "$failures" -gt 0 ]; then
+  echo "$failures assertion(s) failed"
+  exit 1
+fi
+
+echo "all stored-objects-upgrade-ordering assertions passed"

@@ -6,6 +6,10 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Release.Name }}-app
     app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- with .Values.app.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.app.service.type }}
   ports:

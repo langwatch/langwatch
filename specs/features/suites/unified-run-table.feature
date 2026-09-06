@@ -45,38 +45,38 @@ Feature: Unified run table merging queued jobs and completed runs
     Then the pass rate shows completed results out of total jobs
     And pending jobs are reflected in the count
 
-  # Service layer: merge and deduplicate from both data sources
+  # Service layer: one source of truth covers the whole run lifecycle
   @integration
-  Scenario: Service merges BullMQ jobs and ES scenario events into a unified list
-    Given BullMQ has waiting and active jobs for a batch run
-    And ES has completed scenario events for the same batch run
+  Scenario: Service returns queued and completed runs in a unified list
+    Given a batch run has scenario runs still queued
+    And the same batch run has scenario runs that already completed
     When the service fetches the unified run list
-    Then the result contains rows for both queued jobs and completed runs
+    Then the result contains rows for both queued and completed runs
     And no duplicate rows exist for the same scenario run
 
-  # Deduplication: ES wins when both sources have data for the same scenario+target+batch
+  # A run that has progressed shows its latest state, never a stale placeholder
   @integration
-  Scenario: ES data takes precedence over BullMQ job data
-    Given a job exists in BullMQ as active for a scenario and target
-    And an ES event exists for the same scenario, target, and batch run
-    When the service merges both data sources
-    Then only the ES-sourced row is returned for that scenario execution
-
-  # Edge case: no queued jobs returns only ES data
-  @integration
-  Scenario: Returns only ES data when no jobs are queued
-    Given BullMQ has no waiting or active jobs for the suite
-    And ES has completed scenario events
+  Scenario: A scenario run shows its latest state
+    Given a scenario run that was queued and has since completed
     When the service fetches the unified run list
-    Then only ES-sourced rows are returned
+    Then only one row is returned for that scenario execution
+    And the row shows the completed result
 
-  # Edge case: no ES data returns only queued job rows
+  # Edge case: nothing pending returns only completed rows
   @integration
-  Scenario: Returns only queued rows when no ES events exist yet
-    Given BullMQ has waiting jobs for a batch run
-    And ES has no scenario events for that batch run
+  Scenario: Returns only completed rows when no runs are queued
+    Given the suite has no queued or running scenario runs
+    And completed scenario runs exist
     When the service fetches the unified run list
-    Then only queued job rows are returned
+    Then only completed rows are returned
+
+  # Edge case: nothing completed yet returns only queued rows
+  @integration
+  Scenario: Returns only queued rows when no runs have completed yet
+    Given a batch run has scenario runs queued
+    And none of them have reported results yet
+    When the service fetches the unified run list
+    Then only queued rows are returned
 
   # All Runs view works with unified data
   @integration @unimplemented
@@ -115,12 +115,11 @@ Feature: Unified run table merging queued jobs and completed runs
 
   # Service layer: deduplication logic
   @unit
-  Scenario: Deduplication removes BullMQ entries that have matching ES entries
-    Given a list of job rows and a list of ES rows
-    And some entries share the same scenario, target, and batch run
+  Scenario: Deduplication keeps a single row per scenario execution
+    Given a run list where some entries share the same scenario, target, and batch run
     When deduplication runs
-    Then overlapping entries use the ES version
-    And non-overlapping entries from both sources are preserved
+    Then overlapping entries collapse to the most recent state
+    And non-overlapping entries are preserved
 
   # Frontend: queued/running status rendering
   @integration @unimplemented

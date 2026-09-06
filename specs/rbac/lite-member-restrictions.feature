@@ -9,7 +9,7 @@ Feature: Lite member access restrictions
   certain resources or debug individual traces.
 
   # Several scenarios in this file are bound to existing JSDOM
-  # render tests under `langwatch/src/{tests,components}/...`:
+  # render tests under `platform/app/src/{tests,components}/...`:
   #   * TraceDetails-liteMember.integration.test.tsx
   #   * MessageHoverActions-liteMember.integration.test.tsx
   #   * datasets.lite-member.integration.test.tsx
@@ -235,14 +235,14 @@ Feature: Lite member access restrictions
   # R9: Restriction Modal Content
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Restriction modal uses role-based messaging
     When a restriction modal appears for sarah
     Then the title is "Feature Not Available"
     And the body explains the restriction is based on her role
     And the modal does not reference billing, plans, or pricing
 
-  @unit @unimplemented
+  @unit
   Scenario: Restriction modal offers "Contact Admin" not "Upgrade your plan"
     When a restriction modal appears for sarah
     Then the available actions are "Contact Admin" and "Dismiss"

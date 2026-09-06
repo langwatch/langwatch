@@ -1,0 +1,17 @@
+id: no-tautological-assertion-ts
+valid:
+  - |
+    expect(normalise(input)).toBe(expected);
+  - |
+    expect(result.status).toBe("ok");
+  - |
+    expect(rows).toEqual([{ id: "a" }]);
+  - |
+    expect(maybeUser).toBeDefined();
+invalid:
+  - |
+    expect(TIMEOUT_MS).toBe(TIMEOUT_MS);
+  - |
+    expect(true).toBe(true);
+  - |
+    expect(config.retries).toEqual(config.retries);

@@ -52,12 +52,12 @@ func (s *erroringStub) Close() error                { return s.err }
 func TestTraceStreamWrapper_StampsUpstreamErrorOnClose(t *testing.T) {
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   &erroringStub{err: &domain.UpstreamError{StatusCode: 504, Message: "upstream timeout"}},
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-opus-4-7"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            &erroringStub{err: &domain.UpstreamError{StatusCode: 504, Message: "upstream timeout"}},
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-opus-4-7"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		_ = wrapper.Chunk()
@@ -74,12 +74,12 @@ func TestTraceStreamWrapper_NoErrorLeavesStatusZero(t *testing.T) {
 	stub := newChunkedStub([][]byte{[]byte("data: {}\n\n")})
 	captured := newCapturedEnd()
 	wrapper := &traceStreamWrapper{
-		inner:   stub,
-		end:     captured.End,
-		bundle:  &domain.Bundle{ProjectID: "proj_test"},
-		req:     &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-opus-4-7"}},
-		meta:    &Meta{},
-		spanCtx: context.Background(),
+		inner:            stub,
+		end:              captured.End,
+		bundle:           &domain.Bundle{ProjectID: "proj_test"},
+		req:              &domain.Request{Type: domain.RequestTypeMessages, Resolved: &domain.ResolvedModel{ModelID: "claude-opus-4-7"}},
+		gatewayRequestID: "",
+		spanCtx:          context.Background(),
 	}
 	for wrapper.Next(context.Background()) {
 		_ = wrapper.Chunk()

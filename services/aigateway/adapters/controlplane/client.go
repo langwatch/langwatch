@@ -122,6 +122,30 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
+		// The control plane distinguishes the reversible disable and the
+		// self-serve expiry from the one-way revoke in its error code;
+		// forward the distinction so neither tenant is told its credential
+		// is gone for good. The decoded code decides it, never a substring
+		// of the body: the human-readable message travels in the same
+		// payload and may name a code this is not. An unrecognized or
+		// undecodable 403 still reads as revoked, which is the safe answer
+		// for a gateway older than the code.
+		var rejection struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(respBody, &rejection)
+		switch rejection.Error.Code {
+		case "virtual_key_disabled":
+			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
+				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			})
+		case "virtual_key_expired":
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+				"message": domain.KeyExpiredMessage,
+			})
+		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
 	case resp.StatusCode != http.StatusOK:
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
@@ -144,23 +168,18 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 
 // Change is one mutation observed by the control plane that the gateway
 // must react to (cache invalidation, in practice). Mirrors the wire shape
-// emitted by GET /api/internal/gateway/changes.
+// emitted by GET /api/internal/gateway/changes. Kind crosses this boundary
+// as an opaque string; the set the gateway acts on is enumerated by the
+// ChangeKind constants in the authresolver package, which is where the
+// switch over it lives.
 type Change struct {
-	Kind                 string
-	VirtualKeyID         string
-	BudgetID             string
-	ProviderCredentialID string
-	ProjectID            string
-	Revision             string
+	Kind            string
+	VirtualKeyID    string
+	BudgetID        string
+	ModelProviderID string
+	ProjectID       string
+	Revision        string
 }
-
-// Change kinds — keep in sync with the control-plane ChangeEventKind enum
-// in langwatch/src/server/gateway/changeEvent.repository.ts.
-const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
-	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
-)
 
 // PollChanges does one /changes long-poll. Returns the events the control
 // plane buffered since `since`, the org's current revision (advance the
@@ -227,12 +246,12 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	var wire struct {
 		CurrentRevision string `json:"current_revision"`
 		Changes         []struct {
-			Kind                 string `json:"kind"`
-			VirtualKeyID         string `json:"virtual_key_id"`
-			BudgetID             string `json:"budget_id"`
-			ProviderCredentialID string `json:"provider_credential_id"`
-			ProjectID            string `json:"project_id"`
-			Revision             string `json:"revision"`
+			Kind            string `json:"kind"`
+			VirtualKeyID    string `json:"virtual_key_id"`
+			BudgetID        string `json:"budget_id"`
+			ModelProviderID string `json:"model_provider_id"`
+			ProjectID       string `json:"project_id"`
+			Revision        string `json:"revision"`
 		} `json:"changes"`
 	}
 	if err := json.Unmarshal(body, &wire); err != nil {
@@ -241,43 +260,157 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	out := make([]Change, len(wire.Changes))
 	for i, ch := range wire.Changes {
 		out[i] = Change{
-			Kind:                 ch.Kind,
-			VirtualKeyID:         ch.VirtualKeyID,
-			BudgetID:             ch.BudgetID,
-			ProviderCredentialID: ch.ProviderCredentialID,
-			ProjectID:            ch.ProjectID,
-			Revision:             ch.Revision,
+			Kind:            ch.Kind,
+			VirtualKeyID:    ch.VirtualKeyID,
+			BudgetID:        ch.BudgetID,
+			ModelProviderID: ch.ModelProviderID,
+			ProjectID:       ch.ProjectID,
+			Revision:        ch.Revision,
 		}
 	}
 	return out, wire.CurrentRevision, nil
 }
 
 // FetchConfig retrieves the VK's full config from the control plane.
-func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleConfig, error) {
+//
+// Conditional when ifNoneMatch is non-empty: the ETag goes back as
+// If-None-Match and a 304 is reported as NotModified rather than a config.
+// The control plane derives that ETag from the virtual key's revision and
+// from the provider rows its config is built from (contract §4.2), so
+// revalidating a key nobody touched costs two indexed lookups instead of
+// materializing the whole bundle again. Both halves are needed: a credential
+// rotation writes the provider row and leaves the key's revision alone, and a
+// token that cannot see it would confirm a bundle carrying the replaced key.
+// An empty ifNoneMatch asks for the config outright.
+//
+// Anything other than a well-formed 200 or a 304 answering our own
+// If-None-Match is an error: a caller must never take a surprising response
+// as permission to keep serving config it cannot vouch for.
+func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (domain.ConfigFetchResult, error) {
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/config", url.PathEscape(vkID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
+	}
+	if ifNoneMatch != "" {
+		req.Header.Set("If-None-Match", ifNoneMatch)
 	}
 	c.setCommonHeaders(req)
 	c.sign(req, nil)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 
+	// A 304 can only answer a conditional request, so it can only mean the
+	// ETag we sent is still current. The result carries that same ETag back:
+	// a body-less response is no basis for adopting a different one, which
+	// would pin the caller to config it never fetched.
+	if ifNoneMatch != "" && resp.StatusCode == http.StatusNotModified {
+		return domain.ConfigFetchResult{ETag: ifNoneMatch, NotModified: true}, nil
+	}
 	if resp.StatusCode != http.StatusOK {
-		return domain.BundleConfig{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
+	}
+	// A read that ended in an error leaves the response's integrity unknown,
+	// and the bytes that did arrive parsing is not evidence to the contrary:
+	// a prefix can be a complete JSON object while the message it was cut out
+	// of never arrived whole. Config is only worth caching when the whole
+	// answer was seen, the more so because accepting it stamps the server's
+	// ETag on it, and every later refresh then revalidates against a token
+	// vouching for a response this node never fully read.
+	if readErr != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch body: %w", readErr)
 	}
 
 	var wire configWire
 	if err := json.Unmarshal(body, &wire); err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
 	}
-	return wire.toDomain(), nil
+	// An expires_at that is neither a unix timestamp nor null fails the whole
+	// fetch, the same way an unparseable body does: the caller then keeps the
+	// bundle it holds, with the expiry cap it already had, and the refusal is
+	// logged. Taking the rest of the config and dropping the date would move the
+	// key's own end date on a guess.
+	keyExpiry, keyExpiryKnown, err := wire.keyExpiry()
+	if err != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch expires_at: %w", err)
+	}
+	// A response with no ETag header stores none, so the next fetch goes out
+	// unconditional and gets the config outright.
+	return domain.ConfigFetchResult{
+		Config:                wire.toDomain(),
+		ETag:                  resp.Header.Get("ETag"),
+		VirtualKeyExpiresAt:   keyExpiry,
+		VirtualKeyExpiryKnown: keyExpiryKnown,
+	}, nil
+}
+
+// BudgetBucketSpend reads the current-period spend for one attributed-user
+// bucket: the enforcement figure behind per-end-user templates. Cached by
+// the caller (adapters/budget.CachedBucketSpend); this is the cold path.
+func (c *Client) BudgetBucketSpend(ctx context.Context, budgetID, endUserID string) (int64, error) {
+	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/budget-bucket-spend")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+	q := req.URL.Query()
+	q.Set("budget_id", budgetID)
+	q.Set("end_user_id", endUserID)
+	req.URL.RawQuery = q.Encode()
+	c.setCommonHeaders(req)
+	c.sign(req, nil)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("budget bucket spend returned %d", resp.StatusCode)
+	}
+	var wire struct {
+		SpentMicroUSD int64 `json:"spent_micro_usd"`
+	}
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return 0, err
+	}
+	return wire.SpentMicroUSD, nil
+}
+
+// Health performs the signed control-plane connectivity probe backing the
+// gateway's public /health status endpoint (adapters/statusprobe). It hits
+// the HMAC-protected /api/internal/gateway/health route rather than a
+// public liveness path on purpose: a success proves the whole channel the
+// gateway depends on to serve traffic: DNS, TCP/TLS, the app being up,
+// AND the shared internal secret matching. A wrong secret is the exact
+// misconfig where every pod looks green while every virtual-key resolve
+// is refused, and this is the only probe that catches it.
+func (c *Client) Health(ctx context.Context) error {
+	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/health")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	c.setCommonHeaders(req)
+	c.sign(req, nil)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	// Drain the small body so the pooled connection is reusable.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("control plane health returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // --- Internal helpers ---
@@ -289,6 +422,12 @@ type Claims struct {
 	TeamID         string
 	OrganizationID string
 	ExpiresAt      int64
+	// VirtualKeyExpiresAt is the vk_expires_at claim in unix seconds: the
+	// instant the key itself runs out. The control plane sends null for a key
+	// with no expiration date, and a gateway talking to a control plane older
+	// than the claim sees nothing at all; both decode to 0, which means the
+	// key never expires.
+	VirtualKeyExpiresAt int64
 }
 
 func extractClaims(m map[string]any) *Claims {
@@ -308,17 +447,26 @@ func extractClaims(m map[string]any) *Claims {
 	if v, ok := m["exp"].(float64); ok {
 		c.ExpiresAt = int64(v)
 	}
+	if v, ok := m["vk_expires_at"].(float64); ok {
+		c.VirtualKeyExpiresAt = int64(v)
+	}
 	return c
 }
 
 func claimsToBundle(c *Claims) *domain.Bundle {
-	return &domain.Bundle{
+	b := &domain.Bundle{
 		VirtualKeyID:   c.VirtualKeyID,
 		ProjectID:      c.ProjectID,
 		TeamID:         c.TeamID,
 		OrganizationID: c.OrganizationID,
 		ExpiresAt:      time.Unix(c.ExpiresAt, 0),
 	}
+	// A zero claim stays the zero time rather than becoming 1970, which every
+	// clock comparison would read as an expired key.
+	if c.VirtualKeyExpiresAt > 0 {
+		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	return b
 }
 
 // setCommonHeaders stamps headers shared by every outbound control-plane request.
@@ -326,6 +474,53 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
+}
+
+// RefreshCodexToken asks the control plane — the codex OAuth session's owner —
+// to refresh the provider row's stored tokens and hand back a fresh access
+// token. Implements domain.CodexTokenRefresher; a dead session (the control
+// plane answers 401 codex_session_expired) wraps domain.ErrCodexSessionDead
+// so the dispatcher stops retrying and surfaces the sign-in-again error.
+func (c *Client) RefreshCodexToken(ctx context.Context, providerRowID string) (string, string, error) {
+	payload, err := json.Marshal(map[string]string{"provider_row_id": providerRowID})
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := c.signedPost(ctx, "/api/internal/gateway/codex/refresh", payload)
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh call: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh read: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		// herr carries the typed code for surfacing; ErrCodexSessionDead rides
+		// as a reason so the dispatcher's errors.Is sentinel check still fires.
+		return "", "", herr.New(ctx, domain.ErrCodexSessionExpired, nil, domain.ErrCodexSessionDead)
+	}
+	if resp.StatusCode != http.StatusOK {
+		snippet := body
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason":      "codex refresh failed",
+			"http_status": resp.StatusCode,
+			"body":        string(snippet),
+		})
+	}
+	var parsed struct {
+		AccessToken string `json:"access_token"`
+		AccountID   string `json:"account_id"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil || parsed.AccessToken == "" {
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason": "codex refresh: malformed response",
+		})
+	}
+	return parsed.AccessToken, parsed.AccountID, nil
 }
 
 // signedPost is a helper for POST requests to the control plane.

@@ -9,10 +9,13 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
   Two paths the wrapper can pick:
     - Path A "Gateway (virtual key)": LLM calls route through the LangWatch
       gateway via the user's personal virtual key. LLM usage is billed to the
-      gateway. (cfg.tool_mode = "gateway")
+      gateway. Offered in the prompt as "Using an API key".
+      (cfg.tool_mode = "gateway")
     - Path B "Direct OTLP": the tool calls its own provider with the user's own
       plan, and only OTLP telemetry is sent to LangWatch, authorized by the
-      user's personal ingest key. (cfg.tool_mode = "ingestion")
+      user's personal ingest key. Offered in the prompt with per-tool
+      subscription wording, e.g. "Using a Claude subscription" for claude.
+      (cfg.tool_mode = "ingestion")
 
   The remembered answer lives in cfg.tool_mode[tool] (the existing per-tool
   routing field). The wrapper only prompts when the answer is not already
@@ -29,19 +32,22 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
 
   Rule: prompt only when both paths are allowed, on a TTY, with no remembered answer
 
+    # Launch-day users are mostly on Claude subscriptions, so the subscription (direct OTLP) choice is listed first and is the default.
+
     @unit
     Scenario: First interactive run with both paths allowed prompts for the path
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
       When the user runs `langwatch claude`
       Then the wrapper shows a select prompt asking how `langwatch claude` should run
-      And the prompt offers a "Gateway (virtual key)" choice and a "Direct OTLP" choice
+      And the prompt offers "Using a Claude subscription" first and "Using an API key" second
+      And the pre-selected default is "Using a Claude subscription"
 
     @unit
     Scenario: Choosing the gateway remembers it and does not prompt again
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
-      When the user runs `langwatch claude` and picks "Gateway (virtual key)"
+      When the user runs `langwatch claude` and picks "Using an API key"
       Then cfg.tool_mode.claude is saved as "gateway"
       And the wrapper prints a one-line tip explaining how to change it later
       When the user runs `langwatch claude` again
@@ -51,7 +57,7 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
     Scenario: Choosing direct OTLP remembers it as ingestion
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
-      When the user runs `langwatch claude` and picks "Direct OTLP"
+      When the user runs `langwatch claude` and picks "Using a Claude subscription"
       Then cfg.tool_mode.claude is saved as "ingestion"
       And the wrapper proceeds in ingestion mode
 
@@ -75,15 +81,21 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
       Then the wrapper does NOT prompt
       And it proceeds in ingestion mode
 
-  Rule: non-interactive and forced contexts default to the gateway with no prompt
+  Rule: the gateway path is only ever entered by explicit choice
+
+    Routing through the gateway spends money: the model calls go through
+    LangWatch-held provider credentials and are billed to the organization.
+    The only ways in are the prompt, a pinned cfg.tool_mode, `--tool-mode=gateway`,
+    and `LANGWATCH_TOOL_MODE=gateway`. Nothing the wrapper decides on its own,
+    and no failure on the direct OTLP path, may put a run on it.
 
     @unit
-    Scenario: Non-TTY defaults to the gateway
+    Scenario: Non-TTY takes the path that spends nothing
       Given tool_mode.claude is unset
       And stdin is not a TTY
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
-      And it defaults to the gateway path
+      And it proceeds in ingestion mode
 
     @unit
     Scenario: LANGWATCH_AUTO_LOGIN skips the prompt
@@ -91,7 +103,55 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
       And `LANGWATCH_AUTO_LOGIN=1` is exported
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
-      And it defaults to the gateway path
+      And it proceeds in ingestion mode
+
+    @unit
+    Scenario: Cancelling the path prompt cancels the run
+      Given tool_mode.claude is unset
+      And stdin and stdout are a TTY
+      When the user runs `langwatch claude` and aborts the select prompt
+      Then the run is marked aborted and no path is persisted
+      And the wrapper does NOT resolve to the gateway path
+
+  Rule: an expired device session never reroutes the run onto the gateway
+
+    Direct OTLP setup mints a personal ingest key against the control plane, so
+    an expired device session fails it. That is a session problem, not a signal
+    that the user wanted to be billed, so the wrapper says what happened and
+    either recovers the session or stops.
+
+    @unit
+    Scenario: The mint 401 is recognised as an expired session
+      Given the ingestion-key mint returns 401 "Session expired"
+      Then the wrapper classifies the failure as an expired session
+      And a `tool_disabled` policy error is NOT classified as one
+
+    @unit
+    Scenario: On a TTY the wrapper offers the login and stays on direct OTLP
+      Given tool_mode.codex is "ingestion"
+      And the device session has expired
+      And stdin and stdout are a TTY
+      When the user runs `langwatch codex`
+      Then the wrapper explains that the session expired
+      And it asks the user to log in again
+      And on success it retries the direct OTLP path with the refreshed config
+
+    @unit
+    Scenario: Declining the login stops the run instead of starting the tool
+      Given the device session has expired
+      And stdin and stdout are a TTY
+      When the user declines the login prompt
+      Then the wrapper exits non-zero without starting the tool
+
+    @unit
+    Scenario: Without a TTY the wrapper exits and names the login command
+      Given tool_mode.codex is "ingestion"
+      And the device session has expired
+      And stdin is not a TTY
+      When the user runs `langwatch codex`
+      Then the wrapper exits non-zero
+      And the message names `langwatch login --device`
+      And the message says the gateway path was not used
 
   Rule: an explicit override flag or env skips the prompt and is stripped from forwarded args
 

@@ -1,0 +1,141 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"transform": [
+		{
+			"calculate": "datum.total + 1",
+			"as": "s0"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s1"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s2"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s3"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s4"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s5"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s6"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s7"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s8"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s9"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s10"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s11"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s12"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s13"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s14"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s15"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s16"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s17"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s18"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s19"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s20"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s21"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s22"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s23"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s24"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s25"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s26"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s27"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s28"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s29"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s30"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s31"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "s32"
+		}
+	]
+}

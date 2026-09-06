@@ -1,0 +1,1187 @@
+package workerpool
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/egress"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/otelrelay"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/pi"
+	"github.com/langwatch/langwatch/services/langyagent/adapters/runner/sandboxed"
+	"github.com/langwatch/langwatch/services/langyagent/app"
+	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
+	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
+)
+
+// revokeTimeout bounds the revoke call to the control plane. Short on purpose:
+// the worker is already dead, nothing is waiting on the answer, and a control
+// plane that is slow or down must not leave revocation goroutines piling up. A
+// revoke we abandon is one the reaper collects.
+const revokeTimeout = 5 * time.Second
+
+// Options configure a Pool. Constructed from the service Config in deps.go.
+type Options struct {
+	MaxWorkers       int
+	WorkerIdle       time.Duration
+	ReadinessTimeout time.Duration
+	ReaperInterval   time.Duration
+	SessionsRoot     string
+	WorkspaceRoot    string
+	// PiBinaryPath is the langy-worker executable a worker spawns (resolved
+	// via PATH when bare).
+	PiBinaryPath string
+	// Runner is the isolation substrate for worker subprocesses — the ADR-033
+	// secure-vs-local seam (adapters/runner/sandboxed vs adapters/runner/localunsafe),
+	// chosen once at the composition root. nil defaults to the sandboxed (secure)
+	// runner, so a mis-wire fails closed rather than silently running without
+	// per-worker UID isolation.
+	Runner app.Runner
+	// Telemetry and Egress are injected; nil falls back to a working default
+	// (no-op instruments / pass-through guard) so tests and partial wiring boot.
+	Telemetry *telemetry.Telemetry
+	Egress    egress.Guard
+	// Revoker asks the control plane to revoke a dead worker's session key. nil
+	// disables revocation — the key then simply lives out its TTL and the control
+	// plane's reaper collects it, which is the same backstop that covers a manager
+	// killed outright. Optional, so tests and partial wiring boot unchanged.
+	Revoker CredentialRevoker
+	// OTelRelay is the manager's loopback telemetry + LLM mediation relay
+	// (adapters/otelrelay). When set, each spawned worker is registered with it:
+	// the worker exports OTLP to the relay (no LangWatch key in the worker env)
+	// and its LLM traffic is proxied through it (no virtual key in the worker
+	// env). nil ⇒ unmediated fallback wiring — tests and partial wiring boot
+	// unchanged.
+	OTelRelay *otelrelay.Relay
+}
+
+// agentCloser is the optional capability an agent implements when it owns a
+// resource cmd.Wait does not release. The pi agent holds the parent's write end
+// of the worker's stdin pipe; an agent that holds nothing does not
+// implement it.
+type agentCloser interface {
+	Close()
+}
+
+// closeAgent releases an agent's own pipes, if it holds any. Idempotent, so
+// the failed-spawn rollback, the kill path and the exit watcher can all call
+// it.
+func closeAgent(agent app.CodingAgent) {
+	if closer, ok := agent.(agentCloser); ok {
+		closer.Close()
+	}
+}
+
+// closeAgentOf is closeAgent for a registered worker.
+func closeAgentOf(w *Worker) {
+	if w == nil {
+		return
+	}
+	closeAgent(w.agent)
+}
+
+// CredentialRevoker revokes the session key a dead worker was carrying.
+//
+// Consumer-side interface, deliberately one method wide: the pool must be able to
+// destroy a credential and must NOT be able to create one. Anything broader here
+// would let a future change quietly hand the manager minting power.
+type CredentialRevoker interface {
+	Revoke(ctx context.Context, endpoint, projectID, apiKeyID string) error
+}
+
+// Pool owns the per-conversation worker registry (the former Manager). It
+// guarantees:
+//
+//   - One worker per conversationID (spawnLocks dedupe concurrent first turns).
+//   - A hard cap at MaxWorkers using a synchronous pendingSpawns counter so N
+//     distinct conversations arriving at once can't all observe an empty
+//     registry and all spawn.
+//   - Unique kernel UIDs across all active workers (workerUIDFor + linear
+//     probe). Without this, two conversations whose ids hashed to the same UID
+//     would share kernel identity, breaking the cross-tenant credential
+//     boundary chmod 0700 enforces.
+//   - Registry deletes guarded by *exec.Cmd identity. A killed-then-respawned
+//     conversation must not have its replacement's entry deleted by the
+//     original child's exit goroutine.
+//
+// It satisfies app.WorkerPool.
+type Pool struct {
+	maxWorkers       int
+	workerIdle       time.Duration
+	readinessTimeout time.Duration
+	reaperInterval   time.Duration
+	sessionsRoot     string
+	// sessionsRootLock is this manager's claim on sessionsRoot; it is what
+	// makes the boot wipe safe. Released on Shutdown, and by the kernel when
+	// the process dies.
+	sessionsRootLock *sessionsRootLock
+	workspaceRoot    string
+	piBinaryPath     string
+	runner           app.Runner
+	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
+	// spawn writes these bytes through unchanged and never reads disk for them.
+	// Always populated: New fails when the file is unreadable, so no Pool
+	// reaches a spawn without the system prompt it has to write.
+	agentsTemplate string
+
+	telemetry *telemetry.Telemetry
+	egress    egress.Guard
+	revoker   CredentialRevoker
+	otelRelay *otelrelay.Relay
+
+	// baseCtx is the pool-lifetime context (carries the logger; canceled on
+	// Shutdown). Worker subprocesses bind to it at spawn so a pool shutdown /
+	// deadline propagates to them.
+	baseCtx    context.Context
+	baseCancel context.CancelFunc
+
+	mu            sync.Mutex
+	workers       map[string]*Worker
+	spawnLocks    map[string]chan struct{}
+	pendingSpawns int32
+	// uidToConv tracks every UID currently held by an active worker.
+	uidToConv map[uint32]string
+
+	reaperWG sync.WaitGroup
+	stopCh   chan struct{}
+}
+
+var _ app.WorkerPool = (*Pool)(nil)
+
+// New prepares SESSIONS_ROOT and returns a ready Pool.
+//
+// /workspace is an emptyDir that survives container restarts in the same pod, so
+// plaintext per-session credentials and cloned repos could otherwise persist
+// indefinitely if the prior manager crashed before its exit handler ran. Wipe
+// before accepting traffic.
+//
+// ctx becomes the pool-lifetime context (carries the logger; a copy with
+// cancellation is stored so Shutdown propagates to worker subprocesses).
+func New(ctx context.Context, opts Options) (*Pool, error) {
+	rootLock, err := lockSessionsRoot(opts.SessionsRoot)
+	if err != nil {
+		return nil, err
+	}
+	if err := wipeSessionsRoot(opts.SessionsRoot); err != nil {
+		rootLock.Release()
+		return nil, err
+	}
+	// AGENTS.md + skills are EMBEDDED in the binary (internal/assets), not seeded
+	// into /workspace by the entrypoint. Read the template once (a spawn writes it
+	// through unchanged) and materialize the skills tree
+	// onto disk under WorkspaceRoot/skills so each worker can discover it;
+	// setupWorkerHome symlinks each worker home at that path. Both are fatal on
+	// failure — a manager that can't provide the system prompt or skills must not
+	// accept traffic and silently spawn crippled workers.
+	agentsTemplate, err := assets.AgentsTemplate()
+	if err != nil {
+		rootLock.Release()
+		return nil, fmt.Errorf("load embedded AGENTS.md: %w", err)
+	}
+	if err := assets.MaterializeSkills(filepath.Join(opts.WorkspaceRoot, "skills")); err != nil {
+		rootLock.Release()
+		return nil, fmt.Errorf("materialize embedded skills: %w", err)
+	}
+	tel := opts.Telemetry
+	if tel == nil {
+		tel = telemetry.New()
+	}
+	var guard = opts.Egress
+	if guard == nil {
+		guard = egress.NewPassThrough()
+	}
+	// nil Runner fails CLOSED to the secure substrate: a mis-wire runs sandboxed
+	// (per-worker setuid + chown), never accidentally without isolation.
+	runner := opts.Runner
+	if runner == nil {
+		runner = sandboxed.New()
+	}
+	baseCtx, baseCancel := context.WithCancel(ctx)
+	return &Pool{
+		maxWorkers:       opts.MaxWorkers,
+		workerIdle:       opts.WorkerIdle,
+		readinessTimeout: opts.ReadinessTimeout,
+		reaperInterval:   opts.ReaperInterval,
+		sessionsRoot:     opts.SessionsRoot,
+		sessionsRootLock: rootLock,
+		workspaceRoot:    opts.WorkspaceRoot,
+		piBinaryPath:     opts.PiBinaryPath,
+		runner:           runner,
+		agentsTemplate:   agentsTemplate,
+		telemetry:        tel,
+		egress:           guard,
+		revoker:          opts.Revoker,
+		otelRelay:        opts.OTelRelay,
+		baseCtx:          baseCtx,
+		baseCancel:       baseCancel,
+		workers:          make(map[string]*Worker),
+		spawnLocks:       make(map[string]chan struct{}),
+		uidToConv:        make(map[uint32]string),
+		stopCh:           make(chan struct{}),
+	}, nil
+}
+
+// StartReaper begins the idle-worker sweep. Idempotent; safe to call once.
+func (p *Pool) StartReaper() {
+	p.reaperWG.Add(1)
+	go func() {
+		defer p.reaperWG.Done()
+		t := time.NewTicker(p.reaperInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-p.stopCh:
+				return
+			case <-t.C:
+				// Per-iteration recovery: a panic in ONE sweep must not end idle
+				// reaping forever (a whole-goroutine recover would). Log + continue.
+				func() {
+					defer clog.HandlePanic(p.baseCtx, false)
+					p.reapIdle()
+				}()
+			}
+		}
+	}()
+}
+
+// Shutdown stops the reaper and tears down every active worker, then cancels
+// the pool-lifetime context (which any surviving worker subprocess is bound
+// to). Called from the lifecycle Closer; idempotent.
+func (p *Pool) Shutdown() {
+	select {
+	case <-p.stopCh:
+		p.baseCancel()
+		return
+	default:
+		close(p.stopCh)
+	}
+	p.reaperWG.Wait()
+
+	p.mu.Lock()
+	ids := make([]string, 0, len(p.workers))
+	for id := range p.workers {
+		ids = append(ids, id)
+	}
+	p.mu.Unlock()
+
+	for _, id := range ids {
+		p.kill(id, "shutdown")
+	}
+	p.sessionsRootLock.Release()
+	p.baseCancel()
+}
+
+// ShutdownHandoff is the ADR-048 pre-drain SIGTERM step. For each live worker it
+// posts a shutdown-imminent notice (so the worker checkpoints the in-flight turn
+// and emits a terminal `handoff` frame), then waits — bounded by deadline — for
+// every in-flight turn to quiesce, so the frames flush to the control plane over
+// the still-open /chat responses before Shutdown kills the process groups.
+//
+// It runs BEFORE Shutdown (registered as a lifecycle Closer after the
+// worker-pool, so reverse-order stop fires it first). Best-effort by design: a
+// worker that cannot be notified, or a turn that does not quiesce before the
+// deadline, falls back to a cold restart on its next turn — the honest
+// SIGKILL/OOM limit stated in ADR-048. The deadline caps the whole step so a
+// slow/dead worker can never eat the drain budget out from under the kill.
+func (p *Pool) ShutdownHandoff(ctx context.Context, deadline time.Time) {
+	// Snapshot the live workers under the lock; do all network I/O outside it.
+	p.mu.Lock()
+	workers := make([]*Worker, 0, len(p.workers))
+	for _, w := range p.workers {
+		workers = append(workers, w)
+	}
+	p.mu.Unlock()
+	if len(workers) == 0 {
+		return
+	}
+
+	hctx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+
+	log := clog.Get(p.baseCtx)
+	log.Info("shutdown handoff: notifying live workers",
+		zap.Int("workers", len(workers)),
+		zap.Time("deadline", deadline),
+	)
+
+	// Notify each worker in parallel. Bare goroutine guarded by HandlePanic so a
+	// panic in one POST can never take the manager down mid-shutdown (PR4 has no
+	// clog.Go yet; this is exactly what it would do — composes when it lands).
+	var wg sync.WaitGroup
+	for _, w := range workers {
+		wg.Add(1)
+		w := w
+		// clog.Go panic-guards the goroutine so a panic in one notify can never
+		// take the manager down mid-shutdown (PR3).
+		clog.Go(hctx, "shutdown-handoff-notify", func() {
+			defer wg.Done()
+			// Cap a single hung notify so it cannot consume the whole budget.
+			nctx, ncancel := context.WithTimeout(hctx, 2*time.Second)
+			defer ncancel()
+			if err := w.NotifyShutdownImminent(nctx, deadline); err != nil {
+				log.Warn("shutdown handoff: notify failed",
+					zap.String("conversation", w.conversationID),
+					zap.Error(err),
+				)
+			}
+		})
+	}
+	wg.Wait()
+
+	// Wait for in-flight turns to drain (their StreamEvents saw the terminal
+	// handoff frame and Released the worker) or the deadline. Polling keeps this
+	// lock-light; the deadline caps it.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if p.countInFlight(workers) == 0 {
+			log.Info("shutdown handoff: all in-flight turns quiesced")
+			return
+		}
+		select {
+		case <-hctx.Done():
+			log.Warn("shutdown handoff: deadline reached with turns still in flight — falling back to cold restart",
+				zap.Int("still_in_flight", p.countInFlight(workers)),
+			)
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// countInFlight reports how many of the given workers still have a turn in
+// flight. Used by ShutdownHandoff to wait for the in-flight turns to quiesce.
+func (p *Pool) countInFlight(workers []*Worker) int {
+	n := 0
+	for _, w := range workers {
+		if w.isInFlight() {
+			n++
+		}
+	}
+	return n
+}
+
+// HasLiveWorker reports whether a worker is already running for this
+// conversation whose capabilities match `sig`.
+//
+// This is the pre-flight the control plane uses to decide whether it needs to
+// mint a session key at all. It answers exactly the question Acquire would ask
+// and nothing more — in particular the signature is computable WITHOUT a key
+// (it reads only model / active capability keys / egress allow-list, all
+// presence-based), which is what makes "probe, then mint only if spawning"
+// possible in the first place.
+//
+// Deliberately advisory: the worker can die immediately after we answer true.
+// The control plane does not have to get this right, because Acquire refuses a
+// keyless spawn with ErrCredentialsRequired and the caller mints and retries. A
+// stale `true` costs one round trip; it can never boot a broken worker.
+func (p *Pool) HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	w, ok := p.workers[conversationID]
+	return ok && w.credSig == sig
+}
+
+// revokeKeyOf asks the control plane to revoke a dead worker's session key.
+//
+// Fire-and-forget on the pool's base context, NOT the caller's: the caller is
+// usually kill(), which may be running under a request that is about to return,
+// and a revocation must not be canceled just because the turn finished. It must
+// also never block a kill — a dead worker's cleanup cannot wait on an HTTP call
+// to a control plane that might be down.
+//
+// Best-effort by design. If it fails, the key still expires and the control
+// plane's reaper collects it; this call only shortens the window. It has to be
+// this way: a manager that is SIGKILLed (OOM, eviction, force-delete) runs no
+// cleanup at all, so revocation can never be the guarantee — only the fast path.
+func (p *Pool) revokeKeyOf(w *Worker, reason string) {
+	if p.revoker == nil || w == nil || w.apiKeyID == "" {
+		return
+	}
+	apiKeyID, projectID, endpoint, conversationID := w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID
+	go func() {
+		defer clog.HandlePanic(p.baseCtx, false)
+		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
+		defer cancel()
+		if err := p.revoker.Revoke(ctx, endpoint, projectID, apiKeyID); err != nil {
+			clog.Get(p.baseCtx).Warn("revoking worker session key failed — it will expire and be reaped instead",
+				zap.String("conversation", conversationID),
+				zap.String("reason", reason),
+				zap.Error(err),
+			)
+			return
+		}
+		clog.Get(p.baseCtx).Debug("revoked worker session key",
+			zap.String("conversation", conversationID),
+			zap.String("reason", reason),
+		)
+	}()
+}
+
+// capabilitiesFor assembles the turn's capability set from its credentials — the
+// ONE place the pool enumerates it, used for BOTH the worker env (each
+// Contribute) and the credential signature (app.SignatureKeys), so the two can
+// never drift. GitHub is the only capability today; it is inert when the turn
+// carried no token. (The probe path builds the equivalent set from its boolean —
+// see transport/rpc; both compute the same signature via app.SignatureKeys.)
+func capabilitiesFor(creds domain.Credentials) []app.Capability {
+	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin, creds.GithubRepoScope)}
+}
+
+// Acquire returns the worker for conversationID, spawning one if needed. Two
+// concurrent callers for the same conversationID share the same spawn promise,
+// only one subprocess is ever created.
+//
+// If an existing worker's CredentialSignature differs from the caller's (model
+// changed, GitHub token added/removed) the existing worker is killed and a
+// fresh one is spawned with the new capability set.
+//
+// A turn's spawn at capacity evicts the least-recently-active IDLE worker
+// instead of failing: pre-warm fills the pool with workers that may never see
+// a message, and a real turn must never queue behind one of those (a two-slot
+// local pool wedged exactly that way). Warm spawns go through AcquireWarm.
+func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, creds, true)
+}
+
+// AcquireWarm is Acquire for a pre-warm, with two softenings that keep a
+// speculative warm from ever costing the user anything. At capacity it evicts
+// the least-recently-active IDLE worker — served or not — because the newest
+// warm follows the user's attention and an evicted worker's conversation
+// survives in the persistent session store, so its next turn resumes cheaply
+// with the provider's prompt cache intact. Only a pool where every worker is
+// BUSY refuses with ErrMaxWorkers. And a warm whose credentials mismatch the
+// conversation's live worker returns that worker untouched instead of
+// replacing it (see acquire): a warm must never kill a worker, least of all
+// one running a turn.
+func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, creds, false)
+}
+
+func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
+
+	p.mu.Lock()
+	if w, ok := p.workers[conversationID]; ok {
+		if w.credSig == wantedSig {
+			p.mu.Unlock()
+			return w, nil
+		}
+		// A warm is a speculative hint, so a signature mismatch returns the
+		// live worker untouched: killing here would tear down a worker that
+		// may be MID-TURN just because a background warm resolved slightly
+		// different credentials, and the user watches their reply die. The
+		// next real turn carries the authoritative credentials and does the
+		// replacement below.
+		if !forTurn {
+			p.mu.Unlock()
+			return w, nil
+		}
+		// Capability mismatch on a turn: kill the existing worker, then fall
+		// through to the regular spawn path. We release the lock around kill
+		// so the exit goroutine can land its cleanup without contending.
+		p.mu.Unlock()
+		p.kill(conversationID, "credential capability changed")
+		p.mu.Lock()
+	}
+	if ch, ok := p.spawnLocks[conversationID]; ok {
+		p.mu.Unlock()
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		p.mu.Lock()
+		w := p.workers[conversationID]
+		p.mu.Unlock()
+		if w == nil {
+			return nil, herr.New(ctx, domain.ErrWorkerSpawn, herr.M{
+				"message": "the assistant worker could not be started, please try again",
+			})
+		}
+		return w, nil
+	}
+
+	// A SPAWN is now committed: no live worker matched, and no other spawn is in
+	// flight to piggyback on. A spawn needs a session key — and the control plane
+	// deliberately sends none when its pre-flight probe told it we already had a
+	// live worker (a reused worker keeps the key in its env, so a second key would
+	// be minted, discarded unread, and left valid for hours).
+	//
+	// The worker can die in the gap between that probe and this call. THIS is that
+	// race, and refusing here is how it is resolved: we answer
+	// ErrCredentialsRequired, the control plane mints once and retries, and the
+	// user sees a normal response. The alternative — booting a worker with no
+	// LangWatch key — produces a worker that silently cannot call LangWatch at
+	// all, which is far worse than one extra round trip on a rare race.
+	//
+	// Checked BEFORE the capacity reservation so a keyless request can never
+	// consume a worker slot it was never going to fill.
+	if !creds.Spawnable() {
+		p.mu.Unlock()
+		// The control plane, not the end user, is the audience: it catches this
+		// code, mints a key, and retries transparently. So the diagnostic rides as
+		// a reason (logged, per the herr contract) rather than in meta.message,
+		// which herr.WriteHTTP would promote into the user-facing envelope.
+		return nil, herr.New(ctx, domain.ErrCredentialsRequired, nil,
+			errors.New("a worker must be spawned for this conversation, but no session key was supplied"))
+	}
+
+	// Atomic capacity reservation. Increment BEFORE releasing the registry lock
+	// so concurrent first-turns for N distinct conversations can't observe
+	// len(workers)==0 and all pass the cap check. At capacity, a turn's spawn
+	// evicts idle workers (the reaper's own pick order) until a slot opens; the
+	// loop re-checks because a concurrent spawner can take the freed slot first.
+	for len(p.workers)+int(atomic.LoadInt32(&p.pendingSpawns)) >= p.maxWorkers {
+		reason := "evicted: capacity needed for a turn's worker"
+		if !forTurn {
+			reason = "evicted: capacity needed for a newer warm worker"
+		}
+		victim, found := p.idleVictimLocked()
+		if !found {
+			p.mu.Unlock()
+			return nil, herr.New(ctx, domain.ErrMaxWorkers, nil)
+		}
+		p.mu.Unlock()
+		p.kill(victim, reason)
+		p.mu.Lock()
+	}
+	atomic.AddInt32(&p.pendingSpawns, 1)
+	ch := make(chan struct{})
+	p.spawnLocks[conversationID] = ch
+	p.mu.Unlock()
+
+	defer func() {
+		atomic.AddInt32(&p.pendingSpawns, -1)
+		p.mu.Lock()
+		delete(p.spawnLocks, conversationID)
+		p.mu.Unlock()
+		close(ch)
+	}()
+
+	w, err := p.spawn(ctx, conversationID, creds, wantedSig)
+	if err != nil {
+		return nil, err
+	}
+	// Stamped before publication (immutable after): the status copy for this
+	// worker's first turn depends on who booted it.
+	w.prewarmed = !forTurn
+	p.mu.Lock()
+	p.workers[conversationID] = w
+	p.mu.Unlock()
+	return w, nil
+}
+
+// idleVictimLocked picks the least-recently-active idle worker, the same one
+// the reaper would take first. Caller holds p.mu; the p.mu -> w.mu lock order
+// matches reapIdle.
+func (p *Pool) idleVictimLocked() (conversationID string, found bool) {
+	var oldest time.Time
+	for id, w := range p.workers {
+		idle, seen := w.idleSince()
+		if !idle {
+			continue
+		}
+		if !found || seen.Before(oldest) {
+			conversationID, oldest, found = id, seen, true
+		}
+	}
+	return conversationID, found
+}
+
+// Status returns a live worker count and the configured cap (used by /health).
+func (p *Pool) Status() (active, capacity int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.workers), p.maxWorkers
+}
+
+// KillSessionVanished is called when the agent reports the internal session id no
+// longer exists — recycle so the next turn spawns fresh.
+func (p *Pool) KillSessionVanished(conversationID string) {
+	p.kill(conversationID, "agent session vanished")
+}
+
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (the token-burn half of the user's Stop, ADR-078). A registry LOOKUP
+// only, never Acquire: Acquire can spawn, and a cancel for a conversation
+// with no worker must find nothing, not boot one. Every miss (no worker, a
+// different turn in flight, an agent that cannot abort) is a silent no-op: the
+// durable stopped terminal is already recorded upstream, so there is nothing
+// to report and nothing to retry.
+func (p *Pool) CancelTurn(conversationID, turnID string) {
+	p.mu.Lock()
+	w := p.workers[conversationID]
+	p.mu.Unlock()
+	if w == nil {
+		return
+	}
+	w.AbortTurn(p.baseCtx, turnID)
+}
+
+// reserveUIDLocked finds a free UID for conversationID. Must be called with
+// p.mu held. The deterministic seed (workerUIDFor) is tried first so the same
+// conversation usually lands on the same UID across spawns; on collision we
+// linear-probe forward through the slot range. The chosen UID is registered in
+// uidToConv and must be released via releaseUIDLocked when the worker exits.
+func (p *Pool) reserveUIDLocked(conversationID string) (uint32, error) {
+	preferred := workerUIDFor(conversationID)
+	for offset := uint32(0); offset < workerUIDRange; offset++ {
+		// Wrap the slot offset around the range while keeping the absolute UID
+		// inside [workerUIDBase, workerUIDBase+workerUIDRange).
+		slot := (preferred-workerUIDBase+offset)%workerUIDRange + workerUIDBase
+		if _, taken := p.uidToConv[slot]; !taken {
+			p.uidToConv[slot] = conversationID
+			return slot, nil
+		}
+	}
+	return 0, herr.New(p.baseCtx, domain.ErrNoFreeUID, herr.M{"message": "the assistant is at capacity, please try again"})
+}
+
+func (p *Pool) releaseUIDLocked(uid uint32, conversationID string) {
+	// Defensive: only release if the slot still belongs to this conversation. A
+	// killed-then-respawned conversation may have already taken a fresh slot;
+	// the original child's exit goroutine must not release the new reservation.
+	if existing, ok := p.uidToConv[uid]; ok && existing == conversationID {
+		delete(p.uidToConv, uid)
+	}
+}
+
+// spawn is the inner creator. Called from Acquire under spawn-lock; no
+// double-spawn possible. Wrapped with an OTel span + spawn/readiness metrics.
+func (p *Pool) spawn(ctx context.Context, conversationID string, creds domain.Credentials, sig domain.CredentialSignature) (*Worker, error) {
+	ctx, span := p.telemetry.StartSpawn(ctx, conversationID)
+	defer span.End()
+	start := time.Now()
+
+	w, err := p.spawnInner(ctx, conversationID, creds, sig)
+	p.telemetry.WorkerSpawned(ctx, time.Since(start).Seconds(), err == nil)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "spawn failed")
+	}
+	return w, err
+}
+
+func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds domain.Credentials, sig domain.CredentialSignature) (*Worker, error) {
+	log := clog.Get(ctx)
+	workerHome := filepath.Join(p.sessionsRoot, conversationID)
+
+	// Stacked rollback: each acquired resource registers a deferred undo guarded
+	// by `success`. On ANY early return OR panic before success is set, the undos
+	// unwind in reverse acquisition order — no leaked UID (→ eventual capacity
+	// exhaustion), home dir with plaintext creds, listener, egress reservation, or
+	// worker process. On success the guard flips and every undo becomes a no-op:
+	// the live worker owns these resources for its lifetime.
+	success := false
+
+	// Allocate a UID under the registry lock so two concurrent spawns can't both
+	// observe the same slot as free.
+	p.mu.Lock()
+	uid, err := p.reserveUIDLocked(conversationID)
+	p.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if !success {
+			p.mu.Lock()
+			p.releaseUIDLocked(uid, conversationID)
+			p.mu.Unlock()
+		}
+	}()
+
+	// Egress seam (ADR-076 / ADR-047): the enforcing guard stands up THIS
+	// worker's outbound forward proxy here and returns its loopback port (which
+	// buildWorkerEnv points HTTPS_PROXY at); it can fail the spawn closed. The
+	// observe-only / pass-through guards run no proxy (ProxyPort 0).
+	egCtx, egSpan := p.telemetry.StartPhase(ctx, "langy.egress.prepare")
+	we, err := p.egress.PrepareWorker(egCtx, egress.WorkerContext{
+		ConversationID:  conversationID,
+		UID:             uid,
+		EgressAllowlist: creds.EgressAllowlist,
+	})
+	if err != nil {
+		egSpan.RecordError(err)
+		egSpan.SetStatus(codes.Error, "egress rejected")
+		egSpan.End()
+		// The guard's reason is an internal diagnostic — logged, not surfaced.
+		// The rejection is deliberately handled, so the caller gets a herr with
+		// an actionable message.
+		log.Warn("egress guard rejected worker", zap.String("conversation", conversationID), zap.Error(err))
+		return nil, herr.New(ctx, domain.ErrWorkerSpawn, herr.M{"message": "the assistant worker could not be started, please try again"})
+	}
+	egSpan.End()
+	defer func() {
+		if !success {
+			// we.Close tears down THIS worker's forward proxy. Nil-safe /
+			// idempotent and only run on a failed spawn — on success the live
+			// Worker owns `we`.
+			we.Close()
+		}
+	}()
+
+	// Create the worker home THROUGH an os.Root anchored at SESSIONS_ROOT. Unlike a
+	// lexical filepath.Abs + HasPrefix check (which does NOT resolve symlinks), the
+	// root refuses any component that escapes it — traversal OR a planted symlink —
+	// at the syscall level, so this is both the creation and the real containment
+	// guard. conversationID is already charset-validated at the edge, so a failure
+	// here is operational or hostile, not a bad id: fail the spawn closed.
+	// One span for the whole worker-home layout: create the home under the
+	// containment root, then Provision writes the worker config + AGENTS.md and
+	// symlinks the materialized skills tree. Ends when the home is fully staged (or
+	// on the first failure), so the trace separates "laying out the home" from the
+	// readiness wait that follows.
+	_, provSpan := p.telemetry.StartPhase(ctx, "langy.worker.provision")
+	root, err := os.OpenRoot(p.sessionsRoot)
+	if err != nil {
+		provSpan.RecordError(err)
+		provSpan.End()
+		return nil, fmt.Errorf("open sessions root: %w", err)
+	}
+	if err := root.MkdirAll(conversationID, 0o700); err != nil {
+		root.Close()
+		provSpan.RecordError(err)
+		provSpan.SetStatus(codes.Error, "mkdir worker home")
+		provSpan.End()
+		return nil, herr.New(ctx, domain.ErrWorkerSpawn, herr.M{"message": "the assistant worker could not be started, please try again"})
+	}
+	root.Close()
+	// Register the home undo right after MkdirAll so a failure inside Provision
+	// (which writes config.json with the project API key) still wipes the partial
+	// home.
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(workerHome)
+		}
+	}()
+	// Host-mediated telemetry + LLM traffic (adapters/otelrelay): register this
+	// worker so the relay can (a) accept its loopback OTLP export, re-parent the
+	// spans under the turn's trace, and forward them to the customer's project
+	// with the session key the MANAGER holds, and (b) proxy its LLM calls to the
+	// gateway with the virtual key + turn traceparent injected. The unguessable
+	// routing token scopes both paths to this conversation; the worker env gets
+	// the token-scoped loopback URLs and NO key for either flow.
+	var otelToken string
+	if p.otelRelay != nil {
+		otelToken, err = p.otelRelay.Register(otelrelay.WorkerInfo{
+			ConversationID:    conversationID,
+			ActorUserID:       creds.ActorUserID,
+			LangwatchEndpoint: creds.LangwatchEndpoint,
+			LangwatchAPIKey:   creds.LangwatchAPIKey,
+			Model:             creds.Model,
+			GatewayBaseURL:    creds.GatewayBaseURL,
+			LLMVirtualKey:     creds.LLMVirtualKey,
+			// ADR-061 mirror lane: the tier + source tenant ride the envelope.
+			// The tier is in the credential signature, so this worker's registered
+			// tier is never stale (a change respawned it).
+			MirrorTier:           creds.MirrorTier,
+			SourceOrganizationID: creds.OrganizationID,
+			SourceProjectID:      creds.ProjectID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("register worker telemetry relay: %w", err)
+		}
+		defer func() {
+			if !success {
+				p.otelRelay.Unregister(otelToken)
+			}
+		}()
+	}
+
+	// The coding agent provisions its own home, spawns its own process, and is
+	// driven through the app.CodingAgent port: the pool orchestrates but never
+	// speaks the agent's wire protocol. The agent instance is shared between
+	// Provision/Spawn here and the Worker's drive methods.
+	agent := pi.NewAgent(p.readinessTimeout)
+	if err := agent.Provision(pi.ProvisionInput{
+		Home:           workerHome,
+		WorkspaceRoot:  p.workspaceRoot,
+		SessionDir:     p.piSessionDir(conversationID),
+		Creds:          creds,
+		UID:            uid,
+		AgentsTemplate: p.agentsTemplate,
+		Runner:         p.runner,
+	}); err != nil {
+		provSpan.RecordError(err)
+		provSpan.SetStatus(codes.Error, "provision worker home")
+		provSpan.End()
+		return nil, err
+	}
+	provSpan.End()
+
+	// A worker has no listener: the stdio pipes are its only control surface.
+	// Its LLM traffic still routes through the relay's mediated loopback URL
+	// when the relay runs.
+	llmBaseURL := ""
+	if p.otelRelay != nil {
+		llmBaseURL = p.otelRelay.LLMBaseURLFor(otelToken)
+	}
+	// baseCtx (not ctx) binds the subprocess, which outlives the request;
+	// the span hangs off the spawn span so the fork shows up in the
+	// waterfall, tagged with the isolation substrate.
+	_, piSpan := p.telemetry.StartPhase(ctx, "langy.pi.spawn")
+	piSpan.SetAttributes(attribute.String("langy.runner", p.runner.Name()))
+	cmd, err := agent.Spawn(p.baseCtx, pi.SpawnInput{
+		BinaryPath:     p.piBinaryPath,
+		ConversationID: conversationID,
+		Home:           workerHome,
+		UID:            uid,
+		Creds:          creds,
+		EgressPort:     we.ProxyPort,
+		Runner:         p.runner,
+		LLMBaseURL:     llmBaseURL,
+		// The turn's capabilities fold their own env into the worker: the
+		// SAME set that produced this worker's credential signature.
+		Capabilities: capabilitiesFor(creds),
+	})
+	if err != nil {
+		piSpan.RecordError(err)
+		piSpan.SetStatus(codes.Error, "spawn langy-worker")
+		piSpan.End()
+		return nil, err
+	}
+	piSpan.End()
+	// The exit watcher goroutine is NOT started until success below, so this undo
+	// owns cmd.Wait() without a race: on a readiness/session failure it kills the
+	// process and drains its exit, and the rollbacks above shut the proxy, wipe
+	// the home (config.json with the project API key), release the UID, and notify
+	// the egress guard — leaving no sensitive material on the emptyDir.
+	defer func() {
+		if !success {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			// The agent's own pipes go with the process. This worker never
+			// reached the registry, so neither kill() nor onWorkerExit will
+			// ever see it, and a readiness or session failure would otherwise
+			// leave the pi agent's stdin pipe held for the manager's life.
+			closeAgent(agent)
+		}
+	}()
+
+	readyStart := time.Now()
+	readinessCtx, cancel := context.WithTimeout(ctx, p.readinessTimeout)
+	defer cancel()
+	// The readiness wait: the worker booting to its ready handshake. This span
+	// is where that time lands in the trace.
+	readyCtx, readySpan := p.telemetry.StartPhase(readinessCtx, "langy.worker.ready")
+	if err := agent.WaitReady(readyCtx); err != nil {
+		readySpan.RecordError(err)
+		readySpan.SetStatus(codes.Error, "readiness timeout")
+		readySpan.End()
+		p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), false)
+		return nil, err
+	}
+	readySpan.End()
+	p.telemetry.ReadinessObserved(ctx, time.Since(readyStart).Seconds(), true)
+
+	sessionID, resumedSession, err := agent.OpenSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Healthy. Commit: flip the guard so the deferred rollbacks become no-ops,
+	// THEN transfer watch ownership to the exit goroutine (started AFTER success
+	// so the cmd rollback above never double-Wait()s the process). clog.Go guards
+	// the watcher so a panic in teardown can't crash the manager.
+	success = true
+	clog.Go(p.baseCtx, "worker-exit-watcher", func() {
+		err := cmd.Wait()
+		clog.Get(p.baseCtx).Info("worker exited",
+			zap.String("conversation", conversationID),
+			zap.Error(err),
+		)
+		p.onWorkerExit(conversationID, cmd, uid)
+	})
+
+	log.Info("worker ready",
+		zap.String("conversation", conversationID),
+		zap.String("session", sessionID),
+		zap.Bool("resumedSession", resumedSession),
+		zap.Uint32("uid", uid),
+	)
+
+	return &Worker{
+		conversationID: conversationID,
+		agent:          agent,
+		egress:         we,
+		otelRelay:      p.otelRelay,
+		otelToken:      otelToken,
+		sessionID:      sessionID,
+		// A resumed session already carries the conversation — folding the
+		// history seed into its next message would tell it its own story twice
+		// and break the byte-stable prefix provider caching reads.
+		promptDelivered:   resumedSession,
+		cmd:               cmd,
+		uid:               uid,
+		credSig:           sig,
+		apiKeyID:          creds.LangwatchAPIKeyID,
+		projectID:         creds.ProjectID,
+		langwatchEndpoint: creds.LangwatchEndpoint,
+		lastSeen:          time.Now(),
+	}, nil
+}
+
+// onWorkerExit is the teardown decision the exit watcher in spawnInner fires
+// when a worker subprocess returns from cmd.Wait(). It runs under p.mu so a
+// concurrent spawn trying to reserve the same UID or set up the same home path
+// blocks until the decision (and any wipe) completes.
+//
+// Replacement-race invariants the decision preserves:
+//
+//  1. Wipe iff we still own the slot AND no replacement is in flight. If the
+//     slot holds a different *exec.Cmd, a replacement is already committed. If
+//     the slot is empty but spawnLocks[X] is set, a replacement's
+//     setupWorkerHome is writing into our home path right now. Either way,
+//     wiping would rm -rf live data under the replacement.
+//  2. Registry delete is identity-guarded. Only delete workers[X] if we're
+//     still the entry there.
+//  3. UID release is convId-guarded inside releaseUIDLocked.
+func (p *Pool) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
+	var tombstone string
+	shouldWipe := false
+	deletedOwnEntry := false
+	var egressToClose egress.WorkerEgress
+	// The worker that exited, captured under the lock so its session key can be
+	// revoked after we release it. Only set when we still owned the slot — a
+	// worker that kill() already removed had its key revoked there, and revoking
+	// twice would race the reaper for no gain.
+	var exitedWorker *Worker
+
+	// The decision runs under the lock (defer-unlocked so a panic can't leave it
+	// held); the slow RemoveAll + egress I/O run AFTER the unlock.
+	func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+
+		if w, ok := p.workers[conversationID]; ok {
+			if w.cmd == cmd {
+				egressToClose = w.egress
+				exitedWorker = w
+				delete(p.workers, conversationID)
+				shouldWipe = true
+				deletedOwnEntry = true
+			}
+			// else: replacement is in the slot; leave its home alone.
+		} else if _, spawning := p.spawnLocks[conversationID]; !spawning {
+			// Slot empty AND no spawn in flight — the home is ours to reclaim. (If
+			// a spawn IS in flight, its setupWorkerHome is writing into the home dir
+			// right now; reclaiming would corrupt the new worker.) This is a worker
+			// kill() already removed from the registry, so the gauge was decremented
+			// there — do NOT decrement again below.
+			shouldWipe = true
+		}
+		p.releaseUIDLocked(uid, conversationID)
+		if shouldWipe {
+			// Rename the canonical home to a unique tombstone WHILE the lock is
+			// held — a microsecond metadata op that frees the canonical path so a
+			// fresh Acquire for the same conversation can't collide with our
+			// teardown — then RemoveAll the tombstone AFTER unlock, off the pool-
+			// wide hot path (every Acquire/kill/reap/Status blocks on this lock, so
+			// the old in-lock tree-walk unlink stalled them all).
+			tombstone = tombstoneWorkerHome(p.baseCtx, p.sessionsRoot, conversationID)
+		}
+		// Only the identity-owned delete decrements the active gauge: that worker
+		// exited on its own (crash / self-exit) and never went through kill(),
+		// which is the only other place the gauge is decremented. Without this the
+		// gauge drifts upward on every self-exit.
+		if deletedOwnEntry {
+			p.telemetry.WorkerExited(p.baseCtx)
+		}
+	}()
+
+	// Everything below runs WITHOUT the pool lock.
+
+	// The worker exited on its own (crash or self-exit) and never went through
+	// kill(), so this is the one place its session key gets revoked. Its lifetime
+	// was this worker's — it lived in the subprocess env — and the process is gone,
+	// so the key is now pure liability: nothing can use it, and it would otherwise
+	// stay valid for hours.
+	if deletedOwnEntry {
+		closeAgentOf(exitedWorker)
+		p.revokeKeyOf(exitedWorker, "worker exited")
+		// Revoke the telemetry-relay routing token too: a dead worker's token must
+		// stop attributing spans / spending the virtual key, and the relay's
+		// retained credentials for this conversation are dropped with it.
+		if p.otelRelay != nil {
+			p.otelRelay.Unregister(exitedWorker.otelToken)
+		}
+	}
+
+	if tombstone != "" {
+		if err := os.RemoveAll(tombstone); err != nil {
+			clog.Get(p.baseCtx).Warn("remove worker home tombstone failed",
+				zap.String("conversation", conversationID),
+				zap.Error(err),
+			)
+		}
+	}
+	// Egress teardown runs OUTSIDE the pool lock: tearing down a forward proxy
+	// may perform network I/O, which must never stall the pool. It is not part
+	// of the home-dir race, so ordering after the unlock is correct. Close is the
+	// per-worker forward-proxy teardown (identity-guarded above so a
+	// replacement's proxy is never closed); idempotent / nil-safe.
+	egressToClose.Close()
+}
+
+// kill terminates a worker and cleans its home. The exit-watcher goroutine in
+// spawnInner ultimately fires the registry delete on the actual process exit;
+// this synchronous path drops the entry immediately so callers don't see a
+// half-dead worker. UID release stays with the exit watcher so the slot isn't
+// reusable until the kernel has fully torn down the prior process.
+func (p *Pool) kill(conversationID, reason string) {
+	p.mu.Lock()
+	w, ok := p.workers[conversationID]
+	if ok {
+		delete(p.workers, conversationID)
+	}
+	p.mu.Unlock()
+	if !ok {
+		return
+	}
+	p.telemetry.WorkerKilled(p.baseCtx, reason)
+	closeAgentOf(w)
+	// The key's lifetime is the worker's. kill() is the funnel for EVERY
+	// deliberate death — capability change, idle reap, shutdown — so revoking here
+	// covers all three at once. Self-exit and crash are the other path, handled in
+	// the exit goroutine below.
+	p.revokeKeyOf(w, reason)
+	// Same lifetime rule for the telemetry-relay registration: the routing token
+	// and the relay's retained credentials die with the worker. Idempotent, so
+	// the exit watcher re-running it is harmless.
+	if p.otelRelay != nil {
+		p.otelRelay.Unregister(w.otelToken)
+	}
+	clog.Get(p.baseCtx).Info("killing worker",
+		zap.String("conversation", conversationID),
+		zap.String("reason", reason),
+	)
+	if w.cmd != nil && w.cmd.Process != nil {
+		// Signal the WHOLE process group, not just the worker's leader pid.
+		// The spawn sets Setpgid: true, so the worker + every child it shelled
+		// out to (`gh`, `git`, `npm`, `gh auth git-credential fill`) share one
+		// pgid == leader pid. Without `-pgid`, a kill against the leader leaves
+		// the children reparented to PID 1 (the manager) holding the user's
+		// GH_TOKEN / OPENAI_API_KEY / LANGWATCH_API_KEY in env, on the network,
+		// until they finish. That breaks the per-conversation isolation
+		// guarantee on the temporal axis.
+		pid := w.cmd.Process.Pid
+		_ = syscall.Kill(-pid, syscall.SIGINT)
+		// Best-effort hard kill if SIGINT didn't take. Negative pid sends to the
+		// whole group; the worker's own cleanup gets SIGINT first for a chance
+		// to flush, then SIGKILL nukes the tree.
+		clog.Go(p.baseCtx, "worker-hard-kill", func() {
+			time.Sleep(2 * time.Second)
+			_ = syscall.Kill(-pid, syscall.SIGKILL)
+		})
+	}
+	// The per-worker egress forward proxy's loopback port. Closed HERE
+	// (synchronously with the kill, before the exit watcher's onWorkerExit runs)
+	// so a kill-then-respawn on the same conversation frees the port promptly and
+	// never leaves the old worker's proxy bound. Idempotent + nil-safe.
+	go w.egress.Close()
+}
+
+// reapIdle scans the registry and kills workers idle longer than WorkerIdle.
+func (p *Pool) reapIdle() {
+	cutoff := p.workerIdle
+	p.mu.Lock()
+	candidates := make([]string, 0)
+	for id, w := range p.workers {
+		if w.shouldReap(cutoff) {
+			candidates = append(candidates, id)
+		}
+	}
+	p.mu.Unlock()
+	for _, id := range candidates {
+		p.kill(id, "idle timeout")
+	}
+	p.sweepSessionStashes()
+}
+
+// piSessionStashDirName holds every conversation's persistent pi session
+// storage, one subdirectory per conversation, as a SIBLING of the worker homes
+// under sessionsRoot. The home is wiped on every worker death; the session
+// files here survive it, so a respawned worker resumes the conversation's pi
+// session — same messages, same provider prompt-cache prefix — instead of
+// re-reading the whole conversation from a folded transcript. The leading dot
+// keeps the name outside the validated conversation-id charset, so a home and
+// the stash can never collide. Boot still wipes sessionsRoot whole, same
+// hygiene as before.
+const piSessionStashDirName = ".pi-sessions"
+
+// sessionStashTTL bounds how long a conversation's session files may sit with
+// no live worker: conversation content must not linger on the manager's disk
+// indefinitely after the user moved on. Well past the 1h provider cache tier
+// it exists to serve; a conversation resumed later than this re-seeds from the
+// durable transcript exactly as before.
+const sessionStashTTL = 24 * time.Hour
+
+func (p *Pool) piSessionDir(conversationID string) string {
+	return filepath.Join(p.sessionsRoot, piSessionStashDirName, conversationID)
+}
+
+// stashLastWrite is the newest mtime of the stash directory or anything in it.
+func stashLastWrite(dir string) time.Time {
+	newest := time.Time{}
+	if info, err := os.Stat(dir); err == nil {
+		newest = info.ModTime()
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return newest
+	}
+	for _, entry := range entries {
+		if info, err := entry.Info(); err == nil && info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	return newest
+}
+
+// sweepSessionStashes removes session storage whose conversation has gone
+// quiet: no live worker and nothing written for sessionStashTTL. Runs on the
+// reaper's clock, off the pool lock except for the live-worker check.
+func (p *Pool) sweepSessionStashes() {
+	stashRoot := filepath.Join(p.sessionsRoot, piSessionStashDirName)
+	entries, err := os.ReadDir(stashRoot)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for _, entry := range entries {
+		p.mu.Lock()
+		_, live := p.workers[entry.Name()]
+		p.mu.Unlock()
+		if live {
+			continue
+		}
+		// Freshness is the newest mtime INSIDE the stash: appending to a
+		// session file updates the file, not its directory, so the directory
+		// mtime alone would sweep a conversation that wrote minutes ago.
+		if now.Sub(stashLastWrite(filepath.Join(stashRoot, entry.Name()))) < sessionStashTTL {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(stashRoot, entry.Name())); err != nil {
+			clog.Get(p.baseCtx).Warn("remove stale session stash failed",
+				zap.String("conversation", entry.Name()),
+				zap.Error(err),
+			)
+		}
+	}
+}

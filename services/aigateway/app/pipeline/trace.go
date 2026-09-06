@@ -7,13 +7,23 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/forkedcontext"
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // classifyUpstream maps a dispatch error to an HTTP status + short error-class
 // token for the customer trace. A *domain.UpstreamError forwards the provider's
-// verbatim status; everything else collapses to a generic 502/provider_error so
-// the trace still records that the request failed rather than dropping silently.
+// verbatim status; a handled error carries its own; anything else collapses to
+// a generic 502/provider_error so the trace still records that the request
+// failed rather than dropping silently.
+//
+// The middle case is the point: a herr already HAS the two facts this function
+// exists to produce — a registered HTTP status and a stable code — and they
+// are the same two the client was answered with. Collapsing it to
+// 502/provider_error wrote an upstream outage into the customer's own trace
+// for a failure that was never upstream (a dead Codex sign-in, a guardrail
+// block, a rate limit we imposed), sending them to look at the provider's
+// status page for something only they can fix.
 func classifyUpstream(err error) (status int, errType string) {
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
@@ -33,6 +43,13 @@ func classifyUpstream(err error) (status int, errType string) {
 			return status, "provider_error"
 		}
 	}
+	var e herr.E
+	if errors.As(err, &e) && e.Code != "" {
+		// herr.HTTPStatus answers 500 for a code nobody registered, which is
+		// exactly what the client was told, so the trace and the response
+		// agree either way.
+		return herr.HTTPStatus(err), string(e.Code)
+	}
 	return 502, "provider_error"
 }
 
@@ -49,8 +66,10 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Name: "traces",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
-				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
+				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				resp, err := next(spanCtx, call)
 				if err != nil {
@@ -62,28 +81,42 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						end(spanCtx, domain.AITraceParams{
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
+							RequestedModel:     rewrittenFrom(call.Request),
 							ProviderID:         call.Request.Resolved.ProviderID,
+							InternalModel:      internalModel,
+							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							ModelProviderID:    call.Meta.DispatchedProviderID(),
+							VKTags:             call.Bundle.Config.VKTags,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
 				}
 				if call.Request.Resolved != nil {
 					end(spanCtx, domain.AITraceParams{
-						ProjectID:        call.Bundle.ProjectID,
-						Model:            call.Request.Resolved.ModelID,
-						ProviderID:       call.Request.Resolved.ProviderID,
-						Usage:            resp.Usage,
-						RequestType:      call.Request.Type,
-						VirtualKeyID:     call.Bundle.VirtualKeyID,
-						GatewayRequestID: call.Meta.GatewayRequestID,
-						RequestBody:      call.Request.Body,
-						ResponseBody:     resp.Body,
+						ProjectID:          call.Bundle.ProjectID,
+						Model:              call.Request.Resolved.ModelID,
+						RequestedModel:     rewrittenFrom(call.Request),
+						ProviderID:         call.Request.Resolved.ProviderID,
+						InternalModel:      internalModel,
+						InternalProviderID: internalProviderID,
+						Usage:              resp.Usage,
+						RequestType:        call.Request.Type,
+						VirtualKeyID:       call.Bundle.VirtualKeyID,
+						ModelProviderID:    call.Meta.DispatchedProviderID(),
+						VKTags:             call.Bundle.Config.VKTags,
+						GatewayRequestID:   gatewayRequestID,
+						RequestBody:        call.Request.Body,
+						ResponseBody:       resp.Body,
+						MirrorTier:         call.Bundle.Config.MirrorTier,
+						MirrorSourceOrgID:  call.Bundle.OrganizationID,
 					})
 				}
 				return resp, nil
@@ -91,8 +124,10 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
-				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
+				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				iter, err := next(spanCtx, call)
 				if err != nil {
@@ -104,13 +139,20 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						end(spanCtx, domain.AITraceParams{
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
+							RequestedModel:     rewrittenFrom(call.Request),
 							ProviderID:         call.Request.Resolved.ProviderID,
+							InternalModel:      internalModel,
+							InternalProviderID: internalProviderID,
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							ModelProviderID:    call.Meta.DispatchedProviderID(),
+							VKTags:             call.Bundle.Config.VKTags,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
@@ -119,16 +161,58 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					return iter, nil
 				}
 				return &traceStreamWrapper{
-					inner:   iter,
-					end:     end,
-					bundle:  call.Bundle,
-					req:     call.Request,
-					meta:    call.Meta,
-					spanCtx: spanCtx,
+					inner:              iter,
+					end:                end,
+					bundle:             call.Bundle,
+					req:                call.Request,
+					meta:               call.Meta,
+					gatewayRequestID:   gatewayRequestID,
+					spanCtx:            spanCtx,
+					internalModel:      internalModel,
+					internalProviderID: internalProviderID,
 				}, nil
 			}
 		},
 	}
+}
+
+// internalTraceMetadata selects model metadata that is safe for LangWatch's
+// operational span. A raw request model is arbitrary customer input unless it
+// exactly names a control-plane alias or a finite allowed-model entry.
+// rewrittenFrom reports the name the client sent when a routing policy sent
+// the request somewhere else, and "" when the caller got what they asked for.
+// The trace records the model that was dispatched, so this is the only place
+// the caller's own name survives.
+func rewrittenFrom(req *domain.Request) string {
+	if req == nil || req.Resolved == nil || req.Model == "" {
+		return ""
+	}
+	// A provider prefix has several accepted spellings, and the resolver
+	// normalises them, so comparing against the canonical form alone reads
+	// "azure_openai/gpt-5-mini" as a rewrite of itself. Split the sent name
+	// the same way the resolver did and compare what each side means.
+	if provider, model, ok := domain.SplitModelSpelling(req.Model); ok {
+		if provider == req.Resolved.ProviderID && model == req.Resolved.ModelID {
+			return ""
+		}
+		return req.Model
+	}
+	if req.Model == req.Resolved.ModelID {
+		return ""
+	}
+	return req.Model
+}
+
+func internalTraceMetadata(config domain.BundleConfig, rawModel string) (string, domain.ProviderID) {
+	if alias, ok := config.ModelAliases[rawModel]; ok {
+		return alias.Model, alias.ProviderID
+	}
+	for _, allowed := range config.AllowedModels {
+		if allowed == rawModel {
+			return allowed, ""
+		}
+	}
+	return "", ""
 }
 
 // responseBodyCap bounds the per-stream response accumulator at 8 MiB so a
@@ -146,16 +230,21 @@ const responseBodyCap = 8 * 1024 * 1024
 // extractOutputMessages return "" for every streamed Path A trace — the
 // gen_ai.output.messages key was simply absent from every streaming span.
 type traceStreamWrapper struct {
-	inner       domain.StreamIterator
-	end         EndSpanFunc
-	bundle      *domain.Bundle
-	req         *domain.Request
-	meta        *Meta
-	spanCtx     context.Context
-	closeOnce   sync.Once
-	bodyMu      sync.Mutex
-	body        []byte
-	bodyDropped bool
+	inner  domain.StreamIterator
+	end    EndSpanFunc
+	bundle *domain.Bundle
+	req    *domain.Request
+	// meta is the request's accumulator; read at close for the dispatched
+	// provider id (dispatch has long finished by then, the value is final).
+	meta               *MetaAccumulator
+	gatewayRequestID   string
+	spanCtx            context.Context
+	internalModel      string
+	internalProviderID domain.ProviderID
+	closeOnce          sync.Once
+	bodyMu             sync.Mutex
+	body               []byte
+	isBodyDropped      bool
 }
 
 func (w *traceStreamWrapper) Next(ctx context.Context) bool {
@@ -174,7 +263,7 @@ func (w *traceStreamWrapper) Err() error          { return w.inner.Err() }
 // captureChunk appends chunk to the body accumulator under the cap.
 // Called from Next() after the inner iterator advances, so we capture
 // exactly once per chunk regardless of how many times the caller reads
-// Chunk(). bodyDropped flips once we've truncated so onClose can stamp
+// Chunk(). isBodyDropped flips once we've truncated so onClose can stamp
 // a langwatch.reserved.trace_body_truncated marker downstream.
 func (w *traceStreamWrapper) captureChunk(chunk []byte) {
 	if len(chunk) == 0 {
@@ -182,17 +271,17 @@ func (w *traceStreamWrapper) captureChunk(chunk []byte) {
 	}
 	w.bodyMu.Lock()
 	defer w.bodyMu.Unlock()
-	if w.bodyDropped {
+	if w.isBodyDropped {
 		return
 	}
 	remaining := responseBodyCap - len(w.body)
 	if remaining <= 0 {
-		w.bodyDropped = true
+		w.isBodyDropped = true
 		return
 	}
 	if len(chunk) > remaining {
 		w.body = append(w.body, chunk[:remaining]...)
-		w.bodyDropped = true
+		w.isBodyDropped = true
 		return
 	}
 	w.body = append(w.body, chunk...)
@@ -232,15 +321,22 @@ func (w *traceStreamWrapper) onClose() {
 			w.end(ctx, domain.AITraceParams{
 				ProjectID:          w.bundle.ProjectID,
 				Model:              w.req.Resolved.ModelID,
+				RequestedModel:     rewrittenFrom(w.req),
 				ProviderID:         w.req.Resolved.ProviderID,
+				InternalModel:      w.internalModel,
+				InternalProviderID: w.internalProviderID,
 				Usage:              w.inner.Usage(),
 				RequestType:        w.req.Type,
 				VirtualKeyID:       w.bundle.VirtualKeyID,
-				GatewayRequestID:   w.meta.GatewayRequestID,
+				ModelProviderID:    w.meta.DispatchedProviderID(),
+				VKTags:             w.bundle.Config.VKTags,
+				GatewayRequestID:   w.gatewayRequestID,
 				RequestBody:        w.req.Body,
 				ResponseBody:       body,
 				UpstreamStatusCode: status,
 				UpstreamErrorType:  errType,
+				MirrorTier:         w.bundle.Config.MirrorTier,
+				MirrorSourceOrgID:  w.bundle.OrganizationID,
 			})
 			return nil
 		})

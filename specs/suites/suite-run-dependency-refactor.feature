@@ -7,7 +7,7 @@ Feature: Suite run validation uses repository classes
   # The validation behavior described here lives behind the SuiteService
   # `run()` path which is exercised by `suite.service.unit.test.ts`. The
   # `archived-scenario-exclusion.feature` file in this same directory already
-  # binds the active/archived/all-archived/missing-reference cases to those
+  # binds the active/archived/all-archived/missing-reference scenarios to those
   # tests. The scenarios here are duplicates focused on "uses repositories
   # via injection" — a pure-implementation detail that has no behavioral
   # observable beyond what's already covered. Tracked rather than retested.
@@ -19,13 +19,13 @@ Feature: Suite run validation uses repository classes
   # Scenario validation
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run succeeds when all scenarios exist
     Given a suite referencing existing scenarios
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run fails when a scenario does not exist
     Given a suite referencing a nonexistent scenario
     When the suite run is triggered
@@ -35,13 +35,13 @@ Feature: Suite run validation uses repository classes
   # HTTP target validation
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run succeeds when HTTP target agent exists
     Given a suite with an HTTP target referencing an existing agent
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run fails when HTTP target agent does not exist
     Given a suite with an HTTP target referencing a nonexistent agent
     When the suite run is triggered
@@ -51,25 +51,25 @@ Feature: Suite run validation uses repository classes
   # Prompt target validation
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run succeeds when prompt config exists in project
     Given a suite with a prompt target referencing an existing project-level config
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run succeeds when prompt config is org-scoped
     Given a suite with a prompt target referencing an org-scoped config
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run fails when prompt config is soft-deleted
     Given a suite with a prompt target referencing a soft-deleted config
     When the suite run is triggered
     Then the run fails with an invalid target references error
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run fails when prompt config belongs to another organization
     Given a suite with a prompt target referencing a config from another organization
     When the suite run is triggered

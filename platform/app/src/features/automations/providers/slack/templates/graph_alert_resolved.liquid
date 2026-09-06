@@ -1,0 +1,34 @@
+{%- capture _level -%}
+{%- if reason == "heartbeat-resolve" -%}success{%- elsif reason == "heartbeat-absence" -%}warning{%- else -%}error{%- endif -%}
+{%- endcapture -%}
+{%- capture _header -%}
+{% if reason == "heartbeat-resolve" %}✅ Recovered: {{ trigger.name }}{% elsif reason == "heartbeat-absence" %}🔇 No data: {{ trigger.name }}{% else %}🚨 {{ trigger.name }}{% endif %}
+{%- endcapture -%}
+{%- capture _lead -%}
+{% if reason == "heartbeat-resolve" %}*{{ metric.label | mrkdwn_escape }}* is back within threshold ({{ condition.operatorLabel }} {{ condition.threshold }} over the {{ condition.timePeriodLabel }}).{% elsif reason == "heartbeat-absence" %}No qualifying data was seen for *{{ metric.label | mrkdwn_escape }}* in the {{ condition.timePeriodLabel }}.{% else %}*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} {{ condition.threshold }} over the {{ condition.timePeriodLabel }}.{% endif %}
+{%- endcapture -%}
+{%- capture _was_field -%}
+*Was*
+{{ previousValue | default: "—" }}
+{%- endcapture -%}
+{%- capture _now_field -%}
+*Now*
+{{ currentValue }}
+{%- endcapture -%}
+{%- capture _when -%}
+{{ occurredAt | date: "%b %d, %H:%M" }}
+{%- endcapture -%}
+{%- capture _links -%}
+<{{ graph.url }}|Open dashboard ↗> · <{{ trigger.editUrl }}|Edit alert>
+{%- endcapture -%}
+[
+  { "type": "alert", "level": {{ _level | json }}, "text": { "type": "mrkdwn", "text": {{ _lead | truncate: 190 | json }} } },
+  { "type": "header", "text": { "type": "plain_text", "text": {{ _header | truncate: 140 | json }}, "emoji": true } },
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _lead | json }} } },
+  { "type": "section", "fields": [
+    { "type": "mrkdwn", "text": {{ _was_field | json }} },
+    { "type": "mrkdwn", "text": {{ _now_field | json }} }
+  ] },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _when | json }} }] },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _links | json }} }] }
+]

@@ -118,7 +118,7 @@ const fullWorkflowJSON = `{
       "data": {
         "name": "Answer",
         "parameters": [
-          {"identifier": "llm", "type": "llm", "value": {"model": "openai/gpt-5-mini", "temperature": 0.0}}
+          {"identifier": "llm", "type": "llm", "value": {"model": "openai/gpt-5-mini", "temperature": 0.0, "reasoning": "low"}}
         ],
         "inputs": [{"identifier": "question", "type": "str"}],
         "outputs": [{"identifier": "answer", "type": "str"}]
@@ -173,10 +173,15 @@ func TestParseFullWorkflow(t *testing.T) {
 	assert.Equal(t, "outputs.question", w.Edges[0].SourceHandle)
 	assert.Equal(t, "inputs.x", w.Edges[0].TargetHandle)
 
-	// Default LLM config carries reasoning.
-	require.NotNil(t, w.DefaultLLM)
-	require.NotNil(t, w.DefaultLLM.Reasoning)
-	assert.Equal(t, "low", *w.DefaultLLM.Reasoning)
+	// The node-level llm param carries reasoning; the legacy top-level
+	// `default_llm` key in the fixture is tolerated as an unknown field
+	// (nodes own their LLM config since DSL spec_version 1.5).
+	var sigLLM dsl.LLMConfig
+	sigParams := w.Nodes[3].Data.Parameters
+	require.Len(t, sigParams, 1)
+	require.NoError(t, json.Unmarshal(sigParams[0].Value, &sigLLM))
+	require.NotNil(t, sigLLM.Reasoning)
+	assert.Equal(t, "low", *sigLLM.Reasoning)
 }
 
 func TestEntrySelectionString(t *testing.T) {
@@ -261,7 +266,7 @@ func TestUnknownNodeKindParses(t *testing.T) {
 }
 
 // Prompt-config fields land on the Component struct exactly as the TS
-// signatureComponentSchema (langwatch/src/optimization_studio/types/
+// signatureComponentSchema (platform/app/src/optimization_studio/types/
 // dsl.ts:414-428) ships them: flat configId/handle on data, nested
 // versionMetadata sub-object. nlpgo's engine reads these to stamp the
 // PromptApiService.get + Prompt.compile span identity attributes.

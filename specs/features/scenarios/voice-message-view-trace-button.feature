@@ -1,79 +1,60 @@
-Feature: View Trace button on voice messages in simulation run UI
+Feature: Turn separators on voice messages in simulation run UI
   As a user reviewing a simulation run that includes voice (audio) turns
-  I want voice/audio messages to expose the same "View Trace" affordance as text and tool turns
-  So that I can jump from any model-generated turn — including voice — to its underlying trace
+  I want traced turns — including voice — to be headed by the same turn separator
+  So that I can jump from any turn's separator to its underlying trace
+
+  # Turn separators replaced the per-message "View Trace" buttons: consecutive
+  # messages sharing a trace id group into a turn, and each turn is headed by a
+  # "TURN N · View trace" separator with hover-preview and click/keyboard
+  # activation opening the trace drawer (owned by RunTurnSeparator; the
+  # drawer-open behavior is browser-verified).
 
   Background:
     Given I am viewing a simulation run in the run detail drawer
     And the run's conversation is rendered by ScenarioMessageRenderer
 
   @integration
-  Scenario: Assistant audio turn with a trace id shows the View Trace button in drawer variant
-    Given the renderer is mounted in drawer variant (variant === "drawer", smallerView === false)
-    And the conversation contains an assistant message rendered as a media item with a non-empty traceId
-    When the renderer paints that turn
-    Then a "View Trace" button is shown under the media bubble
-    And the button has the same affordance (button + hover-peek) as the text / tool-call / tool-result branches
-
-  @integration
-  Scenario: Assistant audio turn without a trace id does not show the button
+  Scenario: Assistant audio turn with a trace id shows a turn separator in drawer variant
     Given the renderer is mounted in drawer variant
-    And the conversation contains an assistant message rendered as a media item with no traceId
+    And the conversation contains an assistant message rendered as a media item with a non-empty trace id
     When the renderer paints that turn
-    Then no "View Trace" button is shown under the media bubble
+    Then a turn separator carrying that trace id renders above the media bubble
 
   @integration
-  Scenario: User-role audio turn does not show the View Trace button
+  Scenario: Assistant audio turn without a trace id renders no separator
     Given the renderer is mounted in drawer variant
-    And the conversation contains a user message rendered as a media item with a non-empty traceId
+    And the conversation contains an assistant message rendered as a media item with no trace id
     When the renderer paints that turn
-    Then no "View Trace" button is shown under the media bubble
-    # Mirrors the role gate the text branch applies — only assistant turns get the affordance
+    Then no turn separator is rendered for that turn
 
   @integration
-  Scenario: Clicking View Trace on an audio turn opens the trace details drawer
-    Given an assistant media turn in drawer variant has a "View Trace" button
-    When I click the button
-    Then the trace details drawer opens for that traceId
-    # Wiring is delegated to TraceMessage's existing click handler — no new wiring expected
-
-  @integration
-  Scenario: Grid variant suppresses the View Trace button on audio turns
-    Given the renderer is mounted in grid variant (variant === "grid", smallerView === true)
-    And the conversation contains an assistant message rendered as a media item with a non-empty traceId
-    When the renderer paints that turn
-    Then no "View Trace" button is shown under the media bubble
-    # Matches how the other kinds behave in grid view
-
-  @integration
-  Scenario: Transcript-collapse case renders one bubble with one View Trace button
+  Scenario: A traced turn gets one separator regardless of message role
     Given the renderer is mounted in drawer variant
-    And an assistant message contains both an audio part and a text-transcript part with a shared non-empty traceId
+    And the conversation contains a user message rendered as a media item with a non-empty trace id
+    When the renderer paints that turn
+    Then a turn separator carrying that trace id renders above the media bubble
+    # Unlike the old View Trace button (assistant-only), separators head every
+    # traced turn — the trace covers the whole turn, not one side of it
+
+  @integration
+  Scenario: Grid variant suppresses turn separators on audio turns
+    Given the renderer is mounted in grid variant
+    And the conversation contains an assistant message rendered as a media item with a non-empty trace id
+    When the renderer paints that turn
+    Then no turn separator is rendered
+    # Grid cards are previews — trace navigation lives in the drawer
+
+  @integration
+  Scenario: Transcript-collapse case renders one bubble with one turn separator
+    Given the renderer is mounted in drawer variant
+    And an assistant message contains both an audio part and a text-transcript part with a shared non-empty trace id
     When the renderer paints that turn
     Then exactly one bubble is rendered for that turn
-    And exactly one "View Trace" button is shown under that bubble
-    # No duplication between the media branch and the (now-collapsed) text branch
+    And exactly one turn separator is rendered above it
 
   @integration
-  Scenario: Existing trace-button behavior on text and tool turns is unchanged
+  Scenario: Each distinct consecutive trace id group gets its own separator
     Given the renderer is mounted in drawer variant
-    And the conversation contains assistant text, tool-call, and tool-result turns with non-empty traceIds
+    And the conversation contains assistant text, tool-call, and tool-result turns with distinct trace ids
     When the renderer paints those turns
-    Then each turn shows its existing "View Trace" affordance exactly as before
-    # Guards the existing test suite against regressions when the media branch is changed
-
-  # --- AC Coverage Map ---
-  # AC 1 ("drawer variant: assistant media + traceId shows View Trace, same affordance as other branches")
-  #   -> Scenario: Assistant audio turn with a trace id shows the View Trace button in drawer variant
-  # AC 2 ("media item with no traceId, or role !== assistant, does not show the button — same gate as text branch")
-  #   -> Scenario: Assistant audio turn without a trace id does not show the button
-  #   -> Scenario: User-role audio turn does not show the View Trace button
-  # AC 3 ("button opens the trace details drawer for that trace id — delegated to TraceMessage's existing click handler")
-  #   -> Scenario: Clicking View Trace on an audio turn opens the trace details drawer
-  # AC 4 ("grid variant continues to suppress the button on media, matching how other kinds behave in grid view")
-  #   -> Scenario: Grid variant suppresses the View Trace button on audio turns
-  # AC 5 ("transcript-collapse case still renders a single bubble and a single View Trace button — no duplication")
-  #   -> Scenario: Transcript-collapse case renders one bubble with one View Trace button
-  # AC 6 ("existing tests pass; a new test covers AC 1 and AC 2 in the renderer's test suite")
-  #   -> Scenarios covering AC 1 and AC 2 (above) supply the new coverage
-  #   -> Scenario: Existing trace-button behavior on text and tool turns is unchanged (guards "existing tests pass")
+    Then one turn separator renders per distinct consecutive trace id group

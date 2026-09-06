@@ -1,0 +1,231 @@
+// Verbatim prompts from https://langwatch.ai/docs/skills/code-prompts
+// These are copied to clipboard when users click "copy" in the onboarding UI.
+
+export const PROMPT_TRACING = `Add LangWatch Tracing to Your Code
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Add LangWatch Tracing to Your Code
+
+## Determine Scope
+
+If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
+- Read the full codebase to understand the agent's architecture
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
+- Add comprehensive tracing across all LLM call sites
+
+If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
+- Focus on the specific function or module
+- Add tracing only where requested
+- Verify the instrumentation works in context
+
+## Detect Context
+
+This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation and point them to the LangWatch docs.
+
+## Step 1: Set up the LangWatch MCP
+
+First, install the LangWatch MCP server so you have access to framework-specific documentation:
+
+# Installing the LangWatch MCP
+
+## For Claude Code
+Run:
+\`\`\`bash
+claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey ASK_USER_FOR_LANGWATCH_API_KEY
+\`\`\`
+
+Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.claude.json\` or \`.mcp.json\` with these fields:
+- \`command\`: npx
+- \`args\`: -y, then the package name on a separate token
+- package to launch: the npm package \`@langwatch/mcp-server\` (scoped)
+- \`env.LANGWATCH_API_KEY\`: the user's LangWatch API key
+
+## For other editors
+Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file using the fields listed above.
+
+**Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
+
+If MCP installation fails, see # Fetching LangWatch Docs Without MCP
+
+If the LangWatch MCP cannot be installed, you can fetch docs directly:
+
+1. Fetch the index: https://langwatch.ai/docs/llms.txt
+2. Follow links to specific pages, appending \`.md\` extension
+3. For Scenario docs: https://langwatch.ai/scenario/llms.txt
+
+Example flow:
+1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
+2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs.
+
+## Step 2: Get the API Key
+
+
+**API Key**: Ask the user for their LangWatch API key. They can get one at https://app.langwatch.ai/authorize
+Once they provide it, use it wherever you see a placeholder below.
+## Step 3: Read the Integration Docs
+
+Use the LangWatch MCP to fetch the correct integration guide for this project:
+
+- Call \`fetch_langwatch_docs\` with no arguments to see the docs index
+- Find the integration guide matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.)
+- Read the specific integration page for step-by-step instructions
+
+CRITICAL: Do NOT guess how to instrument. Read the actual documentation for the specific framework. Different frameworks have different instrumentation patterns.
+
+## Step 4: Install the LangWatch SDK
+
+For Python:
+\`\`\`bash
+pip install langwatch
+# or: uv add langwatch
+\`\`\`
+
+For TypeScript:
+\`\`\`bash
+npm install langwatch
+# or: pnpm add langwatch
+\`\`\`
+
+## Step 5: Add Instrumentation
+
+Follow the integration guide you read in Step 3. The general pattern is:
+
+**Python:**
+\`\`\`python
+import langwatch
+langwatch.setup()
+
+@langwatch.trace()
+def my_function():
+    # your existing code
+    pass
+\`\`\`
+
+**TypeScript:**
+\`\`\`typescript
+import { LangWatch } from "langwatch";
+const langwatch = new LangWatch();
+\`\`\`
+
+IMPORTANT: The exact pattern depends on the framework. Always follow the docs, not these examples.
+
+## Step 6: Verify
+
+Run the application and check that traces appear in your LangWatch dashboard at https://app.langwatch.ai
+
+## Common Mistakes
+
+- Do NOT invent instrumentation patterns — always read the docs for the specific framework
+- Do NOT skip the \`langwatch.setup()\` call in Python
+- Do NOT forget to add LANGWATCH_API_KEY to .env
+- Do NOT use \`platform_\` MCP tools — this skill is about adding code, not creating platform resources`;
+
+export const PROMPT_EXPERIMENTS = `Run Experiments for Your Agent
+
+Use LangWatch experiments for pre-deployment batch tests, prompt or model comparisons, regression checks, benchmarks, and CI quality gates.
+
+Read the agent code before creating a domain-specific dataset. Read the current documentation with \`langwatch docs evaluations/experiments/overview\` and \`langwatch docs evaluations/experiments/sdk\`. Build the experiment with the SDK that matches the project, run it with real credentials from the project environment, then verify it with \`langwatch experiment list --format json\`.
+
+Do not configure production monitors or guardrails. If the request concerns live traffic, use the online-evaluations skill instead.`;
+
+export const PROMPT_ONLINE_EVALUATIONS = `Set Up Online Evaluations and Guardrails
+
+Use LangWatch online evaluations to score live traces or threads asynchronously. Use guardrails only when an evaluator must synchronously stop or replace unsafe traffic.
+
+Inspect existing evaluators and monitors first. Read the current documentation with \`langwatch docs evaluations/online-evaluation/overview\`, \`langwatch docs evaluations/online-evaluation/setup-monitors\`, and the relevant guardrail guide. Discover the installed CLI flags with \`langwatch monitor create --help\`, create the real monitor or guardrail, and verify the saved configuration and real behavior.
+
+Do not create a batch experiment. If the request concerns a dataset, benchmark, comparison, or CI gate, use the experiments skill instead.`;
+
+export const PROMPT_SCENARIOS = `Test Your Agent with Scenarios
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Test Your Agent with Scenarios
+
+NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the platform MCP tools for no-code scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+
+## Common Mistakes
+
+### Code Approach
+- Do NOT create your own testing framework or simulation library — use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`). It already handles user simulation, judging, multi-turn conversations, and tool call verification
+- Do NOT just write regular unit tests with hardcoded inputs and outputs — use scenario simulation tests with \`UserSimulatorAgent\` and \`JudgeAgent\` for realistic multi-turn evaluation
+- Always use \`JudgeAgent\` criteria instead of regex or word matching for evaluating agent responses — natural language criteria are more robust and meaningful than brittle pattern matching
+- Do NOT forget \`@pytest.mark.asyncio\` and \`@pytest.mark.agent_test\` decorators in Python tests
+- Do NOT forget to set a generous timeout (e.g., \`30_000\` ms) for TypeScript tests since simulations involve multiple LLM calls
+- Do NOT import from made-up packages like \`agent_tester\`, \`simulation_framework\`, \`langwatch.testing\`, or similar — the only valid imports are \`scenario\` (Python) and \`@langwatch/scenario\` (TypeScript)
+
+### Red Teaming
+- Do NOT manually write adversarial prompts -- let \`RedTeamAgent\` generate them systematically. The crescendo strategy handles warmup, probing, escalation, and direct attack phases automatically
+- Do NOT create your own red teaming or adversarial testing framework -- use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`). It already handles structured attacks, scoring, backtracking, and early exit
+- Do NOT use \`UserSimulatorAgent\` for red teaming -- use \`RedTeamAgent.crescendo()\` (Python) or \`scenario.redTeamCrescendo()\` (TypeScript) which is specifically designed for adversarial testing
+- Use \`attacker.marathon_script()\` instead of \`scenario.marathon_script()\` for red team runs -- the instance method pads extra iterations for backtracked turns and wires up early exit
+- Do NOT forget to set a generous timeout (e.g., \`180_000\` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
+
+### Platform Approach
+- This approach uses \`platform_\` MCP tools — do NOT write code files
+- Do NOT use \`fetch_scenario_docs\` for SDK documentation — that's for code-based testing
+- Write criteria as natural language descriptions, not regex patterns
+- Create focused scenarios — each should test one specific behavior
+- Always call \`discover_schema\` first to understand the scenario format`;
+
+export const PROMPT_PROMPTS = `Version Your Prompts with LangWatch Prompts CLI
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Version Your Prompts with LangWatch Prompts CLI
+
+## Common Mistakes
+
+- Do NOT hardcode prompts in application code — always use \`langwatch.prompts.get()\` to fetch managed prompts
+- Do NOT duplicate prompt text as a fallback (no try/catch around \`prompts.get\` with a hardcoded string) — this silently defeats versioning
+- Do NOT manually edit \`prompts.json\` — use the CLI commands (\`langwatch prompt init\`, \`langwatch prompt create\`, \`langwatch prompt sync\`)
+- Do NOT skip \`langwatch prompt sync\` — prompts must be synced to the platform after creation`;
+
+export const PROMPT_AGENT_PERFORMANCE = `Diagnose Your Agent's Production Behavior
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it, they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
+
+# Diagnose Your Agent's Production Behavior
+
+This skill reads production traffic and answers: what is my agent doing, where is it failing, who is it annoying, and where is the money going. Read-only, plus one report file.
+
+1. Baseline the vital signs with \`langwatch analytics query\` presets (trace-count, total-cost, avg-latency, p95-latency, total-tokens, eval-pass-rate), then slice with \`--group-by\` to find where the numbers come from.
+2. Export evidence with \`langwatch trace export --format jsonl --limit 1000\` and mine it locally: failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes between time windows, outliers.
+3. Read representative traces in full with \`langwatch trace get <traceId>\` and keep 2-3 example trace IDs per finding.
+4. Write a self-contained agent-performance-report.html where every finding links to real example traces, then summarize the top findings with numbers in the conversation.
+5. Close by recommending the agent-improve skill to turn findings into tested changes (\`npx skills add langwatch/skills/agent-improve\`).
+
+## Common Mistakes
+
+- Do NOT modify code, prompts, or platform resources, this skill is read-only plus the report file
+- Do NOT report a pattern without linked example traces
+- Do NOT rely on aggregates alone, always read full traces per finding
+- Do NOT present raw JSON to the user, deliver the diagnosis in plain language with numbers`;
+
+export const PROMPT_LEVEL_UP = `${PROMPT_TRACING}
+
+---
+
+${PROMPT_PROMPTS}
+
+---
+
+${PROMPT_EXPERIMENTS}
+
+---
+
+${PROMPT_SCENARIOS}`;

@@ -155,3 +155,48 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     Given a prompt whose http URL points at a PDF document
     When I run the workflow
     Then the model receives it as a document to read
+
+  # ============================================================================
+  # What the trace records
+  # ============================================================================
+  # The engine may fetch an attachment far larger than a span can carry: the
+  # fetch ceiling is 20 MB and the collector refuses an OTLP body over 10 MB, so
+  # a copy of the messages is summarized before it becomes span content. That
+  # guard was written for the 20 MB case but applied to every attachment at any
+  # size, which cost the trace a 2 KB thumbnail for no benefit and left the
+  # reader a placeholder that renders as broken media.
+  #
+  # So the summary is now a last resort, sized against the collector's body
+  # limit rather than the fetch ceiling. An attachment that fits reaches the
+  # trace as real content and the ingestion edge externalizes it to the
+  # content-addressed store like any other SDK's media
+  # (specs/trace-processing/trace-media-blob-extraction.feature). Only the
+  # provider call was ever built from the unsummarized messages; that does not
+  # change, so what the model sees is unaffected either way.
+
+  @unit
+  Scenario: An attachment small enough to carry reaches the trace as real content
+    Given a prompt whose image is a data URL well under the traced-content budget
+    When I run the workflow
+    Then the span's recorded input carries the image content itself
+    And the model receives exactly the same image
+
+  @unit
+  Scenario: An attachment too large to carry keeps a summary naming its type and size
+    Given a prompt whose attachment is larger than the traced-content budget
+    When I run the workflow
+    Then the span's recorded input carries a summary naming the media type and byte count
+    And the model still receives the whole attachment
+
+  @unit
+  Scenario: The budget counts every attachment in the message, not each one alone
+    Given a prompt carrying several attachments that each fit but together exceed the budget
+    When I run the workflow
+    Then the attachments are carried in order until the budget is spent
+    And the remainder keep their summaries, so the span stays under the collector's body limit
+
+  @unit
+  Scenario: Audio and documents follow the same budget as images
+    Given a prompt carrying a small audio recording and a small PDF
+    When I run the workflow
+    Then both reach the trace as real content rather than as summaries

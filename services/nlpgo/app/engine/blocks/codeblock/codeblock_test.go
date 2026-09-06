@@ -53,6 +53,7 @@ func TestCodeBlock_StdoutCaptured(t *testing.T) {
 	assert.Contains(t, res.Stdout, "hello-stdout")
 }
 
+// @scenario "A declared output the code never returns fails the run"
 func TestCodeBlock_MissingDeclaredOutput(t *testing.T) {
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
@@ -84,6 +85,60 @@ func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
 	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, scratch)
 }
 
+// TestCodeBlock_WithholdsPodEnvironment is the regression guard for the
+// env-exfiltration hotfix: user code must NOT see credential-bearing
+// variables from the pod environment, while the interpreter still receives
+// the allowlisted plumbing it needs. A secret set in the parent process
+// must be invisible to the subprocess; PATH (allowlisted) must be visible.
+func TestCodeBlock_WithholdsPodEnvironment(t *testing.T) {
+	requirePython(t)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret-should-not-leak")
+	t.Setenv("LANGWATCH_INTERNAL_TOKEN", "also-secret")
+
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: "import os\n" +
+			"def execute():\n" +
+			"    return {\n" +
+			"        'aws': os.environ.get('AWS_SECRET_ACCESS_KEY', '<absent>'),\n" +
+			"        'token': os.environ.get('LANGWATCH_INTERNAL_TOKEN', '<absent>'),\n" +
+			"        'has_path': bool(os.environ.get('PATH')),\n" +
+			"    }\n",
+		DeclaredOutputs: []string{"aws", "token", "has_path"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "<absent>", res.Outputs["aws"], "AWS secret leaked into user code env")
+	assert.Equal(t, "<absent>", res.Outputs["token"], "internal token leaked into user code env")
+	assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+}
+
+// TestCodeBlock_EmptyAllowlistPassesNothing verifies the explicit
+// lock-everything-down configuration: a non-nil empty allowlist yields a
+// subprocess with no environment at all (not an inherited one).
+func TestCodeBlock_EmptyAllowlistPassesNothing(t *testing.T) {
+	requirePython(t)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret-should-not-leak")
+
+	e, err := codeblock.New(codeblock.Options{EnvAllowlist: []string{}})
+	require.NoError(t, err)
+	res, err := e.Execute(context.Background(), codeblock.Request{
+		// PATH is allowlisted by the default set but NOT by an explicit
+		// empty allowlist, so its absence proves nothing from the parent
+		// environment (allowlisted or otherwise) was propagated.
+		Code: "import os\n" +
+			"def execute():\n" +
+			"    return {\n" +
+			"        'aws': os.environ.get('AWS_SECRET_ACCESS_KEY', '<absent>'),\n" +
+			"        'path': os.environ.get('PATH', '<absent>'),\n" +
+			"    }\n",
+		DeclaredOutputs: []string{"aws", "path"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "<absent>", res.Outputs["aws"], "secret must not leak under empty allowlist")
+	assert.Equal(t, "<absent>", res.Outputs["path"], "empty allowlist must pass no parent env vars, not even PATH")
+}
+
 func TestCodeBlock_RaisesAreStructured(t *testing.T) {
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
@@ -105,18 +160,21 @@ func TestCodeBlock_SyntaxErrorReported(t *testing.T) {
 	assert.Contains(t, res.Error.Type, "SyntaxError")
 }
 
+// @scenario "Exceeding the wall-clock budget is reported as a timeout"
 func TestCodeBlock_TimeoutKillsSubprocess(t *testing.T) {
 	requirePython(t)
 	start := time.Now()
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
-		Code:    "def execute():\n    import time\n    time.sleep(10)\n    return {'ok': True}\n",
-		Timeout: 500 * time.Millisecond,
+		Code:            "def execute():\n    import time\n    time.sleep(10)\n    return {'ok': True}\n",
+		DeclaredOutputs: []string{"ok"},
+		Timeout:         500 * time.Millisecond,
 	})
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 	assert.True(t, res.TimedOut)
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "Timeout", res.Error.Type)
+	assert.Empty(t, res.Outputs, "a timed-out run must not surface outputs")
 	assert.Less(t, elapsed, 3*time.Second, "subprocess must die promptly")
 }
 
@@ -405,6 +463,74 @@ func TestCodeBlock_NoSecretsLeavesNamespaceUndefined(t *testing.T) {
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "NameError", res.Error.Type)
 	assert.Contains(t, res.Error.Message, "secrets")
+}
+
+// TestCodeBlock_ParamsExposedAsNamespace pins the run-parameters contract:
+// a configured parameter rides on the request and the runner exposes it as
+// `params.NAME` attribute access, the same shape as secrets. Values keep
+// their configured type on the way through, so a boolean is usable as a
+// boolean and a number is usable in arithmetic rather than arriving as text.
+func TestCodeBlock_ParamsExposedAsNamespace(t *testing.T) {
+	requirePython(t)
+	code := "def execute():\n" +
+		"    return {\n" +
+		"        'tenant': params.TENANT,\n" +
+		"        'tenant_kind': type(params.TENANT).__name__,\n" +
+		"        'verbose_kind': type(params.VERBOSE).__name__,\n" +
+		"        'flipped': not params.VERBOSE,\n" +
+		"        'doubled': params.RETRIES * 2,\n" +
+		"    }\n"
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: code,
+		Params: map[string]any{
+			"TENANT":  "acme",
+			"RETRIES": 3,
+			"VERBOSE": true,
+		},
+		DeclaredOutputs: []string{"tenant", "tenant_kind", "verbose_kind", "flipped", "doubled"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "acme", res.Outputs["tenant"])
+	assert.Equal(t, "str", res.Outputs["tenant_kind"])
+	// The load-bearing assertion for typed params: a boolean reaches Python
+	// as a bool, so `not params.VERBOSE` is False. Were it stringified the
+	// way secrets are, the type would be "str" and the negation True.
+	assert.Equal(t, "bool", res.Outputs["verbose_kind"])
+	assert.Equal(t, false, res.Outputs["flipped"])
+	assert.InDelta(t, 6.0, res.Outputs["doubled"], 1e-9)
+}
+
+// TestCodeBlock_UndefinedParamRaisesAttributeError pins that a reference to
+// a parameter that isn't configured fails as AttributeError (the namespace
+// exists but the attr doesn't), not a silent empty value.
+func TestCodeBlock_UndefinedParamRaisesAttributeError(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': params.ABSENT}\n",
+		Params:          map[string]any{"PRESENT": "yes"},
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "AttributeError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "ABSENT")
+}
+
+// TestCodeBlock_NoParamsLeavesNamespaceUndefined pins the same failure shape
+// secrets has: with no parameters configured, `params` is undefined
+// (NameError) rather than an empty namespace, so reading one that was never
+// set fails loudly instead of resolving to nothing.
+func TestCodeBlock_NoParamsLeavesNamespaceUndefined(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': params.ANYTHING}\n",
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "NameError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "params")
 }
 
 func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {

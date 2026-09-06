@@ -6,6 +6,13 @@ Feature: Scoped role bindings
   Role bindings attach a principal (user or group) to a named role at a specific scope.
   The most specific scope always wins. Group bindings are expanded via group membership.
 
+  # ADR-092 supersedes the override behaviour described here: grants are an
+  # additive union, so a narrower binding adds and never subtracts. The
+  # scenarios this affects, and the premise sentence above, are named in the
+  # header of specs/rbac/unified-authorization-engine.feature. They are
+  # rewritten in the contract PR (delivery plan PR 4); until then they
+  # describe the live resolver for not-yet-cut-over organizations.
+
   Background:
     Given an organization "acme"
     And the following teams in "acme": "client-a", "client-b"
@@ -110,3 +117,28 @@ Feature: Scoped role bindings
       | Viewer | analytics:view   | granted |
       | Member | datasets:manage  | granted |
       | Viewer | datasets:manage  | denied  |
+
+  # ============================================================================
+  # Batch scope checks match per-scope checks
+  # ============================================================================
+  # The batched helper (one permission, many scopes) must reach the same
+  # verdict as the per-scope helpers for every scope. A project check must
+  # honour a TEAM-scoped binding on the project's team even when the batch
+  # call only enumerates project ids — the projects' team ids ride along in
+  # the binding load, exactly as the single-project resolver includes the
+  # team scope in its query.
+
+  @integration
+  Scenario: Batch project check honours a team-scoped binding
+    Given user "konrad" has a RoleBinding: Member on team "client-a"
+    And user "konrad" has no TeamUser membership rows at all
+    When the platform batch-checks "project:view" for every project in "acme"
+    Then projects "clienta-dev" and "clienta-prod" resolve to granted
+    And the batch verdict for "clienta-dev" equals the per-project check verdict
+
+  @integration
+  Scenario: Batch project check still denies projects of other teams
+    Given user "konrad" has a RoleBinding: Member on team "client-a"
+    And a project "clientb-app" in team "client-b"
+    When the platform batch-checks "project:view" for every project in "acme"
+    Then project "clientb-app" resolves to denied

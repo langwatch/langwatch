@@ -65,3 +65,67 @@ Feature: Dedicated Langy API key provisioning
     When I revoke the Langy key
     Then the Langy key can no longer act on my project
     And my project's other API keys are unaffected
+
+  # ---------------------------------------------------------------------------
+  # The per-chat session key: the caller's own access, and never more
+  # ---------------------------------------------------------------------------
+
+  # Langy's key is issued at the "read and create" grain, and creating a
+  # scenario was gated at the "manage everything" grain, so an admin who could
+  # create a scenario by hand watched Langy be refused. The answer is that an
+  # action asks for access at the grain it acts at — never that the assistant
+  # is handed the power to delete in order to be allowed to create.
+  Rule: Langy acts with the caller's own access, never more and never less
+
+    @unit
+    Scenario: Creating asks for permission to create
+      Given I can create scenarios but not delete them
+      When Langy creates a scenario on my behalf
+      Then the scenario is created
+
+    @unit
+    Scenario: Being able to manage still lets you create
+      Given I can manage scenarios
+      When Langy creates a scenario on my behalf
+      Then the scenario is created
+
+    @unit
+    Scenario: Langy is never granted the power to delete
+      Given I can manage scenarios, which includes deleting them
+      When Langy starts a chat on my behalf
+      Then Langy cannot delete a scenario in this project
+
+    @unit
+    Scenario: Langy can do what the person asking can do
+      Given I can create and manage scenarios in this project
+      When Langy starts a chat on my behalf
+      Then Langy can create a scenario in this project
+
+    @unit
+    Scenario: Langy cannot do what the person asking cannot do
+      Given I can only view scenarios in this project
+      When Langy starts a chat on my behalf
+      Then Langy can read the scenarios in this project
+      And Langy cannot create a scenario in this project
+
+    @unit
+    Scenario: Langy is never granted access outside its own remit
+      Given I am an admin of this organization
+      When Langy starts a chat on my behalf
+      Then Langy cannot administer the organization
+      And Langy cannot read or write the project's stored secrets
+      And Langy cannot share traces publicly
+
+    @unit
+    Scenario: A person with no relevant access gets no key at all
+      Given I hold none of the access Langy uses in this project
+      When Langy starts a chat on my behalf
+      Then no key is created
+      And I am told plainly that my access does not cover it
+
+    @integration
+    Scenario: Reducing someone's access takes effect on keys already issued
+      Given Langy holds a key issued while I could manage scenarios
+      When my access is reduced to viewing scenarios
+      Then that key can no longer create a scenario
+      And it can still read the scenarios I can still read

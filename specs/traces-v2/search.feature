@@ -155,6 +155,18 @@ Rule: Search bar keyboard shortcuts
     When the user presses Tab
     Then the highlighted suggestion is inserted into the search bar
 
+  # The search bar used to carry a lightbulb button whose popover listed
+  # these tips. That was one more button crowding the bar; the tips now live
+  # in the single keyboard-shortcuts dialog (opened with "?") alongside every
+  # other shortcut, so there is one place to look.
+  Scenario: Search tips live in the keyboard shortcuts dialog
+    Given the search bar is shown
+    Then there is no lightbulb "Search shortcuts" button next to it
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then a "Search" section lists: Ask AI to build a query (⌘/Ctrl I),
+      combine a facet with OR (Shift or ⌘/Ctrl click), and flip an operator
+      by clicking AND / OR in the query
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QUERY SYNTAX
@@ -178,6 +190,7 @@ Rule: Query syntax
   Scenario: Free text search in quotes
     When the user searches for "refund policy"
     Then traces with "refund policy" in their input or output content are shown
+    And traces whose trace name or any span name contains "refund policy" are shown
 
   Scenario: Negation with NOT
     When the user searches for "NOT @status:error"
@@ -223,6 +236,94 @@ Rule: Query syntax
   Scenario: Unquoted free text is treated as full-text search
     When the user types "timeout" without quotes or @ prefix
     Then it is treated as a full-text search across trace content
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FREE TEXT REACHES SPAN NAMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Free text used to match only ComputedInput and ComputedOutput, so a trace
+# whose span name was the only place the query appeared was invisible to the
+# search box. Searching "codex" returned nothing even though Codex traces
+# existed, because the tool name lives on the span, not in the captured I/O.
+# Span names are now part of the same free-text clause: the trace's own name
+# (the root span's name, held on trace_summaries) plus every span name in
+# stored_spans, matched as a case-insensitive substring the way the I/O
+# columns already are.
+Rule: Free text matches span names as well as captured I/O
+  When a query is answered from stored data, a free-text term is looked for in
+  the trace input, the trace output, the trace name, and the names of the
+  trace's spans. Any one of them matching surfaces the trace. The in-memory
+  evaluator that automation dispatch uses is narrower, and the last scenario
+  in this rule pins how.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: A term that appears only in a span name still finds the trace
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term that appears only in the trace name still finds the trace
+    Given a trace is named "codex exec" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: Span name matching is case-insensitive substring matching
+    Given a trace has a span named "Codex.Exec"
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term in no field at all does not match
+    Given a trace has no occurrence of "codex" in its input, output, trace name, or any span name
+    When the user searches for "codex"
+    Then that trace is not in the results
+
+  Scenario: Negated free text excludes a span-name match
+    Given a trace has a span named "codex"
+    When the user searches for "NOT codex"
+    Then that trace is not in the results
+
+  # Both free-text paths carry the same promise: the traces-v2 search bar
+  # (which is also what Langy searches through) and the legacy messages list
+  # and public search endpoint.
+  Scenario: The legacy messages list search also reaches span names
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the same term is searched through the legacy messages list search
+    Then that trace is in the results
+
+  # Ranking is deliberately unchanged. Neither free-text path scores results:
+  # they are boolean SQL filters and the list stays ordered newest-first, so
+  # "prioritising" a span-name match means including it in the match set at
+  # all rather than assigning it a relevance weight.
+  Scenario: Results stay in chronological order
+    Given several traces match "codex" by span name and by input content
+    When the user searches for "codex"
+    Then the results are ordered newest first, not by which field matched
+
+  # The one place the two sides of the query language do not agree. A trigger's
+  # filter is re-checked in memory at dispatch time against the settled fold
+  # state, which carries the trace name but no span rows. Treating the missing
+  # spans as unknown and failing the tag closed would stop every negated
+  # free-text trigger from matching, so the narrower answer is the deliberate
+  # choice: it can miss a match that only a span name would have made. A
+  # dispatcher that starts deriving spans becomes exact with no change needed.
+  @unit
+  Scenario: A trigger's in-memory re-check cannot see span names
+    Given an automation whose filter is the free text "codex"
+    And a trace whose only occurrence of "codex" is a span name
+    When the filter is re-checked in memory at dispatch time, with no span rows loaded
+    Then the trace does not match
+    But the same filter run against stored data does surface that trace
+
+  @unit
+  Scenario: The in-memory re-check still matches on the trace name
+    Given an automation whose filter is the free text "codex"
+    And a trace named "codex exec" with no occurrence of "codex" in its input or output
+    When the filter is re-checked in memory at dispatch time
+    Then the trace matches, because the trace name travels with the fold state
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,66 +514,6 @@ Rule: Filter column collapse and expand
     Given the user collapses or expands the sidebar
     When the user navigates away and returns to the Observe page
     Then the sidebar restores from `langwatch:traces-v2:ui` in localStorage
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FACET FINDER — FILTER THE SIDEBAR'S FACETS BY NAME
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Facet finder
-  A search control in the sidebar header filters which facet SECTIONS are
-  shown, so the user can jump to a facet by name without scrolling. It filters
-  the already-visible facets in place — it does not change which facets are
-  enabled (that is Configure) and does not search facet values (that is the
-  per-facet value search).
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And the sidebar shows the Model, Cost, Duration, and Status facets
-
-  Scenario: The finder is collapsed until invoked
-    Then a facet-finder search icon is shown in the sidebar header
-    And no finder input is shown
-
-  Scenario: Opening the finder focuses the input
-    When the user clicks the facet-finder icon
-    Then a "Find a facet…" input appears below the header
-    And it is focused for immediate typing
-
-  Scenario: Typing filters the facet sections by name
-    Given the facet finder is open
-    When the user types "cost"
-    Then only facet sections whose name matches "cost" remain
-    And the non-matching sections are hidden
-
-  Scenario: Matching is case-insensitive and also matches the field key
-    Given the facet finder is open
-    When the user types "PROMPT"
-    Then the "Prompt version" facet remains visible
-    # Matches the human label OR the raw field key, lower-cased.
-
-  Scenario: The finder shows how many facets match
-    Given the sidebar shows 12 facets
-    And the facet finder is open
-    When the user types a query that matches 3 of them
-    Then the finder shows a "3 of 12" count
-
-  Scenario: No match shows an inline hint, not a blank column
-    Given the facet finder is open
-    When the user types a query that matches no shown facet
-    Then an inline "No facets match" hint is shown
-
-  Scenario: Clearing the finder restores every facet
-    Given the user has filtered the facets with a query
-    When the user presses Escape or clicks the clear button
-    Then every previously visible facet is shown again
-    And the finder input closes
-
-  Scenario: The finder is a transient view filter, not a visibility change
-    Given the user filtered to a single facet with the finder
-    When the user clears the finder
-    Then the other facets reappear without opening Configure
-    And no facet's shown or hidden setting was changed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1206,13 +1247,110 @@ Rule: Performance
 # AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: AI query composer (Ask AI)
-  Natural-language → query translation runs in a separate FloatingAiBar mode,
-  not inline in the structured search bar.
+Rule: The search bar's ask affordance belongs to Langy when Langy is available
+  The Ask AI query composer predates Langy. For a user who has Langy (it is
+  rolled out to them and they may start a conversation), the search bar's ask
+  button is the Langy entry point instead: a Langy-styled ask surface floats
+  over the search bar — at the top of the trace explorer, next to the traces
+  the question is about — and Enter hands the question and the active search
+  to the Langy panel. When the panel is already open there is no second
+  composer: the panel takes the question. Users without Langy keep the inline
+  Ask AI composer below, unchanged — the affordance is never a dead button.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
+    And Langy is available to the user, with permission to start a conversation
+
+  Scenario: The ask button reads Ask Langy
+    When the Observe page loads
+    Then the search bar's ask button reads "Ask Langy"
+    And the placeholder text reads "Search filters, free text, or Ask Langy…"
+    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+
+  Scenario: Clicking Ask Langy floats the ask surface over the search bar
+    Given the Langy panel is closed
+    When the user clicks "Ask Langy" (or presses ⌘I / Ctrl+I)
+    Then a Langy-styled ask surface floats where the search bar was
+    And the user can type their question there, next to their traces
+    And the inline AI composer does not open
+
+  Scenario: The floating surface shows what will go with the question
+    Given the search bar contains the applied query "status:error"
+    When the user opens the Langy ask surface
+    Then it says the active search goes with the question
+
+  Scenario: Enter hands the question and the search to the panel
+    Given the Langy ask surface is open with "why are these failing?" typed
+    And the search bar contains the applied query "status:error"
+    When the user presses Enter
+    Then the ask surface dissolves
+    And the Langy panel opens and asks "why are these failing?"
+    And the active search rides along as attached context
+
+  Scenario: Escape closes the ask surface without sending anything
+    Given the Langy ask surface is open
+    When the user presses Escape
+    Then the surface closes and the search bar returns
+    And nothing was sent or attached
+
+  Scenario: An open Langy panel is used instead of a second composer
+    Given the Langy panel is already open
+    And the search bar contains the applied query "status:error"
+    When the user clicks "Ask Langy"
+    Then no floating surface appears
+    And the active search attaches to the open panel's conversation context
+
+  Scenario: The panel opening elsewhere retires the floating surface
+    Given the Langy ask surface is open
+    When the Langy panel opens some other way
+    Then the ask surface closes — two composers are never on screen
+
+  Scenario: ⌘+Enter hands the typed question straight to Langy
+    Given the user typed "why are checkout traces failing" in the search bar
+    When the user presses ⌘+Enter / Ctrl+Enter
+    Then the Langy panel opens and asks "why are checkout traces failing"
+
+  Scenario: A question that is just the applied filter is not attached twice
+    Given the search bar contains the applied query "status:error"
+    When the user presses ⌘+Enter / Ctrl+Enter on that same text
+    Then Langy is asked "status:error"
+    And no separate search attachment duplicates it
+
+  Scenario: No model provider setup is demanded on the way to Langy
+    Given the project has no enabled model provider
+    When the user clicks "Ask Langy"
+    Then the Langy ask surface opens
+    # Langy walks the user through model setup itself when it needs one.
+
+  Scenario: Sample data keeps the handoff gated
+    Given the trace list is showing sample data
+    Then the ask button is dimmed
+    And its tooltip explains it works on real traces, not the sample data
+
+  Scenario: A broken ask surface gives the search bar straight back
+    Given the Langy ask surface fails to render
+    Then the surface folds away and the search bar returns
+    And searching keeps working
+
+  Scenario: The keyboard shortcuts dialog names Langy
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then the "Search" section lists "Ask Langy about these traces" for ⌘/Ctrl I
+
+  Scenario: Without Langy the inline Ask AI composer remains
+    Given Langy is not available to the user
+    Then the search bar's ask button reads "Ask AI"
+    And clicking it opens the inline AI composer
+
+Rule: AI query composer (Ask AI)
+  Natural-language → query translation runs in a separate FloatingAiBar mode,
+  not inline in the structured search bar. This is the ask affordance for
+  users WITHOUT Langy (see the rule above).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+    And Langy is not available to the user
 
   Scenario: Free-text in the structured bar stays free-text
     When the user types "show me all errors" in the structured search bar
@@ -1301,6 +1439,41 @@ Rule: AI query composer (Ask AI)
     When the composer renders the error
     Then the pill shows the message as a tooltip on hover (no expand affordance)
     And no popover opens on click
+
+  # The FloatingAiBar portal covers the docked search bar while AI mode is
+  # active, so an error that only renders in the docked bar's banner is
+  # invisible exactly when the user is looking for it. The floating bar owns
+  # its own error surface: the tip row under the input swaps to the error
+  # pill the moment a failure lands, and stays until the prompt changes or
+  # AI mode closes.
+
+  Scenario: Provider error is visible while the FloatingAiBar is open
+    Given the user is in AI mode with the FloatingAiBar open
+    When the AI search request fails with a provider error
+    Then the row under the floating input swaps from the rotating tip to a red error pill
+    And the pill shows the curated error message
+    And the composer stays open so the user can rephrase or bail out
+
+  Scenario: Provider config errors point the user at Model Providers settings
+    Given the AI search request fails with a provider error (e.g. 404 "Resource not found")
+    When the floating bar renders the error
+    Then the error row includes a "Review model providers" link to /settings/model-providers
+    And the message names the model that failed when the backend knows it
+
+  Scenario: Editing the prompt clears the floating error row
+    Given the floating bar shows an error pill
+    When the user edits the prompt text
+    Then the error row swaps back to the rotating tip
+
+  Scenario: The floating error row can be dismissed
+    Given the floating bar shows an error pill
+    When the user clicks the pill's dismiss button
+    Then the error clears, matching the docked banner's dismiss
+
+  Scenario: The floating error strip never blocks the UI underneath
+    Given the floating bar shows an error pill
+    Then only the pill itself takes pointer events
+    And the rest of the strip's width stays click-transparent
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1727,6 +1900,147 @@ Rule: Dynamic prefix sidebar parity
   Scenario: Event attributes section lives in the Trace group alongside event names
     Then an "Event attributes" section appears in the Trace group
     And toggling a value writes "@event.attribute.<key>:<value>" into the search bar
+
+
+Rule: Attribute sections list values from their own attribute store
+  Each attribute flavour is backed by a different ClickHouse column
+  (trace.attribute → trace_summaries.Attributes, span.attribute →
+  stored_spans.SpanAttributes, event.attribute → stored_spans.Events.Attributes).
+  Expanding a key must list values read from that flavour's own store — a
+  span- or event-attribute key whose values only exist on spans/events must
+  not come back empty because the lookup went to the trace-level map.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with trace, span, and event attributes
+
+  Scenario: Expanding an event-attribute key lists values observed on events
+    Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
+    And no trace-level attribute named "event.metrics.vote" exists
+    When the user expands the "event.metrics.vote" key in the Event attributes section
+    Then the value list shows "1" and "-1"
+
+  Scenario: Expanding a span-attribute key lists values observed on spans
+    Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
+    And no trace-level attribute named "gen_ai.request.model" exists
+    When the user expands the "gen_ai.request.model" key in the Span attributes section
+    Then the value list shows "gpt-5-mini"
+
+  Scenario: A listed event-attribute value round-trips verbatim into the filter
+    Given events carry the attribute "event.metrics.vote" with the stored string "1"
+    When the user toggles the listed value "1" under "event.metrics.vote"
+    Then the search bar shows "event.attribute.event.metrics.vote:1"
+    And the filter value is the stored string unmodified — never reformatted
+
+
+Rule: Event filtering is reachable on the default sidebar
+  A fresh profile lands on comfortable density; the Event name section and
+  the Event attributes section must be part of that default set so feedback
+  events (thumbs_up_down and friends) are filterable without configuration.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the user has never changed density
+    And the project has traces with events carrying attributes
+
+  Scenario: Event name and Event attributes sections show on the comfortable default
+    Given the user has never changed facet visibility
+    Then the sidebar shows the "Event name" section
+    And the sidebar shows the "Event attributes" section
+
+  Scenario: Span attributes stays behind the facet picker on comfortable density
+    Given the user has never changed facet visibility
+    And the project has traces with span attributes
+    Then the sidebar does not show the "Span attributes" section
+    But the facet picker still offers "Span attributes"
+
+  Scenario: Users who previously hid the Event name section keep it hidden
+    Given the user explicitly hid the "Event name" section earlier
+    And no event filter is active in the query
+    Then the sidebar does not show the "Event name" section
+
+
+Rule: Event rows drill down into their metric values
+  Each event-name row in the Event name section expands inline — like the
+  evaluator drilldown — to show the metric values observed for that event
+  type, with counts, sourced from the same discover payload (no extra query
+  per click).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
+
+  Scenario: Expanding the thumbs_up_down row shows its vote values with counts
+    When the user expands the "thumbs_up_down" row in the Event name section
+    Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
+    And no additional facet query is fired by the expansion
+
+  # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
+  # Only the label is humanised — the value the filter carries stays the
+  # stored string, so the round-trip is unaffected. Every other metric,
+  # named by whoever sent it, has no such mapping and shows as stored.
+  # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
+  # record of string to number — so "as stored" always means a decimal.)
+  Scenario: A metric with no human name shows its stored value
+    Given "checkout_survey" events carry "event.metrics.stars" with value "4"
+    When the user expands the "checkout_survey" row in the Event name section
+    Then the drilldown lists that value as "4"
+
+  Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
+    Given "event:thumbs_up_down" is already an active filter
+    When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
+    Then the search bar shows "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1"
+    And no additional "event" clause is added to the query
+
+  # Without the event anchor, "event.attribute.event.metrics.vote:-1" alone
+  # would match a trace carrying that value under a completely different
+  # event type — a metric that never happened on "thumbs_up_down" would still
+  # pass. Adding the anchor keeps the picked value scoped to the row the user
+  # actually expanded.
+  Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
+    Given the "thumbs_up_down" row is not yet an active filter
+    When the user expands the row and clicks the vote value shown as "thumbs down"
+    Then the search bar shows "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1"
+
+  # Known limitation, accepted: the anchor added above is not taken back when
+  # the metric clause is cleared. A click on an inactive row adds TWO clauses
+  # but the value's include/exclude/off cycle only ever removes ONE, so
+  # clearing the metric leaves "event:thumbs_up_down" behind — an event
+  # filter the user never picked directly. Withdrawing it safely means
+  # tracking that WE added it and that no other metric under that event is
+  # still active; until then the leftover clause stays visible as an active
+  # Event name row and one click clears it. This matches how the evaluator
+  # drilldown already behaves: buildGroupClause always emits the anchor first
+  # and returns it bare when every sub-condition is gone
+  # (evaluatorGroup.ts:216,229), so a cleared evaluator group leaves
+  # "evaluator:X" behind in the same way.
+  #
+  # NOTE ON QUOTING: the strings above carry no "@" prefix, unlike most
+  # scenarios in this file. "@" is an input sigil only — normalizeQueryString
+  # strips it at token start (parse.ts:153-156) and `serialize` never re-adds
+  # it (parse.ts:98), so a facet click yields "event:x", not "@event:x". The
+  # bound tests already assert the un-prefixed form (filterStore.unit.test.ts
+  # :94-96 expects "(origin:sample OR origin:application)"). The "@" spellings
+  # elsewhere in this file are inaccurate and predate this Rule.
+  @integration
+  Scenario: Clearing the metric leaves the event anchor it added behind
+    Given the user clicked a vote value on the inactive "thumbs_up_down" row
+    When the user cycles that same vote value back off
+    Then the search bar still shows "event:thumbs_up_down"
+
+  # Known limitation, accepted: once TWO DIFFERENT events are both active,
+  # each one's attribute clause still ANDs as an independent trace-scoped
+  # subquery — they may match different events in the same trace. Same-event
+  # pairing would need new filter grammar and is out of scope here.
+  @integration @unimplemented
+  Scenario: The drilldown filter is trace-scoped, not same-event-scoped
+    Given a trace has a "thumbs_up_down" event with vote "1" and another event with vote "-1"
+    When the user clicks the vote value "-1" in the thumbs_up_down drilldown
+    Then that trace still matches the resulting query
+
+  Scenario: An event type with no metrics shows no drilldown affordance
+    Given the project has "custom_marker" events carrying no event.metrics attributes
+    Then the "custom_marker" row shows no expand affordance
 
 
 Rule: Unknown field handling for typo'd prefixes

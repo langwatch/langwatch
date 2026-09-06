@@ -1,0 +1,187 @@
+Feature: Langy shows a live plan checklist for multi-step work
+  As someone who asked Langy to do something that takes several steps,
+  I want to watch a checklist of what it is going to do and where it is,
+  so that a long turn reads as deliberate progress rather than an opaque wait.
+
+  # The plan is not narrated in prose and it is not scraped from the model's
+  # text. Langy's agent keeps a todo list with the `todowrite` tool; the panel
+  # MIRRORS that list as a checklist. The list is the plan — the source of
+  # truth is a tool the model already maintains, structurally, not a magic-word
+  # convention in prose (the same class of protocol this codebase deliberately
+  # killed). Step activity is attributed by stream order: a tool call belongs to
+  # whichever plan item was the single in-progress one when the call started.
+  #
+  # Two increments back this behaviour. In Phase 1 the checklist is folded on
+  # the client from the durable `todowrite` tool parts already on the message,
+  # so it needs no backend change and survives a reload for free. In Phase 2 the
+  # manager authors a typed `plan` snapshot frame (capped and truncated) that the
+  # client prefers when present, and the transitions the manager truly knows —
+  # a cold spawn, resuming from a handoff — surface as honest status lines.
+
+  @unit
+  Scenario: Multi-step work shows a live checklist
+    Given Langy is working through a task it planned with three or more steps
+    When it maintains its todo list as each step begins
+    Then the user sees a checklist of the steps in order
+    And exactly one step is shown as the current step
+    And earlier steps that finished are shown as done
+
+  # The work is NOT nested under its step any more. The transcript carries a
+  # turn in the order it happened (langy-capability-cards.feature, "The
+  # transcript reads in the order the turn happened"), and a card cannot be in
+  # the transcript and inside the checklist at once without being read twice.
+  @unit
+  Scenario: The checklist is the steps, and the work stays in the transcript
+    Given a turn that ran tools between its plan updates
+    When the checklist is folded from the turn
+    Then it carries the steps and their status
+    And it carries none of the tool calls that ran
+
+  # A whole turn ran with all five steps finished and the card read
+  # "Plan · 0 of 5 done" the entire time, including after the pull request had
+  # opened. The status crosses the wire as a free string, and only the four
+  # exact words the tool documents were understood, so a model that wrote
+  # "done" or "in-progress" instead had every one of its steps recorded as not
+  # started.
+  @unit
+  Scenario: A step written with another word for done still counts as done
+    Given the agent wrote its statuses as "done", "Completed" and "in-progress"
+    When the checklist is folded from the turn
+    Then the finished steps are marked done and counted in the header
+    And the step written as in progress is the current step
+    And a status word that means nothing to us still reads as not started
+
+  @unit
+  Scenario: The agent's own todo tool reads those words the same way
+    Given the todo tool is given a status word that means done
+    Then it records the step as completed, exactly as the checklist folds it
+
+  # The live snapshot is not always the newer one. A dropped stream, or a tab
+  # that adopted the turn late, leaves it holding the first all-pending list
+  # while the turn's own plan updates already carry the finished steps.
+  @unit
+  Scenario: The fresher of the two plan snapshots wins
+    Given a live plan snapshot in which nothing has finished
+    And the turn's own plan updates in which three steps have
+    When the checklist is folded
+    Then it shows those three steps as done
+    And no step is ever ticked from anything but a snapshot the agent wrote
+
+  # The plan was written to the turn's durable record end to end and nothing
+  # read it back, so a reader who reloaded mid-turn lost the checklist until
+  # the turn finished.
+  @integration
+  Scenario: A reload in the middle of a turn keeps the checklist
+    Given a turn that is running and has maintained a plan
+    When the reader reloads the page before the turn ends
+    Then the checklist still shows the plan the turn has reached
+
+  @integration
+  Scenario: Completed steps read as one line each
+    Given a plan with steps that have finished
+    Then each finished step shows as one line with a done mark
+    And the checklist stays readable at a glance however many steps have run
+
+  @unit
+  Scenario: The checklist survives a reload
+    Given a turn that maintained a plan and then finished
+    When the user reloads the conversation from history
+    Then the checklist still renders from the durable record
+    And the current-step activity that was ephemeral is gone
+
+  @unit
+  Scenario: A failure freezes the checklist honestly
+    Given a plan whose third step was in progress when the turn failed
+    Then the finished steps stay marked done
+    And the plan is not shown as if it had completed
+    And no step is invented that the agent never planned
+
+  @unit
+  Scenario: A cancelled step is struck through, not dropped
+    Given a plan in which the agent cancelled one of its steps
+    Then that step is shown struck through
+    And it is not counted toward the completed total
+
+  # "0 of 4 · 4 left" sat above a list where only three steps looked
+  # outstanding: "left" counted the step currently running, and the steps not
+  # yet started had no visible mark at all, so nothing on screen agreed with
+  # either number. Checkboxes make the list countable and the header counts
+  # what is checked.
+  @integration
+  Scenario: Every step reads as a checkbox and the header counts what is checked
+    Given a plan with finished, current, and not-yet-started steps
+    When the checklist renders
+    Then a finished step shows a checked box
+    And the current step shows a filled box
+    And a step not yet started shows an empty box
+    And each box names its status for a reader who gets no shape or colour
+    And the header says how many steps are done out of the total, never "left"
+
+  # A four-minute turn that ran twenty commands showed one line, "PLAN · 3 OF 3
+  # DONE", and a wall of narration with nothing between the paragraphs: the
+  # card was closed, so every command was behind it, and a finished plan has no
+  # current step left to show either.
+  @integration
+  Scenario: The checklist is open while the turn works
+    Given a turn maintaining a plan
+    When the turn is still running
+    Then every step is visible without a click
+    And it folds back to the progress line once the turn settles
+    And a reader who opens or closes it themselves keeps their choice
+
+  # A plan is a promise about the rest of the turn, so it belongs where the
+  # reader can see it. Rendered inside the message it scrolled away the moment
+  # the turn wrote more than a screen of text, which is exactly the turn long
+  # enough to want a plan. It is held above the message box instead, the way a
+  # coding agent holds its todo list, and the work stays in the transcript.
+  @integration
+  Scenario: The checklist stays in view while the turn works
+    Given a turn maintaining a plan
+    When the transcript grows past the height of the panel
+    Then the checklist is still visible above the message box
+    And it hides no part of the conversation above it
+
+  @integration
+  Scenario: The checklist rejoins the conversation once the turn is over
+    Given a turn maintaining a plan
+    When the turn settles, fails, or the reader stops it
+    Then the checklist is no longer held above the message box
+    And the plan it reached is still readable inside the turn it belongs to
+
+  @unit
+  Scenario: No plan means today's rendering, unchanged
+    Given a turn in which the agent never maintained a todo list
+    Then the message renders exactly as it does today
+    And no empty checklist is shown
+
+  @unit
+  Scenario: The latest full list wins
+    Given the agent rewrote its whole todo list several times in one turn
+    When the checklist is folded from the message
+    Then it reflects the most recent full list, not an earlier one
+
+  @unit
+  Scenario: The manager caps a runaway plan
+    Given the agent wrote a todo list with far more items than a checklist should show
+    When the manager derives the typed plan snapshot
+    Then the number of items is capped and long item text is truncated rather than dropped
+    And the durable tool call is still recorded for the audit trail
+
+  @unit
+  Scenario: A capability's sub-status shows while a step runs
+    Given the current step runs a LangWatch capability
+    When that capability starts
+    Then a present-continuous sub-status like "Searching traces" shows for the step
+    And it is cleared once the step produces output
+
+  # A long scan reports its real position by writing the running count into the
+  # plan item, in one exact shape. The instructions Langy is given carry a single
+  # example of that shape, and it is the only description of it Langy ever reads,
+  # so an example the reader does not accept means Langy writes progress
+  # faithfully and none of it is ever shown, with nothing reporting a problem.
+  @unit
+  Scenario: The documented progress example is the format the parser accepts
+    Given the instructions show Langy how to write a running count
+    When that example is read back the way a live plan item is read
+    Then it is understood as measured progress and the count is drawn
+    And an example the reader cannot understand fails this check instead of shipping

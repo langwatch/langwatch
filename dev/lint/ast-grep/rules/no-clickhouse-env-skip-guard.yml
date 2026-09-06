@@ -1,0 +1,35 @@
+id: no-clickhouse-env-skip-guard
+message: >
+  This skip guard is inverted, and inverted it means "always skip".
+  `TEST_CLICKHOUSE_URL` does not mean "we are in the testcontainers-only lane";
+  it means "globalSetup provisioned services". `setup.ts` is a setupFiles entry
+  for the WHOLE integration lane and sets it in both the testcontainers and
+  native-local modes, and `setupEnv.ts` sets it again from `CI_CLICKHOUSE_URL`
+  in CI — so it is always truthy there, and skipping WHEN it is present skips
+  the suite in every mode, forever. A skipped suite reports green, so nothing
+  ever says so: 15 suites sat like this until #6327, and the 78 tests inside
+  them had never run in any environment, had rotted into assertions the code no
+  longer satisfied, and were hiding a real bug in the model-provider read path.
+  The correct polarity is the one `export-summary-blob-resolution` and
+  `eventLogDurability` use — `const hasTestcontainers = !!(...); ` then
+  `describe.skipIf(!hasTestcontainers)`, i.e. skip when services are ABSENT.
+  Better still, drop the guard: the integration lane always provisions them.
+  See #6327 and PR #5988.
+severity: error
+language: TypeScript
+rule:
+  any:
+    # The exact idiom that spread to 15 files by copy-paste. The name asserts
+    # the opposite of what the value holds, which is why it kept being reused.
+    - pattern: const isTestcontainersOnly = $$$REST
+    - pattern: describe.skipIf(isTestcontainersOnly)($$$)
+    # The same inversion written inline, without the misleading name.
+    - pattern: describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)($$$)
+    - pattern: describe.skipIf(process.env.TEST_CLICKHOUSE_URL)($$$)
+    - pattern: describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)($$$)
+    - pattern: describe.skipIf(process.env.CI_CLICKHOUSE_URL)($$$)
+files:
+  - "platform/app/**/*.test.ts"
+  - "platform/app/**/*.test.tsx"
+  - "platform/app/**/*.spec.ts"
+  - "platform/app/**/*.spec.tsx"

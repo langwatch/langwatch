@@ -1,0 +1,389 @@
+# thuishaven (`haven`)
+
+_Home port._ A tiny Go orchestrator that gives every LangWatch dev stack a stable
+**hostname** instead of a raw port — so worktrees never fight over ports again.
+
+Built on [portless](https://github.com/vercel-labs/portless): a local reverse
+proxy that maps hostnames to loopback ports. `.localhost` resolves to `127.0.0.1`
+natively (in browsers, curl, Go, Node), so there is **no `/etc/hosts`, no DNS, no
+sudo** for name resolution.
+
+## The scheme
+
+Each worktree's slug is simply its own directory name, sanitised (a checkout at
+`.../worktrees/portless` is the `portless` stack), cached in `.langwatch-slug`.
+Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
+
+| Hostname | Service |
+| --- | --- |
+| `app.<slug>.langwatch.localhost` | App — the UI, **and its API at `/api`** |
+| `gateway.<slug>.langwatch.localhost` | AI Gateway (Go) |
+| `nlp.<slug>.langwatch.localhost` | NLP engine (Go) |
+| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database |
+
+The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
+the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
+separate `api.<slug>` hostname — the frontend and backend never split into two
+confusable URLs. Vite serves the SPA and proxies `/api` (plus `/mcp`, `/sse`,
+`/oauth`, `/.well-known/*`) to the API backend on loopback.
+
+Shared, machine-wide (one daemon serves all worktrees):
+
+| Hostname | What |
+| --- | --- |
+| `langwatch.localhost` | Dashboard — which worktree runs what |
+| `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000) |
+| `telemetry.langwatch.localhost` | OTLP fan-out to **every** running stack |
+
+## Setup
+
+There is none. The first `haven up` bootstraps the machine itself: installs
+portless if missing, trusts its CA, starts the proxy — every step idempotent.
+`make haven install` (optional) go-installs the binary so plain `haven ...`
+works everywhere. Hostname routing is opt-in — `pnpm dev` uses the plain
+`PORT` scheme:
+
+```bash
+haven up                 # registers hostnames, starts + supervises the stack
+haven up +workers        # …with a standalone workers lane (sticky, per worktree)
+```
+
+Open <https://langwatch.localhost> to see every stack across your worktrees.
+
+## Commands
+
+One name per command, one meaning per flag, no aliases (ADR-064). The daily
+surface is six verbs; `db` and `clean` are the only destructive nouns.
+
+```text
+haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
+                 the daemon's reaping — with actions on the selected row
+                 (agents/pipes get the plain status report)
+haven up         start or reconcile this worktree's stack — in a terminal it
+                 runs in the BACKGROUND under an attached log view: ←/→/tab/digits
+                 switch between "all" and per-service logs, q detaches (the stack
+                 keeps running; haven down stops it). +svc/-svc picks services and
+                 sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
+                 app + nlp + gateway + idp, langy off. -w watches the Go services via
+                 air; -d detaches without the view; --rebuild forces images
+haven down       stop this worktree's stack — data is always kept;
+                 --all stops every stack, the shared servers, daemon, and proxy
+haven restart    bounce one supervised service (or all) in place; `restart obs`
+                 bounces the observability stack; `restart langy --rebuild`
+                 re-images first
+haven idp        run ONLY the IdP simulator — no app, API or databases — routed
+                 at idp.langwatch.localhost; --tenants <n> sizes the range
+haven logs       captured service logs from any terminal, attached or detached:
+                 all interleaved, `haven logs nlp` filters, -t tails,
+                 --since 10m windows, --level warn filters severity,
+                 --stack <slug> reads another worktree, `logs obs` streams LGTM
+haven status     one-shot report: selection, per-service health, shared servers,
+                 RAM footprints (--json for machines)
+haven db         this stack's data: `db seed [preset]` (reseed in place, drops
+                 nothing) · `db reset [preset]` (fresh database, confirmed;
+                 --yes for scripts) · `db url [engine]`. Presets: demo, traces,
+                 onboarding, post-onboarding, bare, mass
+haven clean      one cleanup: interactive worktree picker + safe reclaim
+                 (build artifacts, orphaned processes); --yes applies only the
+                 safe categories
+haven pr <ref>   try a GitHub PR in a fresh worktree (--allow-closed,
+                 --allow-scripts)
+haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
+                 Postgres/ClickHouse/Redis containers, own play-<n> hostname.
+                 Quitting the view DESTROYS everything it created, every time.
+                 No argument opens a picker of open PRs (terminal only).
+                 --seed <preset> seeds it from the same registry `db seed`
+                 reads, so it can open on data rather than the onboarding
+                 screen: demo, traces and mass load data, onboarding and
+                 post-onboarding move the onboarding flag, bare is the
+                 identity alone
+                 Trust-gated: every commit author must have write access, or a
+                 two-step confirmation — y/N, then the PR number typed back
+                 after it discloses that the code runs as you, from this
+                 shell's environment (--allow-untrusted in agent mode)
+haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
+haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
+                 it becomes a real cd, tab-completed
+haven shell-init emit that shell function + completion
+haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven slot       run any command under the machine-wide check slot:
+                 `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
+                 runs with stdio passed through, releases; `slot explain`
+                 prints the resolved limit. check-queue.mjs delegates every
+                 whole-repo check here when haven is installed
+haven typecheck  pnpm typecheck under a machine-wide RAM slot
+haven upgrade    reinstall the haven binary from this checkout
+haven help       exhaustive, copy-pasteable reference
+```
+
+**Service selection.** `haven up +langy` / `haven up -nlp` — sticky per
+worktree (`.haven.json`), shown by `status`, remembered across terminals and
+reboots. A running stack reconciles: matching selection is a no-op, a changed
+one replaces the stack in place. langy is off by default (it costs a container
+image and a hard memory cap); the worktrees that need it say `+langy` once.
+idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
+SAML + SCIM tenants with DNS/HTTP domain verification, routed at
+`idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
+want it says `haven up -idp` once. `haven idp` runs the simulator alone —
+no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
+
+**Automatic preparation.** `up` owns the whole path from a fresh machine to a
+running stack: portless install + CA trust, `pnpm install` when the lockfile
+changed, database create + migrate + seed, recovery of a wedged ClickHouse
+container (data kept), and content-addressed langy images — rebuilt only when
+the Dockerfile or a COPY source actually changed, pulled from CI when
+`HAVEN_LANGY_IMAGE_REGISTRY` is set, `--rebuild` to force. A failed migration
+stops the up and names the one recovery command (`haven db reset`); nothing is
+ever dropped silently.
+
+**Logs.** The supervisor captures every service's output to per-service,
+size-capped files whether the stack runs attached or detached — so `haven
+logs` works from any terminal, filters by plain argument, and still reads
+after a crash or a `down`. Capture is built to keep going: a line longer than
+1 MiB (the api lane prints its errors as one-line JSON, so a stack dump is one
+line) is split across captured lines instead of ending the read, the pipe is
+drained to EOF before the child is reaped so nothing buffered is lost, and a
+log file that cannot be written or rotated is retried a few seconds later
+rather than dropped for the life of the process. A rotation that cannot happen
+degrades to appending past the cap, never to silence.
+
+**The hub.** Bare `haven` opens the interactive machine view. The header is
+the machine's real memory picture from one process listing, every process
+attributed once: each stack charged its whole process **tree** (supervised
+children lead their own process groups, so a group sum sees only the ~20MB
+launcher), the shared servers (ClickHouse, Postgres, Redis, the container VM),
+the coding agents and dev tooling beside them, and everything that is not dev
+work as its own colour in the chart — with the daemon's pressure level when it
+is not green. Below it, every stack (liveness, branch, service health, RAM);
+idle worktrees stay collapsed behind `t` while stacks run and show by default
+otherwise. Actions run on the selected row — enter/`g` opens its git view (and
+returns to the hub on quit), `o` opens the stack's app, `r` restarts it, `d`
+shuts it down keeping its databases, and `x` destroys the worktree entirely:
+stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
+confirmed by typing the name. The primary checkout and the worktree haven runs
+from can never be destroyed. One-key handoffs: `c` opens the interactive
+cleanup picker and returns, `w` opens the machine's web dashboard, and `m`
+toggles the monitor panel — the shared servers' footprints plus the daemon's
+recent reaping (stacks, test containers, governed processes, idle databases),
+newest first, from the persisted event record. The web dashboard
+(`langwatch.localhost`) shows the same machine: the memory chart, the stack
+cards (their own services only — the shared servers are stated once), the idle
+worktrees, and the reaping feed.
+
+**Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
+only add or refresh, never discard — and `haven db reset` is the destructive
+sibling that starts from a fresh, migrated database. Both take a preset:
+`demo` marks the project past onboarding and ingests deterministic sample
+traces + realistic platform lifecycles through the running stack's real
+collector (the stack must be up; re-running is idempotent), `traces` ingests
+just the sample traces, `onboarding` / `post-onboarding` flip the first-trace
+flag, and `bare` seeds the identity alone. `mass` is demo plus months of
+backdated activity (`HAVEN_SEED_MONTHS`, default 3): event-sourced products
+are seeded through their event logs with backdated `occurredAt` and replayed
+by the projection workers — read models are never written directly — while
+traces ingest through the collector inside its 31-day window.
+
+**Resource caps.** Everything haven manages is bounded: the ClickHouse
+container and the observability stack are memory-capped (and their colima VM is
+sized at creation), and the managed Redis gets a `maxmemory` ceiling
+(`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
+loudly instead of paging the machine. `haven status` shows each service's
+current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Playing a PR.** `haven play 4913` reviews a PR without letting it near your
+own stacks: a dedicated checkout under the haven home, dedicated database
+containers and volumes (play-scoped names, freshly allocated ports, never the
+shared servers or volumes), migrated and seeded, served at
+`app.play-4913.langwatch.localhost` under the same attached log view as `up`.
+The defining difference from `up`: quitting the view destroys everything the
+sandbox created, always. That is the contract, disclosed up front, so no
+`--yes` is asked at teardown. Before anything is checked out, a trust gate
+collects every commit author and committer on the PR and checks their write
+access; anyone without it (including commits with no GitHub account) stops
+play for an explicit default-no confirmation, and in agent mode only
+`--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
+record and finishes the teardown.
+
+A sandbox's databases start empty, so the PR opens on the onboarding screen —
+the wrong place to be standing if the change is about anything afterwards.
+`haven play 4913 --seed demo` takes the same presets as `haven db seed` (one
+registry, no play-only variants) and applies them where each belongs: the
+preset's switches go to the sandbox's own seed, and any data that has to travel
+through the collector is ingested once the sandbox's app answers, in a lane
+beside the services. A failed ingest never takes the sandbox down — it names
+the step and the command that retries it, since a PR that broke the collector
+is exactly the PR you want to keep watching.
+
+**Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
+in-process (a Go module dependency — nothing extra to install) for the current
+worktree; pass a stack slug, worktree name, or path to open another. Inside the
+TUI, Enter on a branch shows its diff against HEAD without checking it out, and
+Enter on a worktree re-targets the whole view at that worktree — the filesystem
+is never touched. The hub page (`langwatch.localhost`) shows the same fleet with
+live health, per-stack RAM, and database names.
+
+**Destructive-operation guards.** Database drops only ever run against the
+managed loopback servers, `db reset` refuses when the worktree's effective
+`DATABASE_URL`/`CLICKHOUSE_URL` is non-local, uses the wrong dev user, or has a
+production-looking name, and every bulk path (`clean`, worktree destruction,
+the daemon's idle prune) always keeps `lw_main` — the standing database you
+fall back to when a worktree doesn't need its own data.
+
+**Agent mode.** `--agent` (or `HAVEN_AGENT=1`, `NO_COLOR`, or a non-TTY stdout)
+switches to plain, colourless, redraw-free output — zero token waste when an AI
+agent drives haven. `haven status --json` is the machine-readable inventory:
+`stacks` is always a list (`[]` when nothing is registered, never `null`), each
+stack carries `live` (its launcher process is running), and each service carries
+`listening` (something accepts connections on the port its hostname routes to).
+A listed stack is a registered stack, which is not the same as a running one.
+
+## Design
+
+Hexagonal, à la `services/nlpgo`:
+
+```
+tools/thuishaven/
+  domain/     pure logic — slug derivation, hostname/URL scheme, overlay (no I/O)
+  app/        orchestrator + daemon; depends only on ports (interfaces)
+  adapters/   portlessproxy · fileregistry · procsupervisor · system · dashboard
+  cmd/        composition root: builds adapters, injects, dispatches
+cmd/haven/    the installable binary (go install ./cmd/haven)
+```
+
+A single **daemon** (auto-spawned by the first `haven up`) hosts the dashboard +
+telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
+registry/*.json`), and **reaps** stacks whose launcher has exited or whose
+heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
+
+**A dead stack deregisters, it never respawns.** Every 10s the daemon compares
+each registered stack against its launcher process. When the launcher is gone
+(an out-of-memory kill from the OS, a closed terminal, a crashed `pnpm dev`) it
+removes every hostname the stack could own (the four per-worktree services, any
+service the stack recorded, and the `clickhouse` + `postgres` aliases) and then
+drops the registry entry. The hostname then gets portless's own "no route"
+answer. Leaving the route up is the failure this closes: the kernel reissues the
+loopback port to the next process that asks, and the hostname starts serving an
+unrelated worktree's dev server, which answers HTML 404s to `/api/*` and reads
+like an auth or routing bug rather than a dead stack. haven does not restart
+what it did not start; `haven up` is the recovery, and it deregisters the dead
+entry's routes before it provisions.
+
+The resolved config lands in `platform/app/.env.portless`, which every TS entry
+point loads **last with `override: true`** so it beats anything pinned in `.env`
+(that repo runs `dotenv.config({ override: true })`).
+
+### Why native processes, not kind/k8s (yet)
+
+Vite/tsx run as **native host processes** for instant HMR — running the dev
+server inside a container/kind mount reintroduces the slow file-watching it
+already fights. haven routes across native processes **and** containerized
+backends uniformly by hostname, so a future backend swap (a shared `kind`
+cluster with per-worktree Helm value overlays: standard services off `main`,
+worktrees overriding select ones) is a change *behind* haven — the routing,
+registry, and dashboard stay the same.
+
+## More of what haven does
+
+- **Managed ClickHouse.** haven runs one shared native `clickhouse-server` and
+  gives every worktree its own database (`lw_<slug>`) on it — so migration counts
+  are always this worktree's own. Light local config (memory cap, no S3 tiering,
+  no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
+  prints this stack's URL, `haven db reset` gives it a fresh database, and the
+  daemon prunes databases whose worktree hasn't been up for `HAVEN_DB_TTL`
+  (default 4 days). `LANGWATCH_HAVEN_CH_STOP_IDLE=1` additionally stops the
+  server once no stack is running (opt-in: native-mode tests and
+  `haven db url clickhouse` reach it with no stack up) — the next `up`
+  restarts it over the same data in seconds.
+- **The TypeScript compiler can never take the machine down.** The daemon
+  watches every compiler process on the machine — `tsc` (typescript@7) and
+  `tsgo` (the preview package) alike, as one class against one budget, however
+  it was spawned — and reclaims runaways: a
+  whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
+  server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
+  `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
+  per-run ceiling) — the youngest run
+  until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
+  spawns — half the machine, clamped to `[3, 6]` GiB — so the common case
+  degrades to "slower" rather than expanding into whatever room the machine
+  happens to have (`dev/docs/adr/100-the-typecheck-memory-ceiling.md`). On a
+  machine already under memory pressure (ADR-090's levels) the queue goes
+  further: the derived slot limit narrows to one, `GOMEMLIMIT` drops to its
+  3 GiB floor and `GOMAXPROCS` is halved, so the check pays for the shortage
+  instead of everything else swapping. `CHECK_PRESSURE=green|amber|red`
+  forces the level; explicit `GOMEMLIMIT`/`GOMAXPROCS`/`CHECK_SLOTS` win. The
+  same watch observes gopls, biome, vitest workers, node, bun and claude
+  agents (never touched — observed only) and ships every class's footprint to
+  the local Grafana as `haven_proc_*` metrics. See
+  `dev/docs/adr/095-haven-tsgo-governor.md`.
+- **Leaked test containers are reaped.** An interrupted integration-test run
+  leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
+  VM forever — the library's own reaper (Ryuk) dies with the run, and reused
+  containers are skipped by it entirely. The daemon removes
+  Testcontainers-labelled containers: terminally stopped ones (exited or dead)
+  older than `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep),
+  every other state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  (default 2h) since a running (or paused, or mid-restart) container may still
+  be serving a live run whatever its age. Ryuk itself is never touched, and the
+  sweep never boots the VM just to clean it. See
+  `specs/setup/haven-testcontainer-reaper.feature`.
+- **Always migrate + seed, fully static identity.** Every `up` migrates *and*
+  seeds idempotently. Nothing about the local dev identity is ever randomly
+  generated — the same admin login, org/team/project/user IDs, and API
+  tokens exist on every worktree and every machine. See the doc comment at
+  the top of `platform/app/prisma/seed.ts` for the exact values (admin email +
+  password, ingestion key `sk-lw-local-development-key` (override
+  `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
+  and a public ingestion-only token).
+- **Shared-baseline fallback.** Every stack defines all hostnames; a service a
+  worktree doesn't run itself (`haven up -gateway` / `-nlp`)
+  resolves to a shared baseline stack (`HAVEN_BASELINE=1`, off `main`) instead of
+  dead-ending. ClickHouse embodies this: one server, `clickhouse.<slug>` always
+  resolves, only the database is per-worktree.
+- **Sandboxed Langy worker (by default).** The langyagent worker runs the Langy
+  agent, so haven isolates it like production rather than letting a test model run
+  as your own user. Two env flags pick one of three tiers:
+  - _neither_ (default): the worker runs in the shared colima VM with the
+    per-worker UID sandbox on (production-like); nothing it does can touch your
+    real filesystem. haven builds `langyagent:dev` into colima on first `up`
+    (minutes once; the image tag is content-addressed, so it rebuilds by itself
+    when its build inputs change — `haven up --rebuild` or
+    `haven restart langy --rebuild` forces it).
+  - `LANGY_UNSAFE_CONTAINER=1`: still in the colima VM (host still isolated), but
+    the per-worker UID sandbox is off — simpler/faster when iterating.
+  - `LANGY_UNSAFE_HOST_ACCESS=1`: runs the worker as a bare host process, no VM,
+    full host filesystem access — the least safe, for when it genuinely must reach
+    host paths.
+
+  In the container tiers the worker reaches the control plane + gateway back on the
+  host via `host.docker.internal` (haven injects `LANGY_WORKER_CALLBACK_URL` /
+  `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published
+  loopback port. Production is never any of these — it always runs sandboxed under
+  gVisor.
+- **`haven clean`.** One cleanup command. The interactive picker scans every
+  worktree at once (git + database facts on a fast queue, disk size via `du` on
+  a slow one), pre-ticks everything idle 5+ days (`--stale-days N`), lets you
+  sort and tick, then removes exactly those (stack stopped, databases dropped,
+  directory removed — the primary checkout, the current worktree, and `lw_main`
+  are never touched), and finishes by reclaiming the safe categories:
+  regenerable build artifacts of idle worktrees and orphaned dev runtimes.
+  `--yes` skips the picker and applies only the safe categories. Agents (and
+  any non-TTY) get the read-only report and delete nothing.
+- **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
+  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
+  `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
+  `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
+  spawns and stays the only thing counting it.
+- **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
+  agent edits, then fires one catch-up reload — a human's browser isn't thrashed
+  through broken intermediate states. Opt-in and always time-bounded.
+
+## Forward ideas
+
+- **Per-worktree Postgres.** Today Postgres is the shared singleton and ClickHouse
+  is per-slug; extending per-worktree isolation to PG would let "a new DB is always
+  migrated + seeded" cover Postgres too.
+- **Shared `kind` cluster.** The baseline fallback already routes across a
+  heterogeneous set, so the backend can become a shared `kind` cluster with
+  per-worktree Helm value overlays *behind* haven — the routing, registry, and
+  dashboard stay the same.

@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -8,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
@@ -28,6 +28,42 @@ function copySkillToWorkDir(tempFolder: string) {
   installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "level-up" });
 }
 
+/**
+ * Asserts that the instrumentation reached the source of the agent.
+ *
+ * Reads every source file of the workspace rather than the entry file alone.
+ * The agent is free to move the model calls into a module of its own, which
+ * several runs do, and the tracing then correctly sits next to the calls
+ * instead of in the entry file.
+ */
+function expectTracingInSource({
+	tempFolder,
+	extension,
+}: {
+	tempFolder: string;
+	extension: string;
+}) {
+  const sources = fs
+    .readdirSync(tempFolder, { recursive: true, withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith(extension) &&
+        !`${entry.parentPath}`.includes("node_modules") &&
+        !`${entry.parentPath}`.includes(".skills"),
+    )
+    .map((entry) => path.join(`${entry.parentPath}`, entry.name));
+
+  const instrumented = sources.filter((file) =>
+    fs.readFileSync(file, "utf8").includes("langwatch"),
+  );
+
+  expect(
+    instrumented,
+    `Expected a ${extension} file under ${tempFolder} to carry LangWatch tracing. Read: ${sources.join(", ")}`,
+  ).not.toHaveLength(0);
+}
+
 describe("Level-up Skill", () => {
   it.skipIf(isCI)(
     "orchestrates all sub-skills for a Python OpenAI bot",
@@ -36,9 +72,10 @@ describe("Level-up Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-level-up-py-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -67,11 +104,7 @@ describe("Level-up Skill", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             // Verify tracing was added
-            const mainPy = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
-            expect(mainPy).toContain("langwatch");
+            expectTracingInSource({ tempFolder, extension: ".py" });
           },
           scenario.judge(),
         ],
@@ -79,7 +112,7 @@ describe("Level-up Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000 // 15 min timeout for meta-skill
+    1_800_000 // 30 min: the meta-skill runs every sub-skill in one turn
   );
 
   it.skipIf(isCI)(
@@ -88,9 +121,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-ts-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-vercel",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -118,18 +152,14 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            const indexTs = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
-            expect(indexTs).toContain("langwatch");
+            expectTracingInSource({ tempFolder, extension: ".ts" });
           },
           scenario.judge(),
         ],
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -138,9 +168,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-langgraph-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-langgraph",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -167,18 +198,14 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            const mainPy = fs.readFileSync(
-              `${tempFolder}/main.py`,
-              "utf8"
-            );
-            expect(mainPy).toContain("langwatch");
+            expectTracingInSource({ tempFolder, extension: ".py" });
           },
           scenario.judge(),
         ],
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
   it.skipIf(isCI)(
@@ -187,9 +214,10 @@ describe("Level-up Skill", () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-level-up-mastra-")
       );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "typescript-mastra",
+        workingDirectory: tempFolder,
+      });
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
@@ -216,17 +244,13 @@ describe("Level-up Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "level-up");
-            const indexTs = fs.readFileSync(
-              `${tempFolder}/index.ts`,
-              "utf8"
-            );
-            expect(indexTs).toContain("langwatch");
+            expectTracingInSource({ tempFolder, extension: ".ts" });
           },
           scenario.judge(),
         ],
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 });

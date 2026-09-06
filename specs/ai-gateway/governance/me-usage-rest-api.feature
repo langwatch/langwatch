@@ -47,13 +47,15 @@ Feature: Personal usage REST API
     Given I authenticate with a user-bound key that can view another user's personal workspace
     When I GET /api/me/usage for that other workspace
     Then the response status is 403
-    And the error explains the key cannot read another user's personal usage
+    And the refusal carries a named code saying the key is for a different workspace
+    And nothing in the refusal says whose workspace it is
 
   Scenario: A shared-workspace API key is rejected
     Given I authenticate with an API key from a shared (non-personal) workspace
     When I GET /api/me/usage
     Then the response status is 400
-    And the error explains a personal-workspace API key is required
+    And the refusal carries a named code saying a personal-workspace API key is required
+    And the refusal names no internal detail of how the check is made
 
   Scenario: Unauthenticated requests are rejected
     Given I provide no API key

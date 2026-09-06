@@ -90,6 +90,29 @@ Feature: AI Create Modal for Scenarios
     Then a new empty scenario is created
     And I am navigated to the scenario editor
 
+  # Resilience when the generation gateway is unavailable or slow (langwatch#5758).
+  # The endpoint always answers with JSON, and fails fast, so the modal shows a
+  # clear, retryable error instead of a raw parsing crash or an opaque hang.
+  @integration @unimplemented
+  Scenario: Show a clear, retryable error when the generation service is unavailable
+    Given the AI generation service is unavailable
+    When I click the "New Scenario" button
+    And I enter a description
+    And I click "Generate with AI"
+    Then I see the error state within a few seconds
+    And the error message does not contain a raw parsing error
+    And I see a "Try again" option
+
+  @integration @unimplemented
+  Scenario: Show a clear error when generation takes too long
+    Given the AI generation service does not respond in time
+    When I click the "New Scenario" button
+    And I enter a description
+    And I click "Generate with AI"
+    Then I see the error state
+    And the error message indicates the request took too long
+    And I see a "Try again" option
+
   @integration @unimplemented
   Scenario: Display error when API keys not configured
     Given the user has no API keys configured for the default model

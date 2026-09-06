@@ -16,14 +16,14 @@ Feature: Fold Projections
   Scenario: Sequential processing (FIFO)
     Given multiple events arrive for the same aggregate "trace-456"
     When the events are dispatched to the projection queue
-    Then BullMQ GroupQueue ensures they are processed one at a time
+    Then GroupQueue ensures they are processed one at a time
     And they are processed in the order they arrived
     And each event is applied to the state produced by the previous event
 
   Scenario: Error handling and retries
     Given an event being processed for aggregate "trace-789"
     When the "apply" function or "store" operation fails
-    Then the BullMQ job is retried with exponential backoff
+    Then the job is retried with exponential backoff
     And the fold state remains at the last successfully persisted version
     And subsequent events for the same aggregate wait in the queue until retry succeeds
 

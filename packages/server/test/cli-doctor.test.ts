@@ -89,13 +89,12 @@ describe("CLI doctor command", () => {
   });
 
   describe("when run with `start --help`", () => {
-    it("documents the port-base, --yes, --no-open, --bullboard, --dry-run flags", async () => {
+    it("documents the port-base, --yes, --no-open, --dry-run flags", async () => {
       const result = await execa("node", [cliPath, "start", "--help"], { reject: false });
       const text = result.stdout;
       expect(text).toContain("--port-base");
       expect(text).toContain("--yes");
       expect(text).toContain("--no-open");
-      expect(text).toContain("--bullboard");
       expect(text).toContain("--dry-run");
     });
   });

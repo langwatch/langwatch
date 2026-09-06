@@ -1,167 +1,164 @@
 ---
 title: Budgets
-description: Hierarchical, windowed spend limits enforced at the gateway.
+description: Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
 sidebarTitle: Budgets
 ---
 
-A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it; any hard-block breach blocks the request, any warn breach surfaces a header.
+## What a budget is
 
-<Tip>**Detect spikes before a budget breach**: pair budgets with [AI Governance → Anomaly Rules](/ai-governance/anomaly-rules) so spend-spike, geo-mismatch, and off-hours patterns surface as alerts *before* they hit a hard cap.</Tip>
+A budget is a spend cap in USD on one scope over one window. The gateway checks every request against every budget that applies to it. A `block` budget at its limit rejects the request. A `warn` budget lets it through and adds a warning header.
+
+Spend is counted after the provider answers, from the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected and requests that failed at the provider add no cost.
+
+## Create a budget
+
+Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fields:
+
+| Field | Values |
+|---|---|
+| **Name**, **Description** | The name is required. |
+| **Applies to** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
+| **Provider** | **All providers**, or one provider credential. Only requests served by that credential count. |
+| **Window** | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
+| **Limit (USD)** | The cap. |
+| **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
+| **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
+
+<Frame caption="The New budget drawer: Applies to with the six scope types, the provider filter, the window, the limit, the cycle anchor and On breach.">
+  <img src="/images/ai-gateway/budget-create-drawer.png" alt="The New budget drawer with Project selected under Applies to, Per calendar month, a 500 dollar limit and Block on breach" />
+</Frame>
+
+The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+
+For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
+
+Per-end-user budgets are created over the API. See [Per end user](#per-end-user).
 
 ## Scopes
 
-| Scope | Applies to |
+| Scope | Counts |
 |---|---|
-| `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team. |
-| `project` | All gateway traffic in this project. |
-| `virtual_key` | This specific VK. |
-| `principal` | This user or service account across any VK they use. |
+| `organization` | Every request in the organization. |
+| `team` | Every request whose trace project belongs to the team. |
+| `project` | Every request whose traces land in the project. |
+| `virtual_key` | Every request on this key. |
+| `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
+| `group` | Each member of the group, individually. One budget, one allowance per member. Needs the ClickHouse spend ledger. |
+| `attributed_user` | Each end user of your product, individually, on one key or one project. Needs the ClickHouse spend ledger. |
 
-A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
+One request is checked against all of them. For example, a request on key `acme-support-agent` in project `support` of team `platform` counts against the key's, the project's, the team's and the organization's budgets, and against the principal and group budgets when the key has a principal.
 
-- Org `acme`'s budgets (all windows).
-- Team `platform`'s budgets (all windows).
-- Project `demo`'s budgets (all windows).
-- VK `prod-key`'s budgets (all windows).
-- Alice's principal budgets (all windows).
+A `group` budget gives each member their own allowance: a $10 per day budget on group `engineering` caps each engineer at $10, and one member's spend never counts against another. It applies only to keys with a principal. Telling members apart needs the ClickHouse spend ledger, so a deployment that reads budget spend from Postgres only refuses the create with `group_budget_requires_clickhouse`. An `attributed_user` budget is refused the same way.
 
-If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
+### Per end user
 
-## Windows
-
-- `minute`, `hour`, `day`, `week`, `month`, `total`.
-- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
-- `total` never resets, useful for one-off grant-style budgets.
-
-## on_breach
-
-- `block`, hard-cap. The next request after `spent_usd >= limit_usd` returns `402 budget_exceeded` with an OpenAI-compatible error envelope.
-- `warn`, soft-cap. The request passes but the response gains `X-LangWatch-Budget-Warning: <scope>:<pct_used>`. Multiple soft caps can fire on one request.
-
-## Creating a budget
-
-**AI Gateway → Budgets → New budget.**
-
-| Field | Example |
-|---|---|
-| Name | `eng-team-monthly` |
-| Scope | `team` |
-| Target | `platform` team |
-| Window | `month` |
-| Limit (USD) | `5000` |
-| on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
-
-Save. The budget is in force immediately; the next request counts against it.
-
-## Multiple tiers on the same scope
-
-A single scope can carry multiple budgets with different `on_breach` values. Common pattern:
-
-- Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
-- Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
-
-The UI surfaces this as "Warning thresholds" on a single budget row; each threshold is stored as its own `GatewayBudget` row in the schema for simplicity.
-
-## Debit model
-
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id so gateway retries and trace replays never double-bill.
-
-Debit flow:
-
-1. Gateway streams the response to the client.
-2. When the response closes, the gateway captures the provider's token counts and emits an OTel span carrying `gen_ai.usage.*` plus `langwatch.virtual_key_id` and `langwatch.gateway_request_id`.
-3. The gateway also posts a post-response debit event to the control plane for the primary ledger path.
-4. The control plane recomputes USD cost from `tokens × pricing catalog` (the gateway-side cost is authoritative only when it short-circuits without a provider call, e.g. `blocked_by_guardrail`) and writes a ledger row in a transaction that also increments `spent_usd` on every affected scope (org, team, project, VK, principal).
-5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
-
-<Note>
-The ClickHouse path is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. Both write paths run in parallel today; the Postgres write path retires in a follow-up. Customer-visible behaviour is unchanged, a $1 budget still blocks at $1 of spend during and after the cutover.
-</Note>
-
-## Pre-request check
-
-Before dispatching to the provider, the gateway runs a **two-tier precheck** designed to keep the hot path free while avoiding stale-snapshot races as budgets approach their caps:
-
-### Tier 1: cached snapshot (always)
-
-The gateway checks the VK's in-memory budget snapshot (refreshed via the `/changes` long-poll on every debit). If the snapshot already shows a hard-breach, the request is rejected immediately with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely. This costs ~0 μs: it's an in-process map lookup.
-
-### Tier 2: live reconciliation (near-limit only)
-
-If any scope applicable to the request has `spent_usd / limit_usd >= 0.90`, the gateway makes a signed `POST /api/internal/gateway/budget/check` call to the control plane with ONLY those hot scopes. The control plane returns the real-time `spent_usd` from the authoritative ledger, and the gateway re-evaluates. Timeout is 200 ms; if the call fails, tier 1's decision is used (fail-open).
-
-This closes the **stale-snapshot race** where two gateway nodes each see a cached `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 in actual spend against a $25 cap. With tier 2 active on the near-limit 10% band, the control plane sees both requests and rejects the second based on the live ledger.
-
-Cold scopes (under 90%) skip the live call entirely, no latency tax on the common case.
-
-```
-request → tier 1 (always, ~0μs) → pass?
-                                → breach? → 402 (saved provider spend)
-
-tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
-                              → live spent says breach? → 402
-                              → live says OK? → dispatch
-                              → timeout / 5xx? → dispatch (fail-open)
-```
-
-Gateway env knobs:
-
-- `LW_GATEWAY_BUDGET_LIVE_THRESHOLD`, default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
-- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT`, Go duration string, default `200ms`. Accepts `200ms`, `500ms`, `1s`, etc.
-
-## What "USD cost" means
-
-Token × unit-price lookup, computed per provider using their published pricing. Updates land as provider pricing changes (pricing table is a separate Prisma table owned by LangWatch).
-
-Cache reads, writes are priced **separately** per provider, Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
-
-## Viewing budget spend (UI)
-
-The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
-
-- **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
-- **Window column** wraps `hour`, `day`, `week`, `month`, `total` in a subtle gray identifier badge matching the rest of the product.
-- **Resets column** shows a humanised relative time ("in 3 days", "in 11 hours", "in 15 minutes") with a hover tooltip for the exact UTC timestamp. `total`-window budgets render a muted `never`.
-- **Scope column** resolves the raw scope id into the target's human name and link: `organization acme-demo`, `team platform`, `virtual_key prod-openai` (linking to the VK detail page), `principal user@example.com`. Resolution is batched per scope type so the column adds no per-row DB cost.
-
-Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK detail layout:
-
-- **Header action bar**: **Audit history** (deep-links to `/settings/audit-log?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
-- **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
-- **Identity**: name, description, window, timezone, created/updated timestamps.
-- **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
-- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
-
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
-
-Programmatic equivalent:
+An `attributed_user` budget is a template on one virtual key or one project: each distinct end user seen there gets the limit per window. You create one budget, and buckets appear per end user on first spend.
 
 ```bash
-# List budgets
-langwatch gateway-budgets list
-
-# Spend detail (same data the UI detail page renders)
-curl -sS https://app.langwatch.ai/api/gateway/v1/budgets/<id> \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY"
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "attributed_user", "anchor_virtual_key_id": "vk_..." },
+    "name": "acme per-user cap",
+    "window": "month",
+    "limit_usd": "25",
+    "on_breach": "block"
+  }'
 ```
 
-The REST response includes the resolved scope-target fields the UI uses; the `gatewayBudgets.get` tRPC procedure powers both surfaces from a shared service method.
+The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
-## Permissions
+Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
-| Action | Permission |
+## Block and warn
+
+| `on_breach` | At the limit | From 80 percent |
+|---|---|---|
+| `block` | HTTP 402 `budget_exceeded` | `X-LangWatch-Budget-Warning` header |
+| `warn` | Request served, header set | `X-LangWatch-Budget-Warning` header |
+
+The 402 body is an OpenAI-shaped error with the budget in `error.meta`:
+
+```json
+{
+  "error": {
+    "type": "budget_exceeded",
+    "code": "budget_exceeded",
+    "message": "...",
+    "meta": {
+      "budget_id": "NtdzZ9i9EctuXAeZ1oFyr",
+      "budget_scope": "virtual_key",
+      "budget_window": "month"
+    }
+  }
+}
+```
+
+`budget_scope` tells your application which allowance ran out: `attributed_user` is the end user's own cap, `virtual_key` is the tenant's cap.
+
+The warning header lists every budget at or past 80 percent as `scope:percent`, comma separated, for example `X-LangWatch-Budget-Warning: project:84,virtual_key:100`. A provider-filtered budget appears as `scope/provider_id:percent`.
+
+A `block` budget with a **Provider** filter removes that provider from the request's provider chain instead of rejecting the request. The request is rejected only when no provider is left.
+
+Two webhook events fire once per period: `gateway.budget.threshold_crossed` at 80 percent and `gateway.budget.breached` at the limit, on `warn` budgets too. See [Webhooks](/features/webhooks).
+
+## Windows and cycles
+
+The cycling windows (`minute`, `hour`, `day`, `week`, `month`) roll on the calendar in UTC: a day resets at 00:00, a week on Monday 00:00, a month on the first.
+
+Set **Start cycle on** (`cycle_anchor_at` on the API) to roll from your own date instead. Anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly anchor past the 28th clamps into shorter months. The anchor is fixed at creation; `total` and `manual` refuse one with `gateway_budget_cycle_anchor_invalid`.
+
+`total` never resets. `manual` accrues until you reset it:
+
+```bash
+curl -sS -X POST https://app.langwatch.ai/api/gateway/v1/budgets/<budget_id>/reset \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+A reset moves the period boundary to now. Recorded spend and emitted spend events never change. On an `attributed_user` budget, add `?end_user_id=<id>` to reset one end user's bucket.
+
+## See the spend
+
+**AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset.
+
+<Frame caption="AI Gateway > Budgets: spent against limit per budget, the window, the breach mode and the next reset. The block budget is at 100 percent, the warn budget at 85.">
+  <img src="/images/ai-gateway/budgets-page.png" alt="The Budgets list with an organization budget at 0 percent, a block budget at 100 percent and a warn budget at 85 percent" />
+</Frame>
+
+Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
+
+<Frame caption="A breached block budget opened: $0.05822 spent of a $0.05 daily limit, 100 percent used, the next reset, and under Recent activity the requests that spent it.">
+  <img src="/images/ai-gateway/budget-breached-detail.png" alt="The budget detail page for acme-block-budget with the utilization bar full and red, Window day, On breach block, the Identity block and the Recent activity table" />
+</Frame>
+
+**AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
+
+## Manage budgets from the CLI
+
+```bash
+langwatch gateway-budgets create \
+  --name "engineering monthly cap" \
+  --scope team --team <team_id> \
+  --window month --limit 5000 --on-breach block
+
+langwatch gateway-budgets list --scope-type team,project
+langwatch gateway-budgets update <budget_id> --limit 6000
+langwatch gateway-budgets reset <budget_id> --reason "new billing period"
+langwatch gateway-budgets archive <budget_id>
+```
+
+`create` takes `--scope organization|team|project|virtual-key|principal|group` with the matching `--organization`, `--team`, `--project`, `--virtual-key`, `--principal` or `--group <id>`, plus `--provider-key <id>` and `--cycle-anchor-at <rfc3339>`.
+
+## Manage budgets over REST
+
+| Method and path | Permission |
 |---|---|
-| View budgets | `gatewayBudgets:view` |
-| Create | `gatewayBudgets:create` |
-| Edit | `gatewayBudgets:update` |
-| Delete | `gatewayBudgets:delete` |
-| All of the above | `gatewayBudgets:manage` |
+| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
+| `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
+| `GET /api/gateway/v1/budgets/:id` | `gatewayBudgets:view` |
+| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
+| `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
+| `DELETE /api/gateway/v1/budgets/:id` (archive) | `gatewayBudgets:delete` |
 
-See [RBAC](/ai-gateway/rbac).
-
-## Trace attributes
-
-- `langwatch.cost_usd`, cost of this single request.
-- `langwatch.budget.breached_scope`, present when the request was blocked; format `scope:window` (e.g. `project:month`).
-- `langwatch.budget.warnings`, comma-separated list of `scope:pct_used` entries for soft breaches.
+Field by field: [Budgets API reference](/api-reference/gateway-budgets/overview). A virtual key's own budget can also be set inline on the key: see [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest).

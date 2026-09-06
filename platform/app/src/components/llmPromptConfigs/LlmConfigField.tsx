@@ -1,0 +1,117 @@
+import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
+import {
+  LLMConfigPopover,
+  type Output,
+} from "~/components/llmPromptConfigs/LLMConfigPopover";
+import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { ModelOption } from "~/server/app-layer/topic-clustering/clustering.types";
+import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
+import { Popover } from "../ui/popover";
+import { LLMModelDisplay } from "./LLMModelDisplay";
+
+type LLMConfigFieldProps = {
+  llmConfig: LLMConfig;
+  modelOption?: ModelOption;
+  requiresCustomKey: boolean;
+  onChange: (llmConfig: LLMConfig) => void;
+  showProviderKeyMessage?: boolean;
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
+  /** True when the project has zero enabled providers / models for
+   *  the requested mode. Renders the empty-state callout in place of
+   *  the model-picker trigger so the user never sees a stale persisted
+   *  model id (e.g. "openai/gpt-5.2") pretending to be a working
+   *  selection on a fresh account. */
+  noModelsConfigured?: boolean;
+};
+
+/**
+ * LLM Config field
+ * Can be used outside of the form context (does not use react-hook-form)
+ *
+ * Displays a compact clickable row with model info and ChevronDown icon.
+ * Clicking opens the LLMConfigPopover for model and parameter configuration.
+ */
+export function LLMConfigField({
+  llmConfig,
+  onChange,
+  modelOption,
+  requiresCustomKey,
+  showProviderKeyMessage = true,
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
+  noModelsConfigured = false,
+}: LLMConfigFieldProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const { model } = llmConfig ?? {};
+
+  // Check if the model is disabled (has line-through styling)
+  const isModelDisabled = modelOption?.isDisabled ?? false;
+
+  // No providers configured on the project: skip the popover entirely.
+  // The model id stored on this LLMConfig is meaningless without a
+  // provider key to back it, so don't echo it as if it were a real
+  // selection — show the honest empty-state callout instead.
+  if (noModelsConfigured) {
+    return <NoModelsConfiguredCallout size="sm" />;
+  }
+
+  return (
+    <>
+      <Popover.Root
+        positioning={{ placement: "bottom-start" }}
+        closeOnInteractOutside={false}
+        open={popoverOpen}
+        onOpenChange={({ open }) => setPopoverOpen(open)}
+      >
+        {/* Use Anchor (not Trigger) for positioning only — avoids Zag.js
+            installing an onClick handler that fights with the Drawer's
+            dismissable layer. See #2390. */}
+        <ChakraPopover.Anchor asChild>
+          <HStack
+            width="full"
+            paddingY={2}
+            paddingX={3}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="border"
+            cursor="pointer"
+            _hover={{ bg: "bg.subtle" }}
+            transition="background 0.15s"
+            justify="space-between"
+            opacity={modelOption?.isDisabled ? 0.5 : 1}
+            onClick={() => setPopoverOpen((prev) => !prev)}
+          >
+            <LLMModelDisplay model={model ?? ""} />
+            <Box color="fg.muted">
+              <ChevronDown size={16} />
+            </Box>
+          </HStack>
+        </ChakraPopover.Anchor>
+
+        <LLMConfigPopover
+          values={llmConfig}
+          onChange={onChange}
+          outputs={outputs}
+          onOutputsChange={onOutputsChange}
+          showStructuredOutputs={showStructuredOutputs}
+        />
+      </Popover.Root>
+      {(requiresCustomKey || isModelDisabled) && showProviderKeyMessage && (
+        <AddModelProviderKey
+          runWhat="run this component"
+          nodeProvidersWithoutCustomKeys={[model?.split("/")[0] ?? "unknown"]}
+        />
+      )}
+    </>
+  );
+}

@@ -18,12 +18,11 @@ Feature: License tRPC Router
     Then the response includes:
       | hasLicense     | false       |
       | valid          | false       |
-      | planName       | Open Source |
 
   Scenario: Rejects request for unauthorized organization
     Given I am not a member of organization "other-org"
     When I call license.getStatus with organizationId "other-org"
-    Then the request fails with FORBIDDEN
+    Then the request fails with UNAUTHORIZED
 
   # ============================================================================
   # upload Endpoint

@@ -7,7 +7,7 @@ Feature: MCP Analytics Tool
   # All scenarios in this file describe the get_analytics MCP tool. The
   # underlying analytics router is exercised in the LangWatch app
   # integration tests; the MCP-side wrapper has integration coverage
-  # in `mcp-server/src/__tests__/all-tools.integration.test.ts` (the
+  # in `mcp/typescript/src/__tests__/all-tools.integration.test.ts` (the
   # `get_analytics` section already covers formatted output and API
   # parameter forwarding). What's missing is @scenario binding to the
   # specific feature scenarios below, plus assertions for groupBy and

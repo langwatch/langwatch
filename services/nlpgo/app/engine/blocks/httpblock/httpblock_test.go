@@ -7,11 +7,14 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
@@ -135,6 +138,140 @@ func TestSSRF_DNSResolutionToPrivate(t *testing.T) {
 	require.Error(t, err)
 }
 
+// observedLogs returns a logger plus the buffer its entries land in, so a test
+// can assert on what an operator would actually read.
+func observedLogs() (*zap.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zap.InfoLevel)
+	return zap.New(core), logs
+}
+
+// The ranges pkg/ssrf added on top of the historical deny set. Permitting
+// these by default is what keeps a self-hosted upgrade from breaking a
+// workflow that reaches an internal service over, say, Tailscale.
+var newlyCoveredAddresses = []string{
+	"100.64.0.1",  // CGNAT / Tailscale (RFC 6598)
+	"240.0.0.1",   // reserved (RFC 1112)
+	"198.18.0.1",  // benchmarking (RFC 2544)
+	"192.0.2.1",   // TEST-NET-1 (RFC 5737)
+	"224.0.1.1",   // multicast, not link-local
+	"203.0.113.1", // TEST-NET-3 (RFC 5737)
+}
+
+func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
+	t.Run("permits addresses outside the historical deny set", func(t *testing.T) {
+		for _, ip := range newlyCoveredAddresses {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				assert.NoError(t, err,
+					"%s was reachable before strict egress existed and must stay reachable by default", ip)
+			})
+		}
+	})
+
+	t.Run("logs each permitted non-public address so the operator can prepare", func(t *testing.T) {
+		logger, logs := observedLogs()
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{Logger: logger})
+		require.NoError(t, err)
+
+		entries := logs.FilterMessage("ssrf_permitted_non_public_address").All()
+		require.Len(t, entries, 1, "a permitted non-public address must be reported exactly once")
+
+		fields := entries[0].ContextMap()
+		assert.Equal(t, "100.64.0.1", fields["address"])
+		assert.Contains(t, fields["range"], "100.64.0.0/10")
+		assert.Contains(t, fields["range"], "RFC 6598", "the log must name the RFC, not just the CIDR")
+		assert.Contains(t, fields["hint"], "ALLOWED_PROXY_HOSTS",
+			"the hint must tell the operator how to keep this working under strict egress")
+	})
+
+	t.Run("still refuses the historical deny set", func(t *testing.T) {
+		for _, ip := range []string{"127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.1.1"} {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("still refuses cloud metadata", func(t *testing.T) {
+		// Azure WireServer is globally-routable-looking and sits in no
+		// special range, so only the metadata set catches it. It was
+		// reachable before pkg/ssrf; that hole closes for everyone.
+		err := httpblock.CheckURL("http://168.63.129.16/x", httpblock.SSRFOptions{})
+		require.Error(t, err)
+	})
+}
+
+func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
+	t.Run("refuses every non-globally-routable address", func(t *testing.T) {
+		for _, ip := range newlyCoveredAddresses {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{
+					StrictPublicOnly: true,
+				})
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("names the range and the escape hatch in the refusal log", func(t *testing.T) {
+		logger, logs := observedLogs()
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+			Logger:           logger,
+		})
+		require.Error(t, err)
+
+		entries := logs.FilterMessage("ssrf_refused").All()
+		require.Len(t, entries, 1)
+
+		fields := entries[0].ContextMap()
+		assert.Equal(t, "strict_public_only", fields["reason"])
+		assert.Contains(t, fields["range"], "CGNAT")
+		assert.Contains(t, fields["hint"], "ALLOWED_PROXY_HOSTS")
+	})
+
+	t.Run("keeps the allow-list working as the escape hatch", func(t *testing.T) {
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+			AllowedHosts:     []string{"100.64.0.1"},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("permits globally routable addresses", func(t *testing.T) {
+		err := httpblock.CheckURL("http://93.184.216.34/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+		})
+		assert.NoError(t, err)
+	})
+}
+
+func TestSSRF_RefusalLogNeverReachesTheCaller(t *testing.T) {
+	// The log names the range; the error must not. An SSRF refusal that
+	// echoes which internal range was hit hands the tenant a network map.
+	logger, logs := observedLogs()
+	err := httpblock.CheckURL("http://10.1.2.3/x", httpblock.SSRFOptions{Logger: logger})
+
+	require.Error(t, err)
+	assert.Equal(t, "ssrf_blocked", err.Error())
+	require.NotEmpty(t, logs.FilterMessage("ssrf_refused").All(),
+		"the detail belongs in the log, which is why the error can stay opaque")
+}
+
+func TestSSRF_StrictEgressAppliesAtDialTime(t *testing.T) {
+	// CheckURL is the optimistic gate; SafeDialer is the one that holds
+	// under DNS rebinding. Strict mode must be enforced in both.
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		StrictPublicOnly: true,
+		Resolver: func(host string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("100.64.0.1")}, nil
+		},
+	})
+	_, err := dial(context.Background(), "tcp", "rebind.test:80")
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
+}
+
 func TestExecute_HappyPath(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -163,6 +300,63 @@ func TestExecute_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "pong", res.Output)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
+}
+
+// The response headers are diagnostics: they travel into the workflow's
+// execution state and onto the screen of whoever opens it. A cookie handed out
+// by the endpoint is a live session, so the name survives and the value does
+// not, while the headers an author is actually debugging stay readable.
+func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-42")
+		w.Header().Set("X-Api-Version", "2026-08-01")
+		w.Header().Set("X-Idempotency-Key", "req-42")
+		w.Header().Add("Set-Cookie", "session=super-secret; HttpOnly")
+		w.Header().Add("Set-Cookie", "refresh=also-secret")
+		// Convention says these are request headers. An upstream can send them
+		// anyway, and Go hands us whatever arrived.
+		w.Header().Set("Authorization", "Bearer super-secret-echo")
+		w.Header().Set("X-Authorization", "super-secret-variant")
+		w.Header().Set("X-Auth", "super-secret-short")
+		w.Header().Set("X-Amz-Security-Token", "super-secret-sts")
+		w.Header().Set("X-Api-Key", "super-secret-key")
+		// A challenge names the scheme and realm rather than handing out access.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agents"`)
+		_, _ = io.WriteString(w, `{"result":"pong"}`)
+	}))
+	defer srv.Close()
+	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:    srv.URL + "/echo",
+		Method: http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"Set-Cookie", "Authorization", "X-Authorization", "X-Auth",
+		"X-Amz-Security-Token", "X-Api-Key",
+	} {
+		assert.Equal(t, "[REDACTED]", res.ResponseHeaders[name],
+			"%s hands out access rather than describing it", name)
+	}
+
+	// Half the value of reporting headers at all is the ones an author came to
+	// read, and none of these is a credential.
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"])
+	assert.Equal(t, "2026-08-01", res.ResponseHeaders["X-Api-Version"])
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Idempotency-Key"])
+	assert.Equal(t, "application/json", res.ResponseHeaders["Content-Type"])
+	assert.Equal(t, `Bearer realm="agents"`, res.ResponseHeaders["Www-Authenticate"],
+		"a 401 is undebuggable without the challenge that caused it")
+
+	for name, value := range res.ResponseHeaders {
+		assert.NotContains(t, value, "secret", "header %q leaked a credential", name)
+	}
 }
 
 func TestExecute_TimeoutAbortsRequest(t *testing.T) {
@@ -366,4 +560,100 @@ func TestDefaultTimeoutAccommodatesSlowAgents(t *testing.T) {
 		t.Errorf("httpblock.DefaultTimeout = %s; want 12m (slow agents take 10+ min, Lambda capped at 15min so 3min margin)",
 			httpblock.DefaultTimeout)
 	}
+}
+
+// BLOCK_LOCAL_HTTP_CALLS=false reaches the engine as AllowLocal. A self-hosted
+// install whose agent runs on its own network is the case it exists for, and
+// the engine refusing it regardless of the setting is what made an HTTP agent
+// pass its test button and then fail the evaluation with ssrf_blocked.
+func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
+	permissive := httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(_ string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+
+	t.Run("permits the private and loopback set", func(t *testing.T) {
+		for _, u := range []string{
+			"http://127.0.0.1/x",
+			"http://localhost/",
+			"http://0.0.0.0/x",
+			"http://[::1]/",
+			"http://10.0.0.1/x",
+			"http://192.168.0.1/x",
+			"http://172.16.4.9/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				assert.NoError(t, httpblock.CheckURL(u, permissive))
+			})
+		}
+	})
+
+	t.Run("permits a hostname that resolves to a private address", func(t *testing.T) {
+		err := httpblock.CheckURL("http://agent.internal/", httpblock.SSRFOptions{
+			AllowLocal: true,
+			Resolver: func(_ string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("10.0.0.5")}, nil
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("still refuses cloud metadata", func(t *testing.T) {
+		for _, u := range []string{
+			"http://169.254.169.254/latest/meta-data/",
+			"http://metadata.google.internal/",
+			"http://168.63.129.16/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				require.Error(t, httpblock.CheckURL(u, permissive),
+					"%s stays refused however permissive the deployment is", u)
+			})
+		}
+	})
+
+	t.Run("strict egress overrides the permission", func(t *testing.T) {
+		err := httpblock.CheckURL("http://10.0.0.1/x", httpblock.SSRFOptions{
+			AllowLocal:       true,
+			StrictPublicOnly: true,
+		})
+		require.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
+			"strict egress means globally routable only, which a private address is not")
+	})
+
+	t.Run("holds at dial time, not just at the check", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+
+		dial := httpblock.SafeDialer(httpblock.SSRFOptions{AllowLocal: true})
+		conn, err := dial(context.Background(), "tcp", strings.TrimPrefix(srv.URL, "http://"))
+		require.NoError(t, err, "the dialer must permit what CheckURL permitted")
+		require.NoError(t, conn.Close())
+	})
+}
+
+// The end-to-end shape a customer reported: an HTTP agent pointed at a service
+// on their own network, which the engine refused while the rest of the product
+// reached it happily.
+func TestExecute_ReachesALocalEndpointWhenPermitted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"answer":"from the internal service"}`))
+	}))
+	defer srv.Close()
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowLocal: true},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:        srv.URL,
+		Method:     http.MethodGet,
+		OutputPath: "$.answer",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "from the internal service", res.Output)
 }

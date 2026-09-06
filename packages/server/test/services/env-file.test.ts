@@ -40,6 +40,18 @@ CREDENTIALS_SECRET=0123456789abcdef
     });
   });
 
+  describe("when a key is left blank", () => {
+    it("treats it as not configured rather than set-to-empty", () => {
+      // The scaffolded .env ships fill-me-in lines like `OPENAI_API_KEY=`.
+      // Passing them through as empty strings poisons `?? fallback` guards
+      // downstream; absence is the honest reading.
+      const env = readEnvFile(tmpFile("OPENAI_API_KEY=\nREDIS_URL=redis://x:1/0\nEMPTY_QUOTED=\"\"\n"));
+      expect(env).not.toHaveProperty("OPENAI_API_KEY");
+      expect(env).not.toHaveProperty("EMPTY_QUOTED");
+      expect(env.REDIS_URL).toBe("redis://x:1/0");
+    });
+  });
+
   describe("when values are quoted", () => {
     it("strips matching double or single quotes", () => {
       const path = tmpFile(`A="value with spaces"

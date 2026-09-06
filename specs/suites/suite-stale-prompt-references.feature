@@ -36,7 +36,7 @@ Feature: Suite run validation for organization-scoped prompts
   # suite-run-dependency-refactor.feature "Suite run succeeds when prompt config exists in project"
   # (removed per AUDIT_MANIFEST.md, #3458).
 
-  @unit @unimplemented
+  @unit
   Scenario: Run validation rejects prompt from unrelated project without org scope
     Given a project-scoped prompt "Private Bot" exists in "other-project"
     And a suite in "my-project" references that prompt as a target

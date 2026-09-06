@@ -4,16 +4,39 @@ Feature: BetterAuth config (unmounted)
   I want a fully-configured BetterAuth instance ready to use
   So that I can swap NextAuth for it in a single cutover without gaps
 
-  # The file `langwatch/src/server/better-auth/index.ts` exports a `betterAuth`
+  # The file `platform/app/src/server/better-auth/index.ts` exports a `betterAuth`
   # instance with every provider we care about and every custom hook ported
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.
+  #
+  # Retiring at the IDENTITY_ROUTER_V2 flip (D03/D13, ADR-117), and kept until
+  # then because each one is still the live mechanism behind the flag:
+  #
+  #   - the `NEXTAUTH_PROVIDER` matrix below no longer decides WHERE anyone
+  #     signs in. Routing is the router's (specs/identity/signin-router.feature),
+  #     and what the env names is now the deployment's default METHOD SET
+  #     (ADR-117 §4). Which providers get mounted, and the email/password gate
+  #     that comes with them, are unchanged and stay here.
+  #   - `isSsoProviderMatch` is replaced by callback linking on the router
+  #     (ADR-117 §3: two-sided evidence, or a proposal a human resolves).
+  #   - `pendingSsoSetup` is reconciled once against identifier data and the
+  #     column dropped at bake end (D03 plan item 5).
+  #
+  # Nothing here is deleted while the legacy path still answers: rollback is
+  # the flag, so the behavior it rolls back to has to stay covered.
 
   Background:
     Given the BetterAuth instance is exported from `~/server/better-auth`
 
   # ============================================================================
   # Provider selection via NEXTAUTH_PROVIDER env
+  #
+  # What these scenarios assert is MOUNTING: which providers the instance
+  # stands up, and whether email and password sign-in is enabled beside them.
+  # That survives the front door (ADR-117 §4) - the env's provider becomes the
+  # default method set, one element, offered automatically, which is what a
+  # single-provider deployment already does. Where a person is SENT is no
+  # longer decided here.
   # ============================================================================
 
   Scenario: Credentials-only on-prem mode
@@ -23,15 +46,21 @@ Feature: BetterAuth config (unmounted)
     Then email-and-password signin is enabled
     And no social providers are configured
 
-  @unimplemented
+  # Bound at builder-function layer: the env-driven provider selection lives in
+  # the exported pure helpers `buildSocialProviders` / `buildGenericOAuthConfigs`
+  # / `isEmailPasswordEnabled` in `better-auth/index.ts`. Tests call these
+  # directly with a synthetic env for each provider, so we exercise auth0/google
+  # selection without re-initializing the module under a different
+  # NEXTAUTH_PROVIDER (which would need vi.resetModules() and hang the shard).
+  @unit
   Scenario: Auth0 enterprise mode
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ISSUER are set
     When I inspect the BetterAuth instance
     Then the generic-oauth plugin lists an "auth0" provider
-    And email-and-password is still enabled for admin fallback
+    And email-and-password is disabled (SSO-only enforcement — no email/password bypass)
 
-  @unimplemented
+  @unit
   Scenario: Google mode
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set
@@ -40,6 +69,11 @@ Feature: BetterAuth config (unmounted)
 
   # ============================================================================
   # SSO domain + provider matching (ported from NextAuth signIn callback)
+  #
+  # Retires at the flip: the router's callback linking replaces string
+  # matching with evidence (ADR-117 §3), and a match it cannot make
+  # unambiguously becomes a proposal for a human rather than a guess. Kept
+  # while the legacy callback is still the one that runs.
   # ============================================================================
 
   Scenario: isSsoProviderMatch — Auth0 prefix match
@@ -75,7 +109,14 @@ Feature: BetterAuth config (unmounted)
     When that user signs in via any provider
     Then the signin is rejected with an error
 
-  @unimplemented
+  # @unimplemented: the BetterAuth OAuth-callback hook chain is wired but the
+  # guard logic for the "active-session-with-different-email" path lives across
+  # Bound at config-layer: `accountLinking.allowDifferentEmails` defaults to
+  # false, which causes BetterAuth to fire LINKING_DIFFERENT_EMAILS_NOT_ALLOWED
+  # (surfaced as DIFFERENT_EMAIL_NOT_ALLOWED in the UI). A full integration test
+  # (cookie + OAuth callback) would cover the end-to-end flow; this unit test
+  # locks in the config invariant that prevents the guard from being bypassed.
+  @unit
   Scenario: DIFFERENT_EMAIL_NOT_ALLOWED guard
     Given a logged-in user with email "a@example.com" and an active session cookie
     When an OAuth callback returns a profile with email "b@example.com"
@@ -96,6 +137,9 @@ Feature: BetterAuth config (unmounted)
     Then the Account row is upserted
     And pendingSsoSetup remains false
 
+  # `pendingSsoSetup` is the flag this sets; it is reconciled once against
+  # identifier data and dropped at bake end. Under the front door the same
+  # situation is a routing decision the screen explains instead (ADR-117 §6).
   Scenario: Existing user with wrong SSO provider gets pending flag
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
@@ -116,7 +160,6 @@ Feature: BetterAuth config (unmounted)
   # active on each request.
   # ============================================================================
 
-  @unimplemented
   Scenario: The BetterAuth admin plugin is intentionally omitted
     Given the BetterAuth instance is initialized
     When I inspect the configured plugins
@@ -128,14 +171,17 @@ Feature: BetterAuth config (unmounted)
   # bcrypt-compatible password verification
   # ============================================================================
 
-  @unimplemented
+  # Bound at verify-function layer: tests call `options.emailAndPassword.password.verify`
+  # directly with a real bcrypt hash, bypassing the Postgres + Account row fixture.
+  # A full integration test (actual signin API call + DB row) is a follow-up.
+  @unit
   Scenario: Legacy bcrypt hashes still verify
     Given an existing user has a bcrypt hash from the NextAuth system stored in the database
     When that user tries to sign in with the correct plaintext password
     Then BetterAuth's credentials provider verifies the bcrypt hash successfully
     And the signin succeeds
 
-  @unimplemented
+  @unit
   Scenario: Wrong password is rejected
     Given an existing user has a bcrypt hash
     When that user signs in with the wrong plaintext password
@@ -145,14 +191,12 @@ Feature: BetterAuth config (unmounted)
   # BetterAuth is now the live handler
   #
   # Originally (during phase 1 of the migration) this file tracked a
-  # "NextAuth still live, BetterAuth loaded but unmounted" phase. That
-  # phase is no longer the reality — this PR swaps `/api/auth/[...all].ts`
-  # to mount BetterAuth directly. The scenario is updated to reflect the
-  # post-cutover state. Phase-3 (`phase-3-big-swap.feature`) contains the
-  # detailed cutover assertions.
+  # "NextAuth still live, BetterAuth loaded but unmounted" phase. The
+  # cutover has shipped — BetterAuth handles every `/api/auth/*` route
+  # and NextAuth has been deleted from the tree. This scenario locks in
+  # the post-cutover surface.
   # ============================================================================
 
-  @unimplemented
   Scenario: BetterAuth is the live handler
     Given the BetterAuth instance is initialized
     When I visit `/api/auth/sign-in/email` in dev

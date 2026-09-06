@@ -1,0 +1,100 @@
+---
+title: POST /v1/audio/*
+description: Speech synthesis and transcription through the LangWatch AI Gateway on OpenAI's wire, served by OpenAI and ElevenLabs.
+sidebarTitle: Audio (TTS + STT)
+---
+
+## Endpoints
+
+```
+POST /v1/audio/speech
+POST /v1/audio/transcriptions
+Authorization: Bearer vk-lw-<ULID>
+```
+
+Both take OpenAI's request shape and are served by an OpenAI or an ElevenLabs credential, whichever the model resolves to. Any client that speaks OpenAI's audio API works by pointing its base URL at the gateway and its API key at a virtual key.
+
+For ElevenLabs' own paths (`/v1/text-to-speech/{voice_id}`, `/v1/speech-to-text`) and the post-call webhook, see [ElevenLabs](/ai-gateway/api/elevenlabs). For OpenAI Realtime and ElevenLabs Conversational AI, see [Realtime voice](/ai-gateway/api/realtime).
+
+## Text to speech
+
+```bash
+curl https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o-mini-tts",
+    "voice": "nova",
+    "input": "Hello from the gateway.",
+    "response_format": "mp3"
+  }' --output hello.mp3
+```
+
+The response body is the audio bytes, with no JSON envelope. `Content-Type` follows `response_format`:
+
+| `response_format` | `Content-Type` |
+|---|---|
+| `mp3` (default) | `audio/mpeg` |
+| `opus` | `audio/ogg` |
+| `aac` | `audio/aac` |
+| `flac` | `audio/flac` |
+| `wav` | `audio/wav` |
+| `pcm` | `audio/pcm` |
+
+For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on ElevenLabs is requested as `pcm_24000`, which matches OpenAI's raw PCM16 at 24 kHz.
+
+### Parameters the gateway changes or refuses
+
+| Parameter | What the gateway does |
+|---|---|
+| `model` | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
+| `input` | Required. Missing: `400 bad_request`. |
+| `voice`, `instructions`, `response_format`, `speed` | Forwarded. |
+| Every other field | Not forwarded. |
+
+## Transcription
+
+```bash
+curl https://gateway.langwatch.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "model=openai/whisper-1" \
+  -F "file=@call-recording.wav"
+```
+
+```json
+{"text": "Hello from the gateway."}
+```
+
+The response is JSON with `text`, plus the duration or token usage the provider reports.
+
+### Parameters the gateway changes or refuses
+
+| Form part | What the gateway does |
+|---|---|
+| `file` | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
+| `model` | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist. |
+| `language`, `prompt`, `response_format`, `temperature` | Forwarded. |
+| Every other part | Not forwarded. |
+
+## Request and response headers
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
+
+## Streaming
+
+Neither route streams. The audio bytes and the transcript are returned complete.
+
+## Metering
+
+Providers that report token usage fill the standard `gen_ai.usage.*` token attributes on the trace. Character-priced synthesis and duration-priced transcription are measured by two attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_chars` | Characters synthesized by a text-to-speech call. |
+| `gen_ai.usage.audio_seconds` | Seconds of audio transcribed by a speech-to-text call. |
+
+## Errors
+
+Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`) and `payload_too_large` (`413`). A provider's own error, for example an unknown voice id, is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).

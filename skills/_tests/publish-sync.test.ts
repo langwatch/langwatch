@@ -56,6 +56,15 @@ describe("sync publishes self-contained skills", () => {
     expect(files.some((f) => f.includes("/recipes/"))).toBe(true);
   });
 
+  it("never publishes the Langy-internal github skill", () => {
+    // The github skill (skills/github/SKILL.mdx)
+    // documents Langy's provisioned GH_TOKEN + bot-author workflow — useless
+    // and confusing outside the product. It must never land in the public
+    // langwatch/skills repo.
+    const files = listMarkdown(tmpDir);
+    expect(files.some((f) => f.includes("/github/"))).toBe(false);
+  });
+
   it("contains no relative markdown links in any published SKILL.md", () => {
     const offenders: string[] = [];
     for (const file of listMarkdown(tmpDir)) {

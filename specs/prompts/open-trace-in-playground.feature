@@ -3,11 +3,11 @@ Feature: Open trace in Playground
   I want to open it in the Prompt Playground
   So that I can iterate on the prompt used in the traced LLM call
 
-  # All 3 remaining @unimplemented scenarios are KEEP per AUDIT_MANIFEST.md:
-  # the LLM_PARAMETER_MAP loop in clickhouse-trace.service.ts and
-  # elasticsearch-trace.service.ts extracts all gen_ai.request.* params plus
-  # routes unknown keys into litellmParams, but no integration test exercises
-  # the ClickHouse or Elasticsearch path end-to-end with these attributes.
+  # The remaining @unimplemented scenarios are KEEP per AUDIT_MANIFEST.md:
+  # the LLM_PARAMETER_MAP loop in clickhouse-trace.service.ts extracts all
+  # gen_ai.request.* params plus routes unknown keys into litellmParams, but
+  # no integration test exercises the ClickHouse path end-to-end with these
+  # attributes.
   # All other parameter-coercion / unset-handling scenarios are covered by
   # useLoadSpanIntoPromptPlayground.unit.test.ts. Aspirational pending KEEP-class
   # backend-integration tests tracked in PR #3458.
@@ -20,12 +20,6 @@ Feature: Open trace in Playground
   @integration @unimplemented
   Scenario: ClickHouse backend extracts all OTel gen_ai.request attributes
     Given a span stored in ClickHouse with gen_ai.request.* attributes for all supported parameters
-    When the getForPromptStudio API is called
-    Then all parameters are returned in the llmConfig response
-
-  @integration @unimplemented
-  Scenario: Elasticsearch backend extracts all parameters from span params
-    Given a span stored in Elasticsearch with LLM params for all supported parameters
     When the getForPromptStudio API is called
     Then all parameters are returned in the llmConfig response
 

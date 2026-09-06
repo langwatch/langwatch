@@ -1,0 +1,72 @@
+# The SSRF address-classification rule set exists twice: pkg/ssrf (Go) and
+# @langwatch/ssrf (TypeScript). Both are held to one corpus,
+# pkg/ssrf/testdata/address_vectors.json.
+#
+# Those two suites otherwise run in two unrelated workflows (go-ci and
+# langwatch-app-ci), so "the two languages disagree about an address" shows up
+# as two red Xs in different places, or — worse — as one, if only one side's
+# paths changed. This workflow runs both halves against the corpus in a single
+# job so divergence is one unambiguous failure on any change to either
+# implementation or to the vectors themselves.
+#
+# If you add a range to pkg/ssrf/address.go or packages/ssrf/src/index.ts, add a
+# vector here too; this is the gate that makes that non-optional.
+name: ssrf-conformance
+
+# Filtering happens in `on:` rather than in a gate job. This workflow has no
+# required status check, which is what makes that safe: GitHub evaluates
+# `on.paths` BEFORE allocating a runner, so an irrelevant PR costs nothing at
+# all — where a gate job costs a full runner lease to reach the same verdict in
+# six seconds. A workflow filtered out this way never reports, so a *required*
+# check must never be filtered here; the always-run + green-aggregator pattern
+# stays exactly as it is for the workflows that have one.
+on:
+  # Only `pull_request` is filtered. "Push to main always runs all workflows"
+  # (specs/ci/path-filters.feature) — every commit that lands on main keeps its
+  # own validation, which is the same reason `cancel-in-progress` is off there.
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "pkg/ssrf/**"
+      - "packages/ssrf/**"
+      - ".github/workflows/ssrf-conformance.yaml"
+  # No paths here on purpose: a manual dispatch is an explicit request to run.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ssrf-conformance-${{ github.ref_name }}
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Go half of the corpus
+        run: go test -count=1 -race ./pkg/ssrf/...
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
+      # Runs even when the Go half already failed, so a divergence report names
+      # both sides in one log instead of making you re-run to see the second.
+      - name: TypeScript half of the corpus
+        if: ${{ !cancelled() }}
+        working-directory: platform/app
+        run: pnpm --filter @langwatch/ssrf test:unit

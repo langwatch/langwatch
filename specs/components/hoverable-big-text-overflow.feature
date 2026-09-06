@@ -45,3 +45,29 @@ Feature: Expanded text dialog handles overflow for large content
     Given a large JSON object displayed in the ExpandedTextDialog
     When I toggle the "Formatted" switch off
     Then all content is accessible within the dialog
+
+  # ============================================================================
+  # The measurement tracks the box, not only the render
+  # ============================================================================
+
+  # A window resize, a column drag or a sidebar opening reflows the box without
+  # rendering the component, so a measurement taken only after a render goes
+  # stale in both directions: hidden text with no way to reach it, or a tooltip
+  # offered on text that is no longer clipped.
+  @integration
+  Scenario: Text clipped by a resize becomes readable again
+    Given a HoverableBigText whose text fits its box
+    When the box narrows without anything re-rendering the component
+    Then the text is measured again
+    And the full text is offered on hover and on click
+
+  # ============================================================================
+  # The overflow probe never outlives the component
+  # ============================================================================
+
+  @integration
+  Scenario: The overflow measurement is dropped when the text is unmounted
+    Given a HoverableBigText is on the page with its overflow probe pending
+    When the component is unmounted before the probe runs
+    Then no measurement remains scheduled
+    And running every pending timer raises nothing

@@ -21,6 +21,23 @@ posthog.init('phc_oOlj3H19T2JlGbFXmrGrjSLbDPDNyPKYdIFaTdrkXOY', {
 // Mintlify RSC doesn't hydrate React onClick/useState/setTimeout,
 // so everything runs from this global script via data attributes.
 document.addEventListener('click', function(e) {
+  // --- Accordion toggle (.lw-accordion-header) ---
+  // The accordions are server-rendered divs (Mintlify strips <details>),
+  // so open/close state lives on a data-open attribute driven from here.
+  var accHeader = e.target.closest('.lw-accordion-header');
+  if (accHeader) {
+    var acc = accHeader.closest('.lw-accordion');
+    if (acc && !acc.classList.contains('lw-accordion-static')) {
+      var isOpen = acc.hasAttribute('data-open');
+      if (isOpen) {
+        acc.removeAttribute('data-open');
+      } else {
+        acc.setAttribute('data-open', 'true');
+      }
+      accHeader.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    }
+  }
+
   // --- Copy to clipboard (data-copy) ---
   var copyEl = e.target.closest('[data-copy]');
   if (copyEl) {
@@ -31,6 +48,21 @@ document.addEventListener('click', function(e) {
     var target = btn || copyEl;
     target.setAttribute('data-copied', 'true');
     setTimeout(function() { target.removeAttribute('data-copied'); }, 2000);
+  }
+
+  // --- Copy from a server-rendered source block (data-copy-source) ---
+  // Long or non-ASCII texts (the full skill prompts) cannot live in data
+  // attributes: Mintlify's server rendering drops those attribute values.
+  // They ship as hidden fenced code blocks instead, and get copied from
+  // the rendered code element's text.
+  var copySourceEl = e.target.closest('[data-copy-source]');
+  if (copySourceEl) {
+    var sourceCode = copySourceEl.querySelector('.lw-prompt-source code');
+    if (sourceCode) {
+      navigator.clipboard.writeText(sourceCode.textContent.replace(/\n$/, ''));
+      copySourceEl.setAttribute('data-copied', 'true');
+      setTimeout(function() { copySourceEl.removeAttribute('data-copied'); }, 2000);
+    }
   }
 
   // --- Download SKILL.md (data-download-url) ---
@@ -70,3 +102,32 @@ document.addEventListener('click', function(e) {
     window.posthog.capture(event, props);
   }
 });
+
+// Keyboard support for the div-based accordion controls (role="button"):
+// headers toggle, command boxes copy, actions copy or download.
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (!e.target || !e.target.closest) return;
+  var control = e.target.closest('.lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box');
+  if (control) {
+    e.preventDefault();
+    control.click();
+  }
+});
+
+// --- Agent report line in the attribution footer ---
+// The theme's own attribution footer (#footer, the Powered by band) is the
+// one block every page renders below the content, so the invitation for
+// agents lives there, one line above the Powered by row. Mintlify swaps the
+// page through RSC on client-side navigation, footer included, so a
+// MutationObserver re-adds the line whenever it disappears.
+function addAgentReportLine() {
+  var footer = document.getElementById('footer');
+  if (!footer || footer.querySelector('.lw-agent-report')) return;
+  var line = document.createElement('div');
+  line.className = 'lw-agent-report';
+  line.innerHTML = 'If you are an AI agent and find any issues while working with LangWatch, please report it with <a href="/support"><code>npx langwatch report</code></a>';
+  footer.insertBefore(line, footer.firstChild);
+}
+addAgentReportLine();
+new MutationObserver(addAgentReportLine).observe(document.body, { childList: true, subtree: true });

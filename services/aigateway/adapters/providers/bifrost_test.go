@@ -9,6 +9,9 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -54,15 +57,15 @@ func TestRawResponseFromBifrostError_UnmarshalFailure(t *testing.T) {
 		},
 	}
 
-	body, gotStatus, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr, domain.RequestTypeResponses)
 	if !ok {
 		t.Fatalf("rawResponseFromBifrostError returned ok=false despite populated RawResponse")
 	}
-	if gotStatus != status {
-		t.Fatalf("status mismatch: got %d, want %d", gotStatus, status)
+	if raw.status != status {
+		t.Fatalf("status mismatch: got %d, want %d", raw.status, status)
 	}
-	if string(body) != `{"id":"resp_abc","object":"response"}` {
-		t.Fatalf("body mismatch: got %q", body)
+	if string(raw.body) != `{"id":"resp_abc","object":"response"}` {
+		t.Fatalf("body mismatch: got %q", raw.body)
 	}
 }
 
@@ -253,18 +256,23 @@ func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
 	}
 }
 
-// A zero status means no upstream HTTP response (transport failure / timeout):
-// keep the existing classification (provider_timeout), not a forwarded status.
+// A zero status means no upstream HTTP response, so there is nothing to
+// forward and the error is classified instead. It does NOT mean "timeout":
+// Bifrost stamps a genuine timeout with 504 and request_timed_out, and a
+// transport failure with its own network-error message. Reading a zero status
+// as a timeout is what put every credential and configuration failure on a
+// retryable 504 (see bifrost_error.go).
 func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 	berr := &bfschemas.BifrostError{
-		Error: &bfschemas.ErrorField{Message: "dial tcp: timeout"},
+		IsBifrostError: false,
+		Error:          &bfschemas.ErrorField{Message: bfNetworkErrorMessage + " (dial tcp: connection refused)"},
 	}
 	err := errFromBifrost(context.Background(), berr, nil)
 	if _, ok := err.(*domain.UpstreamError); ok {
 		t.Fatalf("transport failure must not become an UpstreamError")
 	}
-	if !herr.IsCode(err, domain.ErrProviderTimeout) {
-		t.Fatalf("expected provider_timeout, got %v", err)
+	if !herr.IsCode(err, domain.ErrProviderConnectionFailed) {
+		t.Fatalf("expected provider_connection_failed, got %v", err)
 	}
 }
 
@@ -344,6 +352,43 @@ func TestParseGeminiPassthroughUsage_CacheRead(t *testing.T) {
 	}
 }
 
+// Gemini reports thinking tokens outside candidatesTokenCount and bills them
+// at the output rate. Reading candidatesTokenCount alone billed a 47-token
+// answer for a 243-token turn and reported no reasoning at all.
+func TestParseGeminiPassthroughUsage_ThinkingTokens(t *testing.T) {
+	body := []byte(`{"candidates":[],"usageMetadata":{"promptTokenCount":25,` +
+		`"candidatesTokenCount":47,"thoughtsTokenCount":196,"totalTokenCount":268}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 196 {
+		t.Fatalf("ReasoningTokens: want 196, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 243 {
+		t.Fatalf("CompletionTokens: want 243 (47 visible + 196 thinking), got %d", u.CompletionTokens)
+	}
+	if u.PromptTokens+u.CompletionTokens != u.TotalTokens {
+		t.Fatalf("totals disagree: %d + %d != %d", u.PromptTokens, u.CompletionTokens, u.TotalTokens)
+	}
+}
+
+// A model that did not think reports no thoughtsTokenCount, and the
+// completion total stays exactly what the provider said.
+func TestParseGeminiPassthroughUsage_NoThinking(t *testing.T) {
+	body := []byte(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":4,"totalTokenCount":14}}`)
+	u, ok := parseGeminiPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected usageMetadata to parse")
+	}
+	if u.ReasoningTokens != 0 {
+		t.Fatalf("ReasoningTokens: want 0, got %d", u.ReasoningTokens)
+	}
+	if u.CompletionTokens != 4 {
+		t.Fatalf("CompletionTokens: want 4, got %d", u.CompletionTokens)
+	}
+}
+
 // Regression: opencode (Vercel AI SDK Anthropic provider) Zod-rejected
 // the OpenAI-shape `delta.choices` chunks Bifrost's ChatCompletionStream
 // emitted for /v1/messages with `No matching discriminator on 'type'`,
@@ -377,6 +422,67 @@ func TestParseAnthropicPassthroughUsage_MessageStartCarriesPromptAndCacheTokens(
 	}
 	if u.CacheCreationTokens == u.CacheReadTokens {
 		t.Fatalf("cache_creation must stay distinct from cache_read")
+	}
+}
+
+// Anthropic bills an hour-long cache entry at twice the input rate and a
+// five-minute one at 1.25x, and states which is which only in its own
+// `usage.cache_creation` breakdown. Reading the flat total alone prices an
+// hour-long write about a third under the bill.
+func TestParseAnthropicPassthroughUsage_MessageStartCarriesCacheWriteLifetime(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreationTokens != 17854 {
+		t.Fatalf("CacheCreationTokens: want 17854, got %d", u.CacheCreationTokens)
+	}
+	if u.CacheCreation1hTokens != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// A request that never asked for the extended TTL gets no breakdown at all,
+// and its writes must price short-lived rather than guess.
+func TestParseAnthropicPassthroughUsage_NoBreakdownLeavesLifetimeUnknown(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreation1hTokens != 0 {
+		t.Fatalf("CacheCreation1hTokens: want 0, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// The non-streaming /v1/messages lane returns the provider's body verbatim
+// but takes its usage from Bifrost's normalized struct, which has one flat
+// cache-write count. The lifetime has to come back off those same bytes.
+func TestAnthropicCacheCreation1h_ReadsTheBreakdownOffTheResponseBody(t *testing.T) {
+	body := []byte(`{"id":"msg_x","type":"message","role":"assistant","content":[],` +
+		`"model":"claude-opus-5","usage":{"input_tokens":2,` +
+		`"cache_creation_input_tokens":17854,"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":210}}`)
+	if got := anthropicCacheCreation1h(body); got != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", got)
+	}
+	if got := anthropicCacheCreation1h(nil); got != 0 {
+		t.Fatalf("empty body: want 0, got %d", got)
+	}
+	if got := anthropicCacheCreation1h([]byte(`{"usage":{"input_tokens":2}}`)); got != 0 {
+		t.Fatalf("no breakdown: want 0, got %d", got)
 	}
 }
 
@@ -424,7 +530,7 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 			"aws_region_name":       "us-east-1",
 		},
 	}
-	k := credentialToBifrostKey(cred, bfschemas.Bedrock)
+	k := credentialToBifrostKey(cred, bfschemas.Bedrock, nil)
 	if k.BedrockKeyConfig == nil {
 		t.Fatal("BedrockKeyConfig is nil")
 	}
@@ -465,6 +571,10 @@ func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
 		}, bfschemas.VLLM},
 		{"openai without base_url keeps openai", domain.Credential{ProviderID: domain.ProviderOpenAI}, bfschemas.OpenAI},
 		{"anthropic is unaffected", domain.Credential{ProviderID: domain.ProviderAnthropic}, bfschemas.Anthropic},
+		{"xai is bifrost-native", domain.Credential{ProviderID: domain.ProviderXAI}, bfschemas.XAI},
+		{"groq is bifrost-native", domain.Credential{ProviderID: domain.ProviderGroq}, bfschemas.Groq},
+		{"cerebras is bifrost-native", domain.Credential{ProviderID: domain.ProviderCerebras}, bfschemas.Cerebras},
+		{"deepseek maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderDeepSeek}, bfschemas.VLLM},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -487,7 +597,7 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 		ProviderID: domain.ProviderCustom,
 		Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.VLLM)
+	key := credentialToBifrostKey(cred, bfschemas.VLLM, nil)
 
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
@@ -500,6 +610,124 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 	}
 	if key.Value.Val != "" {
 		t.Fatalf("key.Value = %q, want empty for unauthenticated server", key.Value.Val)
+	}
+}
+
+// DeepSeek rides the vLLM (openai-compat) path but is a hosted API —
+// customers configure only an API key, so the key must default to
+// DeepSeek's public endpoint instead of dispatching with an empty URL.
+func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
+	key := credentialToBifrostKey(domain.Credential{
+		ID:         "mp-ds",
+		ProviderID: domain.ProviderDeepSeek,
+		APIKey:     "sk-ds",
+	}, bfschemas.VLLM, nil)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
+	}
+	if got := key.VLLMKeyConfig.URL.Val; got != "https://api.deepseek.com" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want DeepSeek public endpoint", got)
+	}
+	if key.Value.Val != "sk-ds" {
+		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
+	}
+}
+
+// Azure's resource endpoint must reach Bifrost's AzureKeyConfig.Endpoint.
+// The /go/proxy path (gatewayproxy.ParseCredentialFromHeaders) carries the
+// customer's Azure endpoint under Extra["api_base"] — the litellm-era name
+// that TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs pins — while the
+// control-plane VK path (config.materialiser.ts / config_wire.go) uses
+// "endpoint". This branch reads only "endpoint" today, so every Azure
+// scenario/playground call dispatched via /go/proxy hands Bifrost an empty
+// endpoint and Bifrost returns provider_timeout "endpoint not set" (#5760).
+// The Azure branch must accept BOTH names, mirroring credBaseURL for vLLM.
+//
+// Spec: specs/ai-gateway/azure-endpoint-from-api-base.feature
+func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
+	cred := domain.Credential{
+		ID:            "mp-azure",
+		ProviderID:    domain.ProviderAzure,
+		APIKey:        "az-key",
+		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint "+
+			"(#5760: /go/proxy Azure sends the endpoint as api_base, not endpoint)", got)
+	}
+}
+
+// bifrost v1.5 removed the per-key AzureKeyConfig.APIVersion field: the Azure
+// provider now injects its own api-version (DefaultAzureAPIVersion for classic
+// /deployments/ routes, "preview" for the responses API) and only when the
+// query is absent, so the empty-`?api-version=` shape #5760 guarded against is
+// structurally unreachable. The adapter therefore emits no api-version at all;
+// the caller-supplied api_version override is no longer forwarded (see the
+// bifrost/core v1.5.17 bump, GO-2026-6320). What remains adapter-owned for
+// Azure is the endpoint (dual-named endpoint/api_base) and the model->deployment
+// map, which v1.5 moved onto Key.Aliases and resolves via Aliases.Resolve.
+func TestCredentialToBifrostKey_Azure_EndpointAndDeploymentsMapToKey(t *testing.T) {
+	cred := domain.Credential{
+		ID:            "mp-azure",
+		ProviderID:    domain.ProviderAzure,
+		APIKey:        "az-key",
+		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt5mini-deploy"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint (#5760)", got)
+	}
+	if got := key.Aliases.Resolve("gpt-5-mini"); got != "gpt5mini-deploy" {
+		t.Fatalf("Aliases.Resolve(gpt-5-mini) = %q, want the mapped deployment; "+
+			"v1.5 resolves model->deployment via Key.Aliases", got)
+	}
+}
+
+// A caller-supplied api_version (still sent by the control plane, see
+// config_wire.go) is dropped by bifrost v1.5 (no per-key api-version field),
+// but must not panic and must not block the rest of the key build — and the
+// drop must be observable via a warning log, so a customer's pinned version
+// silently ignored is at least visible in logs.
+func TestCredentialToBifrostKey_Azure_APIVersionOverrideWarnsAndIsDropped(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+	logger := zap.New(core)
+
+	cred := domain.Credential{
+		ID:         "mp-azure",
+		ProviderID: domain.ProviderAzure,
+		APIKey:     "az-key",
+		Extra: map[string]string{
+			"api_base":    "https://acme.openai.azure.com",
+			"api_version": "2023-05-15",
+		},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure, logger)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint even with api_version set", got)
+	}
+
+	entries := logs.FilterMessage("azure api_version override is ignored: bifrost v1.5 sets api-version itself").All()
+	if len(entries) != 1 {
+		t.Fatalf("want 1 warning about the dropped api_version override, got %d", len(entries))
+	}
+	if got := entries[0].ContextMap()["api_version"]; got != "2023-05-15" {
+		t.Fatalf("warning api_version field = %v, want 2023-05-15", got)
 	}
 }
 

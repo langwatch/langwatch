@@ -83,7 +83,7 @@ func (a *Adapter) dispatch(ctx context.Context, req app.GatewayRequest, typ doma
 		return nil, err
 	}
 	bare := bareModel(req.Model)
-	cred = withDeploymentMap(cred, bare)
+	cred = domain.WithDeploymentSelfMap(cred, bare)
 	resp, err := a.disp.Dispatch(ctx, dispatcher.Request{
 		Type:       typ,
 		Model:      bare,
@@ -106,7 +106,7 @@ func (a *Adapter) dispatchStream(ctx context.Context, req app.GatewayRequest, ty
 		return nil, err
 	}
 	bare := bareModel(req.Model)
-	cred = withDeploymentMap(cred, bare)
+	cred = domain.WithDeploymentSelfMap(cred, bare)
 	iter, err := a.disp.DispatchStream(ctx, dispatcher.Request{
 		Type:       typ,
 		Model:      bare,
@@ -143,6 +143,9 @@ type inlineCreds struct {
 	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
 	Gemini    map[string]string `json:"gemini,omitempty"`
 	Custom    map[string]string `json:"custom,omitempty"`
+	// Generic carries plain api-key providers (xai, groq, cerebras,
+	// deepseek); Provider disambiguates which one.
+	Generic map[string]string `json:"generic,omitempty"`
 }
 
 // credentialFromHeaders reads the inline-credentials header that
@@ -170,9 +173,9 @@ func credentialFromHeaders(headers map[string]string) (domain.Credential, error)
 func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 	switch ic.Provider {
 	case "openai":
-		return openAICred(ic.OpenAI), nil
+		return apiKeyCred(domain.ProviderOpenAI, ic.OpenAI), nil
 	case "anthropic":
-		return anthropicCred(ic.Anthropic), nil
+		return apiKeyCred(domain.ProviderAnthropic, ic.Anthropic), nil
 	case "azure":
 		return azureCred(ic.Azure), nil
 	case "bedrock":
@@ -180,12 +183,17 @@ func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 	case "vertex_ai", "vertex":
 		return vertexCred(ic.VertexAI), nil
 	case "gemini":
-		return geminiCred(ic.Gemini), nil
+		return apiKeyCred(domain.ProviderGemini, ic.Gemini), nil
+	case "xai", "groq", "cerebras", "deepseek":
+		// Plain api-key providers share the Generic slot. DeepSeek routes
+		// through the gateway's openai-compat (vLLM) path with its public
+		// endpoint as the default base URL; the rest are Bifrost-native.
+		return apiKeyCred(domain.ProviderID(ic.Provider), ic.Generic), nil
 	case "custom":
 		// Custom routes through Bifrost's openai-compat adapter — same
 		// credential layout as OpenAI but a different ProviderID so the
 		// gateway-side custom-→-openai mapping logic stays applicable.
-		return openAICred(ic.Custom), nil
+		return apiKeyCred(domain.ProviderOpenAI, ic.Custom), nil
 	case "":
 		return domain.Credential{}, errors.New("dispatcheradapter: provider is required in inline credentials")
 	default:
@@ -203,19 +211,12 @@ func inlineCredentialID(provider domain.ProviderID) string {
 	return "nlpgo-inline-" + string(provider)
 }
 
-func openAICred(m map[string]string) domain.Credential {
+// apiKeyCred builds the Credential for providers that authenticate with
+// a plain api_key (plus optional pass-through extras like api_base).
+func apiKeyCred(provider domain.ProviderID, m map[string]string) domain.Credential {
 	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderOpenAI),
-		ProviderID: domain.ProviderOpenAI,
-		APIKey:     m["api_key"],
-		Extra:      stringExtras(m, "api_key"),
-	}
-}
-
-func anthropicCred(m map[string]string) domain.Credential {
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderAnthropic),
-		ProviderID: domain.ProviderAnthropic,
+		ID:         inlineCredentialID(provider),
+		ProviderID: provider,
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
 	}
@@ -310,47 +311,6 @@ func vertexCred(m map[string]string) domain.Credential {
 		APIKey:     m["vertex_credentials"],
 		Extra:      extra,
 	}
-}
-
-func geminiCred(m map[string]string) domain.Credential {
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderGemini),
-		ProviderID: domain.ProviderGemini,
-		APIKey:     m["api_key"],
-		Extra:      stringExtras(m, "api_key"),
-	}
-}
-
-// withDeploymentMap adds a deployment entry on Azure / Bedrock / Vertex
-// credentials so Bifrost's per-key-config readers ("deployments not set"
-// otherwise) accept the call. By default the model id IS the deployment
-// name (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {model: model}
-// self-map suffices. When the provider defines an explicit deployment
-// (the model id need not equal the deployment name, e.g. an Azure
-// deployment named differently from the model), the control plane forwards
-// it as Extra["deployment"]; honor it so the model id maps to the real
-// deployment. aigateway HTTP callers populate richer maps at the control
-// plane layer.
-func withDeploymentMap(cred domain.Credential, bareModel string) domain.Credential {
-	if bareModel == "" {
-		return cred
-	}
-	switch cred.ProviderID {
-	case domain.ProviderAzure, domain.ProviderBedrock, domain.ProviderVertex:
-	default:
-		return cred
-	}
-	if cred.DeploymentMap == nil {
-		cred.DeploymentMap = map[string]string{}
-	}
-	if _, present := cred.DeploymentMap[bareModel]; !present {
-		deployment := bareModel
-		if explicit := cred.Extra["deployment"]; explicit != "" {
-			deployment = explicit
-		}
-		cred.DeploymentMap[bareModel] = deployment
-	}
-	return cred
 }
 
 // bareModel strips the langwatch-internal provider prefix

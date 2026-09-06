@@ -270,7 +270,7 @@ type Component struct {
 	Evaluator *string `json:"evaluator,omitempty"`
 
 	// Signature/Prompt-specific — forwarded from the TS signatureComponentSchema
-	// (langwatch/src/optimization_studio/types/dsl.ts:414) so the engine can
+	// (platform/app/src/optimization_studio/types/dsl.ts:414) so the engine can
 	// stamp the PromptApiService.get + Prompt.compile span identity attrs.
 	// PromptDraft is true when the executed config diverges from the saved
 	// version (user edited inline without persisting); base configId / handle /
@@ -283,7 +283,7 @@ type Component struct {
 }
 
 // PromptVersionMetadata mirrors signatureComponentSchema.versionMetadata
-// (langwatch/src/optimization_studio/types/dsl.ts:417-422). Kept as a
+// (platform/app/src/optimization_studio/types/dsl.ts:417-422). Kept as a
 // nested struct rather than three flat fields so the JSON round-trip
 // matches the TS wire format byte-for-byte.
 type PromptVersionMetadata struct {
@@ -359,7 +359,6 @@ type Workflow struct {
 	Icon            string            `json:"icon"`
 	Description     string            `json:"description"`
 	Version         string            `json:"version"`
-	DefaultLLM      *LLMConfig        `json:"default_llm,omitempty"`
 	Nodes           []Node            `json:"nodes"`
 	Edges           []Edge            `json:"edges"`
 	State           WorkflowState     `json:"state"`
@@ -367,6 +366,16 @@ type Workflow struct {
 	EnableTracing   *bool             `json:"enable_tracing,omitempty"`
 	WorkflowType    *string           `json:"workflow_type,omitempty"`
 	Secrets         map[string]string `json:"secrets,omitempty"`
+	// Params are the run's user-defined parameters. Unlike secrets they keep
+	// their JSON types, so a number stays a number and a boolean stays a
+	// boolean by the time user code reads params.NAME.
+	Params map[string]any `json:"params,omitempty"`
+	// SandboxAPIKey is the credential a code node authenticates with. It is
+	// minted for one run, reaches the project's agent cache and nothing else,
+	// and expires by itself. It is never the project key. An empty value means
+	// the run injects no credential, which is what a caller that could not
+	// mint one sends.
+	SandboxAPIKey string `json:"sandbox_api_key,omitempty"`
 }
 
 // ParseWorkflow deserializes a Workflow from JSON, returning a wrapped

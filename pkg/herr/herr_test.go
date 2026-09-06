@@ -24,6 +24,23 @@ func TestNew_SetsCodeAndMeta(t *testing.T) {
 	assert.Equal(t, reason, e.Reasons[0])
 }
 
+func TestNewLight_SetsCodeAndMetaWithoutStack(t *testing.T) {
+	e := NewLight(context.Background(), codeNotFound, M{"id": "abc"})
+
+	assert.Equal(t, codeNotFound, e.Code)
+	assert.Equal(t, "abc", e.Meta["id"])
+	// The whole point of NewLight: no stack capture on the hot path.
+	assert.Empty(t, e.Stack, "NewLight must skip stack capture")
+	// It still behaves as a herr for errors.Is on the code.
+	assert.True(t, IsCode(e, codeNotFound))
+}
+
+func TestNewLight_PanicsOnNilReason(t *testing.T) {
+	assert.Panics(t, func() {
+		NewLight(context.Background(), codeNotFound, nil, nil)
+	})
+}
+
 func TestE_Error_IncludesCodeAndMeta(t *testing.T) {
 	reason := errors.New("timeout")
 	e := New(context.Background(), codeInternal, M{"svc": "db"}, reason)

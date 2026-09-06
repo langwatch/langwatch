@@ -1,0 +1,180 @@
+Feature: Langy conversations are an event-sourced projection
+  As the LangWatch platform
+  I want a Langy conversation to be a projection of an append-only event stream
+  So that the conversation row and its messages converge from canonical events,
+  retries are idempotent, and turns are ordered per conversation
+
+  # Behavioural contract for ADR-046 (PR2 of the Langy event-sourcing stack).
+  # The conversation aggregate is `langy_conversation`; aggregateId is the
+  # conversationId and TenantId is the projectId. Writes are commands that emit
+  # past-tense events. ADR-049 keeps the ClickHouse event_log as the sole event
+  # source of truth, while queued events build the conversation/turn/message
+  # operational projections in Postgres. ClickHouse also holds analytics.
+
+  Background:
+    Given I am signed in with Langy enabled for project "demo"
+
+  # ============================================================================
+  # Sending a message (the user turn)
+  # ============================================================================
+
+  Scenario: Sending the first message creates the conversation from its events
+    Given no Langy conversation exists yet
+    When I send the message "why are my traces failing?"
+    Then a "conversation_continued" event is recorded for a new conversation aggregate
+    And the operational conversation state shows me as the owner
+    And the conversation title is derived from the first message
+    And the message count is 1
+    And the queued event stores a user message row in Postgres for that conversation
+
+  Scenario: A message and its activity bump are one command, not two writes
+    Given I am continuing an existing conversation I own
+    When I send a message
+    Then exactly one "ContinueConversation" command is dispatched
+    And the message content and the conversation's activity bump come from the
+      same "conversation_continued" event
+    And there is no separate spine write that could desync from the message
+
+  Scenario: Retrying the same send does not double-count
+    Given a "ContinueConversation" command with a fixed idempotency key
+    When the command is dispatched twice for the same message
+    Then the conversation message count reflects a single message
+    And LangyMessage holds a single row for that message id
+
+  # ============================================================================
+  # The agent turn and its final answer
+  # ============================================================================
+
+  Scenario: Starting an agent response records the turn in operational state
+    Given I have sent a message on a conversation I own
+    When the agent response begins
+    Then an "agent_response_started" event is recorded
+    And the conversation status reflects an in-progress turn
+
+  Scenario: A tool call reaches exactly one terminal — succeeded or failed
+    Given the agent has initiated a tool call during a response
+    When the tool call returns successfully
+    Then a "tool_call_succeeded" event is recorded carrying the command and duration
+    And no "tool_call_failed" event is recorded for that call
+
+  Scenario: A failing tool call is a distinct event carrying the error
+    Given the agent has initiated a tool call during a response
+    When the tool call returns an error
+    Then a "tool_call_failed" event is recorded carrying the error text
+    And no "tool_call_succeeded" event is recorded for that call
+
+  Scenario: Streamed tokens are not events
+    Given an agent turn is streaming its answer token by token
+    When 500 tokens have streamed
+    Then no per-token event is written to the event log
+    And only meaningful transitions are recorded as durable events
+
+  Scenario: Status and progress are ephemeral, never durable
+    Given an agent turn is reporting status and progress while it runs
+    When the turn ends
+    Then no status or progress signal was written to the event log
+    And none reached the conversation projection or the message rows
+    And they left no residue once the turn finished
+
+  Scenario: The finalized response carries the whole answer as the source of truth
+    Given an agent response has streamed to completion
+    When the response is recorded
+    Then an "agent_responded" event is recorded carrying the full final answer
+    And an assistant LangyMessage row is stored from that event
+    And the conversation message count includes the assistant message
+    And the conversation status returns to idle
+
+  Scenario: A failed response is recorded without an assistant message loss
+    Given an agent response ended in failure
+    When the response is recorded with a failure outcome
+    Then an "agent_responded" event records the failure
+    And the conversation status reflects the failure
+
+  Scenario: A stalled response with no answer to carry fails distinctly
+    Given an agent response stalled with no answer to carry
+    When the liveness sweep drains it
+    Then an "agent_response_failed" event is recorded
+    And the conversation status reflects the failure
+
+  # ============================================================================
+  # The turn as its own render document (a second projection)
+  # ============================================================================
+
+  # The queued event stream is folded into a conversation spine and per-turn
+  # documents. Each Postgres fold commit is atomic, but it follows the canonical
+  # ClickHouse event append asynchronously.
+
+  Scenario: A turn folds into one render document keyed per turn
+    Given an agent response that initiated two tool calls and then answered
+    When I read the turn document for that turn
+    Then it carries the turn's status, the whole answer, and both tool calls
+    And each tool call shows whether it succeeded or failed
+    And it is keyed by conversation and turn, distinct from the conversation spine
+
+  Scenario: Two turns of one conversation fold into two separate documents
+    Given a conversation I own with two completed turns
+    When I read that conversation's turn documents
+    Then each turn is its own document
+    And neither turn's tool calls or answer bleed into the other
+
+  # ============================================================================
+  # Reading conversations (projections)
+  # ============================================================================
+
+  Scenario: Listing conversations reads the operational projection, newest activity first
+    Given I own three conversations with different last-activity times
+    When I list my conversations
+    Then they are returned ordered by last activity, newest first
+    And each item exposes title, message count, and last activity
+    And no archived conversation is included
+
+  Scenario: A shared conversation is visible to other project members
+    Given another member shared a conversation in "demo"
+    When I list my conversations
+    Then the shared conversation appears in my list
+    And it is marked as not owned by me
+
+  Scenario: Every conversation read is scoped to the project
+    When any conversation or message is read from Postgres
+    Then the query filters on projectId
+    And no row from another project can be returned
+
+  Scenario: Restoring a conversation returns its messages in order
+    Given a conversation I own with a user message and an assistant reply
+    When I open that conversation
+    Then its messages are returned in send order
+    And each message exposes its role and flattened text content
+
+  # ============================================================================
+  # Deleting becomes archiving
+  # ============================================================================
+
+  Scenario: Deleting a conversation archives it rather than hard-deleting
+    Given a conversation I own
+    When I delete it
+    Then a "conversation_archived" event is recorded
+    And the conversation stops appearing in my list
+    And the underlying Postgres rows are not hard-deleted
+
+  Scenario: Clearing memory archives all of my conversations
+    Given I own several conversations
+    When I clear my Langy memory
+    Then a "conversation_archived" event is recorded for each
+    And the returned count matches the number archived
+
+  Scenario: A non-owner cannot archive someone else's conversation
+    Given a conversation owned by another user and not shared to me for control
+    When I attempt to delete it
+    Then no "conversation_archived" event is recorded
+    And the delete reports not-found or not-owned
+
+  # ============================================================================
+  # Rename and share (metadata) — beyond the prescribed vocabulary (see ADR-046)
+  # ============================================================================
+
+  @review
+  Scenario: Renaming or sharing updates metadata via one event
+    Given a conversation I own
+    When I rename it or toggle sharing
+    Then a "conversation_metadata_updated" event is recorded
+    And the operational projection reflects the new title or sharing state

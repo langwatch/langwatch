@@ -4,20 +4,21 @@ Feature: Scenario tests for skills quality assurance
   We want every skill to have scenario tests proving it works
   So that we can compound improvements with confidence and catch regressions
 
-  # All `@unimplemented` scenarios in this file describe live Claude
-  # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
-  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
-  # `level-up.scenario.test.ts`, `analytics.scenario.test.ts`,
-  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
-  # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
-  # spawn an actual Claude Code agent against a fixture codebase.
+  # The scenarios in this file describe live Claude Code-driven scenario
+  # tests under `skills/_tests/*.scenario.test.ts` (e.g.
+  # `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # `level-up.scenario.test.ts`, `agent-performance.scenario.test.ts`,
+  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The tests
+  # spawn an actual Claude Code agent against a fixture codebase, so they
+  # are skipped in CI (`it.skipIf(isCI)`) and run on a developer machine.
   #
-  # The `check-feature-parity` script's DEFAULT_TEST_ROOTS does not
-  # include `skills/_tests/`, so JSDoc `@scenario` annotations in
-  # those files would not currently bind. Expanding the test roots
-  # is the right structural fix for this domain — tracked outside
-  # this PR. Until then, scenarios stay `@unimplemented` (with this
-  # justifying note) rather than being orphaned.
+  # `skills/_tests` is one of the parity checker's test roots, so a
+  # `@scenario` annotation in those files binds the scenario it names.
+  #
+  # What we ship in a skill is instructions, so the outcome a scenario
+  # here observes is what the coding agent does after reading them: the
+  # commands it runs and the code it writes. Naming them is the behavior,
+  # not an implementation detail of the test.
 
   Background:
     Given scenario tests live in skills/_tests/
@@ -151,6 +152,41 @@ Feature: Scenario tests for skills quality assurance
     And the agent does NOT use any MCP tools
 
   # ──────────────────────────────────────────────────
+  # Connect-agent skill tests
+  # ──────────────────────────────────────────────────
+
+  @connect-agent @integration @unimplemented
+  Scenario: Connect-agent skill wires a FastAPI agent for platform simulations
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch scenarios"
+    Then the agent makes the chat endpoint adopt the incoming W3C traceparent header
+    And the agent adds a dedicated scenario key check against the Authorization Bearer header
+    And the agent keeps the existing session authentication in place for normal traffic
+    And the agent attempts to register the endpoint with `langwatch agent create --type http`
+    And the agent does not claim a suite run succeeded when the platform is unreachable
+
+  @connect-agent @integration
+  Scenario: Connect-agent skill decorates the agent function instead of registering a URL
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch simulations"
+    Then the agent adds langwatch.connect_agent to the function that runs the agent
+    And the agent reads the agent row back with `langwatch agent list` or `langwatch agent get`
+    And no `langwatch agent create` command runs
+    And the agent does not claim the agent is online without reading its status
+
+  @scenarios @connect-agent @integration
+  Scenario: The scenarios skill proposes scenarios from the levers of a connected agent
+    Given the fixture "python-connected-agent" runs and is online as a connected agent
+    And the skill "scenarios" is loaded
+    When Claude Code receives "add scenario tests for my connected agent on the platform"
+    Then the agent reads the run parameters the agent declares with `langwatch agent get` or `langwatch agent list`
+    And the agent creates the scenarios with `langwatch scenario create` and writes no test files
+    And at least one scenario depends on the customer plan and the plan travels as `--param plan=` or a `?plan=` target suffix
+    And the agent names the comparison run across the model options
+
+  # ──────────────────────────────────────────────────
   # Prompts skill tests
   # ──────────────────────────────────────────────────
 
@@ -215,14 +251,15 @@ Feature: Scenario tests for skills quality assurance
   # Platform skill tests (no codebase — simulating claude web)
   # ──────────────────────────────────────────────────
 
-  @platform @analytics @integration @unimplemented
-  Scenario: Analytics skill uses the CLI to query performance
+  @platform @agent-performance @integration @unimplemented
+  Scenario: Agent performance skill diagnoses production behavior through the CLI
     Given an empty temporary directory (no codebase)
-    And the skill "analytics" is loaded
-    When the agent receives "tell me how my agent has been performing"
+    And the skill "agent-performance" is loaded
+    When the agent receives "how is my agent performing?"
     Then the agent runs `langwatch analytics query` with one or more metric presets
-    And the agent uses `langwatch trace search` or `langwatch trace get` to inspect specific traces
-    And the agent provides a summary of performance trends
+    And the agent exports or inspects traces with `langwatch trace export`, `langwatch trace search`, or `langwatch trace get`
+    And the agent writes an HTML report whose findings link to example traces
+    And the agent recommends the agent-improve skill as the next step
     And the agent does NOT use any MCP tools
 
   # ──────────────────────────────────────────────────

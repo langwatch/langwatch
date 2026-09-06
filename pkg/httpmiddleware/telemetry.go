@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -39,6 +40,14 @@ func Telemetry() func(http.Handler) http.Handler {
 				zap.Duration("duration", time.Since(start)),
 			}
 
+			// Level follows fault attribution, the same rule the TS boundaries
+			// (tRPC, Hono, SSE) apply: a handled error with a customer fault is
+			// expected and warns (spike-watched via error_code); platform /
+			// provider faults are incidents and log at error; a handled error
+			// with no fault annotation stays at info; a plain (unhandled)
+			// error — the "unknown" WriteHTTP hides behind a generic 500 —
+			// always logs at error for alerting.
+			level := zapcore.InfoLevel
 			if rec.err != nil {
 				var e herr.E
 				if errors.As(rec.err, &e) {
@@ -53,12 +62,19 @@ func Telemetry() func(http.Handler) http.Handler {
 						}
 						fields = append(fields, zap.Strings("error_reasons", reasons))
 					}
+					switch e.Meta["fault"] {
+					case "customer":
+						level = zapcore.WarnLevel
+					case "platform", "provider":
+						level = zapcore.ErrorLevel
+					}
 				} else {
+					level = zapcore.ErrorLevel
 					fields = append(fields, zap.NamedError("error", rec.err))
 				}
 			}
 
-			clog.Get(ctx).Info("request_completed", fields...)
+			clog.Get(ctx).Log(level, "request_completed", fields...)
 		})
 	}
 }

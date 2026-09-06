@@ -190,6 +190,13 @@ Feature: Evaluator management
     Then I see "Create your first evaluator" message
     And I see a "New Evaluator" button
 
+  @integration
+  Scenario: The empty state distinguishes no evaluators from all hidden
+    Given every evaluator the project has is already attached and hidden from this list
+    When the EvaluatorListDrawer opens
+    Then it says every evaluator is already attached
+    And it offers no create-first-evaluator prompt
+
   Scenario: Select evaluator from drawer
     Given the EvaluatorListDrawer is open
     And evaluator "Exact Match" exists
@@ -280,6 +287,15 @@ Feature: Evaluator management
     Then the code editor opens with its saved code, inputs and outputs
     And in the workbench each input shows its source mapping inline
 
+  # A disabled Create button must say why instead of being a silent dead button:
+  # the drawer surfaces the missing requirement and clears it once the field is met.
+  Scenario: A disabled code evaluator Create button explains what is missing
+    Given the code evaluator drawer is open in create mode without a name
+    Then the Create button is disabled
+    And the drawer shows the reason, naming the missing name
+    When I fill in the name
+    Then the reason clears and the Create button is enabled
+
   # Same behavior as the studio code node: the Python entrypoint is kept in
   # sync with the declared inputs, so changing the inputs keeps the evaluator
   # callable with exactly those inputs, with no missing or unexpected keyword.
@@ -294,6 +310,14 @@ Feature: Evaluator management
     Given the code evaluator drawer
     Then the outputs are shown as the fixed evaluator result fields
     And there is no control to add or remove output fields
+
+  @integration
+  Scenario: A code evaluator attachment gates and removes itself
+    Given the code evaluator drawer open on a suite attachment
+    When the Required to pass switch is flipped
+    Then the attachment's required flag changes
+    When Remove evaluator is chosen
+    Then the attachment is removed
 
   # A function returns any subset of the contract; whichever it returns become
   # the result, so an evaluator that returns only passed does not fail.

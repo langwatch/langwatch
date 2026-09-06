@@ -1,0 +1,54 @@
+---
+title: Langy Limits
+description: Reference table of Langy's operational limits, which are fixed in code, and which you configure through environment variables when self-hosting.
+sidebarTitle: Limits
+keywords: langy limits, langy rate limit, langy max workers, langy pull requests per day
+---
+
+The table lists each limit's current value; the **Kind** column marks which ones you can change. The sections below explain what happens when you hit each limit and, where possible, how to raise it.
+
+## Limits
+
+| Limit | Value | Kind | Set by |
+|---|---|---|---|
+| GitHub pull requests per day | 20 | Hardcoded | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var) |
+| Max concurrent workers | 20 (default) | Configurable | `LANGY_MAX_WORKERS` |
+| Idle worker reap | 10 minutes (600000 ms default) | Configurable | `LANGY_WORKER_IDLE_MS` |
+| Per-session LangWatch API key lifetime | Short-lived, auto-expiring | Fixed by design | Minted per chat, owned by the requesting user |
+| GitHub installation token lifetime | 1 hour | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
+
+## What each limit means
+
+### GitHub pull requests per day
+
+Langy opens at most 20 pull requests per project per day. The count is a code constant (`LANGY_GITHUB_PRS_PER_DAY = 20`), so it is the same on every install and you cannot raise it with an environment variable. When the cap is hit, Langy stops the turn before it opens another PR. See [Pull requests](/langy/pull-requests).
+
+### Max concurrent workers
+
+Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how many workers run at once; the default is 20. Past the cap the agent returns 503 rather than spawning another worker. Raise it by giving the agent pod more resources and increasing the value. See [Self-hosting overview](/self-hosting/langy/overview).
+
+### Idle worker reap
+
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so nothing sensitive stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+
+### Per-session LangWatch API key
+
+Each chat mints its own LangWatch API key, owned by the requesting user, project-scoped, clamped to the intersection of the Langy permission set and that user's own permissions, and short-lived. It auto-expires; a worker exit revokes it early. A Langy tool call can never exceed what that user could do by hand. See [Data flow and privacy](/langy/security/data-flow-and-privacy).
+
+### GitHub installation token
+
+Langy mints a fresh 1-hour GitHub App installation token per turn, hands it to the worker as an environment variable only, and never stores it at rest. The token carries only `contents:write` and `pull_requests:write`, scoped to the installation's repositories. See [GitHub access](/langy/security/github-access).
+
+<Note>
+Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full environment-variable reference, see [Environment variables](/self-hosting/langy/environment-variables).
+</Note>
+
+<Info>
+**Also check:** [Environment variables](/self-hosting/langy/environment-variables), [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
+</Info>
+
+## Reference
+
+- [Environment variables](/self-hosting/langy/environment-variables)
+- [Supported models](/langy/reference/supported-models)
+- [Troubleshooting](/langy/reference/troubleshooting)

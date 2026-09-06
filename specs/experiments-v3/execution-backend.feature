@@ -224,7 +224,7 @@ Feature: Evaluation execution - Backend
   Scenario: Abort saves partial results
     Given 5 cells completed before abort
     When abort is processed
-    Then the 5 completed results are saved to Elasticsearch
+    Then the 5 completed results are persisted and visible in the run history
     And stopped_at timestamp is set
 
   # A cell blocked waiting on a slow model must not keep running until that
@@ -381,3 +381,26 @@ Feature: Evaluation execution - Backend
     When I load execution data
     Then the loaded data includes the evaluator configuration
     And the evaluator settings are available for workflow building
+
+  # ==========================================================================
+  # Verdict Identity - one score per target, per evaluator, per row
+  # ==========================================================================
+
+  # Every evaluator runs against every target, so two columns produce a verdict
+  # for the same evaluator on the same row. Those two verdicts are different
+  # facts and both have to survive. When the stored identity of a verdict left
+  # the target out, the second column's score was dropped on its way to storage
+  # and the results page showed that column with outputs and cost but no score.
+
+  @unit
+  Scenario: Two columns keep their own score for the same evaluator and row
+    Given a run with two targets scored by the same evaluator
+    When both targets produce a verdict for the same row
+    Then each target keeps its own verdict
+    And neither verdict replaces the other
+
+  @unit
+  Scenario: The same verdict sent twice is still stored once
+    Given a target that produced a verdict for one evaluator and one row
+    When the same verdict is recorded a second time
+    Then only one verdict is stored for that target, evaluator and row

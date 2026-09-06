@@ -93,6 +93,43 @@ Feature: Scenario Execution
     And I can optionally remember my choice
 
   # ============================================================================
+  # Turn Config Threading (ADR-015)
+  # ============================================================================
+
+  @integration
+  Scenario: Run with maxTurns limits conversation length
+    Given scenario "Refund Flow" exists with maxTurns = 5
+    When the scenario is executed
+    Then the scenario executes with a maximum of 5 turns
+
+  @integration
+  Scenario: Run with minTurns guarantees minimum conversation length
+    Given scenario "Refund Flow" exists with minTurns = 3
+    When the scenario is executed
+    Then the scenario executes with at least 3 turns before the judge can end it
+
+  @integration
+  Scenario: Run with both turn fields applies both constraints
+    Given scenario "Refund Flow" exists with maxTurns = 5 and minTurns = 2
+    When the scenario is executed
+    Then the scenario executes with at least 2 turns
+    And the scenario executes with at most 5 turns
+
+  @integration
+  Scenario: Run with no turn config uses SDK defaults
+    Given scenario "Refund Flow" exists with no turn config
+    When the scenario is executed
+    Then the scenario executes with the SDK default turn limit
+
+  @integration
+  Scenario: In-flight job without turn config still parses
+    Given a job was queued before the turn config deploy
+    And the job payload has no maxTurns or minTurns fields
+    When the child process parses the job data
+    Then parsing succeeds
+    And the scenario runs with SDK defaults
+
+  # ============================================================================
   # Error Handling - Model Provider Configuration
   # ============================================================================
 

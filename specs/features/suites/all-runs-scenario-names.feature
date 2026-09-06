@@ -12,15 +12,8 @@ Feature: All Runs rows display scenario names
     - Long individual names are truncated via CSS (text-overflow: ellipsis)
     - Pass rate percentage and status icon are right-aligned (layout concern, not tested)
 
-  # Parity status: 0 of 5 scenarios bound to existing tests.
-  # Remaining @unimplemented scenarios (#3458):
-  #   5 NO_TEST: shipped behavior, no integration test yet
-  # NO_TEST gaps:
-  #   - "Run row displays scenario names in the collapsed header"
-  #   - "Run row displays single scenario name without separator"
-  #   - "Run row truncates long scenario name lists"
-  #   - "Extracts unique sorted scenario names from batch run data"
-  #   - "Falls back to scenario ID when name is null or undefined"
+  # Parity status: 2 of 5 scenarios bound to existing tests.
+  # 3 @unimplemented remaining (#3458): integration display tests requiring React harness.
 
   Background:
     Given a batch run with scenario runs
@@ -43,13 +36,13 @@ Feature: All Runs rows display scenario names
     When the run row is rendered in collapsed state
     Then the row header displays "Alpha, Beta, Delta +2 more"
 
-  @unit @unimplemented
+  @unit
   Scenario: Extracts unique sorted scenario names from batch run data
     Given scenario runs with names ["Login Flow", "Checkout Flow", "Login Flow"]
     When unique scenario names are extracted
     Then the result is ["Checkout Flow", "Login Flow"]
 
-  @unit @unimplemented
+  @unit
   Scenario: Falls back to scenario ID when name is null or undefined
     Given a scenario run with name null and scenarioId "scenario-abc"
     When the scenario display name is resolved
