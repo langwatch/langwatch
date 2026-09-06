@@ -110,3 +110,31 @@ Rule: Emitted label values are clickable filters
     Given an evaluator drilldown whose aggregates include emitted label values
     Then each label value renders as a clickable row with its count
     And picking a label adds an evaluatorLabel filter scoped to that evaluator
+
+Rule: The Evaluator Verdict facet reads like the drilldown
+  The standalone Evaluator Verdict section sits directly above the evaluator
+  drilldown, showing the same words — Pass, Fail, Error. It had no colour or
+  order rules of its own, so it fell through to the generic string hash and
+  the generic count sort: the verdicts drew arbitrary palette slots, and Fail
+  sat above Pass whenever failures happened to outnumber passes. Two rows
+  swapping places between projects, in colours that disagreed with the panel
+  underneath them.
+
+  @unit
+  Scenario: Verdicts carry the drilldown's traffic light
+    Given the Evaluator Verdict facet
+    Then pass renders green, fail renders red and error renders yellow
+    And skipped and unknown stay neutral grey
+    And the palette renders at full strength rather than dimmed
+
+  @unit
+  Scenario: Verdicts read pass, fail, error regardless of counts
+    Given evaluator verdict values arriving in count order with fail ahead of pass
+    Then the section lists pass, then fail, then error
+    And verdicts outside that order trail behind in the order they arrived
+
+  @unit
+  Scenario: Ordering the facet does not invent verdict rows
+    Given a project whose evaluators have only ever emitted pass and fail
+    Then the section lists only pass and fail
+    And no zero-count error row is added to an already dense section

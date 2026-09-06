@@ -29,6 +29,7 @@ import {
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
+  FACET_VALUE_ORDER,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
@@ -656,7 +657,13 @@ function buildDiscreteFacetItems(
   }));
 }
 
-function buildFacetItems(
+/**
+ * Exported for direct unit coverage. This is where a facet's curated colour
+ * and order rules actually reach the rows — `FACET_COLORS` being correct
+ * proves nothing if `dotColorFor` stops consulting it, and that wiring is
+ * otherwise only observable through the whole sidebar.
+ */
+export function buildFacetItems(
   cat: CategoricalSection,
   synthetic: boolean,
 ): FacetItem[] {
@@ -683,6 +690,7 @@ function buildFacetItems(
   );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
+    order: FACET_VALUE_ORDER[cat.key],
     fallback: cat.topValues.map((v) => v.value),
     keys: [...counts.keys()],
   });
@@ -702,16 +710,34 @@ function buildFacetItems(
   }));
 }
 
-function orderValues({
+/**
+ * Exported for direct unit coverage: the ordering rule (rank what is present,
+ * seed nothing) is invisible from the rendered sidebar, which sorts by count
+ * often enough to look right by accident.
+ */
+export function orderValues({
   defaults,
+  order,
   fallback,
   keys,
 }: {
   defaults: string[] | undefined;
+  order: readonly string[] | undefined;
   fallback: string[];
   keys: string[];
 }): string[] {
-  if (!defaults) return fallback;
-  const defaultSet = new Set(defaults);
-  return [...defaults, ...keys.filter((v) => !defaultSet.has(v))];
+  const base = defaults
+    ? [...defaults, ...keys.filter((v) => !new Set(defaults).has(v))]
+    : fallback;
+  if (!order) return base;
+  // Rank-sort rather than prepend: `defaults` may introduce values, `order`
+  // must not — a facet can be given a reading order without also being given
+  // rows for values it has never seen. Sort is stable, so anything outside
+  // the ranked list keeps the count-sorted position it arrived with.
+  const rank = new Map(order.map((value, i) => [value, i]));
+  return [...base].sort(
+    (a, b) =>
+      (rank.get(a) ?? Number.POSITIVE_INFINITY) -
+      (rank.get(b) ?? Number.POSITIVE_INFINITY),
+  );
 }

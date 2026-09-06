@@ -149,12 +149,25 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   conversation: [],
   errorMessage: [],
   evaluator: [],
-  // Fixed traffic-light order, matching the evaluator drilldown's
-  // Passed / Failed / Errored rows. Left to the count-sorted fallback, the
-  // section listed Fail above Pass whenever failures happened to outnumber
-  // passes — the same two rows swapping places between projects, for no
-  // reason a reader could see. `skipped` / `unknown` trail behind and only
-  // appear once they have traces.
+};
+
+/**
+ * Display order for facets whose values have an inherent sequence, applied
+ * on top of the default count-sort. Deliberately NOT `FACET_DEFAULTS`: that
+ * map SEEDS values (it feeds `synthesizeDefaultDescriptors`, and its entries
+ * render as zero-count rows), so ordering a facet through it would also
+ * conjure rows for verdicts the project has never emitted — extra furniture
+ * in a section that is already dense. Ordering ranks what is present and
+ * introduces nothing.
+ *
+ * Evaluator Verdict is the only member today: left to count-sorting, Fail
+ * sat above Pass whenever failures outnumbered passes, so the same two rows
+ * swapped places between projects for no reason a reader could see. The
+ * order here is the drilldown's Passed / Failed / Errored, so the two
+ * surfaces read the same way down as well as in colour. Values outside the
+ * list (`skipped`, `unknown`) keep their count-sorted position behind these.
+ */
+export const FACET_VALUE_ORDER: Record<string, readonly string[]> = {
   evaluatorVerdict: ["pass", "fail", "error"],
 };
 
