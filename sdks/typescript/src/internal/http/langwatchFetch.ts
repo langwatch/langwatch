@@ -32,8 +32,18 @@ const FOLLOWING_METHODS = new Set(["GET", "HEAD"]);
 /** The most redirects a GET or HEAD follows before the next one is refused. */
 export const MAX_FOLLOW_HOPS = 5;
 
-/** Headers dropped when a GET or HEAD hop leaves the origin. */
-const CREDENTIAL_HEADERS = ["authorization", "x-auth-token", "x-project-id"];
+/**
+ * Headers dropped when a GET or HEAD hop leaves the origin: the three the Fetch
+ * standard strips on a cross-origin redirect, plus the names LangWatch keys on.
+ */
+const CREDENTIAL_HEADERS = [
+  "authorization",
+  "cookie",
+  "proxy-authorization",
+  "x-api-key",
+  "x-auth-token",
+  "x-project-id",
+];
 
 export class LangWatchRedirectError extends Error {
   readonly url: string;
@@ -184,6 +194,102 @@ const refusalOf = ({
   });
 
 /**
+ * What `fetch(input, init)` would send, as one request both sends read from.
+ * `init` wins over a `Request` input field by field, so reading the raw input
+ * for the replay would resend a method, headers or body the caller overrode.
+ * A plain URL input stays null: the non-Request path keeps `init` as it is, so
+ * a stream body reaches the transport untouched.
+ */
+const effectiveRequest = ({
+  input,
+  init,
+}: {
+  input: RequestInfo | URL;
+  init: RequestInit | undefined;
+}): Request | null =>
+  typeof Request !== "undefined" && input instanceof Request
+    ? new Request(input, { ...init, redirect: "manual" })
+    : null;
+
+interface Hop {
+  send: LangWatchFetch;
+  log: Logger;
+  effective: Request | null;
+  init: RequestInit | undefined;
+  url: string;
+  first: Response;
+}
+
+/** The GET and HEAD rule: follow with the same method, up to MAX_FOLLOW_HOPS. */
+const follow = async ({
+  send,
+  log,
+  effective,
+  init,
+  url,
+  method,
+  first,
+}: Hop & { method: string }): Promise<Response> => {
+  let headers = new Headers(effective?.headers ?? init?.headers);
+  const signal = effective?.signal ?? init?.signal;
+  let current = url;
+  let response = first;
+
+  for (let hop = 0; hop < MAX_FOLLOW_HOPS; hop++) {
+    const location = response.headers.get("location");
+    const target = location === null ? null : followTarget({ url: current, location });
+    if (target === null) throw refusalOf({ url: current, response });
+
+    const from = new URL(current);
+    const to = new URL(target);
+    if (!keepsCredentials({ from, to })) headers = withoutCredentials(headers);
+    if (isSchemeUpgrade({ from, to })) warnOnce({ url: current, logger: log });
+
+    current = target;
+    response = effective
+      ? await send(new Request(target, { method, headers, signal, redirect: "manual" }))
+      : await send(target, { ...init, method, headers, body: undefined, redirect: "manual" });
+    if (!isRedirect(response)) return response;
+  }
+
+  throw refusalOf({ url: current, response });
+};
+
+/** The rule for every other method: one hop, and only an https upgrade of the same URL. */
+const upgrade = async ({
+  send,
+  log,
+  effective,
+  init,
+  url,
+  first,
+  spare,
+}: Hop & { spare: Request | null }): Promise<Response> => {
+  const location = first.headers.get("location");
+  const refused = refusalOf({ url, response: first });
+  if (location === null || first.status === 303) throw refused;
+  const target = schemeUpgradeTarget({ url, location });
+  if (target === null || isStream(init?.body)) throw refused;
+
+  warnOnce({ url, logger: log });
+
+  const second = effective
+    ? await send(
+        new Request(target, {
+          method: effective.method,
+          headers: effective.headers,
+          body: spare ? await spare.arrayBuffer() : null,
+          signal: effective.signal,
+          redirect: "manual",
+        }),
+      )
+    : await send(target, { ...init, redirect: "manual" });
+  if (!isRedirect(second)) return second;
+
+  throw refusalOf({ url: target, response: second });
+};
+
+/**
  * Builds a `fetch` that applies the redirect rule. Pass `fetch` to send through
  * another transport (a test double, a proxying client) and `logger` to route
  * the http endpoint warning.
@@ -196,91 +302,9 @@ export const createLangWatchFetch = ({
     fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   const log = logger ?? new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
 
-  /** The GET and HEAD rule: follow with the same method, up to MAX_FOLLOW_HOPS. */
-  const follow = async ({
-    effective,
-    init,
-    url,
-    method,
-    first,
-  }: {
-    effective: Request | null;
-    init: RequestInit | undefined;
-    url: string;
-    method: string;
-    first: Response;
-  }): Promise<Response> => {
-    let headers = new Headers(effective?.headers ?? init?.headers);
-    const signal = effective?.signal ?? init?.signal;
-    let current = url;
-    let response = first;
-
-    for (let hop = 0; hop < MAX_FOLLOW_HOPS; hop++) {
-      const location = response.headers.get("location");
-      const target = location === null ? null : followTarget({ url: current, location });
-      if (target === null) throw refusalOf({ url: current, response });
-
-      const from = new URL(current);
-      const to = new URL(target);
-      if (!keepsCredentials({ from, to })) headers = withoutCredentials(headers);
-      if (isSchemeUpgrade({ from, to })) warnOnce({ url: current, logger: log });
-
-      current = target;
-      response = effective
-        ? await send(new Request(target, { method, headers, signal, redirect: "manual" }))
-        : await send(target, { ...init, method, headers, body: undefined, redirect: "manual" });
-      if (!isRedirect(response)) return response;
-    }
-
-    throw refusalOf({ url: current, response });
-  };
-
-  /** The rule for every other method: one hop, and only an https upgrade of the same URL. */
-  const upgrade = async ({
-    effective,
-    init,
-    url,
-    first,
-    spare,
-  }: {
-    effective: Request | null;
-    init: RequestInit | undefined;
-    url: string;
-    first: Response;
-    spare: Request | null;
-  }): Promise<Response> => {
-    const location = first.headers.get("location");
-    const refused = refusalOf({ url, response: first });
-    if (location === null || first.status === 303) throw refused;
-    const target = schemeUpgradeTarget({ url, location });
-    if (target === null || isStream(init?.body)) throw refused;
-
-    warnOnce({ url, logger: log });
-
-    const second = effective
-      ? await send(
-          new Request(target, {
-            method: effective.method,
-            headers: effective.headers,
-            body: spare ? await spare.arrayBuffer() : null,
-            signal: effective.signal,
-            redirect: "manual",
-          }),
-        )
-      : await send(target, { ...init, redirect: "manual" });
-    if (!isRedirect(second)) return second;
-
-    throw refusalOf({ url: target, response: second });
-  };
-
   return async (input, init) => {
-    const isRequest = typeof Request !== "undefined" && input instanceof Request;
     const url = requestUrl(input);
-    // What `fetch(input, init)` would send: `init` wins over the Request field
-    // by field, so both sends read the same method, headers and body.
-    const effective = isRequest
-      ? new Request(input, { ...init, redirect: "manual" })
-      : null;
+    const effective = effectiveRequest({ input, init });
     const method = (effective?.method ?? init?.method ?? "GET").toUpperCase();
     // A Request carries its body as a stream that one send consumes, so a copy
     // is taken before the first send and read only if the replay happens.
@@ -291,10 +315,10 @@ export const createLangWatchFetch = ({
       : await send(input, { ...init, redirect: "manual" });
     if (!isRedirect(first)) return first;
 
-    if (FOLLOWING_METHODS.has(method)) {
-      return follow({ effective, init, url, method, first });
-    }
-    return upgrade({ effective, init, url, first, spare });
+    const hop = { send, log, effective, init, url, first };
+    return FOLLOWING_METHODS.has(method)
+      ? follow({ ...hop, method })
+      : upgrade({ ...hop, spare });
   };
 };
 

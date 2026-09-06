@@ -342,6 +342,28 @@ def test_get_drops_credentials_on_another_host(caplog: pytest.LogCaptureFixture)
 
 
 # @scenario "a GET drops credential headers on a cross origin redirect"
+def test_get_drops_cookie_proxy_auth_and_api_key_on_another_host():
+    handler, seen = scripted(redirect(302, OTHER_HOST), httpx.Response(200))
+
+    with sync_client(handler) as client:
+        client.get(
+            HTTPS_URL,
+            headers={
+                **CREDENTIALS,
+                "Cookie": "session=secret",
+                "Proxy-Authorization": "Basic c2VjcmV0",
+                "X-Api-Key": "sk-lw-test",
+            },
+        )
+
+    second = seen[1]
+    assert "cookie" not in second.headers
+    assert "proxy-authorization" not in second.headers
+    assert "x-api-key" not in second.headers
+    assert second.headers["x-trace"] == "abc"
+
+
+# @scenario "a GET drops credential headers on a cross origin redirect"
 def test_get_drops_credentials_on_another_port():
     handler, seen = scripted(
         redirect(302, "https://langwatch.test:8443/api/v1/things?page=2"),

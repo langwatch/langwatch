@@ -38,8 +38,16 @@ UPGRADE_STATUSES = frozenset({301, 302, 307, 308})
 FOLLOWING_METHODS = frozenset({"GET", "HEAD"})
 # The most redirects a GET or HEAD follows before the next one is refused.
 MAX_FOLLOW_HOPS = 5
-# Headers dropped when a GET or HEAD hop leaves the origin.
-CREDENTIAL_HEADERS = ("authorization", "x-auth-token", "x-project-id")
+# Headers dropped when a GET or HEAD hop leaves the origin: the three the Fetch
+# standard strips on a cross-origin redirect, plus the names LangWatch keys on.
+CREDENTIAL_HEADERS = (
+    "authorization",
+    "cookie",
+    "proxy-authorization",
+    "x-api-key",
+    "x-auth-token",
+    "x-project-id",
+)
 
 _SCHEME_DEFAULT_PORTS = {"http": 80, "https": 443}
 

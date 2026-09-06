@@ -350,6 +350,27 @@ describe("langwatchFetch", () => {
     });
 
     /** @scenario a GET drops credential headers on a cross origin redirect */
+    it("drops Cookie, Proxy-Authorization and X-Api-Key on a hop to another host too", async () => {
+      const { fetchImpl, calls } = scripted(redirect({ status: 302, location: OTHER_HOST }), ok());
+      const fetchLangWatch = createLangWatchFetch({ fetch: fetchImpl, logger: silentLogger() });
+
+      await fetchLangWatch(HTTPS_URL, {
+        headers: {
+          ...CREDENTIALS,
+          Cookie: "session=secret",
+          "Proxy-Authorization": "Basic c2VjcmV0",
+          "X-Api-Key": "sk-lw-secret",
+        },
+      });
+
+      const hop = headersOf(calls[1]!);
+      expect(hop.get("cookie")).toBeNull();
+      expect(hop.get("proxy-authorization")).toBeNull();
+      expect(hop.get("x-api-key")).toBeNull();
+      expect(hop.get("accept")).toBe("application/json");
+    });
+
+    /** @scenario a GET drops credential headers on a cross origin redirect */
     it("drops credential headers on a hop to another port of the same host", async () => {
       const { fetchImpl, calls } = scripted(
         redirect({ status: 302, location: "https://app.langwatch.ai:8443/api/traces/search?limit=1" }),

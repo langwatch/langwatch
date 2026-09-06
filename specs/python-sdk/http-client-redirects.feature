@@ -10,10 +10,11 @@ Feature: Python SDK HTTP client redirects
     A GET or HEAD follows a 301, 302, 303, 307 or 308 with the same method,
     up to five hops. A hop that keeps the origin, or only upgrades http to
     https on the same host and port, keeps every header; any other hop drops
-    Authorization, X-Auth-Token and X-Project-Id first. A hop from https to
-    http is refused. Every other method follows exactly one redirect: a 301,
-    302, 307 or 308 whose Location is the same URL with the scheme changed
-    from http to https. Same host, same port (an absent port is the scheme
+    Authorization, Cookie, Proxy-Authorization, X-Api-Key, X-Auth-Token and
+    X-Project-Id first. A hop from https to http is refused. Every other
+    method follows exactly one redirect: a 301, 302, 307 or 308 whose
+    Location is the same URL with the scheme changed from http to https.
+    Same host, same port (an absent port is the scheme
     default), same path, same query; the fragment is ignored. The replay
     keeps the method, the headers and the body bytes. Every refused redirect
     raises `RedirectRefusedError`, which carries the request URL, the
