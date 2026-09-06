@@ -40,7 +40,7 @@ const GATEWAY_CRITERIA = [
   `Langy says, word for word: "${GUIDED_LINES.gatewayLive}"`,
   "Langy prints an environment snippet in a code block that sets the OpenAI base URL to the gateway and the API key to the production-app key.",
   `Langy ends with, word for word: "${GUIDED_LINES.gatewayClose}"`,
-  "Langy asks the user nothing.",
+  "Langy asks the user no question and hands over no step; the closing line's offer to help is the copy, not a question.",
   ...GUIDED_TONE_CRITERIA,
 ];
 
