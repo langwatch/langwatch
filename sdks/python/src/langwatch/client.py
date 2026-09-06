@@ -1,4 +1,3 @@
-import asyncio
 import atexit
 import os
 import logging
@@ -8,8 +7,6 @@ from typing import List, Optional, Sequence, ClassVar
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
-import httpx
-
 from langwatch.http_client import create_async_client, create_client
 from langwatch.state import DEFAULT_ENDPOINT, get_instance, normalize_endpoint
 from opentelemetry import trace
@@ -81,9 +78,6 @@ class Client(LangWatchClientProtocol):
     _exporter_attached_providers: ClassVar[set[int]] = set()
     _langwatch_processor: ClassVar[Optional["FilterableBatchSpanProcessor"]] = None
     _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
-    # Held so a reconfiguration can release the pools before replacing them.
-    _rest_httpx_client: ClassVar[Optional[httpx.Client]] = None
-    _rest_async_httpx_client: ClassVar[Optional[httpx.AsyncClient]] = None
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
     ] = {}
@@ -430,7 +424,6 @@ class Client(LangWatchClientProtocol):
         cls._is_dedicated_provider = False
         cls._exporter_attached_providers.clear()
         cls._langwatch_processor = None
-        cls._close_rest_httpx_clients()
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
@@ -789,46 +782,20 @@ class Client(LangWatchClientProtocol):
             headers=headers,
             raise_on_unexpected_status=True,
         )
-        Client._close_rest_httpx_clients()
         # The generated client would build plain httpx clients on first use;
         # these carry the shared redirect rule instead. Timeout stays unset,
         # the way the generated client leaves it.
-        sync_client = create_client(
-            base_url=Client._endpoint_url, headers=headers, timeout=None
+        rest_api_client.set_httpx_client(
+            create_client(base_url=Client._endpoint_url, headers=headers, timeout=None)
         )
-        async_client = create_async_client(
-            base_url=Client._endpoint_url, headers=headers, timeout=None
+        rest_api_client.set_async_httpx_client(
+            create_async_client(
+                base_url=Client._endpoint_url, headers=headers, timeout=None
+            )
         )
-        rest_api_client.set_httpx_client(sync_client)
-        rest_api_client.set_async_httpx_client(async_client)
-        Client._rest_httpx_client = sync_client
-        Client._rest_async_httpx_client = async_client
         Client._rest_api_client = rest_api_client
 
         return Client._rest_api_client
-
-    @staticmethod
-    def _close_rest_httpx_clients() -> None:
-        """Release the connection pools the previous REST clients held.
-
-        The sync client closes here. The async one needs an await, which this
-        synchronous method cannot give it, so it closes on a loop of its own
-        when none is running and is left to the caller's loop otherwise:
-        firing the coroutine at a running loop would leave it unobserved.
-        """
-        sync_client = Client._rest_httpx_client
-        Client._rest_httpx_client = None
-        if sync_client is not None and not sync_client.is_closed:
-            sync_client.close()
-
-        async_client = Client._rest_async_httpx_client
-        Client._rest_async_httpx_client = None
-        if async_client is None or async_client.is_closed:
-            return
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            asyncio.run(async_client.aclose())
 
 
 class ConditionalSpanExporter(SpanExporter):
