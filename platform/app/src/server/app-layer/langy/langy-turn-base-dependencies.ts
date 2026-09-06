@@ -19,10 +19,7 @@ const tracer = getLangWatchTracer("langwatch.langy.chat");
 export async function resolveLangyTurnBaseDependencies(args: {
   deps: Pick<
     LangyTurnServiceDeps,
-    | "conversations"
-    | "credentials"
-    | "resolveModel"
-    | "resolveDeleteGate"
+    "conversations" | "credentials" | "resolveModel" | "resolveDeleteGate"
   >;
   projectId: string;
   userId: string;

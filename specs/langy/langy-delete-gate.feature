@@ -488,11 +488,36 @@ Feature: Langy's worker-side delete gate
 
     @unit
     Scenario: Every enabled tool is classified as gated or exempt
-      Given the full ENABLED_TOOLS set: read, bash, edit, write, grep, find, ls, todowrite, skill
+      Given the full ENABLED_TOOLS set: read, bash, edit, write, grep, find, ls, todowrite,
+        skill, question, code_access, local_read, local_write, local_edit, local_bash,
+        local_grep, local_find, local_ls
       When each tool is checked against the gate
-      Then bash, write, and edit are routed through the gate
-      And read, grep, find, ls, todowrite, and skill are provably unable to reach a destructive LangWatch operation
+      Then bash, write, edit, local_bash, local_write, and local_edit are routed through the gate
+      And read, grep, find, ls, todowrite, skill, question, code_access, local_read,
+        local_grep, local_find, and local_ls are provably unable to reach a destructive
+        LangWatch operation
       And user_bash / emitUserBash is confirmed absent from ENABLED_TOOLS by grep
+
+    @unit
+    Scenario: A destructive command via local_bash is blocked without a confirmation
+      Given branch history contains zero user-authored assent
+      When a gated local_bash command deletes a LangWatch resource
+      Then the gate returns allow:false
+
+    @unit
+    Scenario: local_bash is released by the same bound confirmation that releases bash
+      Given a bound confirmation authorizes a destructive local_bash command's target
+      When the confirmed local_bash command is checked against the gate
+      Then the gate returns allow:true
+      And a local_bash command against a different, unconfirmed target is still blocked
+
+    @unit
+    Scenario: local_write/local_edit content carrying a destructive command is held
+      Given a local_write or local_edit tool call whose content contains a destructive
+        LangWatch command
+      And a valid confirmation is on record
+      When the gate evaluates the call
+      Then the gate returns allow:false
 
   Rule: The gate proves itself at the real pi tool_call seam, not only in unit isolation
 
@@ -603,7 +628,7 @@ Feature: Langy's worker-side delete gate
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)
 # AC 17: "Case-insensitive + new-verb classification is forced by canary" -> Scenario: A destructive verb matches regardless of case; Scenario: The verb canary red-fails on a catalog leaf verb classified as neither destructive nor reviewed-benign
-# AC 18: "Every model-reachable destructive path is gated or provably cannot be one" -> Scenario: Every enabled tool is classified as gated or exempt
+# AC 18: "Every model-reachable destructive path is gated or provably cannot be one" -> Scenario: Every enabled tool is classified as gated or exempt; Scenario: A destructive command via local_bash is blocked without a confirmation; Scenario: local_bash is released by the same bound confirmation that releases bash; Scenario: local_write/local_edit content carrying a destructive command is held
 # AC 19: "Real-seam use-proof across every bypass class" -> Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam; Scenario: A self-authored affirmative injected through the extension API does not confirm; Scenario: A correctly confirmed delete executes exactly once at the real seam
 # AC 20: "Fail-closed when history is unreadable" -> Scenario: An unreadable session history fails closed
 # AC 21: "SDK canary guards the undocumented contracts" -> Scenario: The SDK canary guards block-on-return, throw-blocks-execution, and role-persistence
