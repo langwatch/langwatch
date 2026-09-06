@@ -16,9 +16,9 @@ Feature: The run dialog
     the entry point asks for it, then the chip row.
 
     The chips are, in this order, "Add parameters", "Compare agents", "Add a
-    note", "Run against a prompt", "Custom simulation models" and "Run multiple
-    times". A chip adds one block to the form, and each added block can be
-    removed again. The chips are drawn flat, with a dashed border and no shadow.
+    note", "Run against a prompt", "Custom simulation models", "Run multiple
+    times" and "Add evaluators". A chip adds one block to the form, and each
+    added block can be removed again. The chips are drawn flat, with a dashed border and no shadow.
 
     A test suite is only a grouping and carries no run option. The run options
     of a run belong to the run plan its name resolves onto, so the next run

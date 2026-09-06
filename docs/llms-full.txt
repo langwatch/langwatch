@@ -38194,10 +38194,10 @@ An [evaluator](/agent-testing/evaluators) attached to the test suite or to the r
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. |
+| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, or no retrieved contexts. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
-| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+| `error` | The evaluator itself failed to run. The reason says why. |
 
 The run header shows a pill per evaluator: the pass rate for one with a verdict, the mean for one with a score. The verdict of a run is settled when the evaluators are in. A run whose evaluators all pass, or that has none, keeps the judge's verdict.
 
@@ -38217,7 +38217,7 @@ The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **
 
 | Status | Meaning | What to do |
 |---|---|---|
-| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read the reasoning in the **RESULTS** block, then the transcript. |
+| `completed` | The judge delivered a verdict and every evaluator is in. The verdict itself is `PASSED` or `FAILED`, and a failed required evaluator is what makes it `FAILED` even when the judge passed the run. | On a fail, read the reasoning in the **RESULTS** block and the evaluator rows, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
 | `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
