@@ -6,6 +6,10 @@ description: Use the Comparison evaluator to judge two or more candidate outputs
 
 **Comparison** is an evaluator that shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it is a tie. The result is a per-row verdict naming the winning candidate, a win-rate chart across the run, and, from three candidates upward, a Bradley-Terry leaderboard that ranks the candidates and states whether the run separates them.
 
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/pairwise-comparison.webm" type="video/webm" />
+</video>
+
 When you choose between two prompts, two models, or several agent configurations, absolute evaluator scores are hard to calibrate. A score of `0.78` does not tell you whether one variant is better than the others for your users. A relative question, "which of these outputs is best for this input?", is easier for a judge to answer and gives a more stable verdict.
 
 ## When to use it
