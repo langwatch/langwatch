@@ -14,13 +14,13 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { composeApiAutomationApp } from "../../app/api-automation.composition";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { composeApiAutomationApp } from "../../app/api-automation.composition.ts";
 import {
   createAutomationTrpcRouter,
   createEmailSuppressionTrpcRouter,
   type AutomationMountPorts,
-} from "./automation-trpc.mount";
+} from "./automation-trpc.mount.ts";
 
 /** The other services and deployment facts a trigger is read and written over. */
 export type AutomationPeers = Readonly<{
@@ -34,7 +34,7 @@ export type AutomationPeers = Readonly<{
   redis: RedisConnection | null;
 }>;
 
-import type { ComposedAutomationFeature } from "./automation.composition.types";
+import type { ComposedAutomationFeature } from "./automation.composition.types.ts";
 
 /** Composes both automation namespaces over this process's own graph. */
 export function composeAutomationFeature(options: {

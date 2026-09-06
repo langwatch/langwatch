@@ -9,11 +9,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port";
+import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port.ts";
 import {
   PulledUsagePricingService,
   type PulledUsagePriceInput,
-} from "../pulled-usage-pricing.service";
+} from "../pulled-usage-pricing.service.ts";
 
 const QUANTITIES = {
   tokensInput: 120_000,

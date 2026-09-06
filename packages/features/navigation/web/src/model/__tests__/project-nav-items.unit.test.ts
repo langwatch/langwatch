@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { projectNavItemAt, projectNavItems, toProjectRoutePattern } from "../project-nav-items";
+import { projectNavItemAt, projectNavItems, toProjectRoutePattern } from "../project-nav-items.ts";
 
 describe("given an address inside the reader's project", () => {
   describe("when the project home is on screen", () => {

@@ -28,20 +28,20 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { IsolatedErrorBoundary } from "../../isolated-error-boundary";
+import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { useViewStore } from "../../../../behavior/view.store";
-import { FacetManagerPopover } from "./facet-manager-popover";
-import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton";
-import { HoverHighlightStyle } from "./hover-highlight-style";
-import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data";
-import { SectionRenderer } from "./section-renderer";
-import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section";
-import { getFacetIcon } from "./utils";
+import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import { FacetManagerPopover } from "./facet-manager-popover.tsx";
+import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
+import { HoverHighlightStyle } from "./hover-highlight-style.tsx";
+import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data.ts";
+import { SectionRenderer } from "./section-renderer.tsx";
+import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";
+import { getFacetIcon } from "./utils.ts";
 
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 

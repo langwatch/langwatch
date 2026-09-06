@@ -3,7 +3,7 @@ import {
   GovernanceSubscriberDiagnosticsPort,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../../governance-subscriber.port";
+} from "../../governance-subscriber.port.ts";
 
 export class SilentSubscriberDiagnostics extends GovernanceSubscriberDiagnosticsPort {
   warn(): void {}

@@ -4,19 +4,19 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
 import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
-import type { NumericMode } from "../../../../behavior/numeric-mode.store";
-import { NONE_TOGGLE_VALUE } from "../../../../behavior/facet-constants";
-import { AttributesSection } from "./attributes-section";
-import { EvaluatorDrilldown } from "./evaluator-drilldown";
-import { EventDrilldown } from "./event-drilldown";
-import { FacetSection } from "./facet-section";
-import { RangeSection } from "./range-section";
+import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
+import { NONE_TOGGLE_VALUE } from "../../../../behavior/facet-constants.ts";
+import { AttributesSection } from "./attributes-section.tsx";
+import { EvaluatorDrilldown } from "./evaluator-drilldown.tsx";
+import { EventDrilldown } from "./event-drilldown.tsx";
+import { FacetSection } from "./facet-section.tsx";
+import { RangeSection } from "./range-section.tsx";
 import type {
   FacetItem,
   FacetValueState,
   Section,
-} from "../../../../behavior/explorer/filter-sidebar/types";
-import { getFacetIcon, getRangeFormatter } from "./utils";
+} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { getFacetIcon, getRangeFormatter } from "./utils.ts";
 
 interface SectionRendererProps {
   section: Section;

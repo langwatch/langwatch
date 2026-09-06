@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
-import { turnMediaForSide } from "../utils";
+import { turnMediaForSide } from "../utils.ts";
 
 const CALLER = "/api/files/project-1/caller";
 const REPLY = "/api/files/project-1/reply";

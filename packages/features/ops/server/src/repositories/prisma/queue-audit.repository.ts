@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import { QueueAuditSinkPort, type QueueControlAction } from "../../ports/queue-audit-sink.port";
+import { QueueAuditSinkPort, type QueueControlAction } from "../../ports/queue-audit-sink.port.ts";
 
 const auditMetadataSchema = z.record(z.string(), z.json());
 

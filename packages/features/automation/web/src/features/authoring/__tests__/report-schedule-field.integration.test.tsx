@@ -7,12 +7,12 @@ import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ReportScheduleField } from "../ui/elements/report-schedule-field";
+import { ReportScheduleField } from "../ui/elements/report-schedule-field.tsx";
 
 // The viewer's locale is non-deterministic across machines/CI, so pin the
 // browser timezone the "default to locale" behaviour reads.
-vi.mock("../model/report-schedule", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../model/report-schedule")>();
+vi.mock("../model/report-schedule.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../model/report-schedule.ts")>();
   return { ...actual, defaultTimezone: () => "Europe/Amsterdam" };
 });
 

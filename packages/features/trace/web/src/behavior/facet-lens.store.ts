@@ -4,7 +4,7 @@ import {
   type FacetPerspectiveId,
   isFacetPerspectiveId,
   sectionOrderForPerspective,
-} from "./facet-constants";
+} from "./facet-constants.ts";
 
 /**
  * Facet sidebar preferences modeled as a "lens" — section ordering plus explicit

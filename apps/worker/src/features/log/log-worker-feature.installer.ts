@@ -1,8 +1,8 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingPipeline } from "@langwatch/log-server";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Log's worker-facing capability after its server graph is composed. */
 export interface LogWorkerCapability {

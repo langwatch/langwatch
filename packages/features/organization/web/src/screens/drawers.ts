@@ -20,5 +20,5 @@
  * capability off that port.
  */
 
-export { CreateTeamDrawer } from "../ui/sections/create-team-drawer";
-export { InviteMemberDrawer } from "../ui/sections/invite-member-drawer";
+export { CreateTeamDrawer } from "../ui/sections/create-team-drawer.tsx";
+export { InviteMemberDrawer } from "../ui/sections/invite-member-drawer.tsx";

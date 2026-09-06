@@ -16,10 +16,10 @@
 
 import { HStack, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { PromptPlaygroundChatProvider } from "../../model/prompt-chat-sync-context";
-import { PromptPlaygroundMainContent } from "./playground-main-content";
-import { PromptConfigProvider } from "./prompt-config-provider";
-import { PromptPlaygroundSidebar } from "./sidebar/prompt-playground-sidebar";
+import { PromptPlaygroundChatProvider } from "../../model/prompt-chat-sync-context.tsx";
+import { PromptPlaygroundMainContent } from "./playground-main-content.tsx";
+import { PromptConfigProvider } from "./prompt-config-provider.tsx";
+import { PromptPlaygroundSidebar } from "./sidebar/prompt-playground-sidebar.tsx";
 
 export function PromptStudioScreen() {
   return (

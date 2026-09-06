@@ -16,11 +16,11 @@ import userEvent from "@testing-library/user-event";
 import type { UIMessage } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/use-langy-dev-mode", () => ({
+vi.mock("../../../../../behavior/use-langy-dev-mode.ts", () => ({
   useLangyDevMode: () => [false, vi.fn()],
 }));
 
-const { LangyToolActivity } = await import("../langy-tool-activity");
+const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
 
 const failedProbe = {
   type: "tool-bash",

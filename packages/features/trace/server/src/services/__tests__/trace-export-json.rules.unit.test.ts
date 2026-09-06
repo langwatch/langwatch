@@ -10,7 +10,7 @@ import type { Evaluation, LLMSpan, RAGSpan, Trace } from "@langwatch/trace-contr
 import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
-} from "../../rules/trace-export-json.rules";
+} from "../../rules/trace-export-json.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Test data builders

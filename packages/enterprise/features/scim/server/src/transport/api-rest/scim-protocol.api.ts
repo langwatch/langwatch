@@ -21,7 +21,7 @@ import {
   PATCH_USER,
   REPLACE_GROUP,
   REPLACE_USER,
-} from "./scim-openapi.api";
+} from "./scim-openapi.api.ts";
 import {
   ScimProtocolError,
   scimCreateGroupRequestSchema,

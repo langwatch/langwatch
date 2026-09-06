@@ -4,12 +4,12 @@ import {
   type EmailContent,
   type EmailProviderName,
   type MailerConfiguration,
-} from "../../ports/email-delivery.port";
-import { EmailDeliveryAdapter } from "../email-delivery.adapter";
-import { ResendEmailGatewayAdapter } from "../resend.email-gateway.adapter";
-import { SendgridEmailGatewayAdapter } from "../sendgrid.email-gateway.adapter";
-import { SesEmailGatewayAdapter } from "../ses.email-gateway.adapter";
-import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.adapter";
+} from "../../ports/email-delivery.port.ts";
+import { EmailDeliveryAdapter } from "../email-delivery.adapter.ts";
+import { ResendEmailGatewayAdapter } from "../resend.email-gateway.adapter.ts";
+import { SendgridEmailGatewayAdapter } from "../sendgrid.email-gateway.adapter.ts";
+import { SesEmailGatewayAdapter } from "../ses.email-gateway.adapter.ts";
+import { SmtpEmailGatewayAdapter } from "../smtp.email-gateway.adapter.ts";
 
 /**
  * Spec: packages/features/notification/specs/packaged-mail-delivery.feature

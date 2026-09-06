@@ -30,11 +30,11 @@ vi.mock("@aws-sdk/client-ses", () => {
   return { SESClient, SendEmailCommand, SendRawEmailCommand };
 });
 
-import { sendEmail as sendEmailWithMailer } from "../email-sender";
-import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime";
-import { MailerAdapter } from "../adapters/mailer.adapter";
-import type { SesAwsClientConfiguration } from "../providers/ses";
-import type { EmailContent } from "../providers/types";
+import { sendEmail as sendEmailWithMailer } from "../email-sender.ts";
+import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime.ts";
+import { MailerAdapter } from "../adapters/mailer.adapter.ts";
+import type { SesAwsClientConfiguration } from "../providers/ses.ts";
+import type { EmailContent } from "../providers/types.ts";
 
 /**
  * The AWS half, as this suite needs it: SES is the selected gateway, so the

@@ -1,14 +1,14 @@
 import { Skeleton } from "@chakra-ui/react";
 import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
-import { modelProviderIcons } from "../model-selection/model-provider-icons";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { useAllPromptsForProject } from "../../../behavior/use-all-prompts-for-project";
-import { computeInitialFormValuesForPrompt } from "../../../surfaces/prompt-form";
-import { promptApi } from "../../../behavior/prompt-api";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
-import { PublishedPromptContent } from "./published-prompt-content";
-import { Sidebar, SidebarEmptyState } from "../studio-internals";
+import { modelProviderIcons } from "../model-selection/model-provider-icons.tsx";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { useAllPromptsForProject } from "../../../behavior/use-all-prompts-for-project.ts";
+import { computeInitialFormValuesForPrompt } from "../../../surfaces/prompt-form/index.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { PublishedPromptContent } from "./published-prompt-content.tsx";
+import { Sidebar, SidebarEmptyState } from "../studio-internals.ts";
 
 /**
  * Displays a list of published prompts grouped by folder.

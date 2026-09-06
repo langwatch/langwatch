@@ -3,7 +3,7 @@
  * @see ../catalog/types.ts — what the fields mean
  */
 
-import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service";
+import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 
 /**
  * A dataset that *is* captured content end to end.

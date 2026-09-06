@@ -11,7 +11,7 @@ const { calls } = vi.hoisted(() => ({
   calls: { updateOrganization: vi.fn(), updateProject: vi.fn(), invalidate: vi.fn() },
 }));
 
-vi.mock("../../../behavior/project-api", () => {
+vi.mock("../../../behavior/project-api.ts", () => {
   const utils = {
     organization: { getAll: { invalidate: calls.invalidate } },
     governance: { resolveHome: { invalidate: calls.invalidate } },
@@ -50,8 +50,8 @@ vi.mock("@langwatch/organization-web/surfaces/department-picker", () => ({
   DepartmentPicker: () => null,
 }));
 
-import { anOrganization, aProject, FakeProjectHost, renderWithProjectHost } from "../../../testing";
-import ProjectSettingsScreen from "../project-settings.screen";
+import { anOrganization, aProject, FakeProjectHost, renderWithProjectHost } from "../../../testing.tsx";
+import ProjectSettingsScreen from "../project-settings.screen.tsx";
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);

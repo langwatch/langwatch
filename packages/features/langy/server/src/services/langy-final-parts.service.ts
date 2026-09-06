@@ -7,8 +7,8 @@ import {
   salvageLangyDerivedCard,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
-import { LangyCliEnvelopeService } from "./langy-cli-envelope.service";
-import type { LangyTurnSegment } from "./langy-turn-order.service";
+import { LangyCliEnvelopeService } from "./langy-cli-envelope.service.ts";
+import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 export type LangyBlockCounter = (reason: string) => void;
 

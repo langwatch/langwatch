@@ -1,7 +1,7 @@
 import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error";
 
-import type { ScenarioParameterValue } from "./scenario.parameters";
-import type { ScenarioContentField } from "./scenario-content-template";
+import type { ScenarioParameterValue } from "./scenario.parameters.ts";
+import type { ScenarioContentField } from "./scenario-content-template.ts";
 
 type ScenarioParameterErrorCode =
   | "scenario_parameter_missing"

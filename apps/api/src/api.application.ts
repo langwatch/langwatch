@@ -36,18 +36,18 @@ import {
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
 import { Hono, type Context } from "hono";
-import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features";
-import type { TopicApiFeature } from "./features/topic/topic-api.feature";
-import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
-import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
-import { apiClientAddress, apiSocketAddress } from "./app/api-client-address";
-import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter";
-import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy";
+import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features.ts";
+import type { TopicApiFeature } from "./features/topic/topic-api.feature.ts";
+import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle.ts";
+import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse.ts";
+import { apiClientAddress, apiSocketAddress } from "./app/api-client-address.ts";
+import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter.ts";
+import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy.ts";
 import type {
   ApiTrpcEnterpriseRequest,
   ApiTrpcFeatureApplication,
   ApiTrpcSession,
-} from "./app-trpc/app-trpc.context";
+} from "./app-trpc/app-trpc.context.ts";
 
 export type ApiActor = Readonly<{ id: string }>;
 

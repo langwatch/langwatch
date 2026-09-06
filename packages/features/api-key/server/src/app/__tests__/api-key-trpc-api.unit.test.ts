@@ -14,8 +14,8 @@ import {
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiKeyApp } from "../api-key.app";
-import { ApiKeyTrpcApi } from "../../transport/api-trpc/api-key.api";
+import { ApiKeyApp } from "../api-key.app.ts";
+import { ApiKeyTrpcApi } from "../../transport/api-trpc/api-key.api.ts";
 
 const USER_ID = "user_1";
 const ORG_ID = "org_1";

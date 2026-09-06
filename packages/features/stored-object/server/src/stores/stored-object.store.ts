@@ -4,7 +4,7 @@ import type {
   StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageAddress } from "../ports/stored-object.port";
+import type { StoredObjectStorageAddress } from "../ports/stored-object.port.ts";
 
 export type StoredObjectSource = "canonical" | "imported";
 

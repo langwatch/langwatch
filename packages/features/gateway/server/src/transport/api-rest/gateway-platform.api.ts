@@ -41,13 +41,13 @@ import {
   externalIdSchema,
   resourceMetadataSchema,
 } from "@langwatch/gateway-contract";
-import { GatewayBudgetDtoAdapter } from "../../adapters/gateway-budget-dto.adapter";
+import { GatewayBudgetDtoAdapter } from "../../adapters/gateway-budget-dto.adapter.ts";
 import {
   GatewayWirePaginationAdapter,
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
-} from "../../adapters/gateway-wire-pagination.adapter";
-import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port";
+} from "../../adapters/gateway-wire-pagination.adapter.ts";
+import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port.ts";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 

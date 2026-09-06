@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { UNLIMITED_PLAN } from "./license-constants";
-import type { PlanInfo } from "./license-plan";
+import { UNLIMITED_PLAN } from "./license-constants.ts";
+import type { PlanInfo } from "./license-plan.ts";
 
 /**
  * Raises a license-resolved plan so it is never more restrictive than the

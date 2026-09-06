@@ -18,7 +18,7 @@
  *
  * Shared by the sign-in and sign-up screens so the two cannot drift.
  */
-import { explainErrorCode } from "./error-presentation";
+import { explainErrorCode } from "./error-presentation.ts";
 
 const GENERIC = "Sign in did not go through. Please try again.";
 

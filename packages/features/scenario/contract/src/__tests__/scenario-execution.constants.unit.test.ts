@@ -13,7 +13,7 @@
  * @see specs/background/redis-cluster-compatibility.feature
  */
 import { describe, expect, it } from "vitest";
-import { SCENARIO_QUEUE } from "../scenario-execution.constants";
+import { SCENARIO_QUEUE } from "../scenario-execution.constants.ts";
 
 /**
  * A queue name is Redis Cluster compatible when it contains a hash tag:

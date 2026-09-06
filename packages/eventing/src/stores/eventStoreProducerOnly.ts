@@ -1,11 +1,11 @@
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event } from "../domain/types";
-import { ConfigurationError } from "../services/errorHandling";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event } from "../domain/types.ts";
+import { ConfigurationError } from "../services/errorHandling.ts";
 import type {
   EventStore,
   EventStoreEventReadInput,
   EventStoreReadContext,
-} from "./eventStore.types";
+} from "./eventStore.types.ts";
 
 /**
  * The event store of a process that only PRODUCES commands.

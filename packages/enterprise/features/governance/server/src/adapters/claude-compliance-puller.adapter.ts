@@ -19,9 +19,9 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
-import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.adapter";
-import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port";
+import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.adapter.ts";
+import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**

@@ -1,4 +1,4 @@
-import { resolveExperimentVerdictLabel } from "../experiment-comparison";
+import { resolveExperimentVerdictLabel } from "../experiment-comparison.ts";
 import {
   COMPARISON_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
@@ -6,7 +6,7 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type PairwiseEvaluatorConfig,
   type TargetConfig,
-} from "../experiment-workbench";
+} from "../experiment-workbench.ts";
 
 export { resolveExperimentVerdictLabel as resolveVerdictLabel };
 

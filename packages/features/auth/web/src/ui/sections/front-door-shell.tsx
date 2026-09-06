@@ -1,12 +1,12 @@
 /// <reference path="../../model/ambient.d.ts" />
 import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import "../elements/auth-front-door.css";
-import { CastleSnake } from "../elements/castle-snake";
-import { FrontDoorGround } from "./front-door-ground";
-import { FrontDoorValuePanel } from "../elements/front-door-value-panel";
-import { LogoHandoff } from "./logo-handoff";
+import { CastleSnake } from "../elements/castle-snake.tsx";
+import { FrontDoorGround } from "./front-door-ground.tsx";
+import { FrontDoorValuePanel } from "../elements/front-door-value-panel.tsx";
+import { LogoHandoff } from "./logo-handoff.tsx";
 
 /**
  * The ground the front door stands on.

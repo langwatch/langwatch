@@ -5,8 +5,8 @@ import {
   RoutingPolicyProviderScopeError,
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyRepository } from "../routing-policy.port";
-import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service";
+import { RoutingPolicyRepository } from "../routing-policy.port.ts";
+import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
 
 const policy: RoutingPolicy = {
   id: "policy",

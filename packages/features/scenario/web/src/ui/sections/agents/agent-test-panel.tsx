@@ -8,8 +8,8 @@ import { Play } from "lucide-react";
 import { useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { HandledErrorAlert } from "../../../behavior/errors";
-import { api } from "../../../behavior/scenario-api";
+import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { api } from "../../../behavior/scenario-api.ts";
 
 /** The message the panel sends when nothing else is typed. */
 export const AGENT_TEST_DEFAULT_MESSAGE = "ping";

@@ -4,9 +4,9 @@ import type {
   TriggerSummary,
   UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
-import { AutomationLoggerPort } from "../../../ports/automation-graph.port";
-import type { ReportScheduleTarget } from "../../trigger.repository";
-import { TriggerRepository } from "../../trigger.repository";
+import { AutomationLoggerPort } from "../../../ports/automation-graph.port.ts";
+import type { ReportScheduleTarget } from "../../trigger.repository.ts";
+import { TriggerRepository } from "../../trigger.repository.ts";
 
 const unavailable = (): Promise<never> => Promise.reject(new Error("unused test dependency"));
 

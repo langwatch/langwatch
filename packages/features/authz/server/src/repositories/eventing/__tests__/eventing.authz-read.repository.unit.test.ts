@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzDatabase } from "../../authz-read.repository";
-import { EventingAuthzReadRepository } from "../eventing.authz-read.repository";
+import type { AuthzDatabase } from "../../authz-read.repository.ts";
+import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
 
 /**
  * The grants-head adapter's contract with Prisma, the mirror of

@@ -1,8 +1,8 @@
-import { guardEnMasse } from "./mass-delete-guard";
-import type { GuardNext, GuardParams } from "./guard-middleware";
-import { guardProjectId } from "./multi-tenancy-guard";
-import { guardOrganizationId } from "./organization-guard";
-import { PrismaQueryGuard, type PrismaQueryContext, type PrismaQueryExecutor } from "./connection";
+import { guardEnMasse } from "./mass-delete-guard.ts";
+import type { GuardNext, GuardParams } from "./guard-middleware.ts";
+import { guardProjectId } from "./multi-tenancy-guard.ts";
+import { guardOrganizationId } from "./organization-guard.ts";
+import { PrismaQueryGuard, type PrismaQueryContext, type PrismaQueryExecutor } from "./connection.ts";
 
 /**
  * The tenancy policy every LangWatch process composes its client with.

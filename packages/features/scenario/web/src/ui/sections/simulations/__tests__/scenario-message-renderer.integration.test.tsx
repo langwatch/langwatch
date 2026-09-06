@@ -6,13 +6,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import { ScenarioMessageRenderer } from "../scenario-message-renderer";
+import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
 // RunTurnSeparator internally calls useOrganizationTeamProject() and
 // api.traces.getById.useQuery, neither of which is available in this jsdom
 // harness — mock the module so the renderer's grouping contract (one
 // separator per traced turn) is what these tests exercise.
-vi.mock("../run-turn-separator", () => ({
+vi.mock("../run-turn-separator.tsx", () => ({
   RunTurnSeparator: ({ index, traceId }: { index: number; traceId: string }) => (
     <div data-testid="run-turn-separator" data-trace-id={traceId}>
       Turn {index}

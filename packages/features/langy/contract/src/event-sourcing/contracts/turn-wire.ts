@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 
-import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants.ts";
 import {
   langyAgentResponseFailedEventDataSchema,
   langyAgentRespondedEventDataSchema,
@@ -16,7 +16,7 @@ import {
   langyToolCallSucceededEventDataSchema,
   langyUserWaitEndedEventDataSchema,
   langyUserWaitStartedEventDataSchema,
-} from "./langy.events";
+} from "./langy.events.ts";
 
 /** The `type` strings the turn fold consumes (routing/subscription filters). */
 export const LANGY_CONVERSATION_TURN_EVENT_TYPES = [

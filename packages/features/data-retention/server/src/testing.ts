@@ -1,5 +1,5 @@
-import { StorageMeterService } from "./services/storage-meter.service";
-import type { StorageMeterClickHouseResolver } from "./ports/storage-meter-clickhouse.port";
+import { StorageMeterService } from "./services/storage-meter.service.ts";
+import type { StorageMeterClickHouseResolver } from "./ports/storage-meter-clickhouse.port.ts";
 
 export type StorageMeterIntegrationBreakdown = {
   totalBytes: number;

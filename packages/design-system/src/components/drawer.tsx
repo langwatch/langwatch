@@ -1,6 +1,6 @@
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
-import { CloseButton } from "./close-button";
+import { CloseButton } from "./close-button.tsx";
 
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;

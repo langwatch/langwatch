@@ -4,7 +4,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import {
   ModelProviderProjectScopeService,
   type ModelProviderProjectSystemContext,
-} from "./model-provider-project-scope.service";
+} from "./model-provider-project-scope.service.ts";
 
 type ScopeReference = { id: string; name: string };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gatewayBudgetCheckInputSchema, gatewayBudgetCheckResultSchema } from "../index";
+import { gatewayBudgetCheckInputSchema, gatewayBudgetCheckResultSchema } from "../index.ts";
 
 describe("gateway contract", () => {
   it("requires request scope context at the boundary", () => {

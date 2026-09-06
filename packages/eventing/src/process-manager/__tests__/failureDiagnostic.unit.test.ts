@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toSafeFailureDiagnostic } from "../failureDiagnostic";
+import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 
 describe("toSafeFailureDiagnostic", () => {
   it.each([

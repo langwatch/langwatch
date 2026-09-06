@@ -24,9 +24,9 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
 import { Database } from "lucide-react";
 
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetHost } from "../../model/dataset-host";
-import { DatasetPickerList, type DatasetPickerSelection } from "../blocks/dataset-picker-list";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { DatasetPickerList, type DatasetPickerSelection } from "../blocks/dataset-picker-list.tsx";
 
 export type SelectDatasetDrawerProps = {
   open?: boolean;

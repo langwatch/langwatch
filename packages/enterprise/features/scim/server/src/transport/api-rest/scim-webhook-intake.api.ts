@@ -24,12 +24,12 @@ import {
   type ServiceContext,
 } from "@langwatch/api/rest";
 
-import { ScimWebhookApi } from "./scim-webhook.api";
+import { ScimWebhookApi } from "./scim-webhook.api.ts";
 import {
   SCIM_WEBHOOK_SIGNATURE_HEADER,
   SCIM_WEBHOOK_TOLERANCE_SECONDS,
   verifyScimWebhookSignature,
-} from "../../rules/scim-webhook-signature.rules";
+} from "../../rules/scim-webhook-signature.rules.ts";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
 
 /** Everything the intake reaches that the SCIM boundary does not own. */

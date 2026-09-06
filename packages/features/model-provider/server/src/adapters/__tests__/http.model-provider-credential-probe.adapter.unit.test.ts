@@ -4,11 +4,11 @@ import {
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ModelProviderEgressPort } from "../../ports/model-provider.port";
+import type { ModelProviderEgressPort } from "../../ports/model-provider.port.ts";
 import {
   HttpModelProviderCredentialProbeAdapter,
   ProviderUnreachableError,
-} from "../http.model-provider-credential-probe.adapter";
+} from "../http.model-provider-credential-probe.adapter.ts";
 
 // The probe goes out through the guarded egress port the composition root hands it, not
 // `global.fetch`, so that port is what these tests stand in for; mocking the global would leave the

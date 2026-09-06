@@ -8,8 +8,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createIntegrationsChecksTrpcRouter } from "./project-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createIntegrationsChecksTrpcRouter } from "./project-trpc.mount.ts";
 
 /**
  * Whether this project has run any simulation, for the checklist's own step. The evidence
@@ -44,7 +44,7 @@ export type ApiOnboardingCheckStatus = Readonly<{
   integrated: boolean;
 }>;
 
-import type { ComposedIntegrationsChecksFeature } from "./integrations-checks.composition.types";
+import type { ComposedIntegrationsChecksFeature } from "./integrations-checks.composition.types.ts";
 
 /** Composes the setup checklist over this process's own connection. */
 export function composeIntegrationsChecksFeature(options: {

@@ -8,8 +8,8 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { UsageMembershipPort } from "../../ports/usage-membership.port";
-import { MemberClassificationService } from "../../services/member-classification.service";
+import { UsageMembershipPort } from "../../ports/usage-membership.port.ts";
+import { MemberClassificationService } from "../../services/member-classification.service.ts";
 
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {

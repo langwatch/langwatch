@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-budget-change-dedupe.repository";
+import type { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-budget-change-dedupe.repository.ts";
 
 const logger = createLogger("langwatch:gateway:budget-change-event-dedupe");
 

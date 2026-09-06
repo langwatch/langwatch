@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cliAccessTokenKey, cliRefreshTokenKey, cliUserTokensIndexKey } from "../cli-session-keys";
+import { cliAccessTokenKey, cliRefreshTokenKey, cliUserTokensIndexKey } from "../cli-session-keys.ts";
 
 describe("CLI session keys", () => {
   it("keeps the existing Redis key protocol stable", () => {

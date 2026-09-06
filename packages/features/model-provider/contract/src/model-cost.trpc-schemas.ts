@@ -8,7 +8,7 @@
  * the contract, without this package having to own the predicate.
  */
 import { z } from "zod";
-import { modelProviderScopeTypeSchema } from "./model-provider";
+import { modelProviderScopeTypeSchema } from "./model-provider.ts";
 
 export const MODEL_COST_UNSAFE_REGEX_MESSAGE =
   "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)";

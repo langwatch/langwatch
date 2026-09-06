@@ -3,7 +3,7 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { describe, expect, it, vi } from "vitest";
-import { AutomationUseCaseStrip } from "../ui/elements/automation-use-case-strip";
+import { AutomationUseCaseStrip } from "../ui/elements/automation-use-case-strip.tsx";
 
 describe("AutomationUseCaseStrip", () => {
   it("opens alert cards with the existing graph and delivery prefills", () => {

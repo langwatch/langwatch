@@ -8,18 +8,18 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "demo", name: "Demo", apiKey: null },
     organization: { id: "org_1", name: "ACME" },
   }),
 }));
 
-vi.mock("../../../use-public-env", () => ({
+vi.mock("../../../use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { IS_SAAS: false, NODE_ENV: "test" } }),
 }));
 
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
 
@@ -29,7 +29,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => (
     selector({ askLangy: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     apiKey: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
     personalAccessToken: {
@@ -44,10 +44,10 @@ vi.mock("../../../../../behavior/trace-api", () => ({
 // The faded page chrome is the real SearchBar and Toolbar, which pull
 // the whole trace page behind them. The pane's own layout is what is
 // under test, so the chrome is stubbed out.
-vi.mock("../../search-bar/search-bar", () => ({ SearchBar: () => null }));
-vi.mock("../../toolbar/toolbar", () => ({ Toolbar: () => null }));
+vi.mock("../../search-bar/search-bar.tsx", () => ({ SearchBar: () => null }));
+vi.mock("../../toolbar/toolbar.tsx", () => ({ Toolbar: () => null }));
 
-vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       setShowSamplePreview: vi.fn(),
@@ -56,11 +56,11 @@ vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", ()
     }),
 }));
 
-vi.mock("../../onboarding/spotlights/spotlight-overlay", () => ({
+vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
   writeSpotlightFragment: vi.fn(),
 }));
 
-import { IntegratePane } from "../integrate-pane";
+import { IntegratePane } from "../integrate-pane.tsx";
 
 function renderPane() {
   return render(

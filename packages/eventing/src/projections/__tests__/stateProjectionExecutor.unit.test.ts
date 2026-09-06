@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
-} from "../stateProjection.types";
-import { compareCursors, orderEvents, StateProjectionExecutor } from "../stateProjectionExecutor";
+} from "../stateProjection.types.ts";
+import { compareCursors, orderEvents, StateProjectionExecutor } from "../stateProjectionExecutor.ts";
 
 interface CounterState {
   count: number;

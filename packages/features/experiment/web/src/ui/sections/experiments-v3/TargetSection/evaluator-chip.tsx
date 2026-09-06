@@ -19,10 +19,10 @@ import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
 } from "@langwatch/evaluator-web/surfaces/evaluation-results";
-import { parseLLMError } from "../../../../model/format-llm-error";
-import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants";
-import { useEvaluatorName } from "../../../../behavior/experiments-v3/use-evaluator-name";
-import type { EvaluatorConfig } from "../../../../model/experiments-v3/types";
+import { parseLLMError } from "../../../../model/format-llm-error.ts";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
+import { useEvaluatorName } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
+import type { EvaluatorConfig } from "../../../../model/experiments-v3/types.ts";
 
 // Pulsing animation for alert icon
 const pulseAnimation = keyframes`

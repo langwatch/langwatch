@@ -8,7 +8,7 @@ import {
   consumeDraftKeptOnSubFlowReturn,
   isHandingOverToSubFlow,
   keepDraftOnSubFlowReturn,
-} from "../behavior/sub-flow";
+} from "../behavior/sub-flow.ts";
 
 beforeEach(() => {
   consumeDraftKeptOnSubFlowReturn();

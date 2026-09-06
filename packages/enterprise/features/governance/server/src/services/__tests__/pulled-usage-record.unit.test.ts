@@ -11,9 +11,9 @@ import {
   type NormalizedPullEvent,
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
-import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service";
-import { PulledUsageRecordService } from "../pulled-usage-record.service";
+import { PulledUsageRatePort } from "../../ports/pulled-usage-rate.port.ts";
+import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 
 class FixedRatePort extends PulledUsageRatePort {
   rate(input: Parameters<PulledUsageRatePort["rate"]>[0]): {

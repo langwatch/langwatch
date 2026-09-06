@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { IngestionPullWorkerService } from "../ingestion-pull-worker.service";
+import { IngestionPullWorkerService } from "../ingestion-pull-worker.service.ts";
 
 // We re-import the mapping helper from the worker module's internals
 // via a small shim. Keeping the helper unexported keeps the worker

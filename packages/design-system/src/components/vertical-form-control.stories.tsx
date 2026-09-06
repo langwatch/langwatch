@@ -1,6 +1,6 @@
 import { Box, Input, Textarea } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { VerticalFormControl } from "./vertical-form-control";
+import { VerticalFormControl } from "./vertical-form-control.tsx";
 
 const meta = {
   title: "Components/Vertical form control",

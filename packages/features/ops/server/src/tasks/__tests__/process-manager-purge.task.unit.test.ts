@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PrismaProcessManagerPurgeRepository,
   type ProcessManagerPurgeDatabase,
-} from "../../repositories/prisma/prisma.process-manager-purge.repository";
-import { purgeProcessManagerTables } from "../process-manager-purge.task";
+} from "../../repositories/prisma/prisma.process-manager-purge.repository.ts";
+import { purgeProcessManagerTables } from "../process-manager-purge.task.ts";
 
 /**
  * A database double that answers the two counts and hands back one full batch

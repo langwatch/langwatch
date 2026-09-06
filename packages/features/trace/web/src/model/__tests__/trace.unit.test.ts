@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateOtelSpanId, generateOtelTraceId } from "../trace";
+import { generateOtelSpanId, generateOtelTraceId } from "../trace.ts";
 
 describe("generateOtelTraceId", () => {
   /** @scenario Generated trace id has the OpenTelemetry format */

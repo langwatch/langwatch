@@ -6,23 +6,23 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { traceContextChip } from "../../../../../behavior/langy-context-chips";
-import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document";
+import { traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
+import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
   type TraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link";
-import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target";
-import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state";
-import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data";
-import { LangySpaAnchor } from "../langy-spa-anchor";
-import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry";
+} from "../../../../../model/langy-trace-explorer-link.ts";
+import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target.tsx";
+import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state.tsx";
+import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
+import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
+import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,
   LangyCapabilityCard,
-} from "./langy-capability-card";
+} from "./langy-capability-card.tsx";
 
 /**
  * How many traces the card shows. Three is enough to recognise a pattern ("they

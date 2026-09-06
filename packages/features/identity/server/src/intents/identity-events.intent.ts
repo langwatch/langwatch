@@ -5,7 +5,7 @@ import {
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
-import type { IdentityEvent } from "../projections/identity-state.projection";
+import type { IdentityEvent } from "../projections/identity-state.projection.ts";
 
 /**
  * The ONE place an identity fact becomes a framework event: the guards

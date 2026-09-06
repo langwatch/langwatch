@@ -10,7 +10,7 @@ import {
   trainTestSplit,
   transpostRowsFirstToColumnsFirstWithoutId,
   tryToMapPreviousColumnsToNewColumns,
-} from "../model/studio-dataset.utils";
+} from "../model/studio-dataset.utils.ts";
 
 describe("studio dataset column/field type conversion", () => {
   describe("when a dataset column is typed image (URL)", () => {

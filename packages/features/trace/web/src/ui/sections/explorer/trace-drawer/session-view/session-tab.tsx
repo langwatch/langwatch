@@ -1,5 +1,5 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { api } from "../../../../../behavior/trace-api";
+import { api } from "../../../../../behavior/trace-api.ts";
 import { SessionView } from "@langwatch/coding-agent-web/surfaces/agent-traces";
 
 interface SessionTabProps {

@@ -1,7 +1,7 @@
 import type { PrismaPg } from "@prisma/adapter-pg";
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { PrismaConfigService } from "./config";
+import { PrismaConfigService } from "./config.ts";
 import {
   PrismaClientFactory,
   type PrismaClientFactoryInput,
@@ -10,17 +10,17 @@ import {
   PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
-} from "./connection";
-import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter";
-import type { PrismaClient } from "./generated/client";
+} from "./connection.ts";
+import { type PrismaDriverAdapter, PrismaDriverAdapterFactory } from "./driver-adapter.ts";
+import type { PrismaClient } from "./generated/client.ts";
 import {
   PrismaMigrationExecutor,
   type PrismaMigrationRequest,
   PrismaMigrationService,
-} from "./migration";
-import { PrismaReadinessService } from "./readiness";
-import { PrismaSeed, PrismaSeedService } from "./seed";
-import { PrismaShutdownService } from "./shutdown";
+} from "./migration.ts";
+import { PrismaReadinessService } from "./readiness.ts";
+import { PrismaSeed, PrismaSeedService } from "./seed.ts";
+import { PrismaShutdownService } from "./shutdown.ts";
 
 class RecordingGuard extends PrismaQueryGuard {
   readonly contexts: PrismaQueryContext[] = [];

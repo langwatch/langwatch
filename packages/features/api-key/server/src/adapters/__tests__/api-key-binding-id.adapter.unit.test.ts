@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiKeyBindingIdAdapter } from "../api-key-binding-id.adapter";
+import { ApiKeyBindingIdAdapter } from "../api-key-binding-id.adapter.ts";
 
 describe("ApiKeyBindingIdAdapter", () => {
   describe("when an API-key grant needs a binding identifier", () => {

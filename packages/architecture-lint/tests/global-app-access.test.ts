@@ -6,7 +6,7 @@ import {
   collectGlobalAppAccesses,
   formatGlobalAppAccessBaseline,
   lintGlobalAppAccess,
-} from "../src";
+} from "../src/index.ts";
 
 let root = "";
 

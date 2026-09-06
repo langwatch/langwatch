@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveCoalesceMaxBatch } from "../queueManager";
+import { resolveCoalesceMaxBatch } from "../queueManager.ts";
 
 describe("resolveCoalesceMaxBatch", () => {
   describe("given an entry with no coalescing bound", () => {

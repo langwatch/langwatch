@@ -9,11 +9,11 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
 
-import { workflowApi } from "../../model/workflow-api";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { workflowApi } from "../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { WorkflowCreateDialogHost } from "../../ui/sections/workflow-create-dialog-host";
-import { WorkflowListCard } from "../../ui/sections/workflow-list-card";
+import { WorkflowCreateDialogHost } from "../../ui/sections/workflow-create-dialog-host.tsx";
+import { WorkflowListCard } from "../../ui/sections/workflow-list-card.tsx";
 
 /** The grant the platform page asked for, unchanged. */
 export const WORKFLOWS_PAGE_PERMISSION = "workflows:view";

@@ -3,15 +3,15 @@ export type {
   BinaryPart,
   ContentPartVisitor,
   ContentSource,
-} from "./trace-content-part.types";
+} from "./trace-content-part.types.ts";
 
 export {
   inlineDataToMediaPart,
   isInlineDataCarrier,
   normalizeContentSource,
-} from "./trace-content-part.provider-source";
+} from "./trace-content-part.provider-source.ts";
 
-export { parseBase64DataUri } from "./trace-content-part.file-decoder";
+export { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 
-export { visitContentPart } from "./trace-content-part.dispatcher";
-export { visitContentPartAsync } from "./trace-content-part.async-dispatcher";
+export { visitContentPart } from "./trace-content-part.dispatcher.ts";
+export { visitContentPartAsync } from "./trace-content-part.async-dispatcher.ts";

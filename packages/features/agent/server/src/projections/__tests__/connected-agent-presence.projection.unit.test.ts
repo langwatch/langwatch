@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ConnectedAgentPresenceProjection,
   type AgentLastSeenWriter,
-} from "../connected-agent-presence.projection";
+} from "../connected-agent-presence.projection.ts";
 
 function repository(): AgentLastSeenWriter & { touchLastSeenAt: ReturnType<typeof vi.fn> } {
   return { touchLastSeenAt: vi.fn().mockResolvedValue(undefined) };

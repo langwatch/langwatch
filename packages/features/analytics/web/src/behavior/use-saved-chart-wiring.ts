@@ -14,11 +14,11 @@
 
 import { useCallback, useState } from "react";
 
-import { useAnalyticsHost } from "../model/analytics-host";
-import type { LangWatchQLParameterValue } from "../model/lwql-request-state";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
+import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
-import type { UseLangWatchQLQuery } from "./use-langwatch-ql-query";
-import { useSavedWorkbenchCharts } from "./use-saved-workbench-charts";
+import type { UseLangWatchQLQuery } from "./use-langwatch-ql-query.ts";
+import { useSavedWorkbenchCharts } from "./use-saved-workbench-charts.ts";
 
 export function useSavedChartWiring({
   projectId,

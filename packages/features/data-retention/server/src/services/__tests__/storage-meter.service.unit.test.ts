@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-import { StorageMeterService } from "../storage-meter.service";
+import { StorageMeterService } from "../storage-meter.service.ts";
 import type {
   StorageMeterClickHouseClient,
   StorageMeterQuery,
-} from "../../ports/storage-meter-clickhouse.port";
+} from "../../ports/storage-meter-clickhouse.port.ts";
 
 describe("StorageMeterService memory guard", () => {
   function makeService() {

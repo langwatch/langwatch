@@ -2,7 +2,7 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
+import { createTestService as createService } from "./test-service.ts";
 
 // Documentation contract (ADR 002 §2): the published spec carries EVERY dated
 // version of every documented endpoint, plus latest — so a pinned client sees

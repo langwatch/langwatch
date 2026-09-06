@@ -13,7 +13,7 @@
  * its neighbour.
  */
 
-import { readHandledError } from "../../../model/handled-error";
+import { readHandledError } from "../../../model/handled-error.ts";
 
 /** The option a select is currently on. "" is Never, "custom" is a date. */
 export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";

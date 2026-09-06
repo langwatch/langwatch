@@ -6,7 +6,7 @@ import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
 } from "@langwatch/metric-contract";
-import { RecordMetricDataPointCommand } from "../metric-processing.adapter";
+import { RecordMetricDataPointCommand } from "../metric-processing.adapter.ts";
 
 describe("RecordMetricDataPointCommand", () => {
   /** @scenario "Valid OTLP points become canonical durable events" */

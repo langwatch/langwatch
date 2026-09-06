@@ -13,7 +13,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 
 const pass: MiddlewareHandler = async (_c, next) => next();
 

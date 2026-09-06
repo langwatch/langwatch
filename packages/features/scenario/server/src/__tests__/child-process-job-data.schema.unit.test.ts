@@ -20,7 +20,7 @@
 import { describe, expect, it } from "vitest";
 import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";
 
-import { selectRoleModelParams } from "../index";
+import { selectRoleModelParams } from "../index.ts";
 
 const scenario = {
   id: "scen_1",

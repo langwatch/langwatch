@@ -23,9 +23,9 @@ import {
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 
-import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition";
-import type { ApiTraceReadStackPort } from "./trace-read-stack.port";
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features";
+import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition.ts";
+import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
 
 /**
  * The v1 search body: the deployment's filter vocabulary, minus the three fields this

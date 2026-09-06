@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MigrationLeaseRepository } from "../lease.repository";
-import { SystemMigrationRunnerService } from "../runner.service";
-import type { SystemMigrationStateRepository } from "../state.repository";
-import type { SystemMigration } from "../system-migration";
-import type { TenantSource } from "../tenant-source";
-import type { TenantMigrationOutcome, TenantMigrationRecord } from "../types";
+import type { MigrationLeaseRepository } from "../lease.repository.ts";
+import { SystemMigrationRunnerService } from "../runner.service.ts";
+import type { SystemMigrationStateRepository } from "../state.repository.ts";
+import type { SystemMigration } from "../system-migration.ts";
+import type { TenantSource } from "../tenant-source.ts";
+import type { TenantMigrationOutcome, TenantMigrationRecord } from "../types.ts";
 
 class FakeStateRepository implements SystemMigrationStateRepository {
   records = new Map<string, TenantMigrationRecord>();

@@ -7,7 +7,7 @@
 
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveChildProcessSpawn } from "../index";
+import { resolveChildProcessSpawn } from "../index.ts";
 
 // vi.hoisted runs before vi.mock hoisting, so mockLogger is available in the factory
 const mockLogger = vi.hoisted(() => ({

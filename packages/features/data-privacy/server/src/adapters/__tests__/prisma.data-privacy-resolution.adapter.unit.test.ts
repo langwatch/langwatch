@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaDataPrivacyResolutionAdapter } from "../prisma.data-privacy-resolution.adapter";
-import type { DataPrivacyResolutionDatabase } from "../prisma.data-privacy-resolution.adapter";
+import { PrismaDataPrivacyResolutionAdapter } from "../prisma.data-privacy-resolution.adapter.ts";
+import type { DataPrivacyResolutionDatabase } from "../prisma.data-privacy-resolution.adapter.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/data-privacy-resolution-seam.feature

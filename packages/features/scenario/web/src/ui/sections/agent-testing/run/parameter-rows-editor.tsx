@@ -8,12 +8,12 @@ import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Lock, LockOpen, Plus, X } from "lucide-react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
-import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
-import { ParameterLineField } from "./parameter-line-field";
-import { errorOnRow, type ParameterFieldError } from "./parameter-suggestions";
+import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
+import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
+import { ParameterLineField } from "./parameter-line-field.tsx";
+import { errorOnRow, type ParameterFieldError } from "./parameter-suggestions.ts";
 
 /** What a secret with no value yet says under its row. */
 const MISSING_SECRET_MESSAGE = "Type the value to start the run.";

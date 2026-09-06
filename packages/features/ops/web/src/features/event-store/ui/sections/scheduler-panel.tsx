@@ -1,8 +1,8 @@
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
-import { isSlotStale } from "../../model/scheduler-presentation";
-import { SchedulerContentView } from "./scheduler-content";
-import { SchedulerRowActions } from "./scheduler-row-actions";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { isSlotStale } from "../../model/scheduler-presentation.ts";
+import { SchedulerContentView } from "./scheduler-content.tsx";
+import { SchedulerRowActions } from "./scheduler-row-actions.tsx";
 
 /** App transport adapter for the controlled scheduler presentation surface. */
 export function SchedulerContent() {

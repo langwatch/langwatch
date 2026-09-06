@@ -1,6 +1,6 @@
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/trace-api";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 /**
  * Live lookup of a prompt's *current* version by id-or-handle.

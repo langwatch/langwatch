@@ -1,8 +1,8 @@
 import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
-import { createBlobMaintenancePipeline } from "../blob-maintenance.pipeline";
-import { BLOB_CLEANUP_PROCESS_NAME, blobCleanupWake } from "../blob-cleanup.process";
-import { runBlobCleanup } from "../blob-cleanup.intent";
+import { createBlobMaintenancePipeline } from "../blob-maintenance.pipeline.ts";
+import { BLOB_CLEANUP_PROCESS_NAME, blobCleanupWake } from "../blob-cleanup.process.ts";
+import { runBlobCleanup } from "../blob-cleanup.intent.ts";
 
 const report = (overrides: Partial<BlobSweepReport["totals"]> = {}): BlobSweepReport => ({
   queues: [],

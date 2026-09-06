@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { BetaPill } from "../beta-pill";
+import { BetaPill } from "../beta-pill.tsx";
 
 afterEach(cleanup);
 

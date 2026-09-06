@@ -2,9 +2,9 @@ import { Box, Button, Code, Heading, HStack, IconButton, Text, VStack } from "@c
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
-import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { docsUrl } from "@langwatch/config/docs-url";
-import { Link } from "../elements/personal-link";
+import { Link } from "../elements/personal-link.tsx";
 
 /**
  * Empty-state install affordance for the LangWatch CLI.

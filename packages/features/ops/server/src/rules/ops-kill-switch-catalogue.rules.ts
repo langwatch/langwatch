@@ -2,7 +2,7 @@ import type {
   OperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import type { OpsKillSwitchDescriptor } from "../ports/eventing-introspection.port";
+import type { OpsKillSwitchDescriptor } from "../ports/eventing-introspection.port.ts";
 
 const UNSET: Pick<
   OperatorFeatureFlag,

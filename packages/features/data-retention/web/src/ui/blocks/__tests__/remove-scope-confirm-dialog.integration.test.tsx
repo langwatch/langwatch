@@ -5,8 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { RetentionScopeGroup } from "../../../model/retention-grouping";
-import { RemoveScopeConfirmDialog } from "../remove-scope-confirm-dialog";
+import type { RetentionScopeGroup } from "../../../model/retention-grouping.ts";
+import { RemoveScopeConfirmDialog } from "../remove-scope-confirm-dialog.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

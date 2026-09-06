@@ -5,7 +5,7 @@ import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../drawer.store";
+} from "../drawer.store.ts";
 
 const VIEWPORT_WIDTH = 1440;
 

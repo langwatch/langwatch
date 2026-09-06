@@ -7,14 +7,14 @@
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
 import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run";
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { Menu } from "@langwatch/design-system/menu";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design";
-import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label";
-import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline";
-import type { RunResultsTableProps } from "./run-results-table";
+import { ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
+import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
+import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
+import type { RunResultsTableProps } from "./run-results-table.tsx";
 
 export type RunResultRowProps = Pick<
   RunResultsTableProps,

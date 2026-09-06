@@ -56,8 +56,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "generate:langy-skills": "tsx scripts/generate-langy-skills.ts",
-    "generate:feature-map": "tsx scripts/generate-feature-map.ts"
+    "generate:langy-skills": "node --experimental-transform-types scripts/generate-langy-skills.ts",
+    "generate:feature-map": "node --experimental-transform-types scripts/generate-feature-map.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.219",

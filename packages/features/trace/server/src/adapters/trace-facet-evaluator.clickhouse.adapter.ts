@@ -1,9 +1,9 @@
-import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter";
+import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
-} from "./trace-facet-registry.clickhouse.adapter";
+} from "./trace-facet-registry.clickhouse.adapter.ts";
 
 /**
  * Cap on distinct emitted-label values surfaced per evaluator. Drilldown renders these as clickable filter rows; beyond ~10 the list stops being a quick picker and bloats the discover payload, so only the most frequent survive (ties broken by ClickHouse's sort).

@@ -19,7 +19,7 @@ import {
   isSecurityKey,
   passkeyLabel,
   providerDisplayName,
-} from "../sign-in-methods";
+} from "../sign-in-methods.ts";
 
 describe("given an account linked through Auth0", () => {
   describe("when it is Auth0's own username-password database", () => {

@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { GithubPullRequestEventAdapter } from "../github-pull-request-event.adapter";
+import { GithubPullRequestEventAdapter } from "../github-pull-request-event.adapter.ts";
 
 const protocol = GithubPullRequestEventAdapter.create();
 const parseGithubPullRequestEvent = (payload: unknown) => protocol.tryParse(payload);

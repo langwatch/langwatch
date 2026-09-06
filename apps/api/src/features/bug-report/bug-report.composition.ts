@@ -11,10 +11,10 @@ import {
 } from "@langwatch/ops-server";
 import type { BugReport } from "@langwatch/prisma-client/generated";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createBugReportTrpcRouter } from "./bug-report-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createBugReportTrpcRouter } from "./bug-report-trpc.mount.ts";
 
-import type { ComposedBugReportFeature } from "./bug-report.composition.types";
+import type { ComposedBugReportFeature } from "./bug-report.composition.types.ts";
 
 /** The inbox's ports: the two reads, and the trail each is written to. */
 type ApiBugReportPorts = BugReportTrpcPorts<BugReportListing, BugReport>;

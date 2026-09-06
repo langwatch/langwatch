@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   type OrganizationDataplane,
   OrganizationDataplanePort,
-} from "../../ports/organization-dataplane.port";
-import { SystemMigrationCohortService } from "../system-migration-cohort.service";
+} from "../../ports/organization-dataplane.port.ts";
+import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 
 /** The routing table as a fake: organizations it names are on their own instance. */
 class FakeDataplanePort extends OrganizationDataplanePort {

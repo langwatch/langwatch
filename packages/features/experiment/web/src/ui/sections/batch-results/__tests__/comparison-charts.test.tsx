@@ -10,8 +10,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ComparisonCharts, computeRunMetrics, computeTargetMetrics } from "../comparison-charts";
-import type { BatchEvaluationData, ComparisonRunData } from "../../batch-evaluation-results.types";
+import { ComparisonCharts, computeRunMetrics, computeTargetMetrics } from "../comparison-charts.tsx";
+import type { BatchEvaluationData, ComparisonRunData } from "../../batch-evaluation-results.types.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

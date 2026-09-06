@@ -4,9 +4,9 @@ import {
   pilotEvent,
   pilotRef,
   T0,
-} from "../../__tests__/helpers/pilotProcess.fixture";
-import { ProcessManagerService } from "../../processManagerService";
-import { InMemoryProcessStore } from "../inMemoryProcessStore";
+} from "../../__tests__/helpers/pilotProcess.fixture.ts";
+import { ProcessManagerService } from "../../processManagerService.ts";
+import { InMemoryProcessStore } from "../inMemoryProcessStore.ts";
 
 describe("InMemoryProcessStore lease fencing", () => {
   describe("given a committed outbox message", () => {

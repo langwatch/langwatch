@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import { LWQL_GRANULARITY_MAX_BUCKETS } from "@langwatch/analytics-contract";
 
-import { widgetCoarsenedNotice } from "../widget-coarsened-notice";
+import { widgetCoarsenedNotice } from "../widget-coarsened-notice.ts";
 
 describe("the notice a coarsened widget shows", () => {
   it("names the step it used and the step it was asked for", () => {

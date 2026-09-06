@@ -1,8 +1,8 @@
-import { SimulationService } from "../services/simulation.service";
-import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository";
-import { SimulationWindowedReadPort } from "../ports/simulation-windowed-read.port";
-import type { SimulationExecutionPort } from "../ports/simulation-execution.port";
-import { NullSimulationRepository } from "../repositories/simulation.repository";
+import { SimulationService } from "../services/simulation.service.ts";
+import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
+import { SimulationWindowedReadPort } from "../ports/simulation-windowed-read.port.ts";
+import type { SimulationExecutionPort } from "../ports/simulation-execution.port.ts";
+import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
 
 /** The narrow query capability Simulation needs from a routed ClickHouse client. */
 export type SimulationReadClient = {

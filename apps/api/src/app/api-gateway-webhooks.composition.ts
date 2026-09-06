@@ -58,7 +58,7 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiGatewaySpendWebhookPort } from "./api-gateway-spend-rest.composition";
+import type { ApiGatewaySpendWebhookPort } from "./api-gateway-spend-rest.composition.ts";
 
 /** One tenant's ClickHouse, as the emitted-envelope log reads it. */
 export type ApiWebhookClickHouseResolver = Parameters<typeof WebhookEventsAdapter.create>[0];

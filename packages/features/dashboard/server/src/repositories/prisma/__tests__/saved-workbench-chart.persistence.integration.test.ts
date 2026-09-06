@@ -38,9 +38,9 @@ import {
   DashboardGraphVisibilityPolicyPort,
   DashboardIdGenerator,
   SavedWorkbenchChartPolicy,
-} from "../../../ports/dashboard.port";
-import { PrismaDashboardRepository } from "../prisma.dashboard.repository";
-import { DashboardService } from "../../../services/dashboard.service";
+} from "../../../ports/dashboard.port.ts";
+import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
+import { DashboardService } from "../../../services/dashboard.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

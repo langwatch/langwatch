@@ -5,7 +5,7 @@ import {
 } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
-import { registeredUserMigrations } from "../system-migrations.composition";
+import { registeredUserMigrations } from "../system-migrations.composition.ts";
 
 /** This process produces commands; nothing here appends during composition. */
 class StubIdentityEventing extends IdentityEventingPort {

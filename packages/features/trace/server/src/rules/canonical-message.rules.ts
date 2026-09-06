@@ -4,7 +4,7 @@ import {
   isUnknownArray,
   type MessageLike,
   safeStringify,
-} from "./canonical-guard.rules";
+} from "./canonical-guard.rules.ts";
 import { isReplyTextPart } from "@langwatch/trace-contract";
 
 /**

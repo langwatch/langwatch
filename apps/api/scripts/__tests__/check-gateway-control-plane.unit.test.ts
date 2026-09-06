@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { evaluateGatewayReuse } from "../check-gateway-control-plane";
+import { evaluateGatewayReuse } from "../check-gateway-control-plane.ts";
 
 describe("evaluateGatewayReuse", () => {
   describe("when the reused gateway reports the control plane this worktree expects", () => {

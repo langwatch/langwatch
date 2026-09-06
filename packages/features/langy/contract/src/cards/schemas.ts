@@ -44,7 +44,7 @@ import {
   paginationSchema,
   rowOrTruncationMarker,
   textValueSchema,
-} from "./primitives.js";
+} from "./primitives.ts";
 
 /**
  * One trace, as the traces API spells it — which is, unhelpfully, two ways at

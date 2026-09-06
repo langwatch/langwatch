@@ -5,18 +5,18 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { CancellationSubscriberPort } from "../ports/cancellation-channel.port";
-import { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port";
-import type { ScenarioProcessorServiceMetricsPort } from "../ports/scenario-processor-metrics.port";
+import type { CancellationSubscriberPort } from "../ports/cancellation-channel.port.ts";
+import { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port.ts";
+import type { ScenarioProcessorServiceMetricsPort } from "../ports/scenario-processor-metrics.port.ts";
 import type {
   ScenarioChildBootstrapPort,
   ScenarioChildExecutionSession,
-} from "../ports/scenario-child-bootstrap.port";
-import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules";
+} from "../ports/scenario-child-bootstrap.port.ts";
+import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,
-} from "./scenario-execution-pool.service";
+} from "./scenario-execution-pool.service.ts";
 
 const logger = createLogger("langwatch:scenarios:processor");
 

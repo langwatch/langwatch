@@ -7,7 +7,7 @@ import {
   GatewayAuditPort,
   type AppendGatewayAuditInput,
   type GatewayAuditTransaction,
-} from "../../ports/gateway-audit.port";
+} from "../../ports/gateway-audit.port.ts";
 
 // Dotted-lowercase past-tense convention (Stripe / GitHub / Vercel / Datadog).
 // Namespaced under `gateway.` so a single `LIKE 'gateway.%'` filter scopes

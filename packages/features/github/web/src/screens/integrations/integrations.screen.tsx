@@ -30,10 +30,10 @@ import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@ch
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
 import { UiSlot } from "@langwatch/ui-host/slots";
-import { githubApi } from "../../behavior/github-api";
-import { GITHUB_ERROR_QUERY_KEY, githubInstallAddress } from "../../model/github-install-address";
-import { useGithubHost } from "../../model/github-host";
-import { GithubInstallationRow } from "../../ui/elements/github-installation-row";
+import { githubApi } from "../../behavior/github-api.ts";
+import { GITHUB_ERROR_QUERY_KEY, githubInstallAddress } from "../../model/github-install-address.ts";
+import { useGithubHost } from "../../model/github-host.ts";
+import { GithubInstallationRow } from "../../ui/elements/github-installation-row.tsx";
 
 /** The grant the platform page asked for, unchanged. */
 export const INTEGRATIONS_PAGE_PERMISSION = "organization:manage";

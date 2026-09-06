@@ -24,19 +24,19 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process";
+import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
 import {
   buildConnectedCall,
   CONNECTED_BUSY_RETRY_BUDGET_MS,
   CONNECTED_REQUEST_SLACK_MS,
   connectedCallFailure,
   connectedOutputText,
-} from "../processes/experiment-connected-target.process";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
-import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
+} from "../processes/experiment-connected-target.process.ts";
+import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

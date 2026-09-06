@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { IdentityLedgerWriterAdapter } from "./identity-ledger.adapter";
-import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter";
-import type { IdentityEventingPort } from "../ports/identity-eventing.port";
-import { PrismaIdentityNewbornRepository } from "../repositories/prisma/prisma.identity-newborn.repository";
-import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository";
-import { IdentityNewbornReconciliationService } from "../services/identity-newborn-reconciliation.service";
-import { IdentityService } from "../services/identity.service";
+import { IdentityLedgerWriterAdapter } from "./identity-ledger.adapter.ts";
+import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter.ts";
+import type { IdentityEventingPort } from "../ports/identity-eventing.port.ts";
+import { PrismaIdentityNewbornRepository } from "../repositories/prisma/prisma.identity-newborn.repository.ts";
+import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
+import { IdentityNewbornReconciliationService } from "../services/identity-newborn-reconciliation.service.ts";
+import { IdentityService } from "../services/identity.service.ts";
 
 export type PostgresIdentityNewbornSweepOptions = {
   database: PrismaClient;

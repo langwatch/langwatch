@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../model/batch-evaluation-results.bt-leaderboard";
-import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy.ts";
 
 const entry = (
   variantId: string,

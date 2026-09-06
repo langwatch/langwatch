@@ -3,8 +3,8 @@ import {
   GatewayTraceDestinationReportRepository,
   type TraceDestinationKeyRow,
   type TraceDestinationProjectRow,
-} from "../../repositories/gateway-trace-destination-report.repository";
-import { reportTraceDestinationBackfill } from "../trace-destination-report.task";
+} from "../../repositories/gateway-trace-destination-report.repository.ts";
+import { reportTraceDestinationBackfill } from "../trace-destination-report.task.ts";
 
 function project(overrides: Partial<TraceDestinationProjectRow>): TraceDestinationProjectRow {
   return {

@@ -14,7 +14,7 @@ import {
   timeseriesPointFields,
   timeseriesUnitSchema,
   type CardKind,
-} from "./schemas.js";
+} from "./schemas.ts";
 
 /**
  * The kinds that present values they were handed, rather than asserting that

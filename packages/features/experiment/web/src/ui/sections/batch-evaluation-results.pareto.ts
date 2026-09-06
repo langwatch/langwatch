@@ -7,10 +7,10 @@ import type {
   BTLeaderboard,
   BTLeaderboardEntry,
   ScoreDifferenceCI,
-} from "../../model/batch-evaluation-results.bt-leaderboard";
-import type { Comparability } from "../../model/batch-evaluation-results.comparability";
-import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics";
-import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation";
+} from "../../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { Comparability } from "../../model/batch-evaluation-results.comparability.ts";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics.ts";
+import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation.ts";
 
 export type TradeoffDimension = "quality" | "cost" | "speed";
 

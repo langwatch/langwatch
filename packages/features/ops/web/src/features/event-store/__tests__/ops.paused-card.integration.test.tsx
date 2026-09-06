@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PausedCard } from "../ui/sections/paused-card";
+import { PausedCard } from "../ui/sections/paused-card.tsx";
 
 /**
  * The merged "what is switched off" panel.

@@ -28,18 +28,18 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   setupAgentPrompt: () => "",
 }));
 
-vi.mock("../dev/home-dev-state", () => ({ useHomeDevState: () => null }));
-vi.mock("../welcome-header", () => ({ WelcomeHeader: () => <div>Good morning</div> }));
+vi.mock("../dev/home-dev-state.ts", () => ({ useHomeDevState: () => null }));
+vi.mock("../welcome-header.tsx", () => ({ WelcomeHeader: () => <div>Good morning</div> }));
 
 const reachMock = vi.fn();
-vi.mock("../use-project-reach", () => ({ useProjectReach: () => reachMock() }));
+vi.mock("../use-project-reach.ts", () => ({ useProjectReach: () => reachMock() }));
 
 import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
   type ProjectHomeProject,
-} from "../../../../model/project-home-host";
-import { LangyHomeHero } from "../langy-home-hero";
+} from "../../../../model/project-home-host.ts";
+import { LangyHomeHero } from "../langy-home-hero.tsx";
 
 class StubProjectHomeHost extends ProjectHomeHostPort {
   constructor(private readonly canAsk = true) {

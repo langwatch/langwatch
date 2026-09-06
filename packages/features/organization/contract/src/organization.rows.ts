@@ -3,7 +3,7 @@
  * no port, service or transport names the generated client. Each mirrors
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
-import type { OrganizationIntent } from "./organization";
+import type { OrganizationIntent } from "./organization.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type OrganizationJsonObject = { [Key in string]?: OrganizationJsonValue };

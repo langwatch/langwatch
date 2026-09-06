@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router";
-import { useOrganizationTeamProject } from "./use-organization-team-project";
-import { api } from "./langy-api";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
+import { api } from "./langy-api.ts";
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
-import { useLangyStore } from "./langy.store";
+import { useLangyStore } from "./langy.store.ts";
 
 /**
  * Opens the panel on the conversation named by `?langyConversation=<id>`. Read through

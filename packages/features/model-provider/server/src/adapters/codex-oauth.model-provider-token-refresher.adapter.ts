@@ -6,7 +6,7 @@ import {
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { CodexTokenRefresher } from "../ports/model-provider.port";
+import { CodexTokenRefresher } from "../ports/model-provider.port.ts";
 
 /**
  * Sign in with your OpenAI account for the Codex provider, so requests bill the user's ChatGPT plan instead of API credits. This is OpenAI's own

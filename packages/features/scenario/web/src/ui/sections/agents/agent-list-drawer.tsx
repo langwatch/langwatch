@@ -13,15 +13,15 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { CascadeArchiveDialog } from "../../elements/cascade-archive-dialog";
+import { CascadeArchiveDialog } from "../../elements/cascade-archive-dialog.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import type { AgentWithFields, AgentType } from "@langwatch/agent-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 
 export type AgentListDrawerProps = {
   open?: boolean;

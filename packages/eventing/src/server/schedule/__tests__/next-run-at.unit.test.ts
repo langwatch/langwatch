@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeCatchUp, computeNextRunAt } from "../next-run-at";
+import { computeCatchUp, computeNextRunAt } from "../next-run-at.ts";
 
 describe("computeNextRunAt", () => {
   describe("given a weekly cron '0 9 * * 1' (Mondays 09:00)", () => {

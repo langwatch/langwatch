@@ -7,7 +7,7 @@ import {
   PYTHON_STDLIB_MODULE_NAMES,
   type PyMember,
   type PyModule,
-} from "./python-stdlib";
+} from "./python-stdlib.ts";
 import {
   ATTR_ACCESS,
   type ContractRef,
@@ -16,7 +16,7 @@ import {
   IMPORT_MODULE_PREFIX,
   INSERT_AS_SNIPPET,
   scanImports,
-} from "./python-provider.shared";
+} from "./python-provider.shared.ts";
 
 function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
   switch (kind) {

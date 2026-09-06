@@ -5,7 +5,7 @@ import {
 import {
   ManagedProviderConfigurationPort,
   type ManagedProviderConfigurationReporter,
-} from "../ports/managed-provider-configuration.port";
+} from "../ports/managed-provider-configuration.port.ts";
 
 const PRIVATE_BEDROCK_ENV_PREFIX = "MANAGED_BEDROCK__";
 

@@ -13,7 +13,7 @@
 import { Box, chakra, Flex, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Bot, KeyRound, Webhook } from "lucide-react";
 import type React from "react";
-import { Link } from "../elements/personal-link";
+import { Link } from "../elements/personal-link.tsx";
 
 /**
  * Where a reader mints an API key. `platform/app` exported the path from

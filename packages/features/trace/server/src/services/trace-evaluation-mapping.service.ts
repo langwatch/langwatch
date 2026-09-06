@@ -1,4 +1,4 @@
-import { TraceSafeJsonService } from "./trace-safe-json.service";
+import { TraceSafeJsonService } from "./trace-safe-json.service.ts";
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
 import type { Evaluation } from "@langwatch/trace-contract";
 

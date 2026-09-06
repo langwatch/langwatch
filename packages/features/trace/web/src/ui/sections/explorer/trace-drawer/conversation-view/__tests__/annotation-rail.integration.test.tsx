@@ -22,35 +22,35 @@ const mocks = vi.hoisted(() => ({
   activeScores: [] as unknown[],
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../../../../behavior/auth-session", () => ({
+vi.mock("../../../../../../behavior/auth-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: {},
   }),
 }));
 
-vi.mock("../../../../me/personal-feature-gate-dialog", () => ({
+vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -92,7 +92,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
  * something the rail can sit beside, and to report what the rail layout asked
  * of it.
  */
-vi.mock("../chat-turn-row", () => ({
+vi.mock("../chat-turn-row.tsx", () => ({
   ChatTurnRow: ({
     turn,
     annotationItems,
@@ -110,21 +110,21 @@ vi.mock("../chat-turn-row", () => ({
   ),
 }));
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
-import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
-import { AnnotatedTurnRow } from "../annotated-turn-row";
-import type { ParsedTurn, TurnLayout } from "../types";
+} from "../../../../../../behavior/annotation-queue-session.store.ts";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
+import type { ParsedTurn, TurnLayout } from "../types.ts";
 import {
   RAIL_WIDTH_SLIM_PX,
   RAIL_WIDTH_WIDE_PX,
   type RailLayout,
   THREAD_COLUMN_MAX_WIDTH_PX,
-} from "../use-rail-layout";
+} from "../use-rail-layout.ts";
 
 const TRACE_ID = "trace-1";
 const SIDE_LAYOUT: RailLayout = {

@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { ShareService } from "@langwatch/share-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount.ts";
 
 /** The two namespaces and the service `ctx.app.share` carries. */
 export type ComposedShareFeature = Readonly<{

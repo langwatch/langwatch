@@ -1,9 +1,9 @@
 import { Badge, Box, HStack, Input, NativeSelect, Spacer, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { api } from "../../../../behavior/gateway-api";
+import { api } from "../../../../behavior/gateway-api.ts";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { formatBudgetUsd } from "../../../../model/format-budget-usd";
+import { formatBudgetUsd } from "../../../../model/format-budget-usd.ts";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 

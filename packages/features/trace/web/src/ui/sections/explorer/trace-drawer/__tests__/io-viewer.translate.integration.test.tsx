@@ -9,14 +9,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,
   }),
 }));
 
-vi.mock("../../../../../behavior/prompts/use-load-span-into-prompt-playground", () => ({
+vi.mock("../../../../../behavior/prompts/use-load-span-into-prompt-playground.ts", () => ({
   useGoToSpanInPlaygroundTabUrlBuilder: () => ({ buildUrl: () => null }),
 }));
 
@@ -24,7 +24,7 @@ const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: strin
   translation: `TRANSLATED::${textToTranslate.slice(0, 20)}`,
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     // The toolbar reads the field's comments to decide whether to offer the
     // comment action; none stored here.
@@ -40,7 +40,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { IOViewer } from "../io-viewer";
+import { IOViewer } from "../io-viewer.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

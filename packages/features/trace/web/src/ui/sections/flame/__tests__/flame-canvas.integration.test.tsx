@@ -5,8 +5,8 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, render } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { FlameCanvas } from "../flame-canvas";
-import type { FlameCanvasProps } from "../flame-canvas";
+import { FlameCanvas } from "../flame-canvas.tsx";
+import type { FlameCanvasProps } from "../flame-canvas.tsx";
 
 describe("FlameCanvas", () => {
   it("renders the controlled axis and flame layer without owning view state", () => {

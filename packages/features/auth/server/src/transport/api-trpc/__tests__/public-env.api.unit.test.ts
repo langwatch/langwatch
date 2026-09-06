@@ -9,8 +9,8 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { AuthApp, type AuthAppDependencies } from "../../../app/auth.app";
-import { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "../public-env.api";
+import { AuthApp, type AuthAppDependencies } from "../../../app/auth.app.ts";
+import { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "../public-env.api.ts";
 
 function harness({ resolveAuthProvider }: { resolveAuthProvider: () => Promise<string> }) {
   const trpc = initTRPC.context<PublicEnvTrpcContext>().create();

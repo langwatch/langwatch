@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeOrGroups, parse } from "@langwatch/trace-contract";
-import { routeToggleViaOrGroups } from "../route-toggle-via-or-groups";
+import { routeToggleViaOrGroups } from "../route-toggle-via-or-groups.ts";
 
 describe("routeToggleViaOrGroups", () => {
   describe("given a field that is not in any OR group", () => {

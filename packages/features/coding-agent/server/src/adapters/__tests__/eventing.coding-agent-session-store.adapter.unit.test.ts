@@ -13,15 +13,15 @@ import type {
   CodingAgentSession,
 } from "@langwatch/coding-agent-contract";
 import { describe, expect, it } from "vitest";
-import { EventingCodingAgentSessionStoreAdapter } from "../eventing.coding-agent-session-store.adapter";
+import { EventingCodingAgentSessionStoreAdapter } from "../eventing.coding-agent-session-store.adapter.ts";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
   CodingAgentSessionRowMapper,
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
-} from "../../projections/coding-agent-session.projection";
-import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection";
+} from "../../projections/coding-agent-session.projection.ts";
+import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection.ts";
 
 const tenantId = createTenantId("tenant-1");
 

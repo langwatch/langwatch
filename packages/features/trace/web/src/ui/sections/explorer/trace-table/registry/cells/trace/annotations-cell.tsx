@@ -6,9 +6,9 @@ import {
   AnnotationScoresChip,
   AnnotationSuggestionsChip,
 } from "@langwatch/annotation-web/surfaces/annotation-chips";
-import { useScoreNamesById } from "../../../../../use-score-names-by-id";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
+import { useScoreNamesById } from "../../../../../use-score-names-by-id.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
 
 type Density = "compact" | "comfortable";
 

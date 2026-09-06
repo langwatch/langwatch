@@ -6,7 +6,7 @@ import {
   PostgresAuthzCutoverAdapter,
   type AuthzCutoverDatabase,
   type AuthzCutoverReadFailure,
-} from "../postgres.authz-cutover.adapter";
+} from "../postgres.authz-cutover.adapter.ts";
 
 const ORG_ID = "org_gate";
 

@@ -7,37 +7,37 @@ import {
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port";
-import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port";
-import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port";
-import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port";
-import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port";
-import { RedisSessionContextMemoAdapter } from "./redis.session-context-memo.adapter";
-import { createCodingAgentCostDriftSubscriber } from "../subscribers/coding-agent-cost-drift.subscriber";
-import { EventingContributeLogFactsAdapter } from "./eventing.contribute-log-facts.adapter";
-import { EventingContributeMetricFactsAdapter } from "./eventing.contribute-metric-facts.adapter";
-import { EventingContributeSpanFactsAdapter } from "./eventing.contribute-span-facts.adapter";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
+import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port.ts";
+import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
+import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port.ts";
+import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port.ts";
+import { RedisSessionContextMemoAdapter } from "./redis.session-context-memo.adapter.ts";
+import { createCodingAgentCostDriftSubscriber } from "../subscribers/coding-agent-cost-drift.subscriber.ts";
+import { EventingContributeLogFactsAdapter } from "./eventing.contribute-log-facts.adapter.ts";
+import { EventingContributeMetricFactsAdapter } from "./eventing.contribute-metric-facts.adapter.ts";
+import { EventingContributeSpanFactsAdapter } from "./eventing.contribute-span-facts.adapter.ts";
 import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
-} from "../projections/coding-agent-session.projection";
-import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection";
-import { CodingAgentTraceSessionsMapProjection } from "../projections/coding-agent-trace-sessions.projection";
-import { SessionMetricSeriesMapProjection } from "../projections/session-metric-series.projection";
+} from "../projections/coding-agent-session.projection.ts";
+import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection.ts";
+import { CodingAgentTraceSessionsMapProjection } from "../projections/coding-agent-trace-sessions.projection.ts";
+import { SessionMetricSeriesMapProjection } from "../projections/session-metric-series.projection.ts";
 import {
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
   CODING_AGENT_PROCESSING_EVENT_TYPES,
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
-import { createPullRequestMappingSubscriber } from "../subscribers/pull-request-mapping.subscriber";
-import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service";
+import { createPullRequestMappingSubscriber } from "../subscribers/pull-request-mapping.subscriber.ts";
+import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
 import {
   EventingCodingAgentSessionEventsAppendAdapter,
   EventingCodingAgentTraceSessionAppendAdapter,
   EventingSessionMetricSeriesAppendAdapter,
-} from "./eventing.coding-agent-projections.adapter";
-import { EventingCodingAgentSessionStoreAdapter } from "./eventing.coding-agent-session-store.adapter";
+} from "./eventing.coding-agent-projections.adapter.ts";
+import { EventingCodingAgentSessionStoreAdapter } from "./eventing.coding-agent-session-store.adapter.ts";
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: TraceCanonicalisationService;

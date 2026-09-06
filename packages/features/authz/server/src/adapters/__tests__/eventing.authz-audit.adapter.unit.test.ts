@@ -12,8 +12,8 @@ import {
   AuthzAuditTrailStore,
   type AuthzAuditRow,
   EventingAuthzAuditAdapter,
-} from "../eventing.authz-audit.adapter";
-import type { AuthzGrantsEvent } from "../eventing.authz.adapter";
+} from "../eventing.authz-audit.adapter.ts";
+import type { AuthzGrantsEvent } from "../eventing.authz.adapter.ts";
 
 const TENANT_ID = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;

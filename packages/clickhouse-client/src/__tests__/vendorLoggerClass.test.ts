@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { VENDOR_CAUSE_FIELD, vendorLoggerClassFor, type VendorLogSink } from "../logging";
+import { VENDOR_CAUSE_FIELD, vendorLoggerClassFor, type VendorLogSink } from "../logging.ts";
 
 function recordingSink(): VendorLogSink & { lines: Array<[string, string]> } {
   const lines: Array<[string, string]> = [];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryExperimentIdLookupRepository } from "../memory.experiment-id-lookup.repository";
+import { MemoryExperimentIdLookupRepository } from "../memory.experiment-id-lookup.repository.ts";
 
 describe("MemoryExperimentIdLookupRepository", () => {
   it("always returns null", async () => {

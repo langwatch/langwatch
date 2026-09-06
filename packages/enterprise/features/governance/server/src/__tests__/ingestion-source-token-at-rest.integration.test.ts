@@ -17,21 +17,21 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
-import { GovernanceEncryptionPort } from "../ports/governance-encryption.port";
+import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
+import { GovernanceEncryptionPort } from "../ports/governance-encryption.port.ts";
 import {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
-} from "../ports/ingestion-source.port";
-import { TestProjectService } from "../ports/__tests__/support/test-project-service";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository";
-import { IngestionCredentialsService } from "../services/ingestion-credentials.service";
+} from "../ports/ingestion-source.port.ts";
+import { TestProjectService } from "../ports/__tests__/support/test-project-service.ts";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../services/ingestion-source-secret.service";
-import { IngestionSourceService } from "../services/ingestion-source.service";
-import { PullDestinationService } from "../services/pull-destination.service";
+} from "../services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../services/ingestion-source.service.ts";
+import { PullDestinationService } from "../services/pull-destination.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

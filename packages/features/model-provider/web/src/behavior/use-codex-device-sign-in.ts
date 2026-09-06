@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CODEX_SIGN_IN_TTL_MS } from "@langwatch/model-provider-contract";
 
-import { api } from "./model-provider-api";
-import type { ScopeAssignment } from "../model/scope-assignment";
+import { api } from "./model-provider-api.ts";
+import type { ScopeAssignment } from "../model/scope-assignment.ts";
 
 /**
  * The Codex device-sign-in state machine, headless: start a device code,

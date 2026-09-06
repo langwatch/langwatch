@@ -11,8 +11,8 @@
  * @see specs/agents/agent-test-run.feature
  */
 
-import { INTERNAL_SET_PREFIX } from "./scenario-set-id";
-import type { TargetConfig } from "./scenario-execution-data";
+import { INTERNAL_SET_PREFIX } from "./scenario-set-id.ts";
+import type { TargetConfig } from "./scenario-execution-data.ts";
 
 /** Suffix of the set that holds a project's agent test runs. */
 export const AGENT_TEST_SET_SUFFIX = "__agent-test";

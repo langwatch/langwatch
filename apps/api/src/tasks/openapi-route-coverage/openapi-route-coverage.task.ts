@@ -4,9 +4,9 @@ import {
   auditCoverage,
   coverageFailed,
   renderCoverageReport,
-} from "./openapi-route-coverage.auditor";
-import { UNPUBLISHED } from "./openapi-route-coverage.exclusions";
-import { readCoverageSurface } from "./openapi-route-coverage.surface";
+} from "./openapi-route-coverage.auditor.ts";
+import { UNPUBLISHED } from "./openapi-route-coverage.exclusions.ts";
+import { readCoverageSurface } from "./openapi-route-coverage.surface.ts";
 
 /**
  * Where the description this audit reads is written when the caller names no

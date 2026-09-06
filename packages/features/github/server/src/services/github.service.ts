@@ -12,18 +12,18 @@ import type {
   GithubInstallStatePayload,
   GithubAppConfig,
 } from "@langwatch/github-contract";
-import type { GithubHostPort } from "../ports/github-host.port";
-import type { GithubInstallResponsePort } from "../ports/github-install-response.port";
-import type { GithubInstallStatePort } from "../ports/github-install-state.port";
-import type { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubInstallResponsePort } from "../ports/github-install-response.port.ts";
+import type { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
+import type { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port.ts";
 
-import { GithubConnectionService } from "./github-connection.service";
-import { GithubInstallationsService } from "./github-installations.service";
+import { GithubConnectionService } from "./github-connection.service.ts";
+import { GithubInstallationsService } from "./github-installations.service.ts";
 import {
   type BranchMappingRequest,
   GithubPullRequestMappingService,
-} from "./github-pull-request-mapping.service";
-import { GithubPullRequestStatusService } from "./github-pull-request-status.service";
+} from "./github-pull-request-mapping.service.ts";
+import { GithubPullRequestStatusService } from "./github-pull-request-status.service.ts";
 
 type GithubServiceDependencies = {
   installations: GithubInstallationsService;

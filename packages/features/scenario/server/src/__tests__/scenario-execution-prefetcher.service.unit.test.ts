@@ -25,7 +25,7 @@ import {
   type SuiteConfigFetcher,
   type TraceWaitBudgetResolver,
   type WorkflowVersionFetcher,
-} from "./support/scenario-execution-prefetcher.fixture";
+} from "./support/scenario-execution-prefetcher.fixture.ts";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,

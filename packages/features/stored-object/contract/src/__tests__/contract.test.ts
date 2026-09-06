@@ -19,7 +19,7 @@ import {
   type StoredObjectByteSource,
   type StoredObjectReference,
   type StoredObjectService,
-} from "../index";
+} from "../index.ts";
 
 const SHA256 = "a".repeat(64);
 function reference(overrides: Partial<StoredObjectReference> = {}): StoredObjectReference {

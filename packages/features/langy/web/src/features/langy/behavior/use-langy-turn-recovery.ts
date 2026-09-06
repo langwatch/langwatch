@@ -3,7 +3,7 @@ import {
   canAutoRecover,
   isMutatingLangyTool,
   langyRecoveryPolicy,
-} from "./logic/langy-recovery-policy";
+} from "./logic/langy-recovery-policy.ts";
 
 /**
  * Drives the CLIENT half of Langy's turn recovery: owns the clock and the attempt

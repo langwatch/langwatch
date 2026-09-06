@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ConfirmDialog } from "./confirm-dialog";
+import { ConfirmDialog } from "./confirm-dialog.tsx";
 
 const meta = {
   title: "Components/Confirm dialog",

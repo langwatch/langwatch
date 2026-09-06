@@ -1,9 +1,9 @@
 import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
-import type { TimeRange } from "../../../../behavior/filter.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
-import { QueryBreakdownChips } from "./query-breakdown-chips";
+import type { TimeRange } from "../../../../behavior/filter.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
 
 const LangWatchMark: React.FC = () => (
   <Box color="fg.muted" opacity={0.55} css={{ filter: "grayscale(1)" }} aria-hidden="true">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaIdentityVerificationRepository } from "../prisma.identity-verification.repository";
+import { PrismaIdentityVerificationRepository } from "../prisma.identity-verification.repository.ts";
 
 /**
  * `consume` reaps every generation it reads, not just the pair it was offered (D01) — `identifier`

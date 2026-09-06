@@ -11,8 +11,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveLoggerConfiguration } from "../logger-config";
-import { serviceVersionField } from "../logger";
+import { resolveLoggerConfiguration } from "../logger-config.ts";
+import { serviceVersionField } from "../logger.ts";
 
 describe("serviceVersionField", () => {
   it("emits the build identity injected by process configuration", () => {

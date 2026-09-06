@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   PrismaLlmConfigRepository,
   type PromptConfigDatabase,
-} from "../../repositories/prisma/prisma.prompt.repository";
-import { transformCamelToSnake } from "../prompt-transform-db.port";
+} from "../../repositories/prisma/prisma.prompt.repository.ts";
+import { transformCamelToSnake } from "../prompt-transform-db.port.ts";
 
 /**
  * Regression tests for the false diff bug in prompt sync.

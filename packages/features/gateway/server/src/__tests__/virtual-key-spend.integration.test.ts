@@ -15,13 +15,13 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository";
+import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
 import { GatewayWindow } from "@langwatch/gateway-contract";
-import { GatewayUsageService } from "../services/gateway-usage.service";
+import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the

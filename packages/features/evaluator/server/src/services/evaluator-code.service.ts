@@ -15,8 +15,8 @@ import {
   type StudioClientEvent,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { EvaluatorCodeExecutionPort } from "../ports/evaluator.port";
-import type { EvaluatorRepository } from "../repositories/evaluator.repository";
+import type { EvaluatorCodeExecutionPort } from "../ports/evaluator.port.ts";
+import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 
 const outputFields: Field[] = codeEvaluatorOutputFields.map((field) => ({
   ...field,

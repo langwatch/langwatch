@@ -8,8 +8,8 @@
 // needed.
 import type { ErrorHandler } from "hono";
 
-import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.js";
-import type { EndpointVariables, ServiceContext } from "./types.js";
+import type { AppRestOrganizationVariables, AppRestProjectVariables } from "./variables.ts";
+import type { EndpointVariables, ServiceContext } from "./types.ts";
 
 /**
  * A context that can answer for one variable. Structural rather than a whole

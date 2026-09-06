@@ -8,7 +8,7 @@ import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);

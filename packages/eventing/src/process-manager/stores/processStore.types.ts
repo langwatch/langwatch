@@ -1,5 +1,5 @@
-import type { JsonValue } from "../json";
-import type { ProcessRef } from "../processManager.types";
+import type { JsonValue } from "../json.ts";
+import type { ProcessRef } from "../processManager.types.ts";
 
 /**
  * Persistence port for process-manager state, inbox, and outbox

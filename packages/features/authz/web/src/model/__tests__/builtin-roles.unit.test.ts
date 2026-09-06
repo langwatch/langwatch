@@ -17,8 +17,8 @@
 
 import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../builtin-roles";
-import { ORDERED_RESOURCES, permissionsForResource } from "../permission-catalogue";
+import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../builtin-roles.ts";
+import { ORDERED_RESOURCES, permissionsForResource } from "../permission-catalogue.ts";
 
 const OFFERED = ORDERED_RESOURCES.flatMap((resource) => permissionsForResource(resource));
 

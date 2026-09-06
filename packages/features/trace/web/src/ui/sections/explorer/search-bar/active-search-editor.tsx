@@ -1,9 +1,9 @@
 import { EditorContent } from "@tiptap/react";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { SuggestionDropdown } from "./suggestion-dropdown";
-import { useFilterEditor, type ValueResolver } from "./use-filter-editor";
-import { useGlobalSlashFocus } from "../../../../behavior/explorer/search-bar/use-global-slash-focus";
+import { SuggestionDropdown } from "./suggestion-dropdown.tsx";
+import { useFilterEditor, type ValueResolver } from "./use-filter-editor.ts";
+import { useGlobalSlashFocus } from "../../../../behavior/explorer/search-bar/use-global-slash-focus.ts";
 
 interface ActiveSearchEditorProps {
   queryText: string;

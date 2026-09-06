@@ -19,7 +19,7 @@ const mockSetReplacingData = vi.fn();
 
 // ─── Store mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedQueryText: mockQueryText,
@@ -33,7 +33,7 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       sort: { columnId: mockSortColumnId, direction: mockSortDirection },
@@ -41,11 +41,11 @@ vi.mock("../../../../../behavior/view.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: unknown) => unknown) => selector({ density: mockDensity }),
 }));
-vi.mock("../../../../../behavior/refresh-ui.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/refresh-ui.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRefreshUIStore: (selector: (state: unknown) => unknown) =>
     selector({
@@ -55,7 +55,7 @@ vi.mock("../../../../../behavior/refresh-ui.store", async (importOriginal) => ({
 }));
 
 // ─── Module under test ────────────────────────────────────────────────────────
-import { useViewSwitchingDim } from "../use-view-switching-dim";
+import { useViewSwitchingDim } from "../use-view-switching-dim.ts";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

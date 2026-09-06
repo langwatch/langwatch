@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ReplayRepository } from "../repositories/replay.repository";
+import type { ReplayRepository } from "../repositories/replay.repository.ts";
 
 const logger = createLogger("langwatch:ops:replay-lock-heartbeat");
 

@@ -18,9 +18,9 @@ import {
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TabIdProvider } from "../studio-internals";
+import { TabIdProvider } from "../studio-internals.ts";
 import React from "react";
-import { PromptBrowserTab } from "./tab/prompt-browser-tab-view";
+import { PromptBrowserTab } from "./tab/prompt-browser-tab-view.tsx";
 
 // Context for managing drag state and callbacks
 /**

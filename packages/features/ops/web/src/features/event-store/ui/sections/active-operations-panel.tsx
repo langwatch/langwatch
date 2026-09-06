@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
-import { ActiveOperationsSection as ActiveOperationsSectionView } from "../elements/active-operations-section";
+import { ActiveOperationsSection as ActiveOperationsSectionView } from "../elements/active-operations-section.tsx";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { useReplayStatus } from "../../behavior/use-replay-status";
-import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link.tsx";
 
 export function ActiveOperationsSection({ data }: { data: DashboardData }) {
   const statusQuery = useReplayStatus();

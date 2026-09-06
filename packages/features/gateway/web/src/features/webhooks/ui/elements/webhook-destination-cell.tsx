@@ -2,7 +2,7 @@ import { Badge, Table, Text, VStack } from "@chakra-ui/react";
 import {
   WEBHOOK_DESTINATION_LABELS,
   type WebhookDestinationKind,
-} from "../../model/webhook-destinations";
+} from "../../model/webhook-destinations.ts";
 
 /** Just enough of an endpoint to say where it delivers. */
 export interface WebhookDestinationSummary {

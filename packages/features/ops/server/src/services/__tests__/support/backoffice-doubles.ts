@@ -7,8 +7,8 @@ import { AuthService } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import { UserService, type UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
-import { AdminBackofficeRepository } from "../../../repositories/admin-backoffice.repository";
-import { AdminAuditSink } from "../../impersonation.service";
+import { AdminBackofficeRepository } from "../../../repositories/admin-backoffice.repository.ts";
+import { AdminAuditSink } from "../../impersonation.service.ts";
 
 export const backofficeOperator: UserProfile = {
   id: "olive",

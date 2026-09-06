@@ -1,16 +1,16 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port";
-import { TraceMediaReferencePort } from "../ports/trace-media-reference.port";
-import { TraceModelCostPort } from "../ports/trace-model-cost.port";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port";
-import { SpanCostService } from "./span-cost.service";
-import { SpanStatusService } from "./span-status.service";
-import { SpanTimingService } from "./span-timing.service";
-import { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service";
-import { TraceIOAccumulationService } from "./trace-io-accumulation.service";
-import { TraceNameResolutionService } from "./trace-name-resolution.service";
-import { TraceOriginService } from "./trace-origin.service";
-import { TracePromptAccumulationService } from "./trace-prompt-accumulation.service";
+import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port.ts";
+import { TraceMediaReferencePort } from "../ports/trace-media-reference.port.ts";
+import { TraceModelCostPort } from "../ports/trace-model-cost.port.ts";
+import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
+import { SpanCostService } from "./span-cost.service.ts";
+import { SpanStatusService } from "./span-status.service.ts";
+import { SpanTimingService } from "./span-timing.service.ts";
+import { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service.ts";
+import { TraceIOAccumulationService } from "./trace-io-accumulation.service.ts";
+import { TraceNameResolutionService } from "./trace-name-resolution.service.ts";
+import { TraceOriginService } from "./trace-origin.service.ts";
+import { TracePromptAccumulationService } from "./trace-prompt-accumulation.service.ts";
 
 /**
  * The deterministic collaborators shared by Trace's three event projections.

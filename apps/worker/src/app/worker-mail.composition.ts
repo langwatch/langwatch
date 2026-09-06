@@ -2,7 +2,7 @@ import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/a
 import { ReactEmailMailRenderer, type MailRenderPort } from "@langwatch/mail";
 import { EmailDeliveryAdapter, type EmailDeliveryPort } from "@langwatch/notification-server";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config";
+import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The one outbound mail graph a worker process holds, the host its messages

@@ -5,7 +5,7 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback } from "react";
 
-import { useWorkflowStore } from "./use-workflow-store";
+import { useWorkflowStore } from "./use-workflow-store.ts";
 
 export function useSmartSetNode() {
   const setNode = useWorkflowStore((state) => state.setNode);

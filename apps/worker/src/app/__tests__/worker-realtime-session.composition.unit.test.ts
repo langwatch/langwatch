@@ -4,11 +4,11 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../../features/gateway/gateway-realtime-session-worker-feature.installer";
+import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
 import {
   tryCreateWorkerRealtimeSessionPoller,
   WorkerRealtimeSessionAbsenceReportPort,
-} from "../worker-realtime-session.composition";
+} from "../worker-realtime-session.composition.ts";
 
 /** A 32-byte key in the hex spelling the stored-secret cipher demands. */
 const CREDENTIALS_KEY = "a".repeat(64);

@@ -20,7 +20,7 @@ import type { DatasetSummary } from "@langwatch/dataset-contract";
 import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithDatasetHost } from "../../../testing";
+import { renderWithDatasetHost } from "../../../testing.tsx";
 
 const { datasetsQuery } = vi.hoisted(() => ({
   datasetsQuery: {
@@ -28,7 +28,7 @@ const { datasetsQuery } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/dataset-api", () => ({
+vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
     useUtils: () => ({
       limits: { getUsage: { invalidate: vi.fn() } },
@@ -41,13 +41,13 @@ vi.mock("../../../behavior/dataset-api", () => ({
   },
 }));
 
-vi.mock("../../../ui/sections/add-or-edit-dataset-drawer", () => ({
+vi.mock("../../../ui/sections/add-or-edit-dataset-drawer.tsx", () => ({
   AddOrEditDatasetDrawer: () => <div data-testid="add-edit-dataset-drawer" />,
 }));
-vi.mock("../../../ui/sections/bulk-upload-drawer", () => ({
+vi.mock("../../../ui/sections/bulk-upload-drawer.tsx", () => ({
   BulkUploadDrawer: () => <div data-testid="bulk-upload-drawer" />,
 }));
-vi.mock("../../../ui/sections/copy-dataset-dialog", () => ({
+vi.mock("../../../ui/sections/copy-dataset-dialog.tsx", () => ({
   CopyDatasetDialog: () => <div data-testid="copy-dataset-dialog" />,
 }));
 
@@ -60,7 +60,7 @@ vi.mock("@langwatch/design-system/menu", () => ({
   },
 }));
 
-const { default: DatasetsScreen } = await import("../datasets.screen");
+const { default: DatasetsScreen } = await import("../datasets.screen.tsx");
 
 const dataset: DatasetSummary = {
   id: "ds-1",

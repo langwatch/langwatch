@@ -18,11 +18,11 @@ import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api";
-import { useEvaluatorHost } from "../../model/evaluator-host";
-import { EvaluatorApiUsageDialog } from "../blocks/evaluator-api-usage-dialog";
-import { EvaluatorListItem } from "../blocks/evaluator-list-item";
-import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state";
+import { evaluatorApi } from "../../behavior/evaluator-api.ts";
+import { useEvaluatorHost } from "../../model/evaluator-host.ts";
+import { EvaluatorApiUsageDialog } from "../blocks/evaluator-api-usage-dialog.tsx";
+import { EvaluatorListItem } from "../blocks/evaluator-list-item.tsx";
+import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state.tsx";
 
 /**
  * One row of the picker, as this package's own transport map answers it:

@@ -2,18 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection";
+} from "../projections/evaluation-analytics-fold.projection.ts";
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsRowProjection,
-} from "../projections/evaluation-analytics-row.projection";
+} from "../projections/evaluation-analytics-row.projection.ts";
 import {
   createEvaluationCompletedEvent,
   createEvaluationReportedEvent,
   createEvaluationScheduledEvent,
   createEvaluationStartedEvent,
-} from "./eventing/fixtures/evaluation-events.fixtures";
-import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy";
+} from "./eventing/fixtures/evaluation-events.fixtures.ts";
+import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy.ts";
 
 const TENANT = "proj-eval";
 const attributePolicy = new PreserveEvaluationAnalyticsAttributes();

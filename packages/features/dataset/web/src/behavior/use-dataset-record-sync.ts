@@ -19,10 +19,10 @@
  * editor; the only change is which client the two mutations run on.
  */
 import { useCallback, useEffect, useRef } from "react";
-import type { AutosaveState } from "../model/dataset-table-context";
-import type { PendingSavedChanges } from "../model/pending-saved-changes";
+import type { AutosaveState } from "../model/dataset-table-context.tsx";
+import type { PendingSavedChanges } from "../model/pending-saved-changes.ts";
 
-import { datasetApi } from "./dataset-api";
+import { datasetApi } from "./dataset-api.ts";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 

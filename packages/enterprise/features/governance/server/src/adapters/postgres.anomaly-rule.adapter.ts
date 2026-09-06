@@ -1,5 +1,5 @@
-import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository";
-import { AnomalyRuleService } from "../services/anomaly-rule.service";
+import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
+import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 
 export class PostgresAnomalyRuleAdapter {
   private constructor(

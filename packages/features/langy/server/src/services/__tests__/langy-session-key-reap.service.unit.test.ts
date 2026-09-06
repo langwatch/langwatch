@@ -12,9 +12,9 @@
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangySessionKeyMetricsPort } from "../../ports/langy-session-key-metrics.port";
-import { LangySessionKeyReapRepository } from "../../repositories/langy-session-key-reap.repository";
-import { LangySessionKeyReapService } from "../langy-session-key-reap.service";
+import { LangySessionKeyMetricsPort } from "../../ports/langy-session-key-metrics.port.ts";
+import { LangySessionKeyReapRepository } from "../../repositories/langy-session-key-reap.repository.ts";
+import { LangySessionKeyReapService } from "../langy-session-key-reap.service.ts";
 
 class ReapRepository extends LangySessionKeyReapRepository {
   readonly calls: Array<{ name: string; now: Date }> = [];

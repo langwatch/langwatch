@@ -8,19 +8,19 @@ import {
   LuPencil,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { Link } from "../../../blocks/link";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground";
+import { Link } from "../../../blocks/link.tsx";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle";
-import { useSpansFull } from "../hooks/use-spans-full";
-import type { PromptReference } from "../../../../model/prompt-attributes";
-import { formatDuration } from "../../../../model/display-formatters";
+import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
+import { useSpansFull } from "../hooks/use-spans-full.ts";
+import type { PromptReference } from "../../../../model/prompt-attributes.ts";
+import { formatDuration } from "../../../../model/display-formatters.ts";
 import {
   extractPromptReference,
   parseTracePromptIds,
   promptReferenceKey,
-} from "../../../../model/prompt-attributes";
+} from "../../../../model/prompt-attributes.ts";
 
 interface PromptsPanelProps {
   trace: TraceHeader;

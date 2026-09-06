@@ -1,6 +1,6 @@
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
-import { type BucketEntry, resetOrGap } from "./rollup-row";
-import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
+import { type BucketEntry, resetOrGap } from "./rollup-row.ts";
+import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence.ts";
 
 /**
  * OTLP summaries are cumulative even though they carry no temporality field.

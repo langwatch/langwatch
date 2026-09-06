@@ -6,8 +6,8 @@ import type {
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "@langwatch/experiment-contract";
-import type { ExperimentDspyRetentionPort } from "../../ports/experiment-dspy-retention.port";
-import { ExperimentDspyRepository } from "../experiment-dspy.repository";
+import type { ExperimentDspyRetentionPort } from "../../ports/experiment-dspy-retention.port.ts";
+import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 
 const TABLE_NAME = "dspy_steps";
 

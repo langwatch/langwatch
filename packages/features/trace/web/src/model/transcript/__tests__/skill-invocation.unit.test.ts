@@ -5,7 +5,7 @@ import {
   isSkillToolName,
   skillInvocationFromToolUse,
   skillSlugFromInput,
-} from "../skill-invocation";
+} from "../skill-invocation.ts";
 
 describe("skillInvocation", () => {
   describe("isSkillToolName", () => {

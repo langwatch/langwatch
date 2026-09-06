@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { useGatewayHost } from "../model/gateway-host";
+import { useGatewayHost } from "../model/gateway-host.ts";
 
 /** The subset of the application toaster's create options these screens use. */
 export type GatewayToast = {

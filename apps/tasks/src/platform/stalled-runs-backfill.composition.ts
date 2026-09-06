@@ -22,8 +22,8 @@ import {
   type SimulationTextMessageEnd,
   type SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
-import type { TasksHost } from "./tasks-host.composition";
+import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition.ts";
+import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
  * `finishUnsuccessfulRun` only reads `AgentService` when the input carries a `target`, and this

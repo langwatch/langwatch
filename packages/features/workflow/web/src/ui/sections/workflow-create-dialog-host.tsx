@@ -8,16 +8,16 @@ import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workfl
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { workflowApi } from "../../model/workflow-api";
-import { useWorkflowHost } from "../../model/workflow-host";
-import { getRandomWorkflowIcon } from "../../model/random-workflow-icon";
+import { workflowApi } from "../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
+import { getRandomWorkflowIcon } from "../../model/random-workflow-icon.ts";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,
   type WorkflowTemplateCardProps,
-} from "../elements/workflow-create-dialog";
-import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker";
-import { WorkflowErrorBoundary } from "../elements/workflow-error-boundary";
-import { WorkflowListCard } from "./workflow-list-card";
+} from "../elements/workflow-create-dialog.tsx";
+import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker.tsx";
+import { WorkflowErrorBoundary } from "../elements/workflow-error-boundary.tsx";
+import { WorkflowListCard } from "./workflow-list-card.tsx";
 
 type WorkflowCreationFormData = {
   name: string;

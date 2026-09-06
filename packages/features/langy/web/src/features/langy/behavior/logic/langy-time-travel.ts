@@ -9,7 +9,7 @@ import {
   replayTurnProjection,
   streamRecords,
   tapeUpTo,
-} from "../stores/langy-dev-log";
+} from "../stores/langy-dev-log.ts";
 
 /** The minimal structural message the panel's renderer needs. */
 export interface TimeTravelMessage {

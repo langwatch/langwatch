@@ -8,7 +8,7 @@
  * would drift into testing three slightly different forms.
  */
 
-import type { ComposerState } from "../governance-inventory.screen";
+import type { ComposerState } from "../governance-inventory.screen.tsx";
 
 export function composer(parserConfig: Record<string, string>, pullSchedule = ""): ComposerState {
   return {

@@ -3,7 +3,7 @@
  * zero, so a normal interval is misleading at these sample sizes.
  */
 
-import { mulberry32 } from "./random.mulberry32";
+import { mulberry32 } from "./random.mulberry32.ts";
 import { quantile } from "@langwatch/experiment-contract";
 
 /** Resamples per interval. Matches the score bootstrap for the same reason. */

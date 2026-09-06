@@ -13,7 +13,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import slugify from "slugify";
-import { OrganizationMemberRoleService } from "./organization-member-role.service";
+import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
 
 import {
@@ -22,7 +22,7 @@ import {
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
   type OrganizationPlanUser,
-} from "../ports/organization-membership.port";
+} from "../ports/organization-membership.port.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -34,7 +34,7 @@ import type {
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
-} from "../repositories/organization-membership.repository";
+} from "../repositories/organization-membership.repository.ts";
 
 /** The KSUID resources an organization and its first team are born under. */
 const ORGANIZATION_KSUID_RESOURCE = "organization";

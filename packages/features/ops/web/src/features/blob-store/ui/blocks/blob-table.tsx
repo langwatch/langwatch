@@ -2,7 +2,7 @@ import { Box, Table } from "@chakra-ui/react";
 
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
-import { BlobRow } from "./blob-row";
+import { BlobRow } from "./blob-row.tsx";
 
 export function BlobTable({
   blobs,

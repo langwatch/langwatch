@@ -20,8 +20,8 @@ import {
   Workflow,
 } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel";
-import { LocalTunnelBadge } from "../../../../ui/elements/local-tunnel-badge";
+import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
+import { LocalTunnelBadge } from "../../../../ui/elements/local-tunnel-badge.tsx";
 
 /**
  * The icon and the label per agent type. Both maps are keyed by the whole

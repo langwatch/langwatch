@@ -5,7 +5,7 @@ import {
   LangyWorkerHttpAdapter,
   NullLangyWorkerMetricsAdapter,
   UnavailableLangyWorkerAdapter,
-} from "../index";
+} from "../index.ts";
 
 const tracing = vi.hoisted(() => {
   const span = {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
-import { BillableEventsMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.billable-events-meter.repository";
-import type { BillableEventsMeterPort } from "../ports/billable-events-meter.port";
+import { BillableEventsMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
+import type { BillableEventsMeterPort } from "../ports/billable-events-meter.port.ts";
 
 /**
  * The one statement this meter issues, rather than a vendor client.

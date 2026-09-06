@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — the identifier guard.
  * @see ../services/langwatch-ql-access-model.service.ts — the access model, as statements
  */
-import { SAFE_IDENTIFIER } from "../rules/langwatch-ql-sql-literal.rules";
+import { SAFE_IDENTIFIER } from "../rules/langwatch-ql-sql-literal.rules.ts";
 
 /**
  * Column-name shape, which unlike a table name may carry dots. ClickHouse's nested columns are

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { estimateCost } from "../model-cost";
-import type { ModelCostRate } from "../model-provider";
+import { estimateCost } from "../model-cost.ts";
+import type { ModelCostRate } from "../model-provider.ts";
 
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-2 $5 text in, $8 image in, $30 image out

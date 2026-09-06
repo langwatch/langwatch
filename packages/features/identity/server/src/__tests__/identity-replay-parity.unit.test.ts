@@ -26,7 +26,7 @@ import {
   identifierFactToRow,
   identifierRowToFact,
   type IdentifierRow,
-} from "../repositories/prisma/prisma.identifier.mapper";
+} from "../repositories/prisma/prisma.identifier.mapper.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

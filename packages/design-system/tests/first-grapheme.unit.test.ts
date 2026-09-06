@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstGrapheme } from "../src/first-grapheme";
+import { firstGrapheme } from "../src/first-grapheme.ts";
 
 describe("firstGrapheme", () => {
   describe("given a name beginning with an astral emoji", () => {

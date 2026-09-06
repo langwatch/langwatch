@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import {
   StripeUsageReportingService,
   type UsageReportingService,
-} from "../services/usage-reporting.service";
+} from "../services/usage-reporting.service.ts";
 
 /**
  * The Stripe SDK policy one composed process holds.

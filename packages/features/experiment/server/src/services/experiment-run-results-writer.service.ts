@@ -18,7 +18,7 @@ import {
   type RunResultsDraft,
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
+import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-results-writer");
 

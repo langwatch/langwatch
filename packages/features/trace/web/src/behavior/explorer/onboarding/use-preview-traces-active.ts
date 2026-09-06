@@ -1,6 +1,6 @@
-import { useOrganizationTeamProject } from "../../use-organization-team-project";
-import { useProjectHasTraces } from "../use-project-has-traces";
-import { useOnboardingStore } from "./store/onboarding-store";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { useProjectHasTraces } from "../use-project-has-traces.ts";
+import { useOnboardingStore } from "./store/onboarding-store.ts";
 
 /**
  * Sample preview is active when the user is *meant* to be seeing sample trace fixtures

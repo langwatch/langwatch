@@ -26,12 +26,12 @@ import {
 } from "@langwatch/dataset-server/composition/dataset-content";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
-import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition";
-import type { WorkerStorageConfig } from "../platform/config/worker.config";
+import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition.ts";
+import type { WorkerStorageConfig } from "../platform/config/worker.config.ts";
 import type {
   WorkerProjectS3SourcePort,
   WorkerProjectS3Target,
-} from "../platform/infrastructure/worker-stored-object-storage.adapter";
+} from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
 /**
  * `job:datasetNormalize`, composed in this process. Azure reuses

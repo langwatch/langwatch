@@ -7,7 +7,7 @@ import {
   compareBoundaryEdgeBaseline,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
-} from "../src";
+} from "../src/index.ts";
 
 function writeFixture(root: string, file: string, source: string): void {
   const path = join(root, file);

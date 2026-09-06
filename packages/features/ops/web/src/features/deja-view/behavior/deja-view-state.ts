@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildFragment, parseFragment } from "../model/deja-view-fragment";
+import { buildFragment, parseFragment } from "../model/deja-view-fragment.ts";
 
 type AggregateSelection = { aggregateId: string; tenantId: string } | null;
 

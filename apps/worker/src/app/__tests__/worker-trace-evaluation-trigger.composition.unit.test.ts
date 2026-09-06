@@ -11,7 +11,7 @@ import {
   type TraceEvaluationLoopBlockReason,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerTraceEvaluationTrigger } from "../worker-trace-evaluation-trigger.composition";
+import { createWorkerTraceEvaluationTrigger } from "../worker-trace-evaluation-trigger.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/evaluation-trigger.feature

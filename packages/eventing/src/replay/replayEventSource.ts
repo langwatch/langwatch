@@ -1,4 +1,4 @@
-import { compareOrdinal } from "../utils/compareOrdinal";
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
 
 export interface ReplayEvent {
   id: string;

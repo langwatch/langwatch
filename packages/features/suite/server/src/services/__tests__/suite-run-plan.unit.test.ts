@@ -12,10 +12,10 @@ import {
   type Suite,
 } from "@langwatch/suite-contract";
 
-import { SuiteService } from "../suite.service";
-import type { SuiteExecutionPort } from "../../ports/suite-execution.port";
-import type { SuiteRepository } from "../../repositories/suite.repository";
-import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository";
+import { SuiteService } from "../suite.service.ts";
+import type { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import type { SuiteRepository } from "../../repositories/suite.repository.ts";
+import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 
 const projectId = "project-1";
 

@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Icon, Text, Textarea } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { LuRotateCcw, LuTriangleAlert } from "react-icons/lu";
-import { IO_DISPLAY_TRUNCATE_AT } from "../io-viewer";
+import { IO_DISPLAY_TRUNCATE_AT } from "../io-viewer.tsx";
 
 const MIN_ROWS = 4;
 const MAX_ROWS = 24;

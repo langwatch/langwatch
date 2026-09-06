@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyticsMetrics } from "../analytics-registry";
+import { analyticsMetrics } from "../analytics-registry.ts";
 
 describe("analyticsMetrics", () => {
   describe("evaluation_pass_rate", () => {

@@ -11,8 +11,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   mountScenarioRunExportRest,
   type ScenarioRunExportAudit,
-} from "../scenario-run-export-rest.mount";
-import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session";
+} from "../scenario-run-export-rest.mount.ts";
+import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session.ts";
 
 const downloadBody = JSON.stringify({
   projectId: "project-1",

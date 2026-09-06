@@ -8,7 +8,7 @@ import {
 import type { SecretService } from "@langwatch/secret-contract";
 import { SecretApp, SecretPublicRestApi } from "@langwatch/secret-server";
 import { Hono } from "hono";
-import type { ApiRestProjectPolicy } from "./api-rest.security";
+import type { ApiRestProjectPolicy } from "./api-rest.security.ts";
 
 const restVersionSelector = RestVersionSelector.create({
   versions: ["v1"],

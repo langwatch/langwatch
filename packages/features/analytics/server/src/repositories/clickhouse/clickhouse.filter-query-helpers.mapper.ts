@@ -1,6 +1,6 @@
-import { generateClickHouseFilterConditions } from "../../rules/analytics-filter-conditions.rules";
-import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper";
-import type { FilterOption } from "../../ports/filter-options.port";
+import { generateClickHouseFilterConditions } from "../../rules/analytics-filter-conditions.rules.ts";
+import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper.ts";
+import type { FilterOption } from "../../ports/filter-options.port.ts";
 
 /**
  * Attribute keys as stored in ClickHouse trace_summaries.Attributes map. These must match the

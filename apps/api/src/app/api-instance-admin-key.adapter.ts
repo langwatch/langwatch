@@ -1,4 +1,4 @@
-import type { ApiConfig } from "../platform/config/api.config";
+import type { ApiConfig } from "../platform/config/api.config.ts";
 
 /**
  * The instance administrator credential, as the REST feature ports read it.

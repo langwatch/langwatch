@@ -1,6 +1,6 @@
 import type { EventHandler, IntentExecutor, ProcessManagerApplier } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import {
   LANGY_PROCESS_INTENT_TYPES,
   type LangyConversationProcessState,
@@ -10,12 +10,12 @@ import {
   langyGenerateTitleIntentSchema,
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
-} from "../ports/langy-conversation-process.port";
-import { LANGY_OUTBOX_LEASE_DURATION_MS, type LangyEffectPorts } from "../ports/langy-effect.port";
+} from "../ports/langy-conversation-process.port.ts";
+import { LANGY_OUTBOX_LEASE_DURATION_MS, type LangyEffectPorts } from "../ports/langy-effect.port.ts";
 import {
   createLangyGenerateTitleIntent,
   createLangyWorkerDispatchIntent,
-} from "../intents/langy-conversation.intent";
+} from "../intents/langy-conversation.intent.ts";
 
 /**
  * The content boundary (`toPayload`): narrows a committed Langy pipeline event to identities and

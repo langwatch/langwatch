@@ -3,7 +3,7 @@
  * @see packages/features/agent/specs/package-boundary.feature
  */
 import { describe, expect, it } from "vitest";
-import { mapAgentRow, type AgentRow } from "../prisma.agent.mapper";
+import { mapAgentRow, type AgentRow } from "../prisma.agent.mapper.ts";
 
 function persistedRow(overrides: Partial<AgentRow> = {}): AgentRow {
   return {

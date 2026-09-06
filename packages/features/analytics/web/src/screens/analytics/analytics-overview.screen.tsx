@@ -16,15 +16,15 @@ import { BarChart2 } from "react-feather";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
-} from "../../ui/sections/documents-counts-table";
-import { UserMetrics } from "../../ui/sections/user-metrics";
-import { FilterSidebar } from "../../ui/sections/filter-sidebar";
-import AnalyticsLayout from "../../ui/sections/analytics-layout";
-import { LLMMetrics } from "../../ui/sections/llm-metrics";
-import { Link } from "../../ui/elements/analytics-link";
-import { useFilterParams } from "../../behavior/use-filter-params";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { analyticsApi } from "../../behavior/analytics-api";
+} from "../../ui/sections/documents-counts-table.tsx";
+import { UserMetrics } from "../../ui/sections/user-metrics.tsx";
+import { FilterSidebar } from "../../ui/sections/filter-sidebar.tsx";
+import AnalyticsLayout from "../../ui/sections/analytics-layout.tsx";
+import { LLMMetrics } from "../../ui/sections/llm-metrics.tsx";
+import { Link } from "../../ui/elements/analytics-link.tsx";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 
 function AnalyticsContent() {
   const host = useAnalyticsHost();

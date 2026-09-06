@@ -4,7 +4,7 @@
 import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { EventSourcing } from "@langwatch/eventing";
-import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
+import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { createLogger } from "@langwatch/observability";
@@ -13,9 +13,14 @@ import {
   EventExplorerClickHouseRepository,
   EventExplorerService,
   EventingOpsIntrospectionAdapter,
+  ManagerExplorerService,
   NoopSchedulerWakeService,
   OpsApp,
   PostgresOpsAdapter,
+  ProcessAuditRepository,
+  OpsSnapshotRedisPort,
+  ProcessOpsPrismaRepository,
+  RedisOpsSnapshotAdapter,
   type OpsCapability,
   type OpsEventExplorer,
   type OpsProcessExplorer,
@@ -25,11 +30,12 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiAuditPort } from "../../api-request.policy";
-import { createOpsTrpcRouter } from "./ops-trpc.mount";
-import { opsPolicyKit } from "./ops-policy-kit";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
+import { createOpsTrpcRouter } from "./ops-trpc.mount.ts";
+import { opsPolicyKit } from "./ops-policy-kit.ts";
 
 const OPS_EVENT_LOG_LOOKBACK_DAYS = 365;
 
@@ -60,14 +66,20 @@ export type OpsFeatureCollaborators = Readonly<{
   eventLogClient: ClickHouseClient | null;
   /** This process's own registrations, for the explorer's introspection half. */
   eventing: EventSourcing | undefined;
+  /**
+   * The connection the ops snapshot is published to by the worker. Reading it
+   * is all this process does with it: the dashboard, its badge counts and its
+   * live stream are all one artifact the writer already computed.
+   */
+  redis: RedisConnection | null;
   logger: Logger;
 }>;
 
-import type { ComposedOpsFeature } from "./ops.composition.types";
+import type { ComposedOpsFeature } from "./ops.composition.types.ts";
 
 /** Reports each operator absence, with what it costs. */
 export abstract class ApiOpsAbsenceReport {
-  abstract absent(capability: "operator-runtime"): void;
+  abstract absent(capability: "replay-runtime" | "ops-snapshot"): void;
 }
 
 /** Writes each absence to the process log, once, at composition time. */
@@ -80,14 +92,16 @@ export class LoggedApiOpsAbsence extends ApiOpsAbsenceReport {
     super();
   }
 
-  absent(capability: "operator-runtime"): void {
+  absent(capability: "replay-runtime" | "ops-snapshot"): void {
     this.logger.warn({ capability }, OPS_CONSEQUENCE[capability]);
   }
 }
 
 const OPS_CONSEQUENCE = {
-  "operator-runtime":
-    "API process composed no operator runtime: the process-manager fleet and the projection replay runner refuse by name. The event-log explorer, the scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
+  "replay-runtime":
+    "API process composed no projection replay runner: every replay call refuses by name. The process-manager fleet, the event-log explorer, the scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
+  "ops-snapshot":
+    "API process composed no Redis: the operator dashboard, its badge counts and its live stream have no snapshot to read, so they answer empty rather than showing what the worker computed.",
 } as const;
 
 /** Composes the operator surface over this process's own graph. */
@@ -97,6 +111,8 @@ export function composeOpsFeature(options: {
   adminEmails: readonly string[];
   eventLogClient: ClickHouseClient | null;
   eventing: EventSourcing | undefined;
+  /** The connection the worker publishes the ops snapshot on, where one exists. */
+  redis?: RedisConnection | null;
   report?: ApiOpsAbsenceReport;
 }): ComposedOpsFeature {
   const collaborators: OpsFeatureCollaborators = {
@@ -109,12 +125,13 @@ export function composeOpsFeature(options: {
     adminEmails: options.adminEmails,
     eventLogClient: options.eventLogClient,
     eventing: options.eventing,
+    redis: options.redis ?? null,
     logger: createLogger("langwatch:api:ops"),
   };
-  // Both remaining legs are unconditional: this process runs no process
-  // managers whatever it is configured with, and no replay runtime exists in
-  // the tree for any process to compose.
-  options.report?.absent("operator-runtime");
+  // Unconditional: no replay runtime exists in the tree for any process to
+  // compose, whatever this one is configured with.
+  options.report?.absent("replay-runtime");
+  if (!collaborators.redis) options.report?.absent("ops-snapshot");
   const app = composeOps(collaborators, collaborators.logger);
 
   return {
@@ -169,10 +186,19 @@ function refusingOps<T>(): T {
 // ---------------------------------------------------------------------------
 
 /**
- * The operator application, over the Postgres half of the operations capability. `redis`
- * is deliberately NOT passed.
+ * The operator application, over this process's own connections.
  */
 function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
+  const snapshots = options.redis
+    ? RedisOpsSnapshotAdapter.create({ redis: ApiOpsSnapshotRedis.create(options.redis) })
+    : null;
+  // Polling starts here rather than on first read: the dashboard, the badge and
+  // the live stream all read the last artifact this process pulled, so a reader
+  // that had never polled would answer an empty fleet on the first open.
+  snapshots?.start().catch((error) => {
+    logger.error({ error }, "failed to start the ops snapshot reader");
+  });
+
   const operations = PostgresOpsAdapter.create({
     adminEmails: options.adminEmails,
     // Once the connection projection decides sign-in, editing the legacy
@@ -198,9 +224,11 @@ function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
   return OpsApp.create({
     ops: Object.assign(operations, {
       eventExplorer: composeEventExplorer(options),
-      managerExplorer: unavailableOperatorRuntime<OpsProcessExplorer>("the process-manager fleet"),
+      managerExplorer: composeManagerExplorer(options),
       replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
-      snapshots: null,
+      // Read-only here: the worker holds the lease and writes the artifact, and
+      // a second writer would publish a second answer for one fleet.
+      snapshots,
     }) as OpsCapability,
     featureFlags: options.featureFlags,
     projects: options.projects,
@@ -227,6 +255,22 @@ function composeEventExplorer(options: OpsFeatureCollaborators): OpsEventExplore
 }
 
 /**
+ * The process-manager fleet, over the same rows the managers themselves run on: the
+ * instance store, the fleet counts, the operator audit trail, and this process's own
+ * pipeline registrations.
+ */
+function composeManagerExplorer(options: OpsFeatureCollaborators): OpsProcessExplorer {
+  return ManagerExplorerService.create({
+    store: PrismaProcessStore.create({ database: options.prisma }),
+    fleet: ProcessOpsPrismaRepository.create({ prisma: options.prisma }),
+    audit: ProcessAuditRepository.create({ prisma: options.prisma }),
+    introspection: EventingOpsIntrospectionAdapter.create(
+      () => options.eventing?.definitions ?? [],
+    ),
+  });
+}
+
+/**
  * One operator explorer, refused by name on every method.
  */
 function unavailableOperatorRuntime<T>(capability: string): T {
@@ -237,6 +281,43 @@ function unavailableOperatorRuntime<T>(capability: string): T {
       has: () => true,
     },
   ) as T;
+}
+
+/**
+ * The four Redis commands the snapshot artifact is held under, named as the package asks
+ * for them. `set` and `incr` belong to the writer, which is the worker's; this process
+ * composes the whole port because the artifact is one key shape, not two.
+ */
+class ApiOpsSnapshotRedis extends OpsSnapshotRedisPort {
+  static create(redis: RedisConnection): ApiOpsSnapshotRedis {
+    return new ApiOpsSnapshotRedis(redis);
+  }
+
+  private constructor(private readonly redis: RedisConnection) {
+    super();
+  }
+
+  eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown> {
+    return this.redis.eval(script, numberOfKeys, ...args) as Promise<unknown>;
+  }
+
+  set(
+    key: string,
+    value: string,
+    expiryMode: "EX",
+    expirySeconds: number,
+    condition: "NX",
+  ): Promise<unknown> {
+    return this.redis.set(key, value, expiryMode, expirySeconds, condition);
+  }
+
+  tryGet(key: string): Promise<string | null> {
+    return this.redis.get(key);
+  }
+
+  incr(key: string): Promise<number> {
+    return this.redis.incr(key);
+  }
 }
 
 /** Bridges the operations package's audit sink onto this process's trail. */

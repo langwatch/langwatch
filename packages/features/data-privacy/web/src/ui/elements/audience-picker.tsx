@@ -11,7 +11,7 @@ import {
   ROLE_VALUES,
   selectionToAudience,
   type AudienceFormState,
-} from "../../model/data-privacy-rule-config";
+} from "../../model/data-privacy-rule-config.ts";
 
 interface AudienceItem {
   value: string;

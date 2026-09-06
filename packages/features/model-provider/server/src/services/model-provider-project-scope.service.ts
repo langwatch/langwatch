@@ -1,5 +1,5 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import type { ModelCostProjectPort } from "../ports/model-provider.port";
+import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
 
 export type ModelProviderProjectSystemContext = {
   scopes: ModelDefaultScope[];

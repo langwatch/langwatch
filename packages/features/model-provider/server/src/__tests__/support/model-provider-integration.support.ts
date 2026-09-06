@@ -26,8 +26,8 @@ import type {
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
-} from "../../ports/model-provider.port";
-import { PrefixedModelProviderIdAdapter } from "../../adapters/prefixed.model-provider-id.adapter";
+} from "../../ports/model-provider.port.ts";
+import { PrefixedModelProviderIdAdapter } from "../../adapters/prefixed.model-provider-id.adapter.ts";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

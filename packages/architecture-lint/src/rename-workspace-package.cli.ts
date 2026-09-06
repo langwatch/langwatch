@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { renameWorkspaceReference } from "./workspace-package-rename";
+import { renameWorkspaceReference } from "./workspace-package-rename.ts";
 
 const USAGE = `Usage:
   pnpm refactor:rename-package --from OLD --to NEW [--write] [--all-string-literals] FILE...

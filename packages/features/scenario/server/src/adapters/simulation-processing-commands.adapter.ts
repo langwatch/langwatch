@@ -17,7 +17,7 @@ import {
  * ./commands/; FinishRunCommand is re-surfaced here for one import site.
  */
 
-export { FinishRunCommand } from "./finish-run.adapter";
+export { FinishRunCommand } from "./finish-run.adapter.ts";
 
 export const QueueRunCommand = defineCommand({
   commandType: "lw.simulation_run.queue",

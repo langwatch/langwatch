@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { PrismaExperimentWorkflowVersionRepository } from "../prisma.experiment-workflow-version.repository";
+import { PrismaExperimentWorkflowVersionRepository } from "../prisma.experiment-workflow-version.repository.ts";
 
 type FindManyArgs = {
   where: { projectId: string; id: { in: string[] } };

@@ -5,8 +5,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -20,7 +20,7 @@ import {
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
-} from "./lwql-clickhouse-harness";
+} from "./lwql-clickhouse-harness.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const accessAudit = LangWatchQLAccessAuditService.create();

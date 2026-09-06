@@ -3,14 +3,14 @@ import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import type { EvaluatorOption } from "../../hooks/use-evaluator-options";
+import type { EvaluatorOption } from "../../hooks/use-evaluator-options.ts";
 import {
   EVAL_COLUMN_FIELDS,
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
-} from "../../../../../model/lens-eval-column-id";
-import { evalColumnLabel } from "../../trace-table/eval-columns";
+} from "../../../../../model/lens-eval-column-id.ts";
+import { evalColumnLabel } from "../../trace-table/eval-columns.ts";
 
 /** Toast hint shown after a column is added, shared with the picker's own
  *  column-toggle toast so the copy stays in one place. */

@@ -3,18 +3,18 @@ import {
   type IdentifierFact,
   type IdentityHeads,
 } from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../../services/identity-guards.service";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
+import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { describe, expect, it } from "vitest";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
-import { AttachIdentifierCommand } from "../../intents/attach-identifier.intent";
-import { DetachIdentifierCommand } from "../../intents/detach-identifier.intent";
-import { EraseUserCommand } from "../../intents/erase-user.intent";
-import { MarkPrimaryCommand } from "../../intents/mark-primary.intent";
-import { VerifyIdentifierCommand } from "../../intents/verify-identifier.intent";
-import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
-import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
+import { AttachIdentifierCommand } from "../../intents/attach-identifier.intent.ts";
+import { DetachIdentifierCommand } from "../../intents/detach-identifier.intent.ts";
+import { EraseUserCommand } from "../../intents/erase-user.intent.ts";
+import { MarkPrimaryCommand } from "../../intents/mark-primary.intent.ts";
+import { VerifyIdentifierCommand } from "../../intents/verify-identifier.intent.ts";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter.ts";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

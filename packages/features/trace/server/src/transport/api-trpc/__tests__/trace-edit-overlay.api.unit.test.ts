@@ -10,7 +10,7 @@ import {
   TraceEditOverlayTrpcApi,
   type TraceEditOverlayTrpcContext,
   type TraceEditOverlayTrpcPorts,
-} from "../trace-edit-overlay.api";
+} from "../trace-edit-overlay.api.ts";
 
 function harness({ canUpdateAnnotations = true }: { canUpdateAnnotations?: boolean } = {}) {
   const trpc = initTRPC.context<TraceEditOverlayTrpcContext>().create();

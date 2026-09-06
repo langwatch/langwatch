@@ -3,8 +3,8 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useFlameViewport } from "../use-flame-viewport";
-import type { Viewport } from "../types";
+import { useFlameViewport } from "../use-flame-viewport.ts";
+import type { Viewport } from "../types.ts";
 
 const fullRange: Viewport = { startMs: 0, endMs: 100 };
 

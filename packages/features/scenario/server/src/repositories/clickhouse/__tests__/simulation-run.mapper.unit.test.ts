@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   mapClickHouseRowToScenarioRunData,
   type ClickHouseSimulationRunRow,
-} from "../simulation-run.mapper";
+} from "../simulation-run.mapper.ts";
 
 function row(overrides: Partial<ClickHouseSimulationRunRow> = {}): ClickHouseSimulationRunRow {
   return {

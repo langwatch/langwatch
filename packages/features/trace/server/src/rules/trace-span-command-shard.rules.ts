@@ -23,7 +23,7 @@
  * hot trace cannot starve its neighbours (see packages/group-queue/specs/tenant-soft-cap.feature).
  */
 
-import { clampShardCount, shardIndexFor } from "./trace-command-shard.rules";
+import { clampShardCount, shardIndexFor } from "./trace-command-shard.rules.ts";
 
 /**
  * Upper bound on the shard count. A hot trace never needs more parallelism than

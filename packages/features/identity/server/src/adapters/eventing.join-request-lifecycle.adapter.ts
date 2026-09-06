@@ -1,9 +1,9 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { JoinRequestService } from "../services/join-request.service";
-import { newJoinRequestCommandId } from "../rules/join-request-id.rules";
-import type { JoinRequestNotificationService } from "../services/join-request-notification.service";
-import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
-import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository";
+import type { JoinRequestService } from "../services/join-request.service.ts";
+import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
+import type { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
+import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
+import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
 
 export type EventingJoinRequestLifecycleOptions = {
   /** The write surface the expiry wake dispatches its command through. */

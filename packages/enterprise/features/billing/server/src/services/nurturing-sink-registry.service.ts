@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository";
-import type { NurturingService } from "./nurturing.service";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
+import type { NurturingService } from "./nurturing.service.ts";
 
 /**
  * What the lifecycle-signal services reach for, and why it is registered rather than passed.

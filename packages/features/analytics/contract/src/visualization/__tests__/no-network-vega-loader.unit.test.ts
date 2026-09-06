@@ -14,7 +14,7 @@ import {
   createNoNetworkVegaLoader,
   LangWatchQLVegaLoadBlockedError,
   redactResourceReference,
-} from "../no-network-vega-loader";
+} from "../no-network-vega-loader.ts";
 
 /**
  * Runs an attempt that must refuse, and hands back the refusal it raised.

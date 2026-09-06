@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { langwatchEndpoint, langwatchEndpointEnv } from "../langwatch-endpoint";
+import { langwatchEndpoint, langwatchEndpointEnv } from "../langwatch-endpoint.ts";
 
 const selfHosted = { protocol: "https:", hostname: "langwatch.acme.internal", port: "" };
 const local = { protocol: "http:", hostname: "localhost", port: "5560" };

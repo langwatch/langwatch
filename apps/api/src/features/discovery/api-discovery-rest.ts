@@ -9,8 +9,8 @@
 import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
-import { WHY_DISCOVERY_IS_PUBLIC } from "./discovery-locations";
-import { respondWithApiDocument } from "./openapi-serve";
+import { WHY_DISCOVERY_IS_PUBLIC } from "./discovery-locations.ts";
+import { respondWithApiDocument } from "./openapi-serve.ts";
 
 export function createApiDiscoveryRestApp(options: {
   security: AppRestSecurity;

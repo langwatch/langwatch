@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BillingErrorReporter, NurturingService } from "../index";
+import { BillingErrorReporter, NurturingService } from "../index.ts";
 import type { CioBatchCall } from "@langwatch/enterprise-billing-contract";
 
 // Suppress logger output and captureException in tests

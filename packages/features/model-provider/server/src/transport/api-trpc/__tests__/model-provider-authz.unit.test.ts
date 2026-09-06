@@ -6,7 +6,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { ModelProviderTrpcApi, type ModelProviderTrpcContext } from "../model-provider.api";
+import { ModelProviderTrpcApi, type ModelProviderTrpcContext } from "../model-provider.api.ts";
 
 const PROJECT_A = "project_a";
 const PROJECT_B = "project_b";

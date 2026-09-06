@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
-import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
-import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
+import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
+import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 
 function createMockRedis() {
   return {

@@ -12,11 +12,11 @@ import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
-} from "../rules/legacy-model-provider.rules";
+} from "../rules/legacy-model-provider.rules.ts";
 import type {
   ModelCostProjectPort,
   ModelProviderCodexHandlePort,
-} from "../ports/model-provider.port";
+} from "../ports/model-provider.port.ts";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.

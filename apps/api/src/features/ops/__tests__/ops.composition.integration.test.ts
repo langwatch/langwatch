@@ -16,15 +16,15 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
+} from "../../../api.application.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
-import { composeOpsFeature } from "../ops.composition";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { composeOpsFeature } from "../ops.composition.ts";
 
 const SESSION_USER = {
   id: "user-1",

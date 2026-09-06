@@ -9,7 +9,7 @@ import {
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   resolveJoinLookup,
-} from "../join-matching";
+} from "../join-matching.ts";
 
 /**
  * The offers behind an `ask`, or a failure naming the outcome that arrived.

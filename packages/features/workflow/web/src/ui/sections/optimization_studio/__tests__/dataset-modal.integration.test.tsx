@@ -33,7 +33,7 @@ vi.mock("@langwatch/ui-host/use-drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
     organization: { id: "org-1" },
@@ -49,7 +49,7 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../model/workflow-api-client", () => ({
+vi.mock("../../../../model/workflow-api-client.ts", () => ({
   api: {
     dataset: {
       getAll: {
@@ -94,9 +94,9 @@ vi.mock("../../../../model/workflow-api-client", () => ({
   },
 }));
 
-import { _useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { _useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import type { Entry } from "@langwatch/workflow-contract";
-import { DatasetModal } from "../dataset-modal";
+import { DatasetModal } from "../dataset-modal.tsx";
 
 const ENTRY_NODE = {
   id: "entry",

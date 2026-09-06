@@ -3,7 +3,7 @@
  * One source of truth — every facet builder consumes these.
  */
 
-import type { FacetQueryContext } from "./trace-facet-registry.clickhouse.adapter";
+import type { FacetQueryContext } from "./trace-facet-registry.clickhouse.adapter.ts";
 
 /**
  * Per-query memory guard for unbounded key-discovery facets (metadata/span/event-attribute-keys): each flattens an attribute map with arrayJoin and groups by key over the whole window, and high-cardinality key names (per-user/UUID) turn GROUP BY into millions of groups, tripping MEMORY_LIMIT_EXCEEDED in prod. max_bytes_before_external_group_by spills to disk so the facet completes; max_memory_usage caps the read so a pathological tenant fails its own query rather than triggering the OvercommitTracker to kill an unrelated one (same rationale as SINGLE_TRACE_READ_SETTINGS). Sits above any normal read and below the global limit.

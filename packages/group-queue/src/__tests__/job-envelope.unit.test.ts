@@ -2,8 +2,8 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage";
-import { MAX_BLOB_BYTES } from "../blobConstants";
+import { createTenantId } from "../storage.ts";
+import { MAX_BLOB_BYTES } from "../blobConstants.ts";
 import {
   assertPayloadWithinCap,
   decodeJobEnvelope,
@@ -13,9 +13,9 @@ import {
   readEnvelopeRetirement,
   readJobPayloadBytes,
   readJobRoutingMeta,
-} from "../jobEnvelope";
-import { TieredBlobStore } from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
+} from "../jobEnvelope.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 describe("jobEnvelope", () => {
   // The GROUP_QUEUE_ENVELOPE_WRITES_ENABLED flag that let encodeJobEnvelope

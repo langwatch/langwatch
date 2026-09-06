@@ -18,18 +18,18 @@
 import { useCallback, useMemo } from "react";
 import qs from "qs";
 
-import { useAnalyticsHost } from "../model/analytics-host";
-import { availableFilters } from "../model/analytics-filter-catalogue";
-import type { FilterField } from "../model/analytics-filter-definition";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
+import { availableFilters } from "../model/analytics-filter-catalogue.ts";
+import type { FilterField } from "../model/analytics-filter-definition.ts";
 import {
   countFilters,
   isFilterQueryKey,
   readFiltersFromQuery,
   type FilterParam,
-} from "../model/analytics-filter-params";
-import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options";
-import { useAnalyticsPeriod } from "./use-analytics-period";
-import type { AnalyticsReadScope } from "./analytics-api";
+} from "../model/analytics-filter-params.ts";
+import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
+import { useAnalyticsPeriod } from "./use-analytics-period.ts";
+import type { AnalyticsReadScope } from "./analytics-api.ts";
 
 /**
  * How this family writes a query string.

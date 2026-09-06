@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
-} from "../redis.billing-organization-cache.adapter";
-import type { BillingReportOrganizationLookup } from "../../ports/billing-report-organization.port";
+} from "../redis.billing-organization-cache.adapter.ts";
+import type { BillingReportOrganizationLookup } from "../../ports/billing-report-organization.port.ts";
 
 /** The whole verdict is what the cache stores, not just the organization. */
 const ORGANIZATION: BillingReportOrganizationLookup = {

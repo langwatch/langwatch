@@ -12,9 +12,9 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository";
-import { PrismaOrganizationRepository } from "../prisma.organization.repository";
-import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port";
+import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
+import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
+import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

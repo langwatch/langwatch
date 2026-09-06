@@ -26,15 +26,15 @@ import type {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
   WorkflowIdPort,
-} from "../ports/workflow.port";
+} from "../ports/workflow.port.ts";
 import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
-} from "../repositories/workflow.repository";
-import type { StudioEventPreparationInput } from "./studio-event-preparer.service";
-import type { StudioEventPreparer } from "./studio-event-preparer.service";
-import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service";
-import { WorkflowDslService } from "./workflow-dsl.service";
+} from "../repositories/workflow.repository.ts";
+import type { StudioEventPreparationInput } from "./studio-event-preparer.service.ts";
+import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
+import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
+import { WorkflowDslService } from "./workflow-dsl.service.ts";
 
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;

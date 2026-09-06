@@ -1,6 +1,6 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurfacePort } from "../ports/langy-turn-runtime.port";
+import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurfacePort } from "../ports/langy-turn-runtime.port.ts";
 
 const logger = createLogger("langwatch:langy:ui-action-surface");
 

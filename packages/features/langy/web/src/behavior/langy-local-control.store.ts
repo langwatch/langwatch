@@ -4,7 +4,7 @@
  */
 import { create } from "zustand";
 
-import { type LangyLiveWait, mergeLangyWaitStatus } from "../model/langy-local-waits";
+import { type LangyLiveWait, mergeLangyWaitStatus } from "../model/langy-local-waits.ts";
 
 /** The folder as the live stream last reported it. */
 export interface LangyLiveWorkspace {

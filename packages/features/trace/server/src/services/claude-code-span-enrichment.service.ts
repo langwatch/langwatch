@@ -4,7 +4,7 @@
  * request_id, input positionally, the Nth request body with the Nth span in one query source.
  */
 import type { SpanInputOutput } from "@langwatch/trace-contract";
-import { capPayloadString } from "../rules/trace-payload-cap.rules";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   ASSISTANT_RESPONSE_EVENT,
@@ -14,7 +14,7 @@ import {
   type ClaudeContentLog,
   type ClaudeSpanEnrichment,
   type ClaudeSpanRef,
-} from "../rules/claude-code-message-index.rules";
+} from "../rules/claude-code-message-index.rules.ts";
 import {
   buildToolInput,
   buildToolOutput,
@@ -24,7 +24,7 @@ import {
   type ClaudeToolSpanRef,
   TOOL_DECISION_EVENT,
   TOOL_RESULT_EVENT,
-} from "../rules/claude-code-tool-enrichment.rules";
+} from "../rules/claude-code-tool-enrichment.rules.ts";
 
 export class ClaudeCodeSpanEnrichmentService {
   static create(): ClaudeCodeSpanEnrichmentService {

@@ -58,7 +58,7 @@ import {
   buildTraceTestContext,
   generateTraceIds,
   type AgentTestTrace,
-} from "../../rules/agent-test-tracing.rules";
+} from "../../rules/agent-test-tracing.rules.ts";
 
 const logger = createLogger("langwatch:httpProxy");
 

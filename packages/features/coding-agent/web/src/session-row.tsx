@@ -1,17 +1,17 @@
 import { Table } from "@chakra-ui/react";
-import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell";
-import { AgentLabel } from "./agent-label";
-import { CompactionsCell } from "./cells/compactions-cell";
-import { ContextCell } from "./cells/context-cell";
-import { MISSING_VALUE } from "./cells/missing-value";
-import { PullRequestsCell } from "./cells/pull-requests-cell";
-import { SessionNameCell } from "./cells/session-name-cell";
-import { SessionRowActions } from "./session-row-actions";
-import { TokenCostCell } from "./cells/token-cost-cell";
-import type { SessionListRow, SessionPullRequest } from "./session-list-row";
+import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";
+import { AgentLabel } from "./agent-label.tsx";
+import { CompactionsCell } from "./cells/compactions-cell.tsx";
+import { ContextCell } from "./cells/context-cell.tsx";
+import { MISSING_VALUE } from "./cells/missing-value.tsx";
+import { PullRequestsCell } from "./cells/pull-requests-cell.tsx";
+import { SessionNameCell } from "./cells/session-name-cell.tsx";
+import { SessionRowActions } from "./session-row-actions.tsx";
+import { TokenCostCell } from "./cells/token-cost-cell.tsx";
+import type { SessionListRow, SessionPullRequest } from "./session-list-row.ts";
 import type React from "react";
 
-import { formatLastUpdate } from "./last-update";
+import { formatLastUpdate } from "./last-update.ts";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

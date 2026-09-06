@@ -7,7 +7,7 @@ import {
   expandLatestAlias,
   ModelRestrictedForExecutionError,
 } from "@langwatch/model-provider-contract";
-import { ModelProviderExecutionService } from "../model-provider-execution.service";
+import { ModelProviderExecutionService } from "../model-provider-execution.service.ts";
 
 function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
   return ModelProviderExecutionService.create({

@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { SimulationChip } from "./simulation-chip";
+import { SimulationChip } from "./simulation-chip.tsx";
 
 function useCopyToClipboard() {
   const [copied, setCopied] = useState(false);

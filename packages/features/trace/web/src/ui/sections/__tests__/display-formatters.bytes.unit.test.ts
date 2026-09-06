@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes } from "../../../model/display-formatters";
+import { formatBytes } from "../../../model/display-formatters.ts";
 
 /**
  * `formatBytes` humanises the trace's stored payload size (`_size_bytes` on

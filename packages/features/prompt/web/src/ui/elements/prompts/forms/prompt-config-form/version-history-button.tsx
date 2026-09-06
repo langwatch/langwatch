@@ -1,6 +1,6 @@
-import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { VersionHistoryListPopover } from "../../version-history-list-popover";
+import { VersionHistoryListPopover } from "../../version-history-list-popover.tsx";
 
 export function VersionHistoryButton({
   configId,

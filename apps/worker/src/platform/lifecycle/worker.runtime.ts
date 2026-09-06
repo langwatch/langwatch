@@ -3,9 +3,9 @@ import type {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "./worker-runtime.port";
+} from "./worker-runtime.port.ts";
 
-export { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "./worker-runtime.port";
+export { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "./worker-runtime.port.ts";
 
 export type WorkerRuntimeOptions = {
   lifecycle: WorkerLifecyclePort;

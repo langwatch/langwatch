@@ -7,9 +7,9 @@ import { createLogger } from "@langwatch/observability";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port";
-import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository";
-import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.mapper";
+} from "../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
+import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 

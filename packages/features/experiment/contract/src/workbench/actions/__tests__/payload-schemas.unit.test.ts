@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMPARISON_EVALUATOR_TYPE } from "../../../experiment-workbench";
+import { COMPARISON_EVALUATOR_TYPE } from "../../../experiment-workbench.ts";
 import {
   addColumnPayloadSchema,
   addEvaluatorPayloadSchema,
@@ -14,7 +14,7 @@ import {
   setMappingPayloadSchema,
   setTargetPromptPayloadSchema,
   updateTargetModelPayloadSchema,
-} from "../schemas";
+} from "../schemas.ts";
 
 describe("payload schemas", () => {
   const fixtures = [

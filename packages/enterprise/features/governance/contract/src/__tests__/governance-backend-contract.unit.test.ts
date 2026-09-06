@@ -4,13 +4,13 @@ import {
   createAnomalyRuleInputSchema,
   safeParseDestinationConfig,
   validateThresholdConfig,
-} from "../anomaly-rule";
-import { isGovernanceOriginTrace } from "../governance-attributes";
-import { departmentSchema } from "../department";
-import { getStarterTemplate, isOttlEnabledSourceType } from "../ingestion-source";
-import { ottlTransformInputSchema, ottlValidationResultSchema } from "../ottl";
-import { normalizedPullEventSchema, pulledUsageHintSchema } from "../puller";
-import { quarantineFillInputSchema } from "../quarantine-fill";
+} from "../anomaly-rule.ts";
+import { isGovernanceOriginTrace } from "../governance-attributes.ts";
+import { departmentSchema } from "../department.ts";
+import { getStarterTemplate, isOttlEnabledSourceType } from "../ingestion-source.ts";
+import { ottlTransformInputSchema, ottlValidationResultSchema } from "../ottl.ts";
+import { normalizedPullEventSchema, pulledUsageHintSchema } from "../puller.ts";
+import { quarantineFillInputSchema } from "../quarantine-fill.ts";
 
 describe("governance backend contract", () => {
   it("accepts HTTPS destinations and quarantines malformed legacy rows", () => {

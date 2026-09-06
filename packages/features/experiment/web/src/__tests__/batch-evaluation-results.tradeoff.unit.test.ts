@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ParetoDominance } from "../ui/sections/batch-evaluation-results.pareto";
-import { formatTradeoffSummary } from "../ui/sections/batch-evaluation-results.tradeoff";
+import type { ParetoDominance } from "../ui/sections/batch-evaluation-results.pareto.ts";
+import { formatTradeoffSummary } from "../ui/sections/batch-evaluation-results.tradeoff.ts";
 
 /**
  * The sentence is what a reader acts on, so it is held to the same standard as the

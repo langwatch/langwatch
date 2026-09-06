@@ -48,19 +48,19 @@ import type {
   ModelProviderIdService,
   ModelProviderRepository,
   ModelTranslationPort,
-} from "../ports/model-provider.port";
-import { ModelProviderCommandService } from "./model-provider-command.service";
-import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
-import { ModelProviderCodexService } from "./model-provider-codex.service";
-import { ModelProviderCostsService } from "./model-provider-costs.service";
-import { ModelProviderDefaultsService } from "./model-provider-defaults.service";
-import { ModelProviderDefaultsWriteService } from "./model-provider-defaults-write.service";
-import { ModelProviderExecutionService } from "./model-provider-execution.service";
-import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service";
-import { ModelProviderQueryService } from "./model-provider-query.service";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service";
-import { ModelProviderScopeService } from "./model-provider-scope.service";
-import { ModelProviderResolutionService } from "./model-provider-resolution.service";
+} from "../ports/model-provider.port.ts";
+import { ModelProviderCommandService } from "./model-provider-command.service.ts";
+import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
+import { ModelProviderCodexService } from "./model-provider-codex.service.ts";
+import { ModelProviderCostsService } from "./model-provider-costs.service.ts";
+import { ModelProviderDefaultsService } from "./model-provider-defaults.service.ts";
+import { ModelProviderDefaultsWriteService } from "./model-provider-defaults-write.service.ts";
+import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
+import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
+import { ModelProviderQueryService } from "./model-provider-query.service.ts";
+import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
 
 export interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;

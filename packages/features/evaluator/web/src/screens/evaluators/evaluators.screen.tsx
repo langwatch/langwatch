@@ -31,13 +31,13 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api";
-import { useEvaluatorHost } from "../../model/evaluator-host";
-import { EvaluatorDeleteDialog } from "../../ui/blocks/evaluator-delete-dialog";
-import { EvaluatorGridCard } from "../../ui/blocks/evaluator-grid-card";
-import { EvaluatorHistoryPanel } from "../../ui/sections/evaluator-history-panel";
-import { EvaluatorPushToCopiesDialog } from "../../ui/sections/evaluator-push-to-copies-dialog";
-import { EvaluatorReplicateDialog } from "../../ui/sections/evaluator-replicate-dialog";
+import { evaluatorApi } from "../../behavior/evaluator-api.ts";
+import { useEvaluatorHost } from "../../model/evaluator-host.ts";
+import { EvaluatorDeleteDialog } from "../../ui/blocks/evaluator-delete-dialog.tsx";
+import { EvaluatorGridCard } from "../../ui/blocks/evaluator-grid-card.tsx";
+import { EvaluatorHistoryPanel } from "../../ui/sections/evaluator-history-panel.tsx";
+import { EvaluatorPushToCopiesDialog } from "../../ui/sections/evaluator-push-to-copies-dialog.tsx";
+import { EvaluatorReplicateDialog } from "../../ui/sections/evaluator-replicate-dialog.tsx";
 
 /** The grant the platform page carried, unchanged. */
 export const EVALUATORS_PAGE_PERMISSION = "evaluations:view";

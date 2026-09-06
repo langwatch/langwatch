@@ -5,7 +5,7 @@ import {
   type PlanProvider,
   PlanProviderService,
   type PlanProviderUser,
-} from "../plan-provider.service";
+} from "../plan-provider.service.ts";
 
 const STUB_PLAN: PlanInfo = {
   ...FREE_PLAN,

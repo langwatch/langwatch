@@ -7,8 +7,8 @@ import {
 } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { Registry } from "prom-client";
-import type { ApiAuthzConfig } from "../platform/config/api.config";
-import type { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.infrastructure";
+import type { ApiAuthzConfig } from "../platform/config/api.config.ts";
+import type { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.infrastructure.ts";
 
 /** Reports the composition decision a missing collaborator would otherwise hide. */
 export abstract class ApiAuthzAbsenceReportPort {

@@ -10,11 +10,11 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
-vi.mock("../../../hooks/use-conversation-turns", () => ({
+vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations", () => ({
+vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -24,33 +24,33 @@ vi.mock("../../../hooks/use-conversation-annotations", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events", () => ({
+vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
+vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
 }));
 
 /** The turn itself is covered by its own tests; the notice sits above them. */
-vi.mock("../annotated-turn-row", () => ({
+vi.mock("../annotated-turn-row.tsx", () => ({
   AnnotatedTurnRow: ({ parsed }: { parsed: { turn: { traceId: string } } }) => (
     <div data-testid="annotated-turn-row">{parsed.turn.traceId}</div>
   ),
 }));
 
-vi.mock("../../../../../elements/next-link", () => ({
+vi.mock("../../../../../elements/next-link.tsx", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
-import { ConversationView } from "../conversation-view";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import { ConversationView } from "../conversation-view.tsx";
 
 function turn(over: Partial<TraceListItem> = {}): TraceListItem {
   return {

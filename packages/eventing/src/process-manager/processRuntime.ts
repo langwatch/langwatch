@@ -1,25 +1,25 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import type { Event } from "../domain/types";
+import type { Event } from "../domain/types.ts";
 import {
   buildIntentFactories,
   type ProcessManagerDefinition,
-} from "../pipeline/processManagerDefinition";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+} from "../pipeline/processManagerDefinition.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import {
   DEFAULT_LEASE_DURATION_MS,
   type IntentHandler,
   OutboxDispatcherService,
-} from "./outbox/outboxDispatcherService";
-import { ProcessOutboxWorker } from "./outbox/processOutboxWorker";
+} from "./outbox/outboxDispatcherService.ts";
+import { ProcessOutboxWorker } from "./outbox/processOutboxWorker.ts";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
   ProcessSignalEnvelope,
-} from "./processManager.types";
-import { ProcessManagerService, type SignalHandleResult } from "./processManagerService";
-import type { ProcessStore } from "./stores/processStore.types";
-import { ProcessWakeWorker, type WakeHandlerPort } from "./wake/processWakeWorker";
+} from "./processManager.types.ts";
+import { ProcessManagerService, type SignalHandleResult } from "./processManagerService.ts";
+import type { ProcessStore } from "./stores/processStore.types.ts";
+import { ProcessWakeWorker, type WakeHandlerPort } from "./wake/processWakeWorker.ts";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 

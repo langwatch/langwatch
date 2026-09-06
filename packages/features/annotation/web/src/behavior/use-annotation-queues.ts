@@ -14,8 +14,8 @@
  */
 
 import { useMemo } from "react";
-import { annotationApi } from "./annotation-api";
-import type { AnnotationQueueItemRead } from "./annotation-api";
+import { annotationApi } from "./annotation-api.ts";
+import type { AnnotationQueueItemRead } from "./annotation-api.ts";
 
 /** The date range, only when there is one, so it spreads into the input. */
 function dateRangeInput({ startDate, endDate }: { startDate?: Date; endDate?: Date }): {

@@ -10,16 +10,16 @@ import { createLogger } from "@langwatch/observability";
 import {
   migrationRunsOnThisInstallation,
   userMigrates,
-} from "../rules/ops-system-migration-cohort.rules";
-import { NullOrganizationDataplaneAdapter } from "./null.organization-dataplane.adapter";
-import type { OrganizationDataplanePort } from "../ports/organization-dataplane.port";
-import { SystemMigrationCohortService } from "../services/system-migration-cohort.service";
-import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository";
-import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository";
-import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository";
-import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository";
-import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository";
-import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository";
+} from "../rules/ops-system-migration-cohort.rules.ts";
+import { NullOrganizationDataplaneAdapter } from "./null.organization-dataplane.adapter.ts";
+import type { OrganizationDataplanePort } from "../ports/organization-dataplane.port.ts";
+import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
+import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
+import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository.ts";
+import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository.ts";
+import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository.ts";
+import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations:pass");
 

@@ -29,7 +29,7 @@ import {
   type UpsertAnnotationScoreInput,
 } from "@langwatch/annotation-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { AnnotationRepository } from "../../ports/annotation.port";
+import { AnnotationRepository } from "../../ports/annotation.port.ts";
 
 type AnnotationRow = {
   id: string;

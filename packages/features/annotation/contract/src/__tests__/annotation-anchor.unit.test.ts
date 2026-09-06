@@ -5,7 +5,7 @@ import {
   readableAnnotationAnchor,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
-} from "../index";
+} from "../index.ts";
 
 const anchorInput = annotationAnchorColumnsSchema;
 

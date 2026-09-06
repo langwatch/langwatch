@@ -14,13 +14,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
-vi.mock("../scenario-editor-sidebar", () => ({
+vi.mock("../scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
 
 // SaveAndRunMenu mock — exposes a button that calls onSaveAndRun with the
 // current selectedTarget (passed in via props).
-vi.mock("../save-and-run-menu", () => ({
+vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: ({
     onSaveAndRun,
     selectedTarget,
@@ -49,7 +49,7 @@ vi.mock("../save-and-run-menu", () => ({
 }));
 // Auto-confirm the run-model dialog so the gate flow reaches the run; the
 // dialog UI is covered in ScenarioRunModelDialog.integration.test.tsx.
-vi.mock("../scenario-run-model-dialog", () => ({
+vi.mock("../scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
@@ -58,7 +58,7 @@ vi.mock("../scenario-run-model-dialog", () => ({
   },
 }));
 
-import { ScenarioFormDrawer } from "../scenario-form-drawer";
+import { ScenarioFormDrawer } from "../scenario-form-drawer.tsx";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ const mocks = vi.hoisted(() => ({
   persistedTarget: null as { type: string; id: string } | null,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       create: {
@@ -163,7 +163,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -181,14 +181,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({
     runScenario: mocks.mockRunScenario,
     isRunning: false,
   }),
 }));
 
-vi.mock("../../use-scenario-target", () => ({
+vi.mock("../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: mocks.persistedTarget,
     setTarget: vi.fn(),

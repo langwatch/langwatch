@@ -25,8 +25,8 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-import { COMPARISON_EVALUATOR_TYPE } from "../../../../model/experiments-v3/types";
-import { TargetTypeSelectorDrawer } from "../target-type-selector-drawer";
+import { COMPARISON_EVALUATOR_TYPE } from "../../../../model/experiments-v3/types.ts";
+import { TargetTypeSelectorDrawer } from "../target-type-selector-drawer.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

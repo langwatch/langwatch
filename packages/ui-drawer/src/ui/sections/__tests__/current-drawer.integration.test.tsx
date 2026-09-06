@@ -19,8 +19,8 @@ import {
   clearFlowCallbacks,
   installDrawerOpenRewrite,
   useDrawer,
-} from "../../../behavior/use-drawer";
-import { CurrentDrawer } from "../current-drawer";
+} from "../../../behavior/use-drawer.ts";
+import { CurrentDrawer } from "../current-drawer.tsx";
 
 function ReadableDrawer({ subject }: { subject?: string }) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();

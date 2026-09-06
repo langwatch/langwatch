@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dataPrivacyConfigSchema } from "../data-privacy";
+import { dataPrivacyConfigSchema } from "../data-privacy.ts";
 
 describe("dataPrivacyConfigSchema", () => {
   describe("given the pii config", () => {

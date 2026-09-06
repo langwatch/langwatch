@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GraphTriggerSeriesEvaluationService } from "../graph-trigger-series-evaluation.service";
+import { GraphTriggerSeriesEvaluationService } from "../graph-trigger-series-evaluation.service.ts";
 
 function planThatFailsWith(error: unknown) {
   const logged: Array<Record<string, unknown>> = [];

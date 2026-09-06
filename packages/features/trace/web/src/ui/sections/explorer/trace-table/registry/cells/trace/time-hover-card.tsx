@@ -7,8 +7,8 @@ import {
   formatISOTimestamp,
   formatLocalWithZone,
   resolveViewerTimeZone,
-} from "../../../../../../../model/display-formatters";
-import { useVerboseRelativeTime } from "../../../../utils/use-relative-time";
+} from "../../../../../../../model/display-formatters.ts";
+import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
 
 /**
  * Shared hover popover for the TIME / SINCE / TIMESTAMP columns. Surfaces the same

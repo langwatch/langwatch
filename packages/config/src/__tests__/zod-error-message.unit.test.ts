@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { zodErrorMessage } from "../zod-error-message";
+import { zodErrorMessage } from "../zod-error-message.ts";
 
 /**
  * Spec: specs/api-reference/tracked-event-validation.feature

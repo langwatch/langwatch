@@ -14,9 +14,9 @@ vi.mock("nodemailer", () => ({
   default: { createTransport: createTransportMock },
 }));
 
-import { buildSmtpTransportOptions, SmtpEmailProvider } from "../smtp";
-import { EmailProviderConfigurationError } from "../types";
-import type { MailerConfiguration } from "../types";
+import { buildSmtpTransportOptions, SmtpEmailProvider } from "../smtp.ts";
+import { EmailProviderConfigurationError } from "../types.ts";
+import type { MailerConfiguration } from "../types.ts";
 
 const sentMessage = () => sendMailMock.mock.calls[0]?.[0];
 

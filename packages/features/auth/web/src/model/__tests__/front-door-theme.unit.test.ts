@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDesignSystem } from "@langwatch/design-system/system";
 
-import { frontDoorThemeConfig } from "../front-door-theme";
+import { frontDoorThemeConfig } from "../front-door-theme.ts";
 
 /**
  * The system the front door's config produces, built here rather than imported.

@@ -9,7 +9,7 @@
 import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, X } from "lucide-react";
-import type { AutosaveState } from "../../model/dataset-table-context";
+import type { AutosaveState } from "../../model/dataset-table-context.tsx";
 
 export function SaveStatusChip({ state, error }: { state: AutosaveState; error?: string }) {
   if (state === "saving") {

@@ -6,29 +6,29 @@
 
 import { ScenarioRunContent } from "@langwatch/suite-web/surfaces/run-cards";
 import { type BatchRun, targetKeyOfRun } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useCan } from "../../../../behavior/use-can";
+import { useCan } from "../../../../behavior/use-can.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { VStack } from "@chakra-ui/react";
-import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot";
-import { ComparisonChartsBlock } from "./comparison-charts-block";
-import { ComparisonResultsTable } from "./comparison-results-table";
-import type { PeriodControls } from "./period-controls";
+import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
+import { ComparisonChartsBlock } from "./comparison-charts-block.tsx";
+import { ComparisonResultsTable } from "./comparison-results-table.tsx";
+import type { PeriodControls } from "./period-controls.ts";
 import {
   NoRunInPeriod,
   RunsLoadError,
   RunsLoadingSkeleton,
   WaitingForFirstRun,
-} from "./run-plan-results-states";
-import { RunResultsTable } from "./run-results-table";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import { type BatchTarget, isComparison, runsOfTarget } from "./use-batch-targets";
+} from "./run-plan-results-states.tsx";
+import { RunResultsTable } from "./run-results-table.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { type BatchTarget, isComparison, runsOfTarget } from "./use-batch-targets.ts";
 import type {
   RunPlanBatches,
   RunPlanSelection,
-} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
-import type { useRunPlanCancel } from "./use-run-plan-cancel";
-import type { useRunPlanViewMode } from "./use-run-plan-view-mode";
-import { useRunRowHandlers } from "./use-run-row-handlers";
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import type { useRunPlanCancel } from "./use-run-plan-cancel.ts";
+import type { useRunPlanViewMode } from "./use-run-plan-view-mode.ts";
+import { useRunRowHandlers } from "./use-run-row-handlers.ts";
 
 export type RunPlanRunResultsProps = {
   plan: RunPlan;

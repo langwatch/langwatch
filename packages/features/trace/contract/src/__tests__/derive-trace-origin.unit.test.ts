@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TRACE_ORIGIN, deriveTraceOrigin } from "../derive-trace-origin";
+import { DEFAULT_TRACE_ORIGIN, deriveTraceOrigin } from "../derive-trace-origin.ts";
 
 describe("deriveTraceOrigin", () => {
   it("defaults missing and empty origins to application", () => {

@@ -1,7 +1,7 @@
 import process from "node:process";
 import type { Logger } from "@langwatch/observability";
-import { WorkerSignalHandlers, type WorkerSignalSource } from "./platform/lifecycle/worker.signals";
-import { bootWorker, type WorkerBootOptions } from "./worker.process";
+import { WorkerSignalHandlers, type WorkerSignalSource } from "./platform/lifecycle/worker.signals.ts";
+import { bootWorker, type WorkerBootOptions } from "./worker.process.ts";
 
 export type WorkerMainSignals =
   | false

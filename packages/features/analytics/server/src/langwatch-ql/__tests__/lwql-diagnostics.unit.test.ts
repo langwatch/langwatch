@@ -6,17 +6,17 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   type LangWatchQLDiagnostic,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
-} from "../../rules/langwatch-ql-diagnostics-shape.rules";
-import { LangWatchQLDiagnosticsService } from "../../services/langwatch-ql-diagnostics.service";
-import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service";
-import { validateLangWatchQL } from "./lwql-validate";
+} from "../../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { LangWatchQLDiagnosticsService } from "../../services/langwatch-ql-diagnostics.service.ts";
+import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();

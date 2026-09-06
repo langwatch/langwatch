@@ -7,7 +7,7 @@ import {
   isPasswordResetPath,
   normalizedRequestPathname,
   requestPathname,
-} from "../sso-path-gate";
+} from "../sso-path-gate.ts";
 
 const host = "https://app.example.com/api/auth";
 

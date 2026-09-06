@@ -5,9 +5,9 @@ import {
   ScimGrantRepositoryPort,
   type ScimGrantBindingScope,
   type ScimRoleBindingRecord,
-} from "../../ports/scim-repository.port";
-import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service";
-import { GrantsFake } from "../../__tests__/support/grants-fake";
+} from "../../ports/scim-repository.port.ts";
+import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service.ts";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 
 const organizationId = "org_1";
 const userId = "user_1";

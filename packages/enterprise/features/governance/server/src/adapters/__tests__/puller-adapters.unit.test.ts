@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HttpPollingPullerAdapter } from "../http-poller.adapter";
-import { S3PollingPullerAdapter } from "../s3-puller.adapter";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
-import { GovernanceObjectStoragePort } from "../../ports/governance-object-storage.port";
+import { HttpPollingPullerAdapter } from "../http-poller.adapter.ts";
+import { S3PollingPullerAdapter } from "../s3-puller.adapter.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
+import { GovernanceObjectStoragePort } from "../../ports/governance-object-storage.port.ts";
 
 const httpConfig = {
   adapter: "http_polling",

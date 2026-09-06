@@ -13,7 +13,7 @@ import {
   compilePiiExceptPatterns,
   redactEssentialPiiInText,
   subtractProtectedRanges,
-} from "../essentialPii.js";
+} from "../essentialPii.ts";
 
 const redact = (text: string) => redactEssentialPiiInText({ text });
 

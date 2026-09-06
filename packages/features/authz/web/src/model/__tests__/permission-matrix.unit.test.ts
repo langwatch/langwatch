@@ -19,14 +19,14 @@
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { permissionsForResource } from "../permission-catalogue";
+import { permissionsForResource } from "../permission-catalogue.ts";
 import {
   isPermissionImplied,
   isPermissionSelected,
   permissionsAddedBy,
   permissionsRemovedBy,
   togglePermission,
-} from "../permission-matrix";
+} from "../permission-matrix.ts";
 
 const sorted = (permissions: readonly AuthzPermission[]) => [...permissions].sort();
 

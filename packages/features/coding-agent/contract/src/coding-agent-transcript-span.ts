@@ -1,19 +1,19 @@
-import { isModelCallSpan } from "./telemetry";
-import { parseMcpToolName, resolveToolName } from "./telemetry/coding-agent-normalization";
+import { isModelCallSpan } from "./telemetry/index.ts";
+import { parseMcpToolName, resolveToolName } from "./telemetry/coding-agent-normalization.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import {
   CODEX_RECOVERED_CONTENT_SPAN_NAME,
   collectRecoveredCodexTurn,
-} from "./coding-agent-transcript-codex";
-import { extractedOutputText, outputMessagesText } from "./coding-agent-transcript-content";
+} from "./coding-agent-transcript-codex.ts";
+import { extractedOutputText, outputMessagesText } from "./coding-agent-transcript-content.ts";
 import {
   type CodexToolLogContent,
   createSpanEntryAccumulator,
   emitSystemPrompt,
   fillToolCallGaps,
   type SpanEntryAccumulator,
-} from "./coding-agent-transcript-state";
-import { modelOf, readNumber, readString } from "./coding-agent-transcript-value";
+} from "./coding-agent-transcript-state.ts";
+import { modelOf, readNumber, readString } from "./coding-agent-transcript-value.ts";
 
 export function collectSpanEntries(
   spans: SpanDetail[],

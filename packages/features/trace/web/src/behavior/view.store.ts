@@ -2,14 +2,14 @@ import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { useMemo } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { getCurrentFilterText, useFilterStore } from "./filter.store";
+import { getCurrentFilterText, useFilterStore } from "./filter.store.ts";
 import {
   LENS_CAPABILITIES,
   reconcileAddons,
   reconcileColumns,
   reconcileSort,
-} from "./lens-capabilities";
-import type { RowKind } from "../model/trace-row-kind";
+} from "./lens-capabilities.ts";
+import type { RowKind } from "../model/trace-row-kind.ts";
 
 export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 

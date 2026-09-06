@@ -15,7 +15,7 @@ import {
 } from "@langwatch/github-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { GithubConnectionService } from "../github-connection.service";
+import { GithubConnectionService } from "../github-connection.service.ts";
 
 function installation(overrides: Partial<GithubInstallation> = {}): GithubInstallation {
   return {

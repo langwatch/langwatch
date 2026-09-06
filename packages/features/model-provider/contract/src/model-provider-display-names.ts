@@ -1,6 +1,6 @@
-import type { CustomModelEntry } from "./custom-model";
-import type { ModelProviderEditorValue } from "./model-provider-registry";
-import type { ModelProviderScopeType } from "./model-provider";
+import type { CustomModelEntry } from "./custom-model.ts";
+import type { ModelProviderEditorValue } from "./model-provider-registry.ts";
+import type { ModelProviderScopeType } from "./model-provider.ts";
 
 const SCOPE_RANK: Record<ModelProviderScopeType, number> = {
   PROJECT: 0,

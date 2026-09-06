@@ -9,7 +9,7 @@ import {
   parseLangyChoiceSelectionPart,
 } from "@langwatch/langy-contract";
 
-import { isQuestionToolPart, questionToolCardParts } from "./langy-question-tool";
+import { isQuestionToolPart, questionToolCardParts } from "./langy-question-tool.ts";
 
 interface MessageLike {
   role: string;

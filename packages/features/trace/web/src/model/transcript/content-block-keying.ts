@@ -1,4 +1,4 @@
-import type { ContentBlock, KeyedContentBlock } from "./types";
+import type { ContentBlock, KeyedContentBlock } from "./types.ts";
 
 const FIELD_SEPARATOR = "\u0000";
 

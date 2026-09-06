@@ -4,7 +4,7 @@ import type {
   TopicClusteringStatus,
   TopicNamesInput,
   TopicProjectInput,
-} from "./topic";
+} from "./topic.ts";
 
 export abstract class TopicService {
   abstract getAll(input: TopicProjectInput): Promise<Topic[]>;

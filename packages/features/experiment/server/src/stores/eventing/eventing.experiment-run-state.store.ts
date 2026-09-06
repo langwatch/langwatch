@@ -1,11 +1,11 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { ExperimentRunStateRepository } from "../../repositories/experiment-run-state.repository";
-import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../../rules/experiment-run-event-types.rules";
-import { parseExperimentRunKey } from "../../processes/experiment-run-key.process";
+import type { ExperimentRunStateRepository } from "../../repositories/experiment-run-state.repository.ts";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../../rules/experiment-run-event-types.rules.ts";
+import { parseExperimentRunKey } from "../../processes/experiment-run-key.process.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
-} from "../../projections/experiment-run-state.projection";
+} from "../../projections/experiment-run-state.projection.ts";
 
 /**
  * The FoldProjectionStore for experiment run state.

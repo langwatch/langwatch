@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 
-import type { JobBlobStore } from "../jobEnvelope";
-import type { ObjectStore } from "../tieredBlobStore";
+import type { JobBlobStore } from "../jobEnvelope.ts";
+import type { ObjectStore } from "../tieredBlobStore.ts";
 
 /** In-memory stand-in for the Redis blob tier (a {@link JobBlobStore}). */
 export class InMemoryJobBlobStore implements JobBlobStore {

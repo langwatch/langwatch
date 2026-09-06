@@ -27,8 +27,8 @@ import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import { walkFiles } from "./files.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const POLICY = "api-transport-through-framework";
 const ALLOWLIST_FILE = "api-transport-framework-allowlist.json";

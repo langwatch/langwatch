@@ -4,7 +4,7 @@ import {
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
-import type { TrpcAuthorizationPort, TrpcMiddlewareContext } from "./trpc-policy-ports.js";
+import type { TrpcAuthorizationPort, TrpcMiddlewareContext } from "./trpc-policy-ports.ts";
 
 /**
  * The middleware's own parameters, annotated rather than inferred.

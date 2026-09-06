@@ -4,15 +4,15 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter";
-import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture";
+import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter.ts";
+import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouseQueryResult,
-} from "../../ports/coding-agent-clickhouse.port";
-import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
-import { parseClickHouseDateTimeMs } from "../coding-agent-clickhouse/clickhouse.mapper";
-import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository";
+} from "../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import { parseClickHouseDateTimeMs } from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository.ts";
 
 /**
  * ClickHouse renders DateTime64 without a timezone suffix, and the

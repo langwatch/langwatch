@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import type { TopicClusteringRunStatusData } from "../../projections/topic-clustering-run-status.projection";
+import type { TopicClusteringRunStatusData } from "../../projections/topic-clustering-run-status.projection.ts";
 
 /** KSUID resource for run-status projection rows (the app's KSUID_RESOURCES.TOPIC_CLUSTERING_RUN). */
 const TOPIC_CLUSTERING_RUN_KSUID_RESOURCE = "topicrun";

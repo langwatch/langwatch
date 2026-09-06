@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { NurturingService } from "../index";
+import { NurturingService } from "../index.ts";
 
 /**
  * Wiring unit tests for NurturingService app construction patterns.

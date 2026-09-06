@@ -15,16 +15,16 @@ import {
 } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { parseActiveProjections } from "../../model/replay-presentation";
-import { CowboyAnimation } from "../elements/cowboy-animation";
-import { PhaseTimeline } from "../elements/phase-timeline";
-import { replayStateColor } from "../elements/replay-state-badge";
-import { formatDuration } from "../../../../model/ops-formatters";
-import { Link } from "../../../../ui/elements/ops-link";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { useReplayStatus } from "../../behavior/use-replay-status";
+import { parseActiveProjections } from "../../model/replay-presentation.ts";
+import { CowboyAnimation } from "../elements/cowboy-animation.tsx";
+import { PhaseTimeline } from "../elements/phase-timeline.tsx";
+import { replayStateColor } from "../elements/replay-state-badge.tsx";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { Link } from "../../../../ui/elements/ops-link.tsx";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
-import { api } from "../../../../behavior/ops-api";
+import { api } from "../../../../behavior/ops-api.ts";
 
 const MESH_PULSE_CSS = `
   @keyframes meshPulse {

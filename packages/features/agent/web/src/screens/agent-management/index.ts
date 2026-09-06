@@ -27,7 +27,7 @@ import type { ComponentType } from "react";
 export type AgentScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const agentScreens = {
-  agentManagement: () => import("./agent-management.screen"),
+  agentManagement: () => import("./agent-management.screen.tsx"),
 } as const satisfies Record<string, AgentScreenLoader>;
 
 export type AgentScreenName = keyof typeof agentScreens;
@@ -36,8 +36,8 @@ export {
   AGENT_HISTORY_QUERY_KEY,
   AGENT_NEW_QUERY_KEY,
   AGENT_NEW_QUERY_VALUE,
-} from "./agent-management.screen";
-export { agentApi } from "../../behavior/agent-api";
+} from "./agent-management.screen.tsx";
+export { agentApi } from "../../behavior/agent-api.ts";
 export {
   AgentManagementHostPort,
   AgentManagementHostProvider,
@@ -47,12 +47,12 @@ export {
   type AgentHostProject,
   type AgentRouteReading,
   type AgentSuccessNotice,
-} from "../../model/agent-management-host";
+} from "../../model/agent-management-host.ts";
 export {
   AgentTypeSelectorDrawer,
   type AgentType,
   type AgentTypeSelectorDrawerProps,
-} from "../../features/editor/ui/sections/agent-type-selector-drawer";
+} from "../../features/editor/ui/sections/agent-type-selector-drawer.tsx";
 export {
   AgentCard,
   AgentCardIcon,
@@ -60,8 +60,8 @@ export {
   AgentCardShell,
   type AgentCardShellProps,
   CARD_MENU_CLASS,
-} from "../../features/management/ui/blocks/agent-card";
-export { ConnectedAgentsSection } from "../../features/management/ui/blocks/connected-agents-section";
+} from "../../features/management/ui/blocks/agent-card.tsx";
+export { ConnectedAgentsSection } from "../../features/management/ui/blocks/connected-agents-section.tsx";
 export {
   type ConnectedAgentScope,
   environmentTone,
@@ -71,49 +71,49 @@ export {
   scopeOf,
   sdkLabel,
   sortConnectedAgents,
-} from "../../model/connected-agent-rows";
-export { LocalTunnelBadge } from "../../ui/elements/local-tunnel-badge";
+} from "../../model/connected-agent-rows.ts";
+export { LocalTunnelBadge } from "../../ui/elements/local-tunnel-badge.tsx";
 export {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,
-} from "../../features/http/ui/sections/agent-http-editor-drawer";
+} from "../../features/http/ui/sections/agent-http-editor-drawer.tsx";
 export {
   AgentHttpEditorPresentationPort,
   type RenderAgentVariablesInput,
   type RenderScenarioMappingsInput,
-} from "../../features/http/ui/sections/agent-http-editor.presentation";
+} from "../../features/http/ui/sections/agent-http-editor.presentation.tsx";
 export {
   AuthConfigSection,
   type AuthConfigSectionProps,
-} from "../../features/http/ui/elements/http-auth-config-section";
+} from "../../features/http/ui/elements/http-auth-config-section.tsx";
 export {
   BodyTemplateEditor,
   type BodyTemplateEditorProps,
-} from "../../features/http/ui/elements/http-body-template-editor";
+} from "../../features/http/ui/elements/http-body-template-editor.tsx";
 export {
   HeadersConfigSection,
   type HeadersConfigSectionProps,
-} from "../../features/http/ui/elements/http-headers-config-section";
+} from "../../features/http/ui/elements/http-headers-config-section.tsx";
 export {
   HttpConfigEditor,
   type HttpConfigEditorProps,
-} from "../../features/http/ui/sections/http-config-editor";
+} from "../../features/http/ui/sections/http-config-editor.tsx";
 export {
   HttpMethodSelector,
   type HttpMethodSelectorProps,
-} from "../../features/http/ui/elements/http-method-selector";
+} from "../../features/http/ui/elements/http-method-selector.tsx";
 export {
   HttpTestPanel,
   type HttpTestPanelProps,
   type HttpTestResult,
-} from "../../features/http/ui/sections/http-test-panel";
+} from "../../features/http/ui/sections/http-test-panel.tsx";
 export {
   OutputPathInput,
   type HttpOutputPathInputProps,
-} from "../../features/http/ui/elements/http-output-path-input";
+} from "../../features/http/ui/elements/http-output-path-input.tsx";
 export {
   messagesToJson,
   type TestMessage,
   TestMessagesBuilder,
   type TestMessagesBuilderProps,
-} from "../../features/http/ui/blocks/http-test-messages-builder";
+} from "../../features/http/ui/blocks/http-test-messages-builder.tsx";

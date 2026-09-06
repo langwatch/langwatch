@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config";
+import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * The LangWatch SDK identity a process exports its own operational telemetry

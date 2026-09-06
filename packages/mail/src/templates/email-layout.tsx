@@ -13,7 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
-import { tokenize, type HighlightLanguage } from "./onboarding/highlight";
+import { tokenize, type HighlightLanguage } from "./onboarding/highlight.ts";
 
 /**
  * The one shell every LangWatch message is built in.

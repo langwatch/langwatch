@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
-import { EvaluatorListEmptyState } from "../../elements/evaluator-list-empty-state";
-import { EvaluatorListItem } from "../evaluator-list-item";
+import { EvaluatorListEmptyState } from "../../elements/evaluator-list-empty-state.tsx";
+import { EvaluatorListItem } from "../evaluator-list-item.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

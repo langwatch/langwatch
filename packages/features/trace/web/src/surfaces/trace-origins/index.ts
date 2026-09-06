@@ -1,1 +1,1 @@
-export * from "../../model/origin-display";
+export * from "../../model/origin-display.ts";

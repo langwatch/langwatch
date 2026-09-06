@@ -1,6 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { StudioIsolatedErrorBoundary } from "./studio-error-boundary";
+import { StudioIsolatedErrorBoundary } from "./studio-error-boundary.tsx";
 
 function Crashing(): never {
   throw new Error("Cannot read properties of undefined (reading 'parameters')");

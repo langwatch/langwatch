@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parsePromptShorthand } from "./prompt.shorthand";
+import { parsePromptShorthand } from "./prompt.shorthand.ts";
 
 /**
  * Prompt metadata reconstructed from SDK span attributes. This is deliberately distinct from

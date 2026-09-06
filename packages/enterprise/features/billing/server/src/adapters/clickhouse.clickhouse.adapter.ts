@@ -1,8 +1,8 @@
 import {
   BillableEventsClickHouseRepository,
   type BillableEventsClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.billable-events.repository";
-import type { BillableEventsRepository } from "../ports/billable-events.port";
+} from "../repositories/clickhouse/clickhouse.billable-events.repository.ts";
+import type { BillableEventsRepository } from "../ports/billable-events.port.ts";
 
 export type BillingClickHouseClientResolver = (
   tenantId: string,

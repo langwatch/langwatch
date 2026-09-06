@@ -2,7 +2,7 @@
  * A release flag, tri-state, answered by the host.
  */
 
-import { useLangyHost } from "../model/langy-host";
+import { useLangyHost } from "../model/langy-host.ts";
 
 export type UseFeatureFlagResult = {
   /** Fail-closed, the way every call site reads it. */

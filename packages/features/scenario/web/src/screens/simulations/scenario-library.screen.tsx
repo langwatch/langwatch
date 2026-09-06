@@ -3,31 +3,31 @@
 // Internal pages don't need to be server rendering
 
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
-import { ScenarioArchiveDialog } from "../../ui/elements/scenario-archive-dialog";
+import { ScenarioArchiveDialog } from "../../ui/elements/scenario-archive-dialog.tsx";
 import {
   ScenarioBatchActionBar as BatchActionBar,
   ScenarioEmptyState,
   ScenarioLabelFilter as LabelFilterDropdown,
-} from "../../ui/elements/scenario-library-controls";
-import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../ui/elements/scenario-welcome";
-import { ReturnToNewSimulationsBanner } from "../../ui/sections/suites/return-to-new-simulations-banner";
-import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
+} from "../../ui/elements/scenario-library-controls.tsx";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../ui/elements/scenario-welcome.tsx";
+import { ReturnToNewSimulationsBanner } from "../../ui/sections/suites/return-to-new-simulations-banner.tsx";
+import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect.ts";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { HandledErrorAlert } from "../../behavior/errors";
-import type { Scenario } from "../../model/prisma-types";
-import { useScenarioLabelFilter as useLabelFilter } from "../../behavior/use-scenario-label-filter";
-import { useNewScenarioFlow } from "../../behavior/use-new-scenario-flow";
-import { useScenarioSelection } from "../../behavior/use-scenario-selection";
+import { HandledErrorAlert } from "../../behavior/errors.tsx";
+import type { Scenario } from "../../model/prisma-types.ts";
+import { useScenarioLabelFilter as useLabelFilter } from "../../behavior/use-scenario-label-filter.ts";
+import { useNewScenarioFlow } from "../../behavior/use-new-scenario-flow.ts";
+import { useScenarioSelection } from "../../behavior/use-scenario-selection.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { usePreloadDrawer } from "../../behavior/use-preload-drawer";
-import { api } from "../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { usePreloadDrawer } from "../../behavior/use-preload-drawer.ts";
+import { api } from "../../behavior/scenario-api.ts";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { DashboardLayout } from "../../ui/sections/dashboard-layout";
-import { ScenarioCreateModal } from "../../ui/sections/scenarios/scenario-create-modal";
-import { ScenarioTable } from "../../ui/elements/scenarios/scenario-table";
+import { DashboardLayout } from "../../ui/sections/dashboard-layout.tsx";
+import { ScenarioCreateModal } from "../../ui/sections/scenarios/scenario-create-modal.tsx";
+import { ScenarioTable } from "../../ui/elements/scenarios/scenario-table.tsx";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();

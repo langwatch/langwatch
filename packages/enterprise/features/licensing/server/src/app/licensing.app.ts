@@ -11,8 +11,8 @@ import {
   type LimitCheckResult,
   type LimitType,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port";
-import type { LicenseService } from "../services/license.service";
+import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import type { LicenseService } from "../services/license.service.ts";
 
 /**
  * The caller, as the enforcement service classifies them: a lite member is

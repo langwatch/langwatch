@@ -1,4 +1,4 @@
-import type { PyMember, PyModule } from "./python-api.types";
+import type { PyMember, PyModule } from "./python-api.types.ts";
 
 const fn = (name: string, signature: string, doc: string): PyMember => ({
   name,

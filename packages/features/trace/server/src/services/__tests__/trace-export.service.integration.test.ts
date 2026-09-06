@@ -10,9 +10,9 @@ import type { Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { Evaluation, LLMSpan, Trace } from "@langwatch/trace-contract";
 
-import type { TraceService } from "../trace-legacy-read.service";
+import type { TraceService } from "../trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import { TraceExportService } from "../trace-export.service";
+import { TraceExportService } from "../trace-export.service.ts";
 import type { ExportRequest } from "@langwatch/trace-contract";
 
 const fullProtections: Protections = {

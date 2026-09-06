@@ -14,7 +14,7 @@ import { ChildProcessJobDataSchema, ScenarioConfigSchema } from "@langwatch/scen
 import {
   createTestScenarioExecutionPrefetcherService,
   type ScenarioPrefetchFixture,
-} from "./support/scenario-execution-prefetcher.fixture";
+} from "./support/scenario-execution-prefetcher.fixture.ts";
 
 function createTurnConfigPrefetcher(
   dependencies: ScenarioPrefetchFixture,
@@ -156,7 +156,7 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
 
 describe("fetchScenario turn config mapping", () => {
   it("maps maxTurns and minTurns from DB row to ScenarioConfig", async () => {
-    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture");
+    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture.ts");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {
@@ -190,7 +190,7 @@ describe("fetchScenario turn config mapping", () => {
   });
 
   it("maps null turn fields as undefined", async () => {
-    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture");
+    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture.ts");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {

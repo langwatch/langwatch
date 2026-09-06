@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { DatasetColumn } from "../types";
-import { convertInlineToRowRecords, filterEmptyRows } from "../dataset-conversion";
+import type { DatasetColumn } from "../types.ts";
+import { convertInlineToRowRecords, filterEmptyRows } from "../dataset-conversion.ts";
 
 describe("Save as dataset utilities", () => {
   describe("filterEmptyRows", () => {

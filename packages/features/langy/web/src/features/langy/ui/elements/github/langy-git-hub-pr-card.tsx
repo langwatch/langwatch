@@ -7,7 +7,7 @@ import { GitMerge, GitPullRequest, GitPullRequestClosed, type LucideIcon } from 
 import type {
   GithubPrCardData,
   GithubPrState,
-} from "../../../../../model/shared/langy/github-pr-card";
+} from "../../../../../model/shared/langy/github-pr-card.ts";
 
 export type LangyGitHubPrCardProps = GithubPrCardData;
 

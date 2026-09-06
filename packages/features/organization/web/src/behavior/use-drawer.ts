@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from "react";
-import { useOrganizationHost } from "../model/organization-host";
+import { useOrganizationHost } from "../model/organization-host.ts";
 
 export type OrganizationDrawerNavigator = {
   openDrawer: (name: string, props?: Record<string, unknown>) => void;

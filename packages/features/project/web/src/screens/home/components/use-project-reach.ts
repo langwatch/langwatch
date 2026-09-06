@@ -1,6 +1,6 @@
 import type { ProjectReach } from "@langwatch/langy-web/surfaces/langy-store";
-import { homeApi } from "../../../behavior/home-api";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { homeApi } from "../../../behavior/home-api.ts";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 export interface ProjectReachResult extends ProjectReach {
   /** True until we know, so nothing offers asks it may have to withdraw. */

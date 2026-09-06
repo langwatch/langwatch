@@ -10,7 +10,7 @@ import {
   inputsAndOutputsToDemostrationColumns,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
-} from "../../surfaces/prompt-form";
+} from "../../surfaces/prompt-form/index.ts";
 import { salvageValidData } from "@langwatch/design-system/zod-salvage";
 
 interface UsePromptConfigFormProps {

@@ -1,4 +1,4 @@
-import { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository";
+import { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository.ts";
 
 export type LangySessionKeyRecord = {
   id: string;

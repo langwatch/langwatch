@@ -1,9 +1,9 @@
 import { nanoid } from "nanoid";
 import type { Field } from "@langwatch/workflow-contract";
-import type { TargetConfig } from "../../../experiment-workbench";
-import { inferAllEvaluatorMappings, inferAllTargetMappings } from "../../mapping-inference";
-import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas";
-import { type Transform, TransformError, type WorkbenchState } from "./types";
+import type { TargetConfig } from "../../../experiment-workbench.ts";
+import { inferAllEvaluatorMappings, inferAllTargetMappings } from "../../mapping-inference.ts";
+import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas.ts";
+import { type Transform, TransformError, type WorkbenchState } from "./types.ts";
 
 export const newTargetId = () => `target-${nanoid(8)}`;
 

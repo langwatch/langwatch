@@ -14,18 +14,18 @@
  *   (integration, drives the real GroupQueue bisection end to end)
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import type { JobDelivery } from "../../queues";
+import type { Event } from "../../domain/types.ts";
+import type { JobDelivery } from "../../queues/index.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockQueueManager,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { QueueManager } from "../../services/queues/queueManager";
-import type { FoldProjectionStore } from "../foldProjection.types";
-import { ProjectionRouter } from "../projectionRouter";
+} from "../../services/__tests__/testHelpers.ts";
+import { QueueManager } from "../../services/queues/queueManager.ts";
+import type { FoldProjectionStore } from "../foldProjection.types.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
 describe("continuation forwarding", () => {
   describe("when the queue manager's registry entry receives a batch delivery", () => {

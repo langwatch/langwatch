@@ -1,13 +1,13 @@
 import type { z } from "zod";
-import type { AnyEventSchema } from "./abstractFoldProjection";
+import type { AnyEventSchema } from "./abstractFoldProjection.ts";
 import {
   type DotSnakeToPascal,
   type EventTypeOf,
   eventTypeToMapHandlerName,
   type StripPrefix,
   type UnionToIntersection,
-} from "./eventTypeTransforms";
-import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
+} from "./eventTypeTransforms.ts";
+import type { AppendStore, MapProjectionOptions } from "./mapProjection.types.ts";
 
 // ---------------------------------------------------------------------------
 // Map handler name derivation

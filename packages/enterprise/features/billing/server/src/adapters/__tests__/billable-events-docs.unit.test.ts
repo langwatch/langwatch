@@ -19,9 +19,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import type { BillableEventsMeterPort } from "../../ports/billable-events-meter.port";
-import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service";
-import { EventingBillableEventsMeterAdapter } from "../eventing.billable-events-meter.adapter";
+import type { BillableEventsMeterPort } from "../../ports/billable-events-meter.port.ts";
+import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
+import { EventingBillableEventsMeterAdapter } from "../eventing.billable-events-meter.adapter.ts";
 
 // Repo root containing both `packages/` and `docs/`. `process.cwd()` is this
 // package's own dir when vitest runs, so four levels up lands on the repo

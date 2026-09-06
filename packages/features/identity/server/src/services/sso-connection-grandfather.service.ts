@@ -5,12 +5,12 @@ import {
   type SsoConnectionType,
   type SsoIdpMetadata,
 } from "@langwatch/identity-contract";
-import type { SignInDomainRoutingPort } from "./signin-router.service";
+import type { SignInDomainRoutingPort } from "./signin-router.service.ts";
 import {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
-} from "../rules/sso-connection-id.rules";
-import type { SsoConnectionService } from "./sso-connection.service";
+} from "../rules/sso-connection-id.rules.ts";
+import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**
  * Grandfathering (ADR-117 §5, D04): the organizations that already have

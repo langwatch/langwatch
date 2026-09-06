@@ -16,8 +16,8 @@ import type { TopicService } from "@langwatch/topic-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectApp, type TopicClusteringCommands } from "../project.app";
-import { ProjectTrpcApi } from "../../transport/api-trpc/project.api";
+import { ProjectApp, type TopicClusteringCommands } from "../project.app.ts";
+import { ProjectTrpcApi } from "../../transport/api-trpc/project.api.ts";
 
 type TestContext = {
   app: { projects: ProjectApp };

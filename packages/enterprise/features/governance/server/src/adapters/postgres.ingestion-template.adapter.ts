@@ -1,5 +1,5 @@
-import { PrismaIngestionTemplateRepository } from "../repositories/prisma/prisma.ingestion-template.repository";
-import { IngestionTemplateService } from "../services/ingestion-template.service";
+import { PrismaIngestionTemplateRepository } from "../repositories/prisma/prisma.ingestion-template.repository.ts";
+import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 
 export class PostgresIngestionTemplateAdapter {
   private constructor(

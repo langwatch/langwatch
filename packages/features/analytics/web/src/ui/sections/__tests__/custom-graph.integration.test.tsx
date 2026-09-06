@@ -26,7 +26,7 @@ const timeseries = vi.hoisted(() => ({
   isLoading: false,
 }));
 
-vi.mock("../../../behavior/analytics-api", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     analytics: {
       getTimeseries: {
@@ -60,15 +60,15 @@ vi.mock("recharts", async () => {
   };
 });
 
-vi.mock("../../../behavior/use-filter-params", () => ({
+vi.mock("../../../behavior/use-filter-params.ts", () => ({
   useFilterParams: () => ({
     filterParams: { projectId: "proj-1", startDate: 0, endDate: 1, filters: {} },
     queryOpts: { enabled: true },
   }),
 }));
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing";
-import { CustomGraph, type CustomGraphInput } from "../custom-graph";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
+import { CustomGraph, type CustomGraphInput } from "../custom-graph.tsx";
 
 afterEach(() => {
   cleanup();

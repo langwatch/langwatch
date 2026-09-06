@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 
 /** Workflow execution status with the process-owned stop action supplied by the app. */
 export function WorkflowRunningStatus({

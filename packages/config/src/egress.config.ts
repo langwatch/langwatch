@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, environmentOneOrTrueSchema, RuntimeConfig } from "./runtime-config";
+import { Config, environmentOneOrTrueSchema, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * The address policy an outbound model-provider credential probe is judged

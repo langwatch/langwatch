@@ -3,12 +3,12 @@
  * both answerable from the rows and the column types alone: 1. Is there anything to draw?
  */
 
-import { JSON_POINTER_ROOT, joinPointer, visitJsonObjects } from "./vega-lite-structure";
+import { JSON_POINTER_ROOT, joinPointer, visitJsonObjects } from "./vega-lite-structure.ts";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
   VegaValidationWarning,
-} from "./visualization-types";
+} from "./visualization-types.ts";
 
 /** ClickHouse types whose values can outrun a double's exact integer range. */
 const WIDE_NUMERIC_TYPE = /\b(U?Int(64|128|256)|Decimal\d*)\b/;

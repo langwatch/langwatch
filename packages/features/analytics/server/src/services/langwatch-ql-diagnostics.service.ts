@@ -8,9 +8,9 @@ import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 import {
   type LangWatchQLDiagnosticsInput,
   resolveTableReferences,
-} from "../rules/langwatch-ql-diagnostics-shape.rules";
-import { LangWatchQLBucketDiagnosticsService } from "./langwatch-ql-bucket-diagnostics.service";
-import { LangWatchQLFanoutDiagnosticsService } from "./langwatch-ql-fanout-diagnostics.service";
+} from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { LangWatchQLBucketDiagnosticsService } from "./langwatch-ql-bucket-diagnostics.service.ts";
+import { LangWatchQLFanoutDiagnosticsService } from "./langwatch-ql-fanout-diagnostics.service.ts";
 
 function truncationDiagnostics({
   truncated,

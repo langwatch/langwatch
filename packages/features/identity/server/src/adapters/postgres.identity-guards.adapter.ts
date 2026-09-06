@@ -1,23 +1,23 @@
-import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter";
-import { IdentityGuardsService } from "../services/identity-guards.service";
-import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
-import { MfaGuardsService } from "../services/mfa-guards.service";
+import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
+import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,
-} from "../repositories/prisma/prisma.identity-heads.repository";
+} from "../repositories/prisma/prisma.identity-heads.repository.ts";
 import {
   PrismaIdentityReservationRepository,
   type PrismaIdentityReservationsDatabase,
-} from "../repositories/prisma/prisma.identity-reservations.repository";
+} from "../repositories/prisma/prisma.identity-reservations.repository.ts";
 import {
   PrismaIdentityUsersRepository,
   type PrismaIdentityUsersDatabase,
-} from "../repositories/prisma/prisma.identity-users.repository";
+} from "../repositories/prisma/prisma.identity-users.repository.ts";
 import {
   PrismaMfaEnrollmentRepository,
   type PrismaMfaEnrollmentDatabase,
-} from "../repositories/prisma/prisma.mfa-enrollment.repository";
+} from "../repositories/prisma/prisma.mfa-enrollment.repository.ts";
 
 /** Every model the identity and two-step verification guards read, and no other. */
 export type IdentityGuardsDatabase = PrismaIdentityHeadsDatabase &

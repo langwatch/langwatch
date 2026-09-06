@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useTraceFacets } from "./use-trace-facets";
+import { useTraceFacets } from "./use-trace-facets.ts";
 
 /**
  * Resolve a facet `field:value` pair to its human label using the same discover payload

@@ -11,33 +11,33 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
-import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-} from "../services/langwatch-ql-catalog-shapes.service";
-import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service";
+} from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
 } from "@langwatch/analytics-contract";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
 import type {
   LangWatchQLExecutorPort,
   LangWatchQLResultLimits,
-} from "../ports/langwatch-ql-executor.port";
+} from "../ports/langwatch-ql-executor.port.ts";
 import {
   type LangWatchQLGranularityResolution,
   LangWatchQLTimeWindowService,
-} from "./langwatch-ql-time-window.service";
-import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service";
+} from "./langwatch-ql-time-window.service.ts";
+import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
-import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service";
-import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules";
-import { LangWatchQLValidationService } from "./langwatch-ql-validation.service";
+import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
+import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
+import { LangWatchQLValidationService } from "./langwatch-ql-validation.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 

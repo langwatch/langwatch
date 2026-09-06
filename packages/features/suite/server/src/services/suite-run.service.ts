@@ -40,16 +40,16 @@ import {
   parseScenarioParameterDefinitions,
   type ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
-import { ConnectedTargetService } from "./connected-target.service";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port";
-import type { SuiteServiceOptions } from "./suite.service";
+import { ConnectedTargetService } from "./connected-target.service.ts";
+import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteServiceOptions } from "./suite.service.ts";
 import {
   defaultSuiteId,
   suiteSlugOf,
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
-} from "../rules/suite-target.rules";
-import { SuiteRunScopeService } from "./suite-run-scope.service";
+} from "../rules/suite-target.rules.ts";
+import { SuiteRunScopeService } from "./suite-run-scope.service.ts";
 
 type SuiteRunServiceOptions = {
   options: SuiteServiceOptions;

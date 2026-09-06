@@ -2,14 +2,14 @@ import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef, useState } from "react";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useSpansFull } from "../hooks/use-spans-full";
-import { useTraceEvents } from "../hooks/use-trace-events";
-import { buildTraceMarkdown, splitTraceMarkdown } from "./markdown-view";
-import type { MarkdownConfig } from "../../../../model/markdown/types";
-import { DEFAULT_MARKDOWN_CONFIG } from "../../../../model/markdown/types";
-import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown";
-import { MarkdownConfigurePopover } from "../../../elements/markdown/markdown-configure-popover";
-import { MarkdownCopyButton } from "../../../elements/markdown/markdown-copy-button";
+import { useSpansFull } from "../hooks/use-spans-full.ts";
+import { useTraceEvents } from "../hooks/use-trace-events.ts";
+import { buildTraceMarkdown, splitTraceMarkdown } from "./markdown-view/index.ts";
+import type { MarkdownConfig } from "../../../../model/markdown/types.ts";
+import { DEFAULT_MARKDOWN_CONFIG } from "../../../../model/markdown/types.ts";
+import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown.tsx";
+import { MarkdownConfigurePopover } from "../../../elements/markdown/markdown-configure-popover.tsx";
+import { MarkdownCopyButton } from "../../../elements/markdown/markdown-copy-button.tsx";
 
 interface LlmPanelProps {
   trace: TraceHeader;

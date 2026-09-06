@@ -8,7 +8,7 @@
 import { EventEmitter } from "node:events";
 import type { LangyService } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import { LangyApp } from "../langy.app";
+import { LangyApp } from "../langy.app.ts";
 
 function recordingLangyService(): { service: LangyService; reached: string[] } {
   const reached: string[] = [];

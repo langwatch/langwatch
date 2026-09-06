@@ -9,13 +9,13 @@ import {
 } from "@chakra-ui/react";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills";
+import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 import {
   absorbContextTarget,
   type LangyContextTarget as LangyContextTargetDescriptor,
   useLangyContextTargetStore,
-} from "../../../../behavior/langy-context-target.store";
-import { type LangyContextChip } from "../../../../behavior/langy.store";
+} from "../../../../behavior/langy-context-target.store.ts";
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.

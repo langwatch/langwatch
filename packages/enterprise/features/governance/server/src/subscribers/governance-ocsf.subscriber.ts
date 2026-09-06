@@ -8,7 +8,7 @@ import {
   type GovernanceOcsfEvent,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port";
+} from "../ports/governance-subscriber.port.ts";
 
 export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
 export const GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID = 6;

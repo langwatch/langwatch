@@ -1,5 +1,5 @@
-import { useTabId } from "../model/prompt-tab-context";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+import { useTabId } from "../model/prompt-tab-context.tsx";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**
  * useIsTabActive

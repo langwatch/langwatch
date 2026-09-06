@@ -1,4 +1,4 @@
-import { firstPullRequestUrlIn } from "./langy.github-pr-url";
+import { firstPullRequestUrlIn } from "./langy.github-pr-url.ts";
 
 export type GithubProgressStage =
   | "cloning"

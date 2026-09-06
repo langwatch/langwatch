@@ -1,1 +1,1 @@
-export { ImpersonationBanner, type ImpersonationBannerProps } from "./impersonation-banner";
+export { ImpersonationBanner, type ImpersonationBannerProps } from "./impersonation-banner.tsx";

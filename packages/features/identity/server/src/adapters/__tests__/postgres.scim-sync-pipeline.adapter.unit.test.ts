@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PostgresScimSyncPipelineAdapter,
   type ScimSyncPipelineDatabase,
-} from "../postgres.scim-sync-pipeline.adapter";
-import type { ScimSyncFoldState } from "../../projections/scim-sync-state.projection";
-import type { ScimSyncPipeline } from "../scim-sync-pipeline-definition.adapter";
+} from "../postgres.scim-sync-pipeline.adapter.ts";
+import type { ScimSyncFoldState } from "../../projections/scim-sync-state.projection.ts";
+import type { ScimSyncPipeline } from "../scim-sync-pipeline-definition.adapter.ts";
 
 const ORGANIZATION = "organization_acme";
 const SYNC = "scimsync_1";

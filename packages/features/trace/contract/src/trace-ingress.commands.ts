@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp";
+import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
 
 export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;

@@ -9,16 +9,16 @@
  * collapsed into one.
  */
 import { z } from "zod";
-import { MODEL_ROLES } from "./catalog/model-feature-registry";
-import { customModelUpdateInputSchema } from "./custom-model";
+import { MODEL_ROLES } from "./catalog/model-feature-registry.ts";
+import { customModelUpdateInputSchema } from "./custom-model.ts";
 import {
   modelProviderScopeTypeSchema,
   modelProviderTestConnectionInputSchema,
   ROUTING_HANDLE_MAX_LENGTH,
   ROUTING_HANDLE_RULE,
-} from "./model-provider";
-import type { ModelDefaultEffective } from "./model-provider";
-import type { ModelProviderListEntry } from "./model-provider-list-entry";
+} from "./model-provider.ts";
+import type { ModelDefaultEffective } from "./model-provider.ts";
+import type { ModelProviderListEntry } from "./model-provider-list-entry.ts";
 
 /**
  * The scope-assignment shape the clients send. Deliberately not the

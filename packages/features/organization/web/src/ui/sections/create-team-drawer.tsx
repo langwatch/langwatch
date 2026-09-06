@@ -1,15 +1,15 @@
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { TeamUserRole } from "../../model/prisma-types";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { useRequiredSession } from "../../behavior/use-required-session";
-import { api } from "../../behavior/organization-api";
+import { TeamUserRole } from "../../model/prisma-types.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { api } from "../../behavior/organization-api.ts";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { TeamForm, type TeamFormData } from "./team-form";
-import { teamRolesOptions } from "./team-user-role-field";
-import { useOrganizationToaster } from "../../behavior/organization-feedback";
+import { TeamForm, type TeamFormData } from "./team-form.tsx";
+import { teamRolesOptions } from "./team-user-role-field.tsx";
+import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
 
 export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.ReactElement {
   const toaster = useOrganizationToaster();

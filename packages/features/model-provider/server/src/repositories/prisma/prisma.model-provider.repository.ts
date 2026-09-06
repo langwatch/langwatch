@@ -15,7 +15,7 @@ import {
 import {
   ModelProviderCredentialCodec,
   ModelProviderRepository,
-} from "../../ports/model-provider.port";
+} from "../../ports/model-provider.port.ts";
 
 type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
 

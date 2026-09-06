@@ -1,4 +1,4 @@
-import type { LangyCredentialSession, LangyMirrorTier, LangyWorkerCredentials } from "./langy";
+import type { LangyCredentialSession, LangyMirrorTier, LangyWorkerCredentials } from "./langy.ts";
 
 export function resolveLangyMirrorTier(
   { projectId }: { projectId: string },

@@ -1,4 +1,4 @@
-import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository";
+import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
 
 /** No-op lookup for deployments without ClickHouse. */
 export class MemoryExperimentIdLookupRepository extends ExperimentIdLookupRepository {

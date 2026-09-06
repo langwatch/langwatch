@@ -13,8 +13,8 @@ import type {
 } from "@langwatch/experiment-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
-import type { ExperimentResultDispatchService } from "./experiment-result-dispatch.service";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import type { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

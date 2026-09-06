@@ -1,1 +1,1 @@
-export { OtlpSpanContentDropService } from "./services/otlp-span-content-drop.service";
+export { OtlpSpanContentDropService } from "./services/otlp-span-content-drop.service.ts";

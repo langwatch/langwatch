@@ -16,7 +16,7 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 // `DisplayInvoice` was a server interface this application could name and a
 // browser package cannot. `InvoiceRow` is the same projection, declared where
 // the screen reads it.
-import type { InvoiceRow as DisplayInvoice } from "../../../behavior/billing-api";
+import type { InvoiceRow as DisplayInvoice } from "../../../behavior/billing-api.ts";
 
 // ---------------------------------------------------------------------------
 // Mutable mock organisation (reset per-test via resetMocks)

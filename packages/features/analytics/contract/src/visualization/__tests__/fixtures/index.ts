@@ -6,7 +6,7 @@
  * this package refuses, which is precisely the disagreement the fixtures
  * exist to make impossible.
  */
-export * from "./adversarial";
-export * from "./invalid";
-export * from "./lwql-dataset-registry";
-export * from "./valid";
+export * from "./adversarial/index.ts";
+export * from "./invalid/index.ts";
+export * from "./lwql-dataset-registry.ts";
+export * from "./valid/index.ts";

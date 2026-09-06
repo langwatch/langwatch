@@ -1,8 +1,8 @@
-import type { ChatMessage, ContentBlock } from "../../model/transcript/types";
-import { coerceToChatMessages } from "./chat-message-coercion";
-import { parseContentBlocks } from "./content-parser";
-import { tryParseJSON } from "../../model/transcript/content-format";
-import { isRecord } from "../../model/transcript/record";
+import type { ChatMessage, ContentBlock } from "../../model/transcript/types.ts";
+import { coerceToChatMessages } from "./chat-message-coercion.ts";
+import { parseContentBlocks } from "./content-parser.ts";
+import { tryParseJSON } from "../../model/transcript/content-format.ts";
+import { isRecord } from "../../model/transcript/record.ts";
 
 function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks

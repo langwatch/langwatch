@@ -24,7 +24,7 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { composeApiGateway } from "../api-gateway.composition";
+import { composeApiGateway } from "../api-gateway.composition.ts";
 
 const ORGANIZATION_ID = "organization-1";
 

@@ -12,7 +12,7 @@ import type {
   BatchComparisonVerdict,
   BatchEvaluationData,
   BatchResultRow,
-} from "./batch-evaluation-results.types";
+} from "./batch-evaluation-results.types.ts";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 

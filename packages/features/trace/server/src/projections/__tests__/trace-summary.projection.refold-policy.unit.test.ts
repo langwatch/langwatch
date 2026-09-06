@@ -5,9 +5,9 @@ import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
+import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 
 /**
  * Regression guard for the 2026-07-09 re-fold storm. Sharding recordSpan across

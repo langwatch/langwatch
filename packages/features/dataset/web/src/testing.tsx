@@ -27,7 +27,7 @@ import {
   type DatasetHostProject,
   type DatasetRouteReading,
   type DatasetSuccessNotice,
-} from "./model/dataset-host";
+} from "./model/dataset-host.ts";
 
 export type StubDatasetHostOptions = {
   project?: DatasetHostProject | undefined;

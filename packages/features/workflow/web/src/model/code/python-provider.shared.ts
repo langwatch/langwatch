@@ -1,4 +1,4 @@
-import { PYTHON_STDLIB_MODULE_BY_NAME, type PyModule } from "./python-stdlib";
+import { PYTHON_STDLIB_MODULE_BY_NAME, type PyModule } from "./python-stdlib.ts";
 
 /**
  * Bundle of disposables returned to the caller so a single component unmount

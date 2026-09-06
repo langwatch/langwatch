@@ -3,18 +3,18 @@ export {
   type MetricDataPointPreparation,
   type MetricPiiRedactionLevel,
   type PreparedMetricDataPoint,
-} from "./metric.service";
-export { scalarsFromCanonicalAttributes } from "./metric-attributes";
+} from "./metric.service.ts";
+export { scalarsFromCanonicalAttributes } from "./metric-attributes.ts";
 export {
   metricDataPointReceivedEventSchema,
   metricEventEnvelopeSchema,
   type MetricDataPointReceivedEvent,
   type MetricProcessingEvent,
-} from "./metric.events";
+} from "./metric.events.ts";
 export {
   recordMetricDataPointCommandDataSchema,
   type RecordMetricDataPointCommandData,
-} from "./schemas/metric-processing/metric-processing.commands";
+} from "./schemas/metric-processing/metric-processing.commands.ts";
 export {
   DEFAULT_METRIC_COMMAND_SHARDS,
   MAX_CANONICAL_METRIC_PAYLOAD_BYTES,
@@ -28,7 +28,7 @@ export {
   METRIC_ROLLUP_INTERVAL_MS,
   MIN_METRIC_COMMAND_SHARDS,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
-} from "./schemas/metric-processing/constants";
+} from "./schemas/metric-processing/constants.ts";
 export {
   aggregationTemporalitySchema,
   canonicalMetricDataPointSchema,
@@ -40,11 +40,11 @@ export {
   type MetricTraceCorrelation,
   type MetricUsageEstimate,
   type MetricUsageEstimateQuery,
-} from "./schemas/metric-processing/metric-data-point";
-export { affectedRollupBuckets, buildMetricRollups } from "./metric-rollup/metric-rollup";
-export { MAX_DENSE_BUCKET_SPAN } from "./metric-rollup/exponential-bucket";
+} from "./schemas/metric-processing/metric-data-point.ts";
+export { affectedRollupBuckets, buildMetricRollups } from "./metric-rollup/metric-rollup.ts";
+export { MAX_DENSE_BUCKET_SPAN } from "./metric-rollup/exponential-bucket.ts";
 export {
   comparePoints,
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
-} from "./metric-rollup/sequence";
+} from "./metric-rollup/sequence.ts";

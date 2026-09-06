@@ -4,7 +4,7 @@ import type {
   CanonicalAttributesPort,
   ExtractorContext,
   LogExtractorContext,
-} from "../ports/canonical-attributes.port";
+} from "../ports/canonical-attributes.port.ts";
 
 export const SPRING_AI_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",

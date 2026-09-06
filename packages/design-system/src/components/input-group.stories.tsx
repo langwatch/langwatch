@@ -1,7 +1,7 @@
 import { Box, Input, Kbd, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Search } from "lucide-react";
-import { InputGroup } from "./input-group";
+import { InputGroup } from "./input-group.tsx";
 
 const meta = {
   title: "Primitives/Input group",

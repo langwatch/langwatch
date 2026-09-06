@@ -8,7 +8,7 @@ import {
   graphLaneSelection,
   partitionByModuleGraph,
   selectedGraphLane,
-} from "../integration-module-graph";
+} from "../integration-module-graph.ts";
 
 let root: string;
 

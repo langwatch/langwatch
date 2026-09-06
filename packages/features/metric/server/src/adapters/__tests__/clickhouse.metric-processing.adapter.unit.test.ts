@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { point } from "@langwatch/metric-server/testing";
-import { ClickHouseMetricProcessingAdapter } from "../clickhouse.metric-processing.adapter";
-import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository";
-import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository";
-import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository";
+import { ClickHouseMetricProcessingAdapter } from "../clickhouse.metric-processing.adapter.ts";
+import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
 
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
   return {

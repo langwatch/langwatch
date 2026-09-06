@@ -11,11 +11,11 @@ import {
 } from "@langwatch/scenario-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { MAX_ATOM_PAGE } from "../../ports/result-atoms-read.port";
+import { MAX_ATOM_PAGE } from "../../ports/result-atoms-read.port.ts";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcProcedures,
-} from "../../rules/scenario-trpc-context.rules";
+} from "../../rules/scenario-trpc-context.rules.ts";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

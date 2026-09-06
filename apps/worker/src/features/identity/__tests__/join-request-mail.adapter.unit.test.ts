@@ -5,7 +5,7 @@ import {
   renderJoinRequestReminderEmail,
 } from "@langwatch/mail";
 import type { EmailContent } from "@langwatch/notification-server";
-import { JoinRequestMailAdapter } from "../join-request-mail.adapter";
+import { JoinRequestMailAdapter } from "../join-request-mail.adapter.ts";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature

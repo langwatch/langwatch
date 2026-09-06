@@ -15,16 +15,16 @@ import { useState } from "react";
 import { BudgetOverviewList } from "@langwatch/gateway-web/surfaces/budget-overview";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback";
-import { usePersonalRouter } from "../../behavior/personal-workspace-router";
-import { type PersonalApiKeyRow, usePersonalContext } from "../../behavior/use-personal-context";
-import { formatRelativeTime } from "../../model/relative-time";
-import { AvatarUploadControl } from "../../ui/sections/avatar-upload-control";
-import { DevicesPanel } from "../../ui/sections/devices-panel";
-import { HomePagePicker } from "../../ui/sections/home-page-picker";
-import { PersonalOtlpEndpointPanel } from "../../ui/sections/personal-otlp-endpoint-panel";
-import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import { usePersonalRouter } from "../../behavior/personal-workspace-router.ts";
+import { type PersonalApiKeyRow, usePersonalContext } from "../../behavior/use-personal-context.ts";
+import { formatRelativeTime } from "../../model/relative-time.ts";
+import { AvatarUploadControl } from "../../ui/sections/avatar-upload-control.tsx";
+import { DevicesPanel } from "../../ui/sections/devices-panel.tsx";
+import { HomePagePicker } from "../../ui/sections/home-page-picker.tsx";
+import { PersonalOtlpEndpointPanel } from "../../ui/sections/personal-otlp-endpoint-panel.tsx";
+import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
 
 /** The personal keys carry ISO timestamps; the ladder counts milliseconds. */
 const fmtRelative = (iso: string | null): string =>

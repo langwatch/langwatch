@@ -3,11 +3,11 @@ import merge from "lodash-es/merge";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 
 import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
-import { MODULES } from "../../model/studio-registry";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
-import { AgentNodeDraggable } from "./workflow-agent-node-draggable";
-import { EvaluatorNodeDraggable } from "./workflow-evaluator-node-draggable";
-import { NodeDraggable } from "./workflow-node-draggable";
+import { MODULES } from "../../model/studio-registry.ts";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { AgentNodeDraggable } from "./workflow-agent-node-draggable.tsx";
+import { EvaluatorNodeDraggable } from "./workflow-evaluator-node-draggable.tsx";
+import { NodeDraggable } from "./workflow-node-draggable.tsx";
 
 type WorkflowNodeDropAction = (item: { node: NodeWithOptionalPosition<Component> }) => void;
 

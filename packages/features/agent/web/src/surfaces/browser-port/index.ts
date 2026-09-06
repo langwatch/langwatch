@@ -6,5 +6,5 @@ export {
   type AgentHistoryInput,
   type AgentPushToCopiesInput,
   type AgentSyncFromSourceInput,
-} from "../../model/agent-browser.port";
-export { agentHasDevTunnel } from "../../model/agent-dev-tunnel";
+} from "../../model/agent-browser.port.ts";
+export { agentHasDevTunnel } from "../../model/agent-dev-tunnel.ts";

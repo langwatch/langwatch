@@ -12,7 +12,7 @@ import {
   PICKER_UNFILED_GROUP_NAME,
   ScenarioPicker,
   type ScenarioPickerProps,
-} from "../scenario-picker";
+} from "../scenario-picker.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

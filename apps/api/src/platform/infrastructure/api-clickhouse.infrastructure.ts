@@ -27,7 +27,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { ApiClickHouseConfigResolution } from "../config/api.config";
+import type { ApiClickHouseConfigResolution } from "../config/api.config.ts";
 
 /** Reports the composition decision an unconfigured ClickHouse would otherwise hide. */
 export abstract class ApiClickHouseAbsenceReportPort {
@@ -215,6 +215,14 @@ export class ApiClickHouseInfrastructure {
       throw error;
     }
   };
+
+  /**
+   * Every physical endpoint this process is configured for: the shared one and each
+   * private route, once per URL. The one read that genuinely spans them — resolving which
+   * project owns a stored object from its id alone — has no tenant to route on.
+   */
+  readonly instances = (): readonly { target: string; client: ClickHouseClient }[] =>
+    this.connection.instances();
 
   /**
    * Whether a query issued now would reach an endpoint. Reported rather than assumed: the

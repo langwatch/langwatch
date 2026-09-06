@@ -1,7 +1,7 @@
 import {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
-} from "../ports/trace-windowed-read-metrics.port";
+} from "../ports/trace-windowed-read-metrics.port.ts";
 
 /**
  * Where a windowed read's outcome is counted. A module-level sink rather than a parameter, because

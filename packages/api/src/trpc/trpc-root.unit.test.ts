@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TrpcRootDefinition } from "./trpc-root";
+import { TrpcRootDefinition } from "./trpc-root.ts";
 
 describe("TrpcRootDefinition", () => {
   it("builds a caller whose procedure receives the declared context", async () => {

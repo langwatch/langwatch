@@ -4,15 +4,15 @@ import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Avatar } from "@langwatch/design-system/avatar";
-import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { Link } from "@langwatch/ui-host/link";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version.tsx";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
-import { VersionBox } from "../history";
-import { BasePropertiesPanel } from "./base-properties-panel";
+import { VersionBox } from "../history.tsx";
+import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
 export function CustomPropertiesPanel({ node }: { node: Node<Custom> }) {
   return (

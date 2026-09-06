@@ -21,17 +21,17 @@ const storeState = {
   togglePaneCollapsed,
 };
 
-vi.mock("../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
 // The panel-level translate toggle dispatches through tRPC; stub it to an
 // identity passthrough so these tests don't need a tRPC client.
-vi.mock("../../hooks/use-text-translation", () => ({
+vi.mock("../../hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -40,7 +40,7 @@ vi.mock("../../hooks/use-text-translation", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context", () => ({
+vi.mock("../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: (conversationId: string | null, traceId: string) => ({
     conversationId,
     total: 2,
@@ -79,7 +79,7 @@ vi.mock("../../hooks/use-conversation-context", () => ({
   }),
 }));
 
-import { ConversationContext } from "../conversation-context";
+import { ConversationContext } from "../conversation-context.tsx";
 
 interface SummaryTrace {
   traceId: string;

@@ -5,7 +5,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { StoredObjectTrpcApi, type StoredObjectTrpcContext } from "../stored-object.api";
+import { StoredObjectTrpcApi, type StoredObjectTrpcContext } from "../stored-object.api.ts";
 
 const PROJECT_ID = "project-1";
 

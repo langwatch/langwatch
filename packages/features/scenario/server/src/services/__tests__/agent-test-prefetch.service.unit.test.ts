@@ -6,8 +6,8 @@
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { AGENT_TEST_SCENARIO_ID, AGENT_TEST_USER_MESSAGE } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AgentTestPrefetchService } from "../agent-test-prefetch.service";
-import type { ScenarioExecutionPrefetchConfig } from "../scenario-execution-prefetcher.service";
+import { AgentTestPrefetchService } from "../agent-test-prefetch.service.ts";
+import type { ScenarioExecutionPrefetchConfig } from "../scenario-execution-prefetcher.service.ts";
 
 const config: ScenarioExecutionPrefetchConfig = {
   langwatchEndpoint: "http://app:5560",

@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   createWorkerScenarioProcessing,
   WorkerScenarioAbsenceReportPort,
-} from "../worker-scenario-processing.composition";
+} from "../worker-scenario-processing.composition.ts";
 import type { ExecuteRunIntent } from "@langwatch/scenario-server";
-import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-execution.composition";
+import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-execution.composition.ts";
 
 /**
  * THE CONVERSION, asserted where it can actually fail.

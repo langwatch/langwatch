@@ -1,9 +1,9 @@
 import { VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import { GenerateApiSnippetDialog } from "./generate-api-snippet-dialog";
-import { Link } from "../../../ui/elements/prompt-link";
-import { getGetPromptSnippets } from "../../../surfaces/api-snippet";
+import { GenerateApiSnippetDialog } from "./generate-api-snippet-dialog.tsx";
+import { Link } from "../../../ui/elements/prompt-link.tsx";
+import { getGetPromptSnippets } from "../../../surfaces/api-snippet/index.ts";
 
 interface GeneratePromptApiSnippetButtonProps {
   promptHandle?: string | null;

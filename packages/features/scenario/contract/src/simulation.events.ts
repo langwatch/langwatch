@@ -3,11 +3,11 @@ import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
-} from "./simulation-event.constants";
+} from "./simulation-event.constants.ts";
 import {
   simulationEventMessageSchema,
   simulationEventResultsSchema,
-} from "./simulation-event.values";
+} from "./simulation-event.values.ts";
 
 const runSecretCiphertextSchema = z.record(z.string(), z.string());
 
@@ -323,4 +323,4 @@ export {
   isSimulationSetArchivedEvent,
   isSimulationTextMessageEndEvent,
   isSimulationTextMessageStartEvent,
-} from "./simulation-event.guards";
+} from "./simulation-event.guards.ts";

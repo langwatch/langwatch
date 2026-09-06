@@ -1,13 +1,13 @@
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS, SPAN_TYPE_TO_GEN_AI_OP } from "@langwatch/trace-contract";
-import { asNumber, isNonEmptyString, isRecord } from "./canonical-guard.rules";
+import { asNumber, isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
 import {
   decodeMessagesPayload,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
   stripSystemMessages,
-} from "./canonical-message.rules";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
+} from "./canonical-message.rules.ts";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export type MessageSource =
   | { type: "attr"; keys: readonly string[] }

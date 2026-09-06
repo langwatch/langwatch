@@ -20,7 +20,7 @@ vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
+vi.mock("../../../../../behavior/experiments-v3/use-target-name.ts", () => {
   const useTargetName = (_target: { id: string }) => "Test Target";
   return {
     useTargetName,
@@ -29,21 +29,21 @@ vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
       targets.map((target) => (target ? useTargetName(target) : "")),
   };
 });
-vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import { TargetHeader } from "../target-header";
-import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields";
+import { TargetHeader } from "../target-header.tsx";
+import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
-} from "../../../../../model/experiments-v3/types";
-import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types";
+} from "../../../../../model/experiments-v3/types.ts";
+import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types.ts";
 import {
   evaluatorHasMissingMappings,
   extractFieldsFromContent,
@@ -52,7 +52,7 @@ import {
   getUsedFields,
   targetHasMissingMappings,
   validateWorkbench,
-} from "../../../../../model/experiments-v3/mapping-validation";
+} from "../../../../../model/experiments-v3/mapping-validation.ts";
 
 const createTestDataset = (
   id: string = DEFAULT_TEST_DATA_ID,

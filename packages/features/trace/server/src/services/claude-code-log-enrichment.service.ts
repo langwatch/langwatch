@@ -3,7 +3,7 @@
  * no message content, which lives only in OTLP log records, so every read path wanting whole spans
  * joins the two server-side. Cost is not joined here: it is computed at ingest and stored once.
  */
-import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service";
+import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
 import type { Logger } from "@langwatch/observability";
 import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
@@ -12,12 +12,12 @@ import type { Span } from "@langwatch/trace-contract";
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
-} from "../rules/claude-code-message-index.rules";
+} from "../rules/claude-code-message-index.rules.ts";
 import {
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
-} from "../rules/claude-code-tool-enrichment.rules";
-import { DERIVED_ATTRS } from "./trace-log-content-derivation.service";
+} from "../rules/claude-code-tool-enrichment.rules.ts";
+import { DERIVED_ATTRS } from "./trace-log-content-derivation.service.ts";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
 import {
   CLAUDE_SPAN_NAME_PREFIX,
@@ -30,7 +30,7 @@ import {
   SPAN_REQUEST_ID_KEY,
   SPAN_USER_PROMPT_KEY,
   spanToolUseId,
-} from "../rules/claude-code-span-keys.rules";
+} from "../rules/claude-code-span-keys.rules.ts";
 
 /**
  * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace

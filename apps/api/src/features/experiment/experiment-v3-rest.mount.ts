@@ -12,12 +12,12 @@ import {
   type ExperimentV3RunLoop,
 } from "@langwatch/experiment-server";
 
-import type { ApiExperimentRun } from "../../app/api-experiment-run.composition";
+import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
-} from "../../app/api-handler-managed-session";
-import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential";
+} from "../../app/api-handler-managed-session.ts";
+import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
 
 /**
  * The richer of the process's two credential shapes (not the narrowed one

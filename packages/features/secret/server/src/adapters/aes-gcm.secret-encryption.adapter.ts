@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { SecretEncryptionPort } from "../ports/secret.port";
+import { SecretEncryptionPort } from "../ports/secret.port.ts";
 
 /**
  * The at-rest format for a stored secret: AES-256-GCM under a 32-byte key,

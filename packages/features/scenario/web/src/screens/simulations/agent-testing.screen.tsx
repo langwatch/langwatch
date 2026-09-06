@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { AgentTestingPage } from "../../ui/sections/agent-testing/agent-testing-page";
+import { AgentTestingPage } from "../../ui/sections/agent-testing/agent-testing-page.tsx";
 
 function AgentTestingRoutePage() {
   return <AgentTestingPage />;

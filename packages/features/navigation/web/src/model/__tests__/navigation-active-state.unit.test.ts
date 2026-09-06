@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isExperimentsActivePath, isOnlineEvaluationsActivePath } from "../navigation-active-state";
+import { isExperimentsActivePath, isOnlineEvaluationsActivePath } from "../navigation-active-state.ts";
 
 describe("navigation active state during the evaluation route migration", () => {
   /** @scenario Preserve existing project access during the navigation migration */

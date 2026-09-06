@@ -5,7 +5,7 @@ import {
   type MintGuardrailInput,
   type MintRoutingPolicyInput,
   type VirtualKeyRow,
-} from "../gateway-virtual-key-config-backfill.repository";
+} from "../gateway-virtual-key-config-backfill.repository.ts";
 
 /**
  * Exactly the delegate methods this walk calls, picked from the real client

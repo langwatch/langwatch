@@ -5,9 +5,9 @@
 
 import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import { instanceMetaKey, pendingKey, instanceChannel } from "../rules/connected-agent-keys.rules";
+import { instanceMetaKey, pendingKey, instanceChannel } from "../rules/connected-agent-keys.rules.ts";
 import type { Unsubscribe } from "@langwatch/agent-contract";
-import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service";
+import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:instance-watch");
 

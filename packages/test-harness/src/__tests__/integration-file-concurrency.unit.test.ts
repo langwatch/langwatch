@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertSerialWorkerSlot,
   withdrawWorkerCountOverride,
-} from "../integration-file-concurrency";
+} from "../integration-file-concurrency.ts";
 
 /** A fresh environment, so no test reads another's variables. */
 function env(overrides: Record<string, string>): NodeJS.ProcessEnv {

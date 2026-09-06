@@ -2,9 +2,9 @@ import type { z } from "zod";
 import {
   AVAILABLE_EVALUATORS as GENERATED_AVAILABLE_EVALUATORS,
   evaluatorsSchema as generatedEvaluatorsSchema,
-} from "./evaluators.generated";
-import { NATIVE_EVALUATOR_DEFINITIONS, nativeEvaluatorsSchemaShape } from "./evaluators.native";
-import type { EvaluatorDefinition, EvaluatorCategory } from "./evaluator";
+} from "./evaluators.generated.ts";
+import { NATIVE_EVALUATOR_DEFINITIONS, nativeEvaluatorsSchemaShape } from "./evaluators.native.ts";
+import type { EvaluatorDefinition, EvaluatorCategory } from "./evaluator.ts";
 
 export const evaluatorsSchema = generatedEvaluatorsSchema.extend(nativeEvaluatorsSchemaShape);
 export type Evaluators = z.infer<typeof evaluatorsSchema>;
@@ -24,4 +24,4 @@ export {
   API_KEYS_AND_SECRETS_DETECTION,
   isNativeEvaluatorType,
   NATIVE_EVALUATOR_TYPES,
-} from "./evaluators.native";
+} from "./evaluators.native.ts";

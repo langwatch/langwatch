@@ -1,11 +1,11 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import { describe, expect, it } from "vitest";
-import { createWorkerPrivateInfrastructureComposition } from "../worker-private-infrastructure.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { createWorkerPrivateInfrastructureComposition } from "../worker-private-infrastructure.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
-} from "../../platform/infrastructure/worker-stored-object-storage.adapter";
+} from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
 class Projects extends WorkerProjectS3SourcePort {
   async tryGet(projectId: string) {

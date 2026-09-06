@@ -10,7 +10,7 @@ import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
-} from "../../services/langwatch-ql-access-model.service";
+} from "../../services/langwatch-ql-access-model.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 

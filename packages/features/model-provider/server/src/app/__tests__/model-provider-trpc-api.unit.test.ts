@@ -18,8 +18,8 @@ import type {
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { ModelProviderApp } from "../model-provider.app";
-import { ModelProviderTrpcApi } from "../../transport/api-trpc/model-provider.api";
+import { ModelProviderApp } from "../model-provider.app.ts";
+import { ModelProviderTrpcApi } from "../../transport/api-trpc/model-provider.api.ts";
 
 type TestContext = {
   app: { modelProviders: ModelProviderApp };

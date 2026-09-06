@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { selectMostVisibleSection, useSectionTrackerStore } from "../section-tracker-store";
+import { selectMostVisibleSection, useSectionTrackerStore } from "../section-tracker-store.ts";
 
 beforeEach(() => {
   useSectionTrackerStore.getState().reset();

@@ -20,7 +20,7 @@ import {
   SETTLE_SPEND_COMMAND_TYPE,
   type SettleSpendCommandData,
   settleSpendCommandDataSchema,
-} from "../processes/gateway-spend-commands.process";
+} from "../processes/gateway-spend-commands.process.ts";
 /**
  * The four spend commands are pure appends: validate, stamp identity, emit one event. Aggregate is the gateway request itself (ULID), the id staying the idempotency key everywhere (internal dedup, external webhook event_id, replay). One event per (tenant, request, lifecycle step): a redelivered or double-posted command reuses the same key and the store drops the duplicate, so at-least-once emission can never double a request or a crash-retried confirm double-rate it.
  */

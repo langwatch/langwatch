@@ -2,7 +2,7 @@ import { Button, Heading, HStack } from "@chakra-ui/react";
 import {
   EvaluatorCategoryPicker,
   type EvaluatorCategoryId,
-} from "../../blocks/evaluator-category-picker";
+} from "../../blocks/evaluator-category-picker.tsx";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
@@ -14,10 +14,10 @@ import {
   EvaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
-} from "./evaluator-editor-shared";
-import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-selector-content";
+} from "./evaluator-editor-shared.tsx";
+import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-selector-content.tsx";
 
-export type { EvaluatorCategoryId } from "../../..";
+export type { EvaluatorCategoryId } from "../../../index.ts";
 
 export type EvaluatorCategorySelectorDrawerProps = {
   open?: boolean;

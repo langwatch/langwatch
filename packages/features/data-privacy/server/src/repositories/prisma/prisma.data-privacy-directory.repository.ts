@@ -14,7 +14,7 @@ import {
   DataPrivacyDirectoryPort,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
-} from "../../ports/data-privacy-directory.port";
+} from "../../ports/data-privacy-directory.port.ts";
 
 /** Only what this repository touches. */
 export type DataPrivacyDirectoryDatabase = Pick<

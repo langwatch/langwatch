@@ -30,7 +30,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "project-1" },
     organization: { id: "org-1" },
@@ -42,9 +42,9 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: calls.push, replace: vi.fn(), query: {}, asPath: "/", isReady: true }),
 }));
 
-vi.mock("../../../../model/tracking", () => ({ trackEvent: vi.fn() }));
+vi.mock("../../../../model/tracking.ts", () => ({ trackEvent: vi.fn() }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({ agents: { getAll: { invalidate: vi.fn() } } }),
     workflow: {
@@ -65,7 +65,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-const { WorkflowSelectorDrawer } = await import("../workflow-selector-drawer");
+const { WorkflowSelectorDrawer } = await import("../workflow-selector-drawer.tsx");
 
 /** A limit refusal exactly as the server serialises one. */
 const limitRefusal = ({

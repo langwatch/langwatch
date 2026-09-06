@@ -1,15 +1,15 @@
 import { createLogger } from "@langwatch/observability";
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event } from "../domain/types";
-import type { EventSourcedQueueProcessor } from "../queues";
-import type { ExecutionTarget } from "../runtime.types";
-import { ConfigurationError } from "../services/errorHandling";
-import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager";
-import type { EventStoreReadContext } from "../stores/eventStore.types";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
-import type { FoldProjectionDefinition } from "./foldProjection.types";
-import type { MapProjectionDefinition } from "./mapProjection.types";
-import { ProjectionRouter } from "./projectionRouter";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event } from "../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../queues/index.ts";
+import type { ExecutionTarget } from "../runtime.types.ts";
+import { ConfigurationError } from "../services/errorHandling.ts";
+import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager.ts";
+import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
+import type { MapProjectionDefinition } from "./mapProjection.types.ts";
+import { ProjectionRouter } from "./projectionRouter.ts";
 
 /**
  * Global projection registry for projections that subscribe to events from multiple pipelines.

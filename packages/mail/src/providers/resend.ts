@@ -1,14 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import { hostnameOf, resolveProxyForHost, type OutboundProxyConfig } from "@langwatch/egress";
-import { sanitizeHeaders } from "./mime";
+import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
   type EmailProviderPort,
   type MailerConfiguration,
   toArray,
-} from "./types";
+} from "./types.ts";
 
 const logger = createLogger("langwatch:mailer:resend");
 

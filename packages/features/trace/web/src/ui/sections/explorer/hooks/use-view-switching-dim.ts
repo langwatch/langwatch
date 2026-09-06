@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useDensityStore } from "../../../../behavior/density.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store";
-import { useViewStore } from "../../../../behavior/view.store";
+import { useDensityStore } from "../../../../behavior/density.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
 
 interface DimInputs {
   isFetching: boolean;

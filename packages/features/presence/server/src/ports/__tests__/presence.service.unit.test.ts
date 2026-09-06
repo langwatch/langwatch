@@ -1,9 +1,9 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../presence.port";
-import { PresenceRepository } from "../../repositories/presence.repository";
-import { PresenceService } from "../../services/presence.service";
+import { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../presence.port.ts";
+import { PresenceRepository } from "../../repositories/presence.repository.ts";
+import { PresenceService } from "../../services/presence.service.ts";
 
 const session: PresenceSession = {
   projectId: "project-1",

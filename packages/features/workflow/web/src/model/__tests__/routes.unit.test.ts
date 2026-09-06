@@ -2,7 +2,7 @@
  * @see specs/features/suites/rename-suites-to-runs.feature - Route title scenarios
  */
 import { describe, expect, it } from "vitest";
-import { projectRoutes } from "../routes";
+import { projectRoutes } from "../routes.ts";
 
 describe("projectRoutes", () => {
   describe("when the suites route configuration is read", () => {

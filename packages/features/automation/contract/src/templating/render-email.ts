@@ -1,13 +1,13 @@
-import { TEST_FIRE_EMAIL_SUBJECT_PREFIX, testFireEmailCalloutHtml } from "./banner";
-import { DEFAULT_EMAIL_BODY_TEMPLATE, DEFAULT_EMAIL_SUBJECT_TEMPLATE } from "./defaults";
-import { wrapEmailHtml } from "./email-layout";
-import { markdownToEmailHtml } from "./markdown";
-import { renderWithFallback } from "./render-with-fallback";
+import { TEST_FIRE_EMAIL_SUBJECT_PREFIX, testFireEmailCalloutHtml } from "./banner.ts";
+import { DEFAULT_EMAIL_BODY_TEMPLATE, DEFAULT_EMAIL_SUBJECT_TEMPLATE } from "./defaults.ts";
+import { wrapEmailHtml } from "./email-layout.ts";
+import { markdownToEmailHtml } from "./markdown.ts";
+import { renderWithFallback } from "./render-with-fallback.ts";
 import type {
   GraphAlertTemplateContext,
   ReportTemplateContext,
   TemplateContext,
-} from "./template-context";
+} from "./template-context.ts";
 
 export const EMAIL_SUBJECT_MAX_LENGTH = 200;
 

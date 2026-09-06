@@ -1,5 +1,5 @@
-import type { AutomationEvaluationQueryClassificationPort } from "../ports/automation-evaluation-subscriber.port";
-import { AutomationEvaluationTriggerFilterPort } from "../ports/automation-evaluation-subscriber.port";
+import type { AutomationEvaluationQueryClassificationPort } from "../ports/automation-evaluation-subscriber.port.ts";
+import { AutomationEvaluationTriggerFilterPort } from "../ports/automation-evaluation-subscriber.port.ts";
 
 /**
  * Automation-owned answer to whether a trigger needs an evaluation-terminal

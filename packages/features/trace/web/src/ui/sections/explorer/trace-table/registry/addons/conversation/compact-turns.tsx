@@ -3,45 +3,45 @@ import type { Cell } from "@tanstack/react-table";
 import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
-import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer";
-import type { DensityTokens } from "../../../../hooks/use-density-tokens";
-import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer";
-import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store";
+import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
+import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";
+import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer.ts";
+import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store.ts";
 import {
   formatCost,
   formatDuration,
   formatISOTimestamp,
   formatTokens,
-} from "../../../../../../../model/display-formatters";
-import type { TraceListItem } from "../../../../types/trace";
-import { useRelativeTime } from "../../../../utils/use-relative-time";
-import { TraceIdPeek } from "../../../../trace-id-peek";
-import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content";
-import type { ConversationGroup } from "../../../conversation-groups";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
+} from "../../../../../../../model/display-formatters.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { useRelativeTime } from "../../../../utils/use-relative-time.ts";
+import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
+import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import {
   ROW_STYLES,
   type RowStyle,
   rowVariantFor,
   StatusDot,
   StatusIndicator,
-} from "../../../status-row";
-import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
-import { cellPropsFor } from "../../../trace-table-shell";
-import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder";
-import { SELECT_COLUMN_ID } from "../../cells/select-cells";
-import { ConversationSummaryDetail } from "./conversation-summary";
+} from "../../../status-row.tsx";
+import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
+import { cellPropsFor } from "../../../trace-table-shell.tsx";
+import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import { SELECT_COLUMN_ID } from "../../cells/select-cells.tsx";
+import { ConversationSummaryDetail } from "./conversation-summary.tsx";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,
-} from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles";
+} from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles.ts";
 import {
   formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
   TURN_GAP_VISIBLE_SECONDS,
   turnGapSeconds,
-} from "./turn-gap";
-import { SHOW_MORE_STEP, useTurnsWindow } from "./turns-window";
+} from "./turn-gap.ts";
+import { SHOW_MORE_STEP, useTurnsWindow } from "./turns-window.ts";
 
 const TEXT_TRUNCATE_LENGTH = 80;
 const ERROR_TRUNCATE_LENGTH = 60;

@@ -5,7 +5,7 @@ import {
   spanInputOutputSchema,
   langWatchSpanSchema,
 } from "@langwatch/trace-contract";
-import { AVAILABLE_EVALUATORS, evaluatorTypesSchema, evaluatorsSchema } from "../index";
+import { AVAILABLE_EVALUATORS, evaluatorTypesSchema, evaluatorsSchema } from "../index.ts";
 
 describe("given Zod schemas are the single source of truth", () => {
   describe("when the collector receives spans", () => {

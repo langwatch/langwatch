@@ -1,17 +1,17 @@
 import { createLogger } from "@langwatch/observability";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
-import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
-import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
-import { showErrorToast } from "../../../errors";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
+import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
+import { showErrorToast } from "../../../errors/index.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   isSameAnnotationTarget,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store";
+} from "../../../../../behavior/annotation-draft.store.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
-} from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster";
+} from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
 
 const logger = createLogger("MessageAnnotateCluster");
 

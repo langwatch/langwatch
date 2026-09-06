@@ -1,9 +1,9 @@
-import type { Projection } from "../domain/types";
+import type { Projection } from "../domain/types.ts";
 import type {
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
-} from "./projectionStore.types";
+} from "./projectionStore.types.ts";
 
 /**
  * Base class for in-memory projection stores.

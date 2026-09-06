@@ -13,17 +13,17 @@ import {
   incrementEsProcessIntentsSuppressed,
   incrementEsProcessManagerTotal,
   observeEsProcessManagerDuration,
-} from "../metrics";
-import { toSafeFailureDiagnostic } from "./failureDiagnostic";
-import { ensureJsonSafe, isDeepJsonEqual } from "./json";
+} from "../metrics.ts";
+import { toSafeFailureDiagnostic } from "./failureDiagnostic.ts";
+import { ensureJsonSafe, isDeepJsonEqual } from "./json.ts";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
   ProcessIntent,
   ProcessRef,
   ProcessSignalEnvelope,
-} from "./processManager.types";
-import type { DueWake, NewOutboxMessage, ProcessStore } from "./stores/processStore.types";
+} from "./processManager.types.ts";
+import type { DueWake, NewOutboxMessage, ProcessStore } from "./stores/processStore.types.ts";
 
 export type HandleResult =
   | {

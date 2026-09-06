@@ -1,16 +1,16 @@
-import { ClickHouseSpanStatusFacetAdapter } from "./trace-facet-span-status.clickhouse.adapter";
-import { ClickHouseSpanNameFacetAdapter } from "./trace-facet-span-name.clickhouse.adapter";
+import { ClickHouseSpanStatusFacetAdapter } from "./trace-facet-span-status.clickhouse.adapter.ts";
+import { ClickHouseSpanNameFacetAdapter } from "./trace-facet-span-name.clickhouse.adapter.ts";
 import { deriveTraceOrigin, TRACE_ORIGIN_CLICKHOUSE_EXPRESSION } from "@langwatch/trace-contract";
 import { deriveTraceStatus, TRACE_STATUS_CLICKHOUSE_EXPRESSION } from "@langwatch/trace-contract";
-import { EVALUATOR_FACET } from "./trace-facet-evaluator.clickhouse.adapter";
-import { EVENT_ATTRIBUTE_KEYS_FACET } from "./trace-facet-event-attribute-keys.clickhouse.adapter";
-import { EVENT_FACET } from "./trace-facet-events.clickhouse.adapter";
-import { LABEL_FACET } from "./trace-facet-label.clickhouse.adapter";
+import { EVALUATOR_FACET } from "./trace-facet-evaluator.clickhouse.adapter.ts";
+import { EVENT_ATTRIBUTE_KEYS_FACET } from "./trace-facet-event-attribute-keys.clickhouse.adapter.ts";
+import { EVENT_FACET } from "./trace-facet-events.clickhouse.adapter.ts";
+import { LABEL_FACET } from "./trace-facet-label.clickhouse.adapter.ts";
 import {
   METADATA_KEYS_FACET,
   TRACE_METADATA_FACET,
-} from "./trace-facet-metadata-keys.clickhouse.adapter";
-import { SPAN_ATTRIBUTE_KEYS_FACET } from "./trace-facet-span-attribute-keys.clickhouse.adapter";
+} from "./trace-facet-metadata-keys.clickhouse.adapter.ts";
+import { SPAN_ATTRIBUTE_KEYS_FACET } from "./trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
 import { UNSUPPORTED } from "@langwatch/trace-contract";
 

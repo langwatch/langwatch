@@ -33,8 +33,8 @@ import {
   Workflow,
 } from "lucide-react";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
-import { STATUS_COLORS } from "../model/display-formatters";
-import { ORIGIN_DISPLAY } from "../model/origin-display";
+import { STATUS_COLORS } from "../model/display-formatters.ts";
+import { ORIGIN_DISPLAY } from "../model/origin-display.ts";
 
 /** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";

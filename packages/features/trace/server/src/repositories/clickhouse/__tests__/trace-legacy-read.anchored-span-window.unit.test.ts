@@ -114,7 +114,7 @@ function matchRows({
  * Drives the read and hands back the span query it issued. A missing span read is a broken fixture, not a failed expectation — these scenarios are all about the query's SHAPE, so throwing (rather than returning undefined) keeps assertions in the it blocks and reports a setup break as a setup break.
  */
 async function readTraces(traceIds: string[]) {
-  const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+  const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
   const service = new TraceLegacyReadClickHouseRepository({
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
-import { CodeBlock, DetailTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout";
-import { defineTemplate, renderMailTemplate } from "./registry";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
+import { CodeBlock, DetailTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const licenseEmailProps = z.object({
   email: z.email(),

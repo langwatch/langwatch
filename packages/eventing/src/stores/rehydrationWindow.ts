@@ -1,4 +1,4 @@
-import type { AggregateType } from "../domain/aggregateType";
+import type { AggregateType } from "../domain/aggregateType.ts";
 
 /**
  * Aggregate types whose events all fall within the aggregate's own lifetime

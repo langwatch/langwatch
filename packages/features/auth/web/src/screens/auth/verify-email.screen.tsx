@@ -1,5 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { AuthCard } from "../../ui/elements/auth-card";
+import { AuthCard } from "../../ui/elements/auth-card.tsx";
 
 /**
  * The email verification ceremony's magic-link LANDING page (D01). It

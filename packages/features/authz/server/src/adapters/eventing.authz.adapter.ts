@@ -48,10 +48,10 @@ import {
   EventUtils,
 } from "@langwatch/eventing";
 import type { ZodSchema } from "zod";
-import { EventingAuthzAuditAdapter } from "./eventing.authz-audit.adapter";
-import { AuthzGrantProjection } from "../projections/authz-grant.projection";
-import type { GrantProjectionWriteStore } from "../projections/authz-grant.projection";
-import type { AuthzAuditTrailStore } from "./eventing.authz-audit.adapter";
+import { EventingAuthzAuditAdapter } from "./eventing.authz-audit.adapter.ts";
+import { AuthzGrantProjection } from "../projections/authz-grant.projection.ts";
+import type { GrantProjectionWriteStore } from "../projections/authz-grant.projection.ts";
+import type { AuthzAuditTrailStore } from "./eventing.authz-audit.adapter.ts";
 
 /**
  * Both grants and roles use this one Eventing partition. Their aggregate IDs

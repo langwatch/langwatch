@@ -6,17 +6,17 @@ import { TriggerAction } from "@langwatch/automation-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { INITIAL_DRAFT } from "../ui/sections/draft-model";
-import { useAutomationStore } from "../ui/sections/automation-store";
-import { SubjectSection } from "../ui/sections/subject-section";
+import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
+import { useAutomationStore } from "../ui/sections/automation-store.ts";
+import { SubjectSection } from "../ui/sections/subject-section.tsx";
 
-vi.mock("../../../behavior/automation-session", () => ({
+vi.mock("../../../behavior/automation-session.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", name: "Proj", slug: "proj" },
   }),
 }));
 
-vi.mock("../../../behavior/automation-feedback", () => ({
+vi.mock("../../../behavior/automation-feedback.ts", () => ({
   useDescribeError:
     () =>
     ({ fallbackTitle }: { fallbackTitle?: string }) =>
@@ -33,7 +33,7 @@ const server = vi.hoisted(() => ({
   cap: { data: null as { cap: number } | null },
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     graphs: {
       getAll: {
@@ -66,10 +66,10 @@ vi.mock("../../../behavior/automation-api", () => ({
 
 // The query editors carry the traces-view suggestion engine, which is not what
 // the preview and its advice are about.
-vi.mock("../ui/blocks/condition-builder", () => ({
+vi.mock("../ui/blocks/condition-builder.tsx", () => ({
   ConditionBuilder: () => <div data-testid="condition-builder" />,
 }));
-vi.mock("../ui/elements/query-filter-input", () => ({
+vi.mock("../ui/elements/query-filter-input.tsx", () => ({
   QueryFilterInput: () => <div data-testid="query-filter-input" />,
 }));
 

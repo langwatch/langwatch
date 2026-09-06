@@ -6,8 +6,8 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../../../behavior/langy.store";
-import { useLangyWarmWorker } from "../use-langy-warm-worker";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyWarmWorker } from "../use-langy-warm-worker.ts";
 
 type WarmInput = {
   projectId: string;
@@ -22,7 +22,7 @@ type MutateOptions = {
 
 const mutate = vi.fn<(input: WarmInput, opts?: MutateOptions) => void>();
 
-vi.mock("../../../../behavior/langy-api", () => ({
+vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       warmWorker: {

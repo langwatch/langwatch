@@ -5,7 +5,7 @@
 
 import type { AnnotationScore } from "@langwatch/annotation-contract";
 import { describe, expect, it } from "vitest";
-import { buildReadableAnnotation, type TraceAnnotation } from "../trace-mapping";
+import { buildReadableAnnotation, type TraceAnnotation } from "../trace-mapping.ts";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
 const SPAN_ID = "0af31b2c9d4e5f60";

@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { TEMPLATES } from "../../model/templates/templates.registry";
+import { TEMPLATES } from "../../model/templates/templates.registry.ts";
 
 const MAX_WORKFLOW_FILE_SIZE = 5 * 1024 * 1024;
 

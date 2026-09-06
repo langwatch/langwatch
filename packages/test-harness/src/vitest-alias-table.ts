@@ -19,7 +19,7 @@ import {
   isRegularExpressionLiteral,
   isStringLiteral,
 } from "typescript/unstable/ast";
-import { parseSourceText } from "./ts-ast";
+import { parseSourceText } from "./ts-ast.ts";
 
 /**
  * Reading the module-alias tables the vitest configs declare.

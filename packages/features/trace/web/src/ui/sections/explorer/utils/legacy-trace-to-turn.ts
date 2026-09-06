@@ -1,5 +1,5 @@
 import type { Trace } from "@langwatch/trace-contract";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../types/trace";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../types/trace.ts";
 
 /** The numbers the turn separator reads out: time, cost, tokens. */
 type TurnLedger = Pick<

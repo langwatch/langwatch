@@ -1,8 +1,8 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { toPgTimestampUtc } from "./pg-timestamp";
-import type { ScheduledJobRecord, ScheduledJobStore } from "../../schedule/scheduler.types";
+import { toPgTimestampUtc } from "./pg-timestamp.ts";
+import type { ScheduledJobRecord, ScheduledJobStore } from "../../schedule/scheduler.types.ts";
 
 /**
  * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres

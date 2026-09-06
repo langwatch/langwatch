@@ -1,7 +1,7 @@
 import {
   PrismaAnnotationQueueRepository,
   type AnnotationQueueDatabase,
-} from "../repositories/prisma/prisma.annotation-queue.repository";
+} from "../repositories/prisma/prisma.annotation-queue.repository.ts";
 
 /**
  * The queue rows over Postgres, as the annotation transport's queue port.

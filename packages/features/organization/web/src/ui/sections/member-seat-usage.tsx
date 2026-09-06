@@ -5,7 +5,7 @@ import {
   LIMIT_TYPE_DISPLAY_LABELS,
   ResourceLimitRow,
 } from "@langwatch/enterprise-licensing-web/surfaces/resource-limits";
-import { api } from "../../behavior/organization-api";
+import { api } from "../../behavior/organization-api.ts";
 
 /**
  * Where the organization stands on each kind of seat, on the page where seats are decided.

@@ -3,12 +3,12 @@ import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 import { SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
-import type { FacetGroupDef } from "../../../../behavior/facet-constants";
-import type { SuggestionState } from "../../../../model/get-suggestion-state";
-import { FACET_GROUPS, getFacetGroupId, GROUP_ICONS } from "../../../../behavior/facet-constants";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { getFacetIcon } from "../filter-sidebar/utils";
-import type { SuggestionRow, SuggestionUIState } from "./suggestion-ui";
+import type { FacetGroupDef } from "../../../../behavior/facet-constants.ts";
+import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
+import { FACET_GROUPS, getFacetGroupId, GROUP_ICONS } from "../../../../behavior/facet-constants.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { getFacetIcon } from "../filter-sidebar/utils.ts";
+import type { SuggestionRow, SuggestionUIState } from "./suggestion-ui.ts";
 
 interface SuggestionDropdownProps {
   ui: SuggestionUIState;

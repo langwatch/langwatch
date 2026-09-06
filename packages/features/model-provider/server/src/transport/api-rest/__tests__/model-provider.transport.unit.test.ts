@@ -16,11 +16,11 @@ import {
   ModelProviderRoutingHandleTakenError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import { ModelProviderKeysService } from "../../../services/model-provider-keys.service";
+import { ModelProviderKeysService } from "../../../services/model-provider-keys.service.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createModelProvidersRestApp } from "../model-provider.api";
+import { createModelProvidersRestApp } from "../model-provider.api.ts";
 
 /**
  * The process boundary, reduced to the one fact these tests read back: a

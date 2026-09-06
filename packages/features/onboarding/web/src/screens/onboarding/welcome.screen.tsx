@@ -8,7 +8,7 @@
  * — and the screen is a screen.
  */
 
-import { WelcomeScreen } from "../../ui/sections/welcome-screen";
+import { WelcomeScreen } from "../../ui/sections/welcome-screen.tsx";
 
 const OnboardingWelcome: React.FC = () => <WelcomeScreen />;
 

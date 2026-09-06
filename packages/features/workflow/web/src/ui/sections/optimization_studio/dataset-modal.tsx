@@ -18,13 +18,13 @@ import { UploadCSVDrawer } from "@langwatch/dataset-web/surfaces/upload-csv-draw
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   datasetColumnsToFields,
   inMemoryDatasetToNodeDataset,
-} from "../../../model/studio-dataset.utils";
+} from "../../../model/studio-dataset.utils.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },

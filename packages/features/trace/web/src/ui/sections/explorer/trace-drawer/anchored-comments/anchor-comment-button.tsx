@@ -1,14 +1,14 @@
 import { Button, Icon, type SystemStyleObject, Text } from "@chakra-ui/react";
 import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
-import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
+import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 import { Popover } from "@langwatch/design-system/popover";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import type { TraceAnchor } from "../../hooks/use-anchored-annotations";
-import { AnnotationPopover } from "../conversation-view/annotation-popover";
-import { AnchorCommentThread } from "./anchor-comment-thread";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import type { TraceAnchor } from "../../hooks/use-anchored-annotations.ts";
+import { AnnotationPopover } from "../conversation-view/annotation-popover.tsx";
+import { AnchorCommentThread } from "./anchor-comment-thread.tsx";
 
 /**
  * Whether a control with no room for a label is on screen right now.

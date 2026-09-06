@@ -28,16 +28,16 @@ import {
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
   recordMetricDataPointCommandDataSchema,
 } from "@langwatch/metric-contract";
-import { MetricDataPointStorageMapProjection } from "../projections/metric-data-point-storage.projection";
-import { MetricSeriesCatalogMapProjection } from "../projections/metric-series-catalog.projection";
-import { MetricTimeRollupMapProjection } from "../projections/metric-time-rollup.projection";
-import type { MetricDataPointAppendRepository } from "../repositories/metric-data-point-append.repository";
+import { MetricDataPointStorageMapProjection } from "../projections/metric-data-point-storage.projection.ts";
+import { MetricSeriesCatalogMapProjection } from "../projections/metric-series-catalog.projection.ts";
+import { MetricTimeRollupMapProjection } from "../projections/metric-time-rollup.projection.ts";
+import type { MetricDataPointAppendRepository } from "../repositories/metric-data-point-append.repository.ts";
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
-} from "../stores/metric-projection/metric-projection.store";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+} from "../stores/metric-projection/metric-projection.store.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { sha256 } = MetricSerializationAdapter;
 
 export interface MetricProcessingPipelineDeps {

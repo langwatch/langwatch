@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Evaluation } from "@langwatch/trace-contract";
-import { mapScore, mapStatus } from "../use-trace-evaluations";
+import { mapScore, mapStatus } from "../use-trace-evaluations.ts";
 
 function makeEvaluation(overrides: Partial<Evaluation> = {}): Evaluation {
   return {

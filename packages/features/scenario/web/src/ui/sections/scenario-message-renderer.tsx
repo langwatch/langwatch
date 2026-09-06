@@ -1,21 +1,21 @@
-import type { NextSpeaker } from "../elements/next-speaker";
-import { TypingBubble } from "../elements/typing-bubble";
+import type { NextSpeaker } from "../elements/next-speaker.ts";
+import { TypingBubble } from "../elements/typing-bubble.tsx";
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import type { MediaPartData } from "../../model/media-parts";
-import { MediaPart } from "./media-part";
-import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback";
-import { useSequentialAudioPlayback } from "../../behavior/use-sequential-audio-playback";
+import type { MediaPartData } from "../../model/media-parts.ts";
+import { MediaPart } from "./media-part.tsx";
+import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback.ts";
+import { useSequentialAudioPlayback } from "../../behavior/use-sequential-audio-playback.ts";
 import {
   flattenMessages,
   groupIntoTurns,
   type DisplayItem,
   type StreamingMessage,
-} from "../../model/scenario-message-display";
+} from "../../model/scenario-message-display.ts";
 
-export type { StreamingMessage } from "../../model/scenario-message-display";
+export type { StreamingMessage } from "../../model/scenario-message-display.ts";
 
 // Role → alignment mapping. Extracted here so `align` and `data-align` always
 // derive from the same value — the `data-align` attribute mirrors `align` for

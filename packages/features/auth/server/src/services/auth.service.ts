@@ -9,9 +9,9 @@ import {
 import type { UserService } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AuthClockPort } from "../ports/auth-clock.port";
-import type { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port";
-import type { AuthSessionRepository } from "../repositories/auth-session.repository";
+import type { AuthClockPort } from "../ports/auth-clock.port.ts";
+import type { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port.ts";
+import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
 
 const CACHE_PREFIX = "better-auth:";
 const logger = createLogger("langwatch:auth:session-lifecycle");

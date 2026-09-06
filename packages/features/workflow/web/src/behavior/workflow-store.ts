@@ -24,15 +24,15 @@ import {
   LATEST_SPEC_VERSION,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { rewriteCodeSignature } from "../model/code-signature";
+import { rewriteCodeSignature } from "../model/code-signature.ts";
 import {
   GATE_FIELD,
   GATE_HANDLE_ID,
   isBranchConnectionOrigin,
   nodeHasGateInput,
-} from "../model/control-flow";
+} from "../model/control-flow.ts";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
-import { canConvergeOnInput } from "../model/edge-convergence";
+import { canConvergeOnInput } from "../model/edge-convergence.ts";
 export type CodedExecutionFailure = {
   error_type?: string;
   upstream_status?: number;

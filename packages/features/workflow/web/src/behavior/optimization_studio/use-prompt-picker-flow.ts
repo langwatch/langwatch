@@ -4,7 +4,7 @@ import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
 import {
   useWorkflowPromptPickerFlow,
   type PromptPickerPort,
-} from "../use-workflow-prompt-picker-flow";
+} from "../use-workflow-prompt-picker-flow.ts";
 
 /** App composition adapter for the Workflow prompt-selection state machine. */
 export function usePromptPickerFlow() {

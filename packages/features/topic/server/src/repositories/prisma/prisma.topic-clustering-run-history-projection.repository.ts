@@ -10,7 +10,7 @@ import {
   topicClusteringRunHistoryProjectionEntrySchema,
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunHistoryEntry,
-} from "../../projections/topic-clustering-run-history.projection";
+} from "../../projections/topic-clustering-run-history.projection.ts";
 
 function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
   return {

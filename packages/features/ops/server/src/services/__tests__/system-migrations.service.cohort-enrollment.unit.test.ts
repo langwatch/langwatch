@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type SystemMigrationEnrollmentStore,
   SystemMigrationsService,
-} from "../system-migrations.service";
+} from "../system-migrations.service.ts";
 
 const MIGRATION = "authz-grants-genesis-import";
 

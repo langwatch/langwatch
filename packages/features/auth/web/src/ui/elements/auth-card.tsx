@@ -3,7 +3,7 @@ import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import "./auth-front-door.css";
-import { FullLogo } from "./full-logo";
+import { FullLogo } from "./full-logo.tsx";
 
 /**
  * The card every unauthenticated screen is: the mark, one heading, one column

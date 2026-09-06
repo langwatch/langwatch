@@ -2,11 +2,11 @@ import { z } from "zod";
 import { EventUtils } from "@langwatch/eventing";
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
-import { CanonicalLogRecordRepository } from "../canonical-log-record.repository";
+import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
-} from "./clickhouse.canonical-log-record-append.repository";
+} from "./clickhouse.canonical-log-record-append.repository.ts";
 
 const logger = createLogger("langwatch:log:canonical-log-record-repository");
 

@@ -7,7 +7,7 @@ import type {
   SharedPayloadCacheInput,
   ShareWithProject,
   TracePinInput,
-} from "./share";
+} from "./share.ts";
 
 export abstract class ShareService {
   abstract listForResource(input: ShareResourceInput): Promise<ShareLink[]>;

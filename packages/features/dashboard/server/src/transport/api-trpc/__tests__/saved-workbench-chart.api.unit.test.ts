@@ -15,11 +15,11 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { DashboardApp } from "../../../app/dashboard.app";
+import type { DashboardApp } from "../../../app/dashboard.app.ts";
 import {
   SavedWorkbenchChartTrpcApi,
   type SavedWorkbenchChartTrpcPorts,
-} from "../saved-workbench-chart.api";
+} from "../saved-workbench-chart.api.ts";
 
 type TestContext = { app: { dashboard: DashboardApp } };
 

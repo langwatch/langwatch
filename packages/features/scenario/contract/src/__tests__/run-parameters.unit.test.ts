@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
 
 import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
-import { resolveRunParameters } from "../run-parameters";
+import { resolveRunParameters } from "../run-parameters.ts";
 
 const SECRET_VALUE = "tok-live-abc123";
 

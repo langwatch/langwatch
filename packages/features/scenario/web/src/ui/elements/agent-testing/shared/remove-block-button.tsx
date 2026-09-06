@@ -6,7 +6,7 @@
 
 import { chakra } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 
 export function RemoveBlockButton({
   label,

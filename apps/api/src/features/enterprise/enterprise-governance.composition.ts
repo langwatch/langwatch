@@ -5,8 +5,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiEnterpriseApplicationPort } from "./enterprise.composition";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiEnterpriseApplicationPort } from "./enterprise.composition.ts";
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {

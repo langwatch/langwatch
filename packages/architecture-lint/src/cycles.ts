@@ -1,5 +1,5 @@
-import { manifestDependencies } from "./manifests";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import { manifestDependencies } from "./manifests.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 export function lintCycles(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));

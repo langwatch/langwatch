@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
-import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service";
+import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port.ts";
+import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service.ts";
 
 const migrations = ModelProviderLegacyMigrationService.create();
 

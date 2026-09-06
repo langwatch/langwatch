@@ -6,7 +6,7 @@ import type { ScenarioService, ScenarioTestSuite } from "@langwatch/scenario-con
 import type { ProjectService } from "@langwatch/project-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { SuiteScopeNotAllowedError, type SuiteService } from "@langwatch/suite-contract";
-import { SuiteApp } from "../suite.app";
+import { SuiteApp } from "../suite.app.ts";
 
 function testSuite(overrides: Partial<ScenarioTestSuite> = {}): ScenarioTestSuite {
   return {

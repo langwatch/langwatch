@@ -6,15 +6,15 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack";
-import { parseContentBlocks } from "../../explorer/trace-drawer/transcript/parsing";
-import { RenderInputOutput } from "../render-input-output";
+import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
+import { parseContentBlocks } from "../../explorer/trace-drawer/transcript/parsing.ts";
+import { RenderInputOutput } from "../render-input-output.tsx";
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     storedObjects: {
       headById: {
@@ -24,7 +24,7 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/compat/next-dynamic", () => ({
+vi.mock("../../../../behavior/compat/next-dynamic.ts", () => ({
   default: () =>
     function StubbedDynamic() {
       return null;

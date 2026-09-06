@@ -10,15 +10,15 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
-import { useSpanHoverStore } from "../../../../../behavior/span-hover.store";
-import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store";
-import { formatCost, formatDuration } from "../../../../../model/display-formatters";
-import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button";
-import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges";
-import { isSkillSpan } from "../transcript/skill-invocation";
-import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell";
+import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
+import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
+import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button.tsx";
+import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges.tsx";
+import { isSkillSpan } from "../transcript/skill-invocation.ts";
+import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell.tsx";
 import {
   getSpanPalette,
   INDENT_PX,
@@ -27,7 +27,7 @@ import {
   ROW_HEIGHT,
   SPAN_TYPE_ICONS,
   type WaterfallTreeNode,
-} from "./types";
+} from "./types.ts";
 
 /** Shared empty list so a row with no comments keeps a stable prop identity. */
 const NO_COMMENTS: AnnotationByTrace[] = [];

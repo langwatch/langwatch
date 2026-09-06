@@ -4,9 +4,9 @@
  */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules";
-import { isNonEmptyString } from "../rules/canonical-guard.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
+import { isNonEmptyString } from "../rules/canonical-guard.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 

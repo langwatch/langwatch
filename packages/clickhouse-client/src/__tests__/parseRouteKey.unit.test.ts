@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRouteKey } from "../privateRouteKey";
+import { parseRouteKey } from "../privateRouteKey.ts";
 
 /**
  * Reading a cluster's name out of `CLICKHOUSE_URL__<label>__<orgId>`.

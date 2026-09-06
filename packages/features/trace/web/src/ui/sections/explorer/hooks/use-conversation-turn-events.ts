@@ -1,10 +1,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "../../../../behavior/trace-api";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
-import type { TraceListItem } from "../types/trace";
-import { useDrawerProjectId } from "./use-drawer-project-id";
-import { mergeTraceEvents } from "./use-trace-list-events";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
+import type { TraceListItem } from "../types/trace.ts";
+import { useDrawerProjectId } from "./use-drawer-project-id.ts";
+import { mergeTraceEvents } from "./use-trace-list-events.ts";
 
 /** Padding on the read window, so an event stamped after its turn's start is still inside it. */
 const WINDOW_PAD_MS = 60 * 60 * 1000;

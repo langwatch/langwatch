@@ -21,12 +21,12 @@
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
-import { explainErrorCode } from "../../model/error-presentation";
+import { explainErrorCode } from "../../model/error-presentation.ts";
 import {
   readAuthoredMessage,
   readErrorTraceId,
   readHandledError,
-} from "../../model/read-handled-error";
+} from "../../model/read-handled-error.ts";
 
 /**
  * The same restrained hairline the toast wears — the tone lives in the border

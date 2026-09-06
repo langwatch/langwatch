@@ -29,7 +29,7 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { CheckConfigFormData } from "./check-config-form";
+import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Simple component to handle model disabled check
 const ModelSelectorWithWarning = ({
@@ -69,7 +69,7 @@ const ModelSelectorWithWarning = ({
   );
 };
 
-import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field";
+import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 
 // Toggle-button field for array-of-literal-union fields (e.g. include_metrics),
 // replacing the generic dropdown + "Add" array UI where the option set is

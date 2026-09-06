@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { translateModelIdForLitellm } from "../model-id-boundary";
+import { translateModelIdForLitellm } from "../model-id-boundary.ts";
 
 describe("translateModelIdForLitellm", () => {
   describe("Anthropic Claude models with dots", () => {

@@ -10,7 +10,7 @@
  * Stored entries (ES/ClickHouse) win when both sources share an ID.
  */
 
-import type { ScenarioRunData } from "./scenario-run-data";
+import type { ScenarioRunData } from "./scenario-run-data.ts";
 
 /**
  * Merges stored rows with queued job rows, deduplicating by scenarioRunId.

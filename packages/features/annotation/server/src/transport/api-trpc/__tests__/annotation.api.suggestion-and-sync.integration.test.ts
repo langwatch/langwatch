@@ -17,17 +17,17 @@ import {
   annotationApiCreateInputSchema,
   annotationApiOptimizedQueuesInputSchema,
 } from "@langwatch/annotation-contract";
-import { AnnotationApp } from "../../../app/annotation.app";
-import { PostgresAnnotationAdapter } from "../../../adapters/postgres.annotation.adapter";
+import { AnnotationApp } from "../../../app/annotation.app.ts";
+import { PostgresAnnotationAdapter } from "../../../adapters/postgres.annotation.adapter.ts";
 import {
   createAnnotationTestOrganizations,
   createAnnotationTestProjects,
-} from "../../../adapters/__tests__/support/annotation-test-services";
+} from "../../../adapters/__tests__/support/annotation-test-services.ts";
 import {
   AnnotationTrpcApi,
   type AnnotationTrpcContext,
   type AnnotationTrpcPorts,
-} from "../annotation.api";
+} from "../annotation.api.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

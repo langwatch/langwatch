@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisAuthzEpochAdapter } from "../redis.authz-epoch.adapter";
+import { RedisAuthzEpochAdapter } from "../redis.authz-epoch.adapter.ts";
 
 const ORGANIZATION_ID = "org_epoch";
 const KEY = `authz:epoch:${ORGANIZATION_ID}`;

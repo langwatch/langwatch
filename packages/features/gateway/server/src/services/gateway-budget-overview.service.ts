@@ -11,11 +11,11 @@ import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-c
 import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,
-} from "./gateway-applicable-budgets.service";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+} from "./gateway-applicable-budgets.service.ts";
+import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
 import { scopeTargetKey, type GatewayService, GatewayWindow } from "@langwatch/gateway-contract";
-import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
-import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository";
+import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
+import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 
 /**
  * How binding a scope is to the reader, most binding first, which is the truncation order for

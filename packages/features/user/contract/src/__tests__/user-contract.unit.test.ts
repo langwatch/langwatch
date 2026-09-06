@@ -6,7 +6,7 @@ import {
   setUserAvatarInputSchema,
   userPasskeyNudgeStatusSchema,
   userProfileSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("user contract", () => {
   it("accepts portable user profiles", () => {

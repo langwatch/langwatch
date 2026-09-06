@@ -5,12 +5,12 @@ import {
   TraceAlertTriggerMatchPort,
   TraceAlertTriggerPort,
   type TraceAlertTrigger,
-} from "../../ports/governance-subscriber.port";
-import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber";
+} from "../../ports/governance-subscriber.port.ts";
+import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures";
+} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
 
 class FixedTriggers extends TraceAlertTriggerPort {
   activeForProject(): Promise<TraceAlertTrigger[]> {

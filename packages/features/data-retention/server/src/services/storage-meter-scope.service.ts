@@ -7,9 +7,9 @@ import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type {
   DataRetentionDirectoryPort,
   RetentionScopeTarget,
-} from "../ports/data-retention-directory.port";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port";
-import type { RetentionActor } from "./data-retention-policy.service";
+} from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
+import type { RetentionActor } from "./data-retention-policy.service.ts";
 
 export type StorageScopeUsage = Readonly<{
   /** Total stored bytes across every in-scope project the caller can read. */

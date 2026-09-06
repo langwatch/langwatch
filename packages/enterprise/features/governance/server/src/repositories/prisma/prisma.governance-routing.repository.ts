@@ -14,7 +14,7 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyRepository } from "../../ports/routing-policy.port";
+import { RoutingPolicyRepository } from "../../ports/routing-policy.port.ts";
 
 type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
 

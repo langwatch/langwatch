@@ -26,15 +26,15 @@ export type NavigationScreenLoader = () => Promise<{ default: ComponentType }>;
  * rather than an export path each.
  */
 export const navigationScreens = {
-  landing: () => import("./landing.screen"),
-  notFound: () => import("./not-found.screen"),
-  projectRedirect: () => import("./project-redirect.screen"),
+  landing: () => import("./landing.screen.tsx"),
+  notFound: () => import("./not-found.screen.tsx"),
+  projectRedirect: () => import("./project-redirect.screen.tsx"),
 } as const satisfies Record<string, NavigationScreenLoader>;
 
 export type NavigationScreenName = keyof typeof navigationScreens;
 
-export { navigationApi, type NavigationApiMap } from "../../behavior/navigation-api";
-export { useLandingRedirect } from "../../behavior/use-landing-redirect";
+export { navigationApi, type NavigationApiMap } from "../../behavior/navigation-api.ts";
+export { useLandingRedirect } from "../../behavior/use-landing-redirect.ts";
 export {
   NavigationHostPort,
   NavigationHostProvider,
@@ -53,7 +53,7 @@ export {
   type NavigationSupportChat,
   type NavigationTeam,
   type NavigationUser,
-} from "../../model/navigation-host";
+} from "../../model/navigation-host.ts";
 export {
   PRODUCTS,
   productById,
@@ -63,5 +63,5 @@ export {
   type ProductDefinition,
   type ProductId,
   type ProductScopeKind,
-} from "../../model/products";
-export { readLastVisitedProduct, writeLastVisitedProduct } from "../../model/product-memory";
+} from "../../model/products.ts";
+export { readLastVisitedProduct, writeLastVisitedProduct } from "../../model/product-memory.ts";

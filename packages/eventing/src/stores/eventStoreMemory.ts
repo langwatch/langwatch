@@ -1,10 +1,10 @@
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event } from "../domain/types";
-import { compareOrdinal } from "../utils/compareOrdinal";
-import { AbstractEventStore } from "./abstractEventStore";
-import { eventToRecord } from "./eventStoreUtils";
-import type { EventRepository } from "./repositories/eventRepository.types";
-import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event } from "../domain/types.ts";
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
+import { AbstractEventStore } from "./abstractEventStore.ts";
+import { eventToRecord } from "./eventStoreUtils.ts";
+import type { EventRepository } from "./repositories/eventRepository.types.ts";
+import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory.ts";
 
 /**
  * Simple in-memory EventStore used for tests and local development.

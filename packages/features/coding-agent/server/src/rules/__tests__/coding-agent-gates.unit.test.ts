@@ -14,7 +14,7 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
-} from "../coding-agent-gates.rules";
+} from "../coding-agent-gates.rules.ts";
 
 function sessionListRow(over: Record<string, unknown> = {}) {
   return {

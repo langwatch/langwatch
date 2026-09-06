@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayBudgetResolutionRepository } from "../prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetResolutionRepository } from "../prisma.gateway-budget-resolution.repository.ts";
 
 /**
  * A team-scoped key's team used to be read only from where its traces land (the org's governance project for a multi-project key), so it reported the governance team and a budget on the key's own team matched nothing. Asserts on the query the resolver BUILDS, not on what the stub echoes back — the defect was an OR clause never naming the team, not a row failing to come back.

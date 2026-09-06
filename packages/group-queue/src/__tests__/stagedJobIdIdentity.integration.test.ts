@@ -3,16 +3,16 @@ import type { Readable } from "node:stream";
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts";
-import { GroupQueueProcessor } from "../groupQueue";
-import { encodeJobEnvelope, readJobAttempt, withJobAttempt } from "../jobEnvelope";
-import { gqJobsDroppedTotal } from "../metrics";
-import { JOB_RETRY_CONFIG } from "../retry";
-import { GroupStagingScripts } from "../scripts";
-import { createTenantId } from "../storage";
-import { TieredBlobStore } from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles";
-import { seedDeadOwner as sharedSeedDeadOwner } from "./poison-guard-fixtures";
+import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import { encodeJobEnvelope, readJobAttempt, withJobAttempt } from "../jobEnvelope.ts";
+import { gqJobsDroppedTotal } from "../metrics.ts";
+import { JOB_RETRY_CONFIG } from "../retry.ts";
+import { GroupStagingScripts } from "../scripts.ts";
+import { createTenantId } from "../storage.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles.ts";
+import { seedDeadOwner as sharedSeedDeadOwner } from "./poison-guard-fixtures.ts";
 
 type TestPayload = {
   id: string;

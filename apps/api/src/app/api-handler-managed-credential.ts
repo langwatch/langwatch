@@ -9,8 +9,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { apiKeyCeilingRefusal } from "./api-key-ceiling-refusal";
-import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
+import { apiKeyCeilingRefusal } from "./api-key-ceiling-refusal.ts";
+import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
 
 /** What a resolved credential gives a handler, or what a refused one answers. */
 export type HandlerManagedCredential =

@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   IDENTITY_BORN_REPORT_KIND,
   PrismaIdentityNewbornRepository,
-} from "../prisma.identity-newborn.repository";
+} from "../prisma.identity-newborn.repository.ts";
 
 /**
  * same `migrated` status under the same migration name as an abandoned newborn — only the

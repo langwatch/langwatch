@@ -24,10 +24,10 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { ArrowRight } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetHost } from "../../model/dataset-host";
-import { convertDatasetRecordsToColumnTypes } from "../../model/convert-record-values";
-import { TabularFileDropzone } from "./tabular-file-dropzone";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { convertDatasetRecordsToColumnTypes } from "../../model/convert-record-values.ts";
+import { TabularFileDropzone } from "./tabular-file-dropzone.tsx";
 
 /** The value that maps a dataset column to nothing at all. */
 const NO_SOURCE_COLUMN = "";

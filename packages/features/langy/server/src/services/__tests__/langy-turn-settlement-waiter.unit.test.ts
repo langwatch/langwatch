@@ -7,7 +7,7 @@ const mockReadTail = vi.fn();
 const mockFollow = vi.fn();
 
 const { LangyTurnSettlementWaiterService } =
-  await import("../langy-turn-settlement-waiter.service");
+  await import("../langy-turn-settlement-waiter.service.ts");
 const tryAwaitTurnSettlement = LangyTurnSettlementWaiterService.tryAwaitTurnSettlement;
 
 const emptyPage = {

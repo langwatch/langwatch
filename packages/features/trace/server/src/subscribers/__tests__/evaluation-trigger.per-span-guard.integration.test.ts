@@ -9,13 +9,13 @@ import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port";
+import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port.ts";
 import {
   TraceEvaluationLoopMetricsPort,
   type TraceEvaluationLoopBlockReason,
-} from "../../ports/trace-evaluation-loop-metrics.port";
-import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port";
-import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber";
+} from "../../ports/trace-evaluation-loop-metrics.port.ts";
+import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port.ts";
+import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 const TRACE_ID = "trace-1";
 

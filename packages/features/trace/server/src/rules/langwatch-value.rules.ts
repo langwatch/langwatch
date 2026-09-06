@@ -1,15 +1,15 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
 import {
   extractSystemInstructionFromMessages,
   normalizeToMessages,
   stripSystemMessages,
-} from "./canonical-message.rules";
+} from "./canonical-message.rules.ts";
 import {
   isLangWatchStructuredValue,
   safeStringify,
   stripTrailingAssistantMessages,
-} from "./langwatch-structured-value.rules";
+} from "./langwatch-structured-value.rules.ts";
 
 const LANGWATCH_RULE_PREFIX = "langwatch";
 

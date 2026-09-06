@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metricEventEnvelopeSchema } from "../metric.events";
+import { metricEventEnvelopeSchema } from "../metric.events.ts";
 
 const envelope = {
   id: "event_1",

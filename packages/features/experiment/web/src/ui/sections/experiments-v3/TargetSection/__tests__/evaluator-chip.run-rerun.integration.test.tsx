@@ -10,14 +10,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import type { EvaluatorConfig } from "../../../../../model/experiments-v3/types";
-import { EvaluatorChip } from "../evaluator-chip";
+import type { EvaluatorConfig } from "../../../../../model/experiments-v3/types.ts";
+import { EvaluatorChip } from "../evaluator-chip.tsx";
 
 const evaluator = {
   id: "evaluator_1",

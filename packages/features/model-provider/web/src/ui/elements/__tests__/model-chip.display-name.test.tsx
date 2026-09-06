@@ -22,7 +22,7 @@ import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ModelChip } from "../model-chip";
+import { ModelChip } from "../model-chip.tsx";
 
 afterEach(() => cleanup());
 

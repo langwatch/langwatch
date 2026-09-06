@@ -1,9 +1,9 @@
 import { collectDefaultMetrics, register } from "prom-client";
-import type { ApiMetricsPort } from "../../api-process.lifecycle";
+import type { ApiMetricsPort } from "../../api-process.lifecycle.ts";
 import {
   PrometheusApiMetricsAdapter,
   type ApiMetricsAccess,
-} from "./prometheus.api-metrics.adapter";
+} from "./prometheus.api-metrics.adapter.ts";
 
 /**
  * The default collector whose presence says this process already installed the

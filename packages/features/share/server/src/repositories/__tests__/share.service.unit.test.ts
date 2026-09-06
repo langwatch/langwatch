@@ -12,9 +12,9 @@ import {
   TraceSharingDisabledError,
 } from "@langwatch/share-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { ShareCacheRepository } from "../share-cache.repository";
-import type { ShareRepository } from "../share.repository";
-import { ShareService } from "../../services/share.service";
+import type { ShareCacheRepository } from "../share-cache.repository.ts";
+import type { ShareRepository } from "../share.repository.ts";
+import { ShareService } from "../../services/share.service.ts";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";

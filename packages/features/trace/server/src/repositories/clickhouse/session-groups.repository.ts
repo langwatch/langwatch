@@ -1,12 +1,12 @@
 import { EventUtils } from "@langwatch/eventing";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsPage,
   SessionGroupsQuery,
   SessionGroupsRepository,
-} from "../session-groups.repository";
+} from "../session-groups.repository.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
 

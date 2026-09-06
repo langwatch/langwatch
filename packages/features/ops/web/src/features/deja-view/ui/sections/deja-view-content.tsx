@@ -1,17 +1,17 @@
 import { Box, Center, EmptyState, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Eye, Info } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { AggregateTable } from "../blocks/deja-view-aggregate-table";
-import { DejaViewCenterPanel } from "./deja-view-center-panel";
-import { EventTimeline } from "../blocks/deja-view-event-timeline";
-import { DejaViewKeyboardHints } from "../elements/deja-view-keyboard-hints";
-import { LeftPanel } from "../elements/deja-view-left-panel";
-import { DejaViewManagerPanel } from "../blocks/deja-view-manager-panel";
-import type { DejaViewProcessManager } from "../blocks/deja-view-manager-card";
-import { ReplayHeader } from "../elements/deja-view-replay-header";
-import { RightPanel } from "../blocks/deja-view-right-panel";
-import { SearchHeader } from "../elements/deja-view-search-header";
-import type { AggregateResult, EventResult } from "../../model/deja-view-types";
+import { AggregateTable } from "../blocks/deja-view-aggregate-table.tsx";
+import { DejaViewCenterPanel } from "./deja-view-center-panel.tsx";
+import { EventTimeline } from "../blocks/deja-view-event-timeline.tsx";
+import { DejaViewKeyboardHints } from "../elements/deja-view-keyboard-hints.tsx";
+import { LeftPanel } from "../elements/deja-view-left-panel.tsx";
+import { DejaViewManagerPanel } from "../blocks/deja-view-manager-panel.tsx";
+import type { DejaViewProcessManager } from "../blocks/deja-view-manager-card.tsx";
+import { ReplayHeader } from "../elements/deja-view-replay-header.tsx";
+import { RightPanel } from "../blocks/deja-view-right-panel.tsx";
+import { SearchHeader } from "../elements/deja-view-search-header.tsx";
+import type { AggregateResult, EventResult } from "../../model/deja-view-types.ts";
 
 type AggregateSelection = { aggregateId: string; tenantId: string } | null;
 type Projection = {

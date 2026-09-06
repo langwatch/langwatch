@@ -18,13 +18,13 @@
 import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { useNavigationHost } from "../../model/navigation-host";
-import { useProjectPickGroups } from "../../behavior/use-project-pick-groups";
-import type { ProjectPickGroup } from "../../model/project-pick-items";
-import type { ProductId } from "../../model/products";
-import { ProjectAvatar } from "../elements/project-avatar";
-import { NavigationLink } from "../elements/navigation-link";
-import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
+import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
+import type { ProductId } from "../../model/products.ts";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 
 function ScopeDivider() {
   return (

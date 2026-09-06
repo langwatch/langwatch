@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDecorationPlan, buildDecorationSlots, chipOverlayLabel } from "../filter-highlight";
+import { buildDecorationPlan, buildDecorationSlots, chipOverlayLabel } from "../filter-highlight.ts";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {

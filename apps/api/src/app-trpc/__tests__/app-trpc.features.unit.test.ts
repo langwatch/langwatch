@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildAppTrpcFeatures } from "./support/app-trpc-features";
+import { buildAppTrpcFeatures } from "./support/app-trpc-features.ts";
 
 /**
  * Every door under the `analytics` namespace, as the client calls them.

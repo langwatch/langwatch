@@ -3,12 +3,12 @@ import { Info } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useActiveProject } from "./active-project-context";
-import { CodePreview } from "./observability/code-preview";
-import { buildMcpJson, findLangwatchEnvLines } from "../../model/shared/build-mcp-config";
-import { TabButton } from "../elements/shared/tab-button";
+import { useActiveProject } from "./active-project-context.tsx";
+import { CodePreview } from "./observability/code-preview.tsx";
+import { buildMcpJson, findLangwatchEnvLines } from "../../model/shared/build-mcp-config.ts";
+import { TabButton } from "../elements/shared/tab-button.tsx";
 
 const MotionVStack = motion.create(VStack);
 

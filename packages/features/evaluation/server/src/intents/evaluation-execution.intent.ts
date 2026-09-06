@@ -6,7 +6,7 @@ import {
   executeEvaluationCommandDataSchema,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionIntentPort } from "../ports/evaluation.port";
+import { EvaluationExecutionIntentPort } from "../ports/evaluation.port.ts";
 
 const schema = defineCommandSchema(
   EXECUTE_EVALUATION_COMMAND_TYPE,

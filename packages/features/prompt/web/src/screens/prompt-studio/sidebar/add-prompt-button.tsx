@@ -1,9 +1,9 @@
 import { LuPlus } from "react-icons/lu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { usePromptHost } from "../../../model/prompt-host";
-import { useCreateDraftPrompt } from "../../../behavior/use-create-draft-prompt";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { useCreateDraftPrompt } from "../../../behavior/use-create-draft-prompt.ts";
 
 interface AddPromptButtonProps {
   iconOnly?: boolean;

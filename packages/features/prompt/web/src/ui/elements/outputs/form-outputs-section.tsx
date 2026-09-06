@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
-import { type Output, OutputsSection, type OutputType } from "./outputs-section";
+import { type Output, OutputsSection, type OutputType } from "./outputs-section.tsx";
 
 // Type for the json_schema as expected by the form schema
 type JsonSchemaType = { type: string } & Record<string, unknown>;

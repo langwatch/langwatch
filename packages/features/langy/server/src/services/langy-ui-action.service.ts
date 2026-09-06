@@ -8,11 +8,11 @@ import {
   LangyUiTimeoutError,
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import type {
   LangyUiActionCatalogPort,
   LangyUiActionDefinition,
-} from "../ports/langy-ui-action-catalog.port";
+} from "../ports/langy-ui-action-catalog.port.ts";
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).

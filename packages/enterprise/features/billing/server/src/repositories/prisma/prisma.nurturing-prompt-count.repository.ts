@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { NurturingPromptCountRepository } from "../nurturing-prompt-count.repository";
+import { NurturingPromptCountRepository } from "../nurturing-prompt-count.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

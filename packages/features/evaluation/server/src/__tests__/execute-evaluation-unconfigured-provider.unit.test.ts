@@ -26,7 +26,7 @@ import {
   buildExecuteCommand,
   buildExecutionDeps,
   buildMonitor,
-} from "../ports/__tests__/support/evaluation-execution.fixtures";
+} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
 
 class EvaluatorConfigError extends HandledError {
   constructor(message: string) {

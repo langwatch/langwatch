@@ -6,9 +6,9 @@ import {
   BLOB_RECLAIM_TTL_THRESHOLD_SECONDS,
   BLOB_RELEASE_GRACE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
-} from "../blobConstants";
-import { BlobSweeper } from "../blobSweeper";
-import { GROUP_QUEUE_REGISTRY_KEY } from "../scripts";
+} from "../blobConstants.ts";
+import { BlobSweeper } from "../blobSweeper.ts";
+import { GROUP_QUEUE_REGISTRY_KEY } from "../scripts.ts";
 
 const QUEUE_NAME = "{test/sweeper}";
 const PREFIX = `${QUEUE_NAME}:gq:`;

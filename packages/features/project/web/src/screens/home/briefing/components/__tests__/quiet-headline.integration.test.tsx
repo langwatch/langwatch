@@ -15,8 +15,8 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
   type ProjectHomeProject,
-} from "../../../../../model/project-home-host";
-import { QuietHeadline } from "../quiet-headline";
+} from "../../../../../model/project-home-host.ts";
+import { QuietHeadline } from "../quiet-headline.tsx";
 
 const navigate = vi.fn();
 

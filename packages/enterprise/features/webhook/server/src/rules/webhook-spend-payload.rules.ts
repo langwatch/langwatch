@@ -9,8 +9,8 @@ import type {
   SettleSpendCommandData,
   SpendAttribution,
   WebhookDeliveryState,
-} from "../services/webhook-delivery.service";
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service";
+} from "../services/webhook-delivery.service.ts";
+import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 
 /** The columns admission's attribution owns. A row whose process instance
  *  never saw an `admitted` event still needs every one of them, so each

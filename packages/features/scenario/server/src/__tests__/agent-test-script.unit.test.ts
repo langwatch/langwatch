@@ -6,11 +6,11 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import { AgentTestScriptAdapter, ScriptedUserAgent } from "../adapters/agent-test-script.adapter";
+import { AgentTestScriptAdapter, ScriptedUserAgent } from "../adapters/agent-test-script.adapter.ts";
 import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,
-} from "../adapters/serialized-connected-agent.adapter";
+} from "../adapters/serialized-connected-agent.adapter.ts";
 import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 
 class AnsweringAgent extends ScenarioRunner.AgentAdapter {

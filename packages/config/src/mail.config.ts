@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config";
+import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * The one outbound mail gateway every process that sends mail selects through,

@@ -10,12 +10,12 @@ import {
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
+import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 
-import { isBornFinalizedSignUp } from "../better-auth/born-finalized-opt-in.api";
-import { isAllowedAuthOrigin } from "../better-auth/origin-gate.api";
+import { isBornFinalizedSignUp } from "../better-auth/born-finalized-opt-in.api.ts";
+import { isAllowedAuthOrigin } from "../better-auth/origin-gate.api.ts";
 
 const logger = createLogger("langwatch:auth");
 

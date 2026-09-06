@@ -12,17 +12,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { AttributeEditor } from "../elements/attribute-editor";
-import { LLMSpanEditor } from "./llm-span-editor";
-import { PromptSpanEditor } from "./prompt-span-editor";
-import { RAGSpanEditor } from "./rag-span-editor";
-import { useTraceStore } from "../../behavior/trace.store";
+import { AttributeEditor } from "../elements/attribute-editor.tsx";
+import { LLMSpanEditor } from "./llm-span-editor.tsx";
+import { PromptSpanEditor } from "./prompt-span-editor.tsx";
+import { RAGSpanEditor } from "./rag-span-editor.tsx";
+import { useTraceStore } from "../../behavior/trace.store.ts";
 import {
   SPAN_TYPE_ICONS,
   SPAN_TYPES,
   type SpanConfig,
   type SpanType,
-} from "../../model/foundry-types";
+} from "../../model/foundry-types.ts";
 
 function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
   for (const span of spans) {

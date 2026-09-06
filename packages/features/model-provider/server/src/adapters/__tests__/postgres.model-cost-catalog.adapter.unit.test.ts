@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { PostgresModelCostCatalogAdapter } from "../postgres.model-cost-catalog.adapter";
+import { PostgresModelCostCatalogAdapter } from "../postgres.model-cost-catalog.adapter.ts";
 
 /**
  * Spec: packages/features/model-provider/specs/model-cost-catalog-seam.feature

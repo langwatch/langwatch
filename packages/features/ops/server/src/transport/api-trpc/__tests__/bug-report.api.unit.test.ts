@@ -14,7 +14,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BugReportTrpcApi } from "../bug-report.api";
+import { BugReportTrpcApi } from "../bug-report.api.ts";
 
 type Staff = { id: string; email?: string | null };
 

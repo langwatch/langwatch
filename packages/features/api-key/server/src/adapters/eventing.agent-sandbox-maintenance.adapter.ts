@@ -3,7 +3,7 @@ import { defineAggregate, defineEvents, definePipeline, type Event } from "@lang
 import {
   type AgentSandboxKeyReapDeps,
   runAgentSandboxKeyReap,
-} from "../intents/agent-sandbox-key-reap.intent";
+} from "../intents/agent-sandbox-key-reap.intent.ts";
 import {
   AGENT_SANDBOX_KEY_REAP_INITIAL_STATE,
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
@@ -11,7 +11,7 @@ import {
   type AgentSandboxKeyReapState,
   agentSandboxKeyReapSchema,
   agentSandboxKeyReapWake,
-} from "../processes/agent-sandbox-key-reap.process";
+} from "../processes/agent-sandbox-key-reap.process.ts";
 
 export interface AgentSandboxMaintenancePipelineDeps {
   sandboxKeyReap: AgentSandboxKeyReapDeps;

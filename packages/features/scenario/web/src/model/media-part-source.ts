@@ -1,4 +1,4 @@
-import { isSafeMediaUrl, type MediaPartData, parseNotCapturedMedia } from "./media-parts";
+import { isSafeMediaUrl, type MediaPartData, parseNotCapturedMedia } from "./media-parts.ts";
 
 export type MediaCategory = "audio" | "image" | "video" | "binary";
 

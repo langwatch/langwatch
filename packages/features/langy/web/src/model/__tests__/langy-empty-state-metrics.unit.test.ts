@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyStateMetrics } from "../langy-empty-state-metrics";
+import { emptyStateMetrics } from "../langy-empty-state-metrics.ts";
 
 describe("emptyStateMetrics", () => {
   describe("given the docked sidebar variant", () => {

@@ -3,14 +3,14 @@
  */
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter";
+import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter.ts";
 import {
   TraceIoExtractionPort,
   type TraceIoSide,
   type TraceIoValue,
-} from "../../ports/trace-io-extraction.port";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service";
+} from "../../ports/trace-io-extraction.port.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service.ts";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 

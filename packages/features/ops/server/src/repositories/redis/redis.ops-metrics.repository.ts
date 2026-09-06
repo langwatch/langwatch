@@ -11,7 +11,7 @@ import {
   OpsMetricsRepository,
   type OpsLatencyHistograms,
   type OpsQueueTotals,
-} from "../ops-metrics.repository";
+} from "../ops-metrics.repository.ts";
 
 const REDIS_STATE_KEY = "ops:metrics:state";
 const KNOWN_PIPELINES_KEY = "ops:known-pipelines";

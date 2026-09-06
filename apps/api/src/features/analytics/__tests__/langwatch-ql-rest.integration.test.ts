@@ -6,8 +6,8 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountLangWatchQLRest } from "../langwatch-ql-rest.mount";
-import { mountQueryRest } from "../query-rest.mount";
+import { mountLangWatchQLRest } from "../langwatch-ql-rest.mount.ts";
+import { mountQueryRest } from "../query-rest.mount.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 

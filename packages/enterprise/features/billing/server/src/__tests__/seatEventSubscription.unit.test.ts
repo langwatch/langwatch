@@ -5,7 +5,7 @@ import {
   SeatEventSubscriptionService,
   StripeCustomerCurrencyService,
   StripeErrorAdapter,
-} from "../index";
+} from "../index.ts";
 
 const prices = {
   GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",

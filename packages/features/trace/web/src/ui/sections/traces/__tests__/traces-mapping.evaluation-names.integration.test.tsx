@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type { MappingState } from "@langwatch/trace-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import { TracesMapping } from "../traces-mapping";
+import { TracesMapping } from "../traces-mapping.tsx";
 
 // Project-wide evaluator names returned for the last 30 days — note that the
 // "PII Check" evaluator is NOT present on the loaded trace below.
@@ -19,13 +19,13 @@ const PROJECT_EVALUATION_NAMES = [
   { key: "evaluator-toxicity", label: "Toxicity" },
 ];
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../use-project-span-names", () => ({
+vi.mock("../../use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: [],
     metadataKeys: [],
@@ -35,7 +35,7 @@ vi.mock("../../use-project-span-names", () => ({
   }),
 }));
 
-vi.mock("../../use-project-event-types", () => ({
+vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({
     eventTypes: [],
     isLoading: false,
@@ -43,11 +43,11 @@ vi.mock("../../use-project-event-types", () => ({
   }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     annotationScore: {
       getAllActive: { useQuery: () => ({ data: [] }) },

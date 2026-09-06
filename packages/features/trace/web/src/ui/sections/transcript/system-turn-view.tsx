@@ -1,9 +1,9 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
-import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown";
-import { asMarkdownBody } from "../../../behavior/transcript/parsing";
-import { RoleChip } from "../../blocks/transcript/role-chip";
-import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron";
-import type { ContentBlock } from "../../../model/transcript/types";
+import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+import { asMarkdownBody } from "../../../behavior/transcript/parsing.ts";
+import { RoleChip } from "../../blocks/transcript/role-chip.tsx";
+import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";
+import type { ContentBlock } from "../../../model/transcript/types.ts";
 
 export function SystemTurnView({
   role,

@@ -65,7 +65,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 }));
 
 const { WorkflowSelectorForEvaluatorDrawer } =
-  await import("../workflow-selector-for-evaluator-drawer");
+  await import("../workflow-selector-for-evaluator-drawer.tsx");
 
 /** A limit refusal the licence interceptor has already answered. */
 const answeredLimitRefusal = (limitType: string) => async () => {

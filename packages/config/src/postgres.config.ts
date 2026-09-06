@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config";
+import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * The one Postgres connection every process that reads or writes control-plane

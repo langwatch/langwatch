@@ -1,22 +1,22 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { type LayoutMode, LayoutModeContext } from "../../../../model/layout-mode";
-import { type TabData, useTabId } from "../../studio-internals";
+import { type LayoutMode, LayoutModeContext } from "../../../../model/layout-mode.ts";
+import { type TabData, useTabId } from "../../studio-internals.ts";
 import cloneDeep from "lodash-es/cloneDeep";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
-import { usePromptConfigForm } from "../../../../behavior/use-prompt-config-form";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form";
-import { PromptBrowserHeader } from "./prompt-browser-header";
-import { PromptMessagesEditor } from "./prompt-messages-editor";
-import { PromptTabbedSection } from "./prompt-tabbed-section";
+import { usePromptConfigForm } from "../../../../behavior/use-prompt-config-form.ts";
+import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
+import { PromptBrowserHeader } from "./prompt-browser-header.tsx";
+import { PromptMessagesEditor } from "./prompt-messages-editor.tsx";
+import { PromptTabbedSection } from "./prompt-tabbed-section.tsx";
 
 /** Height of tabs header (32px) + divider (16px) + minimum chat area (200px) */
 const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
-export { useTabId } from "../../studio-internals";
+export { useTabId } from "../../studio-internals.ts";
 
 /**
  * Window content for a prompt tab.

@@ -6,16 +6,16 @@
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { RunDrawerContent } from "./run-drawer-content";
-import { RunDrawerHeaderBand } from "./run-drawer-header-band";
-import { RunDrawerErrorBody } from "./run-drawer-error-body";
-import { RunDrawerLoadingBody } from "./run-drawer-loading-body";
+import { RunDrawerContent } from "./run-drawer-content.tsx";
+import { RunDrawerHeaderBand } from "./run-drawer-header-band.tsx";
+import { RunDrawerErrorBody } from "./run-drawer-error-body.tsx";
+import { RunDrawerLoadingBody } from "./run-drawer-loading-body.tsx";
 import {
   type RunDrawerState,
   useRunDrawerState,
   useRunDrawerStop,
   WIDE_DRAWER_MAX_WIDTH,
-} from "./use-run-drawer-state";
+} from "./use-run-drawer-state.ts";
 
 /**
  * The drawer body. A queued run draws the same as a running one, so the

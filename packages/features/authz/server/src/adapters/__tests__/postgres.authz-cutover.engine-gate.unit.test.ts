@@ -12,7 +12,7 @@ import {
   ENGINE_GATE_CACHE_TTL_MS,
   PostgresAuthzCutoverAdapter,
   type AuthzCutoverDatabase,
-} from "../postgres.authz-cutover.adapter";
+} from "../postgres.authz-cutover.adapter.ts";
 
 const ORGANIZATION_ID = "org_acme";
 

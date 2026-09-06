@@ -7,10 +7,10 @@ import type {
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 import { connectedAgentSeenCutoff } from "@langwatch/agent-contract";
-import type { AgentsDatabase } from "../../ports/agent.port";
-import type { AgentCopyRecord, PersistAgentInput } from "../agent.repository";
-import { AgentRepository } from "../agent.repository";
-import { mapAgentRow, type AgentRow } from "./prisma.agent.mapper";
+import type { AgentsDatabase } from "../../ports/agent.port.ts";
+import type { AgentCopyRecord, PersistAgentInput } from "../agent.repository.ts";
+import { AgentRepository } from "../agent.repository.ts";
+import { mapAgentRow, type AgentRow } from "./prisma.agent.mapper.ts";
 
 /**
  * The `where` fragment that keeps a stale connected agent out of a read.

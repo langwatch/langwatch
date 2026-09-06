@@ -4,9 +4,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LangyChoicesCard } from "../langy-choices-card";
-import { LangyDerivedCardView } from "../langy-derived-card-view";
-import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card";
+import { LangyChoicesCard } from "../langy-choices-card.tsx";
+import { LangyDerivedCardView } from "../langy-derived-card-view.tsx";
+import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card.tsx";
 
 afterEach(cleanup);
 

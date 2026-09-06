@@ -10,9 +10,9 @@ import {
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
   LangyUiActionBackendPort,
-} from "../../ports/langy-ui-action-backend.port";
-import type { LangyUiActionDefinition } from "../../ports/langy-ui-action-catalog.port";
-import { LangyUiActionBackendService } from "../langy-ui-action-backend.service";
+} from "../../ports/langy-ui-action-backend.port.ts";
+import type { LangyUiActionDefinition } from "../../ports/langy-ui-action-catalog.port.ts";
+import { LangyUiActionBackendService } from "../langy-ui-action-backend.service.ts";
 
 /** A saved board with one column, small enough to read in a diff. */
 const savedState = () => ({ name: "My experiment", targets: [{ id: "target-1" }] });

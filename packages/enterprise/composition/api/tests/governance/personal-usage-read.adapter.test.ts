@@ -15,7 +15,7 @@
  * to answer must still leave the trace-summary side of the dashboard standing.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppPersonalUsageReadAdapter } from "../../src/governance/personal-usage.clickhouse.repository";
+import { AppPersonalUsageReadAdapter } from "../../src/governance/personal-usage.clickhouse.repository.ts";
 
 const LEDGER_TABLE = "gateway_budget_ledger_events";
 

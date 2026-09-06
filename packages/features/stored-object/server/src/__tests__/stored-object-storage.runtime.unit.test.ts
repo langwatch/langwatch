@@ -4,7 +4,7 @@ import {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
   StoredObjectStorageRegistryAdapter,
-} from "../index";
+} from "../index.ts";
 
 class ProjectConfig extends StoredObjectProjectS3ConfigPort {
   constructor(private readonly bucket: string | null) {

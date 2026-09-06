@@ -1,4 +1,4 @@
-import type { IdentifierFact, IdentityHeads } from "./facts";
+import type { IdentifierFact, IdentityHeads } from "./facts.ts";
 
 /**
  * Which of a user's identifiers answers "what is this person's email" —

@@ -6,8 +6,8 @@ import {
   type SpanReceivedEvent,
   type SpanReceivedEventData,
   type SpanReceivedEventMetadata,
-} from "./trace-ingress.events";
-import { piiRedactionLevelSchema } from "./trace-ingress.commands";
+} from "./trace-ingress.events.ts";
+import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
 import { z } from "zod";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
@@ -25,11 +25,11 @@ import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
-} from "./trace.constants";
-import { fixed64Schema } from "./trace.otlp";
-import { metricCorrelationFields } from "./trace-metric-correlation";
-import { recordTraceSpanEventDataSchema } from "./trace-processing.commands";
-import { logTraceContributionSchema } from "./trace-log-contribution";
+} from "./trace.constants.ts";
+import { fixed64Schema } from "./trace.otlp.ts";
+import { metricCorrelationFields } from "./trace-metric-correlation.ts";
+import { recordTraceSpanEventDataSchema } from "./trace-processing.commands.ts";
+import { logTraceContributionSchema } from "./trace-log-contribution.ts";
 
 export {
   isSpanReceivedEvent,

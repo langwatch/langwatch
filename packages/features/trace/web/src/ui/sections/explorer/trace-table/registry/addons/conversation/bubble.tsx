@@ -2,15 +2,15 @@ import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react"
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Markdown } from "../../../../../markdown";
-import { useConversationExpand } from "../../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context";
+import { Markdown } from "../../../../../markdown.tsx";
+import { useConversationExpand } from "../../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
   MessageAnnotateCluster,
   type MessageAnnotateTarget,
   type MessageTranslation,
-} from "../../../../trace-drawer/conversation-view/message-annotate-cluster";
-import { MessageExpandToggle } from "../../../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle";
-import { ReasoningBlock } from "../../../../trace-drawer/transcript";
+} from "../../../../trace-drawer/conversation-view/message-annotate-cluster.tsx";
+import { MessageExpandToggle } from "../../../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
+import { ReasoningBlock } from "../../../../trace-drawer/transcript/index.ts";
 
 export type BubbleSide = "left" | "right";
 export type BubbleTone = "user" | "assistant" | "error" | "system";

@@ -4,8 +4,8 @@ import type { DataPrivacyService as DataPrivacyServiceContract } from "@langwatc
 import {
   PrismaDataPrivacyPolicyRepository,
   type DataPrivacyDatabase,
-} from "../repositories/prisma/prisma.data-privacy.repository";
-import { DataPrivacyService } from "../services/data-privacy.service";
+} from "../repositories/prisma/prisma.data-privacy.repository.ts";
+import { DataPrivacyService } from "../services/data-privacy.service.ts";
 
 export class PrismaDataPrivacyAdapter {
   static create(options: {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type LangyContextTarget,
   useLangyContextTargetStore,
-} from "../behavior/langy-context-target.store";
+} from "../behavior/langy-context-target.store.ts";
 
 const traceRow: LangyContextTarget = {
   id: "trace:abc123",

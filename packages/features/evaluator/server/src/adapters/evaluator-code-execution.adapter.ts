@@ -14,7 +14,7 @@
  */
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { z } from "zod";
-import { EvaluatorCodeExecutionPort } from "../ports/evaluator.port";
+import { EvaluatorCodeExecutionPort } from "../ports/evaluator.port.ts";
 
 const codeExecutionResponseBodySchema = z.object({
   status: z.string(),

@@ -2,11 +2,11 @@ import {
   FoundryRuntimeProvider,
   type FoundryProject,
   type FoundryTransport,
-} from "../../behavior/foundry-runtime";
+} from "../../behavior/foundry-runtime.tsx";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { useOpsHost } from "../../../../model/ops-host";
-import { api } from "../../../../behavior/ops-api";
-import type { OpsOrganizationGraph } from "../../../../behavior/ops-api";
+import { useOpsHost } from "../../../../model/ops-host.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import type { OpsOrganizationGraph } from "../../../../behavior/ops-api.ts";
 
 /** Flattens every project across every team of every organization into a flat FoundryProject list. */
 function flattenFoundryProjects(organizations: OpsOrganizationGraph[]): FoundryProject[] {

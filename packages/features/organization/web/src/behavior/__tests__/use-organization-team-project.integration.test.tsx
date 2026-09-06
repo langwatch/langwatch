@@ -15,9 +15,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { OrganizationReading } from "../../model/organization-host";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../testing";
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import type { OrganizationReading } from "../../model/organization-host.ts";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../testing.tsx";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 /** The ambient organization: one team, and not a single project in it. */
 const EMPTY_ORGANIZATION: OrganizationReading = {

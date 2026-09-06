@@ -3,19 +3,19 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { useReducedMotion } from "../../../../../behavior/use-reduced-motion";
-import { useCapabilityData } from "../../../behavior/use-capability-data";
+import { useReducedMotion } from "../../../../../behavior/use-reduced-motion.ts";
+import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
-} from "../../../../../model/langy-activity-ownership";
-import { type CapabilityCommand } from "../../../../../model/langy-capability-digest";
-import { langyThinkingShimmerStyles } from "../../../../../model/values/langy-shimmer";
-import { type LangyProgressSample } from "../../../../../model/values/langy-turn";
-import { LangyInterruptedNote } from "../../../../../ui/elements/langy-interrupted-note";
-import { useProjectedProgress } from "../../../../../ui/sections/streaming-status-line";
-import type { CapabilitySurface } from "../../../../../model/langy-capability-catalog";
-import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card";
+} from "../../../../../model/langy-activity-ownership.ts";
+import { type CapabilityCommand } from "../../../../../model/langy-capability-digest.ts";
+import { langyThinkingShimmerStyles } from "../../../../../model/values/langy-shimmer.ts";
+import { type LangyProgressSample } from "../../../../../model/values/langy-turn.ts";
+import { LangyInterruptedNote } from "../../../../../ui/elements/langy-interrupted-note.tsx";
+import { useProjectedProgress } from "../../../../../ui/sections/streaming-status-line.tsx";
+import type { CapabilitySurface } from "../../../../../model/langy-capability-catalog.ts";
+import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 const rowAppear = keyframes`
   from { opacity: 0; }

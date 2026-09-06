@@ -3,7 +3,7 @@ import {
   logFactsContributionSchema,
   metricFactsContributionSchema,
   spanFactsContributionSchema,
-} from "./coding-agent-processing";
+} from "./coding-agent-processing.ts";
 
 export const contributeSpanFactsCommandDataSchema = spanFactsContributionSchema;
 export type ContributeSpanFactsCommandData = z.infer<typeof contributeSpanFactsCommandDataSchema>;

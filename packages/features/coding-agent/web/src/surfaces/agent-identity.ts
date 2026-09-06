@@ -1,3 +1,3 @@
-export * from "../agent-label";
-export * from "../assistant-identity";
-export * from "../assistant-presets";
+export * from "../agent-label.tsx";
+export * from "../assistant-identity.ts";
+export * from "../assistant-presets.ts";

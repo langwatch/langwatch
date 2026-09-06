@@ -1,11 +1,11 @@
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
-import { addStats, type BucketEntry, resetOrGap } from "./rollup-row";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
+import { addStats, type BucketEntry, resetOrGap } from "./rollup-row.ts";
 import {
   type MetricRollupSourcePoint,
   numberValue,
   previousPoint,
   startsNewSequence,
-} from "./sequence";
+} from "./sequence.ts";
 
 function buildGaugeRow({ row, entries }: { row: MetricRollupRow; entries: BucketEntry[] }): void {
   for (const { point } of entries) {

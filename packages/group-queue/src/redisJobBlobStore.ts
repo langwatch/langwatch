@@ -1,8 +1,8 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import { BLOB_BACKSTOP_TTL_SECONDS } from "./blobConstants";
-import { redisBlobKeyPrefix } from "./blobKeys";
-import type { JobBlobStore } from "./jobEnvelope";
+import { BLOB_BACKSTOP_TTL_SECONDS } from "./blobConstants.ts";
+import { redisBlobKeyPrefix } from "./blobKeys.ts";
+import type { JobBlobStore } from "./jobEnvelope.ts";
 
 /**
  * Stores offloaded envelope bodies as raw gzip binary under standalone keys,

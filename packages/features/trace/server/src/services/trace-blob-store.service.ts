@@ -1,4 +1,4 @@
-import { TraceStreamBufferService } from "./trace-stream-buffer.service";
+import { TraceStreamBufferService } from "./trace-stream-buffer.service.ts";
 import type { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { Logger } from "@langwatch/observability";
@@ -7,13 +7,13 @@ import {
   buildSpoolObjectPath,
   isLegacySpoolRef,
   SPOOL_REF_V2,
-} from "../rules/trace-spool-location.rules";
+} from "../rules/trace-spool-location.rules.ts";
 import {
   eventLogOccurredAtWindow,
   eventLogRowSchema,
   eventPayloadSchema,
   readEventPayloadField,
-} from "../rules/trace-event-log-payload.rules";
+} from "../rules/trace-event-log-payload.rules.ts";
 /**
  * The one read this store issues, in the default JSON format. Declared here rather than taken from
  * the package client, which pins JSONEachRow: this read consumes the envelope the default format

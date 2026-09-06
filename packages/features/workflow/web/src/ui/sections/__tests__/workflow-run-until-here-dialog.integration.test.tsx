@@ -9,7 +9,7 @@ import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 const mockSetNode = vi.fn();
 let mockNodes: unknown[] = [];
 
-vi.mock("../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       nodes: mockNodes,
@@ -19,11 +19,11 @@ vi.mock("../../../behavior/use-workflow-store", () => ({
     }),
 }));
 
-import { useRunUntilHereDialogStore } from "../../../behavior/use-run-until-here-dialog-store";
+import { useRunUntilHereDialogStore } from "../../../behavior/use-run-until-here-dialog-store.ts";
 import {
   WorkflowRunUntilHereDialog,
   type WorkflowDatasetPreviewProps,
-} from "../workflow-run-until-here-dialog";
+} from "../workflow-run-until-here-dialog.tsx";
 
 const entryNode = (data?: Record<string, unknown>) => ({
   id: "entry-1",

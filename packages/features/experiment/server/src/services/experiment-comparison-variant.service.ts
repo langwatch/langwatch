@@ -18,13 +18,13 @@ import {
   evaluatorScoresBlock,
   pickOutputPath,
   toCandidateText,
-} from "../processes/experiment-comparison-candidates.process";
+} from "../processes/experiment-comparison-candidates.process.ts";
 import {
   type ComparisonSetupSkip,
   type ComparisonSkipReason,
-} from "../processes/experiment-comparison-skip.process";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
-import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service";
+} from "../processes/experiment-comparison-skip.process.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 
 const logger = createLogger("langwatch:experiment:comparison-variants");
 

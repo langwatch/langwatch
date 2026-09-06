@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { lintTestQuality } from "../src";
+import { lintTestQuality } from "../src/index.ts";
 
 function writeFixture(root: string, file: string, source: string): string {
   const path = join(root, file);

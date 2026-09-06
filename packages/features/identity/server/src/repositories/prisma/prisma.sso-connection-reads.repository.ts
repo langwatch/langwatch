@@ -2,9 +2,9 @@ import { LIVE_IDENTIFIER_STATES, type SsoConnectionState } from "@langwatch/iden
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-} from "../sso-connection.repository";
+} from "../sso-connection.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository";
+import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The one model the connection guards read, and no other. */
 export type PrismaSsoConnectionReadDatabase = Pick<PrismaClient, "ssoConnection">;

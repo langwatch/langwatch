@@ -5,7 +5,7 @@ import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
 
-import { useWorkflowStore } from "./use-workflow-store";
+import { useWorkflowStore } from "./use-workflow-store.ts";
 
 type SavedEvaluator = { id: string; name: string; evaluatorType?: string };
 type EvaluatorSaveResult = boolean | undefined;

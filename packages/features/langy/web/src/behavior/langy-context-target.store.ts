@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { type LangyContextChip, useLangyStore } from "./langy.store";
+import { type LangyContextChip, useLangyStore } from "./langy.store.ts";
 
 /**
  * The registry of things on the page Langy can take as context.

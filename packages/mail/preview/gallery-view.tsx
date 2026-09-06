@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type SyntheticEvent,
 } from "react";
-import { prepareMailDocument, WIDTHS, type GalleryEntry } from "./studio-shared";
+import { prepareMailDocument, WIDTHS, type GalleryEntry } from "./studio-shared.ts";
 
 export type Density = "compact" | "comfortable";
 

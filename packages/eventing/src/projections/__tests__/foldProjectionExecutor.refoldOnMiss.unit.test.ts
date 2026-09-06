@@ -1,15 +1,15 @@
 import { register } from "prom-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
+} from "../../services/__tests__/testHelpers.ts";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 /**
  * `options.refoldOnStoreMiss` — the continuity mechanism for folds whose

@@ -14,12 +14,12 @@ import { Copy, MoreHorizontal, Trash2 } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
-import { GATE_FIELD, showsTemporaryGate } from "../../model/control-flow";
-import { hasUnsavedChanges } from "../../model/unsaved-changes";
-import { useWorkflowNodeHost } from "../elements/workflow-node.host";
-import { ComponentExecutionButton } from "./workflow-node-execution";
+import { GATE_FIELD, showsTemporaryGate } from "../../model/control-flow.ts";
+import { hasUnsavedChanges } from "../../model/unsaved-changes.ts";
+import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
+import { ComponentExecutionButton } from "./workflow-node-execution.tsx";
 
 export function getNodeDisplayName(node: {
   id: string;

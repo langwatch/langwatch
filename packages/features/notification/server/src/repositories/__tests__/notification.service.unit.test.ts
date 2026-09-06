@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CreateNotificationCommand, Notification } from "@langwatch/notification-contract";
-import { NotificationRepository } from "../notification.repository";
-import { NotificationService } from "../../services/notification.service";
+import { NotificationRepository } from "../notification.repository.ts";
+import { NotificationService } from "../../services/notification.service.ts";
 
 class InMemoryNotificationRepository extends NotificationRepository {
   private readonly records: Notification[] = [];

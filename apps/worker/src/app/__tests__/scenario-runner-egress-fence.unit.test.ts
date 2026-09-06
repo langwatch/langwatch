@@ -11,7 +11,7 @@ import {
   resolveChildTlsEnv,
 } from "@langwatch/scenario-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /** The parent's two lines, then the child's one, for a given environment. */
 function runnerUrlValidator(source: Record<string, string>) {

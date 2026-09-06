@@ -10,7 +10,7 @@ import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
   type ApiProcessRestServices,
-} from "../app-rest.process-features";
+} from "../app-rest.process-features.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 

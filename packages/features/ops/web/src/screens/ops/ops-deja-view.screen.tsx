@@ -1,5 +1,5 @@
-import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout";
-import { DejaViewContent } from "../../features/deja-view/ui/sections/deja-view-panel";
+import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout.tsx";
+import { DejaViewContent } from "../../features/deja-view/ui/sections/deja-view-panel.tsx";
 
 /**
  * Deja View, as a section of the event-sourcing workspace.

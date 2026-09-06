@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { truncatedReadTooltip } from "../dataset-editor-copy";
+import { truncatedReadTooltip } from "../dataset-editor-copy.ts";
 
 describe("given a dataset whose editor read is truncated", () => {
   describe("when building the count tooltip", () => {

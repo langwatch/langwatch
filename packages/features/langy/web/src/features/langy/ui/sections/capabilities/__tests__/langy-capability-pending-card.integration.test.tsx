@@ -6,11 +6,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-capability-data", () => ({
+vi.mock("../../../../behavior/use-capability-data.ts", () => ({
   useCapabilityData: () => ({ rows: [], loadedCount: 0, totalCount: null }),
 }));
 
-import { LangyCapabilityPendingCard } from "../langy-capability-pending-card";
+import { LangyCapabilityPendingCard } from "../langy-capability-pending-card.tsx";
 
 afterEach(cleanup);
 

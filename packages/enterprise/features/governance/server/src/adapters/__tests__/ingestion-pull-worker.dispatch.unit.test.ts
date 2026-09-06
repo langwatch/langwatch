@@ -19,8 +19,8 @@
  */
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpPollingPullerAdapter } from "../http-poller.adapter";
-import { TestHttpPort, createWorkerService } from "../../__tests__/support/puller-test-ports";
+import { HttpPollingPullerAdapter } from "../http-poller.adapter.ts";
+import { TestHttpPort, createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();

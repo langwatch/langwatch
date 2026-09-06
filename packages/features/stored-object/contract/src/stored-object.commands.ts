@@ -1,21 +1,21 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { z, type ZodTypeAny } from "zod";
-import { storedObjectDeliveryAudienceSchema } from "./audiences";
+import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
 import {
   storedObjectGenerationSchema,
   storedObjectIdempotencyKeySchema,
   storedObjectIdSchema,
   storedObjectProjectIdSchema,
-} from "./ids";
-import { storedObjectMetadataSchema, storedObjectTimestampSchema } from "./metadata";
-import { storedObjectDeliveryCapabilitySchema } from "./references";
+} from "./ids.ts";
+import { storedObjectMetadataSchema, storedObjectTimestampSchema } from "./metadata.ts";
+import { storedObjectDeliveryCapabilitySchema } from "./references.ts";
 import {
   createStoredObjectsCreateUploadInputSchema,
   storedObjectsConfirmUploadInputSchema,
   storedObjectsConfirmUploadOutputSchema,
   storedObjectsCreateUploadInputSchema,
   storedObjectsCreateUploadOutputSchema,
-} from "./uploads";
+} from "./uploads.ts";
 
 export const storedObjectsGetInputSchema = z
   .object({

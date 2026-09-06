@@ -1,12 +1,12 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { useFilterStore } from "../../../../../../../behavior/filter.store";
-import { useDrawer } from "../../../../../../../behavior/use-drawer";
-import type { TraceEvalResult, TraceListItem } from "../../../../types/trace";
-import { ioPreviewWillRenderFor } from "../../addons/trace/io-preview-addon";
-import { EvalChip } from "../../shared-chips";
-import type { CellDef } from "../../types";
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import { useDrawer } from "../../../../../../../behavior/use-drawer.ts";
+import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
+import { ioPreviewWillRenderFor } from "../../addons/trace/io-preview-addon.tsx";
+import { EvalChip } from "../../shared-chips.tsx";
+import type { CellDef } from "../../types.ts";
 
 const MAX_EVALS_WHEN_WRAPPING = 9;
 

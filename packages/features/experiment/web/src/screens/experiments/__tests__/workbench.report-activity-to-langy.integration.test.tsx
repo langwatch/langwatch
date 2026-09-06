@@ -26,7 +26,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-evaluations-v3-store", () => ({
+vi.mock("../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () => ({
   useEvaluationsV3Store: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -48,7 +48,7 @@ vi.mock("../../../behavior/experiments-v3/use-evaluations-v3-store", () => ({
   ),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-autosave-evaluations-v3", () => ({
+vi.mock("../../../behavior/experiments-v3/use-autosave-evaluations-v3.ts", () => ({
   useAutosaveEvaluationsV3: () => ({
     isLoading: false,
     isNotFound: false,
@@ -61,7 +61,7 @@ vi.mock("../../../behavior/experiments-v3/use-autosave-evaluations-v3", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-execute-evaluation", () => ({
+vi.mock("../../../behavior/experiments-v3/use-execute-evaluation.ts", () => ({
   useExecuteEvaluation: () => ({
     execute: vi.fn(),
     status: execution.status,
@@ -69,23 +69,23 @@ vi.mock("../../../behavior/experiments-v3/use-execute-evaluation", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-target-name", () => ({
+vi.mock("../../../behavior/experiments-v3/use-target-name.ts", () => ({
   useTargetNames: () => [],
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-saved-dataset-loader", () => ({
+vi.mock("../../../behavior/experiments-v3/use-saved-dataset-loader.ts", () => ({
   useSavedDatasetLoader: () => ({ isLoading: false }),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-workbench-update-listener", () => ({
+vi.mock("../../../behavior/experiments-v3/use-workbench-update-listener.ts", () => ({
   useWorkbenchUpdateListener: () => ({ stale: undefined, reload: vi.fn() }),
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-lambda-warmup", () => ({
+vi.mock("../../../behavior/experiments-v3/use-lambda-warmup.ts", () => ({
   useLambdaWarmup: () => undefined,
 }));
 
-vi.mock("../../../behavior/experiments-v3/use-optimize-with-langy", () => ({
+vi.mock("../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => ({
   useOptimizeWithLangy: () => undefined,
 }));
 
@@ -106,22 +106,22 @@ vi.mock("@langwatch/langy-web/surfaces/langy-page-registration", async (importOr
 // The page's heavy children read the store and tRPC directly; this test only
 // exercises the activity-reporting handover, so they are stubbed out like the
 // sibling `RunFlushesPendingSave` workbench test.
-vi.mock("../../../ui/sections/experiments-v3/evaluations-v3-table", () => ({
+vi.mock("../../../ui/sections/experiments-v3/evaluations-v3-table.tsx", () => ({
   EvaluationsV3Table: () => null,
 }));
-vi.mock("../../../ui/sections/experiments-v3/saved-dataset-loaders", () => ({
+vi.mock("../../../ui/sections/experiments-v3/saved-dataset-loaders.tsx", () => ({
   SavedDatasetLoaders: () => null,
 }));
-vi.mock("../../../ui/sections/experiments-v3/history-button", () => ({
+vi.mock("../../../ui/sections/experiments-v3/history-button.tsx", () => ({
   HistoryButton: () => null,
 }));
-vi.mock("../../../ui/sections/experiments-v3/table-settings-menu", () => ({
+vi.mock("../../../ui/sections/experiments-v3/table-settings-menu.tsx", () => ({
   TableSettingsMenu: () => null,
 }));
-vi.mock("../../../ui/sections/experiments-v3/undo-redo", () => ({
+vi.mock("../../../ui/sections/experiments-v3/undo-redo.tsx", () => ({
   UndoRedo: () => null,
 }));
-vi.mock("../../../ui/sections/experiments-v3/run-evaluation-button", () => ({
+vi.mock("../../../ui/sections/experiments-v3/run-evaluation-button.tsx", () => ({
   RunEvaluationButton: () => null,
 }));
 
@@ -155,7 +155,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 }));
 
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import WorkbenchPage from "../workbench.screen";
+import WorkbenchPage from "../workbench.screen.tsx";
 
 const reported = () => useLangyStore.getState().pageActivity;
 

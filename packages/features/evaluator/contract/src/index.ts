@@ -1,10 +1,10 @@
-export * from "./code-evaluator";
-export * from "./evaluator";
-export * from "./evaluator-execution";
-export * from "./evaluator.service";
-export * from "./evaluator.errors";
-export * from "./evaluator.schemas";
-export * from "./evaluators";
+export * from "./code-evaluator.ts";
+export * from "./evaluator.ts";
+export * from "./evaluator-execution.ts";
+export * from "./evaluator.service.ts";
+export * from "./evaluator.errors.ts";
+export * from "./evaluator.schemas.ts";
+export * from "./evaluators.ts";
 export {
   batchEvaluationResultSchema,
   evaluationResultErrorSchema,
@@ -13,7 +13,7 @@ export {
   evaluatorTypesSchema,
   moneySchema,
   singleEvaluationResultSchema,
-} from "./evaluators.generated";
+} from "./evaluators.generated.ts";
 export type {
   BatchEvaluationResult,
   EvaluationResult,
@@ -21,7 +21,7 @@ export type {
   EvaluationResultSkipped,
   Money,
   SingleEvaluationResult,
-} from "./evaluators.generated";
+} from "./evaluators.generated.ts";
 
-export * from "./evaluator-mappings";
-export * from "./evaluation-result-parsing";
+export * from "./evaluator-mappings.ts";
+export * from "./evaluation-result-parsing.ts";

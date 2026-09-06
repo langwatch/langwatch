@@ -2,13 +2,13 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { EntitlementService } from "@langwatch/entitlement-contract";
-import { ScimService } from "../scim.service";
+import { ScimService } from "../scim.service.ts";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
-import type { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port";
-import { GrantsFake } from "../../__tests__/support/grants-fake";
-import type { ScimUserProvisioning } from "../scim-provisioning.service";
+import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
+import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import type { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port.ts";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 

@@ -14,7 +14,7 @@
  * ignored so a call site that passed one still compiles.
  */
 
-import { useAnnotationHost } from "../model/annotation-host";
+import { useAnnotationHost } from "../model/annotation-host.ts";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

@@ -1,7 +1,7 @@
-import { MODULES } from "../../model/studio-registry";
+import { MODULES } from "../../model/studio-registry.ts";
 import type { Component } from "@langwatch/workflow-contract";
 import type { NodeWithOptionalPosition } from "@langwatch/workflow-contract";
-import { NodeDraggable } from "./workflow-node-draggable";
+import { NodeDraggable } from "./workflow-node-draggable.tsx";
 
 type AgentNodeDraggableProps = {
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;

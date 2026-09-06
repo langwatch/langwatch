@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const REQUIRED_SECTIONS = [
   "Context",

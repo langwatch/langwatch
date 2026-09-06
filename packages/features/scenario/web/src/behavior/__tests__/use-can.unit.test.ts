@@ -10,7 +10,7 @@ const { mockEffectivePermissionsQuery } = vi.hoisted(() => ({
   mockEffectivePermissionsQuery: vi.fn(),
 }));
 
-vi.mock("../scenario-api", () => ({
+vi.mock("../scenario-api.ts", () => ({
   api: {
     authz: {
       effectivePermissions: { useQuery: mockEffectivePermissionsQuery },
@@ -18,14 +18,14 @@ vi.mock("../scenario-api", () => ({
   },
 }));
 
-vi.mock("../use-organization-team-project", () => ({
+vi.mock("../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     organization: { id: "org-1" },
   }),
 }));
 
-const { useCan } = await import("../use-can");
+const { useCan } = await import("../use-can.ts");
 
 /** A TanStack Query v5 result, only the fields this hook reads. */
 const queryResult = ({

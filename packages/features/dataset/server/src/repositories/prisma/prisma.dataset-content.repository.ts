@@ -1,11 +1,11 @@
-import type { DatasetRow } from "../../ports/dataset.port";
+import type { DatasetRow } from "../../ports/dataset.port.ts";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   DatasetContentRepository,
   type CreateDatasetInput,
   type DatasetContentUpdate,
   type UpdateDatasetInput,
-} from "../dataset-content.repository";
+} from "../dataset-content.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

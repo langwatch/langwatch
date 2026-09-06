@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PrismaPromptTagAssignmentRepository,
   type PromptTagAssignmentDatabase,
-} from "../prisma.prompt-tag-assignment.repository";
+} from "../prisma.prompt-tag-assignment.repository.ts";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {

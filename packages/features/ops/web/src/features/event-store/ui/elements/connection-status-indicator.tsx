@@ -1,6 +1,6 @@
 import { Status } from "@chakra-ui/react";
-import { formatDurationMs } from "../../../../model/ops-formatters";
-import { isSnapshotStale } from "../../model/snapshot-staleness";
+import { formatDurationMs } from "../../../../model/ops-formatters.ts";
+import { isSnapshotStale } from "../../model/snapshot-staleness.ts";
 
 export type OpsConnectionStatus = "connected" | "connecting" | "disconnected";
 

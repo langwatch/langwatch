@@ -1,17 +1,17 @@
 import { z } from "zod";
-import { storedObjectDeliveryAudienceSchema } from "./audiences";
+import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
 import {
   storedObjectGenerationSchema,
   storedObjectIdSchema,
   storedObjectProjectIdSchema,
-} from "./ids";
+} from "./ids.ts";
 import {
   storedObjectByteLengthSchema,
   storedObjectFilenameSchema,
   storedObjectMediaTypeSchema,
   storedObjectSha256Schema,
   storedObjectTimestampSchema,
-} from "./metadata";
+} from "./metadata.ts";
 
 /**
  * A durable feature-owned reference. It intentionally carries presentation

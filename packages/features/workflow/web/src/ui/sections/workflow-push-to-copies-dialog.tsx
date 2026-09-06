@@ -7,8 +7,8 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 
-import { workflowApi } from "../../model/workflow-api";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { workflowApi } from "../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export function WorkflowPushToCopiesDialog({
   open,

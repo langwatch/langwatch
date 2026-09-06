@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { spanTreeNodeSchema, type SpanTreeNode } from "./trace";
+import { spanTreeNodeSchema, type SpanTreeNode } from "./trace.ts";
 
 export { spanTreeNodeSchema, type SpanTreeNode };
 

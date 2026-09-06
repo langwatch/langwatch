@@ -7,7 +7,7 @@ import type {
   CancelExecutionIntent,
   ExecuteRunIntent,
   FinishRunIntent,
-} from "../processes/simulation-run-execution-data.process";
+} from "../processes/simulation-run-execution-data.process.ts";
 
 const logger = createLogger("langwatch:simulation-processing:run-execution-effects");
 

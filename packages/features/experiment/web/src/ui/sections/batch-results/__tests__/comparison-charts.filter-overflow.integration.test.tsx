@@ -11,8 +11,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ComparisonCharts } from "../comparison-charts";
-import type { ComparisonRunData } from "../../batch-evaluation-results.types";
+import { ComparisonCharts } from "../comparison-charts.tsx";
+import type { ComparisonRunData } from "../../batch-evaluation-results.types.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

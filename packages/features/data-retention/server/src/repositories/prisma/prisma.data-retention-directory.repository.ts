@@ -13,7 +13,7 @@ import {
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
   type RetentionScopeTarget,
-} from "../../ports/data-retention-directory.port";
+} from "../../ports/data-retention-directory.port.ts";
 
 /** Only what this repository touches. */
 export type DataRetentionDirectoryDatabase = Pick<

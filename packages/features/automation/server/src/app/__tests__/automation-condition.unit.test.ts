@@ -5,8 +5,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { AutomationAppDependencies } from "../automation.app";
-import { AutomationApp } from "../automation.app";
+import type { AutomationAppDependencies } from "../automation.app.ts";
+import { AutomationApp } from "../automation.app.ts";
 
 const CREATED = { id: "trigger_new", triggerKind: "AUTOMATION" };
 

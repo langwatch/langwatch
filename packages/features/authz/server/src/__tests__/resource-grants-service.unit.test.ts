@@ -1,14 +1,14 @@
 import { GrantValidationError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter";
-import type { AuthzGrantRepository } from "../repositories/authz-grant.repository";
-import { AuthzGrantsService } from "../services/authz-grants.service";
-import { AuthzService } from "../services/authz.service";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub";
-import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
-import { liveShareLinkRow, ORG, traceScope } from "./support/resource-fixtures";
+import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter.ts";
+import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzService } from "../services/authz.service.ts";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { liveShareLinkRow, ORG, traceScope } from "./support/resource-fixtures.ts";
 
 describe("AuthzService on a resource scope", () => {
   describe("given a live public share link for trace t1 and no session", () => {

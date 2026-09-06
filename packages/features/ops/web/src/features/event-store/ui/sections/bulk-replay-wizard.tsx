@@ -16,12 +16,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { useReplayStatus } from "../../behavior/use-replay-status";
-import { api } from "../../../../behavior/ops-api";
-import { TenantSelector } from "./tenant-selector";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { TenantSelector } from "./tenant-selector.tsx";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 const KIND_PALETTE = {
   fold: "blue",
   map: "purple",

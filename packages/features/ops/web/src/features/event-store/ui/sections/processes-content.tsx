@@ -1,11 +1,11 @@
 import { Center, Spinner, VStack } from "@chakra-ui/react";
-import { api } from "../../../../behavior/ops-api";
-import { ProcessFleetStrip } from "../blocks/process-fleet-strip";
-import { ProcessFleetCard } from "../elements/process-fleet-card";
-import { ProcessRecentActions } from "./process-recent-actions-panel";
-import { ProcessInstanceDrawer } from "./process-instance-drawer";
-import { ProcessInstancesDrawer } from "./process-instances-drawer";
-import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays";
+import { api } from "../../../../behavior/ops-api.ts";
+import { ProcessFleetStrip } from "../blocks/process-fleet-strip.tsx";
+import { ProcessFleetCard } from "../elements/process-fleet-card.tsx";
+import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
+import { ProcessInstanceDrawer } from "./process-instance-drawer.tsx";
+import { ProcessInstancesDrawer } from "./process-instances-drawer.tsx";
+import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 
 /**
  * strip → structure → detail, per best_practices/ops-dashboard.md.

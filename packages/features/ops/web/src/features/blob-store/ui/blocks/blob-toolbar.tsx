@@ -2,7 +2,7 @@ import { Button, HStack, Spacer } from "@chakra-ui/react";
 
 import type { OpsBlobSort } from "@langwatch/ops-contract";
 
-import { BlobFilters } from "../elements/blob-filters";
+import { BlobFilters } from "../elements/blob-filters.tsx";
 
 export function BlobToolbar({
   queueNames,

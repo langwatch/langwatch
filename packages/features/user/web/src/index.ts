@@ -23,4 +23,4 @@ export {
   AvatarImageError,
   AvatarImageProcessingFailedError,
   processAvatarImage,
-} from "./model/process-avatar-image";
+} from "./model/process-avatar-image.ts";

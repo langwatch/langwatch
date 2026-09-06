@@ -10,9 +10,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { EventDrilldown } from "../event-drilldown";
-import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { EventDrilldown } from "../event-drilldown.tsx";
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 
 const buildItem = ({
   eventMetrics = [

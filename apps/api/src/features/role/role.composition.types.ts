@@ -2,9 +2,9 @@
 import type { AuthzApp } from "@langwatch/authz-server";
 import type { RoleService } from "@langwatch/role-contract";
 import type { RoleApp } from "@langwatch/role-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createTeamTrpcRouter } from "../organization/organization-trpc.mount";
-import type { createRoleTrpcRouter } from "./role-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createTeamTrpcRouter } from "../organization/organization-trpc.mount.ts";
+import type { createRoleTrpcRouter } from "./role-trpc.mount.ts";
 
 /** The two namespaces, the `ctx.app` slices, and the service the invites read. */
 export type ComposedRoleFeature = Readonly<{

@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Span } from "@langwatch/trace-contract";
-import { getEvaluationResult, SpanTypeTag } from "../span-details";
+import { getEvaluationResult, SpanTypeTag } from "../span-details.tsx";
 
 function buildEvaluationSpan(output: Span["output"]): Span {
   return {

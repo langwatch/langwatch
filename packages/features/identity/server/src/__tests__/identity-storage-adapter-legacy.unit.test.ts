@@ -28,14 +28,14 @@
  * the ceremonies' own better-auth suite.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack";
+import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack.ts";
 import {
   identityStack,
   NEW_PASSWORD,
   PASSWORD,
   signUp,
   stockStack,
-} from "./support/storage-adapter-stack";
+} from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "legacy@acme.com";
 

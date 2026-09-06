@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDisplayInput, type Span } from "@langwatch/trace-contract";
-import { capturedInputForEditing } from "../span-input-seed";
+import { capturedInputForEditing } from "../span-input-seed.ts";
 
 const MESSAGES = [
   { role: "user", content: "what is the weather" },

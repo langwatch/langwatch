@@ -2,13 +2,13 @@ import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { LLMConfigPopover, type Output } from "./llm-config-popover";
+import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
 import { AddModelProviderKey } from "@langwatch/workflow-web/surfaces/add-model-provider-key";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "@langwatch/topic-contract";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
-import { LLMModelDisplay } from "./llm-model-display";
+import { LLMModelDisplay } from "./llm-model-display.tsx";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;

@@ -30,12 +30,12 @@ import {
   type OrganizationMembership,
   type OrganizationRole,
   type ShareLinkRow,
-} from "../authz-read.repository";
+} from "../authz-read.repository.ts";
 import {
   RESOURCE_KIND_TO_DB,
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
-} from "../prisma/prisma.authz-grant.mapper";
-import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper";
+} from "../prisma/prisma.authz-grant.mapper.ts";
+import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 

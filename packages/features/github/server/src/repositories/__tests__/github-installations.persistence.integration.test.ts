@@ -9,8 +9,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaGithubInstallationsRepository } from "../prisma/github-installations.repository";
-import type { UpsertGithubInstallationInput } from "../github-installations.repository";
+import { PrismaGithubInstallationsRepository } from "../prisma/github-installations.repository.ts";
+import type { UpsertGithubInstallationInput } from "../github-installations.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

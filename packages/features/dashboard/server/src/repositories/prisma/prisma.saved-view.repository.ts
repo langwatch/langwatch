@@ -1,10 +1,10 @@
-import type { SavedViewRecord } from "../../ports/dashboard.port";
+import type { SavedViewRecord } from "../../ports/dashboard.port.ts";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   SavedViewRepository,
   type CreateSavedViewInput,
   type UpdateSavedViewInput,
-} from "../saved-view.repository";
+} from "../saved-view.repository.ts";
 
 /**
  * Only the delegate this repository touches, plus the transaction it reorders in. Composition

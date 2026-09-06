@@ -3,7 +3,7 @@ import {
   traceFullReadInputSchema,
   traceFullRecordSchema,
   traceFullThreadReadInputSchema,
-} from "../trace-full-read.contract";
+} from "../trace-full-read.contract.ts";
 
 describe("Trace full-read contract", () => {
   it("preserves the rich capture fields for internal readers", () => {

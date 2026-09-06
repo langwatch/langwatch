@@ -57,4 +57,4 @@ export function skillInvocationFromToolUse({
   if (!isSkillToolName(name)) return null;
   return { slug: skillSlugFromInput(input) };
 }
-import { isRecord } from "./record";
+import { isRecord } from "./record.ts";

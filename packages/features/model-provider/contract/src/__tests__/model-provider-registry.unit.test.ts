@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelProviders } from "../model-provider-registry";
+import { modelProviders } from "../model-provider-registry.ts";
 
 describe("Model Provider registry", () => {
   /** @scenario "Azure Safety appears in the Add Model Provider list" */

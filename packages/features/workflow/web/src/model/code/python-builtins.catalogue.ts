@@ -1,4 +1,4 @@
-import type { PyMember } from "./python-api.types";
+import type { PyMember } from "./python-api.types.ts";
 
 export const PYTHON_BUILTINS: PyMember[] = [
   {

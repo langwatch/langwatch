@@ -1,4 +1,4 @@
-import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse.adapter";
+import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse.adapter.ts";
 
 /**
  * OTel status: wire-level StatusCode is Nullable(UInt8) — 0/NULL=unset, 1=ok, 2=error. Surfacing the human label (not the integer) as the facet value lets saved queries round-trip as spanStatus:error, matching the search-bar's FIELD_VALUES.spanStatus. A NULL comparison yields NULL, not 'unset', so a NULL-status span would drop out of the filter entirely — coalesce before comparing to agree with spanStatusRead.

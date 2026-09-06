@@ -6,11 +6,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction } from "@langwatch/automation-contract";
-import { DeliveryPicker } from "../ui/sections/delivery-picker";
+import { DeliveryPicker } from "../ui/sections/delivery-picker.tsx";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
 // DeliveryPicker itself never touches tRPC, so an empty shape suffices.
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: { useUtils: () => ({}) },
 }));
 

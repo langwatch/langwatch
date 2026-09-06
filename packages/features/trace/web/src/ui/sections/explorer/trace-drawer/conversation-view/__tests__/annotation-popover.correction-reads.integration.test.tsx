@@ -20,13 +20,13 @@ const mocks = vi.hoisted(() => ({
   existingAnnotations: [] as unknown[],
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -57,8 +57,8 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-const { AnnotationPopover } = await import("../annotation-popover");
-const { useAnnotationMutations } = await import("../use-annotation-form");
+const { AnnotationPopover } = await import("../annotation-popover.tsx");
+const { useAnnotationMutations } = await import("../use-annotation-form.ts");
 
 const TRACE = "trace-1";
 

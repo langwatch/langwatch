@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveChildTlsEnv } from "../index";
+import { resolveChildTlsEnv } from "../index.ts";
 
 describe("resolveChildTlsEnv", () => {
   describe("when a trusted local CA is present", () => {

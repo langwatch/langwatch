@@ -8,9 +8,9 @@
 // whose app nobody imported. Here the routes come from the policy registry
 // every mount writes to, and the operations from describing that same app.
 
-import { allRegisteredRoutes, documentedPathOf } from "../../app-rest";
-import { generateOpenApiDocument } from "../openapi-document/openapi-document.generator";
-import type { CoverageRoute } from "./openapi-route-coverage.auditor";
+import { allRegisteredRoutes, documentedPathOf } from "../../app-rest/index.ts";
+import { generateOpenApiDocument } from "../openapi-document/openapi-document.generator.ts";
+import type { CoverageRoute } from "./openapi-route-coverage.auditor.ts";
 
 /** What one read of the process's REST surface produced. */
 export type CoverageSurface = Readonly<{

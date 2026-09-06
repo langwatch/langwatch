@@ -8,15 +8,15 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TestCasesTab } from "../../cases/test-cases-tab";
-import { COMPARE_HINT } from "../compare-agents-section";
-import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows";
-import { RunDialog, type RunDialogSubject } from "../run-dialog";
-import { LOCKED_IN_ROWS_MESSAGE } from "../run-parameters-section";
-import { configurationKeyOf } from "../run-configuration";
-import { targetColor } from "../../../../elements/agent-testing/shared/target-colors";
-import { useAgentTestingStore } from "../../use-agent-testing-store";
-import { ScenarioWorkflowHostBridge } from "../../../workflow-host-bridge";
+import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
+import { COMPARE_HINT } from "../compare-agents-section.tsx";
+import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows.ts";
+import { RunDialog, type RunDialogSubject } from "../run-dialog.tsx";
+import { LOCKED_IN_ROWS_MESSAGE } from "../run-parameters-section.tsx";
+import { configurationKeyOf } from "../run-configuration.ts";
+import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
+import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
+import { ScenarioWorkflowHostBridge } from "../../../workflow-host-bridge.tsx";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
 const mockSuitesUpdate = vi.hoisted(() => vi.fn());
@@ -37,7 +37,7 @@ const emptyQuery = vi.hoisted(() => () => ({
   isLoading: false,
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -112,7 +112,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-provider-settings", () => 
   }),
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
@@ -122,7 +122,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getComplexProps: () => null,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },

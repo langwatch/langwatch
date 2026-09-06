@@ -29,10 +29,10 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Inbox, MoreVertical, Pencil, Plus, SquarePen, Users } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useState } from "react";
-import type { AnnotationQueueBadge } from "../../behavior/annotation-api";
-import type { AnnotationView } from "../../model/annotation-view";
-import { ReviewerAvatar } from "../elements/reviewer-avatar";
-import { SidebarMenuLink } from "../elements/sidebar-menu-link";
+import type { AnnotationQueueBadge } from "../../behavior/annotation-api.ts";
+import type { AnnotationView } from "../../model/annotation-view.ts";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
+import { SidebarMenuLink } from "../elements/sidebar-menu-link.tsx";
 
 /** A badge shows a number or nothing; zero is not news. */
 function PendingCount({ count }: { count: number | undefined }) {

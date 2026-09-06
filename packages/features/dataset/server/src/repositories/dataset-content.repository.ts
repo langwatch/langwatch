@@ -1,4 +1,4 @@
-import type { DatasetRow } from "../ports/dataset.port";
+import type { DatasetRow } from "../ports/dataset.port.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };

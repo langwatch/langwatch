@@ -11,7 +11,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   ApiBrowserSessionTransportPort,
   ApiComposedBetterAuth,
-} from "../../app/api-auth.composition";
+} from "../../app/api-auth.composition.ts";
 
 export type ApiAuthRestOptions = Readonly<{
   /** The instance this process composed, or none where a host supplied one. */

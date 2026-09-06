@@ -3,13 +3,13 @@ import {
   GovernanceClickHouseClientPort,
   type GovernanceClickHouseResult,
   GovernanceClickHouseResolverPort,
-} from "../../../ports/ingestion-source-activity.port";
+} from "../../../ports/ingestion-source-activity.port.ts";
 import {
   PrismaActivityMonitorRepository,
   type SortDir,
   type SpendOverTimeGroupBy,
   type SpendSortField,
-} from "../prisma.ingestion-source-activity.repository";
+} from "../prisma.ingestion-source-activity.repository.ts";
 
 type ClickHouseQuery = {
   query: string;

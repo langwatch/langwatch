@@ -1,6 +1,6 @@
-import type { ModelCostRate } from "../model-provider";
-import { isCodexModel } from "./codex-restrictions";
-import { llmModels } from "./model-catalog";
+import type { ModelCostRate } from "../model-provider.ts";
+import { isCodexModel } from "./codex-restrictions.ts";
+import { llmModels } from "./model-catalog.ts";
 
 const ANTHROPIC_MODEL_ID = /^~?anthropic\//;
 const OPENAI_AUDIO_MODEL_ID = /^~?openai\/(gpt-audio|gpt-realtime)/;

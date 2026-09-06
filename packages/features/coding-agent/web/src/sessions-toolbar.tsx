@@ -1,8 +1,8 @@
 import { HStack } from "@chakra-ui/react";
-import type { PeriodSelection } from "./session-filters";
+import type { PeriodSelection } from "./session-filters.ts";
 import type React from "react";
 
-import { computeRelativeWindow, PeriodSelector } from "./period-selector";
+import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
 import { SearchInput } from "@langwatch/design-system/search-input";
 
 /**

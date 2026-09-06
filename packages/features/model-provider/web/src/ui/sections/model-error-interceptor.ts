@@ -11,12 +11,12 @@ import {
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
   type ProviderDisabledExtracted,
-} from "../../model/model-error";
+} from "../../model/model-error.ts";
 import {
   showAiCallFailedToast,
   showMissingModelToast,
   showProviderDisabledToast,
-} from "./missing-model-toast";
+} from "./missing-model-toast.ts";
 
 /**
  * What the composing application lends the interceptor: the two things it can

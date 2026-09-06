@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { identifierDomain, normalizeIdentifierValue } from "../identifier";
+import { identifierDomain, normalizeIdentifierValue } from "../identifier.ts";
 import {
   arrivalStateForProvider,
   identifierProviderFor,
   isLiveIdentifierState,
-} from "../vocabulary";
+} from "../vocabulary.ts";
 
 describe("identifier normalization", () => {
   describe("when a raw email value arrives from a ceremony", () => {

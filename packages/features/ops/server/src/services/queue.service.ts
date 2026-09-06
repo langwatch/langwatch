@@ -1,12 +1,12 @@
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "@langwatch/ops-contract";
-import { NullQueueAuditSink, type QueueAuditSinkPort } from "../ports/queue-audit-sink.port";
+import { NullQueueAuditSink, type QueueAuditSinkPort } from "../ports/queue-audit-sink.port.ts";
 import type {
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
   QueueRepository,
-} from "../repositories/queue.repository";
+} from "../repositories/queue.repository.ts";
 import type {
   OpsParkedTenantsPage,
   OpsQueueReconcileResult,

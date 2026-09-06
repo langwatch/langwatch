@@ -13,7 +13,7 @@ import {
   filterOutEmptyFilters,
   isFilterQueryKey,
   readFiltersFromQuery,
-} from "../analytics-filter-params";
+} from "../analytics-filter-params.ts";
 
 describe("the analytics filter params", () => {
   describe("given a query string carrying a filter", () => {

@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { parseDataplaneS3RoutingTable } from "../dataplane-s3";
+import { parseDataplaneS3RoutingTable } from "../dataplane-s3.ts";
 
 const ACME = {
   endpoint: "https://s3.eu-central-1.amazonaws.com",

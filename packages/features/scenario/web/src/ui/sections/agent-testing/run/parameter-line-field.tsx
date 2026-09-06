@@ -5,14 +5,14 @@
 
 import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import { useId, useRef } from "react";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import { SuggestionPanel } from "@langwatch/trace-web/surfaces/suggestion-dropdown";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,
-} from "../../../elements/agent-testing/shared/dialog-fields";
-import type { ParameterFieldMode, ParameterSuggestionRow } from "./parameter-suggestions";
-import { useParameterLineField } from "./use-parameter-line-field";
+} from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import type { ParameterFieldMode, ParameterSuggestionRow } from "./parameter-suggestions.ts";
+import { useParameterLineField } from "./use-parameter-line-field.ts";
 
 const LINE_MODE: ParameterFieldMode = { kind: "line" };
 

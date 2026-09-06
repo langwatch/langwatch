@@ -21,8 +21,8 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeSecretHost, renderWithSecretHost } from "../../../testing";
-import SecretsScreen from "../secrets.screen";
+import { FakeSecretHost, renderWithSecretHost } from "../../../testing.tsx";
+import SecretsScreen from "../secrets.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -39,7 +39,7 @@ const calls = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
-vi.mock("../../../behavior/secret-api", () => ({
+vi.mock("../../../behavior/secret-api.ts", () => ({
   secretApi: {
     useUtils: () => ({ secrets: { list: { invalidate: vi.fn() } } }),
     secrets: {

@@ -7,13 +7,13 @@ import {
 import {
   GovernanceDiagnosticsPort,
   NullGovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port";
+} from "../ports/governance-diagnostics.port.ts";
 import type {
   AnomalySpendReaderPort,
   AnomalySpendSourceFilter,
   SpendSpikeAnomalyRepository,
-} from "../ports/spend-spike-anomaly.port";
-import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service";
+} from "../ports/spend-spike-anomaly.port.ts";
+import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
 
 const BASELINE_WINDOWS = 6;
 

@@ -3,17 +3,17 @@ import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
 import {
   type CapabilityIconName,
   type CapabilitySurface,
-} from "../../../../../model/langy-capability-catalog";
+} from "../../../../../model/langy-capability-catalog.ts";
 import {
   CapabilityRowSkeletons,
   LangyCapabilityCard as LangyCapabilityCardPresentation,
   type LangyCapabilityTone,
-} from "../../../../../ui/sections/langy-capability-card";
+} from "../../../../../ui/sections/langy-capability-card.tsx";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { useSpaLinkClick } from "../../../behavior/logic/spa-link";
-import { LangySpaAnchor } from "../langy-spa-anchor";
-import { buildSurfaceHref, SURFACE_LABEL } from "../../../model/capabilities/capability-registry";
+import { useSpaLinkClick } from "../../../behavior/logic/spa-link.ts";
+import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
+import { buildSurfaceHref, SURFACE_LABEL } from "../../../model/capabilities/capability-registry.ts";
 
 export { CapabilityRowSkeletons };
 

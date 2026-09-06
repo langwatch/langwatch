@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary";
-import { LangyStreamingAnswerWithCards } from "../../../../../ui/sections/derived-cards/langy-streaming-answer-with-cards";
-import { LangyDerivedCardView } from "./langy-derived-card-view";
+import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
+import { LangyStreamingAnswerWithCards } from "../../../../../ui/sections/derived-cards/langy-streaming-answer-with-cards.tsx";
+import { LangyDerivedCardView } from "./langy-derived-card-view.tsx";
 
 export function StreamingAnswerWithCards({
   text,

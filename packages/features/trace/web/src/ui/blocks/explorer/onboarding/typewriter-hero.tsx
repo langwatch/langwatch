@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   applyAuroraTextShimmer,
   BlinkingCursor,
-} from "../../../elements/explorer/onboarding/hero-text";
+} from "../../../elements/explorer/onboarding/hero-text.tsx";
 
 /**
  * Typewriter cadence — quicker than original 38/22/420/1500. Faster typing

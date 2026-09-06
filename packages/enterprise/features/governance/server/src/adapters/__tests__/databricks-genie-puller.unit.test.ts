@@ -5,8 +5,8 @@ import { z } from "zod";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../databricks-genie-puller.adapter";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
+} from "../databricks-genie-puller.adapter.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";

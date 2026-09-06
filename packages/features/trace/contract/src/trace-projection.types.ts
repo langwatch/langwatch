@@ -1,4 +1,4 @@
-import type { Protections } from "./trace-viewer-protections.contract";
+import type { Protections } from "./trace-viewer-protections.contract.ts";
 /**
  * Projection DSL — public contract for Track 1 of the API Export Traces RFC
  * (EPIC/Q2/api-export). Extends `POST /api/traces/search` with two optional
@@ -15,7 +15,7 @@ import type { Protections } from "./trace-viewer-protections.contract";
  */
 
 import { z } from "zod";
-import type { Trace } from "./trace-format.schemas";
+import type { Trace } from "./trace-format.schemas.ts";
 
 /**
  * Entity roots the DSL can read `from`. Only "traces" ships in M1; the RFC

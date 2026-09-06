@@ -1,6 +1,6 @@
 import type { ModelProvider } from "@langwatch/gateway-contract";
-import type { GatewayModelProviderCredentialsPort } from "./gateway-model-provider-credentials.port";
-import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
+import type { GatewayModelProviderCredentialsPort } from "./gateway-model-provider-credentials.port.ts";
+import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port.ts";
 
 /**
  * What the gateway bundle is assembled from besides the materialiser's own logic: the version token, the reserved model tiers a routing policy falls through to, and the model catalog a provider row declares it serves. A port because each reads something outside the service (provider graph, tier vocabulary, shipped registry); a process composes the concrete reader.

@@ -36,18 +36,18 @@ import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
-import { useApiKeyHost } from "../../model/api-key-host";
+import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   buildMcpJson,
   CLOUD_ENDPOINT,
   findLangwatchEnvLines,
   formatEnvLines,
   maskApiKey,
-} from "../../model/api-key-snippets";
-import { CodePreview } from "../blocks/code-preview";
-import { JsonHighlight } from "../blocks/json-highlight";
-import { InlineCopyButton } from "../elements/inline-copy-button";
-import { TabButton } from "../elements/tab-button";
+} from "../../model/api-key-snippets.ts";
+import { CodePreview } from "../blocks/code-preview.tsx";
+import { JsonHighlight } from "../blocks/json-highlight.tsx";
+import { InlineCopyButton } from "../elements/inline-copy-button.tsx";
+import { TabButton } from "../elements/tab-button.tsx";
 
 type CodeTab = "env" | "bearer" | "basic";
 

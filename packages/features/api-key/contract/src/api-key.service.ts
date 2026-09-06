@@ -15,14 +15,14 @@ import type {
   CreateApiKeyInput,
   RevokeApiKeyInput,
   UpdateApiKeyInput,
-} from "./api-key";
+} from "./api-key.ts";
 import type {
   ApiKeyTokenResolutionInput,
   OrganizationApiKeyResolution,
   OrganizationApiKeyResolutionInput,
   ResolvedApiKeyToken,
-} from "./api-key.tokens";
-import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility";
+} from "./api-key.tokens.ts";
+import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
 export type ApiKeySelectionInput = {
   userId: string;
   organizationId: string;

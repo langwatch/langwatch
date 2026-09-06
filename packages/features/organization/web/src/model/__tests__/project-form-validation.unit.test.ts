@@ -14,7 +14,7 @@ import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
   validateProjectName,
-} from "../project-form-validation";
+} from "../project-form-validation.ts";
 
 describe("given the create-project form's validation", () => {
   describe("when validating the project name", () => {

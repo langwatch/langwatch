@@ -13,21 +13,21 @@ import type {
 import {
   CONTENT_COLUMN_WIDE_MAX_WIDTH,
   ContentColumn,
-} from "../../../elements/agent-testing/shared/content-column";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { periodDays } from "../../../elements/agent-testing/shared/period-picker";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { FlatRowsTable, GroupedRowsTable } from "./grouped-rows-table";
-import { PlanRowsTable } from "./plan-rows-table";
-import { ResultsChartsBlock } from "./results-charts-block";
-import { ResultsFilterRow } from "./results-filter-row";
-import { nextWiderWindow } from "./run-plan-results-states";
-import type { ResultGrouping, ResultRow } from "./result-atoms";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import { type UseResultGroupsResult, useResultGroups } from "./use-result-groups";
-import { useResultsView } from "./use-results-view";
-import { useRunPlanArchive } from "./use-run-plan-archive";
+} from "../../../elements/agent-testing/shared/content-column.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { periodDays } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { FlatRowsTable, GroupedRowsTable } from "./grouped-rows-table.tsx";
+import { PlanRowsTable } from "./plan-rows-table.tsx";
+import { ResultsChartsBlock } from "./results-charts-block.tsx";
+import { ResultsFilterRow } from "./results-filter-row.tsx";
+import { nextWiderWindow } from "./run-plan-results-states.tsx";
+import type { ResultGrouping, ResultRow } from "./result-atoms.ts";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { type UseResultGroupsResult, useResultGroups } from "./use-result-groups.ts";
+import { useResultsView } from "./use-results-view.ts";
+import { useRunPlanArchive } from "./use-run-plan-archive.ts";
 
 /** The title line: what the window holds, and the way to add a run plan. */
 function ResultsHeader({

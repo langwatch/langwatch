@@ -4,5 +4,5 @@ export {
   type IntentHandler,
   OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
-} from "./outboxDispatcherService";
-export { ProcessOutboxWorker, type ProcessOutboxWorkerOptions } from "./processOutboxWorker";
+} from "./outboxDispatcherService.ts";
+export { ProcessOutboxWorker, type ProcessOutboxWorkerOptions } from "./processOutboxWorker.ts";

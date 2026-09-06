@@ -1,7 +1,7 @@
 import {
   ExperimentClickHousePort,
   type ExperimentEventingClickHouseClient,
-} from "../ports/experiment-clickhouse.port";
+} from "../ports/experiment-clickhouse.port.ts";
 
 /** How the application hands the feature a tenant-scoped ClickHouse client. */
 export type ExperimentEventingClickHouseResolver = (

@@ -2,7 +2,7 @@ import { Button } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { RotateCcw, RotateCw } from "react-feather";
 
-import { _useWorkflowStore } from "../../behavior/use-workflow-store";
+import { _useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 
 /** Browser-only workflow history controls. The app owns when the workflow query is loaded. */
 export function WorkflowUndoRedo({ isWorkflowLoaded }: { isWorkflowLoaded: boolean }) {

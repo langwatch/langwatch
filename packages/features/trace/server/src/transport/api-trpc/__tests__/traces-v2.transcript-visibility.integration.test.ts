@@ -43,9 +43,9 @@ import {
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
 
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
-import { TracesV2TrpcApi } from "../traces-v2.api";
-import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support";
+import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TracesV2TrpcApi } from "../traces-v2.api.ts";
+import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support.ts";
 
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const PROJECT_ID = "project_transcript_visibility";

@@ -22,7 +22,7 @@ import {
   supportsTemperature,
   toFormKey,
   toInternalKey,
-} from "../parameter-config";
+} from "../parameter-config.ts";
 
 describe("Parameter Config", () => {
   describe("PARAMETER_CONFIG", () => {

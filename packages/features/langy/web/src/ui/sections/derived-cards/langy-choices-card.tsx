@@ -11,7 +11,7 @@ import type {
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 
-import { LangyDerivedCardFrame } from "./langy-derived-card-frame";
+import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
 
 export type ChoicesRefRow =
   | { state: "pending" }

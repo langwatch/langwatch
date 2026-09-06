@@ -1,20 +1,20 @@
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
 import type { modelProviders } from "@langwatch/model-provider-contract";
-import { Anthropic } from "../icons/anthropic";
-import { AWS } from "../icons/aws";
-import { Azure } from "../icons/azure";
-import { Cerebras } from "../icons/cerebras";
-import { Codex } from "../icons/codex";
-import { Custom } from "../icons/custom";
-import { DeepSeek } from "../icons/deep-seek";
-import { ElevenLabs } from "../icons/eleven-labs";
-import { Gemini } from "../icons/gemini";
-import { GoogleCloud } from "../icons/google-cloud";
-import { Groq } from "../icons/groq";
-import { OpenAI } from "../icons/open-ai";
-import { Voyage } from "../icons/voyage";
-import { Xai } from "../icons/xai";
+import { Anthropic } from "../icons/anthropic.tsx";
+import { AWS } from "../icons/aws.tsx";
+import { Azure } from "../icons/azure.tsx";
+import { Cerebras } from "../icons/cerebras.tsx";
+import { Codex } from "../icons/codex.tsx";
+import { Custom } from "../icons/custom.tsx";
+import { DeepSeek } from "../icons/deep-seek.tsx";
+import { ElevenLabs } from "../icons/eleven-labs.tsx";
+import { Gemini } from "../icons/gemini.tsx";
+import { GoogleCloud } from "../icons/google-cloud.tsx";
+import { Groq } from "../icons/groq.tsx";
+import { OpenAI } from "../icons/open-ai.tsx";
+import { Voyage } from "../icons/voyage.tsx";
+import { Xai } from "../icons/xai.tsx";
 import { IconGlyph } from "@langwatch/design-system/icons";
 
 export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {

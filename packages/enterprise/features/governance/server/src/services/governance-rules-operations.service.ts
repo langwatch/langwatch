@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleService } from "./anomaly-rule.service";
-import type { PostgresGovernancePolicyService } from "./governance-policy.service";
-import type { DepartmentService } from "./department.service";
-import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service";
+import type { AnomalyRuleService } from "./anomaly-rule.service.ts";
+import type { PostgresGovernancePolicyService } from "./governance-policy.service.ts";
+import type { DepartmentService } from "./department.service.ts";
+import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service.ts";
 
 /** Private cohesive collaborator for the rules operation set. */
 export class GovernanceRulesOperationsService {

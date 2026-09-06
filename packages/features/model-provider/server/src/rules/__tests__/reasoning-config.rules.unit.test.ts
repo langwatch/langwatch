@@ -8,7 +8,7 @@ import {
   supportsReasoning,
   getAllowedReasoningValues,
   getDefaultReasoningEffort,
-} from "../reasoning-config.rules";
+} from "../reasoning-config.rules.ts";
 
 describe("Reasoning Config", () => {
   describe("OpenAI Models", () => {

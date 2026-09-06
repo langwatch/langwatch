@@ -16,8 +16,8 @@ import {
   errorCodeOf,
   mountRestFamily,
   TEST_ORGANIZATION_ID,
-} from "../../../app-rest/__tests__/support/rest-family.harness";
-import { organizationWorld } from "../../../app-rest/__tests__/support/organization-family.world";
+} from "../../../app-rest/__tests__/support/rest-family.harness.ts";
+import { organizationWorld } from "../../../app-rest/__tests__/support/organization-family.world.ts";
 
 /** A plan lookup a test can flip between FREE and ENTERPRISE mid-suite. */
 function mutablePlans(initial: string) {

@@ -5,7 +5,7 @@
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port";
+} from "../../ports/coding-agent-clickhouse.port.ts";
 
 export const asNumber = (value: unknown): number => {
   const parsed = Number(value);

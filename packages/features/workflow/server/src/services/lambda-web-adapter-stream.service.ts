@@ -8,7 +8,7 @@ import {
   LWA_PRELUDE_SEPARATOR_LENGTH,
   findLwaPreludeSeparator,
   readLwaPreludeStatus,
-} from "../rules/lambda-web-adapter-stream.rules";
+} from "../rules/lambda-web-adapter-stream.rules.ts";
 
 /** Allocates a new array holding `first` followed by `second`. */
 function concatBytes(

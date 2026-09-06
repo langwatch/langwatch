@@ -1,19 +1,19 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
-import { CodingAgentProjectionPersistenceAdapter } from "./coding-agent.adapter";
-import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter";
+import { CodingAgentProjectionPersistenceAdapter } from "./coding-agent.adapter.ts";
+import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter.ts";
 import {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
-} from "./eventing.coding-agent-processing.adapter";
-import { ModelCatalogCostEstimatorAdapter } from "./model-catalog.cost-estimator.adapter";
-import { OtelCodingAgentCostMetricsAdapter } from "./otel.coding-agent-cost-metrics.adapter";
+} from "./eventing.coding-agent-processing.adapter.ts";
+import { ModelCatalogCostEstimatorAdapter } from "./model-catalog.cost-estimator.adapter.ts";
+import { OtelCodingAgentCostMetricsAdapter } from "./otel.coding-agent-cost-metrics.adapter.ts";
 import {
   CodingAgentClickHousePort,
   type CodingAgentClickHouseClient,
-} from "../ports/coding-agent-clickhouse.port";
-import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port";
-import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port";
+} from "../ports/coding-agent-clickhouse.port.ts";
+import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
+import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port.ts";
 
 /** Binds the feature's ClickHouse port to a process's tenant-keyed resolver. */
 class ResolvedCodingAgentClickHousePort extends CodingAgentClickHousePort {

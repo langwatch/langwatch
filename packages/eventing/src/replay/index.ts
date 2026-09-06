@@ -3,16 +3,16 @@ export {
   CUTOFF_KEY_PREFIX,
   isAtOrBeforeCutoff,
   isAtOrBeforeCutoffMarker,
-} from "./replayConstants";
+} from "./replayConstants.ts";
 export type {
   CutoffInfo,
   DiscoveredAggregate,
   OccurredAtBounds,
   ReplayEvent,
   ReplayEventSource,
-} from "./replayEventSource";
-export type { ReplayLogWriter } from "./replayLog";
-export { ReplayService } from "./replayService";
+} from "./replayEventSource.ts";
+export type { ReplayLogWriter } from "./replayLog.ts";
+export { ReplayService } from "./replayService.ts";
 export type {
   BatchCompleteInfo,
   BatchPhase,
@@ -25,4 +25,4 @@ export type {
   ReplayConfig,
   ReplayProgress,
   ReplayResult,
-} from "./types";
+} from "./types.ts";

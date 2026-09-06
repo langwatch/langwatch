@@ -16,8 +16,8 @@ import { createHmac } from "node:crypto";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GithubInstallStateAdapter } from "../../../adapters/github-install-state.adapter";
-import { createGithubRestApp, type GithubRestPorts } from "../github.api";
+import { GithubInstallStateAdapter } from "../../../adapters/github-install-state.adapter.ts";
+import { createGithubRestApp, type GithubRestPorts } from "../github.api.ts";
 
 const SIGNING_KEY = "x".repeat(64);
 const WEBHOOK_SECRET = "whsecret";

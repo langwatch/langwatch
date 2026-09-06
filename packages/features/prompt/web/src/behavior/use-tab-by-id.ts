@@ -1,5 +1,5 @@
-import type { Tab } from "../model/prompt-tabs-store";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+import type { Tab } from "../model/prompt-tabs-store.ts";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**
  * useTabById

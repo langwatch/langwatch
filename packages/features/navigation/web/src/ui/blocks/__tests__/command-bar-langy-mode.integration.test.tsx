@@ -2,7 +2,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CommandBarLangyMode } from "../command-bar-langy-mode";
+import { CommandBarLangyMode } from "../command-bar-langy-mode.tsx";
 
 /**
  * The mark the HOST hands over, standing in for the assistant's own.

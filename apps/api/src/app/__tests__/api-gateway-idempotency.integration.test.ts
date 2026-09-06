@@ -27,8 +27,8 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeApiGateway } from "../api-gateway.composition";
-import { composeApiIdempotency } from "../api-idempotency.composition";
+import { composeApiGateway } from "../api-gateway.composition.ts";
+import { composeApiIdempotency } from "../api-idempotency.composition.ts";
 
 const PROJECT_ID = "project-1";
 const KEY = "order-4711";

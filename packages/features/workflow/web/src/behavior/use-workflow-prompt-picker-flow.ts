@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
 
-import { useWorkflowStore } from "./use-workflow-store";
+import { useWorkflowStore } from "./use-workflow-store.ts";
 
 export type PromptSelection = {
   id: string;

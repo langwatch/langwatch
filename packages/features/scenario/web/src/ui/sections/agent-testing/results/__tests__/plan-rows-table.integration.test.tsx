@@ -15,15 +15,15 @@ import {
   PLAN_ARCHIVE_TITLE,
   type PlanRowModel,
   PlanRowsTable,
-} from "../plan-rows-table";
+} from "../plan-rows-table.tsx";
 import {
   buildRunPlans,
   CLI_EPHEMERAL_LABEL,
   type RunPlan,
   type RunPlanSuite,
-} from "../../../../../behavior/agent-testing/results/run-plans";
-import { PASS_RATE_BAR_OPACITY } from "../../../../elements/agent-testing/shared/pass-rate-color";
-import type { TargetKind } from "../../../../../model/target-kind";
+} from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { PASS_RATE_BAR_OPACITY } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
+import type { TargetKind } from "../../../../../model/target-kind.ts";
 
 vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),

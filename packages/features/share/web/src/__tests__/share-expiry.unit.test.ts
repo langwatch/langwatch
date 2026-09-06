@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expiryToDate, isShareExpiryOption, SHARE_EXPIRY_OPTIONS } from "../share-expiry";
+import { expiryToDate, isShareExpiryOption, SHARE_EXPIRY_OPTIONS } from "../share-expiry.ts";
 
 const NOW = new Date("2026-08-27T12:00:00.000Z");
 

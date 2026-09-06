@@ -10,7 +10,7 @@ import {
   PASSWORD_METHOD,
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
-} from "../signin-method-policy.service";
+} from "../signin-method-policy.service.ts";
 
 const federationLicensed = vi.fn<() => Promise<boolean>>();
 const resolveAuthProvider = vi.fn<() => Promise<string>>();

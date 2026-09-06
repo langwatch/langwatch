@@ -6,7 +6,7 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service";
+import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service.ts";
 import type { Span, Trace } from "@langwatch/trace-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 
@@ -32,9 +32,9 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { TraceService } from "../trace-legacy-read.service";
-import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository";
-import type { TraceEditOverlayService } from "../trace-edit-overlay.service";
+import { TraceService } from "../trace-legacy-read.service.ts";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const PROJECT_ID = "project_test";

@@ -1,5 +1,5 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { SkeletonHeader } from "../../elements/sequence/skeleton-header";
+import { SkeletonHeader } from "../../elements/sequence/skeleton-header.tsx";
 
 /**
  * Minimal placeholder for the topology view: a few rounded "node" cards scattered

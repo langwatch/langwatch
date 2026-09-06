@@ -1,8 +1,8 @@
 import type React from "react";
 import { useCallback, useState } from "react";
-import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer";
-import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer";
-import type { TraceListItem } from "../types/trace";
+import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
+import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer.ts";
+import type { TraceListItem } from "../types/trace.ts";
 
 interface TraceLensKeyboard {
   selectedTraceId: string | null;

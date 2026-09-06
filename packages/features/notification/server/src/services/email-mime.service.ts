@@ -1,4 +1,4 @@
-import type { EmailAttachment } from "../ports/email-delivery.port";
+import type { EmailAttachment } from "../ports/email-delivery.port.ts";
 
 /** Maximum bytes one RFC 2047 encoded-word can carry.
  *

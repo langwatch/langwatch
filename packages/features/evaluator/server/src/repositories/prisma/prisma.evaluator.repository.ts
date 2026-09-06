@@ -12,7 +12,7 @@ import {
   EvaluatorRepository,
   type EvaluatorDatabase,
   type PersistEvaluatorInput,
-} from "../evaluator.repository";
+} from "../evaluator.repository.ts";
 
 const generateEvaluatorSlug = (name: string): string => {
   const slug = name

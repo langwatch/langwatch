@@ -19,7 +19,7 @@ import {
   type TopicFailureNotice,
   type TopicHostProject,
   type TopicSuccessNotice,
-} from "./model/topic-host";
+} from "./model/topic-host.ts";
 
 export class FakeTopicHost extends TopicHostPort {
   readonly successes: TopicSuccessNotice[] = [];

@@ -3,7 +3,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useExperimentCatalogueWatermark } from "../experiment-catalogue-watermark";
+import { useExperimentCatalogueWatermark } from "../experiment-catalogue-watermark.ts";
 
 const STORAGE_KEY = "langwatch:experiments-seen-version";
 

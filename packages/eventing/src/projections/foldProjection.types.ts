@@ -1,6 +1,6 @@
-import type { Event } from "../domain/types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
+import type { Event } from "../domain/types.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * A stateful projection that folds events into accumulated state.

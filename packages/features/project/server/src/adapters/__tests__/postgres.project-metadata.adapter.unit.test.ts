@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { PostgresProjectMetadataAdapter } from "../postgres.project-metadata.adapter";
-import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository";
-import { ProjectService } from "../../services/project.service";
+import { PostgresProjectMetadataAdapter } from "../postgres.project-metadata.adapter.ts";
+import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository.ts";
+import { ProjectService } from "../../services/project.service.ts";
 
 /**
  * Spec: packages/features/project/specs/project-metadata-seam.feature

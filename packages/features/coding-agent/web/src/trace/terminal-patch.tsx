@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
-import type { PatchHunk } from "./terminal-tool-spans";
+import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
+import type { PatchHunk } from "./terminal-tool-spans.ts";
 
 const CELL = {
   fontFamily: TERMINAL_FONT_STACK,

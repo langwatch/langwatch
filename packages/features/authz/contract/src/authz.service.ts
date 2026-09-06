@@ -1,8 +1,8 @@
-import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz";
-import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage";
-import type { PermissionScopeArg, TierOfScopeArg } from "./declaration";
-import type { AuthzPermission } from "./registry";
-import type { BindingScopeTier } from "./vocabulary";
+import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz.ts";
+import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage.ts";
+import type { PermissionScopeArg, TierOfScopeArg } from "./declaration.ts";
+import type { AuthzPermission } from "./registry.ts";
+import type { BindingScopeTier } from "./vocabulary.ts";
 import type {
   AuthzAccessBreakdownInput,
   AuthzAccessBreakdownOutput,
@@ -11,7 +11,7 @@ import type {
   AuthzListManagedBindingsForOrganizationOutput,
   AuthzListManagedBindingsForUserInput,
   AuthzListManagedBindingsForUserOutput,
-} from "./authz.binding-management";
+} from "./authz.binding-management.ts";
 import type {
   ApiKeyPermissionCheck,
   ApiKeyProjectDecision,
@@ -47,7 +47,7 @@ import type {
   AuthzResolveScopeInput,
   AuthzTeamMemberBinding,
   PermissionDecision,
-} from "./authz.queries";
+} from "./authz.queries.ts";
 
 /**
  * The complete portable read and decision capability. Concrete server
@@ -77,7 +77,7 @@ export abstract class AuthzService {
     } as Authorized<Tier, Permission>;
   }
 
-  abstract check(args: AuthzCheckInput): Promise<import("./authz").AuthzDecision>;
+  abstract check(args: AuthzCheckInput): Promise<import("./authz.ts").AuthzDecision>;
 
   abstract checkDetailed(args: AuthzCheckInput): Promise<AuthzCheckDetailedOutput>;
 

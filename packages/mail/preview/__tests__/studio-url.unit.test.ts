@@ -5,7 +5,7 @@ import {
   DEFAULT_URL_STATE,
   encodePropsFragment,
   parseUrlState,
-} from "../studio-url";
+} from "../studio-url.ts";
 
 describe("studio-url", () => {
   describe("given the address bar's query state", () => {

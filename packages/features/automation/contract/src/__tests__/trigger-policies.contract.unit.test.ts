@@ -3,7 +3,7 @@ import {
   computeScheduledFor,
   hasActionableTriggerFilters,
   isMatchEverythingTrigger,
-} from "../trigger-policies";
+} from "../trigger-policies.ts";
 
 const trigger = (overrides: Record<string, unknown> = {}) => ({
   triggerKind: "AUTOMATION" as const,

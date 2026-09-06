@@ -23,7 +23,7 @@ import type {
   DashboardIdGenerator,
   DashboardRepository,
   SavedWorkbenchChartPolicy,
-} from "../ports/dashboard.port";
+} from "../ports/dashboard.port.ts";
 
 /**
  * The saved workbench chart half of the dashboard capability.

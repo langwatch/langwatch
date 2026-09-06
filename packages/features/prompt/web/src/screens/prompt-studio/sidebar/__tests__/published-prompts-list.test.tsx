@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDisplayHandle } from "../../../../surfaces/prompt-reference";
+import { getDisplayHandle } from "../../../../surfaces/prompt-reference/index.ts";
 
 describe("getDisplayHandle", () => {
   describe("when handle is missing or nullish", () => {

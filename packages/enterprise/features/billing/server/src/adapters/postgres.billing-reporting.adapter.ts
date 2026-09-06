@@ -3,13 +3,13 @@
 import {
   type BillingCheckpointDatabase,
   PrismaBillingCheckpointRepository,
-} from "../repositories/prisma/prisma.billing-checkpoint.repository";
+} from "../repositories/prisma/prisma.billing-checkpoint.repository.ts";
 import {
   type BillingReportOrganizationDatabase,
   PrismaBillingReportOrganizationRepository,
-} from "../repositories/prisma/prisma.billing-report-organization.repository";
-import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port";
-import type { BillingReportOrganizationPort } from "../ports/billing-report-organization.port";
+} from "../repositories/prisma/prisma.billing-report-organization.repository.ts";
+import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port.ts";
+import type { BillingReportOrganizationPort } from "../ports/billing-report-organization.port.ts";
 
 /** The two models the monthly roll-up reads or writes, and no other. */
 export type BillingReportingDatabase = BillingCheckpointDatabase &

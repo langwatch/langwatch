@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
-import { LiteMemberRestrictedError } from "../authz.errors";
+import { LiteMemberRestrictedError } from "../authz.errors.ts";
 
 describe("LiteMemberRestrictedError", () => {
   describe("when constructed with a resource", () => {

@@ -18,7 +18,7 @@ import {
   PRINCIPAL_TO_DB,
   RESOURCE_KIND_TO_DB,
   type RoleRowShape,
-} from "../repositories/prisma/prisma.authz-grant.mapper";
+} from "../repositories/prisma/prisma.authz-grant.mapper.ts";
 import type {
   AuthzGrantsEvent,
   GrantAttachedEvent,
@@ -27,7 +27,7 @@ import type {
   RoleDefinedEvent,
   RoleDeletedEvent,
   RolePermissionsChangedEvent,
-} from "../adapters/eventing.authz.adapter";
+} from "../adapters/eventing.authz.adapter.ts";
 
 export type GrantProjectionWrite =
   | { kind: "grant.upsert"; row: GrantRowShape }

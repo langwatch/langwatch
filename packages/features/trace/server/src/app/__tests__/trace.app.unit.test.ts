@@ -33,7 +33,7 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
+import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -44,7 +44,7 @@ import {
   type TracesV2ListReader,
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
-} from "../trace.app";
+} from "../trace.app.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
 

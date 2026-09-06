@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   API_TRACE_FILTER_INPUT as tracesFilterInput,
   API_TRACE_LIST_INPUT as getAllForProjectInput,
-} from "../api-trace-read-stack.composition";
+} from "../api-trace-read-stack.composition.ts";
 
 const base = {
   projectId: "project_123",

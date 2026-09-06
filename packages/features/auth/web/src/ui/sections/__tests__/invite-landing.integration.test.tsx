@@ -47,7 +47,7 @@ const {
   hardRedirectMock: vi.fn(),
 }));
 
-vi.mock("../../../behavior/auth-api", () => ({
+vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
     frontDoor: {
       inviteLanding: { useQuery: () => landingRef.current },
@@ -76,8 +76,8 @@ vi.mock("../../../behavior/auth-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     signIn: signInMock,
@@ -86,9 +86,9 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../behavior/hard-redirect", () => ({ hardRedirect: hardRedirectMock }));
+vi.mock("../../../behavior/hard-redirect.ts", () => ({ hardRedirect: hardRedirectMock }));
 
-vi.mock("../../elements/router-link", () => ({
+vi.mock("../../elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -96,7 +96,7 @@ vi.mock("../../elements/router-link", () => ({
   ),
 }));
 
-import { InviteLanding } from "../invite-landing";
+import { InviteLanding } from "../invite-landing.tsx";
 
 const INVITE_CODE = "invite-123";
 const CARRIED = encodeURIComponent(`/invite/accept?inviteCode=${INVITE_CODE}`);

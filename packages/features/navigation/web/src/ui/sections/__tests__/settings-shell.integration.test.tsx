@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let opsBadgeCounts: { data?: { blockedCount: number; dlqCount: number; computedAt: Date | null } } =
   {};
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     ops: { getBadgeCounts: { useQuery: () => opsBadgeCounts } },
     limits: { getUsage: { useQuery: () => ({}) } },
@@ -25,13 +25,13 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { captureSettingsReturnPath } from "../../../model/resolve-settings-back-target";
-import { WithStubNavigationHost, StubNavigationHost } from "../../../testing";
-import { NavigationHostProvider } from "../../../model/navigation-host";
-import { ShellTopBar } from "../shell-top-bar";
-import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state";
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
-import { SidebarContent } from "../product-sidebar";
+import { captureSettingsReturnPath } from "../../../model/resolve-settings-back-target.ts";
+import { WithStubNavigationHost, StubNavigationHost } from "../../../testing.tsx";
+import { NavigationHostProvider } from "../../../model/navigation-host.ts";
+import { ShellTopBar } from "../shell-top-bar.tsx";
+import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state.ts";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { SidebarContent } from "../product-sidebar.tsx";
 
 const ORGANIZATION = { id: "org_1", name: "ACME", teams: [] };
 const commandBarOpenMock = vi.fn();

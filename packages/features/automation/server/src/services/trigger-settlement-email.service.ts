@@ -7,10 +7,10 @@ import {
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
-import type { AutomationEmailCapService } from "./email-cap.service";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
 
 export type SettlementNotificationCandidate = {
   traceId: string;

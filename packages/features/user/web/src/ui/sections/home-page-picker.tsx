@@ -1,8 +1,8 @@
 import { Box, HStack, RadioGroup, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { useShowErrorToast } from "../../behavior/personal-workspace-feedback";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
 
 interface Props {
   organizationId: string;

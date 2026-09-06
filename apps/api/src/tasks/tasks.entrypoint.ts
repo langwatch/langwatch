@@ -1,9 +1,9 @@
 import process from "node:process";
 import { createLogger } from "@langwatch/observability";
 import { runTask, TaskCatalogue } from "@langwatch/task";
-import { OpenapiCheckTask } from "./openapi-document/openapi-check.task";
-import { OpenapiGenerateTask } from "./openapi-document/openapi-generate.task";
-import { OpenapiRouteCoverageTask } from "./openapi-route-coverage/openapi-route-coverage.task";
+import { OpenapiCheckTask } from "./openapi-document/openapi-check.task.ts";
+import { OpenapiGenerateTask } from "./openapi-document/openapi-generate.task.ts";
+import { OpenapiRouteCoverageTask } from "./openapi-route-coverage/openapi-route-coverage.task.ts";
 
 /**
  * The API process's own tiny task launcher — `pnpm --filter

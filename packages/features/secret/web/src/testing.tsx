@@ -18,7 +18,7 @@ import {
   type SecretFailureNotice,
   type SecretHostScope,
   type SecretSuccessNotice,
-} from "./model/secret-host";
+} from "./model/secret-host.ts";
 
 export class FakeSecretHost extends SecretHostPort {
   readonly successes: SecretSuccessNotice[] = [];

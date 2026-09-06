@@ -36,7 +36,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { ModelSelector } from "../model-selector";
+import { ModelSelector } from "../model-selector.tsx";
 
 afterEach(() => cleanup());
 

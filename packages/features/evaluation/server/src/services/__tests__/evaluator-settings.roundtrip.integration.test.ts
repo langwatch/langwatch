@@ -30,7 +30,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { EvaluatorSettingsService } from "../evaluator-settings.service";
+import { EvaluatorSettingsService } from "../evaluator-settings.service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the rows

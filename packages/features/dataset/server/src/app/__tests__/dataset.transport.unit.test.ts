@@ -11,8 +11,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { UploadValidationError } from "@langwatch/dataset-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetApp } from "../dataset.app";
-import { createDatasetRestApp } from "../../transport/api-rest/dataset.api";
+import type { DatasetApp } from "../dataset.app.ts";
+import { createDatasetRestApp } from "../../transport/api-rest/dataset.api.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

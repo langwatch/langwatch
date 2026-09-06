@@ -11,8 +11,8 @@ import type {
   NormalizedEvent,
   NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service";
-import { SpanRecordIdentityService } from "./span-record-identity.service";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
+import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
 
 const spanRecordIdentityService = SpanRecordIdentityService.create();
 

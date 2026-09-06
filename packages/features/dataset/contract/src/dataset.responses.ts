@@ -8,7 +8,7 @@
  * own value.
  */
 import { z } from "zod";
-import { datasetRecordSchema, datasetSchema } from "./dataset";
+import { datasetRecordSchema, datasetSchema } from "./dataset.ts";
 
 /**
  * `datasetRecord.getAll` / `datasetRecord.download`: the stored dataset's own

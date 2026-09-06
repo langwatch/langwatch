@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TriggerSettlement } from "../trigger-settlement.process";
+import { TriggerSettlement } from "../trigger-settlement.process.ts";
 
 describe("settle window bucket", () => {
   describe("given activity uses one debounce configuration", () => {

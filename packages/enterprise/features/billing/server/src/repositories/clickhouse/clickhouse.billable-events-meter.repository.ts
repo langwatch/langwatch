@@ -12,11 +12,11 @@
  * self-hosted case this write is simply skipped on.
  */
 import { createLogger } from "@langwatch/observability";
-import type { BillableEventsMeterClickHouseClientResolver } from "../../adapters/clickhouse.billable-events-meter.adapter";
+import type { BillableEventsMeterClickHouseClientResolver } from "../../adapters/clickhouse.billable-events-meter.adapter.ts";
 import {
   BillableEventsMeterPort,
   type BillableEventRecord,
-} from "../../ports/billable-events-meter.port";
+} from "../../ports/billable-events-meter.port.ts";
 
 const logger = createLogger("langwatch:billing:billable-events-repository");
 

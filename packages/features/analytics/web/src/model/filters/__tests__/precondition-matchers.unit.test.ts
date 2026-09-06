@@ -8,7 +8,7 @@ import {
   getAvailablePreconditionFields,
   getFieldLabel,
   PRECONDITION_ALLOWED_RULES,
-} from "../precondition-matchers";
+} from "../precondition-matchers.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

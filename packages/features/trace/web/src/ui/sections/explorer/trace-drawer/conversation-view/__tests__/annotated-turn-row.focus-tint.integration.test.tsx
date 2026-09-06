@@ -8,20 +8,20 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../chat-turn-row", () => ({
+vi.mock("../chat-turn-row.tsx", () => ({
   ChatTurnRow: ({ turn }: { turn: { traceId: string } }) => (
     <div data-testid="chat-turn-row">{turn.traceId}</div>
   ),
 }));
 
-vi.mock("../turn-annotation-rail", () => ({
+vi.mock("../turn-annotation-rail.tsx", () => ({
   TurnAnnotationRail: () => <div data-testid="turn-annotation-rail" />,
 }));
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
-import { AnnotatedTurnRow } from "../annotated-turn-row";
-import type { ParsedTurn, TurnLayout } from "../types";
-import { RAIL_WIDTH_SLIM_PX, RAIL_WIDTH_WIDE_PX, type RailLayout } from "../use-rail-layout";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
+import type { ParsedTurn, TurnLayout } from "../types.ts";
+import { RAIL_WIDTH_SLIM_PX, RAIL_WIDTH_WIDE_PX, type RailLayout } from "../use-rail-layout.ts";
 
 const TRACE_ID = "trace-1";
 const SIDE_LAYOUT: RailLayout = {

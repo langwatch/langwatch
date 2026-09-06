@@ -6,8 +6,8 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, FileText, Folder } from "lucide-react";
-import type { TargetValue } from "../../../../model/scenario-target";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 
 /** One prompt as the picker lists it. */
 export type PromptEntry = {

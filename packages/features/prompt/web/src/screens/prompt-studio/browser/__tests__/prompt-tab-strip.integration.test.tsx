@@ -2,20 +2,20 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals";
+import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals.ts";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PromptTabStrip } from "../prompt-tab-strip";
-import { usePromptBrowserTabController } from "../tab/use-prompt-browser-tab-controller";
-import { DraggableTabsBrowser } from "../draggable-tabs-browser";
+import { PromptTabStrip } from "../prompt-tab-strip.tsx";
+import { usePromptBrowserTabController } from "../tab/use-prompt-browser-tab-controller.ts";
+import { DraggableTabsBrowser } from "../draggable-tabs-browser.tsx";
 
-vi.mock("../../studio-internals", async () => {
+vi.mock("../../studio-internals.ts", async () => {
   const actual =
-    await vi.importActual<typeof import("../../studio-internals")>("../../studio-internals");
+    await vi.importActual<typeof import("../../studio-internals.ts")>("../../studio-internals");
   return { ...actual, useIsOverflowing: vi.fn() };
 });
 
-vi.mock("../prompt-tab-switcher-panel", () => ({
+vi.mock("../prompt-tab-switcher-panel.tsx", () => ({
   PromptTabSwitcher: ({ isStripOverflowing }: { isStripOverflowing: boolean }) => (
     <div data-testid="switcher" data-overflowing={String(isStripOverflowing)} />
   ),
@@ -23,7 +23,7 @@ vi.mock("../prompt-tab-switcher-panel", () => ({
 
 // The real controller reads the tab store and the prompt queries. The strip
 // cares about neither; it cares that each tab gets its own title and flags.
-vi.mock("../tab/use-prompt-browser-tab-controller", () => ({
+vi.mock("../tab/use-prompt-browser-tab-controller.ts", () => ({
   usePromptBrowserTabController: vi.fn(),
 }));
 

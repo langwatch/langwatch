@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { BudgetExceededBanner } from "../budget-exceeded-banner";
+import { BudgetExceededBanner } from "../budget-exceeded-banner.tsx";
 
 function renderBanner(overrides: Partial<React.ComponentProps<typeof BudgetExceededBanner>> = {}) {
   return render(

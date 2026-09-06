@@ -1,6 +1,6 @@
 import { TEMPLATE_VARIABLES } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { detectUnknownVariables, positionInsideLiquid } from "../behavior/liquid-monaco";
+import { detectUnknownVariables, positionInsideLiquid } from "../behavior/liquid-monaco.ts";
 
 const VARS = TEMPLATE_VARIABLES;
 

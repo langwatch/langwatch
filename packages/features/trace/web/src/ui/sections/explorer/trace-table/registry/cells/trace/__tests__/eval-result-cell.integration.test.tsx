@@ -6,9 +6,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EvalColumnField } from "../../../../../../../../model/lens-eval-column-id";
-import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
-import { makeEvalCellDef } from "../eval-result-cell";
+import type { EvalColumnField } from "../../../../../../../../model/lens-eval-column-id.ts";
+import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace.ts";
+import { makeEvalCellDef } from "../eval-result-cell.tsx";
 
 function evalResult(over: Partial<TraceEvalResult>): TraceEvalResult {
   return {

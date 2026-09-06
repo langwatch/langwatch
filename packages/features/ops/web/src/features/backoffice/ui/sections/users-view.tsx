@@ -15,20 +15,20 @@ import {
 import { MoreVertical, Pencil, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { Dialog } from "../../../../ui/elements/ops-dialog";
+import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
 
-import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
-import { impersonateUser } from "../../behavior/admin-client";
-import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/backoffice-cells";
-import { BackofficeTable } from "./backoffice-table-shell";
+import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link.tsx";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { impersonateUser } from "../../behavior/admin-client.ts";
+import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { EmptyCell, formatDate, formatDateTime } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
-import { useOpsHost } from "../../../../model/ops-host";
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsHost } from "../../../../model/ops-host.ts";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 interface OrgRef {
   id: string;
   name: string;

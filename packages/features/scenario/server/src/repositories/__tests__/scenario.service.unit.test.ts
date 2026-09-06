@@ -1,12 +1,12 @@
 import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import { ScenarioRepository } from "../scenario.repository";
-import { ScenarioService } from "../../services/scenario.service";
-import { ScenarioClockPort } from "../../ports/scenario-clock.port";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
-import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port";
-import { MemoryScenarioRepository } from "./fixtures/memory-scenario.repository";
+import { ScenarioRepository } from "../scenario.repository.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
+import { ScenarioClockPort } from "../../ports/scenario-clock.port.ts";
+import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port.ts";
+import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port.ts";
+import { MemoryScenarioRepository } from "./fixtures/memory-scenario.repository.ts";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 

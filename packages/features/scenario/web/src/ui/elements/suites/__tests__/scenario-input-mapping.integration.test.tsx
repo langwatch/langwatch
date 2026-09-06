@@ -13,7 +13,7 @@ import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   ScenarioInputMappingSection,
   type ScenarioInputMappingSectionProps,
-} from "../scenario-input-mapping-section";
+} from "../scenario-input-mapping-section.tsx";
 
 // -- Mock transitive deps that pull in complex modules --
 

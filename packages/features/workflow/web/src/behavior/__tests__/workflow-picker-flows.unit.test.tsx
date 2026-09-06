@@ -12,17 +12,17 @@ import {
   type AgentPickerCallbacks,
   type AgentPickerPort,
   useWorkflowAgentPickerFlow,
-} from "../use-workflow-agent-picker-flow";
+} from "../use-workflow-agent-picker-flow.ts";
 import {
   type EvaluatorPickerCallbacks,
   type EvaluatorPickerPort,
   useWorkflowEvaluatorPickerFlow,
-} from "../use-workflow-evaluator-picker-flow";
+} from "../use-workflow-evaluator-picker-flow.ts";
 import {
   type PromptPickerCallbacks,
   type PromptPickerPort,
   useWorkflowPromptPickerFlow,
-} from "../use-workflow-prompt-picker-flow";
+} from "../use-workflow-prompt-picker-flow.ts";
 
 const { storeActions } = vi.hoisted(() => ({
   storeActions: {
@@ -32,7 +32,7 @@ const { storeActions } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../use-workflow-store", () => ({
+vi.mock("../use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: typeof storeActions) => unknown) => selector(storeActions),
 }));
 

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../../../behavior/trace-api";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
  * The selected span exactly as captured, before any correction. Read it when

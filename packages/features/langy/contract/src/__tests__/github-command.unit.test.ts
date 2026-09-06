@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsGithubAuth } from "../github-command";
+import { needsGithubAuth } from "../github-command.ts";
 
 describe("needsGithubAuth", () => {
   it("recognises every GitHub CLI invocation", () => {

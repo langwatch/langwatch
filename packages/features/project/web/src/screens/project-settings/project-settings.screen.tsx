@@ -28,15 +28,15 @@ import {
   DepartmentPicker,
   useDepartmentColumn,
 } from "@langwatch/organization-web/surfaces/department-picker";
-import { api } from "../../behavior/project-api";
+import { api } from "../../behavior/project-api.ts";
 import {
   useProjectHost,
   type ProjectHostOrganization,
   type ProjectHostProject,
-} from "../../model/project-host";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
-import type { OrganizationIntent } from "../../model/prisma-types";
-import { ProjectTechStackIcon, TechStackSelector } from "../../ui/blocks/tech-stack";
+} from "../../model/project-host.ts";
+import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
+import type { OrganizationIntent } from "../../model/prisma-types.ts";
+import { ProjectTechStackIcon, TechStackSelector } from "../../ui/blocks/tech-stack.tsx";
 
 type OrganizationFormData = {
   name: string;

@@ -8,7 +8,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { SetupSkillsService } from "../../services/setup-skills.service";
+import { SetupSkillsService } from "../../services/setup-skills.service.ts";
 
 /**
  * The surface reads nothing off the request beyond the project the permission

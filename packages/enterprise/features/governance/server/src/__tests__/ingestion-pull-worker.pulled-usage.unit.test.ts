@@ -9,7 +9,7 @@
  */
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createWorkerService } from "./support/puller-test-ports";
+import { createWorkerService } from "./support/puller-test-ports.ts";
 
 const { findUnique, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
   findUnique: vi.fn(),

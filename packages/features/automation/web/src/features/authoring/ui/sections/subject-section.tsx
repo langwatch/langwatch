@@ -19,16 +19,16 @@ import {
 } from "@langwatch/automation-contract";
 import { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/automation-session";
-import { api } from "../../../../behavior/automation-api";
-import { useDescribeError } from "../../../../behavior/automation-feedback";
-import { formatTimeAgoCompact } from "../../../../model/relative-time";
-import { queryIsStructurable } from "../../model/condition-query";
-import { type DailyCapAdvice, dailyCapAdvice } from "../../model/daily-cap-advice";
-import { estimateFiringRate, estimateRatePerDay } from "../../model/firing-rate";
-import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series";
-import { FacetSection, type FacetAccordionProps } from "../elements/facet-section";
-import { FilterDisplay } from "../../../../ui/elements/filter-display";
+import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { api } from "../../../../behavior/automation-api.ts";
+import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import { formatTimeAgoCompact } from "../../../../model/relative-time.ts";
+import { queryIsStructurable } from "../../model/condition-query.ts";
+import { type DailyCapAdvice, dailyCapAdvice } from "../../model/daily-cap-advice.ts";
+import { estimateFiringRate, estimateRatePerDay } from "../../model/firing-rate.ts";
+import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series.ts";
+import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -36,11 +36,11 @@ import {
   isNotifyAction,
   type ReportSourceKind,
   subjectIsSet,
-} from "./draft-model";
-import { useAutomationStore } from "./automation-store";
-import { useDraft } from "./automation-selectors";
-import { ConditionBuilder } from "../blocks/condition-builder";
-import { QueryFilterInput } from "../elements/query-filter-input";
+} from "./draft-model.ts";
+import { useAutomationStore } from "./automation-store.ts";
+import { useDraft } from "./automation-selectors.ts";
+import { ConditionBuilder } from "../blocks/condition-builder.tsx";
+import { QueryFilterInput } from "../elements/query-filter-input.tsx";
 
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {

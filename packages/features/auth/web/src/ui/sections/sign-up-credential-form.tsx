@@ -5,23 +5,23 @@ import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form";
-import { FormServerError } from "../elements/form-server-error";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
-import { readHandledError } from "../../model/read-handled-error";
-import { usePublicEnv } from "../../behavior/use-public-env";
-import { authFailureMessage } from "../../model/auth-failure-message";
-import { authApi as api } from "../../behavior/auth-api";
-import { signIn } from "../../behavior/auth-client";
-import { credentialSignInFailure } from "../../model/credential-sign-in";
-import { rememberLastUsedMethod } from "../../model/last-used-method";
+import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
+import { FormServerError } from "../elements/form-server-error.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { authFailureMessage } from "../../model/auth-failure-message.ts";
+import { authApi as api } from "../../behavior/auth-api.ts";
+import { signIn } from "../../behavior/auth-client.tsx";
+import { credentialSignInFailure } from "../../model/credential-sign-in.ts";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import "../elements/auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme";
-import { EmailPill } from "../elements/email-pill";
-import { FrontDoorField } from "../elements/front-door-field";
-import { PasskeySignUpButton } from "./passkey-sign-up-button";
-import { PasswordInput } from "../elements/password-input";
-import { MethodDivider } from "./sign-in-method-picker";
+import { SHAPE } from "../../model/front-door-theme.ts";
+import { EmailPill } from "../elements/email-pill.tsx";
+import { FrontDoorField } from "../elements/front-door-field.tsx";
+import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
+import { PasswordInput } from "../elements/password-input.tsx";
+import { MethodDivider } from "./sign-in-method-picker.tsx";
 
 // No name. Onboarding asks for it, in a place where it is worth asking —
 // putting it here charges a field at the one moment somebody has least

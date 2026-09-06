@@ -5,7 +5,7 @@ import type {
   Span,
   SpanInputOutput,
   TypedValueJson,
-} from "./trace-format.schemas";
+} from "./trace-format.schemas.ts";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostSpans = flattenSpanTree(organizeSpansIntoTree(spans), "outside-in");

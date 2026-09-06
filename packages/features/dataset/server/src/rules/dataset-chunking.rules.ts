@@ -1,7 +1,7 @@
 /**
  * ADR-032: pure (no-I/O) helpers for the chunked-JSONL dataset layout.
  */
-import { stripNullBytes } from "./dataset-sanitize.rules";
+import { stripNullBytes } from "./dataset-sanitize.rules.ts";
 
 export { assertKeyWithinProject, assertNoTraversal, chunkKey } from "@langwatch/dataset-contract";
 

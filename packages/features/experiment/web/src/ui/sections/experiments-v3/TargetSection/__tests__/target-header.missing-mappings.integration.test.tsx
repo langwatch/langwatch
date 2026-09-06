@@ -29,7 +29,7 @@ vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
+vi.mock("../../../../../behavior/experiments-v3/use-target-name.ts", () => {
   const useTargetName = (target: { id: string }) => target.id;
   return {
     useTargetName,
@@ -37,17 +37,17 @@ vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
       targets.map((target) => (target ? useTargetName(target) : "")),
   };
 });
-vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields";
-import type { DatasetReference, TargetConfig } from "../../../../../model/experiments-v3/types";
-import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types";
-import { TargetHeader } from "../target-header";
+import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import type { DatasetReference, TargetConfig } from "../../../../../model/experiments-v3/types.ts";
+import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types.ts";
+import { TargetHeader } from "../target-header.tsx";
 
 const TARGET_ID = "category_classifier";
 

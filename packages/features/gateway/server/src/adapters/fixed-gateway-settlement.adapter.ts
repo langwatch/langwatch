@@ -1,4 +1,4 @@
-import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port";
+import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port.ts";
 
 export class FixedGatewaySettlementPolicyAdapter extends GatewaySettlementPolicyPort {
   private constructor(private readonly value: number) {

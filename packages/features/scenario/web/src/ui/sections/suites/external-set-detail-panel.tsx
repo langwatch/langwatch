@@ -6,18 +6,18 @@ import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react"
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { ShadowDivider } from "../../elements/shadow-divider";
-import { HandledErrorAlert } from "../../../behavior/errors";
+import { ShadowDivider } from "../../elements/shadow-divider.tsx";
+import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import {
   LangyContextTarget,
   scenarioContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 import {
   GroupRow,
   RunHistorySkeleton,
@@ -39,8 +39,8 @@ import {
   useRunHistoryStore,
   useScrollToBatch,
 } from "@langwatch/suite-web/surfaces/run-history-store";
-import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness";
-import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state";
+import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
+import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
 
 const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>

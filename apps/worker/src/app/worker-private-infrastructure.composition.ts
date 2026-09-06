@@ -1,12 +1,12 @@
 import { OutboundProxyResolverPort } from "@langwatch/aws-client";
-import type { WorkerInfrastructureCompositionOptions } from "./worker-production.composition";
-import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config";
+import type { WorkerInfrastructureCompositionOptions } from "./worker-production.composition.ts";
+import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config.ts";
 import {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
   WorkerStoredObjectStorageRuntimeFactory,
   type WorkerProjectS3Target,
-} from "../platform/infrastructure/worker-stored-object-storage.adapter";
+} from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
 export type WorkerPrivateInfrastructurePorts = Readonly<{
   projects: WorkerProjectS3SourcePort;

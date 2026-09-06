@@ -4,7 +4,7 @@ import type {
   SaasBrowserUser,
 } from "@langwatch/enterprise-saas-contract";
 import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
-import type { SaasBrowserAnalytics } from "./saas-browser-analytics";
+import type { SaasBrowserAnalytics } from "./saas-browser-analytics.ts";
 
 export type ScriptComponent = ComponentType<{
   id: string;

@@ -28,11 +28,11 @@ import { LuExternalLink, LuMoveRight } from "react-icons/lu";
 
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import { formatRelativeTimeAgo } from "../../model/relative-time";
-import { isSafeRegex } from "../../model/safe-regex";
-import { useModelProviderHost } from "../../model/model-provider-host";
-import { ProviderIcon } from "../elements/modelProviders/icons-map";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { formatRelativeTimeAgo } from "../../model/relative-time.ts";
+import { isSafeRegex } from "../../model/safe-regex.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { ProviderIcon } from "../elements/modelProviders/icons-map.tsx";
 
 export interface MatchingSpansPreviewInput {
   regex: string;

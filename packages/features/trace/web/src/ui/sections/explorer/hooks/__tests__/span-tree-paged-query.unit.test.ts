@@ -10,9 +10,9 @@ import {
   spanTreeDeltaSinceMs,
   spanTreeQueryFn,
   spanTreeQueryKey,
-} from "../span-tree-paged-query";
+} from "../span-tree-paged-query.ts";
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     tracesV2: {
       // `getQueryKey` resolves the procedure path via the proxy's `_def()`.

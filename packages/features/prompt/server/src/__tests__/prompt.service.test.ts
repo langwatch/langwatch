@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PromptService } from "../services/prompt.service";
-import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture";
+import { PromptService } from "../services/prompt.service.ts";
+import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
 
 describe("PromptService", () => {
   describe("updatePrompt()", () => {

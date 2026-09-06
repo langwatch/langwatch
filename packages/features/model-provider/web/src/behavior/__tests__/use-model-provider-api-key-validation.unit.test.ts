@@ -19,7 +19,7 @@ const { mockMutateAsync, mockQueryFetch } = vi.hoisted(() => ({
   mockQueryFetch: vi.fn(),
 }));
 
-vi.mock("../model-provider-api", () => ({
+vi.mock("../model-provider-api.ts", () => ({
   api: {
     modelProvider: {
       validateApiKey: {
@@ -38,7 +38,7 @@ vi.mock("../model-provider-api", () => ({
   },
 }));
 
-import { useModelProviderApiKeyValidation } from "../use-model-provider-api-key-validation";
+import { useModelProviderApiKeyValidation } from "../use-model-provider-api-key-validation.ts";
 
 const renderValidation = () =>
   renderHook(() =>

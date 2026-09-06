@@ -19,13 +19,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { AiToolEntry } from "../../model/ai-tool-tile";
+import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback";
-import { api } from "../../../../behavior/governance-api";
+import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
+import { api } from "../../../../behavior/governance-api.ts";
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",
   model_provider: "Model providers",

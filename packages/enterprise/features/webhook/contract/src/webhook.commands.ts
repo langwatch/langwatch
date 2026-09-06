@@ -3,7 +3,7 @@ import {
   sqsDestinationInputSchema,
   webhookDestinationKindSchema,
   webhookDeliveryControlsSchema,
-} from "./webhook";
+} from "./webhook.ts";
 
 export const createWebhookEndpointCommandSchema = z
   .object({

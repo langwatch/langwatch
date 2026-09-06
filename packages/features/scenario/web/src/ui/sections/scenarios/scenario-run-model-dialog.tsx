@@ -1,6 +1,6 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { SimulationModelSelect } from "./simulation-model-select";
+import { SimulationModelSelect } from "./simulation-model-select.tsx";
 
 /**
  * Shown after the user picks a target in the scenario "Save and run" flow. Lets them

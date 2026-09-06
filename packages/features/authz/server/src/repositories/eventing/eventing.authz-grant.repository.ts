@@ -27,19 +27,19 @@ import {
 import {
   AuthzLedgerMapper,
   type EventingAuthzLedgerAdapter,
-} from "../../adapters/eventing.authz-ledger.adapter";
+} from "../../adapters/eventing.authz-ledger.adapter.ts";
 import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,
   type RoleBindingWrite,
-} from "../authz-grant.repository";
+} from "../authz-grant.repository.ts";
 import type {
   AuthzDatabase,
   AuthzReadHeadSelector,
   AuthzReadRepository,
-} from "../authz-read.repository";
-import { PrismaAuthzGrantRepository } from "../prisma/prisma.authz-grant.repository";
-import { RoutedAuthzReadRepository } from "../routed/routed.authz-read.repository";
+} from "../authz-read.repository.ts";
+import { PrismaAuthzGrantRepository } from "../prisma/prisma.authz-grant.repository.ts";
+import { RoutedAuthzReadRepository } from "../routed/routed.authz-read.repository.ts";
 
 /**
  * The port's two typed failures, restored on the way out.

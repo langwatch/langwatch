@@ -4,8 +4,8 @@ import { Check, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
-import { serializeWorkflow } from "../../behavior/workflow-store";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { serializeWorkflow } from "../../behavior/workflow-store.ts";
 
 type WorkflowAutosaveResult = { version: string; id: string };
 

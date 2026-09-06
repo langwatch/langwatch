@@ -4,17 +4,17 @@ import { MoreVertical, Pencil } from "lucide-react";
 import numeral from "numeral";
 import { useMemo } from "react";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { api } from "../../../behavior/trace-api";
+import { api } from "../../../behavior/trace-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useDrawer } from "../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useDrawer } from "../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 import {
   evaluationPassed,
   evaluationStatusColor,
 } from "@langwatch/evaluator-web/surfaces/evaluation-status";
-import { HoverableBigText } from "../hoverable-big-text";
+import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

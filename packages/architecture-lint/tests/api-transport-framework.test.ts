@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   apiTransportFrameworkFindings,
   lintApiTransportFramework,
-} from "../src/api-transport-framework";
+} from "../src/api-transport-framework.ts";
 
 const CONVERTED_REST = `
 import { createRestService } from "@langwatch/api/rest";

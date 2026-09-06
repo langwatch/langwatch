@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createTenantId } from "../storage";
-import { BlobLeases } from "../blobLeases";
-import { CachedLuaScript } from "../cachedLuaScript";
+import { createTenantId } from "../storage.ts";
+import { BlobLeases } from "../blobLeases.ts";
+import { CachedLuaScript } from "../cachedLuaScript.ts";
 
 const PROJECT = createTenantId("project-1");
 

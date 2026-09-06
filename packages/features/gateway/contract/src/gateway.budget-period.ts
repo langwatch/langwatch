@@ -1,8 +1,8 @@
 /**
  * Which period a budget is in, and the lower bound a spend read for it must honor.
  */
-import type { GatewayBudgetWindow } from "./gateway.budget";
-import { GatewayWindow } from "./gateway.budget-window";
+import type { GatewayBudgetWindow } from "./gateway.budget.ts";
+import { GatewayWindow } from "./gateway.budget-window.ts";
 
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose period boundary is not

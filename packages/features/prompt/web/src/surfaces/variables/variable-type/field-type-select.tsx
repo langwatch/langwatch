@@ -1,6 +1,6 @@
 import { Button, HStack, Menu, Text } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { getTypeLabel, VariableTypeIcon } from "./variable-type-icon";
+import { getTypeLabel, VariableTypeIcon } from "./variable-type-icon.tsx";
 
 export type FieldTypeOption = { value: string; label: string };
 

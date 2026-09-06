@@ -10,16 +10,16 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { api } from "../../../behavior/gateway-api";
+import { api } from "../../../behavior/gateway-api.ts";
 
-import type { ProviderCredentialOption } from "../model/provider-credential-option";
+import type { ProviderCredentialOption } from "../model/provider-credential-option.ts";
 import {
   emptyRoutingPolicyForm,
   type RoutingPolicyFormValues,
   routingPolicyFormSchema,
   routingPolicyToFormValues,
   validateRoutingPolicyForm,
-} from "../model/routing-policy-form";
+} from "../model/routing-policy-form.ts";
 
 export interface OrganizationShape {
   id?: string;

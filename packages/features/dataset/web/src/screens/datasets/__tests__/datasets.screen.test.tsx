@@ -20,7 +20,7 @@ import type { DatasetSummary } from "@langwatch/dataset-contract";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithDatasetHost } from "../../../testing";
+import { renderWithDatasetHost } from "../../../testing.tsx";
 
 const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
   datasetsQuery: {
@@ -33,7 +33,7 @@ const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
   mockDeleteMutate: vi.fn(),
 }));
 
-vi.mock("../../../behavior/dataset-api", () => ({
+vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
     useUtils: () => ({
       limits: { getUsage: { invalidate: vi.fn() } },
@@ -48,19 +48,19 @@ vi.mock("../../../behavior/dataset-api", () => ({
 
 // The three overlays have their own suites; here they only have to be absent
 // until the screen opens them.
-vi.mock("../../../ui/sections/add-or-edit-dataset-drawer", () => ({
+vi.mock("../../../ui/sections/add-or-edit-dataset-drawer.tsx", () => ({
   AddOrEditDatasetDrawer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="add-edit-dataset-drawer" /> : null,
 }));
-vi.mock("../../../ui/sections/bulk-upload-drawer", () => ({
+vi.mock("../../../ui/sections/bulk-upload-drawer.tsx", () => ({
   BulkUploadDrawer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="bulk-upload-drawer" /> : null,
 }));
-vi.mock("../../../ui/sections/copy-dataset-dialog", () => ({
+vi.mock("../../../ui/sections/copy-dataset-dialog.tsx", () => ({
   CopyDatasetDialog: () => <div data-testid="copy-dataset-dialog" />,
 }));
 
-const { default: DatasetsScreen } = await import("../datasets.screen");
+const { default: DatasetsScreen } = await import("../datasets.screen.tsx");
 
 const makeDataset = (id: string, name: string, records: number): DatasetSummary => ({
   id,

@@ -7,7 +7,7 @@ import {
   redactStoredObjectStorageErrorText,
   redactStoredObjectStorageUri,
   redactStoredObjectStorageUrisInText,
-} from "../index";
+} from "../index.ts";
 import { describe, expect, it } from "vitest";
 
 describe("stored object storage URIs", () => {

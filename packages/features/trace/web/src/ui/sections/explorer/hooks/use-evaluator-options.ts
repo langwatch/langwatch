@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useTraceFacets } from "./use-trace-facets";
+import { useTraceFacets } from "./use-trace-facets.ts";
 
 export interface EvaluatorOption {
   /** Evaluator id (the value persisted in an eval column key). */

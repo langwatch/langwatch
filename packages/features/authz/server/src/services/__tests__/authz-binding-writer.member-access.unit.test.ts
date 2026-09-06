@@ -25,13 +25,13 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import type { AuthzCompatibilityLedgerPort } from "../../ports/authz-compatibility-ledger.port";
+import type { AuthzCompatibilityLedgerPort } from "../../ports/authz-compatibility-ledger.port.ts";
 import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
   AuthzManagedBindingRow,
-} from "../../repositories/authz-binding.repository";
-import { AuthzBindingWriterService } from "../authz-binding-writer.service";
+} from "../../repositories/authz-binding.repository.ts";
+import { AuthzBindingWriterService } from "../authz-binding-writer.service.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const MEMBER_ID = "user_member";

@@ -6,8 +6,8 @@ import type {
   DatasetColumn,
   DatasetReference,
   SavedRecord,
-} from "../../model/experiments-v3/types";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+} from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * Hook to load records for a single saved dataset.

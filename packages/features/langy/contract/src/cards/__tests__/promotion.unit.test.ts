@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assertTotalOrder, CARD_PROBES, promoteCard, type CardProbe } from "../registry.js";
-import { toCliToolResult } from "../tool-result.js";
+import { assertTotalOrder, CARD_PROBES, promoteCard, type CardProbe } from "../registry.ts";
+import { toCliToolResult } from "../tool-result.ts";
 
 const promote = (nominal: Parameters<typeof promoteCard>[0]["nominal"], payload: unknown) =>
   promoteCard({ nominal, payload, probes: CARD_PROBES });

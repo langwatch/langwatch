@@ -3,7 +3,7 @@
  */
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { SuiteRunProcessingPipelineAdapter } from "./suite-run-processing.adapter";
+import { SuiteRunProcessingPipelineAdapter } from "./suite-run-processing.adapter.ts";
 
 /** Why the stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

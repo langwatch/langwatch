@@ -1,6 +1,6 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { useEffect } from "react";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 
 /**
  * A spring number ticker.

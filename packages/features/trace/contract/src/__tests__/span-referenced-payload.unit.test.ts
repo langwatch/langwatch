@@ -4,7 +4,7 @@ import {
   parseSpanReferencedPayload,
   SPAN_REFERENCED_PAYLOAD_TYPE,
   type SpanReceivedEvent,
-} from "../index";
+} from "../index.ts";
 
 const makeEvent = (startTimeUnixNano: unknown): SpanReceivedEvent =>
   ({

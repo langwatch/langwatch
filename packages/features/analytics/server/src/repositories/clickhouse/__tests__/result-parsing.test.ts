@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
-import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper";
-import { buildMetricAlias } from "../clickhouse.metric-translator.mapper";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
+import { buildMetricAlias } from "../clickhouse.metric-translator.mapper.ts";
 
 /**
  * These tests verify that the column aliases generated in SQL match

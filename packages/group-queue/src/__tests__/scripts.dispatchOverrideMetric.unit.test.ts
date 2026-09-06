@@ -1,8 +1,8 @@
 import type { Redis as IORedis } from "ioredis";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { gqJobsDispatchedOverrideTotal } from "../metrics";
-import { GroupStagingScripts } from "../scripts";
+import { gqJobsDispatchedOverrideTotal } from "../metrics.ts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 /**
  * The dispatch script returns `[flatResults, overrideDispatched]`. These tests

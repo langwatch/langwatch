@@ -15,15 +15,15 @@ import {
   type GithubInstallationToken,
   GithubRateLimitedError,
   type MintInstallationTokenInput,
-} from "../../adapters/github-app-token.adapter";
+} from "../../adapters/github-app-token.adapter.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
   UpsertGithubInstallationInput,
-} from "../github-installations.repository";
-import { GithubInstallationsService } from "../../services/github-installations.service";
-import { GithubInstallationAccessService } from "../../services/github-installation-access.service";
-import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture";
+} from "../github-installations.repository.ts";
+import { GithubInstallationsService } from "../../services/github-installations.service.ts";
+import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
+import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 
 function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;

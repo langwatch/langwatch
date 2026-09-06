@@ -3,7 +3,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { Drawer } from "../../drawer";
+import { Drawer } from "../../drawer.tsx";
 import {
   PromptList,
   SkillList,
@@ -14,9 +14,9 @@ import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
 } from "@langwatch/onboarding-web/surfaces/active-project-context";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { ApiKeyIntegrationInfoCard } from "./api-key-integration-info-card";
-import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { ApiKeyIntegrationInfoCard } from "./api-key-integration-info-card.tsx";
+import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
 
 export type Segment = "skill" | "mcp" | "prompt" | "sdk";
 

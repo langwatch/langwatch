@@ -6,10 +6,10 @@
  * this file is.
  */
 
-export { EnterpriseOttlEditor } from "./ui/sections/ottl-editor.connected";
-export { OttlEditor } from "./ui/elements/ottl-editor";
+export { EnterpriseOttlEditor } from "./ui/sections/ottl-editor.connected.tsx";
+export { OttlEditor } from "./ui/elements/ottl-editor.tsx";
 export {
   GovernanceOttlValidationClient,
   type GovernanceOttlValidationError,
   type GovernanceOttlValidationResult,
-} from "./model/governance-ottl-validation-client";
+} from "./model/governance-ottl-validation-client.ts";

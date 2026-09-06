@@ -1,1 +1,1 @@
-export * from "../../model/studio-dataset.utils";
+export * from "../../model/studio-dataset.utils.ts";

@@ -16,7 +16,7 @@ import {
   ExperimentRepository,
   type ExperimentRowState,
   type WorkbenchWriteResult,
-} from "../experiment.repository";
+} from "../experiment.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

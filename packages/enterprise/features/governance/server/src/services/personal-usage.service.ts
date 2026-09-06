@@ -9,7 +9,7 @@ import {
 import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReaderPort,
-} from "../ports/personal-usage.port";
+} from "../ports/personal-usage.port.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 

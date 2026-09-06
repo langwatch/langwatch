@@ -16,10 +16,10 @@ import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import {
   createLangWatchQLRequestController,
   type LangWatchQLExecuteRequest,
-} from "../lwql-request-controller";
-import { isLangWatchQLResultStale, lwqlActionLabel } from "../lwql-request-state";
+} from "../lwql-request-controller.ts";
+import { isLangWatchQLResultStale, lwqlActionLabel } from "../lwql-request-state.ts";
 
-import { lwqlResult } from "../../__tests__/lwql-fixtures";
+import { lwqlResult } from "../../__tests__/lwql-fixtures.ts";
 
 interface Deferred<T> {
   promise: Promise<T>;

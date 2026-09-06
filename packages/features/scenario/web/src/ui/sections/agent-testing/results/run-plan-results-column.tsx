@@ -4,20 +4,20 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { ContentColumn } from "../../../elements/agent-testing/shared/content-column";
-import type { PeriodControls } from "./period-controls";
-import type { RunPlanDetailProps } from "./run-plan-detail";
-import { RunPlanDetailHeader } from "./run-plan-detail-header";
-import { RunPlanResultsDialogs } from "./run-plan-results-dialogs";
-import { RunPlanRunResults } from "./run-plan-run-results";
-import { RUNS_SIDEBAR_WIDTH } from "./runs-sidebar";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
+import type { PeriodControls } from "./period-controls.ts";
+import type { RunPlanDetailProps } from "./run-plan-detail.tsx";
+import { RunPlanDetailHeader } from "./run-plan-detail-header.tsx";
+import { RunPlanResultsDialogs } from "./run-plan-results-dialogs.tsx";
+import { RunPlanRunResults } from "./run-plan-run-results.tsx";
+import { RUNS_SIDEBAR_WIDTH } from "./runs-sidebar.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type {
   RunPlanBatches,
   RunPlanSelection,
-} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
-import { useRunPlanResultsColumn } from "./use-run-plan-results-column";
-import { RunSettingsBlock } from "./run-settings-block";
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { useRunPlanResultsColumn } from "./use-run-plan-results-column.ts";
+import { RunSettingsBlock } from "./run-settings-block.tsx";
 
 export type RunPlanResultsColumnProps = {
   plan: RunPlan;

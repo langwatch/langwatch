@@ -5,7 +5,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RestApiServicePorts } from "../security/rest-api-service.js";
+import type { RestApiServicePorts } from "../security/rest-api-service.ts";
 
 const logRecords: {
   level: string;
@@ -29,9 +29,9 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { publicEndpoint } = await import("../../access-policy.js");
-const { loggerMiddleware } = await import("../middleware.js");
-const { createRestApiService } = await import("../security/rest-api-service.js");
+const { publicEndpoint } = await import("../../access-policy.ts");
+const { loggerMiddleware } = await import("../middleware.ts");
+const { createRestApiService } = await import("../security/rest-api-service.ts");
 
 const passThrough: MiddlewareHandler = async (_c, next) => next();
 

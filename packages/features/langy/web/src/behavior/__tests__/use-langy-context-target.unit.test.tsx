@@ -5,9 +5,9 @@
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyContextTarget } from "../use-langy-context-target";
-import { useLangyContextTargetStore } from "../langy-context-target.store";
-import { useLangyStore } from "../langy.store";
+import { useLangyContextTarget } from "../use-langy-context-target.ts";
+import { useLangyContextTargetStore } from "../langy-context-target.store.ts";
+import { useLangyStore } from "../langy.store.ts";
 
 /** A stand-in for any surface that opts in — a trace row, an evaluation card. */
 function HostRow({ onOpen }: { onOpen: () => void }) {

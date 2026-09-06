@@ -29,9 +29,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 const applySpanToSummary = TraceSummaryFoldProjection.applySpanToSummary;
 

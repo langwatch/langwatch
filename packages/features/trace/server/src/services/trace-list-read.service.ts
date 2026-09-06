@@ -1,13 +1,13 @@
-import { VisibilityWindowService } from "./trace-visibility-window.service";
-import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service";
-import { TraceFacetValuesService } from "./trace-facet-values.service";
-import { TraceTopicNamingService } from "./trace-topic-naming.service";
-import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service.ts";
+import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
+import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {
   cursorForTraceRow,
   mapToTraceListItem,
   SORT_COLUMN_MAP,
-} from "../rules/trace-list-row.rules";
+} from "../rules/trace-list-row.rules.ts";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {

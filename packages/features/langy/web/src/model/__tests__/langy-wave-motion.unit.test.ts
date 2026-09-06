@@ -14,7 +14,7 @@ import {
   restingWaveMotion,
   stepWaveMotion,
   WAVE_MOTION_TARGETS,
-} from "../langy-wave-motion";
+} from "../langy-wave-motion.ts";
 
 const assistant = (parts: unknown[]) => ({
   role: "assistant",

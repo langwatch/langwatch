@@ -1,7 +1,7 @@
 import { agentSchema, type Agent } from "@langwatch/agent-contract";
 
 /** The connected-agent state store, for another feature's test composing a realistic one. */
-export { ConnectedAgentStateAdapter } from "./adapters/connected-agent-state.adapter";
+export { ConnectedAgentStateAdapter } from "./adapters/connected-agent-state.adapter.ts";
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({

@@ -4,7 +4,7 @@ import {
   absorbContextTarget,
   LANGY_CONTEXT_DRAG_MIME,
   readDraggedTarget,
-} from "./langy-context-target.store";
+} from "./langy-context-target.store.ts";
 
 /**
  * Makes the panel a place you can drop things on.

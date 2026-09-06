@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDisplayInput, type Span } from "../index";
+import { buildDisplayInput, type Span } from "../index.ts";
 
 type InputParts = Pick<Span, "input" | "params">;
 

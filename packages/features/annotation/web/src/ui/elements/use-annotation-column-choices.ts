@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AnnotationColumnChoices } from "./annotation-columns";
+import type { AnnotationColumnChoices } from "./annotation-columns.ts";
 
 /**
  * The reviewer's column choices, kept per project so a wide review project and

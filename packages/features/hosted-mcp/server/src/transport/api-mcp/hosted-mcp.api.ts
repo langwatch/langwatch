@@ -21,10 +21,10 @@ import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
-import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port";
-import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service";
-import { McpRateLimitService } from "../../services/mcp-rate-limit.service";
+import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
+import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port.ts";
+import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
+import { McpRateLimitService } from "../../services/mcp-rate-limit.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 

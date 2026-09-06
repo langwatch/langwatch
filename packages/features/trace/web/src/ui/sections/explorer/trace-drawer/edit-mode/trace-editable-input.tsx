@@ -2,8 +2,8 @@ import { useCallback, useMemo } from "react";
 import {
   selectTraceInputBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
-import { EditableIOField } from "./editable-io-field";
+} from "../../../../../behavior/trace-edit.store.ts";
+import { EditableIOField } from "./editable-io-field.tsx";
 
 /**
  * The trace's own input editor. A dataset record is built from the trace's

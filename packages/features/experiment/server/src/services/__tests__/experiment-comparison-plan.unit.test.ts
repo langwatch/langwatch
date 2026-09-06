@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 
 // Helper to create test state (partial state with just what ExperimentRunOrchestratorService.generateCells needs)
 const createTestState = ({

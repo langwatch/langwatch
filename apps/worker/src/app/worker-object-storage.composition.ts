@@ -20,12 +20,12 @@ import {
   WorkerProjectS3SourcePort,
   WorkerStoredObjectStorageRuntimeFactory,
   type WorkerProjectS3Target,
-} from "../platform/infrastructure/worker-stored-object-storage.adapter";
+} from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 import type {
   WorkerConfig,
   WorkerOutboundProxyConfig,
   WorkerStorageConfig,
-} from "../platform/config/worker.config";
+} from "../platform/config/worker.config.ts";
 
 /** The one table BYOC routing reads, named here and nowhere above it. */
 export type WorkerProjectStorageDatabase = Pick<PrismaClient, "project">;

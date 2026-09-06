@@ -35,7 +35,7 @@
 
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
 import { createContext, useContext, type ComponentType } from "react";
-import type { AgentBrowserPort } from "./agent-browser.port";
+import type { AgentBrowserPort } from "./agent-browser.port.ts";
 
 /** The project every agent on this page belongs to. */
 export type AgentHostProject = {

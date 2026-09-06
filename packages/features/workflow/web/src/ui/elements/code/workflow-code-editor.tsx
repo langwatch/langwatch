@@ -6,9 +6,9 @@ import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import type { PythonField, PythonProviderHandle } from "../../../model/code/python-provider.shared";
-import { registerPythonProviders } from "../../../model/code/python-providers";
-import { EditorStatusBar } from "./editor-status-bar";
+import type { PythonField, PythonProviderHandle } from "../../../model/code/python-provider.shared.ts";
+import { registerPythonProviders } from "../../../model/code/python-providers.ts";
+import { EditorStatusBar } from "./editor-status-bar.tsx";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

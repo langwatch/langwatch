@@ -15,7 +15,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FeatureFlagRulesDialog } from "../feature-flag-rules-dialog";
+import { FeatureFlagRulesDialog } from "../feature-flag-rules-dialog.tsx";
 
 // The dialog marks the rest of the document inert, which user-event reads as
 // "nothing here is clickable"; the operator's pointer is not so fussy.

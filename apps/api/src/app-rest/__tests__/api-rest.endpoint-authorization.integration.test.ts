@@ -10,8 +10,8 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { composeOpenApiDocumentSurface } from "../../tasks/openapi-document/openapi-document.surface";
-import { allRegisteredRoutes } from "../index";
+import { composeOpenApiDocumentSurface } from "../../tasks/openapi-document/openapi-document.surface.ts";
+import { allRegisteredRoutes } from "../index.ts";
 
 /**
  * A method-"ALL" route on a wildcard path is app-level middleware, a sub-app mount, or a

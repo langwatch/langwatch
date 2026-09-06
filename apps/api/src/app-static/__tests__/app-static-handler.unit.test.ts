@@ -10,7 +10,7 @@ import {
   parsePublicAppConfigMetaContent,
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
-import { serveStaticOrFallback } from "../app-static.handler";
+import { serveStaticOrFallback } from "../app-static.handler.ts";
 
 const publicConfig: PublicAppConfig = {
   appBaseUrl: "https://app.example.com",

@@ -1,7 +1,7 @@
 import { Separator, VStack } from "@chakra-ui/react";
-import type { ShareLinkView } from "./share-link-status";
-import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form";
-import { ShareLinksList } from "./share-links-list";
+import type { ShareLinkView } from "./share-link-status.ts";
+import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form.tsx";
+import { ShareLinksList } from "./share-links-list.tsx";
 
 /**
  * Everything inside the share dialog's frame.

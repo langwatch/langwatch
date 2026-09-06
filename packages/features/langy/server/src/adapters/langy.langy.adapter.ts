@@ -13,35 +13,35 @@ import {
   type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
-} from "../services/langy.service";
-import { LangyTurnRelayAdapter, type LangyRelayRedis } from "./langy-turn-relay.adapter";
+} from "../services/langy.service.ts";
+import { LangyTurnRelayAdapter, type LangyRelayRedis } from "./langy-turn-relay.adapter.ts";
 import {
   LangyFeedbackPromptPolicy,
   type LangyFeedbackPromptRedis,
-} from "../ports/langy-feedback-prompt.port";
-import { LangyConversationService } from "../services/langy-conversation.service";
-import { LangyMessageService } from "../services/langy-message.service";
-import { LangyFinalPartsService } from "../services/langy-final-parts.service";
-import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma.langy-conversation.repository";
-import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository";
-import { PrismaLangyCredentialRepository } from "../repositories/prisma/prisma.langy-credential.repository";
-import { PrismaLangyTurnAdmissionRepository } from "../repositories/prisma/prisma.langy-turn-admission.repository";
-import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper";
-import { PrismaLangyConversationProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-projection.repository";
-import { PrismaLangyConversationTurnProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-turn-projection.repository";
-import { PrismaLangyMessageProjectionRepository } from "../repositories/prisma/prisma.langy-message-projection.repository";
-import { LangyCredentialService } from "../services/langy-credential.service";
+} from "../ports/langy-feedback-prompt.port.ts";
+import { LangyConversationService } from "../services/langy-conversation.service.ts";
+import { LangyMessageService } from "../services/langy-message.service.ts";
+import { LangyFinalPartsService } from "../services/langy-final-parts.service.ts";
+import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma.langy-conversation.repository.ts";
+import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository.ts";
+import { PrismaLangyCredentialRepository } from "../repositories/prisma/prisma.langy-credential.repository.ts";
+import { PrismaLangyTurnAdmissionRepository } from "../repositories/prisma/prisma.langy-turn-admission.repository.ts";
+import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { PrismaLangyConversationProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-projection.repository.ts";
+import { PrismaLangyConversationTurnProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-turn-projection.repository.ts";
+import { PrismaLangyMessageProjectionRepository } from "../repositories/prisma/prisma.langy-message-projection.repository.ts";
+import { LangyCredentialService } from "../services/langy-credential.service.ts";
 import type {
   LangyCredentialErrorReporter,
   LangyCredentialRuntimeService,
   LangyGithubService,
   LangySessionKeyMintingService,
   LangyVirtualKeyService,
-} from "../services/langy-credential.service";
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
-import { LangySessionKeyService } from "../services/langy-session-key.service";
-import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository";
-import { LangyTurnService, type LangyTurnTechnicalPorts } from "../services/langy-turn.service";
+} from "../services/langy-credential.service.ts";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
+import { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import { PrismaLangySessionKeyRepository } from "../repositories/prisma/prisma.langy-session-key.repository.ts";
+import { LangyTurnService, type LangyTurnTechnicalPorts } from "../services/langy-turn.service.ts";
 
 export abstract class LangyTrustedMessagePort {
   abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<

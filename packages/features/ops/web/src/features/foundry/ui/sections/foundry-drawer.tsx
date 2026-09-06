@@ -2,13 +2,13 @@ import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from 
 import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useExecutionStore } from "../../behavior/execution.store";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store";
-import { useFoundryTransport } from "../../behavior/foundry-runtime";
-import { usePresetStore } from "../../behavior/preset.store";
-import { getFoundryExecutor } from "../../behavior/trace-executor";
-import { useTraceStore } from "../../behavior/trace.store";
-import { SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types";
+import { useExecutionStore } from "../../behavior/execution.store.ts";
+import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
+import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
+import { usePresetStore } from "../../behavior/preset.store.ts";
+import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
+import { useTraceStore } from "../../behavior/trace.store.ts";
+import { SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
 
 export function FoundryDrawer({ onClose }: { onClose: () => void }) {
   const { currentProject: project } = useFoundryTransport();

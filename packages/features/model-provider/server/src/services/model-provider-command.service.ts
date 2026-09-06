@@ -29,10 +29,10 @@ import type {
   ModelProviderCredentialPolicy,
   ModelProviderIdService,
   ModelProviderRepository,
-} from "../ports/model-provider.port";
-import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service";
-import type { ModelProviderScopeService } from "./model-provider-scope.service";
+} from "../ports/model-provider.port.ts";
+import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
+import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderCommandOptions = {
   repository: ModelProviderRepository;

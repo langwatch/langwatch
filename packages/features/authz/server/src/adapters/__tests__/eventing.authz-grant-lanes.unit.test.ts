@@ -20,7 +20,7 @@ import {
   EventingAuthzAdapter,
   GRANT_COALESCE_MAX_BATCH,
   RevokeGrantCommand,
-} from "../eventing.authz.adapter";
+} from "../eventing.authz.adapter.ts";
 
 function buildPipeline() {
   return EventingAuthzAdapter.build({

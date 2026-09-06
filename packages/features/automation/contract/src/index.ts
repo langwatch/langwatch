@@ -1,13 +1,13 @@
-export * from "./automation.responses";
-export * from "./automation";
-export * from "./automation.trpc-schemas";
-export * from "./automation.events";
-export * from "./automation.commands";
-export * from "./automation.errors";
-export * from "./automation-filters";
-export * from "./automation.queries";
-export * from "./automation.service";
-export * from "./automation-evaluation-subscriber.service";
+export * from "./automation.responses.ts";
+export * from "./automation.ts";
+export * from "./automation.trpc-schemas.ts";
+export * from "./automation.events.ts";
+export * from "./automation.commands.ts";
+export * from "./automation.errors.ts";
+export * from "./automation-filters.ts";
+export * from "./automation.queries.ts";
+export * from "./automation.service.ts";
+export * from "./automation-evaluation-subscriber.service.ts";
 export {
   alertTypeSchema,
   notificationCadenceSchema,
@@ -17,20 +17,20 @@ export {
   triggerSchema,
   triggerTemplateDraftSchema,
   triggerTemplateSchema,
-} from "./trigger";
-export type { Trigger, TriggerKind, TriggerTemplate, TriggerTemplateDraft } from "./trigger";
-export * from "./trigger.commands";
-export * from "./trigger.queries";
-export * from "./trigger-policies";
-export * from "./cadences";
-export * from "./providers";
-export * from "./email-suppression";
-export * from "./custom-graph";
-export * from "./graph-alert";
-export * from "./pause-reasons";
-export * from "./runaway";
-export * from "./persist-cap";
-export * from "./test-fire";
-export * from "./webhook-delivery";
-export * from "./report";
-export * from "./templating";
+} from "./trigger.ts";
+export type { Trigger, TriggerKind, TriggerTemplate, TriggerTemplateDraft } from "./trigger.ts";
+export * from "./trigger.commands.ts";
+export * from "./trigger.queries.ts";
+export * from "./trigger-policies.ts";
+export * from "./cadences.ts";
+export * from "./providers.ts";
+export * from "./email-suppression.ts";
+export * from "./custom-graph.ts";
+export * from "./graph-alert.ts";
+export * from "./pause-reasons.ts";
+export * from "./runaway.ts";
+export * from "./persist-cap.ts";
+export * from "./test-fire.ts";
+export * from "./webhook-delivery.ts";
+export * from "./report.ts";
+export * from "./templating.ts";

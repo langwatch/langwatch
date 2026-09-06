@@ -7,7 +7,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useAutoExpansion } from "../use-auto-expansion";
+import { useAutoExpansion } from "../use-auto-expansion.ts";
 
 // The hook keeps a module-level cache keyed by panelKey::groupBy, so every
 // test uses a unique panel key to stay isolated.

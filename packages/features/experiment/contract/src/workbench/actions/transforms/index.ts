@@ -1,25 +1,25 @@
-export { addColumn } from "./add-column";
+export { addColumn } from "./add-column.ts";
 export {
   addEvaluator,
   assertComparisonColumnAllowed,
   attachEvaluator,
   newEvaluatorId,
-} from "./add-evaluator";
-export { addRows } from "./add-rows";
-export { addTarget, attachTarget, newTargetId } from "./add-target";
-export { duplicateTarget } from "./duplicate-target";
+} from "./add-evaluator.ts";
+export { addRows } from "./add-rows.ts";
+export { addTarget, attachTarget, newTargetId } from "./add-target.ts";
+export { duplicateTarget } from "./duplicate-target.ts";
 export {
   inlineRowCount,
   requireDataset,
   requireEvaluator,
   requireInlineDataset,
   requireTarget,
-} from "./helpers";
-export { removeTarget } from "./remove-target";
-export { setCellValue } from "./set-cell-value";
-export { setEvaluatorMapping } from "./set-evaluator-mapping";
-export { setTargetMapping } from "./set-target-mapping";
-export { setTargetPrompt } from "./set-target-prompt";
+} from "./helpers.ts";
+export { removeTarget } from "./remove-target.ts";
+export { setCellValue } from "./set-cell-value.ts";
+export { setEvaluatorMapping } from "./set-evaluator-mapping.ts";
+export { setTargetMapping } from "./set-target-mapping.ts";
+export { setTargetPrompt } from "./set-target-prompt.ts";
 export {
   type AnyTransform,
   isTransformError,
@@ -28,5 +28,5 @@ export {
   TransformError,
   type TransformErrorCode,
   type WorkbenchState,
-} from "./types";
-export { updateTargetModel } from "./update-target-model";
+} from "./types.ts";
+export { updateTargetModel } from "./update-target-model.ts";

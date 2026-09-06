@@ -1,6 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { BlobStoreContent } from "./blob-store-content";
+import { BlobStoreContent } from "./blob-store-content.tsx";
 
 /**
  * The payload store as a drawer over the ops dashboard.

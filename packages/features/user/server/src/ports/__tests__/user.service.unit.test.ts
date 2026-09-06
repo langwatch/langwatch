@@ -1,9 +1,9 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { UserAvatarStoragePort } from "../user.port";
-import { UserRepository } from "../../repositories/user.repository";
-import { UserService } from "../../services/user.service";
+import { UserAvatarStoragePort } from "../user.port.ts";
+import { UserRepository } from "../../repositories/user.repository.ts";
+import { UserService } from "../../services/user.service.ts";
 
 const user: UserFullProfile = {
   id: "user-1",

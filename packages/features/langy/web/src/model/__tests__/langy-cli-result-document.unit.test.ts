@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectionOf, countResults, totalOf } from "../langy-cli-result-document";
+import { collectionOf, countResults, totalOf } from "../langy-cli-result-document.ts";
 
 describe("collectionOf", () => {
   describe("given a recognised collection key", () => {

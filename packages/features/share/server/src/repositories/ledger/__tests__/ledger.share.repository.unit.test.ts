@@ -2,8 +2,8 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ShareLink } from "@langwatch/share-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LedgerShareRepository } from "../ledger.share.repository";
-import type { ShareRepository } from "../../share.repository";
+import { LedgerShareRepository } from "../ledger.share.repository.ts";
+import type { ShareRepository } from "../../share.repository.ts";
 
 /**
  * ADR-092 delivery-plan PR 3 (D-PR3-10). Two properties carry this file: a

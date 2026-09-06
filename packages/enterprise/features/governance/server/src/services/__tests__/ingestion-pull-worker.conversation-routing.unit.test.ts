@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
-import { createWorkerService } from "../../__tests__/support/puller-test-ports";
+import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
 function countsPullingSource() {
   return governanceIngestionSourceSchema.parse({

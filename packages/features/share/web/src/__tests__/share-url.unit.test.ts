@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-import { shareUrlForToken } from "../share-url";
+import { shareUrlForToken } from "../share-url.ts";
 
 describe("share url", () => {
   describe("when building the address a holder opens", () => {

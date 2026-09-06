@@ -5,15 +5,15 @@
 
 import { Cluster, Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { GroupQueueProcessor } from "../groupQueue";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
 
 // The processor instantiates these collaborators with `new` in consumer mode. The mock
 // implementations MUST therefore be constructible — a `vi.fn(() => ({ ... }))` arrow-returning
 // factory is NOT a constructor under Vitest 4.x and throws `TypeError: ... is not a
 // constructor`, which previously made both consumer-mode cases fail before reaching their
 // assertions. Using a class keeps the mock constructible.
-vi.mock("../dispatcher", () => ({
+vi.mock("../dispatcher.ts", () => ({
   GroupQueueDispatcher: class {
     start(): void {}
     requestShutdown(): void {}
@@ -21,7 +21,7 @@ vi.mock("../dispatcher", () => ({
   },
 }));
 
-vi.mock("../metricsCollector", () => ({
+vi.mock("../metricsCollector.ts", () => ({
   GroupQueueMetricsCollector: class {
     start(): void {}
     stop(): void {}

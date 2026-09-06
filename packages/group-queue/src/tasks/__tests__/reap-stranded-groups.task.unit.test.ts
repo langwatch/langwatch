@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GroupQueueRedis } from "../../dependencies-adapter";
-import { reapStrandedGroups } from "../reap-stranded-groups.task";
+import type { GroupQueueRedis } from "../../dependencies-adapter.ts";
+import { reapStrandedGroups } from "../reap-stranded-groups.task.ts";
 
 const PREFIX = "{event-sourcing/jobs}:gq:";
 const NOW = 1_800_000_000_000;

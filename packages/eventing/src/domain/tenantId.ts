@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SecurityError } from "../services/errorHandling";
+import { SecurityError } from "../services/errorHandling.ts";
 
 /**
  * Zod schema for tenant identifiers.

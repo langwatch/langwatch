@@ -6,8 +6,8 @@ import {
   extractInputMessages,
   extractOutputMessages,
   recordValueType,
-} from "../rules/canonical-extraction.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+} from "../rules/canonical-extraction.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export class TraceloopCanonicaliserService implements CanonicalAttributesPort {
   static create(): TraceloopCanonicaliserService {

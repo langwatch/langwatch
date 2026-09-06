@@ -1,7 +1,7 @@
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
-import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service";
-import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service";
-import type { CodingAgentModelUsage } from "./coding-agent-pull-request-usage.service";
+import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
+import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
+import type { CodingAgentModelUsage } from "./coding-agent-pull-request-usage.service.ts";
 
 export type CodingAgentPersonalSession = {
   sessionId: string;

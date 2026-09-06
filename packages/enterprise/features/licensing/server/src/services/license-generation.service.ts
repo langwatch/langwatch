@@ -6,7 +6,7 @@ import {
   type GenerateLicenseOutput,
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port";
+import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 
 /**
  * Generates a signed, encoded license key. Pure business logic — no HTTP, no Prisma, no env var

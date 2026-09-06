@@ -12,16 +12,16 @@ import {
   type ExecutionScope,
   type ExecutionSummary,
 } from "@langwatch/experiment-contract";
-import { getRunUrl } from "../rules/experiment-run-url.rules";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
-import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process";
+import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
+import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import {
   ExperimentRunResultsWriterService,
   type RunResultsPersistence,
-} from "./experiment-run-results-writer.service";
-import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service";
-import type { OrchestratorInput } from "../rules/experiment-run-input.rules";
+} from "./experiment-run-results-writer.service.ts";
+import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
+import type { OrchestratorInput } from "../rules/experiment-run-input.rules.ts";
 
 const logger = createLogger("langwatch:experiment:polling-run");
 

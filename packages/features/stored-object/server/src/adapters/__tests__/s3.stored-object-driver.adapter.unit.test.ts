@@ -9,8 +9,8 @@ import {
   ObjectNotFoundError,
   UnsupportedStorageSchemeError,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectS3TargetPort } from "../../ports/stored-object-s3-target.port";
-import { S3StoredObjectDriverAdapter } from "../s3.stored-object-driver.adapter";
+import { StoredObjectS3TargetPort } from "../../ports/stored-object-s3-target.port.ts";
+import { S3StoredObjectDriverAdapter } from "../s3.stored-object-driver.adapter.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks

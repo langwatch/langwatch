@@ -1,10 +1,10 @@
 /** Shared Liquid rendering for both persisted and serialised HTTP agents. */
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
-import type { FieldMapping } from "./field-mapping";
-import { resolveFieldMappings, sessionAsText, sourceFieldOf } from "./resolve-field-mappings";
-import type { ScenarioInput } from "./resolve-field-mappings";
-import type { RunParameterValues } from "./scenario.parameters";
+import type { FieldMapping } from "./field-mapping.ts";
+import { resolveFieldMappings, sessionAsText, sourceFieldOf } from "./resolve-field-mappings.ts";
+import type { ScenarioInput } from "./resolve-field-mappings.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
 
 /** Marks pre-serialised JSON that body templates must interpolate verbatim. */
 export class RawJson {

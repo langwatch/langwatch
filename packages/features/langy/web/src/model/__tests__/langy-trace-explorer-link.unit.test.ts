@@ -10,7 +10,7 @@ import {
   buildTraceExplorerHref,
   parseTraceSearchCommand,
   readTraceSearchQuery,
-} from "../langy-trace-explorer-link";
+} from "../langy-trace-explorer-link.ts";
 
 /** The fragment's `?…` half, which is where the Explorer keeps its query. */
 function fragmentParams(href: string): URLSearchParams {

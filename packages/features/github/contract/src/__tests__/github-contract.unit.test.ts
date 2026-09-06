@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { githubInstallStatePayloadSchema } from "../index";
+import { githubInstallStatePayloadSchema } from "../index.ts";
 
 describe("GitHub install state contract", () => {
   it("rejects incomplete or extended callback state", () => {

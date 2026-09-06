@@ -9,14 +9,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../scenario-roles", async () => {
+vi.mock("../../scenario-roles.tsx", async () => {
   const actual =
-    await vi.importActual<typeof import("../../scenario-roles")>("../../scenario-roles");
+    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
 vi.mock(
-  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context",
+  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
   () => ({
     useConversationExpand: () => ({
       isExpandable: false,
@@ -28,11 +28,11 @@ vi.mock(
   }),
 );
 
-vi.mock("../../../../markdown", () => ({
+vi.mock("../../../../markdown.tsx", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     // Viewer without annotations:manage — the Translate action must
@@ -41,18 +41,18 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: null,
   }),
 }));
 
-vi.mock("../../../../me/personal-feature-gate-dialog", () => ({
+vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
@@ -60,7 +60,7 @@ const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: strin
   translation: `EN: ${textToTranslate}`,
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     translate: {
       translate: {
@@ -78,9 +78,9 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import type { TraceListItem } from "../../../types/trace";
-import { NO_TRACE_EVENTS } from "../../../types/trace";
-import { ChatTurnRow } from "../chat-turn-row";
+import type { TraceListItem } from "../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 function turn(over: Partial<TraceListItem>): TraceListItem {
   return {

@@ -20,7 +20,7 @@ import {
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LangyResourceKind } from "@langwatch/langy-contract";
-import type { LangyProgressSample } from "../model/values/langy-turn";
+import type { LangyProgressSample } from "../model/values/langy-turn.ts";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).

@@ -3,21 +3,21 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
-import type { GatewaySpendState } from "../../projections/gateway-spend.projection";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process";
-import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../processes/gateway-spend-commands.process";
+import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
+import type { GatewaySpendState } from "../../projections/gateway-spend.projection.ts";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process.ts";
+import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../processes/gateway-spend-commands.process.ts";
 import {
   GatewaySpendFiltersAdapter,
   SPEND_STATUS_IN_FLIGHT,
   type SpendEventStatus,
-} from "../../adapters/gateway-spend-filters.adapter";
+} from "../../adapters/gateway-spend-filters.adapter.ts";
 import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
-import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter";
+import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter.ts";
 import {
   GatewaySpendCursorAdapter,
   type GatewaySpendEventsCursor,
-} from "../../adapters/gateway-spend-cursor.adapter";
+} from "../../adapters/gateway-spend-cursor.adapter.ts";
 import {
   GatewaySpendEventsPort,
   type SpendBucket,
@@ -26,7 +26,7 @@ import {
   type SpendFilters,
   type SpendGroupByKey,
   type SpendSummaryRow,
-} from "../../ports/gateway-spend-events.port";
+} from "../../ports/gateway-spend-events.port.ts";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;

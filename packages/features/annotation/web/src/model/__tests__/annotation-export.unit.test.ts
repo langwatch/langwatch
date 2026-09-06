@@ -9,9 +9,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { allAnnotationsExport, annotationListExport, csvFileName } from "../annotation-export";
+import { allAnnotationsExport, annotationListExport, csvFileName } from "../annotation-export.ts";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import type { AnnotationRow } from "../annotation-row";
+import type { AnnotationRow } from "../annotation-row.ts";
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
   id: "annotation-1",

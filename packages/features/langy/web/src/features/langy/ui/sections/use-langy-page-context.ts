@@ -1,21 +1,21 @@
 import { useEffect, useMemo } from "react";
 import { useInRouterContext, useLocation } from "react-router";
-import { useLangy } from "../../../../ui/sections/langy-page-context";
+import { useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import {
   datasetContextChip,
   mergeContextChips,
   traceContextChip,
-} from "../../../../behavior/langy-context-chips";
-import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store";
+} from "../../../../behavior/langy-context-chips.ts";
+import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store.ts";
 import {
   type LangyContextChip,
   selectAddableChips,
   selectVisibleChips,
   useLangyStore,
-} from "../../../../behavior/langy.store";
-import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context";
-import { useLangySelectionContext } from "../../behavior/use-langy-selection-context";
-import { useLangyTraceViewContext } from "../../behavior/use-langy-trace-view-context";
+} from "../../../../behavior/langy.store.ts";
+import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context.ts";
+import { useLangySelectionContext } from "../../behavior/use-langy-selection-context.ts";
+import { useLangyTraceViewContext } from "../../behavior/use-langy-trace-view-context.ts";
 
 /**
  * Captures what the user is currently DOING and turns it into composer context chips,

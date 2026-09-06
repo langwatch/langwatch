@@ -7,7 +7,7 @@
  * knows how to resolve one.
  */
 
-import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-lite-chart";
+import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
@@ -16,7 +16,7 @@ import {
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
 } from "@langwatch/analytics-contract/visualization";
-import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens";
+import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens.ts";
 
 export interface LangWatchQLVegaLiteChartProps {
   readonly spec: unknown;

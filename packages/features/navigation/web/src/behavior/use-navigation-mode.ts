@@ -3,7 +3,7 @@ import {
   DEFAULT_NAVIGATION_MODE,
   loadStoredNavigationMode,
   useNavigationModeStore,
-} from "./navigation-mode.store";
+} from "./navigation-mode.store.ts";
 
 /**
  * Which navigation shell this device renders: the stored pick, or the

@@ -15,7 +15,7 @@ import {
   type MetricProcessingEvent,
 } from "@langwatch/metric-contract";
 import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
-import { createCodingAgentMetricFactsDispatchSubscriber } from "../coding-agent-metric-facts-dispatch.subscriber";
+import { createCodingAgentMetricFactsDispatchSubscriber } from "../coding-agent-metric-facts-dispatch.subscriber.ts";
 
 const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);

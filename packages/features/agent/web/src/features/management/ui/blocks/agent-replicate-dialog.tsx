@@ -2,7 +2,7 @@ import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/re
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
-import type { AgentCopyTarget } from "../../../../model/agent-management-host";
+import type { AgentCopyTarget } from "../../../../model/agent-management-host.ts";
 
 /**
  * Replicating one agent into another project.

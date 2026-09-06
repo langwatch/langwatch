@@ -10,14 +10,14 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
+} from "../../../api.application.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
-import { composeIntegrationsChecksFeature } from "../integrations-checks.composition";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { composeIntegrationsChecksFeature } from "../integrations-checks.composition.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";

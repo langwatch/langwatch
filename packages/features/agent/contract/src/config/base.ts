@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fieldSchema } from "../fields";
+import { fieldSchema } from "../fields.ts";
 
 export const baseAgentConfigSchema = z.object({
   _library_ref: z.string().optional(),

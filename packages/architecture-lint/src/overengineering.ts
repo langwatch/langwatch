@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
-import { walkFiles } from "./files";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
+import { walkFiles } from "./files.ts";
 import {
   isOverengineeringSource,
   overengineeringFindings,

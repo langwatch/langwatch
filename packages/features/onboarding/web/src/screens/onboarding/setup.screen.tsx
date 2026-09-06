@@ -10,7 +10,7 @@
  * permissions, nothing refused while an answer is still arriving — now lives.
  */
 
-import WelcomeLayout from "../../ui/sections/welcome/welcome-layout";
+import WelcomeLayout from "../../ui/sections/welcome/welcome-layout.tsx";
 
 export default function SetupGuide() {
   return <WelcomeLayout />;

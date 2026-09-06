@@ -31,7 +31,7 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
  * provider type, whichever row currently owns it. An organization adding its
  * first OpenAI key has an entry with nothing in it, which is what this is.
  */
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     providers: {
       openai: {
@@ -52,7 +52,7 @@ vi.mock("../../../behavior/use-model-providers-settings", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const query = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, isSuccess: true, refetch: vi.fn() }),
   });
@@ -110,8 +110,8 @@ vi.mock("../../../behavior/model-provider-api", () => {
   };
 });
 
-import { EditModelProviderDrawer } from "../edit-model-provider-drawer";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { EditModelProviderDrawer } from "../edit-model-provider-drawer.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const OPEN_FOR_A_NEW_OPENAI_KEY = (
   <EditModelProviderDrawer providerKey="openai" modelProviderId="new" projectId="proj-1" />

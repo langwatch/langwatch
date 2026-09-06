@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository";
+import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository.ts";
 
 function knownRequestError(code: string) {
   return new Prisma.PrismaClientKnownRequestError("conflict", {

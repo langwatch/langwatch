@@ -4,8 +4,8 @@ import {
   type TraceSpanTokenEstimationPort,
   type TraceTokenCounterPort,
 } from "@langwatch/trace-server";
-import { WorkerTiktokenCounterAdapter } from "../platform/infrastructure/worker-token-counter.adapter";
-import type { WorkerTraceTokenizerConfig } from "../platform/config/worker.config";
+import { WorkerTiktokenCounterAdapter } from "../platform/infrastructure/worker-token-counter.adapter.ts";
+import type { WorkerTraceTokenizerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The token counts this process would stamp on a span that arrived without any.

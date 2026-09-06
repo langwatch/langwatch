@@ -16,10 +16,10 @@ import { ArrowLeft } from "lucide-react";
 /** An agent as the browser holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AgentHttpEditorTabs } from "./agent-http-editor-tabs";
-import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation";
-import { HttpMethodSelector } from "../elements/http-method-selector";
-import type { HttpTestResult } from "../../model/http-test.types";
+import { AgentHttpEditorTabs } from "./agent-http-editor-tabs.tsx";
+import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation.tsx";
+import { HttpMethodSelector } from "../elements/http-method-selector.tsx";
+import type { HttpTestResult } from "../../model/http-test.types.ts";
 
 const DEFAULT_URL = "https://api.example.com/agent/chat";
 const DEFAULT_METHOD: HttpMethod = "POST";

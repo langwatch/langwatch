@@ -5,9 +5,9 @@
 
 import { useCallback } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 export type RunPlanArchive = {
   isArchiving: boolean;

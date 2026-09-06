@@ -4,16 +4,16 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerModelProviders,
   tryCreateWorkerModelProviders,
   WorkerModelProviderAbsenceReportPort,
   type WorkerModelProviderTenancy,
   type WorkerModelProviders,
-} from "../worker-model-provider.composition";
-import { createWorkerEvaluationModelEnv } from "../worker-evaluation-model-env.composition";
-import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering.composition";
+} from "../worker-model-provider.composition.ts";
+import { createWorkerEvaluationModelEnv } from "../worker-evaluation-model-env.composition.ts";
+import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering.composition.ts";
 
 /**
  * Spec: specs/worker/worker-capability-mount.feature

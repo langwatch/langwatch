@@ -5,19 +5,19 @@ import {
   OffboardIncompleteError,
 } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter";
+import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter.ts";
 import {
   type AuthzGrantRepository,
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
-} from "../repositories/authz-grant.repository";
-import { AuthzGrantsService } from "../services/authz-grants.service";
-import { AuthzService } from "../services/authz.service";
-import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
+} from "../repositories/authz-grant.repository.ts";
+import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzService } from "../services/authz.service.ts";
+import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 
 const ORG = "org-1";
 const OTHER_ORG = "org-other";

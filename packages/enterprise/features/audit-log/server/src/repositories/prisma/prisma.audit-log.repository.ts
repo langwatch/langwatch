@@ -1,5 +1,5 @@
 import type { AuditLogEntry } from "@langwatch/enterprise-audit-log-contract";
-import { AuditLogRepository } from "../audit-log.repository";
+import { AuditLogRepository } from "../audit-log.repository.ts";
 
 export type AuditLogPrismaClient = {
   auditLog: {

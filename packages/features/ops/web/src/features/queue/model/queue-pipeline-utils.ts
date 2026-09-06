@@ -1,6 +1,6 @@
-import { formatTimeAgo } from "../../../model/ops-formatters";
-import type { OpsPipelineNode, OpsQueueGroup } from "./queue-presentation";
-import type { StatusFilter } from "./queue-types";
+import { formatTimeAgo } from "../../../model/ops-formatters.ts";
+import type { OpsPipelineNode, OpsQueueGroup } from "./queue-presentation.ts";
+import type { StatusFilter } from "./queue-types.ts";
 
 export function isNodePaused(
   node: OpsPipelineNode,

@@ -1,14 +1,14 @@
 import { Badge, Box, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { GroupStateBadge } from "../elements/queue-group-state-badge";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
 import {
   classifyGroup,
   describeNextRun,
   type GroupClassification,
-} from "../../model/queue-pipeline-utils";
-import { GroupJobsSection } from "../blocks/queue-group-jobs-section";
+} from "../../model/queue-pipeline-utils.ts";
+import { GroupJobsSection } from "../blocks/queue-group-jobs-section.tsx";
 
 function DetailField({ label, children }: { label: string; children: ReactNode }) {
   return (

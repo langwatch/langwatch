@@ -5,8 +5,8 @@ import {
   CHAPTERS,
   type ChapterId,
   chapterIndex,
-} from "../../../../model/explorer/onboarding/chapters/chapters";
-import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
+} from "../../../../model/explorer/onboarding/chapters/chapters.ts";
+import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 
 interface BeadStripProps {
   /** Current journey stage — used to compute which dot is active. */

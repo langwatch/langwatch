@@ -6,7 +6,7 @@ import {
   type SpanInputOutput,
   spanInputOutputSchema,
   spanTypesSchema,
-} from "./trace-format.schemas";
+} from "./trace-format.schemas.ts";
 
 /**
  * The only patch version this build understands. A row stored under any other

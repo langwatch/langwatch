@@ -9,12 +9,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support";
-import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository";
-import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../../intents/gateway-spend-settlement.intent";
-import type { OpenAdmission } from "../../../ports/gateway-open-admissions.port";
-import type { GatewaySpendState } from "../../../projections/gateway-spend.projection";
+} from "./support/clickhouse-endpoint.support.ts";
+import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../../intents/gateway-spend-settlement.intent.ts";
+import type { OpenAdmission } from "../../../ports/gateway-open-admissions.port.ts";
+import type { GatewaySpendState } from "../../../projections/gateway-spend.projection.ts";
 
 const chUrl = testClickHouseUrl();
 

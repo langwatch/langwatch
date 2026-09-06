@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
-} from "../model-cost-preview.service";
-import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service";
+} from "../model-cost-preview.service.ts";
+import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service.ts";
 
 const service = ModelCostPreviewService.create({
   regexSafety: ModelCostRegexSafetyService.create(),

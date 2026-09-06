@@ -2,15 +2,15 @@ import { Box, Button, Heading, HStack, Input, Spinner, Text, VStack } from "@cha
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import GovernanceLayout from "../../ui/sections/governance-layout";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
-import { DepartmentEditDrawer } from "../../features/departments/ui/sections/department-edit-drawer";
-import { Link } from "../../ui/elements/governance-link";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
+import { DepartmentEditDrawer } from "../../features/departments/ui/sections/department-edit-drawer.tsx";
+import { Link } from "../../ui/elements/governance-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
-import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useGovernanceScope } from "../../behavior/governance-session";
-import { api, type RouterOutputs } from "../../behavior/governance-api";
+import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useGovernanceScope } from "../../behavior/governance-session.ts";
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 type Department = RouterOutputs["departments"]["list"][number];
 
 /**

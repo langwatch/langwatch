@@ -6,8 +6,8 @@ import type {
   StoredObjectsService,
   PayloadStagingPort,
 } from "@langwatch/stored-object-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount.ts";
 
 /** The namespace, the `ctx.app` slice, and the byte store the doors take. */
 export type ComposedStoredObjectFeature = Readonly<{

@@ -5,10 +5,10 @@ import {
   EvaluationInputsResolutionPort,
   type EvaluationClickHouseResolver,
   type EvaluationRetentionFloorPort,
-} from "../ports/evaluation.port";
-import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository";
-import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository";
-import { EvaluationService } from "../services/evaluation.service";
+} from "../ports/evaluation.port.ts";
+import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
+import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
+import { EvaluationService } from "../services/evaluation.service.ts";
 
 export type EvaluationAdapterOptions = {
   resolveClickHouse: EvaluationClickHouseResolver;

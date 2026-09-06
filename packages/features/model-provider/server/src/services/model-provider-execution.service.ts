@@ -13,8 +13,8 @@ import {
   type ModelProviderExecutionParameters,
   type ModelProviderExecutionPrepareInput,
 } from "@langwatch/model-provider-contract";
-import type { ModelProviderCatalog } from "../ports/model-provider.port";
-import { ModelProviderQueryService } from "./model-provider-query.service";
+import type { ModelProviderCatalog } from "../ports/model-provider.port.ts";
+import { ModelProviderQueryService } from "./model-provider-query.service.ts";
 
 type ModelProviderExecutionOptions = {
   query: ModelProviderQueryService;

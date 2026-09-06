@@ -36,7 +36,7 @@ import {
   type StagedNlpPayload,
 } from "@langwatch/workflow-server/testing";
 
-import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess";
+import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess.ts";
 
 // Unique port alongside the other nlpgo subprocess integration tests
 // (55610 / 55611 / 55612 / 55613 / 55614 / 55620 — see CLAUDE.md). 55615 is

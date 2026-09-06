@@ -10,7 +10,7 @@ import {
   resolveExperimentDecision,
   type ExperimentEvaluationTarget,
   type FeatureFlagExperiment,
-} from "../feature-flag-experiment";
+} from "../feature-flag-experiment.ts";
 
 const EXPERIMENT: FeatureFlagExperiment = {
   title: "An experiment",

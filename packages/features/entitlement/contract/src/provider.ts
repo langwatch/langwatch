@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Plan } from "./plan";
+import type { Plan } from "./plan.ts";
 
 export const planProviderUserSchema = z.object({
   id: z.string().optional(),

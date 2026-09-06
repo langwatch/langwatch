@@ -3,7 +3,7 @@ import {
   ClickHouseConfigService,
   DuplicatePrivateClickHouseRouteError,
   InvalidClickHouseConfigurationError,
-} from "../config";
+} from "../config.ts";
 
 describe("ClickHouseConfigService", () => {
   it("resolves typed process configuration without reading ambient environment", () => {

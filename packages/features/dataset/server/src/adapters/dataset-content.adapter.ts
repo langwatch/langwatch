@@ -9,11 +9,11 @@ import {
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { DatasetContentPort } from "../ports/dataset.port";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import type { ChunkOffset } from "../rules/dataset-chunking.rules";
-import { DatasetChunkService } from "../services/dataset-chunk.service";
+import { DatasetContentPort } from "../ports/dataset.port.ts";
+import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
+import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 import { DatasetChunkCountMissingError, DatasetNotReadyError } from "@langwatch/dataset-contract";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */

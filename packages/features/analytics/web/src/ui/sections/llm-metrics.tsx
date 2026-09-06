@@ -1,10 +1,10 @@
 import { Card, Grid, GridItem, Heading, HStack, IconButton, Tabs } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { analyticsMetrics } from "../../model/analytics-registry";
-import { CustomGraph, type CustomGraphInput } from "./custom-graph";
-import { LLMSummary } from "./llm-summary";
-import { Link } from "../elements/analytics-link";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { analyticsMetrics } from "../../model/analytics-registry.ts";
+import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
+import { LLMSummary } from "./llm-summary.tsx";
+import { Link } from "../elements/analytics-link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 // Time unit conversion constants

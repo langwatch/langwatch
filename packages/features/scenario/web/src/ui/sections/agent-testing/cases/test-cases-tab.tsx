@@ -5,10 +5,10 @@
  */
 
 import { HStack, VStack } from "@chakra-ui/react";
-import { TestCasesDialogs } from "./test-cases-dialogs";
-import { TestCasesPanel } from "./test-cases-panel";
-import { TestCasesRail } from "./test-cases-rail";
-import { useTestCasesTab } from "./use-test-cases-tab";
+import { TestCasesDialogs } from "./test-cases-dialogs.tsx";
+import { TestCasesPanel } from "./test-cases-panel.tsx";
+import { TestCasesRail } from "./test-cases-rail.tsx";
+import { useTestCasesTab } from "./use-test-cases-tab.ts";
 
 export function TestCasesTab() {
   const model = useTestCasesTab();

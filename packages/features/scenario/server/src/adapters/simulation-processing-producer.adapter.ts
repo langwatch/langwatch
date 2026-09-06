@@ -9,17 +9,17 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { SimulationExecutionPort } from "../ports/simulation-execution.port";
-import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection";
-import type { SimulationRunStateData } from "../projections/simulation-run-state.projection";
+import { SimulationExecutionPort } from "../ports/simulation-execution.port.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection.ts";
+import type { SimulationRunStateData } from "../projections/simulation-run-state.projection.ts";
 import {
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   simulationRunExecutionPM,
-} from "../processes/simulation-run-execution.process";
-import { ComputeRunMetricsCommand } from "./compute-run-metrics.adapter";
-import { FinishRunCommand } from "./finish-run.adapter";
-import { SimulationClickHouseAdapter } from "./simulation.clickhouse.adapter";
-import { SimulationProcessingPipelineAdapter } from "./simulation-processing-pipeline.adapter";
+} from "../processes/simulation-run-execution.process.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.adapter.ts";
+import { FinishRunCommand } from "./finish-run.adapter.ts";
+import { SimulationClickHouseAdapter } from "./simulation.clickhouse.adapter.ts";
+import { SimulationProcessingPipelineAdapter } from "./simulation-processing-pipeline.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

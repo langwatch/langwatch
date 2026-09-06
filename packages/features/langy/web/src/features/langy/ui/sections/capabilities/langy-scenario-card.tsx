@@ -10,9 +10,9 @@ import {
   extractResourceName,
   extractToolText,
   summaryLines,
-} from "../../../model/capabilities/capability-registry";
-import { isSerializedDocumentLine } from "../../../../../model/langy-capability-registry";
-import { LangyCapabilityCard } from "./langy-capability-card";
+} from "../../../model/capabilities/capability-registry.ts";
+import { isSerializedDocumentLine } from "../../../../../model/langy-capability-registry.ts";
+import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 /** Keys a scenario or simulation run reports its state under. */
 const STATUS_KEYS = ["status", "verdict", "result", "outcome", "state"];

@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ModelProviderDefaultsService } from "../model-provider-defaults.service";
+import { ModelProviderDefaultsService } from "../model-provider-defaults.service.ts";
 
 const FEATURES = [
   { key: "prompt.create_default", role: "DEFAULT", displayName: "Prompts", description: "" },

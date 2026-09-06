@@ -16,19 +16,19 @@ import type {
   CodingAgentPullRequestDetail,
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput,
-} from "./coding-agent";
+} from "./coding-agent.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { contentAttrKeys, logContentKeys, type LogContentKey } from "./coding-agent-log-content";
+import { contentAttrKeys, logContentKeys, type LogContentKey } from "./coding-agent-log-content.ts";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
   type TranscriptLogRecord,
-} from "./coding-agent-transcript";
-import { shouldFilterCodingAgentSpan } from "./telemetry/coding-agent-span-filter";
+} from "./coding-agent-transcript.ts";
+import { shouldFilterCodingAgentSpan } from "./telemetry/coding-agent-span-filter.ts";
 import type {
   CodingAgentTracePullRequestInput,
   CodingAgentTracePullRequestLink,
-} from "./coding-agent-trace-pull-request";
+} from "./coding-agent-trace-pull-request.ts";
 
 export type CodingAgentSpanFilterInput = {
   scopeName: string | null | undefined;

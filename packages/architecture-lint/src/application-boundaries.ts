@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "./files";
-import { exportedSubpaths } from "./manifests";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import { walkFiles } from "./files.ts";
+import { exportedSubpaths } from "./manifests.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const LEGACY_BASELINE_PATH = join(

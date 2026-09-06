@@ -4,7 +4,7 @@ import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
-import { LangyPromptPort, LangyPromptRegistryService } from "../langy-prompt-registry.service";
+import { LangyPromptPort, LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
 
 const FALLBACK = "IN-REPO FALLBACK PROMPT";
 const PROJECT_ID = "project_system";

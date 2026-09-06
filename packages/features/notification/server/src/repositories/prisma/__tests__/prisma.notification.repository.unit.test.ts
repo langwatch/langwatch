@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PrismaNotificationRepository,
   type NotificationDatabase,
-} from "../prisma.notification.repository";
+} from "../prisma.notification.repository.ts";
 
 const rows = [
   {

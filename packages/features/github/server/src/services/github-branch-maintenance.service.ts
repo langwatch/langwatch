@@ -1,8 +1,8 @@
-import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository";
+import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
-} from "./github-branch-mapping.service";
+} from "./github-branch-mapping.service.ts";
 
 const ACTIVE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

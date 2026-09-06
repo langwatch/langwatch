@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { authClient, navigate, safeRedirectTarget } from "./auth-client";
-import { rememberLastUsedMethod } from "../model/last-used-method";
+import { authClient, navigate, safeRedirectTarget } from "./auth-client.tsx";
+import { rememberLastUsedMethod } from "../model/last-used-method.ts";
 
 /**
  * The waiting half: ask whether the browser can do this at all, then leave a

@@ -1,32 +1,32 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { DisabledPipeline } from "./disabledPipeline";
-import type { Event, Projection } from "./domain/types";
-import { createEventCatalogue } from "./domain/definitions";
+import { DisabledPipeline } from "./disabledPipeline.ts";
+import type { Event, Projection } from "./domain/types.ts";
+import { createEventCatalogue } from "./domain/definitions.ts";
 import type {
   NoCommands,
   RegisteredCommand,
   StaticPipelineDefinition,
-} from "./pipeline/staticBuilder.types";
-import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types";
-import { ProcessRuntime } from "./process-manager/processRuntime";
-import type { ProcessStore } from "./process-manager/stores/processStore.types";
-import { ProjectionRegistry } from "./projections/projectionRegistry";
-import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck";
+} from "./pipeline/staticBuilder.types.ts";
+import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types.ts";
+import { ProcessRuntime } from "./process-manager/processRuntime.ts";
+import type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
+import { ProjectionRegistry } from "./projections/projectionRegistry.ts";
+import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck.ts";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   JobDelivery,
-} from "./queues";
-import { EventSourcedQueueProcessorMemory } from "./queues/memory";
-import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types";
-import { EventSourcingPipeline } from "./runtimePipeline";
-import { ConfigurationError, QueueError } from "./services/errorHandling";
-import type { JobRegistryEntry } from "./services/queues/queueManager";
-import { resolveCoalesceMaxBatch } from "./services/queues/queueManager";
-import type { EventStore } from "./stores/eventStore.types";
-import type { KillSwitchPort } from "./kill-switch";
+} from "./queues/index.ts";
+import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
+import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.ts";
+import { EventSourcingPipeline } from "./runtimePipeline.ts";
+import { ConfigurationError, QueueError } from "./services/errorHandling.ts";
+import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
+import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
+import type { EventStore } from "./stores/eventStore.types.ts";
+import type { KillSwitchPort } from "./kill-switch/index.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 

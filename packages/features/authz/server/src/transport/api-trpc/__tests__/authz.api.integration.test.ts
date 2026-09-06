@@ -6,8 +6,8 @@
 import type { AuthzScopeRef, AuthzService } from "@langwatch/authz-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { AuthzApp } from "../../../app/authz.app";
-import { AuthzTrpcApi } from "../authz.api";
+import { AuthzApp } from "../../../app/authz.app.ts";
+import { AuthzTrpcApi } from "../authz.api.ts";
 
 const USER_ID = "user_1";
 const PROJECT_ID = "project_1";

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { buildMarkdownComponents } from "./components";
+import { buildMarkdownComponents } from "./components.tsx";
 
 /**
  * Reusable rendered-markdown block. Maps markdown → Chakra components so typography,

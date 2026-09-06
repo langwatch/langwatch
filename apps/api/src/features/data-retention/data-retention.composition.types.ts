@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createDataRetentionTrpcRouter } from "./data-retention-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createDataRetentionTrpcRouter } from "./data-retention-trpc.mount.ts";
 
 /** The namespace, the composed policy, and the service every reader shares. */
 export type ComposedDataRetentionFeature = Readonly<{

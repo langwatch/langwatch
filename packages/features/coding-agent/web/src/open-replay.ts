@@ -5,9 +5,9 @@
 // a second answer to "which trace is open".
 import { useDrawerStore } from "@langwatch/trace-web/surfaces/trace-drawer-store";
 
-import type { codingAgentApi } from "./coding-agent-api";
-import type { CodingAgentToaster } from "./coding-agent-feedback";
-import type { CodingAgentRouter } from "./coding-agent-router";
+import type { codingAgentApi } from "./coding-agent-api.ts";
+import type { CodingAgentToaster } from "./coding-agent-feedback.ts";
+import type { CodingAgentRouter } from "./coding-agent-router.ts";
 
 /** The one turn a replay opens on: the last thing the session did. */
 export type ConversationTurn = { traceId: string; timestamp: number };

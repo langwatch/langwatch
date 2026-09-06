@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { type ShortcutContext, TRACE_DRAWER_SHORTCUTS } from "./trace-drawer-shortcut-table";
-import type { ConversationContextResult } from "./use-conversation-context";
-import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { type ShortcutContext, TRACE_DRAWER_SHORTCUTS } from "./trace-drawer-shortcut-table.ts";
+import type { ConversationContextResult } from "./use-conversation-context.ts";
+import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation.ts";
 
 interface ShortcutsParams {
   trace: TraceHeader | null;

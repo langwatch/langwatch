@@ -6,11 +6,11 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
-import type { LangyTitleGenerator } from "../ports/langy-effect.port";
-import type { LangyTitleModelPort } from "../ports/langy-title-model.port";
+import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
+import type { LangyTitleModelPort } from "../ports/langy-title-model.port.ts";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules";
-import type { LangyTrustedMessageReader } from "./langy-message.service";
+import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
+import type { LangyTrustedMessageReader } from "./langy-message.service.ts";
 
 const logger = createLogger("langwatch:langy:title-generator");
 

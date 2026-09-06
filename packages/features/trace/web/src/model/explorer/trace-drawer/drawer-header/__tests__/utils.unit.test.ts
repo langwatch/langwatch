@@ -3,7 +3,7 @@
  * where every value is a string and a key may simply be absent.
  */
 import { describe, expect, it } from "vitest";
-import { readNumberAttribute } from "../utils";
+import { readNumberAttribute } from "../utils.ts";
 
 const RESERVED_SUM = "langwatch.reserved.cache_read_tokens";
 const RAW_PER_SPAN = "gen_ai.usage.cache_read.input_tokens";

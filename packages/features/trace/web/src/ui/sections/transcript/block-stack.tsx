@@ -2,19 +2,19 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
 import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
-import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown";
-import { asMarkdownBody, withBlockKeys } from "../../../behavior/transcript/parsing";
-import { ContextDisclosure } from "../../blocks/transcript/context-disclosure";
+import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+import { asMarkdownBody, withBlockKeys } from "../../../behavior/transcript/parsing.ts";
+import { ContextDisclosure } from "../../blocks/transcript/context-disclosure.tsx";
 import {
   itemBlockKey,
   pairToolBlocks,
   type StackItem,
-} from "../../../model/transcript/block-stack-items";
-import { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block";
-import { ReasoningBlock } from "../../blocks/transcript/reasoning-block";
-import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks";
-import type { ChatMessage, ContentBlock } from "../../../model/transcript/types";
-import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports";
+} from "../../../model/transcript/block-stack-items.ts";
+import { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block.ts";
+import { ReasoningBlock } from "../../blocks/transcript/reasoning-block.tsx";
+import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks.tsx";
+import type { ChatMessage, ContentBlock } from "../../../model/transcript/types.ts";
+import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports.tsx";
 
 export interface BlockStackProps {
   blocks: ContentBlock[];
@@ -225,5 +225,5 @@ export function BlockStack({
   );
 }
 
-export { pairToolBlocks } from "../../../model/transcript/block-stack-items";
-export { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block";
+export { pairToolBlocks } from "../../../model/transcript/block-stack-items.ts";
+export { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block.ts";

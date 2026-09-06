@@ -4,10 +4,10 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { TargetValue } from "../../../../model/scenario-target";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import type { RunScope } from "./run-configuration";
+import type { RunScope } from "./run-configuration.ts";
 
 /**
  * One target the run goes against: the agent, and in a comparison the

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { MENU_ITEM_HEIGHT } from "./side-menu-link";
+import { MENU_ITEM_HEIGHT } from "./side-menu-link.tsx";
 
 export type ThemeToggleProps = {
   showLabel?: boolean;

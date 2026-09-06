@@ -1,4 +1,4 @@
-import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "./types";
+import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "./types.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {

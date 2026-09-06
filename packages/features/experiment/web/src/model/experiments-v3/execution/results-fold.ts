@@ -1,6 +1,6 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { type EvaluationV3Event, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
-import type { EvaluationResults, TargetRowMetadata } from "../types";
+import type { EvaluationResults, TargetRowMetadata } from "../types.ts";
 
 /**
  * How a run's events become the cells the workbench shows.

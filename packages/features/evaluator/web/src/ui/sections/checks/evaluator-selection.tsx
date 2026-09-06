@@ -27,7 +27,7 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { CheckConfigFormData } from "./check-config-form";
+import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type Category = EvaluatorDefinition["category"];
 

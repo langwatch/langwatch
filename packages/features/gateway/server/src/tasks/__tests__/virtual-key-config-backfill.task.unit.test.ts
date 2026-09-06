@@ -5,8 +5,8 @@ import {
   type MintGuardrailInput,
   type MintRoutingPolicyInput,
   type VirtualKeyRow,
-} from "../../repositories/gateway-virtual-key-config-backfill.repository";
-import { backfillVirtualKeyConfig } from "../virtual-key-config-backfill.task";
+} from "../../repositories/gateway-virtual-key-config-backfill.repository.ts";
+import { backfillVirtualKeyConfig } from "../virtual-key-config-backfill.task.ts";
 
 function fakeRepository(virtualKeys: VirtualKeyRow[]) {
   const updates: Array<{

@@ -21,7 +21,7 @@ import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
 } from "@langwatch/model-provider-contract";
-import { makeProvider } from "./model-provider.test-helpers";
+import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("buildCustomModelDisplayNames()", () => {
   describe("given a custom chat model with a display name", () => {

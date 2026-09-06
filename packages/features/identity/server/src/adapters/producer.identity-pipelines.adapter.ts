@@ -1,45 +1,45 @@
 /**
  * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
  */
-import { IdentityGuardsService } from "../services/identity-guards.service";
-import { JoinRequestGuardsService } from "../services/join-request-guards.service";
-import { MfaGuardsService } from "../services/mfa-guards.service";
-import { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
-import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
-import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
-import type { JoinRequestReadRepository } from "../repositories/join-request.repository";
-import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository";
-import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
+import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
+import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
+import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
-} from "../repositories/sso-connection.repository";
+} from "../repositories/sso-connection.repository.ts";
 import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
 import {
   IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
-} from "./identity-pipeline-definition.adapter";
-import type { IdentityFoldState } from "../projections/identity-state.projection";
-import type { MfaFoldState } from "../projections/mfa-enrollment-state.projection";
+} from "./identity-pipeline-definition.adapter.ts";
+import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
+import type { MfaFoldState } from "../projections/mfa-enrollment-state.projection.ts";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
-} from "./join-request-pipeline-definition.adapter";
-import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
-import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
+} from "./join-request-pipeline-definition.adapter.ts";
+import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
 import {
   ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
-} from "./scim-sync-pipeline-definition.adapter";
-import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection";
-import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
-import type { ConnectionTeardownPort } from "../processes/connection-teardown.process";
-import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
-import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter";
+} from "./scim-sync-pipeline-definition.adapter.ts";
+import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection.ts";
+import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter.ts";
+import type { ConnectionTeardownPort } from "../processes/connection-teardown.process.ts";
+import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
+import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(input: { processName: string; pipeline: string; capability: string }): Error {

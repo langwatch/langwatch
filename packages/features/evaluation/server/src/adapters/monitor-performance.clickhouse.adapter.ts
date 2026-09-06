@@ -1,6 +1,6 @@
-import type { EvaluationClickHouseResolver } from "../ports/evaluation.port";
-import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository";
-import { MonitorPerformanceService } from "../services/monitor-performance.service";
+import type { EvaluationClickHouseResolver } from "../ports/evaluation.port.ts";
+import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
+import { MonitorPerformanceService } from "../services/monitor-performance.service.ts";
 
 /**
  * Composes the trend read alone, over a routed ClickHouse.

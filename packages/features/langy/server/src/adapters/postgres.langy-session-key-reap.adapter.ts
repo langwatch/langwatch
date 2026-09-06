@@ -1,9 +1,9 @@
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
 import {
   PrismaLangySessionKeyReapRepository,
   type PrismaLangySessionKeyReapDatabase,
-} from "../repositories/prisma/prisma.langy-session-key-reap.repository";
-import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service";
+} from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
+import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 
 /**
  * The process's Prisma client, as the sweep receives it.

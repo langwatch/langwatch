@@ -35,7 +35,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { InlineCopyButton } from "../elements/inline-copy-button";
+import { InlineCopyButton } from "../elements/inline-copy-button.tsx";
 
 interface CodePreviewProps {
   code: string;

@@ -6,7 +6,7 @@
  * A copy is two writes with the caller's own graph rewrite between them, and
  * this is the first of them.
  */
-import { WorkflowRowPort, type WorkflowRowDraft } from "../ports/workflow.port";
+import { WorkflowRowPort, type WorkflowRowDraft } from "../ports/workflow.port.ts";
 
 /** The one table this adapter writes, named structurally. */
 export type WorkflowRowDatabase = {

@@ -1,4 +1,4 @@
-import type { AnsiColor, AnsiColorName } from "./terminal-ansi-parser";
+import type { AnsiColor, AnsiColorName } from "./terminal-ansi-parser.ts";
 
 /**
  * A real terminal is dark, saturated, and high-contrast — REGARDLESS of

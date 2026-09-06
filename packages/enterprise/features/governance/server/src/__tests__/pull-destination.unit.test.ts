@@ -3,7 +3,7 @@ import { GovernanceValidationError } from "@langwatch/enterprise-governance-cont
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
   PullDestinationService,
-} from "../services/pull-destination.service";
+} from "../services/pull-destination.service.ts";
 
 const pullDestination = PullDestinationService.create();
 

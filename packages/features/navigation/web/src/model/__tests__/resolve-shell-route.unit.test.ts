@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { resolveShellRoute } from "../resolve-shell-route";
+import { resolveShellRoute } from "../resolve-shell-route.ts";
 
 function resolve(
   pathname: string,

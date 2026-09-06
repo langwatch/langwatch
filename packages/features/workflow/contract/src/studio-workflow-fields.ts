@@ -1,6 +1,6 @@
-import type { Component, Entry, StudioEdge, StudioNode, StudioWorkflow } from "./studio-workflow";
-import { checkIsEvaluator } from "./studio-workflow-node-utils";
-import type { WorkflowField } from "./workflow";
+import type { Component, Entry, StudioEdge, StudioNode, StudioWorkflow } from "./studio-workflow.ts";
+import { checkIsEvaluator } from "./studio-workflow-node-utils.ts";
+import type { WorkflowField } from "./workflow.ts";
 
 /**
  * Check if an entry output is connected to at least one non-evaluator node.

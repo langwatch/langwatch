@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 
 export function useAgentTestRun({ projectId }: { projectId: string }) {
   const { openDrawer } = useDrawer();

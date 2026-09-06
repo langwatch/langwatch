@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitLeadingContextBlocks } from "../index";
+import { splitLeadingContextBlocks } from "../index.ts";
 
 describe("splitLeadingContextBlocks", () => {
   describe("when a context block precedes the human text", () => {

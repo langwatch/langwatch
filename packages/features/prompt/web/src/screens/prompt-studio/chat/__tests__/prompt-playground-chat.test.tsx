@@ -13,11 +13,11 @@ import {
   PromptPlaygroundChatProvider,
   TabIdProvider,
   type TabData,
-} from "../../studio-internals";
-import { PromptPlaygroundChat, persistedMessagesKey } from "../prompt-playground-chat";
-import { SyncedChatInput } from "../synced-chat-input";
-import { PromptHostProvider } from "../../../../model/prompt-host";
-import { FakePromptHost } from "../../../../testing";
+} from "../../studio-internals.ts";
+import { PromptPlaygroundChat, persistedMessagesKey } from "../prompt-playground-chat.tsx";
+import { SyncedChatInput } from "../synced-chat-input.tsx";
+import { PromptHostProvider } from "../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked the
@@ -62,7 +62,7 @@ const TEST_PROJECT_ID = "test-project";
 const TEST_TAB_ID = "test-tab-123";
 
 // Mock useOrganizationTeamProject
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: { id: TEST_PROJECT_ID },
     projectId: TEST_PROJECT_ID,
@@ -110,13 +110,13 @@ vi.mock("@copilotkit/runtime-client-gql", () => ({
 
 // TraceMessage pulls in tRPC + trace drawer hooks; stub it so tests can
 // assert on its presence/absence only.
-vi.mock("../trace-message", () => ({
+vi.mock("../trace-message.tsx", () => ({
   TraceMessage: ({ traceId }: { traceId: string }) => (
     <div data-testid="trace-message" data-trace-id={traceId} />
   ),
 }));
 
-vi.mock("../../../../model/scenario-messages", () => ({
+vi.mock("../../../../model/scenario-messages.ts", () => ({
   convertScenarioMessagesToCopilotKit: vi.fn(() => []),
 }));
 

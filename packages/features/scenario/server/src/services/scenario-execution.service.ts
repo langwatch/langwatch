@@ -10,10 +10,10 @@ import type {
 
 import type { SimulationService } from "@langwatch/scenario-contract";
 
-import type { CancellationPublisherPort } from "../ports/cancellation-channel.port";
-import type { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port";
-import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service";
-import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service";
+import type { CancellationPublisherPort } from "../ports/cancellation-channel.port.ts";
+import type { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port.ts";
+import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
+import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 
 export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
   static create(options: {

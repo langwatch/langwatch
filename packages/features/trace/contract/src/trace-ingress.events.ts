@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants";
-import { piiRedactionLevelSchema } from "./trace-ingress.commands";
-import { traceIngressEventEnvelopeSchema } from "./trace-ingress.event-envelope";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp";
+import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
+import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
+import { traceIngressEventEnvelopeSchema } from "./trace-ingress.event-envelope.ts";
+import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
 
 export const spanReceivedEventMetadataSchema = z
   .object({

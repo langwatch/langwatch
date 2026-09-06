@@ -7,13 +7,13 @@ import {
   WorkflowBasePropertiesPanel,
   WorkflowPropertySectionTitle,
   type WorkflowPropertySectionTitleProps,
-} from "../../workflow-base-properties-panel";
+} from "../../workflow-base-properties-panel.tsx";
 
-import { HoverableBigText } from "../../hoverable-big-text";
+import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { ComponentIcon } from "../../../elements/workflow-icons";
-import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field";
+import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
+import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field.tsx";
 
 export { FieldsDefinition, FieldsForm, PropertyField };
 export { WorkflowPropertySectionTitle as PropertySectionTitle };

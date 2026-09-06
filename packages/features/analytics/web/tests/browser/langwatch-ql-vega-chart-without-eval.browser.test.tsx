@@ -45,8 +45,8 @@ vi.mock("@monaco-editor/react", () => {
 
 import embed from "vega-embed";
 
-import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode";
-import { lwqlVegaEmbedOptions, type LangWatchQLDatasetColumn } from "../../src/ui/sections/chart";
+import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode.tsx";
+import { lwqlVegaEmbedOptions, type LangWatchQLDatasetColumn } from "../../src/ui/sections/chart.ts";
 import { buildLangWatchQLVegaSpec } from "@langwatch/analytics-contract/visualization";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [

@@ -5,7 +5,7 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 
-import { explainAnyError } from "./errors";
+import { explainAnyError } from "./errors/index.ts";
 
 interface IsolatedErrorBoundaryProps {
   /**

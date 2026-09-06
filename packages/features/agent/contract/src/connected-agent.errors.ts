@@ -4,7 +4,7 @@
 
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import type { RefusedCode } from "./connected-agent.protocol";
+import type { RefusedCode } from "./connected-agent.protocol.ts";
 
 /** No live instance answered inside the first-turn grace. */
 export class AgentOfflineError extends HandledError {

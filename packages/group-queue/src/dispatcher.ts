@@ -2,8 +2,8 @@ import type { Logger } from "@langwatch/observability";
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { gqJobsDispatchedTotal } from "./metrics";
-import type { DispatchResult, GroupStagingScripts } from "./scripts";
+import { gqJobsDispatchedTotal } from "./metrics.ts";
+import type { DispatchResult, GroupStagingScripts } from "./scripts.ts";
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;

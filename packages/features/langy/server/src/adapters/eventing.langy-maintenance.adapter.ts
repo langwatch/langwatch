@@ -2,14 +2,14 @@ import { defineAggregate, defineEvents, definePipeline, type Event } from "@lang
 import {
   type LangySessionKeyReapDeps,
   runLangySessionKeyReap,
-} from "../intents/langy-session-key-reap.intent";
+} from "../intents/langy-session-key-reap.intent.ts";
 import {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   type LangySessionKeyReapState,
   langySessionKeyReapSchema,
   langySessionKeyReapWake,
-} from "../processes/langy-session-key-reap.process";
+} from "../processes/langy-session-key-reap.process.ts";
 
 export interface LangyMaintenancePipelineDeps {
   sessionKeyReap: LangySessionKeyReapDeps;

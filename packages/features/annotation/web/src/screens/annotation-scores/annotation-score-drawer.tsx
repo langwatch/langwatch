@@ -14,8 +14,8 @@
 
 import { HStack, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { AnnotationScoreForm } from "./annotation-score-form";
-import { useAnnotationScoresHost } from "./annotation-scores-host";
+import { AnnotationScoreForm } from "./annotation-score-form.tsx";
+import { useAnnotationScoresHost } from "./annotation-scores-host.ts";
 
 export const AnnotationScoreDrawer = ({
   onClose,

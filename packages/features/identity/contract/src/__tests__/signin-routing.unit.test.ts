@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeIdentifierValue } from "../identifier";
+import { normalizeIdentifierValue } from "../identifier.ts";
 import {
   compareToLegacy,
   type RoutableConnection,
@@ -9,7 +9,7 @@ import {
   legacyProviderOf,
   routeSignIn,
   routingIdentifierOf,
-} from "../signin-routing";
+} from "../signin-routing.ts";
 
 const PASSWORD: SignInMethod = {
   id: "password",

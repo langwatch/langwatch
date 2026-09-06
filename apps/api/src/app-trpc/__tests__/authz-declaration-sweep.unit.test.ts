@@ -20,7 +20,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { buildAppTrpcFeatures } from "./support/app-trpc-features";
+import { buildAppTrpcFeatures } from "./support/app-trpc-features.ts";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
 

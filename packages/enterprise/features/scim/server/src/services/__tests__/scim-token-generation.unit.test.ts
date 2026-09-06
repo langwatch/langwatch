@@ -9,13 +9,13 @@ import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
 } from "@langwatch/enterprise-scim-contract";
-import { ScimService } from "../scim.service";
+import { ScimService } from "../scim.service.ts";
 import { EntitlementService } from "@langwatch/entitlement-contract";
-import type { ScimRepositoryPort } from "../../ports/scim-repository.port";
-import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
-import { GrantsFake } from "../../__tests__/support/grants-fake";
-import type { ScimUserProvisioning } from "../scim-provisioning.service";
+import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 
 class FixedEntitlementService extends EntitlementService {
   async getActivePlan() {

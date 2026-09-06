@@ -32,7 +32,7 @@ import {
   LIST_API_KEYS,
   REVOKE_API_KEY,
   UPDATE_API_KEY,
-} from "../../rules/api-key-openapi.rules";
+} from "../../rules/api-key-openapi.rules.ts";
 
 const bindingSchema = z.object({
   role: z

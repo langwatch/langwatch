@@ -3,7 +3,7 @@ import type { SimulationRunResult as ScenarioResults } from "@langwatch/scenario
 import {
   CONSOLE_COLORS,
   REASONING_VERDICT_COLOR_MAP,
-} from "../../../model/simulation-console/constants";
+} from "../../../model/simulation-console/constants.ts";
 
 interface CriteriaDetailsProps {
   results?: ScenarioResults | null;

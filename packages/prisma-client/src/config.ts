@@ -1,4 +1,4 @@
-import type { Prisma } from "./generated/client";
+import type { Prisma } from "./generated/client.ts";
 
 export interface PrismaConfigurationInput {
   /** A validated PostgreSQL URL supplied by the composition root. */

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules";
-import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service";
-import { capPayloadString } from "../rules/trace-payload-cap.rules";
+import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
+import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service.ts";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 
 const claudeCodeTruncatedRequestService = ClaudeCodeTruncatedRequestService.create();
 

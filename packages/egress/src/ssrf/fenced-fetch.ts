@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 import { createLogger } from "@langwatch/observability";
 import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
-import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator";
+import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator.ts";
 
 /**
  * The fetch a validated destination is actually reached through.

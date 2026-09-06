@@ -11,16 +11,16 @@ import { describe, expect, it } from "vitest";
 import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
-} from "../../ports/trace-analytics-projection.port";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store";
+} from "../../ports/trace-analytics-projection.port.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-derived.projection";
-import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+} from "../trace-derived.projection.ts";
+import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * The version gate on the committed row. The row is trusted only when its

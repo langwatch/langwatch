@@ -4,13 +4,13 @@
  */
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { GithubInstallationsService } from "./github-installations.service";
-import type { GithubAppTokenPort, GithubPullRequestSummary } from "../ports/github-app-token.port";
+import type { GithubInstallationsService } from "./github-installations.service.ts";
+import type { GithubAppTokenPort, GithubPullRequestSummary } from "../ports/github-app-token.port.ts";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
-} from "../repositories/github-pull-requests.repository";
-import type { GithubPullRequestStatusCacheService } from "./github-pull-request-status-cache.service";
+} from "../repositories/github-pull-requests.repository.ts";
+import type { GithubPullRequestStatusCacheService } from "./github-pull-request-status-cache.service.ts";
 
 const logger = createLogger("langwatch:github:pull-request-status");
 

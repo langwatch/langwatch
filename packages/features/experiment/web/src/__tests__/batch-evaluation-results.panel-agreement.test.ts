@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { computeLeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict";
-import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto";
-import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
-import { areDistinguishable } from "../model/batch-evaluation-results.score-separation";
+import { computeLeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict.ts";
+import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto.ts";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy.ts";
+import { areDistinguishable } from "../model/batch-evaluation-results.score-separation.ts";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../model/batch-evaluation-results.bt-leaderboard";
-import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,

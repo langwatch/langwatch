@@ -1,19 +1,19 @@
 import { Box, Button, HStack, Input, Portal, Text, chakra } from "@chakra-ui/react";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project";
-import { api } from "../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 import { Popover } from "@langwatch/design-system/popover";
-import type { TargetValue } from "../../../model/scenario-target";
-import { useSession } from "../../../behavior/auth-session";
+import type { TargetValue } from "../../../model/scenario-target.ts";
+import { useSession } from "../../../behavior/auth-session.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   isAgentTarget,
   type ScenarioAgent,
   useFilteredAgents,
-} from "../../../behavior/scenarios/use-filtered-scenario-targets";
+} from "../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;

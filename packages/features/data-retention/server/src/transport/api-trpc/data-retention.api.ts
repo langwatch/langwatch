@@ -24,7 +24,7 @@ import { z } from "zod";
 
 type DataRetentionApplication = Readonly<{ dataRetention: DataRetentionService }>;
 
-import type { RetentionScopeTarget } from "../../ports/data-retention-directory.port";
+import type { RetentionScopeTarget } from "../../ports/data-retention-directory.port.ts";
 
 export type { RetentionScopeTarget };
 

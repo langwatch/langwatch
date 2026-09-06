@@ -3,7 +3,7 @@ import type {
   HandledErrorFault,
   SerializedHandledError,
   SerializedReason,
-} from "./serialized-handled-error";
+} from "./serialized-handled-error.ts";
 
 /**
  * The Go pkg/herr wire envelope — herr and HandledError are the SAME model (type ⇄ code, meta,

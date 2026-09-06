@@ -6,7 +6,7 @@ import {
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
   isEnterpriseTier,
-} from "../src";
+} from "../src/index.ts";
 
 const mockGetActivePlan = vi.fn();
 const planProvider = { getActivePlan: mockGetActivePlan };

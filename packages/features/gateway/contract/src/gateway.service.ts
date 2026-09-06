@@ -16,21 +16,21 @@ import type {
   GatewayResolvedBudget,
   ResetGatewayBudgetInput,
   UpdateGatewayBudgetInput,
-} from "./gateway.budget";
+} from "./gateway.budget.ts";
 import type {
   ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
   GatewayCacheRuleCursor,
   GatewayCacheRuleResource,
   UpdateGatewayCacheRuleInput,
-} from "./gateway-cache-rule";
+} from "./gateway-cache-rule.ts";
 import type {
   ArchiveGatewayGuardrailInput,
   CreateGatewayGuardrailInput,
   GatewayGuardrailBundleEntry,
   GatewayGuardrailResource,
   UpdateGatewayGuardrailInput,
-} from "./gateway-guardrail";
+} from "./gateway-guardrail.ts";
 
 export type GatewayConfigGuardrailAttachment = {
   direction: "pre" | "post" | "stream_chunk";

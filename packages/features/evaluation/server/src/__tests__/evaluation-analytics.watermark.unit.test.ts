@@ -1,16 +1,16 @@
 import { AnalyticsService } from "@langwatch/analytics-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port";
+import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection";
+} from "../projections/evaluation-analytics-fold.projection.ts";
 import type {
   EvaluationAnalyticsData,
   EvaluationAnalyticsRow,
-} from "../projections/evaluation-analytics-row.projection";
-import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store";
+} from "../projections/evaluation-analytics-row.projection.ts";
+import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
 
 /**
  * The write path for the evaluation fold. Two claims the executor's dedup and

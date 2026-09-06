@@ -24,10 +24,10 @@ import {
   type TRACE_MAPPINGS,
   type Trace,
 } from "@langwatch/trace-contract";
-import type { EvaluationTraceProtections } from "../ports/evaluation-execution.port";
-import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service";
-import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
-import { EvaluatorAvailabilityService } from "./evaluator-availability.service";
+import type { EvaluationTraceProtections } from "../ports/evaluation-execution.port.ts";
+import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
+import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
+import { EvaluatorAvailabilityService } from "./evaluator-availability.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {

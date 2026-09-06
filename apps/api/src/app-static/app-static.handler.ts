@@ -2,7 +2,7 @@ import fs from "fs";
 import type { ServerResponse } from "http";
 import path from "path";
 
-import { injectAssetBaseIntoHtml } from "./app-static.asset-base";
+import { injectAssetBaseIntoHtml } from "./app-static.asset-base.ts";
 import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,

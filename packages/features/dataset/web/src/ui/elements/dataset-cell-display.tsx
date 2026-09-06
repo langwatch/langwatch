@@ -10,12 +10,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useDatasetTable } from "../../model/dataset-table-context";
+import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 import {
   formatJsonCellValue,
   JSON_LIKE_TYPES,
   truncateCellValue,
-} from "../../model/editable-cell-value";
+} from "../../model/editable-cell-value.ts";
 
 const MAX_DISPLAY_CHARACTERS = 5000;
 const COMPACT_MAX_HEIGHT = 160 - 17;

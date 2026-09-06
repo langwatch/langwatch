@@ -1,24 +1,24 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { ResizableDivider, useTabId } from "../../studio-internals";
+import { ResizableDivider, useTabId } from "../../studio-internals.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type Variable, VariablesSection } from "../../../../surfaces/variables";
+import { type Variable, VariablesSection } from "../../../../surfaces/variables/index.ts";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { RuntimeParametersField } from "../../fields/runtime-parameters-field";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form";
+import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
+import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import type { LlmConfigInputType } from "@langwatch/prompt-contract";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store";
+import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
-} from "../../chat/prompt-playground-chat";
-import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable";
-import { usePromptHost } from "../../../../model/prompt-host";
-import { DemonstrationsTabContent } from "./demonstrations-tab-content";
-import type { LayoutMode } from "../../../../model/layout-mode";
+} from "../../chat/prompt-playground-chat.tsx";
+import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable.tsx";
+import { usePromptHost } from "../../../../model/prompt-host.ts";
+import { DemonstrationsTabContent } from "./demonstrations-tab-content.tsx";
+import type { LayoutMode } from "../../../../model/layout-mode.ts";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioEventType, scenarioEventSchema, scenarioMessageSnapshotSchema } from "../index";
+import { ScenarioEventType, scenarioEventSchema, scenarioMessageSnapshotSchema } from "../index.ts";
 
 const WAV_BASE64 = Buffer.from("fake-wav-bytes").toString("base64");
 

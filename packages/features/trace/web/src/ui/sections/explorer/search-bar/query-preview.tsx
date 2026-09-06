@@ -2,7 +2,7 @@ import type { SystemStyleObject } from "@chakra-ui/react";
 import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import { buildDecorationPlan } from "../../../../behavior/explorer/search-bar/filter-highlight";
+import { buildDecorationPlan } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 
 interface QueryPreviewProps {
   query: string;

@@ -4,8 +4,8 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { PrismaAgentAdapter } from "../../adapters/prisma.agent.adapter";
-import type { AgentsDatabase, AgentsWorkflowPort } from "../../ports/agent.port";
+import { PrismaAgentAdapter } from "../../adapters/prisma.agent.adapter.ts";
+import type { AgentsDatabase, AgentsWorkflowPort } from "../../ports/agent.port.ts";
 
 function workflowAgentRow(overrides: Record<string, unknown> = {}) {
   return {

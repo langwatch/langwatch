@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ALERT_TRIGGER_DEFAULTS } from "../defaults";
-import { renderTriggerEmail } from "../render-email";
-import { renderTriggerSlack } from "../render-slack";
+import { ALERT_TRIGGER_DEFAULTS } from "../defaults.ts";
+import { renderTriggerEmail } from "../render-email.ts";
+import { renderTriggerSlack } from "../render-slack.ts";
 import {
   buildGraphAlertTemplateContext,
   type GraphAlertTemplateContext,
-} from "../template-context";
+} from "../template-context.ts";
 
 function makeContext(
   overrides: Partial<Parameters<typeof buildGraphAlertTemplateContext>[0]> = {},

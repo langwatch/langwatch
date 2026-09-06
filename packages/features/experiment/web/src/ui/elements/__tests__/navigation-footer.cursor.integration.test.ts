@@ -25,7 +25,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-const { useMessagesNavigationFooter } = await import("../navigation-footer");
+const { useMessagesNavigationFooter } = await import("../navigation-footer.tsx");
 
 // A valid base64-encoded cursor that decodes to a ClickHouse scroll cursor
 function makeCursor(

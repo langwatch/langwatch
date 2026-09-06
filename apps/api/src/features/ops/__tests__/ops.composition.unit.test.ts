@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { composeOpsCheck } from "../ops.composition";
+import { composeOpsCheck } from "../ops.composition.ts";
 
 const ADMIN_EMAIL = "admin@acme.test";
 

@@ -7,11 +7,11 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
-import { useExecutionStore } from "../../behavior/execution.store";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store";
-import { useFoundryTransport } from "../../behavior/foundry-runtime";
-import { generateConversation } from "../../model/generate-conversation";
-import { getFoundryExecutor } from "../../behavior/trace-executor";
+import { useExecutionStore } from "../../behavior/execution.store.ts";
+import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
+import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
+import { generateConversation } from "../../model/generate-conversation.ts";
+import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
 

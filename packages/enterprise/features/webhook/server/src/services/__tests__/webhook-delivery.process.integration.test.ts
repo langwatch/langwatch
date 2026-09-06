@@ -36,10 +36,10 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
-import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
-import type { WebhookIdPort } from "../../ports/webhook-id.port";
-import type { WebhookSecretPort } from "../../ports/webhook-secret.port";
+import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
+import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -49,8 +49,8 @@ import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
-} from "../webhook-delivery.service";
-import { WebhookHealthService } from "../webhook-health.service";
+} from "../webhook-delivery.service.ts";
+import { WebhookHealthService } from "../webhook-health.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

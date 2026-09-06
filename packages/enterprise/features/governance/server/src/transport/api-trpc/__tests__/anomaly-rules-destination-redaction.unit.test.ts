@@ -11,7 +11,7 @@
 import { SHARED_SECRET_REDACTED } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { toAnomalyRuleDto } from "../anomaly-rules.api";
+import { toAnomalyRuleDto } from "../anomaly-rules.api.ts";
 
 function ruleRow(destinationConfig: unknown) {
   return {

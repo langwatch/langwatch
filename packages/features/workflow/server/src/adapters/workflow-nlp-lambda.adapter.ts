@@ -4,7 +4,7 @@ import {
   NlpPayloadStagingPort,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
-} from "../ports/workflow-nlp-lambda.port";
+} from "../ports/workflow-nlp-lambda.port.ts";
 
 const logger = createLogger("langwatch:workflow:nlp-lambda");
 

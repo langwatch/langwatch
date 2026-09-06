@@ -26,13 +26,13 @@ import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {
   type ProjectMetadataSubscriberDeps,
   ProjectMetadataSync,
-} from "../project-metadata.subscriber";
+} from "../project-metadata.subscriber.ts";
 import {
   createContext,
   createFoldState,
   createTraceEvent,
   TENANT_ID,
-} from "./subscribers/support/trace-subscriber.fixtures";
+} from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

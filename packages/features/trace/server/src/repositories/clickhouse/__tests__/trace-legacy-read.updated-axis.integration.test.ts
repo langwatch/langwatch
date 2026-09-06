@@ -5,15 +5,15 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
 import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
-import { openProtections } from "./open-protections";
+} from "./support/clickhouse-endpoint.support.ts";
+import { openProtections } from "./open-protections.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 const integration = describe.skipIf(!clickHouseConfigured);

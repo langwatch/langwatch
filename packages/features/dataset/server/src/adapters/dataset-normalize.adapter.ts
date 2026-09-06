@@ -15,11 +15,11 @@ import {
   type FileFormat,
 } from "@langwatch/dataset-contract";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
-import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository";
-import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service";
-import { DatasetNormalizePort } from "../ports/dataset-normalize.port";
-import type { DatasetStorage } from "../ports/dataset-storage.port";
-import { UPLOAD_MAX_BYTES } from "../rules/presigned-upload.rules";
+import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
+import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service.ts";
+import { DatasetNormalizePort } from "../ports/dataset-normalize.port.ts";
+import type { DatasetStorage } from "../ports/dataset-storage.port.ts";
+import { UPLOAD_MAX_BYTES } from "../rules/presigned-upload.rules.ts";
 
 /**
  * A single staged `.json` array can't be parsed without buffering the whole

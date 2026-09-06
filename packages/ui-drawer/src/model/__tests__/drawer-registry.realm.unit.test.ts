@@ -1,7 +1,7 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
-import { preloadDrawer, primeLazyComponent } from "../drawer-registry";
+import { preloadDrawer, primeLazyComponent } from "../drawer-registry.ts";
 
 /**
  * Binds specs/navigation/drawer-chunk-warmup.feature.

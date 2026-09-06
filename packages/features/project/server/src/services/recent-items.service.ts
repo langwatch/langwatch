@@ -1,11 +1,11 @@
-import type { RecentItemsRepository } from "../repositories/recent-items.repository";
+import type { RecentItemsRepository } from "../repositories/recent-items.repository.ts";
 import {
   ACTION_TO_TYPE_MAP,
   ENTITY_ID_EXTRACTORS,
   type GetRecentItemsParams,
   type RecentItem,
   type RecentItemType,
-} from "../rules/recent-items.rules";
+} from "../rules/recent-items.rules.ts";
 
 /**
  * Service for recent items functionality

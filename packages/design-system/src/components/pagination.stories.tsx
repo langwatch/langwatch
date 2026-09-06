@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Pagination } from "./pagination";
+import { Pagination } from "./pagination.tsx";
 
 const meta = {
   title: "Components/Pagination",

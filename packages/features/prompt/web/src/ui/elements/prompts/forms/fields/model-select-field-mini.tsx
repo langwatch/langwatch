@@ -6,8 +6,8 @@ import {
   LLMConfigPopover,
   type Output,
   type OutputType,
-} from "../../../llmPromptConfigs/llm-config-popover";
-import { LLMModelDisplay } from "../../../llmPromptConfigs/llm-model-display";
+} from "../../../llmPromptConfigs/llm-config-popover.tsx";
+import { LLMModelDisplay } from "../../../llmPromptConfigs/llm-model-display.tsx";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -15,7 +15,7 @@ import {
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form/index.ts";
 import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
 
 type ModelSelectFieldMiniProps = {

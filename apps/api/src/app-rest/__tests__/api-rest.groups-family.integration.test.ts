@@ -6,8 +6,8 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { REST_AUTH_ORGANIZATION, RestAuthWorld, type RestAuthKey } from "./support/rest-auth.world";
-import { mountRestFamily } from "./support/rest-family.harness";
+import { REST_AUTH_ORGANIZATION, RestAuthWorld, type RestAuthKey } from "./support/rest-auth.world.ts";
+import { mountRestFamily } from "./support/rest-family.harness.ts";
 
 const ORGANIZATION_KEY = "sk-lw-alpha-organization";
 

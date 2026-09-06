@@ -30,17 +30,17 @@ import type {
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
   getFinishedAt,
-} from "./BatchEvaluationV2/batch-evaluation-summary";
+} from "./BatchEvaluationV2/batch-evaluation-summary.tsx";
 import {
   BatchEvaluationV2EvaluationResults,
   useBatchEvaluationDownloadCSV,
-} from "./BatchEvaluationV2/batch-evaluation-v2-evaluation-results";
+} from "./BatchEvaluationV2/batch-evaluation-v2-evaluation-results.tsx";
 
 export function BatchEvaluationV2({
   project,

@@ -25,7 +25,7 @@ import {
 import { z } from "zod";
 
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { workflowDslSchema, type WorkflowDsl } from "./workflow";
+import { workflowDslSchema, type WorkflowDsl } from "./workflow.ts";
 
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 

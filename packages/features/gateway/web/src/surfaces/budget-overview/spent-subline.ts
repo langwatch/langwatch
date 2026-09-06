@@ -1,4 +1,4 @@
-import { formatBudgetUsd } from "../../model/format-budget-usd";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
 
 /**
  * Second line under the "Spent this month" figure on /me.

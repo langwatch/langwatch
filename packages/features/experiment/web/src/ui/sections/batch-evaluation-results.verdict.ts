@@ -6,10 +6,10 @@
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../../model/batch-evaluation-results.bt-leaderboard";
-import { isIncomparable } from "../../model/batch-evaluation-results.comparability";
-import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics";
-import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation";
+} from "../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { isIncomparable } from "../../model/batch-evaluation-results.comparability.ts";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics.ts";
+import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation.ts";
 
 export type LeaderboardVerdict = {
   /**

@@ -15,16 +15,16 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
-import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository";
-import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
+import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
-import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
+import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

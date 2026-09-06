@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GuardNext, GuardParams } from "./guard-middleware";
+import type { GuardNext, GuardParams } from "./guard-middleware.ts";
 
 const calls = vi.hoisted(() => ({
   order: [] as string[],
   massDeleteParams: [] as GuardParams[],
 }));
 
-vi.mock("./mass-delete-guard", () => ({
+vi.mock("./mass-delete-guard.ts", () => ({
   guardEnMasse: (params: GuardParams, next: GuardNext): Promise<unknown> => {
     calls.order.push("mass-delete");
     calls.massDeleteParams.push(params);
@@ -14,21 +14,21 @@ vi.mock("./mass-delete-guard", () => ({
   },
 }));
 
-vi.mock("./multi-tenancy-guard", () => ({
+vi.mock("./multi-tenancy-guard.ts", () => ({
   guardProjectId: (params: GuardParams, next: GuardNext): Promise<unknown> => {
     calls.order.push("project");
     return next({ ...params, args: { stage: "project" } });
   },
 }));
 
-vi.mock("./organization-guard", () => ({
+vi.mock("./organization-guard.ts", () => ({
   guardOrganizationId: (params: GuardParams, next: GuardNext): Promise<unknown> => {
     calls.order.push("organization");
     return next({ ...params, args: { stage: "organization" } });
   },
 }));
 
-import { PrismaTenancyGuardService } from "./tenancy-guard";
+import { PrismaTenancyGuardService } from "./tenancy-guard.ts";
 
 function reset(): void {
   calls.order.length = 0;

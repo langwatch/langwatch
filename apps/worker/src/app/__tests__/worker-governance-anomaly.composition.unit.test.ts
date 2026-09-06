@@ -22,16 +22,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createWorkerGovernanceAnomalySchedule,
   WorkerAnomalyAlertTransportPort,
-} from "../worker-governance-anomaly.composition";
-import { WorkerProductionComposition } from "../worker-production.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+} from "../worker-governance-anomaly.composition.ts";
+import { WorkerProductionComposition } from "../worker-production.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
-import { createWorkerProcessRedis } from "./support/worker-redis.double";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
+import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
 
 /** The public literal the fence admits without asking DNS anything. */
 const PUBLIC_DESTINATION = "https://93.184.216.34/anomalies";

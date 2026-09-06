@@ -2,8 +2,8 @@ import { WebhookEgressService } from "@langwatch/egress";
 import { DispatchError } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
-import { createWorkerWebhookTransport } from "../worker-webhook-egress.composition";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
+import { createWorkerWebhookTransport } from "../worker-webhook-egress.composition.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

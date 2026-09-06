@@ -4,7 +4,7 @@
  *      "A failure keeps its structure all the way to the card"
  */
 import { describe, expect, it } from "vitest";
-import { presentLangyToolError } from "../langy-tool-failure";
+import { presentLangyToolError } from "../langy-tool-failure.ts";
 
 const failureDocument = (error: Record<string, unknown>) => JSON.stringify({ ok: false, error });
 

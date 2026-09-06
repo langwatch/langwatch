@@ -19,7 +19,7 @@ import { GovernanceOcsfEventsReaderPort } from "@langwatch/enterprise-governance
  *       + specs/ai-gateway/governance/siem-export.feature
  * Migration: 00023_create_governance_ocsf_events.sql
  */
-import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port";
+import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 

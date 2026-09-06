@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useState } from "react";
-import type { CompareRow } from "./compare-rows";
-import type { RunScope } from "./run-configuration";
-import type { RunDialogSubject } from "./run-dialog-types";
+import type { CompareRow } from "./compare-rows.ts";
+import type { RunScope } from "./run-configuration.ts";
+import type { RunDialogSubject } from "./run-dialog-types.ts";
 
 /** What the entry point already decided the run covers. */
 export function initialScopeOf(subject: RunDialogSubject | null): RunScope {

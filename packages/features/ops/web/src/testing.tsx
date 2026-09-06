@@ -24,7 +24,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
-import type { OpsToast, OpsToaster } from "./behavior/ops-feedback";
+import type { OpsToast, OpsToaster } from "./behavior/ops-feedback.ts";
 import {
   OpsHostPort,
   OpsHostProvider,
@@ -32,7 +32,7 @@ import {
   type OpsProject,
   type OpsRouteReading,
   type OpsSuccessNotice,
-} from "./model/ops-host";
+} from "./model/ops-host.ts";
 
 export type OpsQuery = Readonly<Record<string, string | undefined>>;
 

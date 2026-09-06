@@ -1,6 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Delayed } from "./delayed";
+import { Delayed } from "./delayed.tsx";
 
 const meta = {
   title: "Primitives/Delayed",

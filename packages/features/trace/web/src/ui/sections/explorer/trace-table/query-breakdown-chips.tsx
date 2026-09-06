@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useMemo } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { walkAST } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../behavior/filter.store";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
 
 /**
  * Empty-state companion that breaks the active query down into removable chips so a

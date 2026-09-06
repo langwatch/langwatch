@@ -14,11 +14,11 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 }));
 
 import { Markdown } from "@langwatch/workflow-web/surfaces/markdown";
-import { LangyExternalLinkDialog } from "../../elements/langy-external-link-dialog";
+import { LangyExternalLinkDialog } from "../../elements/langy-external-link-dialog.tsx";
 import {
   langyFirstPartyLinkProps,
   useLangyExternalLinkGuard,
-} from "../use-langy-external-link-guard";
+} from "../use-langy-external-link-guard.ts";
 
 /** What the browser would have done with the clicks the guard let through. */
 const navigation = { attempts: 0 };

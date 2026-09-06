@@ -14,20 +14,20 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/enterprise-webhook-contract";
 import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
-import type { WebhookIdPort } from "../../ports/webhook-id.port";
-import type { WebhookSecretPort } from "../../ports/webhook-secret.port";
+import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
+import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
 import {
   WebhookDestinationService,
   type WebhookDestinationConfig,
   type WebhookUrlProblemCode,
-} from "../../services/webhook-destination.service";
+} from "../../services/webhook-destination.service.ts";
 import {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
-} from "../../services/webhook-endpoint-policy.service";
+} from "../../services/webhook-endpoint-policy.service.ts";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;

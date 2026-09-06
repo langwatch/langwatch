@@ -9,9 +9,9 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ProposalHandlers } from "../../model/langy-proposal-handlers";
-import type { LangyContextChip } from "../../behavior/langy.store";
-import type { LangyUiActionHandlers } from "../../model/ui-actions/langy-ui-action-types";
+import type { ProposalHandlers } from "../../model/langy-proposal-handlers.ts";
+import type { LangyContextChip } from "../../behavior/langy.store.ts";
+import type { LangyUiActionHandlers } from "../../model/ui-actions/langy-ui-action-types.ts";
 
 /**
  * Per-page registration surface for Langy (proposal handlers + precise page context).

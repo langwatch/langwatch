@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger, type Logger } from "@langwatch/observability";
-import { BillingErrorReporter } from "../ports/error-reporter.port";
+import { BillingErrorReporter } from "../ports/error-reporter.port.ts";
 
 const defaultLogger = createLogger("langwatch:billing:errorReporter");
 

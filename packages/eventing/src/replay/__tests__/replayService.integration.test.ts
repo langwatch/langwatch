@@ -1,28 +1,28 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "../../domain/types";
-import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
+import type { Event } from "../../domain/types.ts";
+import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
-} from "../../projections/stateProjection.types";
-import { COMPLETED_KEY_PREFIX, CUTOFF_KEY_PREFIX } from "../replayConstants";
+} from "../../projections/stateProjection.types.ts";
+import { COMPLETED_KEY_PREFIX, CUTOFF_KEY_PREFIX } from "../replayConstants.ts";
 import type {
   CutoffInfo,
   DiscoveredAggregateWithEventTypes,
   OccurredAtBounds,
   ReplayEvent,
   ReplayEventSource,
-} from "../replayEventSource";
-import { aggregateKey } from "../replayMarkers";
-import { ReplayService } from "../replayService";
+} from "../replayEventSource.ts";
+import { aggregateKey } from "../replayMarkers.ts";
+import { ReplayService } from "../replayService.ts";
 import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
-} from "../types";
+} from "../types.ts";
 
 /**
  * The replay engine against a real Redis (its markers and pause set live

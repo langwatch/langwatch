@@ -3,7 +3,7 @@
  * leave with.
  */
 
-import type { CheaperAlternative, LeaderboardVerdict } from "./batch-evaluation-results.verdict";
+import type { CheaperAlternative, LeaderboardVerdict } from "./batch-evaluation-results.verdict.ts";
 
 export type LeaderboardHeadline = {
   /** Sentence fragment naming the action, e.g. "Ship support-warm". */

@@ -7,7 +7,7 @@ import {
   buildTraceTestContext,
   buildTraceparentHeader,
   generateTraceIds,
-} from "../agent-test-tracing.rules";
+} from "../agent-test-tracing.rules.ts";
 
 const NOW = 1_800_000_000_000;
 

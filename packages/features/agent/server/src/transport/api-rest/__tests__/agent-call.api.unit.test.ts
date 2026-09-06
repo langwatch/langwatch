@@ -12,8 +12,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../../ports/connected-agent-runtime.port";
-import { registerCallEndpoint, type AgentCallDeps } from "../agent-call.api";
+import type { ConnectedAgentRuntime } from "../../../ports/connected-agent-runtime.port.ts";
+import { registerCallEndpoint, type AgentCallDeps } from "../agent-call.api.ts";
 
 class ForbiddenTestError extends HandledError {
   constructor() {

@@ -1,4 +1,4 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter";
+import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter.ts";
 import {
   FilterFieldUnknownError,
   FilterParseError,
@@ -10,7 +10,7 @@ import {
   type UnaryOperatorToken,
 } from "@langwatch/trace-contract";
 import type { TranslationContext } from "@langwatch/trace-contract";
-import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.clickhouse.adapter";
+import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.clickhouse.adapter.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -19,7 +19,7 @@ import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   TraceQueryValuesAdapter,
-} from "./trace-query-values.clickhouse.adapter";
+} from "./trace-query-values.clickhouse.adapter.ts";
 
 export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;

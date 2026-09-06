@@ -5,8 +5,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { RunMetricsSummary } from "../run-metrics-summary";
-import { makeSummary } from "./test-helpers";
+import { RunMetricsSummary } from "../run-metrics-summary.tsx";
+import { makeSummary } from "./test-helpers.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

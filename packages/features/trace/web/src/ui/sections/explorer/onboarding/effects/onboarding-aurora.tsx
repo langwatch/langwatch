@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { AuroraSvg } from "../../../../elements/explorer/traces-page/aurora-svg";
-import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
+import { AuroraSvg } from "../../../../elements/explorer/traces-page/aurora-svg.tsx";
+import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 /**
  * Aurora ribbon that flares across the top of the trace table during the `auroraArrival` stage — the marquee

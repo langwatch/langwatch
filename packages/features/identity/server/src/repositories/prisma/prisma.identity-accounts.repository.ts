@@ -3,7 +3,7 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
-} from "../../rules/identity-storage-ports.rules";
+} from "../../rules/identity-storage-ports.rules.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The `Identifier` columns an assembled account row is built from. */

@@ -9,27 +9,27 @@ import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } fro
 import { useState } from "react";
 import { SuiteArchiveDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
 import { Menu } from "@langwatch/design-system/menu";
-import { useNow } from "../../../../behavior/use-now";
+import { useNow } from "../../../../behavior/use-now.ts";
 import type { ResultGroup } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge";
-import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text";
-import { TargetMark } from "../../../elements/agent-testing/shared/target-mark";
-import type { TargetKind } from "../../../../model/target-kind";
-import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
+import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
+import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
+import type { TargetKind } from "../../../../model/target-kind.ts";
+import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline.tsx";
 import {
   ResultsTableBody,
   ResultsTableCard,
   ResultsTableEmptyLine,
   ResultsTableHead,
   ResultsTableRow,
-} from "./results-table-chrome";
-import { targetsLabel } from "./result-atoms";
+} from "./results-table-chrome.tsx";
+import { targetsLabel } from "./result-atoms.ts";
 import type {
   RunPlan,
   RunPlanScopeKind,
-} from "../../../../behavior/agent-testing/results/run-plans";
+} from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /**
  * The mark beside what a plan covers. A scope is a rule rather than a list, so the mark

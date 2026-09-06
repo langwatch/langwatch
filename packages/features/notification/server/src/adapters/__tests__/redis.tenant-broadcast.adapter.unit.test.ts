@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   TENANT_BROADCAST_EVENT_TYPES,
   TenantBroadcastPublisherPort,
-} from "../../ports/tenant-broadcast.port";
-import { RedisTenantBroadcastAdapter } from "../redis.tenant-broadcast.adapter";
+} from "../../ports/tenant-broadcast.port.ts";
+import { RedisTenantBroadcastAdapter } from "../redis.tenant-broadcast.adapter.ts";
 
 /**
  * Spec: packages/features/notification/specs/tenant-broadcast-twin.feature

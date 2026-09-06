@@ -4,7 +4,7 @@
 import { Button, Card, Flex, HStack, Link, SimpleGrid, Text } from "@chakra-ui/react";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { Check } from "lucide-react";
-import { ENTERPRISE_PLAN_FEATURES } from "../../model/billing-plans";
+import { ENTERPRISE_PLAN_FEATURES } from "../../model/billing-plans.ts";
 
 export function ContactSalesBlock() {
   return (

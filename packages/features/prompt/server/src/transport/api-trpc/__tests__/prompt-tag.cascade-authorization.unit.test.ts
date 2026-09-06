@@ -8,8 +8,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PromptApp } from "#app/prompt.app";
-import { PromptTagTrpcApi } from "../prompt-tag.api";
-import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules";
+import { PromptTagTrpcApi } from "../prompt-tag.api.ts";
+import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules.ts";
 
 const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
 

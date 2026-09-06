@@ -32,7 +32,7 @@ import {
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port.ts";
 
 export const relayCallBodySchema = z.object({
   messages: z.array(messageSchema).describe("The whole conversation so far, OpenAI style."),

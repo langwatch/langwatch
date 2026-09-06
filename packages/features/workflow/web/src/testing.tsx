@@ -22,7 +22,7 @@ import {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "./model/workflow-host";
+} from "./model/workflow-host.ts";
 
 export type QueryWrite = {
   next: Readonly<Record<string, string | undefined>>;

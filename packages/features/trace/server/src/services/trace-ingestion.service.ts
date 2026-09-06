@@ -14,7 +14,7 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 

@@ -12,7 +12,7 @@ let pendingAnnotationsCount: { data?: number } = {};
 let personalWorkspaceFeatures: { data?: Record<string, boolean> } = {};
 let usage: { data?: unknown } = {};
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => pendingAnnotationsCount } },
     personalWorkspaceFeatures: { get: { useQuery: () => personalWorkspaceFeatures } },
@@ -27,11 +27,11 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost } from "../../../testing";
-import { MENU_WIDTH_EXPANDED } from "../main-menu";
-import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position";
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
-import { ProductSidebar } from "../product-sidebar";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { MENU_WIDTH_EXPANDED } from "../main-menu.tsx";
+import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position.ts";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { ProductSidebar } from "../product-sidebar.tsx";
 
 const team = {
   id: "team_1",

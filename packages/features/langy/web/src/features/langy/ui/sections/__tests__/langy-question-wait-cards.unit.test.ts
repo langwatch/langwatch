@@ -12,11 +12,11 @@
 import type { LangyTurnToolCall } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { langyAnsweredOptionIds, langyQuestionCards } from "../../../../../model/langy-local-waits";
+import { langyAnsweredOptionIds, langyQuestionCards } from "../../../../../model/langy-local-waits.ts";
 import {
   questionToolCallIdsIn,
   questionWaitCardParts,
-} from "../../../../../model/langy-question-tool";
+} from "../../../../../model/langy-question-tool.ts";
 
 const QUESTIONS = [
   {

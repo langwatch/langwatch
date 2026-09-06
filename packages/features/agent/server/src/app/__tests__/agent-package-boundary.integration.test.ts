@@ -5,8 +5,8 @@
  */
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTrpcApi, type AgentTrpcContext } from "../../transport/api-trpc/agent.api";
-import { buildAgentApps } from "../../transport/api-rest/__tests__/agent-rest.test-harness";
+import { AgentTrpcApi, type AgentTrpcContext } from "../../transport/api-trpc/agent.api.ts";
+import { buildAgentApps } from "../../transport/api-rest/__tests__/agent-rest.test-harness.ts";
 
 const PROJECT_ID = "project_agents";
 const OTHER_PROJECT_ID = "project_elsewhere";

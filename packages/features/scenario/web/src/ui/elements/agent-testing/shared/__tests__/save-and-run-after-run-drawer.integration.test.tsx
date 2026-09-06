@@ -4,15 +4,15 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import type { Scenario } from "../../../../../model/prisma-types";
+import type { Scenario } from "../../../../../model/prisma-types.ts";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router";
 import { clearFlowCallbacks, getFlowCallbacks } from "@langwatch/ui-drawer";
-import { AgentTestingCaseEditor } from "../../../../sections/agent-testing/cases/agent-testing-case-editor";
-import { CASE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys";
-import type { RunDialogProps } from "../../../../sections/agent-testing/run/run-dialog-types";
+import { AgentTestingCaseEditor } from "../../../../sections/agent-testing/cases/agent-testing-case-editor.tsx";
+import { CASE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
+import type { RunDialogProps } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
 
 vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
@@ -25,19 +25,19 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../../../sections/use-scenario-target", () => ({
+vi.mock("../../../../sections/use-scenario-target.ts", () => ({
   readScenarioTarget: () => null,
 }));
 
 // The dialog itself is covered by its own tests; here it only has to say
 // whether it was asked to open.
-vi.mock("../../../../sections/agent-testing/run/run-dialog", () => ({
+vi.mock("../../../../sections/agent-testing/run/run-dialog.tsx", () => ({
   RunDialog: ({ subject, onClose }: RunDialogProps) =>
     subject ? (
       <div data-testid="run-dialog-open">

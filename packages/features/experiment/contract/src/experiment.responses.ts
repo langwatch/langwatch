@@ -5,13 +5,13 @@
  */
 import { z } from "zod";
 import { studioWorkflowSchema, workflowWithVersionSchema } from "@langwatch/workflow-contract";
-import { experimentSchema } from "./experiment";
-import { experimentRunSchema } from "./experiment-run";
+import { experimentSchema } from "./experiment.ts";
+import { experimentRunSchema } from "./experiment-run.ts";
 import {
   workbenchActorLabelSchema,
   workbenchVersionSummarySchema,
-} from "./experiment-workbench-version";
-import { persistedEvaluationsV3StateSchema } from "./experiment-workbench-persistence";
+} from "./experiment-workbench-version.ts";
+import { persistedEvaluationsV3StateSchema } from "./experiment-workbench-persistence.ts";
 
 /**
  * Who last wrote the version a probing tab is comparing against, and the run

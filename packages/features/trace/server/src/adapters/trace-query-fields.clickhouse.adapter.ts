@@ -1,13 +1,13 @@
-import { ClickHouseFacetRegistryAdapter } from "./trace-facet-registry.clickhouse.adapter";
-import { ClickHouseTraceQueryCustomFieldsAdapter } from "./trace-query-custom-fields.clickhouse.adapter";
+import { ClickHouseFacetRegistryAdapter } from "./trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseTraceQueryCustomFieldsAdapter } from "./trace-query-custom-fields.clickhouse.adapter.ts";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
-} from "./trace-facet-registry.clickhouse.adapter";
+} from "./trace-facet-registry.clickhouse.adapter.ts";
 import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
 import { UNSUPPORTED } from "@langwatch/trace-contract";
-import { TraceQueryTranslatorsAdapter } from "./trace-query-translators.clickhouse.adapter";
-import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter";
+import { TraceQueryTranslatorsAdapter } from "./trace-query-translators.clickhouse.adapter.ts";
+import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter.ts";
 
 // ---------------------------------------------------------------------------
 // Registry lookup — single-sources the SQL `expression` from ClickHouseFacetRegistryAdapter.FACET_REGISTRY so

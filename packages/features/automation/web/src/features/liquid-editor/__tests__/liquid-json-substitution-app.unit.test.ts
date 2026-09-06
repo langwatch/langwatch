@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { substituteLiquidForJsonValidation } from "../model/liquid-json-substitution";
+import { substituteLiquidForJsonValidation } from "../model/liquid-json-substitution.ts";
 
 describe("substituteLiquidForJsonValidation", () => {
   describe("given Liquid output inside a string", () => {

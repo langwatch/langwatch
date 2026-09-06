@@ -1,5 +1,5 @@
-import type { SpanConfig, SpanType, TraceConfig } from "./foundry-types";
-import { shortId } from "./foundry-types";
+import type { SpanConfig, SpanType, TraceConfig } from "./foundry-types.ts";
+import { shortId } from "./foundry-types.ts";
 
 export interface PromptRef {
   id: string;

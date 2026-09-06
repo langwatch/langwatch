@@ -12,8 +12,8 @@ import {
 } from "@langwatch/trace-server";
 import { z } from "zod";
 
-import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
-import type { ApiTraceReadStackPort } from "../trace/trace-read-stack.port";
+import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
+import type { ApiTraceReadStackPort } from "../trace/trace-read-stack.port.ts";
 
 /**
  * A download request as a caller sends it: the trace package's own shape plus

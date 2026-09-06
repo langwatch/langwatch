@@ -7,7 +7,7 @@ import {
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "../signature";
+} from "../signature.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

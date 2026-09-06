@@ -1,25 +1,25 @@
 import { type AuthzGrantsService } from "@langwatch/authz-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { type OrganizationInvite, OrganizationUserRole } from "@langwatch/organization-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { RoleService } from "@langwatch/role-contract";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
 
 import { TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { OrganizationInviteMailPort } from "../ports/invite.port";
-import { buildInviteAcceptUrl } from "../rules/invite-link.rules";
+import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import {
   resolveInviteDisplayStatus,
   type InviteDisplayStatus,
-} from "../rules/invite-display-status.rules";
-import { type InviteServiceDependencies } from "../rules/invite-contracts.rules";
+} from "../rules/invite-display-status.rules.ts";
+import { type InviteServiceDependencies } from "../rules/invite-contracts.rules.ts";
 
-import { InviteCreationService } from "./invite-creation.service";
-import { InviteAcceptanceService } from "./invite-acceptance.service";
-import { InviteTeamAssignmentService } from "./invite-team-assignment.service";
-import { InviteLifecycleService } from "./invite-lifecycle.service";
+import { InviteCreationService } from "./invite-creation.service.ts";
+import { InviteAcceptanceService } from "./invite-acceptance.service.ts";
+import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
+import { InviteLifecycleService } from "./invite-lifecycle.service.ts";
 
 /**
  * Team assignment input for invite creation.

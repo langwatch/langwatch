@@ -1,11 +1,11 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store";
-import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
  * Secondary signal-detection query for the open drawer trace. Fired in parallel with

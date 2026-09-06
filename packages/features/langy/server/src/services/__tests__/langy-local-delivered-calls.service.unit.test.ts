@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DeliveredCallsService } from "../langy-local-delivered-calls.service";
+import { DeliveredCallsService } from "../langy-local-delivered-calls.service.ts";
 import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 
 function callFrame(callId: string): PlatformFrame {

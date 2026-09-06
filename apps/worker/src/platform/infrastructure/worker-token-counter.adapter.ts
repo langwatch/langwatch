@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createLogger } from "@langwatch/observability";
 import { TraceTokenCounterPort } from "@langwatch/trace-server";
-import type { WorkerTraceTokenizerConfig } from "../config/worker.config";
+import type { WorkerTraceTokenizerConfig } from "../config/worker.config.ts";
 
 const logger = createLogger("langwatch:tiktoken");
 

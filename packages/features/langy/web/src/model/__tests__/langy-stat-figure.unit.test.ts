@@ -7,7 +7,7 @@ import {
   formatStatNumber,
   isComparableSeries,
   resolveStatUnit,
-} from "../langy-stat-figure";
+} from "../langy-stat-figure.ts";
 
 describe("formatStatNumber", () => {
   describe("given a reading smaller than a hundredth", () => {

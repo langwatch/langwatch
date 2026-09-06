@@ -1,15 +1,15 @@
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerTenancy,
   tryCreateWorkerTenancy,
   WorkerTenancyAbsenceReportPort,
-} from "../worker-tenancy.composition";
+} from "../worker-tenancy.composition.ts";
 import {
   tryCreateWorkerModelProviders,
   WorkerModelProviderAbsenceReportPort,
-} from "../worker-model-provider.composition";
+} from "../worker-model-provider.composition.ts";
 
 /**
  * Spec: specs/worker/worker-capability-mount.feature

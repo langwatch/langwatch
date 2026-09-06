@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { promptConfigDataSchema, type PromptConfigData } from "@langwatch/prompt-contract";
-import { PromptService, type VersionedPrompt } from "../services/prompt.service";
-import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture";
+import { PromptService, type VersionedPrompt } from "../services/prompt.service.ts";
+import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
 
 describe("PromptService", () => {
   describe("syncPrompt()", () => {

@@ -14,11 +14,11 @@ import {
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../eventing.experiment-run-processing.adapter";
+} from "../eventing.experiment-run-processing.adapter.ts";
 import type {
   EvaluatorResultEventData,
   TargetResultEventData,
-} from "../../processes/experiment-run-events.process";
+} from "../../processes/experiment-run-events.process.ts";
 
 const TENANT = createTenantId("project_test");
 const RUN = "bold-jolly-bee";

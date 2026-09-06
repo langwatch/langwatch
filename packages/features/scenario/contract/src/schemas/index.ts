@@ -1,2 +1,2 @@
-export * from "./event-schemas";
-export * from "./response-schemas";
+export * from "./event-schemas.ts";
+export * from "./response-schemas.ts";

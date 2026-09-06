@@ -1,4 +1,4 @@
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter";
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter.ts";
 import { describe, expect, it } from "vitest";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { ClickHouseEventRow } from "@langwatch/eventing/server";

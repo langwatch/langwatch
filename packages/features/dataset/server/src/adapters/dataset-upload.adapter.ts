@@ -21,10 +21,10 @@ import type {
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import type { Readable } from "node:stream";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository.ts";
+import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port.ts";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
@@ -38,9 +38,9 @@ import {
   exceedsUploadCap,
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
-} from "../rules/presigned-upload.rules";
-import { DatasetChunkService } from "../services/dataset-chunk.service";
-import { stripNullBytes } from "../rules/dataset-sanitize.rules";
+} from "../rules/presigned-upload.rules.ts";
+import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
 export class DatasetUploadAdapter implements DatasetUploadPort {

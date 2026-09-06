@@ -9,7 +9,7 @@ import { z } from "zod";
 import {
   type ModelParamsFailureReason,
   ScenarioModelParametersService,
-} from "./scenario-model-parameters.service";
+} from "./scenario-model-parameters.service.ts";
 
 const logger = createLogger("langwatch:scenarios:workflow-execution");
 

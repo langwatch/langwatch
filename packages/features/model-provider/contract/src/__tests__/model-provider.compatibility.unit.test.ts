@@ -6,7 +6,7 @@ import {
   toLegacyModelProviderListResponse,
   toLegacyModelProviderMapResponse,
   type ModelProviderSummary,
-} from "../index";
+} from "../index.ts";
 
 const createdAt = new Date("2026-01-02T03:04:05.000Z");
 const updatedAt = new Date("2026-02-03T04:05:06.000Z");

@@ -14,10 +14,10 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaPromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository";
-import type { PromptTagDatabase } from "../../../repositories/prisma/prisma.prompt-tag.repository";
-import { PromptTagService } from "../../../services/prompt-tag.service";
-import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api";
+import { PrismaPromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import type { PromptTagDatabase } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PromptTagService } from "../../../services/prompt-tag.service.ts";
+import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api.ts";
 
 const ORGANIZATION_ID = "org_tags";
 

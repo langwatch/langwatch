@@ -3,14 +3,14 @@ import { useMemo } from "react";
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,
-} from "../model/command-bar-constants";
-import { findEasterEgg } from "../model/command-easter-eggs";
-import type { ListItem } from "../model/command-icon-info";
-import type { Command, RecentItem, SearchResult } from "../model/command-bar-types";
-import type { GroupedRecentItems } from "./use-recent-items";
-import { useTopLevelNavigationCommands } from "./use-command-feature-flags";
-import type { FilteredCommands } from "./use-filtered-commands";
-import type { FilteredProject } from "./use-filtered-projects";
+} from "../model/command-bar-constants.ts";
+import { findEasterEgg } from "../model/command-easter-eggs.ts";
+import type { ListItem } from "../model/command-icon-info.ts";
+import type { Command, RecentItem, SearchResult } from "../model/command-bar-types.ts";
+import type { GroupedRecentItems } from "./use-recent-items.ts";
+import { useTopLevelNavigationCommands } from "./use-command-feature-flags.ts";
+import type { FilteredCommands } from "./use-filtered-commands.ts";
+import type { FilteredProject } from "./use-filtered-projects.ts";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.

@@ -3,7 +3,7 @@ import type {
   IngestionPullOutcomePort,
   IngestionPullRun,
   IngestionPullRunPort,
-} from "../ports/ingestion-pull.port";
+} from "../ports/ingestion-pull.port.ts";
 
 export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;

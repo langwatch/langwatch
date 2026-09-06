@@ -7,7 +7,7 @@ import {
   ScenarioEventType,
   scenarioMessageSnapshotSchema,
   scenarioRunStartedSchema,
-} from "../index";
+} from "../index.ts";
 
 function runStartedEvent(overrides: Record<string, unknown> = {}) {
   return {

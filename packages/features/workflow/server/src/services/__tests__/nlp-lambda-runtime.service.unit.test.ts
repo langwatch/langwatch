@@ -3,11 +3,11 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { NlpLambdaArnCachePort, NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port";
+import { NlpLambdaArnCachePort, NlpLambdaArnResolverPort } from "../../ports/nlp-lambda-arn.port.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
-} from "../nlp-lambda-runtime.service";
+} from "../nlp-lambda-runtime.service.ts";
 
 const IMAGE = "ecr/foo:v1";
 const NEXT_IMAGE = "ecr/foo:v2";

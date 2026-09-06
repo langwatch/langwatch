@@ -7,7 +7,7 @@
  * timeseries. One convention extractor must read them all.
  */
 import { describe, expect, it } from "vitest";
-import { extractDigest, MAX_DIGEST_IDS } from "../digest.js";
+import { extractDigest, MAX_DIGEST_IDS } from "../digest.ts";
 
 describe("extractDigest, given a collection read", () => {
   describe("when a trace search returns matches (traces + pagination.totalHits)", () => {

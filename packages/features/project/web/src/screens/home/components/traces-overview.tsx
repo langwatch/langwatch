@@ -4,10 +4,10 @@ import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { analyticsMetrics } from "@langwatch/analytics-web/surfaces/analytics-registry";
 import { CustomGraph, type CustomGraphInput } from "@langwatch/analytics-web/surfaces/custom-graph";
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
-import { Link } from "../../../ui/elements/app-link";
-import { HomeCard } from "./home-card";
-import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { Link } from "../../../ui/elements/app-link.tsx";
+import { HomeCard } from "./home-card.tsx";
+import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 const QUICK_STARTS = [
   {

@@ -1,15 +1,15 @@
-import { type StreamingMessage } from "../../../model/scenario-message-display";
+import { type StreamingMessage } from "../../../model/scenario-message-display.ts";
 import {
   ScenarioMessageRenderer as FeatureScenarioMessageRenderer,
   type ScenarioMessageRendererProps as FeatureScenarioMessageRendererProps,
-} from "../scenario-message-renderer";
+} from "../scenario-message-renderer.tsx";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import type { NextSpeaker } from "../../elements/next-speaker";
+import type { NextSpeaker } from "../../elements/next-speaker.ts";
 import { Bubble } from "@langwatch/trace-web/surfaces/conversation-bubble";
 import { getDisplayRoleVisuals } from "@langwatch/trace-web/surfaces/scenario-role";
 import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
-import { RunTurnSeparator } from "./run-turn-separator";
-import { MediaPart } from "../media-part";
+import { RunTurnSeparator } from "./run-turn-separator.tsx";
+import { MediaPart } from "../media-part.tsx";
 
 export interface ScenarioMessageRendererProps {
   messages: SimulationMessage[];

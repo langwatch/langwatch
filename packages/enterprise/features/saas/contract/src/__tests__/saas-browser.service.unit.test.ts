@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SAAS_FEATURE_ID, saasBrowserScopeSchema, saasBrowserUserSchema } from "../index";
+import { SAAS_FEATURE_ID, saasBrowserScopeSchema, saasBrowserUserSchema } from "../index.ts";
 
 describe("SaaS browser contract", () => {
   it("exposes its stable catalogue identifier", () => {

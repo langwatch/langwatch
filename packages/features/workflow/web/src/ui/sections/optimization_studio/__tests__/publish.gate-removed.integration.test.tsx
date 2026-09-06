@@ -12,7 +12,7 @@ const { mockCanPublish, mockRouterPush } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (s: any) => any) =>
     selector({
       workflow_id: "wf-1",
@@ -38,14 +38,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     project: { id: "proj-1", slug: "test-project", apiKey: "test-key" },
   }),
 }));
 
-vi.mock("../../../../model/workflow-api-client", () => {
+vi.mock("../../../../model/workflow-api-client.ts", () => {
   const queryStub = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, refetch: vi.fn() }),
   });
@@ -110,14 +110,14 @@ vi.mock("../../../../model/workflow-api-client", () => {
   };
 });
 
-vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys", () => ({
+vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys.ts", () => ({
   useModelProviderKeys: () => ({
     hasProvidersWithoutCustomKeys: false,
     nodeProvidersWithoutCustomKeys: [],
   }),
 }));
 
-vi.mock("../history", () => ({
+vi.mock("../history.tsx", () => ({
   useVersionState: () => ({
     canSaveNewVersion: false,
     versionToBeEvaluated: { version: "1.0.0" },
@@ -125,11 +125,11 @@ vi.mock("../history", () => ({
   }),
 }));
 
-vi.mock("../version-to-be-used", () => ({
+vi.mock("../version-to-be-used.tsx", () => ({
   VersionToBeUsed: () => null,
 }));
 
-vi.mock("../../../elements/optimization_studio/add-model-provider-key", () => ({
+vi.mock("../../../elements/optimization_studio/add-model-provider-key.tsx", () => ({
   AddModelProviderKey: () => null,
 }));
 
@@ -192,7 +192,7 @@ vi.mock("@langwatch/ui-host/link", () => ({
   ),
 }));
 
-const { Publish } = await import("../publish");
+const { Publish } = await import("../publish.tsx");
 
 function renderPublish() {
   return render(

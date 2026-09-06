@@ -1,6 +1,6 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { useCallback, useState } from "react";
-import { authApi as api } from "./auth-api";
+import { authApi as api } from "./auth-api.ts";
 
 /**
  * The screens' one link to the router (ADR-117 §6): an address goes out, a

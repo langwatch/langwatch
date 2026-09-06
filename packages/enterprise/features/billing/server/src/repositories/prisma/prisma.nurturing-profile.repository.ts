@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { NurturingProfileRepository, type NurturingProfile } from "../nurturing-profile.repository";
+import { NurturingProfileRepository, type NurturingProfile } from "../nurturing-profile.repository.ts";
 
 type Database = Pick<
   PrismaClient,

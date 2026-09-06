@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   AnomalyAlertHttpPort,
   type AnomalyAlertHttpResponse,
-} from "../../ports/anomaly-alert-http.port";
-import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service";
+} from "../../ports/anomaly-alert-http.port.ts";
+import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 
 type Call = {
   url: string;

@@ -37,14 +37,14 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 });
 
 import { EventingServerRuntime } from "@langwatch/eventing/server";
-import { createWorkerDurableComposition } from "../worker-durable.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { createWorkerDurableComposition } from "../worker-durable.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 class Lifecycle extends WorkerLifecyclePort {
   async close() {}

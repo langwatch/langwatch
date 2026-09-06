@@ -29,12 +29,12 @@ import {
   type UserTrpcPorts,
 } from "@langwatch/user-server";
 
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiPersonDeploymentFacts } from "../auth/auth.composition";
-import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount";
+import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiPersonDeploymentFacts } from "../auth/auth.composition.ts";
+import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
-import type { ComposedUserFeature } from "./user.composition.types";
+import type { ComposedUserFeature } from "./user.composition.types.ts";
 
 /** The other services the signed-in person's surfaces reach. */
 export type UserPeers = Readonly<{

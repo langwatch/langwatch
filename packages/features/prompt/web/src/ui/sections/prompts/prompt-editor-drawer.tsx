@@ -1,11 +1,11 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
-import { getMaxTokenLimit } from "../../../surfaces/llm-parameters";
-import { FormOutputsSection } from "../../elements/outputs/form-outputs-section";
+import { getMaxTokenLimit } from "../../../surfaces/llm-parameters/index.ts";
+import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -13,7 +13,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "../../../surfaces/variables";
+} from "../../../surfaces/variables/index.ts";
 import { useEvaluationMappings } from "@langwatch/experiment-web/surfaces/evaluation-mappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/surfaces/mapping-validation";
@@ -27,17 +27,17 @@ import {
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web/surfaces/studio-drawer-footer";
-import { PromptEditorFooter } from "./prompt-editor-footer";
-import { PromptEditorHeader } from "./prompt-editor-header";
-import { VersionBadge } from "../../../surfaces/prompt-version";
-import { ChangeHandleDialog } from "./forms/change-handle-dialog";
-import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field";
+import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
+import { PromptEditorHeader } from "./prompt-editor-header.tsx";
+import { VersionBadge } from "../../../surfaces/prompt-version/index.ts";
+import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
+import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
 import {
   type SaveDialogFormValues,
   SaveVersionDialog,
-} from "../../elements/prompts/forms/save-version-dialog";
-import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version";
-import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form";
+} from "../../elements/prompts/forms/save-version-dialog.tsx";
+import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
+import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form.ts";
 import {
   areFormValuesEqual,
   buildDefaultFormValues,
@@ -46,12 +46,12 @@ import {
   hasNonEmptySystemMessage,
   type PromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "../../../surfaces/prompt-form";
-import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
+} from "../../../surfaces/prompt-form/index.ts";
+import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values";
+import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;

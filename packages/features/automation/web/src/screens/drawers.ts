@@ -23,5 +23,5 @@
  * adapter passes the navigator's own.
  */
 
-export { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer";
-export { ViewAutomationDrawer } from "../features/authoring/ui/sections/view-automation-drawer";
+export { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
+export { ViewAutomationDrawer } from "../features/authoring/ui/sections/view-automation-drawer.tsx";

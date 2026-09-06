@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { PostgresMonitorCatalogAdapter } from "../postgres.monitor-catalog.adapter";
-import { PrismaMonitorRepository } from "../../repositories/prisma/prisma.monitor.repository";
-import { MonitorService } from "../../services/monitor.service";
+import { PostgresMonitorCatalogAdapter } from "../postgres.monitor-catalog.adapter.ts";
+import { PrismaMonitorRepository } from "../../repositories/prisma/prisma.monitor.repository.ts";
+import { MonitorService } from "../../services/monitor.service.ts";
 
 /**
  * Spec: packages/features/monitor/specs/monitor-catalog-seam.feature

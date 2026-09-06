@@ -2,9 +2,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason";
-import { EvaluatorCategoryPicker } from "../evaluator-category-picker";
-import { EvaluatorTypePicker } from "../evaluator-type-picker";
+import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
+import { EvaluatorCategoryPicker } from "../evaluator-category-picker.tsx";
+import { EvaluatorTypePicker } from "../evaluator-type-picker.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -18,51 +18,51 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
-import { composeGatewayFeature } from "../gateway.composition";
-import { refusingAuthFeature } from "../../auth/auth.composition";
-import { refusingUserFeature } from "../../user/user.composition";
-import { refusingPresenceFeature } from "../../presence/presence.composition";
-import { refusingApiKeyFeature } from "../../api-key/api-key.composition";
-import { refusingLangyFeature } from "../../langy/langy.composition";
-import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition";
-import { refusingAnalyticsFeature } from "../../analytics/analytics.composition";
-import { refusingDatasetFeature } from "../../dataset/dataset.composition";
-import { refusingEvaluatorFeature } from "../../evaluator/evaluator.composition";
-import { refusingPromptFeature } from "../../prompt/prompt.composition";
-import { refusingFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
-import { refusingMonitorFeature } from "../../monitor/monitor.composition";
-import { refusingScenarioFeature } from "../../scenario/scenario.composition";
-import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition";
-import { refusingBugReportFeature } from "../../bug-report/bug-report.composition";
-import { refusingDataPrivacyFeature } from "../../data-privacy/data-privacy.composition";
-import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition";
-import { refusingAnnotationFeature } from "../../annotation/annotation.composition";
-import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition";
-import { refusingSpendFeature } from "../../entitlement/spend.composition";
-import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition";
-import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition";
-import { refusingShareFeature } from "../../share/share.composition";
-import { refusingTopicFeature } from "../../topic/topic.composition";
-import { refusingTraceFeature } from "../../trace/trace.composition";
-import { refusingWorkflowFeature } from "../../workflow/workflow.composition";
-import { refusingExperimentFeature } from "../../experiment/experiment.composition";
-import { refusingEvaluationFeature } from "../../evaluation/evaluation.composition";
-import { refusingOrganizationFeature } from "../../organization/organization.composition";
-import { refusingProjectFeature } from "../../project/project.composition";
-import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition";
-import { refusingAutomationFeature } from "../../automation/automation.composition";
-import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition";
-import { refusingOpsFeature } from "../../ops/ops.composition";
-import { refusingHomeFeature } from "../../project/home.composition";
-import { refusingRoleFeature } from "../../role/role.composition";
+} from "../../../api.application.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition.ts";
+import { composeGatewayFeature } from "../gateway.composition.ts";
+import { refusingAuthFeature } from "../../auth/auth.composition.ts";
+import { refusingUserFeature } from "../../user/user.composition.ts";
+import { refusingPresenceFeature } from "../../presence/presence.composition.ts";
+import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
+import { refusingLangyFeature } from "../../langy/langy.composition.ts";
+import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition.ts";
+import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
+import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
+import { refusingEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
+import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
+import { refusingFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
+import { refusingMonitorFeature } from "../../monitor/monitor.composition.ts";
+import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
+import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition.ts";
+import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
+import { refusingDataPrivacyFeature } from "../../data-privacy/data-privacy.composition.ts";
+import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
+import { refusingAnnotationFeature } from "../../annotation/annotation.composition.ts";
+import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
+import { refusingSpendFeature } from "../../entitlement/spend.composition.ts";
+import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
+import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
+import { refusingShareFeature } from "../../share/share.composition.ts";
+import { refusingTopicFeature } from "../../topic/topic.composition.ts";
+import { refusingTraceFeature } from "../../trace/trace.composition.ts";
+import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts";
+import { refusingExperimentFeature } from "../../experiment/experiment.composition.ts";
+import { refusingEvaluationFeature } from "../../evaluation/evaluation.composition.ts";
+import { refusingOrganizationFeature } from "../../organization/organization.composition.ts";
+import { refusingProjectFeature } from "../../project/project.composition.ts";
+import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
+import { refusingAutomationFeature } from "../../automation/automation.composition.ts";
+import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
+import { refusingOpsFeature } from "../../ops/ops.composition.ts";
+import { refusingHomeFeature } from "../../project/home.composition.ts";
+import { refusingRoleFeature } from "../../role/role.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";

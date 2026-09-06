@@ -3,13 +3,13 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
-} from "../authz-grants-command-dispatcher.port";
+} from "../authz-grants-command-dispatcher.port.ts";
 import {
   ACTOR,
   ORG_ID,
   binding,
   harness,
-} from "../../adapters/__tests__/support/eventing.authz-ledger-fork.harness";
+} from "../../adapters/__tests__/support/eventing.authz-ledger-fork.harness.ts";
 
 class RecoveringDispatcher extends AuthzGrantsCommandDispatcher {
   readonly commandsCall = vi.fn();

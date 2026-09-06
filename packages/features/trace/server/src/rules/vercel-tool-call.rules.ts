@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
-import { isNonEmptyString } from "./canonical-guard.rules";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { isNonEmptyString } from "./canonical-guard.rules.ts";
 
 const VERCEL_RULE_PREFIX = "vercel";
 

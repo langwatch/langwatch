@@ -7,9 +7,9 @@
  */
 
 import { Spinner } from "@chakra-ui/react";
-import { billingApi } from "../../behavior/billing-api";
-import { useBillingHost } from "../../model/billing-host";
-import { PlansComparisonPage } from "./plans-comparison";
+import { billingApi } from "../../behavior/billing-api.ts";
+import { useBillingHost } from "../../model/billing-host.ts";
+import { PlansComparisonPage } from "./plans-comparison.tsx";
 
 /** The grant the platform page asked for, unchanged. */
 export const PLANS_PAGE_PERMISSION = "organization:view";

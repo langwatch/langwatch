@@ -8,8 +8,8 @@ import {
   pipelineNodeSchema,
   queueSummaryInfoSchema,
   throughputPointSchema,
-} from "./ops-dashboard";
-import { latencyWindowsSchema } from "./ops-latency";
+} from "./ops-dashboard.ts";
+import { latencyWindowsSchema } from "./ops-latency.ts";
 
 /** Unknown wire versions are absent during rolling deploys. */
 export const SNAPSHOT_VERSION = 1;

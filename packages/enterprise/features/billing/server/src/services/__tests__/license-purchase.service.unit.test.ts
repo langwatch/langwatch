@@ -7,7 +7,7 @@ import {
   type LicenseFeaturesResolver,
   type LicenseGenerator,
   type LicensePurchaseDelivery,
-} from "../license-purchase.service";
+} from "../license-purchase.service.ts";
 
 /**
  * Spec: packages/enterprise/features/billing/specs/stripe-webhook.feature

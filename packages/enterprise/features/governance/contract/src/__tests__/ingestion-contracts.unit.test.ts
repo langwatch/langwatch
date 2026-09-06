@@ -3,7 +3,7 @@ import {
   activityMonitorPagedWindowQuerySchema,
   createGovernanceIngestionSourceCommandSchema,
   ingestionKeyMintCommandSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("governance ingestion contracts", () => {
   it("rejects transport values outside the canonical source vocabulary", () => {

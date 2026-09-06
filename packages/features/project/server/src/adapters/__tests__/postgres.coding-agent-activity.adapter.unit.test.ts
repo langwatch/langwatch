@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
-import { PostgresCodingAgentActivityAdapter } from "../postgres.coding-agent-activity.adapter";
+import { PostgresCodingAgentActivityAdapter } from "../postgres.coding-agent-activity.adapter.ts";
 
 /**
  * The staleness window `ProjectService` applies to both activity columns.

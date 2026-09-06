@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
-import { DRAG_THRESHOLD_PX } from "../../model/flame/constants";
-import type { Viewport } from "./types";
+import { DRAG_THRESHOLD_PX } from "../../model/flame/constants.ts";
+import type { Viewport } from "./types.ts";
 
 export interface UseFlamePanDragResult {
   isPanningRef: React.MutableRefObject<boolean>;

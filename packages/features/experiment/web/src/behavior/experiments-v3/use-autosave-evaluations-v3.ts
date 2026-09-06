@@ -6,15 +6,15 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { captureException, toError } from "../../model/posthog-error-capture";
+import { captureException, toError } from "../../model/posthog-error-capture.ts";
 import { isNotFoundError as isTrpcNotFound } from "@langwatch/ui-host/errors";
-import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants";
-import { createInitialState, type EvaluationsV3State } from "../../model/experiments-v3/types";
+import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants.ts";
+import { createInitialState, type EvaluationsV3State } from "../../model/experiments-v3/types.ts";
 import {
   extractPersistedState,
   type PersistedEvaluationsV3State,
-} from "../../model/experiments-v3/types/persistence";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+} from "../../model/experiments-v3/types/persistence.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 

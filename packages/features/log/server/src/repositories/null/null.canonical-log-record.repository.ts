@@ -1,5 +1,5 @@
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "@langwatch/log-contract";
-import { CanonicalLogRecordRepository } from "../canonical-log-record.repository";
+import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 
 /** No-op persistence used when canonical log storage is disabled. */
 export class NullCanonicalLogRecordRepository extends CanonicalLogRecordRepository {

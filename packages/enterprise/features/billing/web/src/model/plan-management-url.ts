@@ -10,7 +10,7 @@
  * instead.
  */
 
-import { PricingModel } from "./prisma-types";
+import { PricingModel } from "./prisma-types.ts";
 
 /**
  * SaaS goes to the subscription page, self-hosted to the license page. One

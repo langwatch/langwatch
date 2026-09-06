@@ -6,7 +6,7 @@ import {
   settlementSummary,
   settlementTrace,
   settlementTrigger,
-} from "./support/settlement.fixtures";
+} from "./support/settlement.fixtures.ts";
 
 const loggerWarn = vi.hoisted(() => vi.fn());
 

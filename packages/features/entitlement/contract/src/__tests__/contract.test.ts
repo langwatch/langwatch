@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { planSchema, type Plan, type PlanProvider } from "../index";
+import { planSchema, type Plan, type PlanProvider } from "../index.ts";
 
 describe("Entitlements contract", () => {
   it("exposes a provider-neutral plan", () => {

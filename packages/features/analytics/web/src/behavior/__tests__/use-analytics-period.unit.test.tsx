@@ -21,8 +21,8 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../testing";
-import { useAnalyticsPeriod } from "../use-analytics-period";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../testing.tsx";
+import { useAnalyticsPeriod } from "../use-analytics-period.ts";
 
 function harness(query: Record<string, string | undefined> = {}) {
   const host = new StubAnalyticsHost({ route: { params: {}, query } });

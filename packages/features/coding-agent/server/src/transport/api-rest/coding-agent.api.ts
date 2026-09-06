@@ -24,7 +24,7 @@ import type { CodingAgentApp } from "#app/coding-agent.app";
 import {
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
-} from "../../rules/pull-request-usage-wire.rules";
+} from "../../rules/pull-request-usage-wire.rules.ts";
 
 /** Records who read an answer that names people. */
 export interface CodingAgentRestAuditPort {

@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   MetricPreparationPort,
   type MetricPreparationInput,
-} from "../../ports/metric-preparation.port";
-import { MetricService } from "../metric.service";
+} from "../../ports/metric-preparation.port.ts";
+import { MetricService } from "../metric.service.ts";
 
 class RecordingPreparationPort extends MetricPreparationPort {
   input: MetricPreparationInput | null = null;

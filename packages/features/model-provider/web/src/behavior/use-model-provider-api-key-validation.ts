@@ -2,7 +2,7 @@ import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
 import { describeError } from "@langwatch/ui-host/errors";
 import { explainSerializedError } from "@langwatch/handled-error/presentation";
-import { api } from "./model-provider-api";
+import { api } from "./model-provider-api.ts";
 
 /**
  * The refusal, in the words the registry chose for its code. A refused credential arrives as a

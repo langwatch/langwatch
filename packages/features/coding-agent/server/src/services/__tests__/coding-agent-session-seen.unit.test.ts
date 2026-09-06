@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   CodingAgentSessionSeenService,
-} from "../coding-agent-session-seen.service";
-import { TestClock, TestProjectService } from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../coding-agent-session-seen.service.ts";
+import { TestClock, TestProjectService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function createFixture(at = 1_000_000) {
   const clock = new TestClock(at);

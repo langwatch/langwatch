@@ -15,10 +15,10 @@ import {
 import { Pause, Play, RotateCcw, StepForward } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
-import { LangyChoicesCard } from "./langy-choices-card";
-import { LangyDerivedCardView } from "./langy-derived-card-view";
-import { LangyFailedCard } from "../../../../../ui/elements/derived-cards/langy-failed-card";
-import type { ChoicesRefRow } from "../../../behavior/derived-cards/use-choices-ref-rows";
+import { LangyChoicesCard } from "./langy-choices-card.tsx";
+import { LangyDerivedCardView } from "./langy-derived-card-view.tsx";
+import { LangyFailedCard } from "../../../../../ui/elements/derived-cards/langy-failed-card.tsx";
+import type { ChoicesRefRow } from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

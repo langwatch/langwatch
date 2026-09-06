@@ -5,11 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";
-import type { DatasetStorage, DatasetStorageResolver } from "../../ports/dataset-storage.port";
-import type { DatasetRow } from "../../ports/dataset.port";
-import type { DatasetContentRepository } from "../../repositories/dataset-content.repository";
-import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository";
-import { DatasetUploadAdapter } from "../dataset-upload.adapter";
+import type { DatasetStorage, DatasetStorageResolver } from "../../ports/dataset-storage.port.ts";
+import type { DatasetRow } from "../../ports/dataset.port.ts";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
+import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
+import { DatasetUploadAdapter } from "../dataset-upload.adapter.ts";
 
 const PROJECT_ID = "project-1";
 const NULL_BYTE = String.fromCharCode(0);

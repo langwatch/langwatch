@@ -1,1 +1,1 @@
-export * from "../../behavior/annotation-queue-session.store";
+export * from "../../behavior/annotation-queue-session.store.ts";

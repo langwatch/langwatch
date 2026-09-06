@@ -80,7 +80,7 @@ import {
   mapLegacySpanSummaryToTreeNode,
   type TraceDerivedAttrPrefixes,
   type TraceReadMapperPorts,
-} from "./trace-read-mappers.api";
+} from "./trace-read-mappers.api.ts";
 import {
   gateHeaderCost,
   gateResources,
@@ -88,7 +88,7 @@ import {
   gateSessionTitle,
   gateTreeCost,
   withoutHiddenResourceAttrs,
-} from "./trace-view-gates.api";
+} from "./trace-view-gates.api.ts";
 import type { TraceApp, TraceLogRecordReader, TraceLogRecordReadRow } from "#app/trace.app";
 
 const logger = createLogger("langwatch:api:traces-v2");

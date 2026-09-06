@@ -1,4 +1,4 @@
-import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.adapter";
+import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.adapter.ts";
 import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -6,15 +6,15 @@ import {
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
-import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic-assignment.adapter";
+import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic-assignment.adapter.ts";
 import {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   type DeferredOriginPayload,
   TraceDeferredOriginSchedulerPort,
-} from "./eventing.deferred-origin.adapter";
-import { TraceProcessingPipelinePort } from "../ports/trace-processing-pipeline.port";
-import { TraceProcessingInstallerPort } from "../ports/trace-processing-installer.port";
-import { TraceTopicAssignmentCommandPort } from "../ports/trace-topic-assignment-command.port";
+} from "./eventing.deferred-origin.adapter.ts";
+import { TraceProcessingPipelinePort } from "../ports/trace-processing-pipeline.port.ts";
+import { TraceProcessingInstallerPort } from "../ports/trace-processing-installer.port.ts";
+import { TraceTopicAssignmentCommandPort } from "../ports/trace-topic-assignment-command.port.ts";
 
 const logger = createLogger("langwatch:trace-processing:installer");
 

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { useDrawerStore } from "../drawer.store";
+import { useDrawerStore } from "../drawer.store.ts";
 import {
   buildTraceEditPatch,
   selectIsSpanDeleted,
   selectIsTraceEditDirty,
   summarizeTraceEdit,
   useTraceEditStore,
-} from "../trace-edit.store";
+} from "../trace-edit.store.ts";
 
 function state() {
   return useTraceEditStore.getState();

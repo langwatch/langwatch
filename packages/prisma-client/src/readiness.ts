@@ -1,4 +1,4 @@
-import type { PrismaConnection } from "./connection";
+import type { PrismaConnection } from "./connection.ts";
 
 export interface PrismaReadinessOptions {
   connection: PrismaConnection;

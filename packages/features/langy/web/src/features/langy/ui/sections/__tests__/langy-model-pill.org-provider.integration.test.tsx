@@ -13,7 +13,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
@@ -40,7 +40,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { LangyModelPill } from "../../elements/langy-model-pill";
+import { LangyModelPill } from "../../elements/langy-model-pill.tsx";
 
 const OPTIONS = ["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "openai/gpt-5-mini"];
 

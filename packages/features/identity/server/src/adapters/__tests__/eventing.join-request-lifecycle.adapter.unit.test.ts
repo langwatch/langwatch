@@ -1,8 +1,8 @@
 import type { JoinRequestFact } from "@langwatch/identity-contract";
-import type { JoinRequestNotificationService } from "../../services/join-request-notification.service";
-import type { JoinRequestService } from "../../services/join-request.service";
+import type { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
+import type { JoinRequestService } from "../../services/join-request.service.ts";
 import { describe, expect, it, vi } from "vitest";
-import { EventingJoinRequestLifecycleAdapter } from "../eventing.join-request-lifecycle.adapter";
+import { EventingJoinRequestLifecycleAdapter } from "../eventing.join-request-lifecycle.adapter.ts";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature

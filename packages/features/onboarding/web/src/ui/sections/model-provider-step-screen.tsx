@@ -11,9 +11,9 @@ import { useAnalytics } from "react-contextual-analytics";
 import {
   onboardingModelProviders,
   RECOMMENDED_ONBOARDING_PROVIDER,
-} from "../../model/onboarding-model-providers";
-import { ModelProviderGrid } from "./model-provider/model-provider-grid";
-import { ModelProviderSetup } from "./model-provider/model-provider-setup";
+} from "../../model/onboarding-model-providers.ts";
+import { ModelProviderGrid } from "./model-provider/model-provider-grid.tsx";
+import { ModelProviderSetup } from "./model-provider/model-provider-setup.tsx";
 
 interface ModelProviderStepScreenProps {
   /** Advances the onboarding flow, on provider save or on skip. */

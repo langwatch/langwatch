@@ -1,12 +1,12 @@
 import type { AuditLog, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GetRecentItemsParams } from "../../rules/recent-items.rules";
-import { ACTION_TO_TYPE_MAP } from "../../rules/recent-items.rules";
+import type { GetRecentItemsParams } from "../../rules/recent-items.rules.ts";
+import { ACTION_TO_TYPE_MAP } from "../../rules/recent-items.rules.ts";
 import {
   RecentItemsRepository,
   type RecentArchivableRow,
   type RecentPromptRow,
   type RecentSluggedRow,
-} from "../recent-items.repository";
+} from "../recent-items.repository.ts";
 
 /**
  * The audit-trail reads behind the home screen's recent strip, and the five entity lookups that

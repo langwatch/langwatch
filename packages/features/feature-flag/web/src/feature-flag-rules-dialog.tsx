@@ -51,7 +51,7 @@ import {
   withRuleMoved,
   type ScopeKind,
   type UIRule,
-} from "./model/rule-editing";
+} from "./model/rule-editing.ts";
 
 const SCOPE_COLLECTION = createListCollection<{ value: ScopeKind; label: string }>({
   items: [

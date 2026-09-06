@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
-import { MemberClassificationService } from "../member-classification.service";
+import { MemberClassificationService } from "../member-classification.service.ts";
 
 /**
  * Unit tests for member classification functions.

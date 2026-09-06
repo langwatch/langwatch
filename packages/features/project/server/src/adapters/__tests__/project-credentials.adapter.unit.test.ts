@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ProjectCredentialsAdapter } from "../project-credentials.adapter";
+import { ProjectCredentialsAdapter } from "../project-credentials.adapter.ts";
 
 /**
  * The onboarding snippets are sized against the 54-byte key this adapter

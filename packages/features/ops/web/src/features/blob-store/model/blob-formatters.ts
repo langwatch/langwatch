@@ -1,4 +1,4 @@
-import { formatTimeAgo } from "../../../model/ops-formatters";
+import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 
 /** Verdict a sweep would reach, phrased for a reader rather than for the script. */
 const OUTCOME_LABELS = {

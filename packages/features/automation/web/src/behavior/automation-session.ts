@@ -22,7 +22,7 @@ import {
   type AutomationOrganization,
   type AutomationProject,
   type AutomationTeam,
-} from "../model/automation-host";
+} from "../model/automation-host.ts";
 
 export type AutomationScopeReading = {
   organization: AutomationOrganization | undefined;

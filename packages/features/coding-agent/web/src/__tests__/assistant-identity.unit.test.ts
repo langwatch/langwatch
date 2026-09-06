@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { assistantKindOfAgent } from "../assistant-identity";
+import { assistantKindOfAgent } from "../assistant-identity.ts";
 
 describe("assistantKindOfAgent", () => {
   describe("given a slug the tiles already use", () => {

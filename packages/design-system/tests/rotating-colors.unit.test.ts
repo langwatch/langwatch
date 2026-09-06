@@ -4,7 +4,7 @@ import {
   getColorPaletteForString,
   getHexColorForString,
   rotatingColors,
-} from "../src/rotating-colors";
+} from "../src/rotating-colors.ts";
 
 const NAMES = [
   "checkout-agent",

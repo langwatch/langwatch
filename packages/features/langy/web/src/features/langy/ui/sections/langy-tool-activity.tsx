@@ -13,38 +13,38 @@ import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import { useLangyStore } from "../../../../behavior/langy.store";
-import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import {
   type CapabilityCommand,
   commandOfToolCall,
-} from "../../../../model/langy-capability-digest";
-import { isCodeAccessToolPart } from "../../../../model/langy-code-access-tool";
-import { isPlanToolPart } from "../../../../model/langy-plan";
-import { isQuestionToolPart, questionToolCardParts } from "../../../../model/langy-question-tool";
-import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer";
-import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note";
+} from "../../../../model/langy-capability-digest.ts";
+import { isCodeAccessToolPart } from "../../../../model/langy-code-access-tool.ts";
+import { isPlanToolPart } from "../../../../model/langy-plan.ts";
+import { isQuestionToolPart, questionToolCardParts } from "../../../../model/langy-question-tool.ts";
+import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
-} from "../../model/logic/langy-tool-failure";
-import { commandOf, describeToolCall, effectiveToolName } from "../../model/logic/langy-tool-label";
+} from "../../model/logic/langy-tool-failure.ts";
+import { commandOf, describeToolCall, effectiveToolName } from "../../model/logic/langy-tool-label.ts";
 import {
   type CapabilityProgress,
   isProposalOutput,
   resolveCapability,
   resolveCapabilityProgress,
-} from "../../model/capabilities/capability-registry";
-import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card";
+} from "../../model/capabilities/capability-registry.ts";
+import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card.tsx";
 import {
   type CapabilityToolCall,
   hasCapabilityCard,
   LangyCapabilityRenderer,
   toolResultForCapability,
-} from "./capabilities/langy-capability-renderer";
-import { LangyPlanLimitCard } from "./langy-plan-limit-card";
-import { LangyToolErrorCard } from "./langy-tool-error-card";
+} from "./capabilities/langy-capability-renderer.tsx";
+import { LangyPlanLimitCard } from "./langy-plan-limit-card.tsx";
+import { LangyToolErrorCard } from "./langy-tool-error-card.tsx";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

@@ -23,9 +23,9 @@ import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections";
-import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
+import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{
@@ -39,7 +39,7 @@ export type CodingAgentPeers = Readonly<{
   viewerProtections?: ApiViewerProtectionsPort | undefined;
 }>;
 
-import type { ComposedCodingAgentFeature } from "./coding-agent.composition.types";
+import type { ComposedCodingAgentFeature } from "./coding-agent.composition.types.ts";
 
 /** Composes `codingAgents.*` over this process's own graph. */
 export function composeCodingAgentFeature(options: {

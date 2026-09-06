@@ -9,11 +9,11 @@ import {
 } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Switch } from "@langwatch/design-system/switch";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store";
-import type { GeneratorOptions, PromptRef } from "../../model/trace-generator";
-import { generateTrace } from "../../model/trace-generator";
-import { useTraceStore } from "../../behavior/trace.store";
-import { useFoundryPrompts } from "../../behavior/use-foundry-prompts";
+import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
+import type { GeneratorOptions, PromptRef } from "../../model/trace-generator.ts";
+import { generateTrace } from "../../model/trace-generator.ts";
+import { useTraceStore } from "../../behavior/trace.store.ts";
+import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
 
 const DEPTH_PRESETS = [
   { label: "Shallow", value: 4 },

@@ -16,7 +16,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createWorkflowRunRestApp } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential";
+import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
 
 /** Everything the three run URLs bind to on this process. */
 export type ApiWorkflowRunRestCollaborators = Readonly<{

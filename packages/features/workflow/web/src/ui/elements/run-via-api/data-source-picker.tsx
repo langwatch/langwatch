@@ -7,7 +7,7 @@ import { HStack, Text } from "@chakra-ui/react";
 
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
-import type { RunSnippetDataSource } from "../../../model/run-via-api/run-snippets";
+import type { RunSnippetDataSource } from "../../../model/run-via-api/run-snippets.ts";
 
 const ITEMS: Array<{ value: RunSnippetDataSource; label: string }> = [
   { value: "attached", label: "Attached dataset" },

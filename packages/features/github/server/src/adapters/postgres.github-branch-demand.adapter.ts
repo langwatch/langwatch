@@ -1,23 +1,23 @@
-import { GithubBranchDemandPort } from "../ports/github-branch-demand.port";
-import type { GithubHostPort } from "../ports/github-host.port";
-import type { GithubProjectActivityPort } from "../ports/github-project-activity.port";
+import { GithubBranchDemandPort } from "../ports/github-branch-demand.port.ts";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
 import {
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
-} from "../repositories/prisma/github-installations.repository";
+} from "../repositories/prisma/github-installations.repository.ts";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../repositories/prisma/github-pull-requests.repository";
+} from "../repositories/prisma/github-pull-requests.repository.ts";
 import {
   GithubBranchDemandService,
   type BranchMappingRequest,
-} from "../services/github-branch-demand.service";
-import { GithubBranchMappingService } from "../services/github-branch-mapping.service";
-import { GithubInstallationAccessService } from "../services/github-installation-access.service";
-import { GithubAppTokenAdapter } from "./github-app-token.adapter";
-import { GithubHostAdapter } from "./github-host.adapter";
-import { RedisGithubAdapter } from "./redis.github.adapter";
+} from "../services/github-branch-demand.service.ts";
+import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
+import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
+import { GithubAppTokenAdapter } from "./github-app-token.adapter.ts";
+import { GithubHostAdapter } from "./github-host.adapter.ts";
+import { RedisGithubAdapter } from "./redis.github.adapter.ts";
 
 /** The two models branch demand reads, and nothing else in the client. */
 export type GithubBranchDemandDatabase = PrismaGithubInstallationsDatabase &

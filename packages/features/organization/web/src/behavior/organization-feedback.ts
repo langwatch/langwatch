@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { useOrganizationHost } from "../model/organization-host";
+import { useOrganizationHost } from "../model/organization-host.ts";
 
 /** The subset of the application toaster's create options this family uses. */
 export type OrganizationToast = {

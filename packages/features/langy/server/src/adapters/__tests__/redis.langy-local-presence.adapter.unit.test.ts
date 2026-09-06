@@ -8,9 +8,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
-import { presenceKey } from "../../rules/langy-local-control-keys.rules";
-import { LangyLocalPresenceAdapter } from "../redis.langy-local-presence.adapter";
-import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port";
+import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { LangyLocalPresenceAdapter } from "../redis.langy-local-presence.adapter.ts";
+import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port.ts";
 
 const conversationId = "conv_1";
 

@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationV3Event, ExperimentService } from "@langwatch/experiment-contract";
 import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contract";
-import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service";
+import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
 
 const TARGET_ID = "target-1";
 const EVALUATOR_ID = "evaluator-1";

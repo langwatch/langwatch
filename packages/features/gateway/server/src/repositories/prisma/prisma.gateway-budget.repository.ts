@@ -10,7 +10,7 @@ import type {
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository";
+import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
 import {
   serializeRowForAudit,
   budgetPeriodFloorMs,
@@ -36,16 +36,16 @@ import {
 import type {
   BudgetBucketBoundary,
   GatewayBudgetSpendPort,
-} from "../../ports/gateway-budget-spend.port";
-import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository";
-import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
-import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
-import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
+} from "../../ports/gateway-budget-spend.port.ts";
+import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
+import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
+import type { GatewayBudgetScopeReach } from "../gateway-budget.repository.ts";
+import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository.ts";
 import {
   type BudgetScopeTargetInfo,
   PrismaGatewayBudgetScopeTargetRepository,
-} from "./prisma.gateway-budget-scope-target.repository";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
+} from "./prisma.gateway-budget-scope-target.repository.ts";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
 import {
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
@@ -56,7 +56,7 @@ import {
   type GatewayOrganizationBudgetReadInput,
   type GatewayProjectBudgetReadInput,
   type GatewayVirtualKeyProjectScope,
-} from "../gateway-budget.repository";
+} from "../gateway-budget.repository.ts";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 
 const wirePages = GatewayWirePaginationAdapter.create();

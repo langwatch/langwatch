@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "@langwatch/coding-agent-contract";
-import { CodingAgentTraceSessionsMapProjection } from "../coding-agent-trace-sessions.projection";
-import { SessionMetricSeriesMapProjection } from "../session-metric-series.projection";
+import { CodingAgentTraceSessionsMapProjection } from "../coding-agent-trace-sessions.projection.ts";
+import { SessionMetricSeriesMapProjection } from "../session-metric-series.projection.ts";
 import {
   EventingCodingAgentTraceSessionAppendAdapter,
   EventingSessionMetricSeriesAppendAdapter,
-} from "../../adapters/eventing.coding-agent-projections.adapter";
+} from "../../adapters/eventing.coding-agent-projections.adapter.ts";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 
 const persistence = {

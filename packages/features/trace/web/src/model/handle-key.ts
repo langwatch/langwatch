@@ -1,4 +1,4 @@
-import type { SuggestionState } from "./get-suggestion-state";
+import type { SuggestionState } from "./get-suggestion-state.ts";
 
 const FIELD_VALUE_SEPARATOR = ":";
 

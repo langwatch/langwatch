@@ -2,9 +2,9 @@ import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import type { Snippet, Target } from "../../../surfaces/api-snippet";
-import { uppercaseFirstLetter } from "../../../model/string-casing";
-import { RenderCode } from "../../../ui/blocks/render-code";
+import type { Snippet, Target } from "../../../surfaces/api-snippet/index.ts";
+import { uppercaseFirstLetter } from "../../../model/string-casing.ts";
+import { RenderCode } from "../../../ui/blocks/render-code.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";

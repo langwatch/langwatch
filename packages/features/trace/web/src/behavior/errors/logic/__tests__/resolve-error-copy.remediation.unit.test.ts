@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveErrorCopy } from "../resolve-error-copy";
+import { resolveErrorCopy } from "../resolve-error-copy.ts";
 
 const DOCS_URL = "https://docs.langwatch.ai/platform/datasets";
 

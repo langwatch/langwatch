@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ClickHouseRetroactiveRetentionRepository,
   type RetentionClickHouseClient,
-} from "../clickhouse.retroactive-retention.repository";
+} from "../clickhouse.retroactive-retention.repository.ts";
 
 type QueryParams = Record<string, number | string | string[]>;
 type CommandRequest = { query: string; query_params: QueryParams };

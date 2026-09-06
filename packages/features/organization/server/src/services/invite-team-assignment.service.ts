@@ -10,15 +10,15 @@ import {
   TeamUserRole,
 } from "@langwatch/organization-contract";
 import type { RoleService } from "@langwatch/role-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
-import { isCustomRole } from "../rules/custom-role-naming.rules";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import {
   type CreateInvitesInviteInput,
   type InviteServiceDependencies,
   type ResolvedInviteTeams,
   type TeamAssignmentInput,
-} from "../rules/invite-contracts.rules";
+} from "../rules/invite-contracts.rules.ts";
 
 export class InviteTeamAssignmentService {
   static create(deps: InviteServiceDependencies): InviteTeamAssignmentService {

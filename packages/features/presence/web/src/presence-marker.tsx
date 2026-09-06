@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
-import { presenceDisplayName, presenceSessionColor } from "./presence-user-color";
+import { presenceDisplayName, presenceSessionColor } from "./presence-user-color.ts";
 
 export interface PresenceMarkerProps {
   peers: PresenceSession[];

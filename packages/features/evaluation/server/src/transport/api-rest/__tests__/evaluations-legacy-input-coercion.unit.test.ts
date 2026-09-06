@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { getEvaluatorDataForParams } from "../evaluations-legacy.api";
+import { getEvaluatorDataForParams } from "../evaluations-legacy.api.ts";
 
 const evaluate = (params: Record<string, unknown>) =>
   getEvaluatorDataForParams("langevals/exact_match", params);

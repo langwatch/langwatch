@@ -10,16 +10,16 @@ import "@testing-library/jest-dom/vitest";
 
 // RedactedInline (rendered by the cells when redacted) looks up the org's
 // permissions to decide whether to show the "Open privacy settings" link.
-vi.mock("../../../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,
   }),
 }));
 
-import type { TraceListItem } from "../../../../../types/trace";
-import { InputCell } from "../input-cell";
-import { OutputCell } from "../output-cell";
+import type { TraceListItem } from "../../../../../types/trace.ts";
+import { InputCell } from "../input-cell.tsx";
+import { OutputCell } from "../output-cell.tsx";
 
 function row(over: Partial<TraceListItem>): TraceListItem {
   return {

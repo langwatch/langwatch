@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   createWorkerSpanStorage,
   createWorkerSpanStoragePort,
-} from "../worker-span-storage.composition";
+} from "../worker-span-storage.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/span-storage-write.feature

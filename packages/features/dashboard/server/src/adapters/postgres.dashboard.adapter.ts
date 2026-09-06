@@ -4,12 +4,12 @@ import type {
   DashboardIdGenerator,
   DashboardGraphVisibilityPolicyPort,
   SavedWorkbenchChartPolicy,
-} from "../ports/dashboard.port";
+} from "../ports/dashboard.port.ts";
 import {
   PrismaDashboardRepository,
   type DashboardDatabase,
-} from "../repositories/prisma/prisma.dashboard.repository";
-import { DashboardService } from "../services/dashboard.service";
+} from "../repositories/prisma/prisma.dashboard.repository.ts";
+import { DashboardService } from "../services/dashboard.service.ts";
 
 export class PostgresDashboardAdapter {
   private constructor(

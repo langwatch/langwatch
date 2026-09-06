@@ -16,7 +16,7 @@ import {
   getFieldMapping,
   qualifiedColumn,
   tableAliases,
-} from "./clickhouse.field-mappings.mapper";
+} from "./clickhouse.field-mappings.mapper.ts";
 
 /**
  * The metric keys each category translator below has an expression for.

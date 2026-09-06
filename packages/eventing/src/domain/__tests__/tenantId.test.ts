@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../tenantId";
+import { createTenantId } from "../tenantId.ts";
 
 describe("createTenantId", () => {
   describe("when value is a valid non-empty string", () => {

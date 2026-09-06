@@ -11,7 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({}) } },
     personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },
@@ -26,8 +26,8 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost } from "../../../testing";
-import { ProductSidebar } from "../product-sidebar";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { ProductSidebar } from "../product-sidebar.tsx";
 
 const project = { id: "project_1", slug: "demo", name: "Demo", isPersonal: false };
 const team = {

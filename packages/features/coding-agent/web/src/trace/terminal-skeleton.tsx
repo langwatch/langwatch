@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
+import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 /**
  * The Terminal's loading state, which must itself look like a terminal.

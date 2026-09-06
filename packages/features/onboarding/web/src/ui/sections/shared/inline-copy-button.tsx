@@ -3,7 +3,7 @@ import { Check, Clipboard } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard";
+import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
 
 export function InlineCopyButton({
   text,

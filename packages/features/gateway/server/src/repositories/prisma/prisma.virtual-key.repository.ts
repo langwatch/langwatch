@@ -4,8 +4,8 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
-import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
+import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port.ts";
 import {
   GatewayVirtualKeysPort,
   type CreateGatewayVirtualKeyInput,
@@ -13,8 +13,8 @@ import {
   type GatewayVirtualKeyScope,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
-} from "../../ports/gateway-virtual-key.port";
-import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port";
+} from "../../ports/gateway-virtual-key.port.ts";
+import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();
 /**

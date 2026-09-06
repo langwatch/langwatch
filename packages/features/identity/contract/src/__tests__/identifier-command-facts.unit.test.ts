@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { IdentityHeads } from "../facts";
-import { primaryChangeFacts, userErasureFacts } from "../identifier-aggregate";
+import type { IdentityHeads } from "../facts.ts";
+import { primaryChangeFacts, userErasureFacts } from "../identifier-aggregate.ts";
 import {
   ACTOR,
   T0,
@@ -9,7 +9,7 @@ import {
   detached,
   foldUser,
   primaryChanged,
-} from "./support/identifier-facts";
+} from "./support/identifier-facts.ts";
 
 describe("primaryChangeFacts", () => {
   describe("given the heads a command reads before it states a fact", () => {

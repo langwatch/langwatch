@@ -20,8 +20,8 @@ import {
 } from "@langwatch/monitor-server";
 import { nanoid } from "nanoid";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createMonitorTrpcRouter } from "./monitor-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createMonitorTrpcRouter } from "./monitor-trpc.mount.ts";
 
 /**
  * The ONE monitor service on this process.
@@ -95,7 +95,7 @@ export type MonitorFeatureCollaborators = MonitorPeers &
     report?: ApiMonitorAbsenceReport;
   }>;
 
-import type { ComposedMonitorFeature } from "./monitor.composition.types";
+import type { ComposedMonitorFeature } from "./monitor.composition.types.ts";
 
 /** Composes the monitor surface over this process's own graph. */
 export function composeMonitorFeature(options: {

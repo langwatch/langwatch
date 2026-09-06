@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { blankTemplate } from "../model/templates/blank.template";
-import { parseWorkflowImport } from "../ui/elements/workflow-create-dialog";
+import { blankTemplate } from "../model/templates/blank.template.ts";
+import { parseWorkflowImport } from "../ui/elements/workflow-create-dialog.tsx";
 
 function workflowFile(contents: string, size = contents.length) {
   return {

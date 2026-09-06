@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { lwqlEmptyEncodingFailure, lwqlRenderFailure } from "../lwql-chart-failures";
-import { LangWatchQLVegaLoadBlockedError } from "../no-network-vega-loader";
+import { lwqlEmptyEncodingFailure, lwqlRenderFailure } from "../lwql-chart-failures.ts";
+import { LangWatchQLVegaLoadBlockedError } from "../no-network-vega-loader.ts";
 
 describe("the refusals the chart layer raises", () => {
   describe("given a failure from inside the chart runtime", () => {

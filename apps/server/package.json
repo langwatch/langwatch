@@ -38,8 +38,8 @@
     }
   },
   "scripts": {
-    "build": "tsx scripts/build.ts",
-    "dev": "tsx src/cli.ts",
+    "build": "node --experimental-transform-types scripts/build.ts",
+    "dev": "node --experimental-transform-types src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -63,7 +63,6 @@
     "@types/prompts": "^2.4.9",
     "@types/tar": "^6.1.13",
     "esbuild": "^0.28.1",
-    "tsx": "^4.21.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },

@@ -19,8 +19,8 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeGithubHost, renderWithGithubHost } from "../../../testing";
-import IntegrationsScreen from "../integrations.screen";
+import { FakeGithubHost, renderWithGithubHost } from "../../../testing.tsx";
+import IntegrationsScreen from "../integrations.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -35,7 +35,7 @@ const calls = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
-vi.mock("../../../behavior/github-api", () => ({
+vi.mock("../../../behavior/github-api.ts", () => ({
   githubApi: {
     github: {
       getConnectionStatus: {

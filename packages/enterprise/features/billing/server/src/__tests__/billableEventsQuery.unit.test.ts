@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type BillableEventsRepository, BillableEventsQueryService } from "../index";
+import { type BillableEventsRepository, BillableEventsQueryService } from "../index.ts";
 
 const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),

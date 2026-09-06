@@ -19,14 +19,14 @@ import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features";
-import { ApiRestSecurity } from "../../api-rest.security";
+import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features.ts";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
 import {
   composeApiEvaluatorExecution,
   type ApiEvaluatorExecution,
-} from "../api-evaluator-execution.composition";
-import { composeApiGatewayInternalRest } from "../api-gateway-internal-rest.composition";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+} from "../api-evaluator-execution.composition.ts";
+import { composeApiGatewayInternalRest } from "../api-gateway-internal-rest.composition.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 
 const LANGEVALS_ENDPOINT = "http://langevals.test";
 const INTERNAL_SECRET = "shared-hmac-secret";

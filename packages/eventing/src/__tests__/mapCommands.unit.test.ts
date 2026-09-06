@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { mapCommands } from "../mapCommands";
-import type { EventSourcedQueueProcessor } from "../queues";
+import { mapCommands } from "../mapCommands.ts";
+import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 
 function createMockProcessor<P extends Record<string, unknown>>(): EventSourcedQueueProcessor<P> {
   return {

@@ -1,9 +1,9 @@
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import type { TraceListItem } from "../../types/trace";
-import { shouldShowArrivals } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import { ARRIVAL_PREVIEW_TRACES, SAMPLE_PREVIEW_TRACES } from "../data/sample-preview-traces";
-import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import type { TraceListItem } from "../../types/trace.ts";
+import { shouldShowArrivals } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { ARRIVAL_PREVIEW_TRACES, SAMPLE_PREVIEW_TRACES } from "../data/sample-preview-traces.ts";
+import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 
 export interface SamplePreviewResult {
   data: TraceListItem[];

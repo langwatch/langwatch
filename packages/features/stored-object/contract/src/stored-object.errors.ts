@@ -1,6 +1,6 @@
 import { HandledError, type HandledErrorFault } from "@langwatch/handled-error";
 import { z } from "zod";
-import type { StoredObjectId, StoredObjectOperationId, StoredObjectProjectId } from "./ids";
+import type { StoredObjectId, StoredObjectOperationId, StoredObjectProjectId } from "./ids.ts";
 
 export const STORED_OBJECT_PROBLEM_CODES = [
   "direct_upload_unavailable",

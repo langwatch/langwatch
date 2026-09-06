@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { adminAuditRequestSchema, adminResourceNameSchema } from "./admin";
+import { adminAuditRequestSchema, adminResourceNameSchema } from "./admin.ts";
 
 export const adminOperationMethodSchema = z.enum([
   "getList",

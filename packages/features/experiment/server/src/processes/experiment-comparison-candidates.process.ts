@@ -4,7 +4,7 @@
  * moving them is what brings the comparison plan service under the module ceiling.
  */
 
-import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service";
+import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
 import { disambiguateNames, type TargetConfig } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 

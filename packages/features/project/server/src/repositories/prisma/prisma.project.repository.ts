@@ -24,12 +24,12 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper";
+import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
 import {
   ProjectRepository,
   type ProjectWithOrgAdmin,
   type TouchCodingAgentActivityInput,
-} from "../project.repository";
+} from "../project.repository.ts";
 
 /**
  * The two models this repository reads and writes, and nothing else in the

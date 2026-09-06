@@ -2,9 +2,9 @@
  * Spec: packages/features/authz/specs/grants-command-dispatch.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { AuthzLedgerUnavailableError } from "../../ports/authz-grants-command-dispatcher.port";
-import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port";
-import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter";
+import { AuthzLedgerUnavailableError } from "../../ports/authz-grants-command-dispatcher.port.ts";
+import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port.ts";
+import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter.ts";
 
 function senders(): AuthzGrantsCommandSenders {
   const send = vi.fn(async () => undefined);

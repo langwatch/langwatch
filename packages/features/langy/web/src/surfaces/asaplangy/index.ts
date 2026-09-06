@@ -1,3 +1,3 @@
-export { LangyCard } from "../../ui/sections/langy-card";
-export { LangyPanelSurface } from "../../ui/sections/langy-panel-surface";
-export * from "../../model/asaplangy-tokens";
+export { LangyCard } from "../../ui/sections/langy-card.tsx";
+export { LangyPanelSurface } from "../../ui/sections/langy-panel-surface.tsx";
+export * from "../../model/asaplangy-tokens.ts";

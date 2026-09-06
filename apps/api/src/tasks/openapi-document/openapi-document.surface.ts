@@ -2,7 +2,7 @@
  * The API process's REST surface, composed for description rather than for service.
  */
 import { Hono } from "hono";
-import { ApiGovernanceIngestKeyProvenance } from "../../features/enterprise/governance-ingest-rest.mount";
+import { ApiGovernanceIngestKeyProvenance } from "../../features/enterprise/governance-ingest-rest.mount.ts";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
@@ -13,19 +13,19 @@ import { createGatewayPlatformRestApp, createGatewaySpendRestApp } from "@langwa
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
 
-import { REGISTRY_RBAC_VOCABULARY } from "../../app/api-packaged-rest.composition";
+import { REGISTRY_RBAC_VOCABULARY } from "../../app/api-packaged-rest.composition.ts";
 
-import { ApiSecretRestFeature } from "../../api-secret-rest.feature";
-import { ApiRestSecurity } from "../../api-rest.security";
+import { ApiSecretRestFeature } from "../../api-secret-rest.feature.ts";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
   type ApiProcessRestServices,
-} from "../../app-rest/app-rest.process-features";
+} from "../../app-rest/app-rest.process-features.ts";
 import type {
   ApiPackagedRestCollaborators,
   ApiPackagedRestFamilyName,
-} from "../../app-rest/app-rest.packaged-families";
+} from "../../app-rest/app-rest.packaged-families.ts";
 
 /** A family the process serves that this composition cannot describe, and why. */
 export type OpenApiSurfaceAbsence = Readonly<{

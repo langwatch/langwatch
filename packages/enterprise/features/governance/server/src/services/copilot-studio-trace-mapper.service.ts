@@ -42,17 +42,17 @@ import {
   type OtlpJsonAttr,
   type OtlpJsonSpan,
   type RoutingOrigin,
-} from "./conversation-trace-assembly.service";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.service";
+} from "./conversation-trace-assembly.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service";
-import { CopilotTurnAssemblyService } from "./copilot-turn-assembly.service";
+import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service.ts";
+import { CopilotTurnAssemblyService } from "./copilot-turn-assembly.service.ts";
 import {
   type BotFacts,
   type ConversationGroup,
   type ToolCall,
   type Turn,
-} from "../rules/copilot-transcript.rules";
+} from "../rules/copilot-transcript.rules.ts";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 

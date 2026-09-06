@@ -1,7 +1,7 @@
 import { Table } from "@chakra-ui/react";
 import type React from "react";
 
-import { Link } from "./activity-link";
+import { Link } from "./activity-link.tsx";
 
 /**
  * The width a contributor's name is allowed to take.

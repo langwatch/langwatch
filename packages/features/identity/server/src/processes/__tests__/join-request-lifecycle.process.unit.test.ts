@@ -7,7 +7,7 @@ import {
   joinRequestLifecycleWake,
   onJoinRequested,
   onJoinResolved,
-} from "../join-request-lifecycle.process";
+} from "../join-request-lifecycle.process.ts";
 
 /**
  * The two timers on one wake column.

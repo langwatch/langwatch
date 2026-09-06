@@ -12,4 +12,4 @@
  * `./screens/integrations`, which is what ADR-004 asks of a screen.
  */
 
-export * from "./behavior/github-connect-popup";
+export * from "./behavior/github-connect-popup.ts";

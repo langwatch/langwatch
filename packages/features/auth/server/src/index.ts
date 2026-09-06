@@ -1,17 +1,17 @@
-export { PostgresAuthAdapter } from "./adapters/postgres.auth.adapter";
-export { PostgresAuthDirectoryAdapter } from "./adapters/postgres.auth-directory.adapter";
-export { AuthDirectoryPort, type AuthDirectoryProject } from "./ports/auth-directory.port";
-export { BetterAuthHooksRepository } from "./repositories/better-auth-hooks.repository";
-export { PrismaBetterAuthHooksRepository } from "./repositories/prisma/prisma.better-auth-hooks.repository";
-export { AuthService } from "./services/auth.service";
+export { PostgresAuthAdapter } from "./adapters/postgres.auth.adapter.ts";
+export { PostgresAuthDirectoryAdapter } from "./adapters/postgres.auth-directory.adapter.ts";
+export { AuthDirectoryPort, type AuthDirectoryProject } from "./ports/auth-directory.port.ts";
+export { BetterAuthHooksRepository } from "./repositories/better-auth-hooks.repository.ts";
+export { PrismaBetterAuthHooksRepository } from "./repositories/prisma/prisma.better-auth-hooks.repository.ts";
+export { AuthService } from "./services/auth.service.ts";
 export {
   AuthApp,
   type AuthAppDependencies,
   type AuthRequestContext,
   type AuthSession,
-} from "./app/auth.app";
-export { FrontDoorTrpcApi, type FrontDoorTrpcContext } from "./transport/api-trpc/front-door.api";
-export { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "./transport/api-trpc/public-env.api";
+} from "./app/auth.app.ts";
+export { FrontDoorTrpcApi, type FrontDoorTrpcContext } from "./transport/api-trpc/front-door.api.ts";
+export { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "./transport/api-trpc/public-env.api.ts";
 export {
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,
@@ -20,11 +20,11 @@ export {
   type SignUpVerificationDeps,
   type SignUpVerificationMailer,
   type SignUpVerificationTokenStore,
-} from "./services/signup-verification.service";
+} from "./services/signup-verification.service.ts";
 export {
   PrismaSignUpAccountDirectoryRepository,
   PrismaSignUpVerificationTokenRepository,
-} from "./repositories/prisma/prisma.signup-verification.repository";
+} from "./repositories/prisma/prisma.signup-verification.repository.ts";
 export {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -33,14 +33,14 @@ export {
   BetterAuthStoragePort,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
-} from "./ports/better-auth.port";
+} from "./ports/better-auth.port.ts";
 export {
   createBetterAuthTransport,
   isEmailPasswordEnabled,
   type BetterAuthDeploymentConfiguration,
   type BetterAuthTransport,
   type BetterAuthTransportOptions,
-} from "./transport/better-auth/better-auth.api";
+} from "./transport/better-auth/better-auth.api.ts";
 export {
   afterAccountCreate,
   afterAccountUpdate,
@@ -50,31 +50,31 @@ export {
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
-} from "./transport/better-auth/better-auth-hooks.api";
+} from "./transport/better-auth/better-auth-hooks.api.ts";
 export {
   BORN_FINALIZED_SIGNUP_FLAG,
   isBornFinalizedSignUp,
-} from "./transport/better-auth/born-finalized-opt-in.api";
-export { isAllowedAuthOrigin } from "./transport/better-auth/origin-gate.api";
+} from "./transport/better-auth/born-finalized-opt-in.api.ts";
+export { isAllowedAuthOrigin } from "./transport/better-auth/origin-gate.api.ts";
 export {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type SignUpVerificationPort,
-} from "./transport/better-auth/passkey-sign-up.api";
+} from "./transport/better-auth/passkey-sign-up.api.ts";
 export {
   isSignInInitiationPath,
   runSignInRouterShadow,
   SignInRouterShadowPort,
   type ShadowRun,
   type SignInRouterMode,
-} from "./transport/better-auth/sign-in-router-shadow.api";
+} from "./transport/better-auth/sign-in-router-shadow.api.ts";
 export {
   Auth0ApiError,
   Auth0PasswordService,
   type Auth0ErrorCode,
   type Auth0ManagementCredentials,
-} from "./services/auth0-password.service";
+} from "./services/auth0-password.service.ts";
 
 // The `/api/auth` REST family: the Better Auth catch-all, the browser's
 // session poll, the explicit logout and the legacy project-token check. The
@@ -86,7 +86,7 @@ export {
   type AuthRestFederatedLogout,
   type AuthRestPorts,
   type AuthRestSession,
-} from "./transport/api-rest/auth.api";
+} from "./transport/api-rest/auth.api.ts";
 
 // The `/api/auth/cli` device grant: RFC 8628's three CLI endpoints plus the
 // four browser-side ones that resolve, approve, deny and end a device session.
@@ -97,8 +97,8 @@ export {
   type AuthCliDeviceFlowRestPorts,
   type CliBrowserSessionPort,
   type CliPersonalWorkspace,
-} from "./transport/api-rest/auth-cli-device-flow.api";
-export { CliDeviceSessionStorePort } from "./ports/cli-device-session-store.port";
+} from "./transport/api-rest/auth-cli-device-flow.api.ts";
+export { CliDeviceSessionStorePort } from "./ports/cli-device-session-store.port.ts";
 export {
   ACCESS_TOKEN_TTL_SECONDS,
   CliDeviceSessionService,
@@ -113,4 +113,4 @@ export {
   type CliDeviceCodeStatus,
   type CliMintedSession,
   type CliRefreshTokenRecord,
-} from "./services/cli-device-session.service";
+} from "./services/cli-device-session.service.ts";

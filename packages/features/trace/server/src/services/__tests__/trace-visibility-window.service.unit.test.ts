@@ -8,7 +8,7 @@ import {
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
   VisibilityWindowService,
-} from "../trace-visibility-window.service";
+} from "../trace-visibility-window.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts",
+    "generate:vega-validator": "node --experimental-transform-types scripts/generate-vega-lite-validator.ts",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
@@ -41,7 +41,6 @@
   },
   "devDependencies": {
     "@types/node": "^26",
-    "tsx": "^4.20.6",
     "typescript": "^7.0.2",
     "vega": "6.3.1",
     "vega-lite": "6.4.3",

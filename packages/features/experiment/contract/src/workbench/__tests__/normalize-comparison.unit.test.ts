@@ -4,14 +4,14 @@ import {
   type EvaluatorConfig,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type TargetConfig,
-} from "../../experiment-workbench";
+} from "../../experiment-workbench.ts";
 import {
   normalizeEvaluators,
   normalizeTargets,
   resolveDispatchEvaluatorType,
   resolveVerdictLabel,
   toComparisonConfig,
-} from "../normalize-comparison";
+} from "../normalize-comparison.ts";
 
 const legacyPairwise = {
   variantA: "target-a",

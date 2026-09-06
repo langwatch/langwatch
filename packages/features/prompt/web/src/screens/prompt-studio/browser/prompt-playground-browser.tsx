@@ -1,14 +1,14 @@
 import { HStack } from "@chakra-ui/react";
-import { TabIdProvider } from "../studio-internals";
+import { TabIdProvider } from "../studio-internals.ts";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
-import { AddPromptButton } from "../sidebar/add-prompt-button";
-import { ExperimentFromPlaygroundButton } from "./experiment-from-playground-button";
-import { PromptTabStrip } from "./prompt-tab-strip";
-import { PromptBrowserWindowContent } from "./window/prompt-browser-window-content";
-import { DraggableTabsBrowser } from "./draggable-tabs-browser";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { AddPromptButton } from "../sidebar/add-prompt-button.tsx";
+import { ExperimentFromPlaygroundButton } from "./experiment-from-playground-button.tsx";
+import { PromptTabStrip } from "./prompt-tab-strip.tsx";
+import { PromptBrowserWindowContent } from "./window/prompt-browser-window-content.tsx";
+import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.

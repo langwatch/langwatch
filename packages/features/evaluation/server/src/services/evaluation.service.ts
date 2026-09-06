@@ -23,10 +23,10 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import type {
   EvaluationExecutionPort,
   EvaluationInputsResolutionPort,
-} from "../ports/evaluation.port";
-import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository";
-import { MonitorPerformanceService } from "./monitor-performance.service";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository";
+} from "../ports/evaluation.port.ts";
+import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
+import { MonitorPerformanceService } from "./monitor-performance.service.ts";
+import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;

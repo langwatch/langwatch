@@ -3,12 +3,12 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
-} from "../../projections/evaluation-analytics-fold.projection";
+} from "../../projections/evaluation-analytics-fold.projection.ts";
 import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
-} from "../../projections/evaluation-analytics-row.projection";
-import type { EvaluationAnalyticsAttributePolicy } from "../../ports/evaluation.port";
+} from "../../projections/evaluation-analytics-row.projection.ts";
+import type { EvaluationAnalyticsAttributePolicy } from "../../ports/evaluation.port.ts";
 
 /**
  * `FoldProjectionStore` adapter for the slim `evaluation_analytics` fold

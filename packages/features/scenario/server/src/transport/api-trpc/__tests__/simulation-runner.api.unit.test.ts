@@ -43,9 +43,9 @@ import {
   type ScenarioRunConfig,
 } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";
-import { createSimulationRunnerRouter } from "../simulation-runner.api";
-import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules";
-import { ScenarioApp, type ScenarioAppDependencies } from "../../../app/scenario.app";
+import { createSimulationRunnerRouter } from "../simulation-runner.api.ts";
+import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules.ts";
+import { ScenarioApp, type ScenarioAppDependencies } from "../../../app/scenario.app.ts";
 
 // The run resolves the scenario's declared parameters before it queues
 // anything, which is the transport's only database read. Stubbed here so this

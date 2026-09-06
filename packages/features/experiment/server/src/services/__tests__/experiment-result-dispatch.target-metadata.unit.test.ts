@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ExperimentExecutionDataService } from "../experiment-execution-data.service";
-import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service";
+import { ExperimentExecutionDataService } from "../experiment-execution-data.service.ts";
+import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service.ts";
 
 const dispatches = ExperimentResultDispatchService.create();
 const buildTargetMetadata = dispatches.buildTargetMetadata.bind(dispatches);

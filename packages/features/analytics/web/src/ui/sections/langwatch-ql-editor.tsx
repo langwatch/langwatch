@@ -18,9 +18,9 @@ import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useCallback, useState } from "react";
 
-import { LWQL_LANGUAGE, useLangWatchQLMonaco } from "../../behavior/use-langwatch-ql-monaco";
-import type { LangWatchQLEditorMarker } from "../../model/lwql-failure";
-import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model";
+import { LWQL_LANGUAGE, useLangWatchQLMonaco } from "../../behavior/use-langwatch-ql-monaco.ts";
+import type { LangWatchQLEditorMarker } from "../../model/lwql-failure.ts";
+import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model.ts";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

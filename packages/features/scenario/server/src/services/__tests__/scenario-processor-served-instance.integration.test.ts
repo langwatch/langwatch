@@ -14,19 +14,19 @@ import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));
-vi.mock("../../adapters/child-process-spawn.adapter", () => ({
+vi.mock("../../adapters/child-process-spawn.adapter.ts", () => ({
   resolveChildProcessSpawn: () => ({
     command: process.execPath,
     args: ["-e", childScript.current],
   }),
 }));
 
-import { NodeScenarioChildProcessAdapter } from "../../adapters/node-scenario-child-process.adapter";
-import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port";
-import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port";
-import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service";
-import type { ExecutionJobData } from "../scenario-execution-pool.service";
-import { ScenarioProcessorService } from "../scenario-processor.service";
+import { NodeScenarioChildProcessAdapter } from "../../adapters/node-scenario-child-process.adapter.ts";
+import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port.ts";
+import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port.ts";
+import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
+import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
+import { ScenarioProcessorService } from "../scenario-processor.service.ts";
 
 const JOB: ExecutionJobData = {
   projectId: "proj_served",

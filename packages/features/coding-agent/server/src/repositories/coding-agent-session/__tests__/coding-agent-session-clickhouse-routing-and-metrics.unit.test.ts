@@ -5,11 +5,11 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter";
-import { CodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port";
-import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture";
-import { CodingAgentSessionClickHouseRepository } from "../clickhouse.repository";
+import { NoopCodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter.ts";
+import { CodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter.ts";
+import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
+import { CodingAgentSessionClickHouseRepository } from "../clickhouse.repository.ts";
 
 const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();
 const WINDOW_TO = new Date("2026-07-24T23:59:59.999Z").getTime();

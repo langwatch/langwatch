@@ -3,8 +3,8 @@ import {
   GovernanceSetupActivityPort,
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
-} from "../governance-setup-state.port";
-import { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service";
+} from "../governance-setup-state.port.ts";
+import { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
 
 const emptyCounts = (): GovernanceSetupCounts => ({
   personalVirtualKeys: 0,

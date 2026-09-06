@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
-import type { Event } from "../../domain/types";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { EventSourcingService } from "../eventSourcingService";
+import type { Event } from "../../domain/types.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   cleanupTestEnvironment,
   createMockFoldProjectionDefinition,
@@ -10,7 +10,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
-} from "./testHelpers";
+} from "./testHelpers.ts";
 
 describe("EventSourcingService - Recovery Flows", () => {
   const { aggregateType, tenantId, context } = createTestContext();

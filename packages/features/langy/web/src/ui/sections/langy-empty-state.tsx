@@ -5,8 +5,8 @@ import { type ComponentType, useMemo } from "react";
 // the same mark LangyGitHubConnectCard uses, so the suggestion and the card you
 // land on speak with one icon.
 import { GitHub } from "react-feather";
-import { LangyMark } from "./langy-mark";
-import { emptyStateMetrics } from "../../model/langy-empty-state-metrics";
+import { LangyMark } from "./langy-mark.tsx";
+import { emptyStateMetrics } from "../../model/langy-empty-state-metrics.ts";
 
 /** Structural, so a lucide icon and a react-feather one can sit in one list. */
 export type SuggestionIcon = ComponentType<{ size?: string | number }>;

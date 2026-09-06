@@ -10,12 +10,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useDatasetTable } from "../../model/dataset-table-context";
+import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 import {
   formatJsonCellValue,
   JSON_LIKE_TYPES,
   validateCellValue,
-} from "../../model/editable-cell-value";
+} from "../../model/editable-cell-value.ts";
 
 type FloatingCellEditorProps = {
   value: string;

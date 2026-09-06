@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { TopicService } from "@langwatch/topic-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createTopicTrpcRouter } from "./topic-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createTopicTrpcRouter } from "./topic-trpc.mount.ts";
 
 /** The one namespace and the reader `ctx.app.topics` carries. */
 export type ComposedTopicFeature = Readonly<{

@@ -11,8 +11,8 @@ import {
   LuNavigation,
 } from "react-icons/lu";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { Dialog } from "../../dialog";
-import { TRACE_DRAWER_HELP_GROUPS } from "../hooks/trace-drawer-shortcut-table";
+import { Dialog } from "../../dialog.tsx";
+import { TRACE_DRAWER_HELP_GROUPS } from "../hooks/trace-drawer-shortcut-table.ts";
 
 type GroupAccent = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 

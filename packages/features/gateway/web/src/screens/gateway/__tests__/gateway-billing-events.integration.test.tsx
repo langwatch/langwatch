@@ -7,7 +7,7 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,13 +15,13 @@ const listQuery = vi.hoisted(() => vi.fn());
 
 // Passthrough with a marker: the page must render INSIDE the gateway layout
 // on the happy path, not only hand it to the guard's denied fallback.
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="ai-gateway-layout">{children}</div>
   ),
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     gatewaySpendEvents: {
       list: { useQuery: listQuery },
@@ -36,7 +36,7 @@ const host = fakeGatewayHost({
   project: { id: "project_1", name: "ACME project", slug: "acme-project", teamId: "team_1" },
 });
 
-import BillingEventsPage from "../gateway-billing-events.screen";
+import BillingEventsPage from "../gateway-billing-events.screen.tsx";
 
 const SPEND_ROW = {
   tenantId: "project_1",

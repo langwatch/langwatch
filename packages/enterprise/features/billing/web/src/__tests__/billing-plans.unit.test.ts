@@ -13,7 +13,7 @@ import {
   getGrowthFeatures,
   getGrowthPlanFeatures,
   WEBHOOK_FEATURE_LABEL,
-} from "../model/billing-plans";
+} from "../model/billing-plans.ts";
 
 describe("getGrowthFeatures()", () => {
   describe("when currency is EUR", () => {

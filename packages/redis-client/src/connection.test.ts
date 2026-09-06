@@ -33,7 +33,7 @@ vi.mock("ioredis", () => {
   return { default: FakeIORedis, Cluster: FakeCluster };
 });
 
-const { RedisConnectionService } = await import("./connection");
+const { RedisConnectionService } = await import("./connection.ts");
 
 function createLoggerSpy() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -198,7 +198,7 @@ describe("RedisConnectionService", () => {
 
   describe("when a resolved configuration is supplied directly", () => {
     it("connects without re-resolving it", async () => {
-      const { RedisConfigService } = await import("./config");
+      const { RedisConfigService } = await import("./config.ts");
       const config = new RedisConfigService().resolve({
         url: "redis://localhost:6379",
       });

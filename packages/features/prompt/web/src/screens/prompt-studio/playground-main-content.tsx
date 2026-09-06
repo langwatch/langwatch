@@ -1,8 +1,8 @@
 import { HStack } from "@chakra-ui/react";
-import { useLoadSpanIntoPromptPlayground } from "../../behavior/use-load-span-into-prompt-studio";
-import { useDraggableTabsBrowserStore } from "../../behavior/use-prompt-tabs-browser-store";
-import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser";
-import { MainContentEmptyState } from "./sidebar/main-content-empty-state";
+import { useLoadSpanIntoPromptPlayground } from "../../behavior/use-load-span-into-prompt-studio.ts";
+import { useDraggableTabsBrowserStore } from "../../behavior/use-prompt-tabs-browser-store.ts";
+import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser.tsx";
+import { MainContentEmptyState } from "./sidebar/main-content-empty-state.tsx";
 
 /**
  * PromptPlaygroundMainContent

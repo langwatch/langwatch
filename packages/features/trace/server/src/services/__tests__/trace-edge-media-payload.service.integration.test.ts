@@ -12,9 +12,9 @@ import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
-import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service";
-import { TraceEdgeSpoolService } from "../trace-edge-spool.service";
+import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
+import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
+import { TraceEdgeSpoolService } from "../trace-edge-spool.service.ts";
 
 function fakeStore(): TraceMediaStorePort {
   const byHash = new Map<string, string>();

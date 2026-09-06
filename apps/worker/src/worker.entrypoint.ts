@@ -2,7 +2,7 @@
 import "@langwatch/time/polyfill";
 
 import process from "node:process";
-import { startStandaloneWorker } from "./app/worker-standalone.executable";
+import { startStandaloneWorker } from "./app/worker-standalone.executable.ts";
 
 /**
  * The runnable worker process — `pnpm --filter @langwatch/worker start`.

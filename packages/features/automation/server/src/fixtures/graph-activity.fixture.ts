@@ -1,10 +1,10 @@
-import { AutomationClockPort } from "../ports/automation-clock.port";
-import { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
+import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
 import {
   AutomationDispatchErrorPort,
   AutomationLoggerPort,
-} from "../ports/automation-graph.port";
-import { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
+} from "../ports/automation-graph.port.ts";
+import { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 
 /**
  * The rows and collaborators the graph-alert vertical touches, and nothing

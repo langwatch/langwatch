@@ -11,13 +11,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The sidebar mounts VoiceAgentsCallout, which reaches for project context
 // and fires tRPC queries this rig does not provide. Same stub the sibling
 // suite uses, for the same reason.
-vi.mock("../behavior/use-organization-team-project", () => ({
+vi.mock("../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({ project: { id: "project_1" } })),
 }));
 
 vi.mock("posthog-js", () => ({ default: { capture: vi.fn() } }));
 
-import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../ui/sections/suites/suite-sidebar";
+import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../ui/sections/suites/suite-sidebar.tsx";
 
 type SuiteSidebarProps = ComponentProps<typeof SuiteSidebar>;
 type Suite = SuiteSidebarProps["suites"][number];

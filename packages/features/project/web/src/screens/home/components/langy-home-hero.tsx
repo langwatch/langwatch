@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette, useCommandBar } from "@langwatch/navigation-web/surfaces/command-bar";
 import { selectLangySuggestions } from "@langwatch/langy-web/surfaces/langy-store";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useHomeDevState } from "./dev/home-dev-state";
+import { useHomeDevState } from "./dev/home-dev-state.ts";
 import "./homeHeroScroll.css";
-import { OnboardAgentPill } from "./onboard-agent-pill";
-import { useProjectReach } from "./use-project-reach";
-import { WelcomeHeader } from "./welcome-header";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { OnboardAgentPill } from "./onboard-agent-pill.tsx";
+import { useProjectReach } from "./use-project-reach.ts";
+import { WelcomeHeader } from "./welcome-header.tsx";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 /**
  * The Langy home's opening: a greeting, one field, and the asks worth

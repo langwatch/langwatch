@@ -8,8 +8,8 @@ const clickHouseMocks = vi.hoisted(() => ({
 vi.mock("@clickhouse/client", () => ({
   createClient: clickHouseMocks.createClient,
 }));
-import { OpsClickHouseRuntime } from "../ops-clickhouse-explain.adapter";
-import { OpsClickhouseExplainAdapter } from "../ops-clickhouse-explain.adapter";
+import { OpsClickHouseRuntime } from "../ops-clickhouse-explain.adapter.ts";
+import { OpsClickhouseExplainAdapter } from "../ops-clickhouse-explain.adapter.ts";
 const { buildExplainQuery, parseOpsConnection, redactQueryForAudit, stripCommentsAndStrings } =
   OpsClickhouseExplainAdapter;
 

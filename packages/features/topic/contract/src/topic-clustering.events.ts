@@ -5,7 +5,7 @@ import {
   TOPIC_CLUSTERING_TRIGGER,
   TOPIC_MODEL_RECORD_MODE,
   TOPIC_MODEL_RECORD_SOURCE,
-} from "./topic-clustering.constants";
+} from "./topic-clustering.constants.ts";
 
 /**
  * Event DATA schemas for the topic-clustering-processing pipeline (ADR-051)

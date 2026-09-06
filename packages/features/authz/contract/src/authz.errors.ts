@@ -1,6 +1,6 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
-import type { AuthzDenialReason, AuthzScopeRef } from "./authz";
+import type { AuthzDenialReason, AuthzScopeRef } from "./authz.ts";
 
 export const AUTHZ_PROBLEM_CODES = [
   "validation_error",

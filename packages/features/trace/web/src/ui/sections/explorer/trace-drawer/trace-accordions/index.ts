@@ -1,1 +1,1 @@
-export { TraceAccordions } from "./trace-accordions";
+export { TraceAccordions } from "./trace-accordions.tsx";

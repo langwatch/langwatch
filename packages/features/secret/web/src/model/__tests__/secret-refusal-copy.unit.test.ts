@@ -23,7 +23,7 @@ import {
   describeSecretRefusal,
   readSecretRefusalCode,
   SECRET_REFUSAL_CODES,
-} from "../secret-refusal-copy";
+} from "../secret-refusal-copy.ts";
 
 /** One instance of every refusal the feature declares. */
 const REFUSALS = [

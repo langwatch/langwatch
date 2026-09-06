@@ -7,7 +7,7 @@ import { Task } from "@langwatch/task";
 import type {
   DuplicateSubscriptionsReportRepository,
   SubscriptionReportRow,
-} from "../repositories/duplicate-subscriptions-report.repository";
+} from "../repositories/duplicate-subscriptions-report.repository.ts";
 
 const logger = createLogger("langwatch:task:duplicate-subscriptions-report");
 

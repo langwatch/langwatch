@@ -17,11 +17,11 @@ let mutationOptions: {
 } = {};
 let isSaving = false;
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       traceEditOverlay: {
@@ -43,14 +43,14 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: (...args: unknown[]) => toasterCreate(...args) },
 }));
 
-vi.mock("../../../../errors", () => ({
+vi.mock("../../../../errors/index.ts", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store";
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
-import { EditModeBar } from "../edit-mode-bar";
+import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store.ts";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { EditModeBar } from "../edit-mode-bar.tsx";
 
 function renderBar() {
   return render(

@@ -1,8 +1,8 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GroupQueueProcessor } from "../groupQueue";
-import { GroupStagingScripts } from "../scripts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 /**
  * The total-pending counter must stay consistent across every lifecycle path.

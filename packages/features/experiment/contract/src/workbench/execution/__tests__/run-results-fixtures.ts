@@ -1,5 +1,5 @@
-import { applyRunEvent, emptyRunResultsDraft, type RunResultsDraft } from "../run-results";
-import type { EvaluationV3Event } from "../types";
+import { applyRunEvent, emptyRunResultsDraft, type RunResultsDraft } from "../run-results.ts";
+import type { EvaluationV3Event } from "../types.ts";
 
 /**
  * The event stream a backend run emits, replayed the way the executor replays

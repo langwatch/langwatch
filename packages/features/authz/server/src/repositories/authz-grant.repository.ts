@@ -13,8 +13,8 @@ import {
   type RoleBindingScopeType,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
-import { ScopeLineageRepository } from "./authz-read.repository";
-import type { AuthzReadRepository } from "./authz-read.repository";
+import { ScopeLineageRepository } from "./authz-read.repository.ts";
+import type { AuthzReadRepository } from "./authz-read.repository.ts";
 
 /** Which principal a binding row points at. Exactly one, by construction -
  *  the `?: never` exclusions are what make "two principals on one row"

@@ -22,23 +22,23 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiAuditPort } from "../../api-request.policy";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import { composeDatasetService } from "../../features/dataset/dataset.composition";
-import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition";
-import { composeMonitorService } from "../../features/monitor/monitor.composition";
-import { composeEvaluationFeature } from "../../features/evaluation/evaluation.composition";
-import { composeExperimentFeature } from "../../features/experiment/experiment.composition";
+import { ApiAuditPort } from "../../api-request.policy.ts";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application.ts";
+import { composeDatasetService } from "../../features/dataset/dataset.composition.ts";
+import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition.ts";
+import { composeMonitorService } from "../../features/monitor/monitor.composition.ts";
+import { composeEvaluationFeature } from "../../features/evaluation/evaluation.composition.ts";
+import { composeExperimentFeature } from "../../features/experiment/experiment.composition.ts";
 import {
   composeWorkflowFeature,
   composeWorkflowRuntime,
-} from "../../features/workflow/workflow.composition";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+} from "../../features/workflow/workflow.composition.ts";
+import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "./api-trpc-record.test-doubles";
+} from "./api-trpc-record.test-doubles.ts";
 
 const NLP_SERVICE_URL = "http://127.0.0.1:5561";
 const PUBLIC_BASE_URL = "https://app.example.test";

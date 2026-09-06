@@ -4,8 +4,8 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules";
-import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service";
+import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 
 const sqlText = LangWatchQLSqlTextService.create();
 

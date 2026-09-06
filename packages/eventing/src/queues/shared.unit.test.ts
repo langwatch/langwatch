@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getBackoffMs, JOB_RETRY_CONFIG } from "./shared";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "./shared.ts";
 
 describe("JOB_RETRY_CONFIG", () => {
   it("uses the cluster-recovery-friendly budget", () => {

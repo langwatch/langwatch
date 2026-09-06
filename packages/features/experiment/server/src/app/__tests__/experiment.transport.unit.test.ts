@@ -13,8 +13,8 @@ import { ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import type { ExperimentApp } from "../experiment.app";
-import { createExperimentsRestApp } from "../../transport/api-rest/experiment.api";
+import type { ExperimentApp } from "../experiment.app.ts";
+import { createExperimentsRestApp } from "../../transport/api-rest/experiment.api.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

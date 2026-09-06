@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { usePageVisibility } from "../../../../behavior/use-page-visibility";
-import { api } from "../../../../behavior/trace-api";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store";
-import { useTraceListRefresh } from "./use-trace-list-refresh";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { usePageVisibility } from "../../../../behavior/use-page-visibility.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
 
 const FAST_MS = 5_000;
 const SLOW_MS = 30_000;

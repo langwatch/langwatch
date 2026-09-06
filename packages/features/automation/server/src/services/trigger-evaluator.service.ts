@@ -6,17 +6,17 @@ import type {
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
 import type {
   AutomationDispatchErrorPort,
   AutomationGraphNotifierPort,
   AutomationLoggerPort,
   AutomationSlackBotTokenDecryptorPort,
-} from "../ports/automation-graph.port";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { CustomGraphRepository } from "../repositories/custom-graph.repository";
-import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository";
-import type { TriggerRepository } from "../repositories/trigger.repository";
+} from "../ports/automation-graph.port.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
 export type GraphActionParams = {
   members?: string[] | null;

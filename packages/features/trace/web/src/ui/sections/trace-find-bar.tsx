@@ -2,17 +2,17 @@ import { Box, Flex, Icon, IconButton, Input, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
 
-import { useFindStore } from "../../behavior/find-store";
-import { useFindAutoFocusInput } from "../../behavior/find-auto-focus-input";
-import { useFindMatchCycling } from "../../behavior/find-match-cycling";
-import { FindMatchCounter } from "../elements/find-match-counter";
-import { FindMatchHighlight } from "../elements/find-match-highlight";
-import { useFindScrollTraceIntoView } from "../../behavior/find-scroll-trace-into-view";
+import { useFindStore } from "../../behavior/find-store.ts";
+import { useFindAutoFocusInput } from "../../behavior/find-auto-focus-input.ts";
+import { useFindMatchCycling } from "../../behavior/find-match-cycling.ts";
+import { FindMatchCounter } from "../elements/find-match-counter.tsx";
+import { FindMatchHighlight } from "../elements/find-match-highlight.tsx";
+import { useFindScrollTraceIntoView } from "../../behavior/find-scroll-trace-into-view.ts";
 import {
   MIN_QUERY_LENGTH,
   useTraceSearchIndex,
   type TraceSearchItem,
-} from "../../behavior/find-search-index";
+} from "../../behavior/find-search-index.ts";
 
 type TraceFindBarProps = {
   traces: TraceSearchItem[];

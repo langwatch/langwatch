@@ -3,7 +3,7 @@ import {
   EmailProviderConfigurationError,
   type EmailProviderName,
   type MailerConfiguration,
-} from "../ports/email-delivery.port";
+} from "../ports/email-delivery.port.ts";
 
 /** What an operator must set to finish configuring a half-configured gateway. */
 const MISSING_SETTING_HINT: Record<EmailProviderName, string> = {

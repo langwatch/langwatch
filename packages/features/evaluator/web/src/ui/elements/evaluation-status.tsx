@@ -1,6 +1,6 @@
 import { CheckCircle, Clock, MinusCircle, XCircle } from "react-feather";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
-import { evaluationPassed, type EvaluationVerdictReading } from "../../model/evaluation-status";
+import { evaluationPassed, type EvaluationVerdictReading } from "../../model/evaluation-status.ts";
 
 export function CheckStatusIcon({ check }: { check: EvaluationVerdictReading }) {
   const iconMap: Record<ElasticSearchEvaluation["status"], React.FC> = {

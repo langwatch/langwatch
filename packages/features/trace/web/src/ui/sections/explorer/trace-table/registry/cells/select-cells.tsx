@@ -4,12 +4,12 @@ const ChakraButton = chakra("button");
 
 import type React from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useSelectionStore } from "../../../../../../behavior/selection.store";
-import type { TraceListItem } from "../../../types/trace";
-import type { ConversationGroup } from "../../conversation-groups";
-import { withoutPlaceholderTraceIds } from "../../skeleton-placeholders";
-import type { CellDef } from "../types";
-import type { TraceGroup } from "./group/types";
+import { useSelectionStore } from "../../../../../../behavior/selection.store.ts";
+import type { TraceListItem } from "../../../types/trace.ts";
+import type { ConversationGroup } from "../../conversation-groups.ts";
+import { withoutPlaceholderTraceIds } from "../../skeleton-placeholders.ts";
+import type { CellDef } from "../types.ts";
+import type { TraceGroup } from "./group/types.ts";
 
 export const SELECT_COLUMN_ID = "select";
 

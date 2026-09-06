@@ -1,4 +1,4 @@
-import type { TemplateMatchInput } from "./template-context";
+import type { TemplateMatchInput } from "./template-context.ts";
 
 /**
  * A single representative example trace that the editor preview, the test

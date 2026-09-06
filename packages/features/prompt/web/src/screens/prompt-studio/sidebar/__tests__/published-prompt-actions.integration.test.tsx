@@ -9,18 +9,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 const mockProject = { id: "test-project" };
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: mockProject,
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../../behavior/use-prompts", () => ({
+vi.mock("../../../../behavior/use-prompts.ts", () => ({
   usePrompts: () => ({ deletePrompt: vi.fn() }),
 }));
 
-vi.mock("../../../../behavior/use-rename-prompt-handle", () => ({
+vi.mock("../../../../behavior/use-rename-prompt-handle.ts", () => ({
   useRenamePromptHandle: () => ({
     renameHandle: vi.fn(),
     canRename: true,
@@ -28,19 +28,19 @@ vi.mock("../../../../behavior/use-rename-prompt-handle", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/use-prompt-tabs-browser-store", () => ({
+vi.mock("../../../../behavior/use-prompt-tabs-browser-store.ts", () => ({
   useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
-vi.mock("../../../../ui/blocks/delete-confirmation-dialog", () => ({
+vi.mock("../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 
-vi.mock("../../dialogs/copy-prompt-dialog", () => ({
+vi.mock("../../dialogs/copy-prompt-dialog.tsx", () => ({
   CopyPromptDialog: () => null,
 }));
 
-vi.mock("../../dialogs/push-to-copies-dialog", () => ({
+vi.mock("../../dialogs/push-to-copies-dialog.tsx", () => ({
   PushToCopiesDialog: () => null,
 }));
 
@@ -56,7 +56,7 @@ const {
   mockInvalidatePromptList: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/prompt-api", () => ({
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
     modelProvider: {
       getResolvedDefault: {
@@ -83,9 +83,9 @@ vi.mock("../../../../behavior/prompt-api", () => ({
 }));
 
 // Import after mocks
-import { FakePromptHost } from "../../../../testing";
-import { PromptHostProvider } from "../../../../model/prompt-host";
-import { PublishedPromptActions } from "../published-prompt-actions";
+import { FakePromptHost } from "../../../../testing.tsx";
+import { PromptHostProvider } from "../../../../model/prompt-host.ts";
+import { PublishedPromptActions } from "../published-prompt-actions.tsx";
 
 /**
  * A fresh host per render, because the assertions read what the screen told it.

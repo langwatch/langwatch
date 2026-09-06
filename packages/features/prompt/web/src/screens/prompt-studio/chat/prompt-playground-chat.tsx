@@ -1,21 +1,21 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { DeletableMessage, useTabId } from "../studio-internals";
+import { DeletableMessage, useTabId } from "../studio-internals.ts";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { AssistantMessage, CopilotChat, UserMessage } from "@copilotkit/react-ui";
 import clsx from "clsx";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { z } from "zod";
-import { TraceMessage } from "./trace-message";
-import { convertScenarioMessagesToCopilotKit } from "../../../model/scenario-messages";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
+import { TraceMessage } from "./trace-message.tsx";
+import { convertScenarioMessagesToCopilotKit } from "../../../model/scenario-messages.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import type { ChatMessage } from "@langwatch/trace-contract";
-import { isLLMErrorType } from "../../../model/format-llm-error";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
-import { ErrorMessage } from "./error-message";
-import { StructuredOutputDisplay } from "./structured-output-display";
-import { SyncedChatInput } from "./synced-chat-input";
+import { isLLMErrorType } from "../../../model/format-llm-error.ts";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
+import { ErrorMessage } from "./error-message.tsx";
+import { StructuredOutputDisplay } from "./structured-output-display.tsx";
+import { SyncedChatInput } from "./synced-chat-input.tsx";
 
 interface PromptPlaygroundChatProps extends BoxProps {
   formValues: PromptConfigFormValues;

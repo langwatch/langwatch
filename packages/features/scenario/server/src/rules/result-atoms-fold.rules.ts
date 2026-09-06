@@ -13,7 +13,7 @@ import {
   type SeriesBucket,
   type TrendPoint,
 } from "@langwatch/scenario-contract";
-import type { RawAtomRow, RawGroupRow, RawTrendRow } from "../ports/result-atoms-read.port";
+import type { RawAtomRow, RawGroupRow, RawTrendRow } from "../ports/result-atoms-read.port.ts";
 
 export interface PlanRecord {
   slug: string;

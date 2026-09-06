@@ -1,7 +1,7 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import { renderHeading } from "../../../elements/explorer/onboarding/hero-text";
+import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { renderHeading } from "../../../elements/explorer/onboarding/hero-text.tsx";
 
 interface StaticHeroProps {
   stage: StageId;

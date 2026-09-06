@@ -21,14 +21,14 @@
 
 import { describe, expect, it } from "vitest";
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
-import { recommendedPullSchedule } from "../../../features/ingestion-sources/model/pull-cadence";
-import { recordingGovernanceToaster } from "../../../testing";
+import { recommendedPullSchedule } from "../../../features/ingestion-sources/model/pull-cadence.ts";
+import { recordingGovernanceToaster } from "../../../testing.tsx";
 import {
   buildAnthropicAdminPullConfig,
   buildEditedParserConfig,
   buildEditSubmission,
-} from "../governance-inventory.screen";
-import { composer } from "./edit-pull-source-config.fixture";
+} from "../governance-inventory.screen.tsx";
+import { composer } from "./edit-pull-source-config.fixture.ts";
 
 describe("buildAnthropicAdminPullConfig on the edit path", () => {
   /** @scenario "Saving without touching the secret keeps the existing credential" */

@@ -11,9 +11,9 @@ import {
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
   type RetentionScopeTarget,
-} from "../../ports/data-retention-directory.port";
-import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port";
-import { StorageMeterScopeService } from "../storage-meter-scope.service";
+} from "../../ports/data-retention-directory.port.ts";
+import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port.ts";
+import { StorageMeterScopeService } from "../storage-meter-scope.service.ts";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 

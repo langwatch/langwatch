@@ -30,16 +30,16 @@ import {
   SOURCE_TYPE_OPTIONS,
   type SourceGroup,
   type SourceType,
-} from "../../features/ingestion-sources/model/ingestion-source-catalog";
+} from "../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
-} from "../../features/ingestion-sources/model/pull-cadence";
-import { AddIngestionSourceMenu } from "../../features/ingestion-sources/ui/elements/add-ingestion-source-menu";
-import { PullCadenceField } from "../../features/ingestion-sources/ui/elements/pull-cadence-field";
-import { TraceDestinationField } from "../../features/ingestion-sources/ui/elements/trace-destination-field";
+} from "../../features/ingestion-sources/model/pull-cadence.ts";
+import { AddIngestionSourceMenu } from "../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
+import { PullCadenceField } from "../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
+import { TraceDestinationField } from "../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
 import {
   ChevronRight,
   CircleCheck,
@@ -53,12 +53,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useGovernanceSearchParams } from "../../behavior/governance-router";
-import { EnterpriseOttlEditor as OttlEditor } from "../../features/ottl/ui/sections/ottl-editor.connected";
-import { SourceTypeIconGlyph } from "../../features/ingestion-sources/ui/elements/source-type-icon-glyph";
-import GovernanceLayout from "../../ui/sections/governance-layout";
-import { ToolCatalogPanel } from "../../features/ai-tools/ui/sections/tool-catalog-panel";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
+import { useGovernanceSearchParams } from "../../behavior/governance-router.ts";
+import { EnterpriseOttlEditor as OttlEditor } from "../../features/ottl/ui/sections/ottl-editor.connected.tsx";
+import { SourceTypeIconGlyph } from "../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
+import { ToolCatalogPanel } from "../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -69,17 +69,17 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../ui/elements/governance-link";
-import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useShowErrorToast } from "../../behavior/governance-feedback";
-import { useGovernancePlan, useGovernanceScope } from "../../behavior/governance-session";
-import { api } from "../../behavior/governance-api";
+import { Link } from "../../ui/elements/governance-link.tsx";
+import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useShowErrorToast } from "../../behavior/governance-feedback.ts";
+import { useGovernancePlan, useGovernanceScope } from "../../behavior/governance-session.ts";
+import { api } from "../../behavior/governance-api.ts";
 import {
   type DestinationContext,
   type Source,
   useDestinationContext,
-} from "./ingestion-source-forms";
+} from "./ingestion-source-forms.ts";
 
 /**
  * Admin CRUD for IngestionSources - the per-platform fleet config that

@@ -1,6 +1,6 @@
-import type { ProjectReach } from "../../model/langy-project-reach";
-import { api } from "../langy-api";
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import type { ProjectReach } from "../../model/langy-project-reach.ts";
+import { api } from "../langy-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 export interface ProjectReachResult extends ProjectReach {
   /** True until we know, so nothing offers asks it may have to withdraw. */

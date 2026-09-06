@@ -1,5 +1,5 @@
-import type { DiscoveredAggregate } from "./replayEventSource";
-import type { DiscoveryResult, ReplayContext } from "./types";
+import type { DiscoveredAggregate } from "./replayEventSource.ts";
+import type { DiscoveryResult, ReplayContext } from "./types.ts";
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must

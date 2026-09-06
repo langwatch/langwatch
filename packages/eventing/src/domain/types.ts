@@ -12,9 +12,9 @@
  */
 
 import { z } from "zod";
-import { AggregateTypeSchema } from "./aggregateType";
-import { EventTypeSchema } from "./eventType";
-import { TenantIdSchema } from "./tenantId";
+import { AggregateTypeSchema } from "./aggregateType.ts";
+import { EventTypeSchema } from "./eventType.ts";
+import { TenantIdSchema } from "./tenantId.ts";
 
 /**
  * Zod schema for event metadata base.

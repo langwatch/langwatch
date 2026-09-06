@@ -12,8 +12,8 @@ import {
   LINK_PROPOSED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
-} from "./facts";
-import type { IdentityActor } from "./vocabulary";
+} from "./facts.ts";
+import type { IdentityActor } from "./vocabulary.ts";
 
 /**
  * An identifier is an aggregate — the rules one identifier's own stream folds

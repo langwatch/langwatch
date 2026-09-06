@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
-import { deliverSchema } from "../webhook-delivery.service";
+import { deliverSchema } from "../webhook-delivery.service.ts";
 
 describe("the deliver intent payload", () => {
   const frozenBeforeAudioQuantities = {

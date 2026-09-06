@@ -5,7 +5,7 @@ import { Crosshair, Lightbulb, MessageCircle, Pencil, ThumbsDown, ThumbsUp } fro
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { z } from "zod";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import type { AnnotationUser } from "../../model/annotation-row";
+import type { AnnotationUser } from "../../model/annotation-row.ts";
 
 interface ScoreEntry {
   name: string;

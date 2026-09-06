@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import { LangyTurnOrderService } from "../langy-turn-order.service";
+import { LangyTurnOrderService } from "../langy-turn-order.service.ts";
 
 const delta = (text: string) => ({ type: "delta", text }) as LangyStreamEntry;
 const tool = (id: string, phase: "start" | "end", name = "bash") =>

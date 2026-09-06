@@ -3,8 +3,8 @@ import {
   GatewaySpendConfirmationPort,
   type ConfirmSpendCommandData,
 } from "@langwatch/gateway-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
 type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];

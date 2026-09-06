@@ -22,7 +22,7 @@ import {
   resolveToolName,
   SESSION_CONTEXT_EVENT_NAME,
   sessionTitleFromPrompt,
-} from "../coding-agent-normalization";
+} from "../coding-agent-normalization.ts";
 
 describe("detectCodingAgent", () => {
   describe("given the name of the record", () => {

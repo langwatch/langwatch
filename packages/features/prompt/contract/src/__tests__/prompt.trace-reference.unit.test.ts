@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePromptTraceReference as parsePromptReference } from "../index";
+import { parsePromptTraceReference as parsePromptReference } from "../index.ts";
 
 describe("parsePromptReference()", () => {
   describe("when new combined format is present", () => {

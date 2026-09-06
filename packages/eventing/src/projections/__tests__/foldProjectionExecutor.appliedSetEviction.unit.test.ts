@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { FoldProjectionStore } from "../foldProjection.types";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
+} from "../../services/__tests__/testHelpers.ts";
+import type { FoldProjectionStore } from "../foldProjection.types.ts";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 /**
  * A commit must record every id it RECOGNISED, not only the ids it folded

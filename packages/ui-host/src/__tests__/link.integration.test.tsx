@@ -12,8 +12,8 @@ import {
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
   type UiRouteReadingValues,
-} from "../capabilities";
-import { Link } from "../link";
+} from "../capabilities.ts";
+import { Link } from "../link.tsx";
 
 const navigate = vi.fn<(to: string) => void>();
 

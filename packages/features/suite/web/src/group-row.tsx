@@ -14,12 +14,12 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { BatchSection } from "./batch-section";
-import { RunMetricsSummary } from "./run-metrics-summary";
-import type { ScenarioRunContextRenderer } from "./scenario-target-row";
-import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { groupRunsByBatchId } from "./run-history-transforms";
-import type { ViewMode } from "./use-run-history-store";
+import { BatchSection } from "./batch-section.tsx";
+import { RunMetricsSummary } from "./run-metrics-summary.tsx";
+import type { ScenarioRunContextRenderer } from "./scenario-target-row.tsx";
+import type { RunGroup, RunGroupSummary } from "./run-history-transforms.ts";
+import { groupRunsByBatchId } from "./run-history-transforms.ts";
+import type { ViewMode } from "./use-run-history-store.ts";
 
 type GroupRowProps = {
   group: RunGroup;

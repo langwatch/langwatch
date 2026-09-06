@@ -34,16 +34,16 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 import { EventEmitter } from "node:events";
 import { nanoid } from "nanoid";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   composeApiExperimentRun,
   composeApiExperimentRunCommands,
   type ApiExperimentRun,
   type ApiExperimentRunAbsenceReport,
-} from "../../app/api-experiment-run.composition";
-import { permissiveCoerceMonitorMappings } from "../trace/trace-mappings";
-import { createExperimentTrpcRouter } from "./experiment-trpc.mount";
+} from "../../app/api-experiment-run.composition.ts";
+import { permissiveCoerceMonitorMappings } from "../trace/trace-mappings.ts";
+import { createExperimentTrpcRouter } from "./experiment-trpc.mount.ts";
 
 /**
  * The retention floor a DSPy run read is bounded by when a project names no policy of its
@@ -83,7 +83,7 @@ export type ExperimentPeers = Readonly<{
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<unknown>;
 }>;
 
-import type { ComposedExperimentFeature } from "./experiment.composition.types";
+import type { ComposedExperimentFeature } from "./experiment.composition.types.ts";
 
 /** Composes the experiment surface and its run loop over this process's graph. */
 export function composeExperimentFeature(options: {

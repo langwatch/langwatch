@@ -9,7 +9,7 @@ import type {
 import {
   PromptTagAssignmentRepository,
   TagValidationError,
-} from "../prompt-tag-assignment.repository";
+} from "../prompt-tag-assignment.repository.ts";
 
 const logger = createLogger("langwatch:prompt-version-tags");
 

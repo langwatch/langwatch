@@ -1,4 +1,4 @@
-import type { BinaryPart } from "./trace-content-part.types";
+import type { BinaryPart } from "./trace-content-part.types.ts";
 
 export function parseBase64DataUri(uri: string): { mimeType: string; base64: string } | null {
   if (!uri.startsWith("data:")) return null;

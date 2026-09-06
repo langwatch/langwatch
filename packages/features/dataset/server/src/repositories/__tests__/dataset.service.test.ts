@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DatasetService } from "../../services/dataset.service";
-import { DatasetRepository } from "../dataset.repository";
-import { DatasetRecordRepository } from "../dataset-record.repository";
+import { DatasetService } from "../../services/dataset.service.ts";
+import { DatasetRepository } from "../dataset.repository.ts";
+import { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
 
 const row = (): Dataset =>

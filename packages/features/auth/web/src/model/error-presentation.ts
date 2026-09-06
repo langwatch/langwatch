@@ -23,11 +23,11 @@
  * have been a redesign of the failure-copy path rather than a move of it.
  */
 
-import type { AuthErrorExplanation } from "./auth-host";
-import { frontDoorErrorCopy } from "./front-door-error-copy";
-import type { AuthHandledError } from "./read-handled-error";
+import type { AuthErrorExplanation } from "./auth-host.ts";
+import { frontDoorErrorCopy } from "./front-door-error-copy.ts";
+import type { AuthHandledError } from "./read-handled-error.ts";
 
-export type { AuthErrorExplanation } from "./auth-host";
+export type { AuthErrorExplanation } from "./auth-host.ts";
 
 /**
  * What a registry answers: the copy for a failure, or nothing for one it lists

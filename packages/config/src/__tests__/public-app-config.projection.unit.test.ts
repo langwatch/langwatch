@@ -4,7 +4,7 @@ import {
   resolveGatewayBaseUrl,
   resolvePublicAppConfig,
   SAAS_GATEWAY_URL,
-} from "../public-app-config.projection";
+} from "../public-app-config.projection.ts";
 
 describe("public application configuration projection", () => {
   it("maps declared private deployment inputs and leaves credentials behind", () => {

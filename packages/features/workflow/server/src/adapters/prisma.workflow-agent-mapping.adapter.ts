@@ -26,7 +26,7 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { WorkflowAgentMappingPort } from "../ports/workflow.port";
+import { WorkflowAgentMappingPort } from "../ports/workflow.port.ts";
 
 /** The agent rows this adapter reads and writes, named structurally. */
 export type WorkflowAgentMappingDatabase = {

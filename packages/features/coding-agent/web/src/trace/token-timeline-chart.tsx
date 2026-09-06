@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatCompact } from "./session-signals";
-import type { CacheRebuildEvent, TokenTimelinePoint } from "./token-timeline";
+import { formatCompact } from "./session-signals.ts";
+import type { CacheRebuildEvent, TokenTimelinePoint } from "./token-timeline.ts";
 
 const CHART_HEIGHT_PX = 56;
 /** Past this many calls a number under every bar would overlap; label the ends. */

@@ -12,16 +12,16 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ pathname: mockPathname }),
 }));
 
-vi.mock("../hooks/use-trace-drawer-url-hydrator", () => ({
+vi.mock("../hooks/use-trace-drawer-url-hydrator.ts", () => ({
   useTraceDrawerUrlHydrator: () => undefined,
 }));
 
-vi.mock("../trace-drawer", () => ({
+vi.mock("../trace-drawer/index.ts", () => ({
   TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" />,
 }));
 
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { GlobalTraceV2DrawerMount } from "../global-trace-v2-drawer-mount";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { GlobalTraceV2DrawerMount } from "../global-trace-v2-drawer-mount.tsx";
 
 describe("GlobalTraceV2DrawerMount", () => {
   beforeEach(() => {

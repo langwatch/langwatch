@@ -23,7 +23,7 @@ import {
   GatewayScopeOrgMismatchError,
   GatewaySpendUnavailableError,
   VirtualKeyNotFoundError,
-} from "../index";
+} from "../index.ts";
 
 describe("gateway handled errors", () => {
   describe("given a scope from another organization", () => {

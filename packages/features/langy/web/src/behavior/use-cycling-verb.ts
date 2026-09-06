@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useReducedMotion } from "./use-reduced-motion";
+import { useReducedMotion } from "./use-reduced-motion.ts";
 
 export function useCyclingVerb(
   active: boolean,

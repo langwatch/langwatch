@@ -5,8 +5,8 @@ import {
   type PinnedTrace,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
-import { PinnedTraceRepository } from "../pinned-trace.repository";
-import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port";
+import { PinnedTraceRepository } from "../pinned-trace.repository.ts";
+import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port.ts";
 
 function mapPinnedTrace(row: unknown): PinnedTrace {
   return pinnedTraceSchema.parse(row);

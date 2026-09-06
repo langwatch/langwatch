@@ -31,8 +31,8 @@ import {
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
-import { api } from "../../behavior/personal-workspace-api";
-import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 
 const DOCS_BASE = "https://docs.langwatch.ai";
 

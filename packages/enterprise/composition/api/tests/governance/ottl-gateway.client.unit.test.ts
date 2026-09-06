@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AppGovernanceOttlGateway } from "../../src/governance/ottl-gateway.client";
+import { AppGovernanceOttlGateway } from "../../src/governance/ottl-gateway.client.ts";
 
 describe("AppGovernanceOttlGateway", () => {
   it("defers validation when the gateway is not configured", async () => {

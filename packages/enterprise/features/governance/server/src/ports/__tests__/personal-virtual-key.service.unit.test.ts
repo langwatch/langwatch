@@ -6,9 +6,9 @@ import {
 import {
   PersonalVirtualKeyIssuerPort,
   PersonalVirtualKeyRepository,
-} from "../personal-virtual-key.port";
-import { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service";
-import { TestOrganizationService } from "./support/test-organization-service";
+} from "../personal-virtual-key.port.ts";
+import { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service.ts";
+import { TestOrganizationService } from "./support/test-organization-service.ts";
 
 const key: PersonalVirtualKey = {
   id: "key",

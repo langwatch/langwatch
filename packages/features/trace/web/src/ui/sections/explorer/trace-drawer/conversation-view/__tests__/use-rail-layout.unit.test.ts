@@ -14,7 +14,7 @@ import {
   THREAD_COLUMN_MAX_WIDTH_PX,
   threadColumnMaxWidth,
   useRailLayout,
-} from "../use-rail-layout";
+} from "../use-rail-layout.ts";
 
 const TURNS = new Set(["trace-1", "trace-2"]);
 

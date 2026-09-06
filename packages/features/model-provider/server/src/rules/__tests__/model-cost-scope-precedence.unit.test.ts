@@ -3,7 +3,7 @@
  */
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
-import { byScopePrecedence } from "../model-cost-scope-precedence.rules";
+import { byScopePrecedence } from "../model-cost-scope-precedence.rules.ts";
 
 function cost({
   scopeType,

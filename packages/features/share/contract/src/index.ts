@@ -1,3 +1,3 @@
-export * from "./share";
-export * from "./share.errors";
-export * from "./share.service";
+export * from "./share.ts";
+export * from "./share.errors.ts";
+export * from "./share.service.ts";

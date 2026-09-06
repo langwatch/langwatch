@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ExpandableDatasetCell } from "../expandable-dataset-cell";
+import { ExpandableDatasetCell } from "../expandable-dataset-cell.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

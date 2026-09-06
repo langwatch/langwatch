@@ -36,13 +36,13 @@ import {
   type QueueInfo,
   type QueueSummaryInfo,
 } from "@langwatch/ops-contract";
-import type { AdminAccess } from "./admin-access.service";
-import type { AdminBackofficeService } from "./admin-backoffice.service";
-import type { ImpersonationService } from "./impersonation.service";
-import type { BlobStoreService } from "./blob-store.service";
-import type { SchedulerOpsService } from "./scheduler-ops.service";
-import type { AnomalyStatePort } from "../ports/anomaly-state.port";
-import type { QueueService } from "./queue.service";
+import type { AdminAccess } from "./admin-access.service.ts";
+import type { AdminBackofficeService } from "./admin-backoffice.service.ts";
+import type { ImpersonationService } from "./impersonation.service.ts";
+import type { BlobStoreService } from "./blob-store.service.ts";
+import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
+import type { AnomalyStatePort } from "../ports/anomaly-state.port.ts";
+import type { QueueService } from "./queue.service.ts";
 
 export class OpsService extends OpsServiceContract {
   private constructor(

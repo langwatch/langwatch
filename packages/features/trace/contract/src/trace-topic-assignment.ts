@@ -1,4 +1,4 @@
-import type { AssignTopicCommandData } from "./trace-processing.commands";
+import type { AssignTopicCommandData } from "./trace-processing.commands.ts";
 
 /**
  * Trace owns the durable assignment command that materialises a clustered

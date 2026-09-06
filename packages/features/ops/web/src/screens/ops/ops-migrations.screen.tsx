@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { MigrationsContent } from "../../features/migrations/ui/sections/migrations-content";
+import { MigrationsContent } from "../../features/migrations/ui/sections/migrations-content.tsx";
 
 export default function OpsMigrationsScreen() {
   return (

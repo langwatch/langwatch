@@ -1,7 +1,7 @@
 import { useIsFetching } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
-import { api } from "../../../../behavior/trace-api";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 
 /**
  * Smallest gap (ms) between two manual refresh clicks.

@@ -79,20 +79,20 @@ Feature: A dev stack boots quiet
   # --- A missing optional file is not news, twice per lane ---
 
   # `--env-file-if-exists` announces a file it did not find, on stderr, in a
-  # form no flag suppresses — and both the tsx CLI process and the child it
-  # spawns parse the flag, so each lane said it twice. The overlay is written
-  # by haven and absent in every non-haven run, which is the common case.
+  # form no flag suppresses, and every lane said so on every boot. The overlay
+  # it named is gone: haven hands its variables to the processes it starts, so
+  # the workspace env file is the only one a lane loads.
   @unit
   Scenario: A dev lane says nothing about an overlay that was never written
-    Given a workspace with no portless overlay
+    Given a workspace with no overlay file
     When a lane starts
     Then it does not mention the overlay at all
 
   @unit
-  Scenario: The overlay is still loaded, and still last, when it is there
-    Given a workspace with a portless overlay
+  Scenario: A lane loads the workspace env file and nothing beside it
+    Given a workspace holding both an env file and a stray overlay file
     When a lane starts
-    Then the overlay is loaded after the workspace env file, so it wins
+    Then only the workspace env file is loaded
 
   # --- Pre-bundling something the package does not depend on ---
 

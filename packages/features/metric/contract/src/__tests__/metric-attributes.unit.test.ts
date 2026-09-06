@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scalarsFromCanonicalAttributes } from "../index";
+import { scalarsFromCanonicalAttributes } from "../index.ts";
 
 describe("scalarsFromCanonicalAttributes", () => {
   it("lifts canonical scalar values and ignores structured or malformed entries", () => {

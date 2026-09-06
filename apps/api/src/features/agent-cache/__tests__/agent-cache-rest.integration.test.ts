@@ -19,9 +19,9 @@ import {
   MAX_VALUE_BYTES,
   MIN_TTL_SECONDS,
   type AgentCacheStore,
-} from "../agent-cache-rest";
-import { MemoryAgentCacheEntryStore } from "../agent-cache.store";
-import { AgentCacheService } from "../agent-cache.service";
+} from "../agent-cache-rest.ts";
+import { MemoryAgentCacheEntryStore } from "../agent-cache.store.ts";
+import { AgentCacheService } from "../agent-cache.service.ts";
 
 const PROJECT_ID = "project_cache";
 

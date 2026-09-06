@@ -19,8 +19,8 @@ import { Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { useLicensingHost } from "../../model/licensing-host";
-import { LicenseStatusPanel } from "./license-status-panel";
+import { useLicensingHost } from "../../model/licensing-host.ts";
+import { LicenseStatusPanel } from "./license-status-panel.tsx";
 
 /**
  * The grant this key carries.

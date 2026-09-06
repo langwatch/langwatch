@@ -23,15 +23,15 @@ import {
   type EvaluationTraceProtections,
   type EvaluationTraceReadPort,
   type EvaluationWorkflowExecutorPort,
-} from "../ports/evaluation-execution.port";
-import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service";
-import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
-import { EvaluationDataService } from "./evaluation-data.service";
-import { executionResultOf } from "../rules/evaluation-execution-result.rules";
+} from "../ports/evaluation-execution.port.ts";
+import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service.ts";
+import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
+import { EvaluationDataService } from "./evaluation-data.service.ts";
+import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
 import {
   maxCausalityDepthOfSpans,
   tryExtractParentTraceForNlpgo,
-} from "../rules/evaluation-causality.rules";
+} from "../rules/evaluation-causality.rules.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {

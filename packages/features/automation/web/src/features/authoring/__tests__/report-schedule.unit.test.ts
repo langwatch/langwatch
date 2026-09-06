@@ -9,7 +9,7 @@ import {
   partsFromCron,
   type ScheduleParts,
   summarizeSchedule,
-} from "../model/report-schedule";
+} from "../model/report-schedule.ts";
 
 describe("reportSchedule", () => {
   describe("given cronFromParts", () => {

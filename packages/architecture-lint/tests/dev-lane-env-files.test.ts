@@ -6,10 +6,9 @@
  *
  *   ../../.env.portless not found. Continuing without it.
  *
- * on stderr, in a form no flag suppresses. The portless overlay is written by
- * haven and absent in every other run, and both the tsx CLI process and the
- * child it spawns parse the flag, so each lane opened with the same sentence
- * twice.
+ * on stderr, in a form no flag suppresses. That overlay is gone — haven hands
+ * its variables to the processes it starts — so the workspace env file is the
+ * only one a lane loads, and it is loaded only when it is there.
  *
  * Corresponds to specs/setup/dev-stack-boot-noise.feature.
  */
@@ -68,7 +67,7 @@ function resolvedEnvFlags(script: string): string {
   }).trim();
 }
 
-describe("given a workspace with no portless overlay", () => {
+describe("given a workspace with no overlay file", () => {
   describe("when a lane starts", () => {
     /** @scenario "A dev lane says nothing about an overlay that was never written" */
     it("does not mention the overlay at all", () => {
@@ -98,24 +97,24 @@ describe("given a workspace with no portless overlay", () => {
   });
 });
 
-describe("given a workspace with a portless overlay", () => {
+describe("given a workspace holding both an env file and a stray overlay file", () => {
   describe("when a lane starts", () => {
-    /** @scenario "The overlay is still loaded, and still last, when it is there" */
-    it("loads the overlay after the workspace env file, so it wins", () => {
+    /** @scenario "A lane loads the workspace env file and nothing beside it" */
+    it("loads only the workspace env file", () => {
       writeFileSync(path.join(scratch, ".env"), "LANGWATCH_TEST_LANE=from-env\n");
       writeFileSync(path.join(scratch, ".env.portless"), "LANGWATCH_TEST_LANE=from-overlay\n");
 
       for (const lane of LANE_SCRIPTS) {
         const flags = resolvedEnvFlags(scriptText(lane));
 
-        expect(flags).toBe("--env-file=../../.env --env-file=../../.env.portless");
+        expect(flags).toBe("--env-file=../../.env");
         expect(
           execFileSync(
             process.execPath,
             [...flags.split(" "), "-e", "process.stdout.write(process.env.LANGWATCH_TEST_LANE)"],
             { cwd: laneDir, encoding: "utf8" },
           ),
-        ).toBe("from-overlay");
+        ).toBe("from-env");
       }
     });
   });

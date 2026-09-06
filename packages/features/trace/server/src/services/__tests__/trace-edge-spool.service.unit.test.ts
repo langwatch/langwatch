@@ -5,7 +5,7 @@
  */
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceEdgeSpoolService } from "../trace-edge-spool.service";
+import { TraceEdgeSpoolService } from "../trace-edge-spool.service.ts";
 
 const PROJECT_ID = "project-001";
 const TRACE_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaabb";

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import DynamicZodForm from "../checks/dynamic-zod-form";
+import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 import { Link } from "@langwatch/ui-host/link";
 import type {
   AvailableSource,
@@ -37,17 +37,17 @@ import {
   evaluatorsSchema,
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
-import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type";
+import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/surfaces/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 
-import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker";
+import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
-} from "../../elements/evaluator-editor-chrome";
-import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section";
+} from "../../elements/evaluator-editor-chrome.tsx";
+import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
 // re-syncs its draft whenever this `value` prop's REFERENCE changes, so a fresh

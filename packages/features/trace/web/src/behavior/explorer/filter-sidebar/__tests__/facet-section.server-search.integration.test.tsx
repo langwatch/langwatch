@@ -14,21 +14,21 @@ import "@testing-library/jest-dom/vitest";
 // hook runs against a controllable server response.
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../trace-api.ts", () => ({
   api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 
-vi.mock("../../../use-organization-team-project", () => ({
+vi.mock("../../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../filter.store", () => ({
+vi.mock("../../../filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 1, to: 2, label: undefined } }),
 }));
 
-import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section";
-import type { FacetItem, FacetValueState } from "../types";
+import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 // Five preloaded service values — the top-N the discover payload shipped.
 // "finance-team-42" is deliberately NOT among them: it lives only server-side.

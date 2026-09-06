@@ -7,7 +7,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createCodingAgentRestApp } from "../coding-agent.api";
+import { createCodingAgentRestApp } from "../coding-agent.api.ts";
 
 const USAGE_PATH = "/api/coding-agent/pull-request-usage?repository=acme/widgets&pullRequest=1";
 

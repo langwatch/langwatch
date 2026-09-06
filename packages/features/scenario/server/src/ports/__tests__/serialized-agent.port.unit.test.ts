@@ -11,7 +11,7 @@ import {
   AgentSessionTooLargeError,
   SESSION_TOO_LARGE_PREFIX,
   SerializedAgentPort,
-} from "../serialized-agent.port";
+} from "../serialized-agent.port.ts";
 
 /** The smallest adapter that exposes the store: no transport, no call. */
 class StoreOnlyAdapter extends SerializedAgentPort {

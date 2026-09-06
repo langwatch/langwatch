@@ -17,8 +17,8 @@
  * mode was not merely unreachable, it was unreachable AND unwritable.
  */
 
-import { availableFilters } from "./analytics-filter-catalogue";
-import type { FilterField } from "./analytics-filter-definition";
+import { availableFilters } from "./analytics-filter-catalogue.ts";
+import type { FilterField } from "./analytics-filter-definition.ts";
 
 /** One filter's value: a list, a keyed list, or a keyed-and-subkeyed list. */
 export type FilterParam =

@@ -8,7 +8,7 @@ import {
   StoredObjectStore,
   type StoredObjectRecord,
   type StoredObjectSource,
-} from "../stored-object.store";
+} from "../stored-object.store.ts";
 
 type StoredObjectDelegate = {
   findUnique(args: unknown): Promise<unknown>;

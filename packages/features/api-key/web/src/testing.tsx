@@ -35,7 +35,7 @@ import {
   type CliDeviceActionResult,
   type CliDeviceApproval,
   type CliDeviceCodeLookup,
-} from "./model/api-key-host";
+} from "./model/api-key-host.ts";
 
 /** One recorded `openPlatformDrawer` call. */
 export type RecordedDrawerOpen = {

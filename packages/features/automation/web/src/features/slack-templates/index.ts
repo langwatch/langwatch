@@ -7,5 +7,5 @@
  * automation is about.
  */
 
-export * from "./ui/elements/registry";
-export { SlackBlockKitTemplatePicker } from "./ui/blocks/template-picker";
+export * from "./ui/elements/registry.ts";
+export { SlackBlockKitTemplatePicker } from "./ui/blocks/template-picker.tsx";

@@ -21,11 +21,11 @@ import {
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
-} from "../projections/ingestion-pull-run-status-eventing.projection";
+} from "../projections/ingestion-pull-run-status-eventing.projection.ts";
 import {
   INGESTION_PULL_PROCESS_NAME,
   IngestionPullProcess,
-} from "../processes/ingestion-pull.process";
+} from "../processes/ingestion-pull.process.ts";
 
 type EventingIngestionPullEvent = IngestionPullProcessingEvent & Event;
 

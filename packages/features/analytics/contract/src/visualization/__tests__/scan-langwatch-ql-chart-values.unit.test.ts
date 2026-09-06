@@ -13,8 +13,8 @@ import { describe, expect, it } from "vitest";
 import {
   encodedFieldsByDataset,
   scanLangWatchQLChartValues,
-} from "../scan-langwatch-ql-chart-values";
-import type { LangWatchQLDatasetColumn } from "../visualization-types";
+} from "../scan-langwatch-ql-chart-values.ts";
+import type { LangWatchQLDatasetColumn } from "../visualization-types.ts";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "model", type: "String" },

@@ -20,7 +20,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
 const retentionResolver = { resolve: async () => null };
 

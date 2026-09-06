@@ -51,7 +51,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: mockCloseDrawer }),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     llmModelCost: {
@@ -87,8 +87,8 @@ vi.mock("../../../behavior/model-provider-api", () => ({
   },
 }));
 
-import { LLMModelCostDrawer } from "../llm-model-cost-drawer";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const REPORTED = new Error("Lite member restricted");
 

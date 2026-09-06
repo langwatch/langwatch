@@ -1,6 +1,6 @@
-import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 import { createLogger } from "@langwatch/observability";
-import type { NurturingPromptCountRepository } from "../repositories/nurturing-prompt-count.repository";
+import type { NurturingPromptCountRepository } from "../repositories/nurturing-prompt-count.repository.ts";
 
 const logger = createLogger("ee:nurturing:prompt-creation");
 

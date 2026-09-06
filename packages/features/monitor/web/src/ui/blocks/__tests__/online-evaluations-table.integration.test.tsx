@@ -9,8 +9,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MonitorHostPort, MonitorHostProvider } from "../../../model/monitor-host";
-import { type OnlineEvaluationRow, OnlineEvaluationsTable } from "../online-evaluations-table";
+import { MonitorHostPort, MonitorHostProvider } from "../../../model/monitor-host.ts";
+import { type OnlineEvaluationRow, OnlineEvaluationsTable } from "../online-evaluations-table.tsx";
 
 const navigate = vi.fn();
 

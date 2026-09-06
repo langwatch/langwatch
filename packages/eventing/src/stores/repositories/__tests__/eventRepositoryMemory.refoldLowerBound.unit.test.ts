@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { EventRecord } from "../eventRepository.types";
-import { EventRepositoryMemory } from "../eventRepositoryMemory";
+import type { EventRecord } from "../eventRepository.types.ts";
+import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
 /**
  * The re-fold reads (`getEventRecordsUpTo` and its paged twin) take an

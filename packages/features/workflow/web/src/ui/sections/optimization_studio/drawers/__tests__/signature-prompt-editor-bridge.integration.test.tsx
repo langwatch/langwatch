@@ -18,11 +18,11 @@ const mockNodeDataToLocalPromptConfig = vi.fn();
 let capturedProps: Record<string, any> = {};
 let mockEdges: any[] = [];
 
-vi.mock("../../../../../behavior/use-smart-set-node", async (importOriginal) => ({
+vi.mock("../../../../../behavior/use-smart-set-node.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useSmartSetNode: () => mockSetNode,
 }));
-vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowStore: (selector: any) =>
     selector({
@@ -67,7 +67,7 @@ function createSignatureNode(overrides: Partial<Signature> = {}): Node<Component
 }
 
 // ---- Import under test (after mocks) ----
-const { SignaturePromptEditorBridge } = await import("../signature-prompt-editor-bridge");
+const { SignaturePromptEditorBridge } = await import("../signature-prompt-editor-bridge.tsx");
 
 // ---- Tests ----
 

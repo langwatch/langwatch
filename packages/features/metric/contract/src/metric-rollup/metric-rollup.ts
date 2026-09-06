@@ -1,16 +1,16 @@
-import { buildHistogramRow } from "./explicit-histogram";
-import { buildExponentialHistogramRow } from "./exponential-histogram";
-import { type BucketEntry, baseRow } from "./rollup-row";
-import { buildGaugeRow, buildSumRow } from "./scalar";
+import { buildHistogramRow } from "./explicit-histogram.ts";
+import { buildExponentialHistogramRow } from "./exponential-histogram.ts";
+import { type BucketEntry, baseRow } from "./rollup-row.ts";
+import { buildGaugeRow, buildSumRow } from "./scalar.ts";
 import {
   comparePoints,
   floorBucket,
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
   usesPredecessor,
-} from "./sequence";
-import { buildSummaryRow } from "./summary";
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
+} from "./sequence.ts";
+import { buildSummaryRow } from "./summary.ts";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 
 const BUILDERS = {
   gauge: buildGaugeRow,

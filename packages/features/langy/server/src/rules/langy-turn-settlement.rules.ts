@@ -1,6 +1,6 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import { LANGY_LIVENESS } from "./langy-streaming-constants.rules";
+import { LANGY_LIVENESS } from "./langy-streaming-constants.rules.ts";
 
 /** Decides a safe synthetic terminal when the live stream missed one. */
 export function decideSyntheticTerminal({

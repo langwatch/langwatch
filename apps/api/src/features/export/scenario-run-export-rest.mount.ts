@@ -21,7 +21,7 @@ import type { z } from "zod";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
-} from "../../app/api-handler-managed-session";
+} from "../../app/api-handler-managed-session.ts";
 
 /**
  * The ksuid resource prefix an export id carries, stated rather than

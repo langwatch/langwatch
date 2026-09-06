@@ -10,42 +10,42 @@ import type { ProcessRetentionMetricsPort, RetentionFamily } from "@langwatch/ev
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerProductionComposition } from "../worker-production.composition";
-import { ApiKeyWorkerFeatureInstaller } from "../../features/api-key/api-key-worker-feature.installer";
-import { AuthzWorkerFeatureInstaller } from "../../features/authz/authz-worker-feature.installer";
-import { AutomationWorkerFeatureInstaller } from "../../features/automation/automation-worker-feature.installer";
-import { BillingReportingWorkerFeatureInstaller } from "../../features/billing/billing-reporting-worker-feature.installer";
-import { CodingAgentWorkerFeatureInstaller } from "../../features/coding-agent/coding-agent-worker-feature.installer";
-import { EvaluationWorkerFeatureInstaller } from "../../features/evaluation/evaluation-worker-feature.installer";
+import { WorkerProductionComposition } from "../worker-production.composition.ts";
+import { ApiKeyWorkerFeatureInstaller } from "../../features/api-key/api-key-worker-feature.installer.ts";
+import { AuthzWorkerFeatureInstaller } from "../../features/authz/authz-worker-feature.installer.ts";
+import { AutomationWorkerFeatureInstaller } from "../../features/automation/automation-worker-feature.installer.ts";
+import { BillingReportingWorkerFeatureInstaller } from "../../features/billing/billing-reporting-worker-feature.installer.ts";
+import { CodingAgentWorkerFeatureInstaller } from "../../features/coding-agent/coding-agent-worker-feature.installer.ts";
+import { EvaluationWorkerFeatureInstaller } from "../../features/evaluation/evaluation-worker-feature.installer.ts";
 import {
   EventingMaintenanceWorkerFeatureInstaller,
   WorkerBlobSweepPort,
-} from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
-import { ExperimentWorkerFeatureInstaller } from "../../features/experiment/experiment-worker-feature.installer";
-import { GatewaySpendWorkerFeatureInstaller } from "../../features/gateway/gateway-spend-worker-feature.installer";
-import { GithubWorkerFeatureInstaller } from "../../features/github/github-worker-feature.installer";
-import { GovernanceEventsWorkerFeatureInstaller } from "../../features/governance/governance-events-worker-feature.installer";
-import { GovernanceIngestionWorkerFeatureInstaller } from "../../features/governance/governance-ingestion-worker-feature.installer";
-import { IdentityWorkerFeatureInstaller } from "../../features/identity/identity-worker-feature.installer";
-import { JoinRequestWorkerFeatureInstaller } from "../../features/identity/join-request-worker-feature.installer";
-import { ScimSyncWorkerFeatureInstaller } from "../../features/identity/scim-sync-worker-feature.installer";
-import { SsoConnectionWorkerFeatureInstaller } from "../../features/identity/sso-connection-worker-feature.installer";
-import { LogWorkerFeatureInstaller } from "../../features/log/log-worker-feature.installer";
-import { MetricWorkerFeatureInstaller } from "../../features/metric/metric-worker-feature.installer";
-import { ScenarioWorkerFeatureInstaller } from "../../features/scenario/scenario-worker-feature.installer";
-import { SuiteWorkerFeatureInstaller } from "../../features/suite/suite-worker-feature.installer";
+} from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
+import { ExperimentWorkerFeatureInstaller } from "../../features/experiment/experiment-worker-feature.installer.ts";
+import { GatewaySpendWorkerFeatureInstaller } from "../../features/gateway/gateway-spend-worker-feature.installer.ts";
+import { GithubWorkerFeatureInstaller } from "../../features/github/github-worker-feature.installer.ts";
+import { GovernanceEventsWorkerFeatureInstaller } from "../../features/governance/governance-events-worker-feature.installer.ts";
+import { GovernanceIngestionWorkerFeatureInstaller } from "../../features/governance/governance-ingestion-worker-feature.installer.ts";
+import { IdentityWorkerFeatureInstaller } from "../../features/identity/identity-worker-feature.installer.ts";
+import { JoinRequestWorkerFeatureInstaller } from "../../features/identity/join-request-worker-feature.installer.ts";
+import { ScimSyncWorkerFeatureInstaller } from "../../features/identity/scim-sync-worker-feature.installer.ts";
+import { SsoConnectionWorkerFeatureInstaller } from "../../features/identity/sso-connection-worker-feature.installer.ts";
+import { LogWorkerFeatureInstaller } from "../../features/log/log-worker-feature.installer.ts";
+import { MetricWorkerFeatureInstaller } from "../../features/metric/metric-worker-feature.installer.ts";
+import { ScenarioWorkerFeatureInstaller } from "../../features/scenario/scenario-worker-feature.installer.ts";
+import { SuiteWorkerFeatureInstaller } from "../../features/suite/suite-worker-feature.installer.ts";
 import {
   TopicWorkerFeatureInstaller,
   type TopicWorkerCapability,
-} from "../../features/topic/topic-worker-feature.installer";
-import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
-import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+} from "../../features/topic/topic-worker-feature.installer.ts";
+import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
+import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);

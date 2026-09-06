@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { redactAuditArgs } from "./trpc-audit-redaction.js";
+import { redactAuditArgs } from "./trpc-audit-redaction.ts";
 
 describe("redactAuditArgs", () => {
   describe("given input carrying provider credentials", () => {

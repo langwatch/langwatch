@@ -5,12 +5,12 @@
  */
 
 import { create } from "zustand";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import { storedPlanSubject } from "./plan-scope";
-import { RunDialog } from "./run-dialog";
-import type { RunDialogSubject } from "./run-dialog-types";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { storedPlanSubject } from "./plan-scope.ts";
+import { RunDialog } from "./run-dialog.tsx";
+import type { RunDialogSubject } from "./run-dialog-types.ts";
 
 type RunPlanDialogStore = {
   /** The stored plan the dialog is open on, "new" for one being written. */

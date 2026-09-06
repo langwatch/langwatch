@@ -1,8 +1,8 @@
 import type { BudgetOverviewItemView } from "@langwatch/gateway-web/surfaces/budget-overview";
 import { useMemo } from "react";
 
-import { api } from "./personal-workspace-api";
-import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session";
+import { api } from "./personal-workspace-api.ts";
+import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 
 export type PersonalSummary = {
   /** Theoretical (list-price) total, including bundled / non-billed usage. */

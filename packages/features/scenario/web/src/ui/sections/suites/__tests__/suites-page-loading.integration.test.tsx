@@ -20,7 +20,7 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
 const mockSuitesQuery = vi.fn();
 let allRunsPanelLoading = false;
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     featureFlag: {
       isEnabled: {
@@ -64,7 +64,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "my-project" },
     hasAnyPermission: () => true,
@@ -91,17 +91,17 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/use-simulation-update-listener", () => ({
+vi.mock("../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => {},
 }));
 
-vi.mock("../../dashboard-layout", () => ({
+vi.mock("../../dashboard-layout.tsx", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dashboard-layout">{children}</div>
   ),
 }));
 
-vi.mock("../run-history-panel", () => ({
+vi.mock("../run-history-panel.tsx", () => ({
   RunHistoryPanel: () => {
     if (allRunsPanelLoading) {
       return (
@@ -119,7 +119,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 async function importSuitesPage(): Promise<React.ComponentType> {
-  const mod = await import("../simulations-page");
+  const mod = await import("../simulations-page.tsx");
   return mod.default;
 }
 

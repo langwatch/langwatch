@@ -12,8 +12,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SuiteApp } from "#app/suite.app";
-import type { SuiteTrpcContext } from "../../../rules/suite-trpc-context.rules";
-import { SuiteTrpcApi } from "../suite.api";
+import type { SuiteTrpcContext } from "../../../rules/suite-trpc-context.rules.ts";
+import { SuiteTrpcApi } from "../suite.api.ts";
 
 const PROJECT_ID = "project_1";
 const TEST_SUITE = {

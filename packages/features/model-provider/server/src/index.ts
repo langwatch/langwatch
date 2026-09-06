@@ -1,18 +1,18 @@
 export {
   PostgresModelProviderAdapter,
   type PostgresModelProviderAdapterOptions,
-} from "./adapters/postgres.model-provider.adapter";
+} from "./adapters/postgres.model-provider.adapter.ts";
 export {
   PostgresModelCostCatalogAdapter,
   type ModelCostCatalogDatabase,
-} from "./adapters/postgres.model-cost-catalog.adapter";
-export { ModelCostCatalogService } from "./services/model-cost-catalog.service";
+} from "./adapters/postgres.model-cost-catalog.adapter.ts";
+export { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 export {
   PostgresModelProviderEvidenceAdapter,
   type ModelProviderEvidenceDatabase,
-} from "./adapters/postgres.model-provider-evidence.adapter";
-export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service";
-export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service";
+} from "./adapters/postgres.model-provider-evidence.adapter.ts";
+export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service.ts";
+export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
 export {
   ModelCostProjectPort,
   ModelCostProjectScopePort,
@@ -30,59 +30,59 @@ export {
   CodexTokenRefresher,
   ModelTranslationPort,
   ModelProviderIdService,
-} from "./ports/model-provider.port";
+} from "./ports/model-provider.port.ts";
 export type {
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
-} from "./ports/model-provider.port";
+} from "./ports/model-provider.port.ts";
 export {
   EncryptedModelProviderCredentialAdapter,
   type CustomKeysRead,
-} from "./adapters/encrypted.model-provider-api-key-credential.adapter";
+} from "./adapters/encrypted.model-provider-api-key-credential.adapter.ts";
 export {
   RegistryModelProviderCatalogAdapter,
   UnmanagedModelProviderGatewayAdapter,
   type RegistryModelProviderCatalogOptions,
-} from "./adapters/registry.model-provider-catalog.adapter";
+} from "./adapters/registry.model-provider-catalog.adapter.ts";
 export {
   HttpModelProviderCredentialProbeAdapter,
   UnavailableModelProviderCredentialProbeAdapter,
-} from "./adapters/http.model-provider-credential-probe.adapter";
+} from "./adapters/http.model-provider-credential-probe.adapter.ts";
 export {
   CodexAccountService,
   CodexAuthError,
   CodexOAuthModelProviderTokenRefresherAdapter,
   type CodexDeviceCode,
   type CodexPollResult,
-} from "./adapters/codex-oauth.model-provider-token-refresher.adapter";
+} from "./adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
 export {
   AI_CALL_FAILED_CAUSE,
   AiCallFailedError,
   AiCallFailureService,
-} from "./services/ai-call-failure.service";
-export { ModelCostRegexSafetyService } from "./services/model-cost-regex-safety.service";
-export { ModelLimitsService } from "./services/model-limits.service";
+} from "./services/ai-call-failure.service.ts";
+export { ModelCostRegexSafetyService } from "./services/model-cost-regex-safety.service.ts";
+export { ModelLimitsService } from "./services/model-limits.service.ts";
 export {
   ModelCostPreviewService,
   PREVIEW_WINDOW_DAYS,
   type ModelCostPreviewSpanReader,
   type ModelCostRuleReader,
-} from "./services/model-cost-preview.service";
-export { WindowedModelProviderConnectionRateLimiterAdapter } from "./adapters/windowed.model-provider-connection-rate-limiter.adapter";
+} from "./services/model-cost-preview.service.ts";
+export { WindowedModelProviderConnectionRateLimiterAdapter } from "./adapters/windowed.model-provider-connection-rate-limiter.adapter.ts";
 export {
   SsrfModelProviderEgressAdapter,
   type ModelProviderEgressPolicy,
-} from "./adapters/ssrf.model-provider-egress.adapter";
-export { PrefixedModelProviderIdAdapter } from "./adapters/prefixed.model-provider-id.adapter";
-export { VercelAiModelTranslationAdapter } from "./adapters/vercel-ai.model-translation.adapter";
+} from "./adapters/ssrf.model-provider-egress.adapter.ts";
+export { PrefixedModelProviderIdAdapter } from "./adapters/prefixed.model-provider-id.adapter.ts";
+export { VercelAiModelTranslationAdapter } from "./adapters/vercel-ai.model-translation.adapter.ts";
 export {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleInput,
   type ModelProviderExecutionHandleOptions,
-} from "./services/model-provider-execution-handle.service";
-export { ModelProviderKeysService } from "./services/model-provider-keys.service";
-export { resolveMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules";
-export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter";
+} from "./services/model-provider-execution-handle.service.ts";
+export { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
+export { resolveMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules.ts";
+export { ModelProviderExecutionAdapter } from "./adapters/model-provider-execution.adapter.ts";
 export {
   getModelMetadataForFrontend,
   getProjectModelProviders,
@@ -95,46 +95,46 @@ export {
   prepareLitellmParams,
   toLegacyExecutionProvider,
   toLegacyProviderSummary,
-} from "./rules/legacy-model-provider.rules";
+} from "./rules/legacy-model-provider.rules.ts";
 export {
   ModelProviderApp,
   type ModelProviderAppDependencies,
   type ModelProviderCaller,
   type SpanReader,
-} from "./app/model-provider.app";
-export { createModelProvidersRestApp } from "./transport/api-rest/model-provider.api";
-export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.api";
+} from "./app/model-provider.app.ts";
+export { createModelProvidersRestApp } from "./transport/api-rest/model-provider.api.ts";
+export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.api.ts";
 export {
   ModelProviderTrpcApi,
   type ModelProviderTrpcContext,
   type ModelProviderTrpcPorts,
-} from "./transport/api-trpc/model-provider.api";
+} from "./transport/api-trpc/model-provider.api.ts";
 export {
   LlmModelCostTrpcApi,
   type LlmModelCostTrpcContext,
   type LlmModelCostTrpcPorts,
-} from "./transport/api-trpc/llm-model-cost.api";
+} from "./transport/api-trpc/llm-model-cost.api.ts";
 export {
   TranslateTrpcApi,
   type TranslateTrpcContext,
   type TranslateTrpcPorts,
-} from "./transport/api-trpc/translate.api";
+} from "./transport/api-trpc/translate.api.ts";
 export {
   createPlaygroundRestApp,
   type PlaygroundRestPorts,
   type PlaygroundRestSession,
-} from "./transport/api-rest/playground.api";
+} from "./transport/api-rest/playground.api.ts";
 
-export { ModelProviderLegacyMigrationService } from "./services/model-provider-legacy-migration.service";
+export { ModelProviderLegacyMigrationService } from "./services/model-provider-legacy-migration.service.ts";
 
-export { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task";
-export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task";
+export { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task.ts";
+export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task.ts";
 export type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
-} from "./rules/model-provider-migration.rules";
+} from "./rules/model-provider-migration.rules.ts";
 export {
   ModelRegistrySyncTask,
   syncModelRegistry,
   type ModelRegistrySyncResult,
-} from "./tasks/model-registry-sync.task";
+} from "./tasks/model-registry-sync.task.ts";

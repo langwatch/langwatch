@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
-import { ClickHouseExperimentRunProcessingAdapter } from "../clickhouse.experiment-run-processing.adapter";
-import type { ExperimentRunProcessingPipeline } from "../eventing.experiment-run-processing.adapter";
-import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection";
-import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection";
+import { ClickHouseExperimentRunProcessingAdapter } from "../clickhouse.experiment-run-processing.adapter.ts";
+import type { ExperimentRunProcessingPipeline } from "../eventing.experiment-run-processing.adapter.ts";
+import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection.ts";
+import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.

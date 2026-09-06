@@ -21,8 +21,8 @@ import {
   parserFieldPresentation,
   seedComposerParserConfig,
   seedPullSchedule,
-} from "../governance-inventory.screen";
-import { composer } from "./edit-pull-source-config.fixture";
+} from "../governance-inventory.screen.tsx";
+import { composer } from "./edit-pull-source-config.fixture.ts";
 
 describe("isEditablePullSource", () => {
   it("accepts a pull type the form knows how to rebuild", () => {

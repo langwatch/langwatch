@@ -24,8 +24,8 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing";
-import ApiKeysScreen, { API_KEY_SCOPE_QUERY_KEY } from "../api-keys.screen";
+import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
+import ApiKeysScreen, { API_KEY_SCOPE_QUERY_KEY } from "../api-keys.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -44,7 +44,7 @@ const mutations = vi.hoisted(() => ({
   regenerate: vi.fn(),
 }));
 
-vi.mock("../../../behavior/api-key-api", () => ({
+vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
     useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },

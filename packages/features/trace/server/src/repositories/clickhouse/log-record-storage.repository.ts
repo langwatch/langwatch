@@ -1,13 +1,13 @@
-import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
+import { TraceWindowedReadService } from "../../services/trace-windowed-read.service.ts";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port";
+import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
-} from "../log-record-storage.repository";
+} from "../log-record-storage.repository.ts";
 
 const TABLE_NAME = "stored_log_records" as const;
 

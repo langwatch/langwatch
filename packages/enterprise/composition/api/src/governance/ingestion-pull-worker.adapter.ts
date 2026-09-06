@@ -38,11 +38,11 @@ import {
   S3PollingPullerAdapter,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
-import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository";
+import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository.ts";
 import {
   AppGovernanceEncryptionPort,
   type GovernanceEncryption,
-} from "./governance-infrastructure.adapter";
+} from "./governance-infrastructure.adapter.ts";
 
 const MAX_S3_FILES = 100;
 const MAX_S3_PAGES = 50;

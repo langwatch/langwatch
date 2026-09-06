@@ -13,22 +13,22 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import { ApiAuditPort } from "../../../api-request.policy";
+import { ApiAuditPort } from "../../../api-request.policy.ts";
 import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
+} from "../../../api.application.ts";
 import { LWQL_FLAG } from "@langwatch/analytics-server";
-import { composeAnalyticsFeature } from "../analytics.composition";
-import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
+import { composeAnalyticsFeature } from "../analytics.composition.ts";
+import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const dashboardRow = {
   id: "dashboard-1",

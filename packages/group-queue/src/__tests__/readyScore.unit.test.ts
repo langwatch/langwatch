@@ -6,7 +6,7 @@ import {
   MAX_SCORE_PAST_SKEW_MS,
   MIN_PLAUSIBLE_EPOCH_MS,
   resolveReadyScore,
-} from "../readyScore";
+} from "../readyScore.ts";
 
 const NOW = 1_786_000_000_000; // 2026-08-05, comfortably above the backstop.
 

@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 
-import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.js";
-import type { ServiceContext } from "./types.js";
+import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
+import type { ServiceContext } from "./types.ts";
 
 export interface SSECompletion {
   error?: Error;

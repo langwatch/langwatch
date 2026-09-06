@@ -25,7 +25,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { WorkerClickHouseConfig } from "../config/worker.config";
+import type { WorkerClickHouseConfig } from "../config/worker.config.ts";
 
 /**
  * Which organization a tenant belongs to. Declared as the one question the router asks rather than

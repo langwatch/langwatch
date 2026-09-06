@@ -2,10 +2,10 @@ import { VStack } from "@chakra-ui/react";
 import { ShareTraceDialogBody } from "@langwatch/share-web/surfaces/share-link-views";
 import { copyShareLink } from "@langwatch/share-web/surfaces/share-links";
 import { useRef } from "react";
-import { Dialog } from "../../../dialog";
+import { Dialog } from "../../../dialog.tsx";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors";
-import { useShareTrace } from "../../hooks/use-share-trace";
+import { showErrorToast } from "../../../errors/index.ts";
+import { useShareTrace } from "../../hooks/use-share-trace.ts";
 
 /**
  * The share dialog's frame. The body — the mint form and the link list — is

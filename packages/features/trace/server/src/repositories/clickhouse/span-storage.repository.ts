@@ -1,15 +1,15 @@
-import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
-import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service";
-import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service";
+import { TraceWindowedReadService } from "../../services/trace-windowed-read.service.ts";
+import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
+import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   RESOLVER_RECENT_WINDOW_MS,
   type WindowFragment,
-} from "../../services/trace-windowed-read.service";
+} from "../../services/trace-windowed-read.service.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port";
+import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
  * `Date`s: the ClickHouse driver serialises a `Date` into a `DateTime64(3)`
@@ -39,7 +39,7 @@ import {
 
 const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
 import type { SpanInsertData } from "@langwatch/trace-contract";
-import { SpanStorageRepository } from "../span-storage.repository";
+import { SpanStorageRepository } from "../span-storage.repository.ts";
 import type {
   LangwatchSignalBucket,
   ModelSpanSampleRow,
@@ -48,14 +48,14 @@ import type {
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   TraceEventRollupParams,
-} from "../span-storage.repository";
+} from "../span-storage.repository.ts";
 import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import {
   LANGWATCH_SIGNAL_BUCKETS,
   MAX_DERIVATION_SPANS,
   MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
-} from "../span-storage.repository";
+} from "../span-storage.repository.ts";
 
 const TABLE_NAME = "stored_spans" as const;
 

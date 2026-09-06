@@ -3,7 +3,7 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
 
-import { FormErrorDisplay } from "./form-error-display";
+import { FormErrorDisplay } from "./form-error-display.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export interface HorizontalFormControlProps extends SystemStyleObject {

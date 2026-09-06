@@ -29,33 +29,33 @@ import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
-import { Link } from "../../../../ui/elements/automation-link";
+import { Link } from "../../../../ui/elements/automation-link.tsx";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
-import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "../../../liquid-editor";
-import { VariableInfoIcon } from "../../../liquid-editor";
-import { LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor";
+import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "../../../liquid-editor/index.ts";
+import { VariableInfoIcon } from "../../../liquid-editor/index.ts";
+import { LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
 import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
   TemplateDisclosure,
-} from "./template-authoring";
-import { api } from "../../../../behavior/automation-api";
-import { useDescribeError } from "../../../../behavior/automation-feedback";
-import { AutomationTestFireButton } from "../elements/test-fire-button";
+} from "./template-authoring.tsx";
+import { api } from "../../../../behavior/automation-api.ts";
+import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import type {
   ConfigFormProps,
   NotifyClientDef,
   SummaryIdentity,
-} from "../../../../model/provider-types";
+} from "../../../../model/provider-types.ts";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
   reportSourceIsAutoLayout,
   SLACK_BLOCK_KIT_TEMPLATES,
-} from "../../../slack-templates";
-import { SlackBlockKitTemplatePicker } from "../../../slack-templates";
+} from "../../../slack-templates/index.ts";
+import { SlackBlockKitTemplatePicker } from "../../../slack-templates/index.ts";
 
 /** A template field. `usingDefault` means "the author has not customised this"
  *  — it is what the Reset affordance and the default badge read. `value` is the

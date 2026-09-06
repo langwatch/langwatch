@@ -9,7 +9,7 @@ import type {
   AnnotationFormState,
   AnnotationScoreOption,
   ScoreChipProps,
-} from "../../model/annotation-form-types";
+} from "../../model/annotation-form-types.ts";
 
 const scoreOptionSchema = z.object({
   label: z.string(),

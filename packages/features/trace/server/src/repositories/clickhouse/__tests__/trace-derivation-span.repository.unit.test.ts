@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository";
-import { ScenarioRoleMetricsDerivationService } from "../../../services/scenario-role-metrics-derivation.service";
-import { ModelCatalogTraceModelCostAdapter } from "../../../adapters/model-catalog.trace-model-cost.adapter";
-import { SpanCostService } from "../../../services/span-cost.service";
-import { ClickHouseTraceDerivationSpanReaderAdapter } from "../../../adapters/clickhouse.trace-derivation-span-reader.adapter";
+import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository.ts";
+import { ScenarioRoleMetricsDerivationService } from "../../../services/scenario-role-metrics-derivation.service.ts";
+import { ModelCatalogTraceModelCostAdapter } from "../../../adapters/model-catalog.trace-model-cost.adapter.ts";
+import { SpanCostService } from "../../../services/span-cost.service.ts";
+import { ClickHouseTraceDerivationSpanReaderAdapter } from "../../../adapters/clickhouse.trace-derivation-span-reader.adapter.ts";
 
 /**
  * Spec: specs/scenarios/worker-simulation-pipeline-conversion.feature

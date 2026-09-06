@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { FormServerError, HandledErrorState } from "../../../behavior/errors";
+import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
 import type { Scenario } from "@langwatch/scenario-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import {
@@ -25,9 +25,9 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useRunScenario } from "../use-run-scenario";
-import { useScenarioTarget } from "../use-scenario-target";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useRunScenario } from "../use-run-scenario.ts";
+import { useScenarioTarget } from "../use-scenario-target.ts";
 import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import { parseScenarioParameterDefinitions } from "@langwatch/scenario-contract";
@@ -37,20 +37,20 @@ import {
   type ScenarioFormData,
   type ScenarioInitialData,
   type ScenarioTestSuiteOption,
-} from "../../elements/scenario-form";
-import { ScenarioParametersDialog } from "../../elements/scenarios/scenario-parameters-dialog";
-import { ScenarioRunModelDialog } from "./scenario-run-model-dialog";
-import type { TargetValue } from "../../../model/scenario-target";
-import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip";
-import { api } from "../../../behavior/scenario-api";
+} from "../../elements/scenario-form.tsx";
+import { ScenarioParametersDialog } from "../../elements/scenarios/scenario-parameters-dialog.tsx";
+import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
+import type { TargetValue } from "../../../model/scenario-target.ts";
+import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
+import { api } from "../../../behavior/scenario-api.ts";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import { PromptEditorDrawer } from "@langwatch/prompt-web/surfaces/prompt-editor-drawer";
-import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section";
+import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { TagList } from "../../elements/tag-list";
+import { TagList } from "../../elements/tag-list.tsx";
 import { toaster } from "@langwatch/design-system/toaster";
-import { SaveAndRunMenu } from "./save-and-run-menu";
-import { ScenarioEditorSidebar } from "./scenario-editor-sidebar";
+import { SaveAndRunMenu } from "./save-and-run-menu.tsx";
+import { ScenarioEditorSidebar } from "./scenario-editor-sidebar.tsx";
 
 export type ScenarioFormDrawerProps = {
   open?: boolean;

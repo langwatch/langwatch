@@ -9,7 +9,7 @@ import {
   TABLE_TTL_CONFIG,
   type TableTTLEntry,
   TIERED_STORAGE_POLICY,
-} from "../ttl.reconciler";
+} from "../ttl.reconciler.ts";
 
 const legacyRetentionEngineFull =
   "ReplicatedMergeTree() TTL toDateTime(EndTime) + toIntervalDay(30) TO VOLUME 'cold', " +

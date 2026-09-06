@@ -9,14 +9,14 @@ import {
   cliVerbTone,
   type MeasuredCardKind,
 } from "@langwatch/langy-contract";
-import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map";
+import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map.ts";
 import {
   CAPABILITY_CATALOG,
   type CapabilityBodyWidget,
   type CapabilityCatalogEntry,
   type CapabilityIconName,
   type CapabilitySurface,
-} from "./langy-capability-catalog";
+} from "./langy-capability-catalog.ts";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";

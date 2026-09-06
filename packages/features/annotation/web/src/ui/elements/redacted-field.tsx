@@ -18,7 +18,7 @@ import { HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "./annotation-link";
+import { Link } from "./annotation-link.tsx";
 
 /** What a privacy rule leaves readable, in words. */
 function explanationFor(visibleTo: string | null): string {

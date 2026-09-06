@@ -48,7 +48,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -60,7 +60,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: mockRouterPush, query: {}, isReady: true }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -83,7 +83,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-import { ExternalSetDetailPanel } from "../external-set-detail-panel";
+import { ExternalSetDetailPanel } from "../external-set-detail-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

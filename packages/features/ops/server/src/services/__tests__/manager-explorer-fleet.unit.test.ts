@@ -1,13 +1,13 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { ManagerExplorerService } from "../manager-explorer.service";
-import { NullProcessAuditSink } from "../../ports/process-audit-sink.port";
-import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter";
-import type { ProcessNameCounts } from "../../repositories/process-ops.repository";
+import { ManagerExplorerService } from "../manager-explorer.service.ts";
+import { NullProcessAuditSink } from "../../ports/process-audit-sink.port.ts";
+import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter.ts";
+import type { ProcessNameCounts } from "../../repositories/process-ops.repository.ts";
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,
-} from "../../ports/eventing-introspection.port";
+} from "../../ports/eventing-introspection.port.ts";
 
 function fakeStore(): ProcessStore {
   return {

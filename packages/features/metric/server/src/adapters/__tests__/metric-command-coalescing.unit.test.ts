@@ -2,8 +2,8 @@ import type { EventStoreReadContext } from "@langwatch/eventing";
 import { processCommandBatch } from "@langwatch/eventing/testing";
 import type { ProcessCommandBatchParams } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
-import { RecordMetricDataPointCommand } from "../metric-processing.adapter";
-import { createMetricProcessingPipeline } from "../metric-processing.adapter";
+import { RecordMetricDataPointCommand } from "../metric-processing.adapter.ts";
+import { createMetricProcessingPipeline } from "../metric-processing.adapter.ts";
 import {
   METRIC_COMMAND_COALESCE_MAX_BATCH,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,

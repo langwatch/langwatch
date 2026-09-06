@@ -22,9 +22,9 @@ import { resolveInviteDisplayStatus } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
-import { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
+import { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount.ts";
 
 /**
  * What the deployment answers so a person-shaped surface can be served. Five values, none
@@ -55,7 +55,7 @@ export type ApiPersonDeploymentFacts = Readonly<{
   adminEmails?: string | readonly string[] | undefined;
 }>;
 
-import type { ComposedAuthFeature } from "./auth.composition.types";
+import type { ComposedAuthFeature } from "./auth.composition.types.ts";
 
 /**
  * The deployment facts as this process resolves them: a host that composed the

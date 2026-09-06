@@ -6,7 +6,7 @@ import type {
   ProcessInstanceDetail,
 } from "@langwatch/ops-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-import type { ProcessAuditSinkPort } from "../ports/process-audit-sink.port";
+import type { ProcessAuditSinkPort } from "../ports/process-audit-sink.port.ts";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -15,8 +15,8 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
-import type { ProcessOpsRepository } from "../repositories/process-ops.repository";
-import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
+import type { ProcessOpsRepository } from "../repositories/process-ops.repository.ts";
+import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 
 /**
  * One global knob each, per the visibility plan: a wake this far past due means the wake worker is starved or

@@ -1,5 +1,5 @@
-import type { Preset, SpanConfig, SpanEvent } from "./foundry-types";
-import { shortId } from "./foundry-types";
+import type { Preset, SpanConfig, SpanEvent } from "./foundry-types.ts";
+import { shortId } from "./foundry-types.ts";
 
 function span(
   overrides: Partial<SpanConfig> & { name: string; type: SpanConfig["type"] },

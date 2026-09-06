@@ -15,7 +15,7 @@ import { findPhoneNumbersInText, getCountries, getExampleNumber } from "libphone
 import examples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 
-import { redactEssentialPiiInText } from "../essentialPii";
+import { redactEssentialPiiInText } from "../essentialPii.ts";
 
 const redact = (text: string) => redactEssentialPiiInText({ text }).text;
 

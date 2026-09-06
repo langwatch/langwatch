@@ -5,8 +5,8 @@
  */
 import { RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ModelProviderEgressPort } from "../../ports/model-provider.port";
-import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.adapter";
+import type { ModelProviderEgressPort } from "../../ports/model-provider.port.ts";
+import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.adapter.ts";
 
 // The probe goes out through the guarded egress port the composition root
 // hands it rather than `global.fetch`, so that port is the seam these tests

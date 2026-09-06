@@ -3,8 +3,8 @@
  */
 import { FEATURE_FLAGS } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
-import type { LangyActorUserReader } from "../langy-actor-session.service";
-import { LangyActorSessionService } from "../langy-actor-session.service";
+import type { LangyActorUserReader } from "../langy-actor-session.service.ts";
+import { LangyActorSessionService } from "../langy-actor-session.service.ts";
 
 /**
  * A user directory exposing only the `user.findUnique` the resolver uses.

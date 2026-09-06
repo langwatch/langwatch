@@ -7,7 +7,7 @@
 import { randomBytes } from "crypto";
 import { TRPCError } from "@trpc/server";
 import type { VirtualKeyConfig, VirtualKeyRoutingMode } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
 import {
   defaultVirtualKeyConfig,
   identityPatchData,
@@ -15,22 +15,22 @@ import {
   virtualKeyConfigSchema,
   translateExternalIdConflict,
 } from "@langwatch/gateway-contract";
-import { GatewayAuditPort } from "../ports/gateway-audit.port";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port";
-import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port";
+import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
+import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
+import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
+import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
+import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
 import type {
   GatewayVirtualKeysPort,
   VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port";
-import { VirtualKeyBudgetService } from "./virtual-key-budget.service";
+} from "../ports/gateway-virtual-key.port.ts";
+import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type CreateVirtualKeyInput,
   type UpdateVirtualKeyInput,
-} from "./virtual-key-validation.service";
+} from "./virtual-key-validation.service.ts";
 
 type GuardrailDelta = ReturnType<typeof VirtualKeyValidationService.diffGuardrailAttachments>;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildStripScoreEvaluatorIds,
   shouldStripScore,
-} from "../experiment-evaluator-score-filter.process";
+} from "../experiment-evaluator-score-filter.process.ts";
 
 describe("evaluatorScoreFilter", () => {
   describe("shouldStripScore", () => {

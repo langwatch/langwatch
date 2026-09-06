@@ -7,7 +7,7 @@ import {
   isTraceMetadataKeyEditable,
   traceAttributeKeyForMetadata,
   traceMetadataKeyForAttribute,
-} from "../trace-metadata-editable-keys";
+} from "../trace-metadata-editable-keys.ts";
 
 describe("trace metadata editable keys", () => {
   describe("given the metadata keys a trace can carry", () => {

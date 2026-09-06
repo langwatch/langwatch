@@ -10,17 +10,17 @@
  */
 import { InMemoryProcessStore, type ProcessHandlerContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { TestGithubService } from "./fixtures/github-service.fixture";
+import { TestGithubService } from "./fixtures/github-service.fixture.ts";
 
-import { EventingGithubMaintenanceAdapter } from "../../adapters/eventing.github-maintenance.adapter";
-import { runGithubBranchRecheck, runGithubRetentionPrune } from "../github-branch-recheck.intent";
+import { EventingGithubMaintenanceAdapter } from "../../adapters/eventing.github-maintenance.adapter.ts";
+import { runGithubBranchRecheck, runGithubRetentionPrune } from "../github-branch-recheck.intent.ts";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
   GITHUB_RETENTION_PRUNE_INTERVAL_MS,
   type GithubBranchRecheckIntents,
   githubBranchRecheckWake,
-} from "../../processes/github-branch-recheck.process";
+} from "../../processes/github-branch-recheck.process.ts";
 
 const wakeContext = (at: number): ProcessHandlerContext<GithubBranchRecheckIntents> => ({
   at,

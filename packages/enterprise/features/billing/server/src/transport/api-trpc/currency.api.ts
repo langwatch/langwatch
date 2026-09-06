@@ -26,7 +26,7 @@ import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import { detectedCurrencySchema } from "@langwatch/enterprise-billing-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { CurrencyService, type CurrencyRequest } from "../../services/currency.service";
+import { CurrencyService, type CurrencyRequest } from "../../services/currency.service.ts";
 
 /**
  * The process supplies the request; authorization arrives as the declaration.

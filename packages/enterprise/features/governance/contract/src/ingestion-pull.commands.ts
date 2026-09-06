@@ -4,7 +4,7 @@ import {
   ingestionPullDisabledEventDataSchema,
   ingestionPullRunCompletedEventDataSchema,
   ingestionPullRunFailedEventDataSchema,
-} from "./ingestion-pull.events";
+} from "./ingestion-pull.events.ts";
 
 export const INGESTION_PULL_COMMAND_TYPES = {
   CONFIGURE: "lw.obs.ingestion_pull.configure",

@@ -1,6 +1,6 @@
 import process from "node:process";
-import { WorkerExecutable, type WorkerExecutableHost } from "../worker.executable";
-import { WorkerStandaloneComposition } from "./worker-standalone.composition";
+import { WorkerExecutable, type WorkerExecutableHost } from "../worker.executable.ts";
+import { WorkerStandaloneComposition } from "./worker-standalone.composition.ts";
 
 /**
  * The Node process surface the standalone executable needs, injectable for

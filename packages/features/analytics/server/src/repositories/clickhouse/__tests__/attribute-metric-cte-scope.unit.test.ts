@@ -26,9 +26,9 @@ import {
   __testOnly__,
   buildTimeseriesQuery,
   TRACE_ATTRIBUTE_METRIC_COLUMNS,
-} from "../clickhouse.aggregation-builder.mapper";
-import { fieldMappings } from "../clickhouse.field-mappings.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+} from "../clickhouse.aggregation-builder.mapper.ts";
+import { fieldMappings } from "../clickhouse.field-mappings.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
  * The metrics whose translation actually emits a trace-level `Attributes` read

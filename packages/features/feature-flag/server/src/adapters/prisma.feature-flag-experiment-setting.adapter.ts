@@ -2,7 +2,7 @@ import {
   FeatureFlagExperimentRepository,
   type ExperimentSetting,
   type ExperimentSubject,
-} from "../repositories/feature-flag-experiment-setting.repository";
+} from "../repositories/feature-flag-experiment-setting.repository.ts";
 
 type DelegateCall<TResult> = {
   bivariant(input: object): Promise<TResult>;

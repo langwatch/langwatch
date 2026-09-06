@@ -21,7 +21,7 @@ import {
   apiResponseModelDefaultsSchema,
   createModelDefaultConfigInputSchema,
   updateModelDefaultConfigInputSchema,
-} from "../../rules/model-defaults-schemas.rules";
+} from "../../rules/model-defaults-schemas.rules.ts";
 
 const logger = createLogger("langwatch:api:model-defaults");
 

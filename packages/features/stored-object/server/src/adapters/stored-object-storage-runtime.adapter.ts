@@ -4,7 +4,7 @@ import type { StoredObjectStorageDestination } from "@langwatch/stored-object-co
 import {
   StoredObjectStorageRegistryAdapter,
   type StoredObjectStorageDriver,
-} from "./stored-object-storage-registry.adapter";
+} from "./stored-object-storage-registry.adapter.ts";
 
 export type StoredObjectStorageProject = {
   objectStore: StoredObjectByteStore;

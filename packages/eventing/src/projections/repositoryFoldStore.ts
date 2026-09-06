@@ -1,8 +1,8 @@
-import type { RetentionPolicy } from "../runtime.types";
-import type { Projection } from "../domain/types";
-import type { ProjectionStore } from "../stores/projectionStore.types";
-import type { FoldProjectionStore } from "./foldProjection.types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { RetentionPolicy } from "../runtime.types.ts";
+import type { Projection } from "../domain/types.ts";
+import type { ProjectionStore } from "../stores/projectionStore.types.ts";
+import type { FoldProjectionStore } from "./foldProjection.types.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 /** Treats absent and null retention as equal (both mean indefinite). */
 function sameRetention(

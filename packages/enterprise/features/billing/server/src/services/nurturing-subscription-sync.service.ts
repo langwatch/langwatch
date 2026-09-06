@@ -1,4 +1,4 @@
-import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 
 async function syncSubscriptionTrait({
   organizationId,

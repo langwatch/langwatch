@@ -4,7 +4,7 @@ import {
   agentProblemSchema,
   createAgentRequestSchema,
   parseAgentConfig,
-} from "../index";
+} from "../index.ts";
 
 describe("agent config contract", () => {
   it("accepts the persisted signature shape", () => {

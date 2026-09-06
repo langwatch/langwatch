@@ -1,5 +1,5 @@
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
-import { VirtualKeyDirectBudgetRepository } from "../gateway-virtual-key-direct-budget.repository";
+import { VirtualKeyDirectBudgetRepository } from "../gateway-virtual-key-direct-budget.repository.ts";
 
 /** The client slice the direct-budget read binds to. */
 export type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget" | "project">;

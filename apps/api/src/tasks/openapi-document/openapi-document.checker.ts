@@ -33,8 +33,8 @@ import {
   operationKeysOf,
   type OpenApiDocument,
   type UnpublishableOperation,
-} from "./openapi-document.generator";
-import type { OpenApiSurfaceAbsence } from "./openapi-document.surface";
+} from "./openapi-document.generator.ts";
+import type { OpenApiSurfaceAbsence } from "./openapi-document.surface.ts";
 
 /** One operation whose published security requirement moved. */
 export type ChangedOperation = Readonly<{

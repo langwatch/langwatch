@@ -51,7 +51,7 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     providers: { openai: EXISTING_PROVIDER },
     modelMetadata: {},
@@ -61,7 +61,7 @@ vi.mock("../../../behavior/use-model-providers-settings", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const query = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, isSuccess: true, refetch: vi.fn() }),
   });
@@ -87,8 +87,8 @@ vi.mock("../../../behavior/model-provider-api", () => {
   };
 });
 
-import { EditModelProviderForm } from "../model-provider-form";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 function renderForm() {
   return renderWithModelProviderHost(

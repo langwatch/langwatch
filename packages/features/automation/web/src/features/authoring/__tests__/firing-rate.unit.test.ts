@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateFiringRate, estimateRatePerDay } from "../model/firing-rate";
+import { estimateFiringRate, estimateRatePerDay } from "../model/firing-rate.ts";
 
 const immediate = (matchesLast7Days: number) =>
   estimateFiringRate({

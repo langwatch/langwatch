@@ -3,9 +3,9 @@ import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { LangyPanelSurface } from "@langwatch/langy-web/surfaces/asaplangy";
 import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
-import type { BriefingData, BriefingReceipt, BriefingSeverity, ScenarioBar } from "../types";
-import { QuietHeadline } from "./quiet-headline";
-import { useProjectHomeHost } from "../../../../model/project-home-host";
+import type { BriefingData, BriefingReceipt, BriefingSeverity, ScenarioBar } from "../types.ts";
+import { QuietHeadline } from "./quiet-headline.tsx";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * Langy's briefing: what changed since last visit (headline, plan chips,

@@ -18,7 +18,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../../model/invite-messages";
+import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../../model/invite-messages.ts";
 
 const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockState } = vi.hoisted(
   () => {
@@ -43,7 +43,7 @@ const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockStat
   },
 );
 
-vi.mock("../auth-api", () => ({
+vi.mock("../auth-api.ts", () => ({
   authApi: {
     organization: {
       acceptInvite: {
@@ -63,16 +63,16 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: toasterCreate },
 }));
 
-vi.mock("../hard-redirect", () => ({
+vi.mock("../hard-redirect.ts", () => ({
   hardRedirect: hardRedirectSpy,
 }));
 
-vi.mock("../error-capture", () => ({
+vi.mock("../error-capture.ts", () => ({
   captureException: captureExceptionSpy,
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-import { _resetSubmittedInviteCodesForTests, useAcceptInviteOnce } from "../use-accept-invite-once";
+import { _resetSubmittedInviteCodesForTests, useAcceptInviteOnce } from "../use-accept-invite-once.ts";
 
 function resetMutationState() {
   mockState.mutation = {

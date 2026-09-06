@@ -6,11 +6,11 @@
 import { ExperimentSavedStateExecutionService } from "@langwatch/experiment-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiExperimentRun } from "../../../app/api-experiment-run.composition";
+import type { ApiExperimentRun } from "../../../app/api-experiment-run.composition.ts";
 import {
   ApiWorkbenchUiActionBackend,
   type ApiLangyWorkbenchPeer,
-} from "../langy-workbench-actions.adapter";
+} from "../langy-workbench-actions.adapter.ts";
 
 /**
  * A saved board of two columns over two rows, with the first column's cells

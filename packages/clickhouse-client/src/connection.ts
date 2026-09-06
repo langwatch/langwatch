@@ -1,5 +1,5 @@
-import type { ClickHouseConfiguration } from "./config";
-import { createTenantRouter, type TenantDirectory, type TenantRouter } from "./tenancy";
+import type { ClickHouseConfiguration } from "./config.ts";
+import { createTenantRouter, type TenantDirectory, type TenantRouter } from "./tenancy.ts";
 
 export interface ClickHouseCloseableClient {
   close(): Promise<void>;

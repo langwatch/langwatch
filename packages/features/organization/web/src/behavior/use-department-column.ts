@@ -1,4 +1,4 @@
-import { api, type RouterOutputs } from "./organization-api";
+import { api, type RouterOutputs } from "./organization-api.ts";
 
 export type DepartmentOption = RouterOutputs["departments"]["list"][number];
 

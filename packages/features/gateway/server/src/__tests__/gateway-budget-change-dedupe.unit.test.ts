@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BUDGET_CHANGE_EVENT_WINDOW_SECONDS,
   GatewayBudgetChangeDedupeService,
-} from "../services/gateway-budget-change-dedupe.service";
-import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository";
+} from "../services/gateway-budget-change-dedupe.service.ts";
+import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

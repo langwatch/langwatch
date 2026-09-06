@@ -7,8 +7,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { LangyToolActivity } from "../langy-tool-activity";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangyToolActivity } from "../langy-tool-activity.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 function turnFromParts(parts: unknown[]): UIMessage {
   return {

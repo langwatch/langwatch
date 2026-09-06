@@ -3,16 +3,16 @@ import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/m
 import type {
   MetricDataPointBulkWrite,
   MetricDataPointWrite,
-} from "../metric-data-point-append.repository";
+} from "../metric-data-point-append.repository.ts";
 import {
   MetricDataPointRepository,
   type SeriesTotalByPointAttribute,
-} from "../metric-data-point.repository";
+} from "../metric-data-point.repository.ts";
 import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClient,
   type MetricClickHouseClientResolver,
-} from "./clickhouse.metric-data-point-append.repository";
+} from "./clickhouse.metric-data-point-append.repository.ts";
 
 const USAGE_DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = {
   organization: ["OrganizationId"],

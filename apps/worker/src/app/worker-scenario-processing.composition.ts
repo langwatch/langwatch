@@ -46,7 +46,7 @@ import {
   SpanCostService,
 } from "@langwatch/trace-server";
 import type { SimulationRunStateData } from "@langwatch/scenario-server";
-import type { ScenarioWorkerCapability } from "../features/scenario/scenario-worker-feature.installer";
+import type { ScenarioWorkerCapability } from "../features/scenario/scenario-worker-feature.installer.ts";
 
 /**
  * Reports the composition decision the simulation pipeline would otherwise hide. The `execute`

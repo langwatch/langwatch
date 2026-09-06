@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { AutomationAction, AutomationKind } from "./automation";
-import { triggerActionSchema, triggerKindSchema } from "./trigger";
+import type { AutomationAction, AutomationKind } from "./automation.ts";
+import { triggerActionSchema, triggerKindSchema } from "./trigger.ts";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 

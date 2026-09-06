@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerFeatureFlags,
   type WorkerFeatureFlagDatabase,
-} from "../worker-feature-flags.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+} from "../worker-feature-flags.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature

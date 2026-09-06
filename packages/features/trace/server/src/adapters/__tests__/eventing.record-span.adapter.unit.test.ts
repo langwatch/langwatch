@@ -8,13 +8,13 @@ import {
 import {
   EventingRecordSpanAdapter,
   type RecordSpanCommandOptions,
-} from "../eventing.record-span.adapter";
+} from "../eventing.record-span.adapter.ts";
 import type {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-} from "../../ports/trace-span-preparation.port";
+} from "../../ports/trace-span-preparation.port.ts";
 
 function createSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {

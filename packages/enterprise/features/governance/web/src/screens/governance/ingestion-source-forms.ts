@@ -13,8 +13,8 @@
  */
 
 import { useMemo } from "react";
-import type { useGovernanceScope } from "../../behavior/governance-session";
-import type { RouterOutputs } from "../../behavior/governance-api";
+import type { useGovernanceScope } from "../../behavior/governance-session.ts";
+import type { RouterOutputs } from "../../behavior/governance-api.ts";
 export type Source = RouterOutputs["ingestionSources"]["list"][number];
 
 /**

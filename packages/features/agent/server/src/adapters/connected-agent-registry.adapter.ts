@@ -8,13 +8,13 @@ import {
   RESULT_TTL_SECONDS,
 } from "@langwatch/agent-contract";
 
-import { inflightKey, instanceMetaKey, instanceSetKey } from "../rules/connected-agent-keys.rules";
+import { inflightKey, instanceMetaKey, instanceSetKey } from "../rules/connected-agent-keys.rules.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   ConnectedAgentRegistryPort,
   type InstanceMeta,
   type LiveInstance,
-} from "../ports/connected-agent-runtime.port";
+} from "../ports/connected-agent-runtime.port.ts";
 
 /** How long a retired member stays readable: it is gone at once. */
 const RETIRED_SCORE_OFFSET_MS = PRESENCE_TTL_SECONDS * 1000;

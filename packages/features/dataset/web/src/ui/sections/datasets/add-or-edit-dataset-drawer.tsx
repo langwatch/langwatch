@@ -12,8 +12,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
-import type { InMemoryDataset } from "./editor/dataset-editor-table";
-import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values";
+import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
+import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
@@ -27,8 +27,8 @@ import {
   datasetRecordFormSchema,
 } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { DatasetSlugDisplay } from "./dataset-slug-display";
-import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation";
+import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
+import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 
 export interface AddDatasetDrawerProps {

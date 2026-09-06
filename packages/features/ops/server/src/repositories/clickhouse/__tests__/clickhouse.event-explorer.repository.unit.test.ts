@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EventExplorerClickHouseRepository } from "../clickhouse.event-explorer.repository";
+import { EventExplorerClickHouseRepository } from "../clickhouse.event-explorer.repository.ts";
 
 const repoCapturingQuery = () => {
   const query = vi.fn().mockResolvedValue({ json: async () => [] as unknown[] });

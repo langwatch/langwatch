@@ -5,9 +5,9 @@
 import type { Context } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential";
-import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session";
-import { createDatasetDirectUploadAuthorizer } from "../dataset-direct-upload-auth";
+import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential.ts";
+import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session.ts";
+import { createDatasetDirectUploadAuthorizer } from "../dataset-direct-upload-auth.ts";
 
 const PROJECT_ID = "project_1";
 const PROJECT = { id: PROJECT_ID, teamId: "team_1", slug: "acme" };

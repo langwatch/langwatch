@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ErrorActions } from "../error-actions";
+import { ErrorActions } from "../error-actions.tsx";
 
 afterEach(() => {
   cleanup();

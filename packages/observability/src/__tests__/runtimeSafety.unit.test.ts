@@ -32,7 +32,7 @@ describe("runtime safety", () => {
     const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
       "base64",
     )}`;
-    const telemetry = (await import(moduleUrl)) as typeof import("../index");
+    const telemetry = (await import(moduleUrl)) as typeof import("../index.ts");
 
     expect(() => {
       const logger = telemetry.createLogger("browser-runtime-smoke");

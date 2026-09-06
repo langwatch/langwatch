@@ -5,8 +5,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
+import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository.ts";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
 import { isElevenLabsHost } from "@langwatch/model-provider-contract";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");

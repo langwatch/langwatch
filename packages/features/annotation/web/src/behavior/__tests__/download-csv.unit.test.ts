@@ -12,8 +12,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { toCsv } from "../download-csv";
-import { csvFileName } from "../../model/annotation-export";
+import { toCsv } from "../download-csv.ts";
+import { csvFileName } from "../../model/annotation-export.ts";
 
 /** The data rows as they land in the file, split back apart. */
 const exportedRows = (rows: (string | number)[][]) =>

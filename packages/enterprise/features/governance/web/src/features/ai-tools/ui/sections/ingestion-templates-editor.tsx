@@ -11,13 +11,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { EnterpriseOttlEditor as OttlEditor } from "../../../ottl";
+import { EnterpriseOttlEditor as OttlEditor } from "../../../ottl/index.ts";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../../../ui/elements/governance-link";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback";
-import { api } from "../../../../behavior/governance-api";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
+import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
+import { api } from "../../../../behavior/governance-api.ts";
 /**
  * Admin Ingestion Templates editor — second tab on
  * /governance/tool-catalog. Per

@@ -2,12 +2,12 @@ import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo } from "react";
 import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
-import { useFacetValueLabelResolver } from "../hooks/use-facet-value-labels";
+import { useFacetValueLabelResolver } from "../hooks/use-facet-value-labels.ts";
 import {
   buildDecorationPlan,
   chipOverlayLabel,
   type TokenRef,
-} from "../../../../behavior/explorer/search-bar/filter-highlight";
+} from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 
 /**
  * The search bar's at-rest invitation, parameterised on who answers the ask — "Ask AI"

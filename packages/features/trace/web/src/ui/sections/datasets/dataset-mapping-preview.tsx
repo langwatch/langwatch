@@ -23,11 +23,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 
-import { useDebouncedCallback } from "../../../behavior/use-debounced-callback";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { ThreadMapping, type ThreadMappingState } from "../traces/thread-mapping";
-import { TracesMapping } from "../traces/traces-mapping";
-import { api } from "../../../behavior/trace-api";
+import { useDebouncedCallback } from "../../../behavior/use-debounced-callback.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { ThreadMapping, type ThreadMappingState } from "../traces/thread-mapping.tsx";
+import { TracesMapping } from "../traces/traces-mapping.tsx";
+import { api } from "../../../behavior/trace-api.ts";
 
 interface DatasetMappingPreviewProps {
   traces: Trace[];

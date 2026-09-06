@@ -3,7 +3,7 @@ import {
   type FrontendFeatureFlag,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
-import { api } from "../model/workflow-api-client";
+import { api } from "../model/workflow-api-client.ts";
 
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the

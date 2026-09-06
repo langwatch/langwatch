@@ -4,7 +4,7 @@ import {
   StoredObjectOwnerInstanceDirectoryPort,
   StoredObjectOwnerLookupTelemetryPort,
   type StoredObjectOwnerLookupSpan,
-} from "../index";
+} from "../index.ts";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 
 const resolveInstances = vi.fn();

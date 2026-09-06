@@ -8,19 +8,19 @@ import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation";
-import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor";
-import { useOpenTargetEditor } from "../../../behavior/experiments-v3/use-open-target-editor";
-import { usePromptTemplateFields } from "../../../behavior/experiments-v3/use-prompt-template-fields";
-import { useResolveTargetName } from "../../../behavior/experiments-v3/use-resolve-target-name";
-import { isComparisonEvaluator } from "../../../model/experiments-v3/types";
-import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
+import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
+import { useOpenTargetEditor } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
+import { usePromptTemplateFields } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import { useResolveTargetName } from "../../../behavior/experiments-v3/use-resolve-target-name.ts";
+import { isComparisonEvaluator } from "../../../model/experiments-v3/types.ts";
+import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import {
   convertFromUIMapping,
   convertToUIMapping,
-} from "../../../model/experiments-v3/field-mapping-converters";
-import { validateWorkbench } from "../../../model/experiments-v3/mapping-validation";
+} from "../../../model/experiments-v3/field-mapping-converters.ts";
+import { validateWorkbench } from "../../../model/experiments-v3/mapping-validation.ts";
 
 type RunEvaluationButtonProps = {
   /** Whether the button is disabled (e.g., while loading) */

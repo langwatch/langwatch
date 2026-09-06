@@ -21,7 +21,7 @@ import type {
   WorkflowService,
   WorkflowVersion,
 } from "@langwatch/workflow-contract";
-import type { WorkflowAgentMappingPort, WorkflowStudioDslPort } from "../ports/workflow.port";
+import type { WorkflowAgentMappingPort, WorkflowStudioDslPort } from "../ports/workflow.port.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
 

@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LangyUiHandlerFailedError } from "../langy.errors";
+import { LangyUiHandlerFailedError } from "../langy.errors.ts";
 
 describe("given a page reported a failure of its own", () => {
   describe("when its code has remediation of its own", () => {

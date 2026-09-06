@@ -10,7 +10,7 @@ import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer"
 import { getLangWatchTracer } from "langwatch";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-import type { LogTraceIoPort } from "../ports/log-trace-io.port";
+import type { LogTraceIoPort } from "../ports/log-trace-io.port.ts";
 
 /**
  * Every field optional, all the way down.

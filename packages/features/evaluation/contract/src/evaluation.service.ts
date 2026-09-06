@@ -1,21 +1,21 @@
-import type { ExecuteEvaluationCommand, UpsertEvaluationRunCommand } from "./evaluation.commands";
+import type { ExecuteEvaluationCommand, UpsertEvaluationRunCommand } from "./evaluation.commands.ts";
 import type {
   EvaluationExecutionResult,
   EvaluationRunData,
   EvaluationSummary,
   TraceEvaluationData,
-} from "./evaluation";
+} from "./evaluation.ts";
 import type {
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
-} from "./evaluation.performance";
+} from "./evaluation.performance.ts";
 import type {
   EvaluationInputsQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
   EvaluationSummariesByTraceIdsQuery,
   TraceEvaluationsQuery,
-} from "./evaluation.queries";
+} from "./evaluation.queries.ts";
 
 export abstract class EvaluationService {
   abstract executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult>;

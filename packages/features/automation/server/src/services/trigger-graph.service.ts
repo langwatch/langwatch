@@ -6,21 +6,21 @@ import type {
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository";
-import type { TriggerRepository } from "../repositories/trigger.repository";
-import type { CustomGraphRepository } from "../repositories/custom-graph.repository";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type {
   AutomationDispatchErrorPort,
   AutomationGraphNotifierPort,
   AutomationLoggerPort,
   AutomationHeartbeatPort,
   AutomationSlackBotTokenDecryptorPort,
-} from "../ports/automation-graph.port";
-import { AutomationRunawayPort } from "../ports/automation-runaway.port";
-import { AutomationClockPort } from "../ports/automation-clock.port";
-import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service";
-import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service";
-import { RunawayContainmentService } from "./runaway-containment.service";
+} from "../ports/automation-graph.port.ts";
+import { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
+import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
+import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
+import { RunawayContainmentService } from "./runaway-containment.service.ts";
 
 /** Private graph-alert collaborator, assembled once with Automation's service. */
 export class AutomationGraphService {

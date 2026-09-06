@@ -1,4 +1,4 @@
-import { GithubRedisPort } from "../ports/github-app-token.port";
+import { GithubRedisPort } from "../ports/github-app-token.port.ts";
 
 type RedisConnection = {
   get(key: string): Promise<string | null>;

@@ -9,10 +9,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import { useState, type MouseEvent } from "react";
 
-import { api } from "../../../../behavior/trace-api";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { UserAvatar } from "../../../elements/user-avatar";
-import { AnnotationPopover } from "./conversation-view/annotation-popover";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { UserAvatar } from "../../../elements/user-avatar.tsx";
+import { AnnotationPopover } from "./conversation-view/annotation-popover.tsx";
 
 export function AnnotationExpectedOutputs({
   traceId,

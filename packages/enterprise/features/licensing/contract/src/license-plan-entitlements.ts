@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PlanInfo } from "./license-plan";
+import type { PlanInfo } from "./license-plan.ts";
 
 /**
  * The entitlements a plan tier carries, applied wherever a plan is resolved.

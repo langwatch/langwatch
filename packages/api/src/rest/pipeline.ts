@@ -9,20 +9,20 @@ import {
   validator as zValidator,
 } from "hono-openapi";
 
-import { cacheReadMiddleware, rateLimitMiddleware, writeCachedResponse } from "./capabilities.js";
-import { isNoBodySchema } from "./definition.js";
+import { cacheReadMiddleware, rateLimitMiddleware, writeCachedResponse } from "./capabilities.ts";
+import { isNoBodySchema } from "./definition.ts";
 import {
   ApiVersionConflictError,
   EndpointWithdrawnError,
   ProjectInputMismatchError,
   ScopeInputMismatchError,
-} from "../errors.js";
-import { parseApiSchemaSync, type ApiSchema } from "../schema.js";
+} from "../errors.ts";
+import { parseApiSchemaSync, type ApiSchema } from "../schema.ts";
 import {
   appendPublicRestDocumentationValidators,
   parsePublicRestInput,
   publicRestPathParams,
-} from "./public-rest-input.js";
+} from "./public-rest-input.ts";
 import {
   idempotentJson,
   IDEMPOTENCY_KEY_HEADER,
@@ -30,11 +30,11 @@ import {
   idempotentReplayHeaders,
   readIdempotencyKey,
   type IdempotentRunner,
-} from "./idempotency.js";
-import { isDeclined, serializeEndpointResult } from "./response.js";
-import { requestValidationErrorFrom } from "./validation.js";
-import { createSSEResponse } from "./sse.js";
-import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.js";
+} from "./idempotency.ts";
+import { isDeclined, serializeEndpointResult } from "./response.ts";
+import { requestValidationErrorFrom } from "./validation.ts";
+import { createSSEResponse } from "./sse.ts";
+import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.ts";
 import type {
   BaseApp,
   EndpointDef,
@@ -42,8 +42,8 @@ import type {
   EndpointRegistration,
   ServiceConfig,
   VersionStatus,
-} from "./types.js";
-import type { ResolvedEndpoint } from "./versioning.js";
+} from "./types.ts";
+import type { ResolvedEndpoint } from "./versioning.ts";
 
 type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;

@@ -3,8 +3,8 @@ import {
   type RetentionCategory,
   type RetentionScopeType,
 } from "@langwatch/data-retention-contract";
-import { CATEGORY_LABELS } from "./retention-constants";
-import { formatDays } from "./retention-format";
+import { CATEGORY_LABELS } from "./retention-constants.ts";
+import { formatDays } from "./retention-format.ts";
 
 export type RetentionRuleRow = {
   scopeType: RetentionScopeType;

@@ -1,7 +1,7 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
-import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection";
+import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port.ts";
+import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection.ts";
 
 const TABLE_NAME = "experiment_run_items" as const;
 

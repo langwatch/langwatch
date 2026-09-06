@@ -1,5 +1,5 @@
 import numeral from "numeral";
-import type { Money } from "./analytics-value-types";
+import type { Money } from "./analytics-value-types.ts";
 
 export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
   const currencySymbols = {

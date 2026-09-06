@@ -9,7 +9,7 @@ import { PersonalUsageReaderPort } from "@langwatch/enterprise-governance-server
 import type {
   AppPersonalUsageReadAdapter,
   PersonalUsageWindow,
-} from "./personal-usage.clickhouse.repository";
+} from "./personal-usage.clickhouse.repository.ts";
 
 type PersonalUsageSummaryRow = {
   totalCost: number;

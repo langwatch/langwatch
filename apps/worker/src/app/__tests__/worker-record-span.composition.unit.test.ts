@@ -1,14 +1,14 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerFeatureFlags } from "../worker-feature-flags.composition";
-import { createWorkerRecordSpanCommand } from "../worker-record-span.composition";
+import { createWorkerFeatureFlags } from "../worker-feature-flags.composition.ts";
+import { createWorkerRecordSpanCommand } from "../worker-record-span.composition.ts";
 import {
   createWorkerTraceCapabilityServices,
   type WorkerTraceCapabilityDatabase,
-} from "../worker-trace-capability-services.composition";
-import type { WorkerFeatureFlagDatabase } from "../worker-feature-flags.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+} from "../worker-trace-capability-services.composition.ts";
+import type { WorkerFeatureFlagDatabase } from "../worker-feature-flags.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature

@@ -7,14 +7,14 @@ import type { ComponentType } from "react";
 export type PersonalWorkspaceScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const personalWorkspaceScreens = {
-  overview: () => import("./personal-overview.screen"),
-  configure: () => import("./personal-configure.screen"),
-  sessions: () => import("./personal-sessions.screen"),
-  pullRequests: () => import("./personal-pull-requests.screen"),
-  budgetRequest: () => import("./personal-budget-request.screen"),
-  projectSessions: () => import("./project-sessions.screen"),
-  projectPullRequests: () => import("./project-pull-requests.screen"),
-  authentication: () => import("./authentication.screen"),
+  overview: () => import("./personal-overview.screen.tsx"),
+  configure: () => import("./personal-configure.screen.tsx"),
+  sessions: () => import("./personal-sessions.screen.tsx"),
+  pullRequests: () => import("./personal-pull-requests.screen.tsx"),
+  budgetRequest: () => import("./personal-budget-request.screen.tsx"),
+  projectSessions: () => import("./project-sessions.screen.tsx"),
+  projectPullRequests: () => import("./project-pull-requests.screen.tsx"),
+  authentication: () => import("./authentication.screen.tsx"),
 } as const satisfies Record<string, PersonalWorkspaceScreenLoader>;
 
 export type PersonalWorkspaceScreenName = keyof typeof personalWorkspaceScreens;
@@ -26,8 +26,8 @@ export {
   isSecurityKey,
   passkeyLabel,
   providerDisplayName,
-} from "../../model/sign-in-methods";
-export { personalWorkspaceApi } from "../../behavior/personal-workspace-api";
+} from "../../model/sign-in-methods.ts";
+export { personalWorkspaceApi } from "../../behavior/personal-workspace-api.ts";
 export { codingAgentApi } from "@langwatch/coding-agent-web/surfaces/activity";
 export {
   PersonalWorkspaceHostPort,
@@ -45,4 +45,4 @@ export {
   type PersonalScope,
   type PersonalSuccessNotice,
   type PersonalTeam,
-} from "../../model/personal-workspace-host";
+} from "../../model/personal-workspace-host.ts";

@@ -7,16 +7,16 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "../../../model/prisma-types";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { SuiteRunConfirmationDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
-import { useRunSuite } from "../use-run-suite";
+import { useRunSuite } from "../use-run-suite.ts";
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   scenarios: [] as { id: string; parameters: unknown }[],
 }));
 
-vi.mock("../../scenario-api", () => ({
+vi.mock("../../scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: { getSuiteRunData: { invalidate: vi.fn() } },
@@ -42,7 +42,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../use-organization-team-project", () => ({
+vi.mock("../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),

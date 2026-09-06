@@ -6,22 +6,22 @@ import {
   ROW_GAP,
   ROW_HEIGHT,
   ZOOM_FIT_PADDING,
-} from "../../../model/flame/constants";
-import { FlameCanvas } from "./flame-canvas";
-import { FlameBreadcrumbs } from "./flame-breadcrumbs";
-import { FlameContextStrip } from "./flame-context-strip";
-import { buildTree, computeSpanContext, generateTicks } from "../../../behavior/flame/tree";
+} from "../../../model/flame/constants.ts";
+import { FlameCanvas } from "./flame-canvas.tsx";
+import { FlameBreadcrumbs } from "./flame-breadcrumbs.tsx";
+import { FlameContextStrip } from "./flame-context-strip.tsx";
+import { buildTree, computeSpanContext, generateTicks } from "../../../behavior/flame/tree.ts";
 import type {
   FlameNode,
   FlameRelatedSpanIds,
   FlameViewProps,
   SpanContext,
   Viewport,
-} from "../../../behavior/flame/types";
-import { useFlameAxisZoom } from "../../../behavior/flame/use-flame-axis-zoom";
-import { useFlameKeyboard } from "../../../behavior/flame/use-flame-keyboard";
-import { useFlamePanDrag } from "../../../behavior/flame/use-flame-pan-drag";
-import { useFlameViewport } from "../../../behavior/flame/use-flame-viewport";
+} from "../../../behavior/flame/types.ts";
+import { useFlameAxisZoom } from "../../../behavior/flame/use-flame-axis-zoom.ts";
+import { useFlameKeyboard } from "../../../behavior/flame/use-flame-keyboard.ts";
+import { useFlamePanDrag } from "../../../behavior/flame/use-flame-pan-drag.ts";
+import { useFlameViewport } from "../../../behavior/flame/use-flame-viewport.ts";
 
 export const FlameView = memo(function FlameView({
   spans,

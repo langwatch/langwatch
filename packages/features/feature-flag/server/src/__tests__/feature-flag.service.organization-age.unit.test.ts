@@ -14,7 +14,7 @@
  */
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createInMemoryFeatureFlagService } from "../testing";
+import { createInMemoryFeatureFlagService } from "../testing.ts";
 
 const FLAG = "ops_es_causality_loop_guard_disabled";
 const ROLLOUT_START = "2026-06-01";

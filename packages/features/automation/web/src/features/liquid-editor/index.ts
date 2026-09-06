@@ -22,10 +22,10 @@ export {
   type MonacoTextModel,
   type UnknownVariable,
   type VariableInfo,
-} from "./behavior/liquid-monaco";
-export { monacoBackgroundFor, trapEscapeInsideEditor } from "./behavior/monaco-editor-chrome";
-export { useMonacoTheme } from "./behavior/use-monaco-theme";
-export * from "./model/alert-variables";
-export * from "./model/monaco-schemas";
-export * from "./model/report-variables";
-export { VariableInfoIcon } from "./ui/elements/variable-info-icon";
+} from "./behavior/liquid-monaco.ts";
+export { monacoBackgroundFor, trapEscapeInsideEditor } from "./behavior/monaco-editor-chrome.ts";
+export { useMonacoTheme } from "./behavior/use-monaco-theme.ts";
+export * from "./model/alert-variables.ts";
+export * from "./model/monaco-schemas.ts";
+export * from "./model/report-variables.ts";
+export { VariableInfoIcon } from "./ui/elements/variable-info-icon.tsx";

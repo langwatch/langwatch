@@ -14,7 +14,7 @@ import {
 import {
   type TargetIdentity,
   useTargetIdentityMap,
-} from "../../../../behavior/use-target-name-map";
+} from "../../../../behavior/use-target-name-map.ts";
 import type { RunParameterValues, ScenarioRunData } from "@langwatch/scenario-contract";
 import {
   differingParameterNames,
@@ -22,8 +22,8 @@ import {
   targetParametersLabel,
   targetSortKey,
 } from "@langwatch/suite-contract";
-import type { TargetKind } from "../../../../model/target-kind";
-import { targetColor } from "../../../elements/agent-testing/shared/target-colors";
+import type { TargetKind } from "../../../../model/target-kind.ts";
+import { targetColor } from "../../../elements/agent-testing/shared/target-colors.ts";
 
 /** One target of a run, as the run detail reads it. */
 export type BatchTarget = {

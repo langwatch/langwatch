@@ -4,8 +4,8 @@ import type {
   TopicModelRecordMode,
   TopicModelRecordSource,
 } from "@langwatch/topic-contract";
-import type { TopicClusteringOutcomeCommands } from "../intents/topic-clustering.intent";
-import { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
+import type { TopicClusteringOutcomeCommands } from "../intents/topic-clustering.intent.ts";
+import { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 
 type CommandSender<Input> = {
   send(input: Input): Promise<unknown>;

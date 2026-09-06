@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { evaluationSchema } from "../index";
-import { sharedTraceDtoSchema } from "../index";
+import { evaluationSchema } from "../index.ts";
+import { sharedTraceDtoSchema } from "../index.ts";
 import {
   spanDetailSchema,
   spanTreeNodeSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
-} from "../index";
+} from "../index.ts";
 
 /**
  * The share payload's output schema is the structural half of the leak-

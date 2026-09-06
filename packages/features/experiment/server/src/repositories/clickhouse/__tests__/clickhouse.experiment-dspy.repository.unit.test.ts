@@ -4,8 +4,8 @@ import {
   ClickHouseExperimentDspyRepository,
   type ExperimentDspyClickHouseResult,
   type ExperimentDspyClickHouseClient,
-} from "../clickhouse.experiment-dspy.repository";
-import { ExperimentDspyRetentionPort } from "../../../ports/experiment-dspy-retention.port";
+} from "../clickhouse.experiment-dspy.repository.ts";
+import { ExperimentDspyRetentionPort } from "../../../ports/experiment-dspy-retention.port.ts";
 
 const step = (overrides: Partial<ExperimentDspyStep> = {}): ExperimentDspyStep => ({
   tenantId: "project_1",

@@ -1,4 +1,4 @@
-import { codingAgentSessionSchema, type CodingAgentSession } from "./coding-agent";
+import { codingAgentSessionSchema, type CodingAgentSession } from "./coding-agent.ts";
 
 export const CODING_AGENT_TEST_NOW_MS = Date.parse("2026-08-20T12:00:00.000Z");
 

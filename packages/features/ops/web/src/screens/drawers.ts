@@ -16,5 +16,5 @@
  * a component it cannot mount.
  */
 
-export { FoundryDrawer } from "../features/foundry/ui/sections/foundry-drawer";
-export { FoundryTransport } from "../features/foundry/ui/sections/foundry-transport";
+export { FoundryDrawer } from "../features/foundry/ui/sections/foundry-drawer.tsx";
+export { FoundryTransport } from "../features/foundry/ui/sections/foundry-transport.tsx";

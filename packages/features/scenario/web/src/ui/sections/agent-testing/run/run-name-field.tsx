@@ -10,8 +10,8 @@ import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
-} from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+} from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 /** One line of the dropdown. */
 export type RunNameOption = {

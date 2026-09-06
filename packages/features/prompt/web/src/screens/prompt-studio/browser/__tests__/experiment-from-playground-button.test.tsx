@@ -15,16 +15,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DeepPartial } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type PromptTabsCapabilities,
   type TabData,
-} from "../../studio-internals";
-import { ExperimentFromPlaygroundButton } from "../experiment-from-playground-button";
-import { PromptHostProvider } from "../../../../model/prompt-host";
-import { FakePromptHost } from "../../../../testing";
+} from "../../studio-internals.ts";
+import { ExperimentFromPlaygroundButton } from "../experiment-from-playground-button.tsx";
+import { PromptHostProvider } from "../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked
@@ -69,7 +69,7 @@ const capabilities: PromptTabsCapabilities = {
 
 const TEST_PROJECT_ID = "test-project-123";
 
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: { id: TEST_PROJECT_ID, slug: "test-project" },
     projectId: TEST_PROJECT_ID,
@@ -108,7 +108,7 @@ let saveExperimentMutateCall:
 // Mock saved prompts - can be overridden per test
 let mockSavedPrompts: Record<string, unknown> = {};
 
-vi.mock("../../../../behavior/prompt-api", () => ({
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
     useUtils: () => ({
       experiments: {

@@ -7,7 +7,7 @@ import {
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { TeamRepository } from "../team.repository";
+import { TeamRepository } from "../team.repository.ts";
 
 const teamSelect = {
   id: true,

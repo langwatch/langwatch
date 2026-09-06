@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { TraceSpanDedupPort, type SpanDedupRef } from "../trace-ingestion.service";
+import { TraceSpanDedupPort, type SpanDedupRef } from "../trace-ingestion.service.ts";
 
 describe("TraceSpanDedupPort", () => {
   describe("given a plain object with the port's three methods", () => {

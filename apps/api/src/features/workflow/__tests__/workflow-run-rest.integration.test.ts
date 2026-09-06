@@ -11,8 +11,8 @@ import {
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountWorkflowRunRest } from "../workflow-run-rest.mount";
-import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential";
+import { mountWorkflowRunRest } from "../workflow-run-rest.mount.ts";
+import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
 
 const jsonInit = {
   method: "POST",

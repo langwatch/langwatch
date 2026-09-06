@@ -3,13 +3,13 @@ import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFacetLensStore } from "../../../../behavior/facet-lens.store";
+import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
 import {
   commitRange as commitRangeShared,
   RangeEndpointInput,
   stepForSpan,
-} from "../../../elements/explorer/filter-sidebar/range-controls";
-import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";
+} from "../../../elements/explorer/filter-sidebar/range-controls.tsx";
+import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 
 const COMMIT_DEBOUNCE_MS = 150;
 /**

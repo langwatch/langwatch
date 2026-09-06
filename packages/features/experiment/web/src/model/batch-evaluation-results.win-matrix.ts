@@ -2,7 +2,7 @@
  * Whether a win matrix actually carries head-to-head information.
  */
 
-import type { WinMatrix } from "./batch-evaluation-results.bt-leaderboard";
+import type { WinMatrix } from "./batch-evaluation-results.bt-leaderboard.ts";
 
 /**
  * True when at least one variant's row varies across opponents — i.e. the run separated

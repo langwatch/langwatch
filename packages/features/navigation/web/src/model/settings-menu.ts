@@ -50,7 +50,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
-import { isPathUnder } from "./products";
+import { isPathUnder } from "./products.ts";
 
 export interface SettingsMenuItem {
   label: string;

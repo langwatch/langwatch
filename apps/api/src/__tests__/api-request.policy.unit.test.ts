@@ -11,8 +11,8 @@ import {
   ApiAuditPort,
   ApiAuthorizationPort,
   ApiRequestPolicy,
-} from "../api-request.policy";
-import type { ApiTrpcSession } from "../app-trpc/app-trpc.context";
+} from "../api-request.policy.ts";
+import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
 
 class TestAuthentication extends ApiAuthenticationPort {
   constructor(private readonly session: ApiTrpcSession | null) {

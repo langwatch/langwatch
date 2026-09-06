@@ -1,6 +1,6 @@
 import { Input, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FormErrorDisplay } from "./form-error-display";
+import { FormErrorDisplay } from "./form-error-display.tsx";
 
 const meta = {
   title: "Primitives/Form error display",

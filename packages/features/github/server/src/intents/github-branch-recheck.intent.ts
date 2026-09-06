@@ -1,8 +1,8 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
-import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port";
-import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "../processes/github-branch-recheck.process";
+import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
+import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "../processes/github-branch-recheck.process.ts";
 
 const logger = createLogger("langwatch:github:branch-recheck");
 const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;

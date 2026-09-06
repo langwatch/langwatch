@@ -61,7 +61,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
-} from "../services/personal-usage-dashboard.service";
+} from "../services/personal-usage-dashboard.service.ts";
 
 /**
  * A member already holds an unrevoked personal key under this label.

@@ -3,8 +3,8 @@ import {
   EmailProviderConfigurationError,
   hasEmailProvider,
   resolveEmailProviderName,
-} from "../index";
-import type { MailerConfiguration } from "../types";
+} from "../index.ts";
+import type { MailerConfiguration } from "../types.ts";
 
 /**
  * Builds a configuration the way the process would resolve it from the

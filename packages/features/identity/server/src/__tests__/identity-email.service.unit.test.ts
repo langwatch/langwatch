@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEmailService } from "../services/identity-email.service";
-import { fact, InMemoryHeads, USER } from "./support/in-memory-heads";
+import { IdentityEmailService } from "../services/identity-email.service.ts";
+import { fact, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
 
 function harness(options?: { onIdentity?: boolean }) {
   const heads = new InMemoryHeads();

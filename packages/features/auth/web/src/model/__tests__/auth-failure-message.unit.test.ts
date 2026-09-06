@@ -22,8 +22,8 @@
  * Corresponds to specs/identity/identity-storage-adapter.feature.
  */
 import { describe, expect, it } from "vitest";
-import { authFailureMessage } from "../auth-failure-message";
-import { frontDoorErrorCopy } from "../front-door-error-copy";
+import { authFailureMessage } from "../auth-failure-message.ts";
+import { frontDoorErrorCopy } from "../front-door-error-copy.ts";
 
 const registryCopy = (code: string): string => {
   const explanation = frontDoorErrorCopy({

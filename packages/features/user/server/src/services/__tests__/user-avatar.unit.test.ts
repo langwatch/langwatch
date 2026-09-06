@@ -5,7 +5,7 @@ import {
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { safeUserAvatarMediaType } from "@langwatch/user-contract";
-import { UserAvatarCodecService } from "../user-avatar.service";
+import { UserAvatarCodecService } from "../user-avatar.service.ts";
 
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";

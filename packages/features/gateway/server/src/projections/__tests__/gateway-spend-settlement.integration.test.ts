@@ -13,14 +13,14 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "../../processes/gateway-spend-commands.process";
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
+} from "../../processes/gateway-spend-commands.process.ts";
+import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { GatewaySpendStore } from "../../stores/gateway-spend/gateway-spend.store";
-import { GatewaySpendFoldProjection } from "../gateway-spend.projection";
+} from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewaySpendStore } from "../../stores/gateway-spend/gateway-spend.store.ts";
+import { GatewaySpendFoldProjection } from "../gateway-spend.projection.ts";
 
 const chUrl = testClickHouseUrl();
 

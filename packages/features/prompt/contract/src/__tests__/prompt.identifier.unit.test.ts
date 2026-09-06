@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { generateUniqueIdentifier, normalizeIdentifier } from "../prompt.identifier";
+import { generateUniqueIdentifier, normalizeIdentifier } from "../prompt.identifier.ts";
 
 describe("generateUniqueIdentifier", () => {
   describe("when no existing identifiers", () => {

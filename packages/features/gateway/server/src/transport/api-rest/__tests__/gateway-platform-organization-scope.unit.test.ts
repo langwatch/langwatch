@@ -7,7 +7,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GatewayApp } from "#app/gateway.app";
-import { createGatewayPlatformRestApp } from "../gateway-platform.api";
+import { createGatewayPlatformRestApp } from "../gateway-platform.api.ts";
 
 const PROJECT_ID = "project_caller";
 const ORGANIZATION_ID = "organization_1";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LicensePlanLimitsSchema } from "@langwatch/enterprise-licensing-contract";
-import { NodeLicenseCryptographyAdapter } from "../index";
-import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "../testing";
+import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "../testing.ts";
 import {
   BASE_LICENSE,
   EMPTY_SIGNATURE_KEY,
@@ -12,7 +12,7 @@ import {
   MALFORMED_BASE64,
   TAMPERED_LICENSE_KEY,
   VALID_LICENSE_KEY,
-} from "../testing";
+} from "../testing.ts";
 
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const isExpired = cryptography.isExpired.bind(cryptography);

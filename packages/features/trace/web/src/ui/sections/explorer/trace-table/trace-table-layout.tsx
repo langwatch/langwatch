@@ -2,16 +2,16 @@ import { Box, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
-import type { PageCursor } from "../../../../behavior/filter.store";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store";
-import { RefreshProgressBar } from "../traces-page/refresh-progress-bar";
-import { ColumnEducationDialog } from "./column-education-dialog";
-import { NewTracesScrollUpIndicator } from "./new-traces-scroll-up-indicator";
-import { Pagination } from "./pagination";
+import type { PageCursor } from "../../../../behavior/filter.store.ts";
+import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { RefreshProgressBar } from "../traces-page/refresh-progress-bar.tsx";
+import { ColumnEducationDialog } from "./column-education-dialog.tsx";
+import { NewTracesScrollUpIndicator } from "./new-traces-scroll-up-indicator.tsx";
+import { Pagination } from "./pagination.tsx";
 import {
   releaseTraceTableScrollElement,
   setTraceTableScrollElement,
-} from "../../../../behavior/explorer/trace-table/scroll-context";
+} from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 
 interface TraceTableLayoutProps {
   totalHits: number;

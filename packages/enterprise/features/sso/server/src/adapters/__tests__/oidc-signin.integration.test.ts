@@ -10,8 +10,8 @@ import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { genericOAuth } from "better-auth/plugins";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildGenericOAuthConfigs } from "../better-auth.better-auth.adapter";
-import { startFakeOidcProvider, type FakeOidcProvider } from "./support/fake-oidc-provider";
+import { buildGenericOAuthConfigs } from "../better-auth.better-auth.adapter.ts";
+import { startFakeOidcProvider, type FakeOidcProvider } from "./support/fake-oidc-provider.ts";
 
 const BASE_URL = "http://localhost:5624";
 

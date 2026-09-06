@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Cluster, Redis } from "ioredis";
-import type { BillingTenantOrganizationCache } from "../services/tenant-organization.service";
+import type { BillingTenantOrganizationCache } from "../services/tenant-organization.service.ts";
 
 /**
  * The Redis keyspace tenant attribution occupies, and how long an answer lives.

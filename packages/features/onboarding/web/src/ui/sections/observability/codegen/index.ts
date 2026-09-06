@@ -1,8 +1,8 @@
-import { usePublicEnv } from "../../../../behavior/use-public-env";
-import { useActiveProject } from "../../active-project-context";
-import { parseSnippet } from "./snippets";
-import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types";
-import { getRegistryEntry } from "./registry";
+import { usePublicEnv } from "../../../../behavior/use-public-env.ts";
+import { useActiveProject } from "../../active-project-context.tsx";
+import { parseSnippet } from "./snippets.ts";
+import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
+import { getRegistryEntry } from "./registry.tsx";
 
 interface CodegenResult {
   code: string;

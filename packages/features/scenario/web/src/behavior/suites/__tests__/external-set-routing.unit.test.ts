@@ -9,7 +9,7 @@ import {
   extractExternalSetId,
   isExternalSetSelection,
   toExternalSetSelection,
-} from "../use-suite-routing";
+} from "../use-suite-routing.ts";
 
 describe("external set routing utilities", () => {
   describe("toExternalSetSelection()", () => {

@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { OrganizationLicensePort } from "../ports/organization-license.port";
-import { PrismaOrganizationLicenseRepository } from "../repositories/prisma/prisma.organization-license.repository";
+import type { OrganizationLicensePort } from "../ports/organization-license.port.ts";
+import { PrismaOrganizationLicenseRepository } from "../repositories/prisma/prisma.organization-license.repository.ts";
 
 /**
  * The composition seam between a process and the licence a plan resolves from.

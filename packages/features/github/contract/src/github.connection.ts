@@ -7,7 +7,7 @@
  * many of them a "selected" install covers.
  */
 import { z } from "zod";
-import { githubPullRequestLiveStatusSchema } from "./github";
+import { githubPullRequestLiveStatusSchema } from "./github.ts";
 
 export const githubInstallationSummarySchema = z.object({
   installationId: z.string(),

@@ -24,15 +24,15 @@ import {
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFormCtx } from "../../../model/provider-types";
+import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with. Everything else in the module stays
  *  real (FieldHeader is exercised as-is). */
-vi.mock("../ui/sections/template-authoring", async (original) => {
-  const actual = await original<typeof import("../ui/sections/template-authoring")>();
+vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
+  const actual = await original<typeof import("../ui/sections/template-authoring.tsx")>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
@@ -40,7 +40,7 @@ vi.mock("../ui/sections/template-authoring", async (original) => {
 });
 
 import type { WebhookPreview } from "@langwatch/automation-contract";
-import webhookClient, { type WebhookSlice } from "../ui/sections/webhook.client";
+import webhookClient, { type WebhookSlice } from "../ui/sections/webhook.client.tsx";
 
 afterEach(() => cleanup());
 

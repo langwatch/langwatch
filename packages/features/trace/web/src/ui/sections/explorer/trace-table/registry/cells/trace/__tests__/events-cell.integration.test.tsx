@@ -5,9 +5,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TraceListEventGroup, TraceListItem } from "../../../../../types/trace";
-import { NO_TRACE_EVENTS } from "../../../../../types/trace";
-import { EventsCell } from "../events-cell";
+import type { TraceListEventGroup, TraceListItem } from "../../../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
+import { EventsCell } from "../events-cell.tsx";
 
 afterEach(cleanup);
 

@@ -12,7 +12,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SimulationService } from "#services/simulation.service";
-import { createSimulationRunsRestApp } from "../simulation-run.api";
+import { createSimulationRunsRestApp } from "../simulation-run.api.ts";
 
 const project = {
   id: "project-123",

@@ -1,4 +1,4 @@
-import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
+import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -12,12 +12,12 @@ import {
   RecordScimGroupMappingCommand,
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
-} from "../intents/scim-sync.intent";
+} from "../intents/scim-sync.intent.ts";
 import {
   type ScimSyncEvent,
   type ScimSyncFoldState,
   ScimSyncStateFoldProjection,
-} from "../projections/scim-sync-state.projection";
+} from "../projections/scim-sync-state.projection.ts";
 import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
 /**

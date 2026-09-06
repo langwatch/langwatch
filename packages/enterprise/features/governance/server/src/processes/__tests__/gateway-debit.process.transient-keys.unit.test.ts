@@ -3,8 +3,8 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   type GatewayDebitPort,
-} from "../../ports/gateway-debit.port";
-import { GatewayDebitProcess } from "../gateway-debit.process";
+} from "../../ports/gateway-debit.port.ts";
+import { GatewayDebitProcess } from "../gateway-debit.process.ts";
 
 /**
  * The contract the absent transaction rests on.

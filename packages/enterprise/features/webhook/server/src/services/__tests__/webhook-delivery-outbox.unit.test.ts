@@ -20,7 +20,7 @@ import {
   WebhookDeliveryService,
   WEBHOOK_RETRY_LADDER_MS,
   WEBHOOK_SEND_MAX_ATTEMPTS,
-} from "../webhook-delivery.service";
+} from "../webhook-delivery.service.ts";
 
 type OutboxOptions = {
   maxAttempts?: number;

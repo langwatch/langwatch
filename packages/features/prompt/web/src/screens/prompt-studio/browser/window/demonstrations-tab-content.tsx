@@ -1,5 +1,5 @@
 import { VStack } from "@chakra-ui/react";
-import { DemonstrationsField } from "../../fields/demonstrations-field";
+import { DemonstrationsField } from "../../fields/demonstrations-field.tsx";
 
 /**
  * DemonstrationsTabContent

@@ -30,9 +30,9 @@ import type { Logger } from "@langwatch/observability";
 import type {
   ApiTrpcFeatureApplication,
   ApiTrpcPortsContext,
-} from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createDataRetentionTrpcRouter } from "./data-retention-trpc.mount";
+} from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createDataRetentionTrpcRouter } from "./data-retention-trpc.mount.ts";
 
 /** Reports the one capability this feature can be composed without. */
 export abstract class ApiDataRetentionAbsenceReport {
@@ -82,7 +82,7 @@ export type DataRetentionFeatureCollaborators = Readonly<{
   report?: ApiDataRetentionAbsenceReport;
 }>;
 
-import type { ComposedDataRetentionFeature } from "./data-retention.composition.types";
+import type { ComposedDataRetentionFeature } from "./data-retention.composition.types.ts";
 
 /** Composes the retention surface over this process's own graph. */
 export function composeDataRetentionFeature(options: {

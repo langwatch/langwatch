@@ -14,7 +14,7 @@ import {
   HOME_DEV_STATES,
   setHomeDevState,
   useHomeDevState,
-} from "../dev/home-dev-state";
+} from "../dev/home-dev-state.ts";
 
 afterEach(() => {
   window.localStorage.clear();

@@ -2,18 +2,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection";
+} from "../projections/evaluation-analytics-fold.projection.ts";
 import {
   type EvaluationAnalyticsData,
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
-} from "../projections/evaluation-analytics-row.projection";
+} from "../projections/evaluation-analytics-row.projection.ts";
 import {
   createEvaluationCompletedEvent,
   createEvaluationScheduledEvent,
   createEvaluationStartedEvent,
-} from "./eventing/fixtures/evaluation-events.fixtures";
-import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy";
+} from "./eventing/fixtures/evaluation-events.fixtures.ts";
+import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy.ts";
 
 /**
  * FOLD-EQUIVALENCE (ADR-066): proves `fold(events, fromRow(project(s))) ===

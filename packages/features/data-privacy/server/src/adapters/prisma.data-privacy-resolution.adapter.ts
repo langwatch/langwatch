@@ -1,9 +1,9 @@
-import type { DataPrivacyProjectPort } from "../ports/data-privacy.port";
+import type { DataPrivacyProjectPort } from "../ports/data-privacy.port.ts";
 import {
   PrismaDataPrivacyPolicyRepository,
   type DataPrivacyDatabase,
-} from "../repositories/prisma/prisma.data-privacy.repository";
-import { DataPrivacyResolutionService } from "../services/data-privacy-resolution.service";
+} from "../repositories/prisma/prisma.data-privacy.repository.ts";
+import { DataPrivacyResolutionService } from "../services/data-privacy-resolution.service.ts";
 
 /** The one model the policy resolution needs from the client. */
 export type DataPrivacyResolutionDatabase = DataPrivacyDatabase;

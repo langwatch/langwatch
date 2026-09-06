@@ -19,9 +19,9 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectCredentialsPort } from "../project.port";
-import { ProjectRepository } from "../../repositories/project.repository";
-import { ProjectService } from "../../services/project.service";
+import { ProjectCredentialsPort } from "../project.port.ts";
+import { ProjectRepository } from "../../repositories/project.repository.ts";
+import { ProjectService } from "../../services/project.service.ts";
 
 const project: InternalProject = {
   id: "governance-project",

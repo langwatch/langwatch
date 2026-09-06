@@ -1,16 +1,16 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import type { MouseEvent, PointerEvent, RefObject } from "react";
-import { formatDuration } from "../../../model/display-formatters";
-import { FlameAxis } from "./flame-axis";
-import { FlameRow } from "./flame-row";
-import { Minimap } from "./minimap";
+import { formatDuration } from "../../../model/display-formatters.ts";
+import { FlameAxis } from "./flame-axis.tsx";
+import { FlameRow } from "./flame-row.tsx";
+import { Minimap } from "./minimap.tsx";
 import type {
   FlameNode,
   FlameRelatedSpanIds,
   FlameTick,
   Viewport,
-} from "../../../behavior/flame/types";
+} from "../../../behavior/flame/types.ts";
 
 export interface FlameCanvasProps {
   flameAreaRef: RefObject<HTMLDivElement | null>;

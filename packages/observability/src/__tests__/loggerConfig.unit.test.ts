@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LOGGER_CONFIGURATION, resolveLoggerConfiguration } from "../logger-config";
+import { DEFAULT_LOGGER_CONFIGURATION, resolveLoggerConfiguration } from "../logger-config.ts";
 
 describe("resolveLoggerConfiguration", () => {
   it("uses deterministic package defaults", () => {

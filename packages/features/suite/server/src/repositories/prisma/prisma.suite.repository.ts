@@ -14,7 +14,7 @@ import {
   type SuiteScope,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
-import { SuiteRepository } from "../suite.repository";
+import { SuiteRepository } from "../suite.repository.ts";
 
 /**
  * Max wall-clock the locked transaction may run, the wait for the lock included. The body

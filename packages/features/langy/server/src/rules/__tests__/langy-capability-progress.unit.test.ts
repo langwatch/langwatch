@@ -14,7 +14,7 @@
  */
 import { CLI_COLLECTION_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import { resolveLangyCapabilityProgress } from "../langy-capability-progress.rules";
+import { resolveLangyCapabilityProgress } from "../langy-capability-progress.rules.ts";
 
 const headline = (name: string): string | undefined =>
   resolveLangyCapabilityProgress(name)?.headline;

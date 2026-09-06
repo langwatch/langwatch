@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
-import { formatRelativeTime } from "../../../../../../../model/display-formatters";
-import type { ConversationGroup } from "../../../conversation-groups";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
+import { formatRelativeTime } from "../../../../../../../model/display-formatters.ts";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
 
 export const StartedCell: CellDef<ConversationGroup> = {
   id: "started",

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { JsonSafetyError } from "../json";
-import type { ProcessDefinition, ProcessRef } from "../processManager.types";
-import { ProcessManagerService } from "../processManagerService";
-import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
+import { JsonSafetyError } from "../json.ts";
+import type { ProcessDefinition, ProcessRef } from "../processManager.types.ts";
+import { ProcessManagerService } from "../processManagerService.ts";
+import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 import {
   CONVERSATION_ID,
   LIVENESS_MS,
@@ -13,7 +13,7 @@ import {
   pilotRef,
   RETRY_WINDOW_MS,
   T0,
-} from "./helpers/pilotProcess.fixture";
+} from "./helpers/pilotProcess.fixture.ts";
 
 describe("ProcessManagerService", () => {
   let store: InMemoryProcessStore;

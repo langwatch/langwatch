@@ -6,20 +6,20 @@
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useNow } from "../../../../behavior/use-now";
+import { useNow } from "../../../../behavior/use-now.ts";
 import type { ResultGroup } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   FG_MUTED,
   GROUP_HEADER_BG,
   ROW_HOVER_BG,
-} from "../../../../model/agent-testing/shared/design";
-import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge";
-import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text";
-import { passRateColor } from "../../../elements/agent-testing/shared/pass-rate-color";
-import { TargetMark } from "../../../elements/agent-testing/shared/target-mark";
-import type { TargetKind } from "../../../../model/target-kind";
-import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline";
+} from "../../../../model/agent-testing/shared/design.ts";
+import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
+import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
+import { passRateColor } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
+import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
+import type { TargetKind } from "../../../../model/target-kind.ts";
+import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline.tsx";
 import {
   ResultsTableBody,
   ResultsTableCard,
@@ -27,9 +27,9 @@ import {
   ResultsTableHead,
   ResultsTableRow,
   ResultsTableTruncationLine,
-} from "./results-table-chrome";
-import type { ResultRow } from "./result-atoms";
-import { isCodeTargetKey } from "./result-atoms";
+} from "./results-table-chrome.tsx";
+import type { ResultRow } from "./result-atoms.ts";
+import { isCodeTargetKey } from "./result-atoms.ts";
 
 const GROUP_COLUMNS = "20px minmax(0,1fr) minmax(120px,190px) 70px 78px minmax(100px,110px)";
 

@@ -6,9 +6,9 @@ import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type { BaseComponent, Component, Field } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
-import { useAlertOnComponent } from "./use-alert-on-component";
-import { usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useAlertOnComponent } from "./use-alert-on-component.ts";
+import { usePostEvent } from "./use-post-event.tsx";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 

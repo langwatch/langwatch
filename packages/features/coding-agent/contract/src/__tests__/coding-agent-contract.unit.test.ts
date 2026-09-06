@@ -3,7 +3,7 @@ import {
   codingAgentRecentSessionsInputSchema,
   codingAgentSessionSchema,
   codingAgentUsageTotalsSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("coding-agent contract", () => {
   it("keeps GitHub's session-branch facts and the complete aggregate row portable", () => {

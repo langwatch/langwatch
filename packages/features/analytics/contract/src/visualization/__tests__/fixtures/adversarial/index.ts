@@ -11,7 +11,7 @@
  * exercised from a generated specification in `vegaLiteLimits.unit.test.ts`.
  */
 
-import type { LangWatchQLVegaRuleId } from "../../../visualization-types";
+import type { LangWatchQLVegaRuleId } from "../../../visualization-types.ts";
 
 import callerSuppliedDatasets from "./caller-supplied-datasets.json";
 import configMarkUrl from "./config-mark-url.json";

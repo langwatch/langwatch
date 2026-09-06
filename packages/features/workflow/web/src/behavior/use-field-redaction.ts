@@ -1,5 +1,5 @@
-import { api } from "../model/workflow-api-client";
-import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project";
+import { api } from "../model/workflow-api-client.ts";
+import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {
   if (typeof window !== "undefined" && window.location.pathname.includes("/share/")) {

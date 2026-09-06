@@ -20,8 +20,8 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
-import { monitorApi } from "../../behavior/monitor-api";
-import { useMonitorHost } from "../../model/monitor-host";
+import { monitorApi } from "../../behavior/monitor-api.ts";
+import { useMonitorHost } from "../../model/monitor-host.ts";
 
 export function MonitorReplicateDialog({
   open,

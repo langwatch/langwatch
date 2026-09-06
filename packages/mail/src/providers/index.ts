@@ -4,7 +4,7 @@ import {
   EmailProviderConfigurationError,
   type MailerConfiguration,
   type EmailProviderName,
-} from "./types";
+} from "./types.ts";
 
 const logger = createLogger("langwatch:mailer:providers");
 

@@ -7,9 +7,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { type BucketSpend } from "../ports/gateway-budget-spend.port";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
+import { type BucketSpend } from "../ports/gateway-budget-spend.port.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {

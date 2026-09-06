@@ -1,7 +1,7 @@
 import type { GithubPullRequestEvent } from "@langwatch/github-contract";
 import { z } from "zod";
 
-import { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port";
+import { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port.ts";
 
 const githubPullRequestEventSchema = z.object({
   action: z.string(),

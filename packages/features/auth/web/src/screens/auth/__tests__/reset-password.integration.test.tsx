@@ -17,15 +17,15 @@ const { mockResetPassword, searchParamsRef } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/auth-client", () => ({
+vi.mock("../../../behavior/auth-client.tsx", () => ({
   authClient: { resetPassword: mockResetPassword },
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -33,7 +33,7 @@ vi.mock("../../../ui/elements/router-link", () => ({
   ),
 }));
 
-import ResetPassword from "../reset-password.screen";
+import ResetPassword from "../reset-password.screen.tsx";
 
 const setToken = (token: string | null) => {
   searchParamsRef.current = token ? new URLSearchParams(`token=${token}`) : new URLSearchParams("");

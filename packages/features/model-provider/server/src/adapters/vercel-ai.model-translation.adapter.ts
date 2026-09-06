@@ -1,10 +1,10 @@
 import { generateText } from "ai";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { ModelTranslationPort } from "../ports/model-provider.port";
+import { ModelTranslationPort } from "../ports/model-provider.port.ts";
 import {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleOptions,
-} from "../services/model-provider-execution-handle.service";
+} from "../services/model-provider-execution-handle.service.ts";
 
 /**
  * One model call, asked to say the same thing in English.

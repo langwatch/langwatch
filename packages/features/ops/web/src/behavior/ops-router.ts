@@ -19,7 +19,7 @@
  */
 
 import { useMemo } from "react";
-import { useOpsHost } from "../model/ops-host";
+import { useOpsHost } from "../model/ops-host.ts";
 
 export type OpsRouterTarget =
   | string

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getNodeDisplayName } from "../ui/sections/workflow-nodes";
+import { getNodeDisplayName } from "../ui/sections/workflow-nodes.tsx";
 
 describe("getNodeDisplayName", () => {
   it.each([

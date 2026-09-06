@@ -19,8 +19,8 @@
 
 import { Button, Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { isAllowedRedirectScheme } from "../../model/redirect-schemes";
-import { useAuthorizeHost } from "../../model/authorize-host";
+import { isAllowedRedirectScheme } from "../../model/redirect-schemes.ts";
+import { useAuthorizeHost } from "../../model/authorize-host.ts";
 
 export default function McpAuthorize() {
   const host = useAuthorizeHost();

@@ -17,7 +17,7 @@ import {
   buildAnthropicAdminPullConfig,
   buildParserConfig,
   type ComposerState,
-} from "../governance-inventory.screen";
+} from "../governance-inventory.screen.tsx";
 
 function composer(parserConfig: Record<string, string>, pullSchedule = ""): ComposerState {
   return {

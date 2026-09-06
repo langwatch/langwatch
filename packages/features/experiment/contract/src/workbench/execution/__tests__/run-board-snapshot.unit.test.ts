@@ -8,10 +8,10 @@
  * page drew a column with no data in it.
  */
 import { describe, expect, it } from "vitest";
-import type { TargetConfig } from "../../../experiment-workbench";
-import type { BoardResults } from "../build-execution-request";
-import { planBoardCarryOver } from "../build-execution-request";
-import type { CarriedOverCell, ExecutionScope } from "../types";
+import type { TargetConfig } from "../../../experiment-workbench.ts";
+import type { BoardResults } from "../build-execution-request.ts";
+import { planBoardCarryOver } from "../build-execution-request.ts";
+import type { CarriedOverCell, ExecutionScope } from "../types.ts";
 
 const TARGETS = [
   { id: "target-A", type: "prompt" },

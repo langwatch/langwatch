@@ -5,10 +5,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { TopicService } from "@langwatch/topic-contract";
 import { PostgresTopicAdapter, TopicClusteringSchedulePort } from "@langwatch/topic-server";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createTopicTrpcRouter } from "./topic-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createTopicTrpcRouter } from "./topic-trpc.mount.ts";
 
-import type { ComposedTopicFeature } from "./topic.composition.types";
+import type { ComposedTopicFeature } from "./topic.composition.types.ts";
 
 /** Composes the topic tree over this process's own connection. */
 export function composeTopicFeature(options: {

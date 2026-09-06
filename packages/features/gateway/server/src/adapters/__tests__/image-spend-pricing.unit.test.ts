@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
-import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process";
+import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process.ts";
 import {
   ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,
-} from "../model-catalog.gateway-spend-rating.adapter";
+} from "../model-catalog.gateway-spend-rating.adapter.ts";
 
 const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 // Catalog rates under test (model-catalog.overlay.json), per token, from

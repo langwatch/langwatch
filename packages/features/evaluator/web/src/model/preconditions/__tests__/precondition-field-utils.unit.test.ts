@@ -7,7 +7,7 @@ import {
   isDefaultOnlyPrecondition,
   isRuleAllowedForField,
   RULE_LABELS,
-} from "../precondition-field-utils";
+} from "../precondition-field-utils.ts";
 
 describe("preconditionFieldUtils", () => {
   describe("RULE_LABELS", () => {

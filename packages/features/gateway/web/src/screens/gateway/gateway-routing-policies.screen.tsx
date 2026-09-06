@@ -2,21 +2,21 @@ import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
 import {
   RoutingPoliciesTable,
   type RoutingPolicyRow,
   type RoutingPolicyScopeLevel,
-} from "../../features/routing-policies/ui/blocks/routing-policies-table";
-import { useRoutingPolicyMutations } from "../../features/routing-policies/behavior/use-routing-policy-mutations";
+} from "../../features/routing-policies/ui/blocks/routing-policies-table.tsx";
+import { useRoutingPolicyMutations } from "../../features/routing-policies/behavior/use-routing-policy-mutations.ts";
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { Link } from "../../ui/elements/gateway-link";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useGatewayHost } from "../../model/gateway-host";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
+import { Link } from "../../ui/elements/gateway-link.tsx";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useGatewayHost } from "../../model/gateway-host.ts";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
 import { docsUrl } from "@langwatch/config/docs-url";
 
 /**

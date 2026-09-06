@@ -11,10 +11,10 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { GroupRowsButton } from "../batch-evaluation-results-table";
-import { ComparisonTable } from "../comparison-table";
-import type { ComparisonRunData } from "../../batch-evaluation-results.types";
-import { useResultsGrouping } from "../../use-results-grouping";
+import { GroupRowsButton } from "../batch-evaluation-results-table.tsx";
+import { ComparisonTable } from "../comparison-table.tsx";
+import type { ComparisonRunData } from "../../batch-evaluation-results.types.ts";
+import { useResultsGrouping } from "../../use-results-grouping.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

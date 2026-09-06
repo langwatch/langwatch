@@ -1,14 +1,14 @@
 import { Table } from "@chakra-ui/react";
-import { AgentLabel } from "./agent-label";
-import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail";
+import { AgentLabel } from "./agent-label.tsx";
+import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
 import numeral from "numeral";
 import type React from "react";
 
 import { ListTable } from "@langwatch/design-system/list-table";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 
-import { ContributorName } from "./contributor-name";
-import { EmptySection, Section } from "./detail-section";
+import { ContributorName } from "./contributor-name.tsx";
+import { EmptySection, Section } from "./detail-section.tsx";
 
 /** Who worked on the pull request, and what each of them consumed. */
 export const ContributorsSection: React.FC<{

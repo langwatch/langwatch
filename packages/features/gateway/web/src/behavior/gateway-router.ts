@@ -11,7 +11,7 @@
  */
 
 import { useMemo } from "react";
-import { useGatewayHost } from "../model/gateway-host";
+import { useGatewayHost } from "../model/gateway-host.ts";
 
 export type GatewayRouter = {
   query: Readonly<Record<string, string | undefined>>;

@@ -8,12 +8,12 @@ import {
   type LangWatchQLDiagnosticsInput,
   type ResolvedTableReference,
   resolveTableReferences,
-} from "../rules/langwatch-ql-diagnostics-shape.rules";
-import type { LangWatchQLQueryBlock } from "../rules/langwatch-ql-validation-shape.rules";
+} from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import type { LangWatchQLQueryBlock } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-} from "./langwatch-ql-catalog-shapes.service";
+} from "./langwatch-ql-catalog-shapes.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 

@@ -9,9 +9,9 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
-import { WebhookEndpointDrawer } from "../ui/sections/webhook-endpoint-drawer";
-import { WebhookSecretDialog } from "../ui/sections/webhook-secret-dialog";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
+import { WebhookEndpointDrawer } from "../ui/sections/webhook-endpoint-drawer.tsx";
+import { WebhookSecretDialog } from "../ui/sections/webhook-secret-dialog.tsx";
 
 const EVENT_TYPES = [
   {

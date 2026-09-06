@@ -108,13 +108,13 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // Cuts the model picker's dependency chain onto the (unrelated) workflow
 // studio host — this test is about the restore-loading placeholder, not the
 // model picker.
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
   const React = await import("react");
 
   const useHeldHistoryQuery = (enabled: boolean) => {
@@ -227,14 +227,14 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   return { api: withFallback(explicitApi), trpcClient: {} };
 });
 
-import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangySidecar } from "../langy-panel.tsx";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 
 /**
  * The host port, stubbed for a panel that is already open on a remembered

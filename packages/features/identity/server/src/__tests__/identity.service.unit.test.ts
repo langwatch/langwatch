@@ -5,13 +5,13 @@ import {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuardsService } from "../services/identity-guards.service";
-import type { IdentityLedger } from "../rules/identity-ledger.rules";
-import { IdentityService } from "../services/identity.service";
-import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
-import { InMemoryUsers } from "./support/in-memory-users";
-import { InMemoryReservations } from "./support/in-memory-reservations";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import { IdentityService } from "../services/identity.service.ts";
+import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads.ts";
+import { InMemoryUsers } from "./support/in-memory-users.ts";
+import { InMemoryReservations } from "./support/in-memory-reservations.ts";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
 
 /** No legacy holder: this suite is about the service's sequencing, not the
  *  cross-population collision guard. */

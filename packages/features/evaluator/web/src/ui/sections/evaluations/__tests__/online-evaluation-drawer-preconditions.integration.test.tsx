@@ -7,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("@langwatch/workflow-web/surfaces/workflow-api", async () =>
-  (await import("./online-evaluation-drawer.test-helpers")).createApiMock(),
+  (await import("./online-evaluation-drawer.test-helpers.tsx")).createApiMock(),
 );
 vi.mock("@langwatch/ui-host/use-organization-team-project", async () =>
-  (await import("./online-evaluation-drawer.test-helpers")).createOrgMock(),
+  (await import("./online-evaluation-drawer.test-helpers.tsx")).createOrgMock(),
 );
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({
@@ -27,12 +27,12 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => void 0,
 }));
 
-import { DEFAULT_PRECONDITION } from "../../../../model/preconditions/precondition-field-utils";
+import { DEFAULT_PRECONDITION } from "../../../../model/preconditions/precondition-field-utils.ts";
 import {
   clearOnlineEvaluationDrawerState,
   OnlineEvaluationDrawer,
-} from "../online-evaluation-drawer";
-import { resetState, state, Wrapper } from "./online-evaluation-drawer.test-helpers";
+} from "../online-evaluation-drawer.tsx";
+import { resetState, state, Wrapper } from "./online-evaluation-drawer.test-helpers.tsx";
 
 describe("<OnlineEvaluationDrawer /> preconditions", () => {
   beforeEach(() => {

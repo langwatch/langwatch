@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter";
+import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter.ts";
 import type { CodeAgentData, WorkflowAgentData } from "@langwatch/scenario-contract";
 
 // Tracing is not the boundary under test, and the real tracer would need a
@@ -42,8 +42,8 @@ vi.mock("@langwatch/observability/tracing", () => ({
   }),
 }));
 
-import { SerializedCodeAgentAdapter } from "../adapters/serialized-code-agent.adapter";
-import { SerializedWorkflowAgentAdapter } from "../adapters/serialized-workflow-agent.adapter";
+import { SerializedCodeAgentAdapter } from "../adapters/serialized-code-agent.adapter.ts";
+import { SerializedWorkflowAgentAdapter } from "../adapters/serialized-workflow-agent.adapter.ts";
 
 /** Bodies the fake nlpgo received, so the request itself can be asserted on. */
 const receivedBodies: string[] = [];

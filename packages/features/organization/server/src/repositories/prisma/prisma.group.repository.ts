@@ -7,7 +7,7 @@ import {
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository";
+import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository.ts";
 
 const groupSelect = {
   id: true,

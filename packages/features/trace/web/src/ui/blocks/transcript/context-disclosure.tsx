@@ -1,8 +1,8 @@
 import { Box, Button, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuFileText } from "react-icons/lu";
-import { RenderedMarkdown } from "../markdown/rendered-markdown";
-import { asMarkdownBody } from "../../../model/transcript/content-format";
+import { RenderedMarkdown } from "../markdown/rendered-markdown.tsx";
+import { asMarkdownBody } from "../../../model/transcript/content-format.ts";
 
 export function ContextDisclosure({ context }: { context: string }) {
   const [open, setOpen] = useState(false);

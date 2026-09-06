@@ -7,7 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../model-catalog", () => ({
+vi.mock("../model-catalog.ts", () => ({
   llmModels: {
     updatedAt: "2026-05-19",
     modelCount: 0,
@@ -41,7 +41,7 @@ vi.mock("../model-catalog", () => ({
   },
 }));
 
-import { resolveLatestAlias } from "../latest-aliases";
+import { resolveLatestAlias } from "../latest-aliases.ts";
 
 describe("given a catalog with no named-tier generation", () => {
   describe("when resolving the openai aliases", () => {

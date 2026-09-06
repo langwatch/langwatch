@@ -15,14 +15,14 @@ import {
   lwqlCompletionItems,
   lwqlHoverFor,
   lwqlSchemaModel,
-} from "../lwql-schema-model";
+} from "../lwql-schema-model.ts";
 
 import {
   SCHEMA_AVAILABLE_COLUMN_NAMES,
   SCHEMA_COLUMN_NAMES,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
-} from "../../__tests__/lwql-fixtures";
+} from "../../__tests__/lwql-fixtures.ts";
 
 describe("mapping the LangWatchQL schema response", () => {
   describe("given a response with datasets, columns, types, units and documentation", () => {

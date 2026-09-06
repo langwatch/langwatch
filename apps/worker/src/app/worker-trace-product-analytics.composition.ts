@@ -1,8 +1,8 @@
 import type { Logger } from "@langwatch/observability";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { TraceProductAnalyticsPort } from "@langwatch/trace-server";
-import { WorkerPostHogProductAnalyticsAdapter } from "../platform/infrastructure/worker-product-analytics.adapter";
-import type { WorkerProductAnalyticsConfig } from "../platform/config/worker.config";
+import { WorkerPostHogProductAnalyticsAdapter } from "../platform/infrastructure/worker-product-analytics.adapter.ts";
+import type { WorkerProductAnalyticsConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The one product-usage sink this process records through.

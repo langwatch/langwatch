@@ -1,6 +1,6 @@
 import { HandledError, NotFoundError, remediationFor } from "@langwatch/handled-error";
 
-import { remediation } from "./langy.error-remediation";
+import { remediation } from "./langy.error-remediation.ts";
 
 /**
  * Langy conversation domain errors (ADR-046).

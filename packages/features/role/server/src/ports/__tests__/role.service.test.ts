@@ -10,9 +10,9 @@ import {
   type RoleUpdate,
 } from "@langwatch/role-contract";
 import { describe, expect, it, vi } from "vitest";
-import { RolePermissionPort, RoleScopePort } from "../role.port";
-import { RoleRepository } from "../../repositories/role.repository";
-import { RoleService } from "../../services/role.service";
+import { RolePermissionPort, RoleScopePort } from "../role.port.ts";
+import { RoleRepository } from "../../repositories/role.repository.ts";
+import { RoleService } from "../../services/role.service.ts";
 
 const actor: LedgerActor = { type: "system", id: null };
 

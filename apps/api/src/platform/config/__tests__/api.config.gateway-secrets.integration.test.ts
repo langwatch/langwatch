@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveApiConfig } from "../api.config";
+import { resolveApiConfig } from "../api.config.ts";
 
 /**
  * The environment a fresh clone boots with: `.env.example` ships the three

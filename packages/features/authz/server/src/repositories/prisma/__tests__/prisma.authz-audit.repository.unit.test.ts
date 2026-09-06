@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { AuthzAuditRow } from "../../../adapters/eventing.authz-audit.adapter";
+import type { AuthzAuditRow } from "../../../adapters/eventing.authz-audit.adapter.ts";
 import {
   type AuthzAuditDatabase,
   type AuthzAuditInsert,
   PrismaAuthzAuditRepository,
-} from "../prisma.authz-audit.repository";
+} from "../prisma.authz-audit.repository.ts";
 
 const ROW: AuthzAuditRow = {
   id: "authz-evt-event_1",

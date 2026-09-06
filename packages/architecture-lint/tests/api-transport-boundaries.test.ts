@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { lintApiTransportBoundaries } from "../src";
-import type { ArchitectureViolation, ClassifiedPackage } from "../src";
+import { lintApiTransportBoundaries } from "../src/index.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "../src/index.ts";
 
 let root = "";
 

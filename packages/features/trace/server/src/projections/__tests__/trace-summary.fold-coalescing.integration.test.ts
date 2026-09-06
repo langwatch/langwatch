@@ -7,16 +7,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   TraceSummaryProjectionPort,
   type TraceSummaryProjectionEntry,
-} from "../../ports/trace-summary-projection.port";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceSummaryStore } from "../../stores/eventing/eventing.trace-summary.store";
-import type { TraceSummaryData } from "../trace-summary.projection";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
+} from "../../ports/trace-summary-projection.port.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceSummaryStore } from "../../stores/eventing/eventing.trace-summary.store.ts";
+import type { TraceSummaryData } from "../trace-summary.projection.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
   msToUnixNano,
-} from "./fixtures/trace-summary-test.fixtures";
+} from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * A backed-up group is folded as ONE batch: the executor loads the state once,

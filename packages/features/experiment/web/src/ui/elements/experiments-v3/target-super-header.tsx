@@ -3,8 +3,8 @@ import { Plus } from "lucide-react";
 import React from "react";
 
 import { LLMIcon } from "@langwatch/design-system/icons";
-import { PulsingDot } from "./pulsing-dot";
-import { SuperHeader } from "./super-header";
+import { PulsingDot } from "./pulsing-dot.tsx";
+import { SuperHeader } from "./super-header.tsx";
 
 type TargetSuperHeaderProps = {
   colSpan: number;

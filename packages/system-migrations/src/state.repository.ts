@@ -1,4 +1,4 @@
-import type { TenantMigrationRecord } from "./types";
+import type { TenantMigrationRecord } from "./types.ts";
 
 /**
  * Stored migration state, one record per (migration, tenant). The app

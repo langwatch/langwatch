@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { LangyApp } from "@langwatch/langy-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createLangyEgressTrpcRouter, createLangyTrpcRouter } from "./langy-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createLangyEgressTrpcRouter, createLangyTrpcRouter } from "./langy-trpc.mount.ts";
 
 /** The Langy application and the two routers built over it. */
 export type ComposedLangyFeature = Readonly<{

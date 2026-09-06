@@ -15,7 +15,7 @@ import {
   docsBaseUrl,
   docsUrl,
   resolveDocsBaseUrl,
-} from "../docs-url";
+} from "../docs-url.ts";
 
 /** The module's own default, so one case cannot leak into the next. */
 afterEach(() => {

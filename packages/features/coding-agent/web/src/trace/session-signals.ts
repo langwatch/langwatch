@@ -1,4 +1,4 @@
-import type { CodingAgentSessionDisplay } from "./session-display";
+import type { CodingAgentSessionDisplay } from "./session-display.ts";
 
 /**
  * What's worth NOTICING about a coding-agent session.

@@ -4,13 +4,13 @@ import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Entry, Field } from "@langwatch/workflow-contract";
 import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports";
+} from "./workflow-properties.ports.ts";
 
 /**
  * Drawer for the workflow's entry point.

@@ -12,20 +12,20 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
-import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository";
-import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository";
-import { ClickHouseStalledSimulationRunRepository } from "../repositories/clickhouse/clickhouse.stalled-simulation-run.repository";
-import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository";
-import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection";
+import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts";
+import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository.ts";
+import { ClickHouseStalledSimulationRunRepository } from "../repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts";
+import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
-} from "../projections/simulation-run-state.projection";
+} from "../projections/simulation-run-state.projection.ts";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type StalledHistoricalRun,
-} from "../repositories/stalled-simulation-run.repository";
-import { SimulationRunMetricsAppendStore } from "../stores/eventing/eventing.simulation-run-metrics.store";
+} from "../repositories/stalled-simulation-run.repository.ts";
+import { SimulationRunMetricsAppendStore } from "../stores/eventing/eventing.simulation-run-metrics.store.ts";
 
 const logger = createLogger("scenario:simulation-run-state-fold-store");
 

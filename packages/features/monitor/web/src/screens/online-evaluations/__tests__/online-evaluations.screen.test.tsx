@@ -21,8 +21,8 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeMonitorHost, renderWithMonitorHost } from "../../../testing";
-import OnlineEvaluationsScreen from "../online-evaluations.screen";
+import { FakeMonitorHost, renderWithMonitorHost } from "../../../testing.tsx";
+import OnlineEvaluationsScreen from "../online-evaluations.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -40,7 +40,7 @@ const calls = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
-vi.mock("../../../behavior/monitor-api", () => {
+vi.mock("../../../behavior/monitor-api.ts", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: (options?: { onSuccess?: () => void; onError?: (error: unknown) => void }) => ({
       isPending: false,

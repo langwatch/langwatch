@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities";
-import { applyHandledErrorToForm, describeError, showErrorToast, toError } from "../errors";
-import { setUiFeedbackHost } from "../toaster";
+import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
+import { applyHandledErrorToForm, describeError, showErrorToast, toError } from "../errors.ts";
+import { setUiFeedbackHost } from "../toaster.ts";
 
 function recordingHost() {
   const failed: UiFailureNotice[] = [];

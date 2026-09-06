@@ -5,14 +5,14 @@
  */
 
 import { useCallback, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { readScenarioTarget } from "../../use-scenario-target";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { readScenarioTarget } from "../../use-scenario-target.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../../../../behavior/scenario-api";
-import { useRunStartedHandler } from "../cases/use-case-run-actions";
-import type { RunDialogSubject } from "../run/run-dialog";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import { storedPlanSubject } from "../run/plan-scope";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";
+import type { RunDialogSubject } from "../run/run-dialog.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { storedPlanSubject } from "../run/plan-scope.ts";
 
 export type RunPlanRunDialog = {
   subject: RunDialogSubject | null;

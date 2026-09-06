@@ -13,17 +13,17 @@ import { describe, expect, it } from "vitest";
 import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,
-} from "../../ports/governance-webhook.port";
+} from "../../ports/governance-webhook.port.ts";
 import type {
   GatewayBudgetCrossingCandidate,
   GatewayBudgetScope,
   GatewayBudgetWindow,
-} from "../../ports/gateway-debit.port";
+} from "../../ports/gateway-debit.port.ts";
 import {
   GovernanceSignalPort,
   type GovernanceResolvedBudgetCrossing,
-} from "../../ports/governance-signal.port";
-import { GovernanceSignalService } from "../governance-signal.service";
+} from "../../ports/governance-signal.port.ts";
+import { GovernanceSignalService } from "../governance-signal.service.ts";
 
 function candidate(budgetId: string, bucketScopeId: string): GatewayBudgetCrossingCandidate {
   return { tenantId: "proj_1", budgetId, bucketScopeId, endUserId: null };

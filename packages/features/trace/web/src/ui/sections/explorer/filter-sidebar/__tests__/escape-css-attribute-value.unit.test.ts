@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCssAttributeValue as escape } from "../hover-highlight-style";
+import { escapeCssAttributeValue as escape } from "../hover-highlight-style.tsx";
 
 /**
  * The escape function is the only thing standing between a malformed search query (or

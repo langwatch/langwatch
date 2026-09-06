@@ -2,19 +2,19 @@ import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/re
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value";
-import { useFacetSearch } from "../hooks/use-facet-search";
-import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "../../../../behavior/facet-constants";
-import { useFacetLensStore } from "../../../../behavior/facet-lens.store";
-import { dedupeByValue } from "../../../../model/dedupe-by-value";
-import { FacetRow } from "./facet-row";
-import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row";
-import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";
+import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value.ts";
+import { useFacetSearch } from "../hooks/use-facet-search.ts";
+import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "../../../../behavior/facet-constants.ts";
+import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
+import { dedupeByValue } from "../../../../model/dedupe-by-value.ts";
+import { FacetRow } from "./facet-row.tsx";
+import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row.tsx";
+import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import type {
   FacetItem,
   FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types";
-import { countPresentValues } from "./utils";
+} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { countPresentValues } from "./utils.ts";
 
 interface FacetSectionProps {
   title: string;

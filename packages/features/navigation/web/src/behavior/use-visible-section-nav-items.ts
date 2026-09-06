@@ -1,5 +1,5 @@
-import { useNavigationHost } from "../model/navigation-host";
-import type { SectionNavItemData } from "../model/section-nav-items";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import type { SectionNavItemData } from "../model/section-nav-items.ts";
 
 /**
  * Filters a section nav list down to the items whose `featureFlag` is

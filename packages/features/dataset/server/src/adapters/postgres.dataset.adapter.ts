@@ -1,36 +1,36 @@
-import { DatasetNormalizeAdapter } from "./dataset-normalize.adapter";
+import { DatasetNormalizeAdapter } from "./dataset-normalize.adapter.ts";
 import type {
   DatasetNormalizePayload,
   DatasetService as DatasetServiceContract,
 } from "@langwatch/dataset-contract";
-import { DatasetService } from "../services/dataset.service";
-import { DatasetRecordRepository } from "../repositories/dataset-record.repository";
-import { DatasetRepository } from "../repositories/dataset.repository";
+import { DatasetService } from "../services/dataset.service.ts";
+import { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
+import { DatasetRepository } from "../repositories/dataset.repository.ts";
 import {
   PrismaDatasetRecordRepository,
   type DatasetRecordDatabase,
-} from "../repositories/prisma/prisma.dataset-record.repository";
+} from "../repositories/prisma/prisma.dataset-record.repository.ts";
 import {
   PrismaDatasetRepository,
   type DatasetDatabase,
-} from "../repositories/prisma/prisma.dataset.repository";
+} from "../repositories/prisma/prisma.dataset.repository.ts";
 import type {
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
-} from "../ports/dataset.port";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { DatasetUploadAdapter } from "./dataset-upload.adapter";
+} from "../ports/dataset.port.ts";
+import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import { DatasetUploadAdapter } from "./dataset-upload.adapter.ts";
 import {
   PrismaDatasetContentRepository,
   type DatasetContentDatabase,
-} from "../repositories/prisma/prisma.dataset-content.repository";
+} from "../repositories/prisma/prisma.dataset-content.repository.ts";
 import {
   DatasetRecordContentRepository,
   type DatasetRecordContentDatabase,
-} from "../repositories/prisma/dataset-record-content.repository";
-import { DatasetContentAdapter } from "./dataset-content.adapter";
-import { DatasetNormalizationService } from "../services/dataset-normalization.service";
+} from "../repositories/prisma/dataset-record-content.repository.ts";
+import { DatasetContentAdapter } from "./dataset-content.adapter.ts";
+import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 
 export type PostgresDatasetAdapterOptions = {
   database: DatasetDatabase &

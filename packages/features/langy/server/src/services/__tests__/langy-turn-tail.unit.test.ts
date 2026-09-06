@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import type { LangyStreamRead } from "../../ports/langy-token-buffer.port";
-import type { TurnHealth } from "../../rules/langy-turn-settlement.rules";
-import { WEDGED_TURN_PATIENCE_MS } from "../../rules/langy-turn-settlement.rules";
-import { LangyTurnTailService, type TurnTailBuffer } from "../langy-turn-tail.service";
+import type { LangyStreamRead } from "../../ports/langy-token-buffer.port.ts";
+import type { TurnHealth } from "../../rules/langy-turn-settlement.rules.ts";
+import { WEDGED_TURN_PATIENCE_MS } from "../../rules/langy-turn-settlement.rules.ts";
+import { LangyTurnTailService, type TurnTailBuffer } from "../langy-turn-tail.service.ts";
 
 const tailService = LangyTurnTailService.create();
 

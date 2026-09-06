@@ -6,7 +6,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { buildAgentTestingPush } from "../../../../behavior/agent-testing/use-agent-testing-routing";
+import { buildAgentTestingPush } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 
 export type OpenPlanRunParams = {
   /** The address segment of the plan, which for a test suite is its slug. */

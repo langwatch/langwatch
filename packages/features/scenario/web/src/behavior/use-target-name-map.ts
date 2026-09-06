@@ -4,9 +4,9 @@
 
 import { useMemo } from "react";
 
-import type { TargetKind } from "../model/target-kind";
-import { api } from "./scenario-api";
-import { useOrganizationTeamProject } from "./use-organization-team-project";
+import type { TargetKind } from "../model/target-kind.ts";
+import { api } from "./scenario-api.ts";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * What a target reference id stands for: the name it reads as, the kind of

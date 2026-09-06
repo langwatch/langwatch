@@ -9,7 +9,7 @@ import type {
 import type {
   ProcessNameCounts,
   ProcessOpsRepository,
-} from "../repositories/process-ops.repository";
+} from "../repositories/process-ops.repository.ts";
 
 /** For app presets that run without Postgres. */
 export class NullProcessOpsAdapter implements ProcessOpsRepository {

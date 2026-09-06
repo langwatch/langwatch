@@ -2,8 +2,8 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
+import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {

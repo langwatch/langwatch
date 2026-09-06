@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
 
 /**
  * Comparing two configs reads no row, so the repository is composed over a persistence

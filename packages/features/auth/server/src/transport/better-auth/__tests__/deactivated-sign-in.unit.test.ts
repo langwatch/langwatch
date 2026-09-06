@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import { beforeSessionCreate } from "../better-auth-hooks.api";
-import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
+import { beforeSessionCreate } from "../better-auth-hooks.api.ts";
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),

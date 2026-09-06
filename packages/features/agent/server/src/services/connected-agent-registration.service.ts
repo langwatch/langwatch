@@ -20,11 +20,11 @@ import {
 } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api";
-import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service";
-import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port";
-import type { ResolvedConnectCredential } from "../ports/connect-credential.port";
-import type { SessionInfo } from "./connected-agent-session.service";
+import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api.ts";
+import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
+import type { ResolvedConnectCredential } from "../ports/connect-credential.port.ts";
+import type { SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:registration");
 

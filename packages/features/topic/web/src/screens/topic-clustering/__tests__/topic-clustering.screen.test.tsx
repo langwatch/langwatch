@@ -28,7 +28,7 @@ const { state, calls } = vi.hoisted(() => ({
   calls: { trigger: vi.fn(), invalidate: vi.fn() },
 }));
 
-vi.mock("../../../behavior/topic-api", () => ({
+vi.mock("../../../behavior/topic-api.ts", () => ({
   topicApi: {
     useUtils: () => ({
       topics: {
@@ -58,8 +58,8 @@ vi.mock("../../../behavior/topic-api", () => ({
   },
 }));
 
-import { FakeTopicHost, renderWithTopicHost } from "../../../testing";
-import TopicClusteringScreen from "../topic-clustering.screen";
+import { FakeTopicHost, renderWithTopicHost } from "../../../testing.tsx";
+import TopicClusteringScreen from "../topic-clustering.screen.tsx";
 
 const settledStatus = (overrides: Record<string, unknown>) => ({
   isRunInFlight: false,

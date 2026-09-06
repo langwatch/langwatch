@@ -1,7 +1,7 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import { EmailDeliveryAdapter, type EmailDeliveryPort } from "@langwatch/notification-server";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { ApiConfig } from "../platform/config/api.config";
+import type { ApiConfig } from "../platform/config/api.config.ts";
 
 /**
  * The one outbound mail graph an interactive process holds, and the host its

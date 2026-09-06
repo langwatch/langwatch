@@ -5,7 +5,7 @@ import {
   createTopicClusteringRunHandler,
   type TopicClusteringDispatchDeps,
   type TopicClusteringRunIntent,
-} from "../topic-clustering.intent";
+} from "../topic-clustering.intent.ts";
 
 function makePayload(overrides: Partial<TopicClusteringRunIntent> = {}): TopicClusteringRunIntent {
   return { runId: "20260717", page: 1, searchAfter: null, ...overrides };

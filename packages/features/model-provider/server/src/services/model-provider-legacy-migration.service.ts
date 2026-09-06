@@ -3,7 +3,7 @@
  */
 
 import { isLegacyCustomModels, type CustomModelEntry } from "@langwatch/model-provider-contract";
-import type { ModelProviderCredentialCipherPort } from "../ports/model-provider.port";
+import type { ModelProviderCredentialCipherPort } from "../ports/model-provider.port.ts";
 
 // ============================================================================
 // Types

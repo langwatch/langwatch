@@ -6,11 +6,11 @@ import type { SsoGate } from "@langwatch/enterprise-sso-contract";
 export {
   EnterpriseGatewayTrpcComposition,
   type EnterpriseGatewayTrpcContext,
-} from "./trpc/enterprise-gateway-trpc.composition";
+} from "./trpc/enterprise-gateway-trpc.composition.ts";
 export {
   EnterpriseGovernanceTrpcComposition,
   type EnterpriseGovernanceTrpcContext,
-} from "./trpc/enterprise-governance-trpc.composition";
+} from "./trpc/enterprise-governance-trpc.composition.ts";
 export {
   BACK_OFFICE_NO_PERMISSION,
   BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
@@ -18,18 +18,18 @@ export {
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
   type EnterpriseTrpcContext,
-} from "./trpc/enterprise-trpc.composition";
+} from "./trpc/enterprise-trpc.composition.ts";
 export {
   AppGatewayDebitAdapter,
   AppGatewayGovernancePort,
   GatewayGovernancePort,
   type GovernanceBudgetResolutionInput,
-} from "./governance/gateway-debit.adapter";
+} from "./governance/gateway-debit.adapter.ts";
 export {
   AppGovernanceSignalsService,
   GovernanceSignalDeliveryPort,
   GovernanceSignalStoragePort,
-} from "./governance/governance-signals.adapter";
+} from "./governance/governance-signals.adapter.ts";
 /**
  * How a personal key is minted: the Governance issuer port over the gateway's own virtual-key
  * writes.
@@ -37,7 +37,7 @@ export {
 export {
   AppPersonalVirtualKeyIssuerPort,
   type GovernanceVirtualKeyPort,
-} from "./governance/governance-products.adapter";
+} from "./governance/governance-products.adapter.ts";
 /**
  * The governance REST family, reached through this composition rather than
  * directly: the API application may depend on the Enterprise API composition

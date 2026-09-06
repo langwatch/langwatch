@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGraphAlertTemplateContext } from "../template-context";
+import { buildGraphAlertTemplateContext } from "../template-context.ts";
 
 const NOW = new Date("2026-06-21T10:00:00.000Z");
 

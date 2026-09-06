@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
-import { computeLineDiff, type DiffLine, diffStat } from "./terminal-line-diff";
-import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
+import { computeLineDiff, type DiffLine, diffStat } from "./terminal-line-diff.ts";
+import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 interface TerminalDiffProps {
   /** File contents before the edit. Empty for a freshly written file. */

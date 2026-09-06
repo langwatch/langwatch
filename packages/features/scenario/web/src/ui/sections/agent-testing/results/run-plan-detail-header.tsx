@@ -9,12 +9,12 @@ import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-
 import { RunMetricsSummary } from "@langwatch/suite-web/surfaces/run-cards";
 import { type RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
 import { Menu } from "@langwatch/design-system/menu";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import type { AgentTestingViewMode } from "../use-agent-testing-store";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import { ViewModeToggle } from "./view-mode-toggle";
-import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { ViewModeToggle } from "./view-mode-toggle.tsx";
+import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 
 /**
  * What the run control reads.

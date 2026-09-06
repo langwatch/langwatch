@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NOT_TARGETED, toRuleContextId, type FeatureFlagTargetId } from "../feature-flag-targeting";
-import { evaluateRules, type FeatureFlagRules } from "../feature-flag-rules";
+import { NOT_TARGETED, toRuleContextId, type FeatureFlagTargetId } from "../feature-flag-targeting.ts";
+import { evaluateRules, type FeatureFlagRules } from "../feature-flag-rules.ts";
 
 /** Mirrors the shape every `use-feature-flag.ts` hook requires: both scopes
  * stated, so a forgotten field is a compile error rather than a silent

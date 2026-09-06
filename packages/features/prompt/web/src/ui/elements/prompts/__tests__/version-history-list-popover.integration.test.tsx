@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 /**
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-version-history-author.feature
@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VersionHistoryListPopover } from "../version-history-list-popover";
+import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),

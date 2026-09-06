@@ -1,10 +1,10 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { usePublicEnv } from "../../../behavior/use-public-env";
-import { useOnboardingHost } from "../../../model/onboarding-host";
-import { useActiveProject } from "../active-project-context";
-import { CLOUD_ENDPOINT } from "../../../model/shared/build-mcp-config";
-import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix";
+import { usePublicEnv } from "../../../behavior/use-public-env.ts";
+import { useOnboardingHost } from "../../../model/onboarding-host.ts";
+import { useActiveProject } from "../active-project-context.tsx";
+import { CLOUD_ENDPOINT } from "../../../model/shared/build-mcp-config.ts";
+import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
   const host = useOnboardingHost();

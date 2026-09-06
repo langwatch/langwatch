@@ -26,7 +26,7 @@
  * that changes.
  */
 
-import { PersonalTracesEmptyState } from "../blocks/personal-traces-empty-state";
+import { PersonalTracesEmptyState } from "../blocks/personal-traces-empty-state.tsx";
 
 export function PersonalRecentTracesTable({
   projectSlug,

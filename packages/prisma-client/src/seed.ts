@@ -1,5 +1,5 @@
-import type { PrismaConnection } from "./connection";
-import type { PrismaClient } from "./generated/client";
+import type { PrismaConnection } from "./connection.ts";
+import type { PrismaClient } from "./generated/client.ts";
 
 /** Product-owned seed behavior; this package owns only its execution mechanics. */
 export abstract class PrismaSeed {

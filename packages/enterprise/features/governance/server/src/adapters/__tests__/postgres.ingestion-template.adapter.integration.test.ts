@@ -18,7 +18,7 @@
  */
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import { PostgresIngestionTemplateAdapter } from "../postgres.ingestion-template.adapter";
+import { PostgresIngestionTemplateAdapter } from "../postgres.ingestion-template.adapter.ts";
 import {
   PlatformTemplateImmutableError,
   TemplateNotFoundError,

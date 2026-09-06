@@ -10,13 +10,13 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { JsonValue } from "../../../../process-manager/json";
-import type { ProcessRef } from "../../../../process-manager/processManager.types";
-import { PrismaProcessStore } from "../prisma-process-store";
+import type { JsonValue } from "../../../../process-manager/json.ts";
+import type { ProcessRef } from "../../../../process-manager/processManager.types.ts";
+import { PrismaProcessStore } from "../prisma-process-store.ts";
 import type {
   NewOutboxMessage,
   ProcessCommit,
-} from "../../../../process-manager/stores/processStore.types";
+} from "../../../../process-manager/stores/processStore.types.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

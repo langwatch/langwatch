@@ -2,7 +2,7 @@ import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useRef } from "react";
 
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import type { MakeDefaultWritePlan } from "../../model/logic/langy-make-default-offer";
+import type { MakeDefaultWritePlan } from "../../model/logic/langy-make-default-offer.ts";
 
 /**
  * The "make it the default?" ask that follows a model pick in the composer, for users

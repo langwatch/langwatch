@@ -1,14 +1,14 @@
-import type { SpanTreeNode, SpanTreePage } from "./trace";
+import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceReadInput,
   EvaluationTraceSpan,
-} from "./trace-evaluation.contract";
+} from "./trace-evaluation.contract.ts";
 import type {
   TraceQueryClassification,
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
-} from "./trace-query.contract";
+} from "./trace-query.contract.ts";
 import type {
   SpanTreeDeltaInput,
   SpanTreeInput,
@@ -16,15 +16,15 @@ import type {
   TraceByIdInput,
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
-} from "./trace.queries";
-import type { DerivedTraceEvent } from "./trace-derived-event";
-import type { TraceSummaryData } from "./trace-projection";
-import type { TraceRecord } from "./trace-record";
+} from "./trace.queries.ts";
+import type { DerivedTraceEvent } from "./trace-derived-event.ts";
+import type { TraceSummaryData } from "./trace-projection.ts";
+import type { TraceRecord } from "./trace-record.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
   TraceFullThreadReadInput,
-} from "./trace-full-read.contract";
+} from "./trace-full-read.contract.ts";
 
 /** Canonical trace reads closed under payload-parity review. */
 export abstract class TraceService {

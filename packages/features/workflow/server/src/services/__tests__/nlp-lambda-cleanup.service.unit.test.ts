@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../../ports/nlp-lambda-fleet.port";
-import { NlpLambdaCleanupService } from "../nlp-lambda-cleanup.service";
+import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../../ports/nlp-lambda-fleet.port.ts";
+import { NlpLambdaCleanupService } from "../nlp-lambda-cleanup.service.ts";
 
 const NOW = new Date("2026-09-05T00:00:00.000Z");
 const daysAgo = (days: number) => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);

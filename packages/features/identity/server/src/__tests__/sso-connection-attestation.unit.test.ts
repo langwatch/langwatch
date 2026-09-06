@@ -7,13 +7,13 @@ import {
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
-} from "./support/in-memory-connections";
+} from "./support/in-memory-connections.ts";
 
 /**
  * Operator attestation (D04's D05 amendment): a LangWatch operator states out of band that a

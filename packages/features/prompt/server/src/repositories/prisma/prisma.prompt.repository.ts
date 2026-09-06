@@ -21,13 +21,13 @@ import {
   parseLlmConfigVersion,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
-import type { CreateLlmConfigVersionParams } from "../prompt-version.repository";
-import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository";
+import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
+import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
 import {
   LlmConfigRepository,
   type CreateLlmConfigParams,
   type LlmConfigWithLatestVersion,
-} from "../prompt.repository";
+} from "../prompt.repository.ts";
 import { sortKeysDeep } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");

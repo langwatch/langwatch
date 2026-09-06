@@ -7,10 +7,10 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
-import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount";
-import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
+import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount.ts";
+import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 const PROJECT_KEY = "sk-lw-alpha-cicd";
 const SLUG = "my-evaluation";

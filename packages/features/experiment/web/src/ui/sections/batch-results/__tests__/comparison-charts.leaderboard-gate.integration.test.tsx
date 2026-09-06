@@ -11,11 +11,11 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ComparisonCharts } from "../comparison-charts";
+import { ComparisonCharts } from "../comparison-charts.tsx";
 import type {
   BatchComparisonColumn,
   ComparisonRunData,
-} from "../../batch-evaluation-results.types";
+} from "../../batch-evaluation-results.types.ts";
 
 const EVALUATOR_ID = "comparison-1";
 

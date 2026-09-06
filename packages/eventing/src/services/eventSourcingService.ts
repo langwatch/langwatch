@@ -2,19 +2,19 @@ import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { AggregateType } from "../domain/aggregateType";
-import { createTenantId } from "../domain/tenantId";
-import type { Event, Projection } from "../domain/types";
-import type { ProjectionRegistry } from "../projections/projectionRegistry";
-import { ProjectionRouter } from "../projections/projectionRouter";
-import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues";
-import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types";
-import { EventUtils } from "../utils/event.utils";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import { createTenantId } from "../domain/tenantId.ts";
+import type { Event, Projection } from "../domain/types.ts";
+import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
+import { ProjectionRouter } from "../projections/projectionRouter.ts";
+import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues/index.ts";
+import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types.ts";
+import { EventUtils } from "../utils/event.utils.ts";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-} from "./eventSourcingService.types";
-import { QueueManager } from "./queues/queueManager";
+} from "./eventSourcingService.types.ts";
+import { QueueManager } from "./queues/queueManager.ts";
 
 /**
  * Main service that orchestrates event sourcing.

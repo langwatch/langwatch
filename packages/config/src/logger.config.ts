@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, environmentBooleanSchema, RuntimeConfig } from "./runtime-config";
+import { Config, environmentBooleanSchema, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * The logging knobs every process folds through

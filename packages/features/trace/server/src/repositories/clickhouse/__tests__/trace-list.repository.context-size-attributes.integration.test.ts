@@ -9,11 +9,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceListClickHouseRepository } from "../trace-list.repository";
+import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 const integration = describe.skipIf(!clickHouseConfigured);

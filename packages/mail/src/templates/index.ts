@@ -1,7 +1,7 @@
-import { automationLimitEmailTemplate } from "./automation-limit-email";
-import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email";
-import { inviteEmailTemplate } from "./invite-email";
-import { inviteReRequestEmailTemplate } from "./invite-re-request-email";
+import { automationLimitEmailTemplate } from "./automation-limit-email.tsx";
+import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email.tsx";
+import { inviteEmailTemplate } from "./invite-email.tsx";
+import { inviteReRequestEmailTemplate } from "./invite-re-request-email.tsx";
 import {
   domainAutoJoinedTemplate,
   joinRequestApprovedTemplate,
@@ -9,13 +9,13 @@ import {
   joinRequestExpiredTemplate,
   joinRequestRejectedTemplate,
   joinRequestReminderTemplate,
-} from "./join-request-emails";
-import { licenseEmailTemplate } from "./license-email";
-import type { MailTemplate } from "./registry";
-import { resetPasswordEmailTemplate } from "./reset-password-email";
-import { signUpVerificationEmailTemplate } from "./sign-up-verification-email";
-import { triggerDigestEmailTemplate } from "./trigger-digest-email";
-import { usageLimitEmailTemplate } from "./usage-limit-email";
+} from "./join-request-emails.tsx";
+import { licenseEmailTemplate } from "./license-email.tsx";
+import type { MailTemplate } from "./registry.ts";
+import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
+import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
+import { triggerDigestEmailTemplate } from "./trigger-digest-email.tsx";
+import { usageLimitEmailTemplate } from "./usage-limit-email.tsx";
 
 /**
  * Every transactional message LangWatch sends, in one list.
@@ -52,5 +52,5 @@ export const mailTemplates: readonly MailTemplate[] = [
   triggerDigestEmailTemplate,
 ];
 
-export { defineTemplate, propsFormSchema, renderMailTemplate } from "./registry";
-export type { MailFixture, MailTemplate } from "./registry";
+export { defineTemplate, propsFormSchema, renderMailTemplate } from "./registry.ts";
+export type { MailFixture, MailTemplate } from "./registry.ts";

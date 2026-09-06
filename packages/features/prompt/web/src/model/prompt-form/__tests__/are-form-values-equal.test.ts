@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areFormValuesEqual } from "../are-form-values-equal";
+import { areFormValuesEqual } from "../are-form-values-equal.ts";
 
 describe("areFormValuesEqual", () => {
   describe("when either value is falsy", () => {

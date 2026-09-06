@@ -11,7 +11,7 @@ import {
   type AuthzBindingScopeRow,
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
-} from "../authz-binding.repository";
+} from "../authz-binding.repository.ts";
 
 type Delegate = {
   count(args: unknown): Promise<number>;

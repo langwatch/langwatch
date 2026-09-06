@@ -22,8 +22,8 @@ import type { ComponentType } from "react";
 export type ModelProviderScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const modelProviderScreens = {
-  modelProviders: () => import("./model-providers.screen"),
-  modelCosts: () => import("./model-costs.screen"),
+  modelProviders: () => import("./model-providers.screen.tsx"),
+  modelCosts: () => import("./model-costs.screen.tsx"),
 } as const satisfies Record<string, ModelProviderScreenLoader>;
 
 export type ModelProviderScreenName = keyof typeof modelProviderScreens;
@@ -31,9 +31,9 @@ export type ModelProviderScreenName = keyof typeof modelProviderScreens;
 export {
   MODEL_PROVIDER_MANAGE_PERMISSION,
   MODEL_PROVIDER_SCOPE_QUERY_KEY,
-} from "./model-providers.screen";
-export { MODEL_COST_MANAGE_PERMISSION } from "./model-costs.screen";
-export { modelProviderApi } from "../../behavior/model-provider-api";
+} from "./model-providers.screen.tsx";
+export { MODEL_COST_MANAGE_PERMISSION } from "./model-costs.screen.tsx";
+export { modelProviderApi } from "../../behavior/model-provider-api.ts";
 export {
   ModelProviderHostPort,
   ModelProviderHostProvider,
@@ -43,4 +43,4 @@ export {
   type ModelProviderPlatformDrawer,
   type ModelProviderRouteReading,
   type ModelProviderSuccessNotice,
-} from "../../model/model-provider-host";
+} from "../../model/model-provider-host.ts";

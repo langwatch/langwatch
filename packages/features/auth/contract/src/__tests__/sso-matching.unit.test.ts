@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractEmailDomain, isSsoProviderMatch } from "../sso-matching";
+import { extractEmailDomain, isSsoProviderMatch } from "../sso-matching.ts";
 
 describe("isSsoProviderMatch", () => {
   describe("when the org has no ssoProvider", () => {

@@ -5,8 +5,8 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 
-import { api } from "../../behavior/langy-api";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import { api } from "../../behavior/langy-api.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 export function LangyCodeAccessPreference() {
   const { project } = useOrganizationTeamProject();

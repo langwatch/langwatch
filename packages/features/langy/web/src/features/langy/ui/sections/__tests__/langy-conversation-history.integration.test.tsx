@@ -126,7 +126,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 // Cuts the model picker's dependency chain onto the (unrelated) workflow
 // studio host — this suite is about conversation history, not the picker.
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
@@ -160,14 +160,14 @@ vi.mock("@ai-sdk/react", () => ({
 }));
 
 // The whole Langy tRPC surface, served from `scenarioRef`.
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const React = await import("react");
   // Peripheral menus in the panel header (GitHub connect, etc.) each pull
   // their own tRPC queries these tests do not care about; the shared harness
   // answers every one of them inert. Only the langy surface and the model
   // picker below are explicit.
   const { createTrpcUtils, modelProviderRouter, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
 
   // A minimal, `enabled`-honouring stand-in for a tRPC query: one async resolution per
   // arm / refetch / invalidate, loading → success | error, no retries.
@@ -506,14 +506,14 @@ vi.mock("../../../../../behavior/langy-api", async () => {
 });
 
 import { toaster } from "@langwatch/design-system/toaster";
-import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangySidecar } from "../langy-panel.tsx";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

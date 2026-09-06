@@ -1,5 +1,5 @@
 import { DispatchError } from "@langwatch/eventing";
-import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port";
+import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 
 /**
  * Per-scope hourly cap on real webhook dispatches — a backstop against an

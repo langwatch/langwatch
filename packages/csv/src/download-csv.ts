@@ -1,6 +1,6 @@
 import Parse from "papaparse";
 
-import { neutralizeFormula, neutralizeRows } from "./formula-guard";
+import { neutralizeFormula, neutralizeRows } from "./formula-guard.ts";
 
 /**
  * Turns a header row plus its data rows into a CSV file and hands it to the browser as a

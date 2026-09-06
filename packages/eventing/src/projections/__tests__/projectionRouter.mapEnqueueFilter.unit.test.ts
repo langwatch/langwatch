@@ -6,18 +6,18 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Event } from "../../domain/types";
-import type { EventSourcedQueueProcessor } from "../../queues";
+import type { Event } from "../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
 import {
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager";
-import type { AppendStore, MapProjectionDefinition } from "../mapProjection.types";
-import { ProjectionRouter } from "../projectionRouter";
+} from "../../services/__tests__/testHelpers.ts";
+import { type JobRegistryEntry, QueueManager } from "../../services/queues/queueManager.ts";
+import type { AppendStore, MapProjectionDefinition } from "../mapProjection.types.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
 const aggregateType = createTestAggregateType();
 const tenantId = createTestTenantId();

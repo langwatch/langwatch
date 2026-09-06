@@ -16,17 +16,17 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,
 } from "@langwatch/data-retention-contract";
-import { BestEffortService } from "./best-effort.service";
-import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service";
-import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service";
+import { BestEffortService } from "./best-effort.service.ts";
+import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service.ts";
+import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port";
-import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port";
+import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port.ts";
 import type {
   BillingWebhookSubscriptionPort,
   SubscriptionWithOrg,
-} from "../ports/billing-webhook-subscription.port";
-import type { BillingSubscriptionRecord } from "../ports/subscription.port";
+} from "../ports/billing-webhook-subscription.port.ts";
+import type { BillingSubscriptionRecord } from "../ports/subscription.port.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 

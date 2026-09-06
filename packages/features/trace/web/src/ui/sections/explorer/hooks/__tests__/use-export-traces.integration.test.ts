@@ -6,9 +6,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
-import { showErrorToast } from "../../../errors";
-import type { TraceFailureNotice, TraceHostPort } from "../../../../../behavior/trace-host";
-import { useExportTraces } from "../use-export-traces";
+import { showErrorToast } from "../../../errors/index.ts";
+import type { TraceFailureNotice, TraceHostPort } from "../../../../../behavior/trace-host.ts";
+import { useExportTraces } from "../use-export-traces.ts";
 
 const { mockToasterCreate } = vi.hoisted(() => ({
   mockToasterCreate: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 // Mock tRPC api — the subscription is a no-op in tests
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     export: {
       onExportProgress: {

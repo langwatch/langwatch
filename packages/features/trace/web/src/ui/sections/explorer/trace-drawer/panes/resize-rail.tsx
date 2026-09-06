@@ -5,7 +5,7 @@ import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../../../../behavior/drawer.store";
+} from "../../../../../behavior/drawer.store.ts";
 
 /**
  * Left-edge resize rail for the trace drawer.

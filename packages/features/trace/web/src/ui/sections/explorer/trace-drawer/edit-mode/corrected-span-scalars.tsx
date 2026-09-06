@@ -1,7 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import type { TraceEditSpanField } from "@langwatch/trace-contract";
-import { CorrectedScalar } from "./corrected-field";
+import { CorrectedScalar } from "./corrected-field.tsx";
 
 /**
  * The corrected name and type of the open span, above its sections.

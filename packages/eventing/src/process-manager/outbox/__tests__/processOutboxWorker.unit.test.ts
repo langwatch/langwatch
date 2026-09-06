@@ -1,7 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ProcessOutboxWorker } from "../processOutboxWorker";
+import { ProcessOutboxWorker } from "../processOutboxWorker.ts";
 
 function makeLogger(): Logger {
   return {

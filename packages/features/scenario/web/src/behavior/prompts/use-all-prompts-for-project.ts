@@ -1,5 +1,5 @@
-import { useOrganizationTeamProject } from "../use-organization-team-project";
-import { api } from "../scenario-api";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import { api } from "../scenario-api.ts";
 
 /**
  * useAllPromptsForProject

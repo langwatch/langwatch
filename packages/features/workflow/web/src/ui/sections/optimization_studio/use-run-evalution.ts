@@ -4,16 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "@langwatch/ui-host/toaster";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../model/workflow-api-client";
-import { useVersionState } from "./history";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../model/workflow-api-client.ts";
+import { useVersionState } from "./history.tsx";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
-import { usePostEvent } from "./use-post-event";
+import { usePostEvent } from "./use-post-event.tsx";
 
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
-import { serializeWorkflow } from "../../../behavior/workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 
 const logger = createLogger("langwatch:studio:evaluation");
 

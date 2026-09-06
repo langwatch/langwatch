@@ -22,18 +22,18 @@ import { describe, expect, it } from "vitest";
 import { apiErrorBody, createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 
-import { WebhookApp, type WebhookAppDependencies } from "../../../app/webhook.app";
+import { WebhookApp, type WebhookAppDependencies } from "../../../app/webhook.app.ts";
 import {
   WebhookEventsRepositoryPort,
   type WebhookEventsPage,
-} from "../../../ports/webhook-events.port";
-import { WebhookTenantsRepository } from "../../../repositories/webhook-tenants.repository";
+} from "../../../ports/webhook-events.port.ts";
+import { WebhookTenantsRepository } from "../../../repositories/webhook-tenants.repository.ts";
 import {
   WebhookEnvelopeService,
   type WebhookSpendEventRow,
-} from "../../../services/webhook-envelope.service";
-import { WebhookEventsService } from "../../../services/webhook-events.service";
-import { createWebhookRestApp } from "../webhook.api";
+} from "../../../services/webhook-envelope.service.ts";
+import { WebhookEventsService } from "../../../services/webhook-events.service.ts";
+import { createWebhookRestApp } from "../webhook.api.ts";
 
 const ORGANIZATION_ID = "org-events-1";
 const PROJECT_ID = "proj-events-1";

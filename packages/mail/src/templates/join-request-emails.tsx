@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
 import {
   DataTable,
   EmailLayout,
@@ -8,9 +8,9 @@ import {
   Muted,
   Paragraph,
   PrimaryButton,
-} from "./email-layout";
-import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps";
-import { defineTemplate, renderMailTemplate } from "./registry";
+} from "./email-layout.tsx";
+import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
  * The six join-request emails (D12).

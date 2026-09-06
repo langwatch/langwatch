@@ -49,29 +49,29 @@ import {
   defaultCliKeyPermissions,
   selectionsFromPermissions,
 } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../../ui/elements/scope-picker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../../ui/elements/scope-picker.tsx";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { apiKeyApi } from "../../behavior/api-key-api";
+import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   useApiKeyHost,
   type ApiKeyRouteReading,
   type CliCredentialType,
-} from "../../model/api-key-host";
+} from "../../model/api-key-host.ts";
 import {
   clampSelectionsToAvailability,
   getUserPermissionsAcrossScopes,
-} from "../../model/api-key-permissions";
-import { resolveCliAuthProjects } from "../../model/cli-auth-projects";
-import { defaultCliKeyScopes } from "../../model/cli-key-scope-defaults";
-import { StatusCard } from "../../ui/blocks/status-card";
+} from "../../model/api-key-permissions.ts";
+import { resolveCliAuthProjects } from "../../model/cli-auth-projects.ts";
+import { defaultCliKeyScopes } from "../../model/cli-key-scope-defaults.ts";
+import { StatusCard } from "../../ui/blocks/status-card.tsx";
 import {
   PermissionCategoryList,
   PermissionCounter,
   type PermissionSelection,
-} from "../../ui/blocks/permission-category-list";
-import { CliAuthContainer } from "../../ui/sections/cli-auth-container";
-import { FirstTraceRedirect } from "../../ui/sections/first-trace-redirect";
+} from "../../ui/blocks/permission-category-list.tsx";
+import { CliAuthContainer } from "../../ui/sections/cli-auth-container.tsx";
+import { FirstTraceRedirect } from "../../ui/sections/first-trace-redirect.tsx";
 
 /** The acquisition source a browser opened by `langwatch login` stamps. */
 export const CLI_LEAD_SOURCE = "cli";

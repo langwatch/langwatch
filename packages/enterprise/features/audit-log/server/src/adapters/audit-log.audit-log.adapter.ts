@@ -2,8 +2,8 @@ import type { AuditLogJsonValue, AuditLogService } from "@langwatch/enterprise-a
 import {
   PrismaAuditLogRepository,
   type AuditLogPrismaClient,
-} from "../repositories/prisma/prisma.audit-log.repository";
-import { DefaultAuditLogService } from "../services/audit-log.service";
+} from "../repositories/prisma/prisma.audit-log.repository.ts";
+import { DefaultAuditLogService } from "../services/audit-log.service.ts";
 
 const IP_HEADERS = [
   "cf-connecting-ip",

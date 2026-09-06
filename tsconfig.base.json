@@ -21,6 +21,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "incremental": true
+    "incremental": true,
+    // Node strips types rather than compiling, so a relative import must name
+    // the file on disk. `rewriteRelativeImportExtensions` is what keeps the
+    // emitting packages honest: their declarations still say `.js`.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   }
 }

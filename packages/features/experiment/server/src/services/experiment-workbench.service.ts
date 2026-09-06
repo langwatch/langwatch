@@ -32,11 +32,11 @@ import {
 import {
   isPostgresUniqueConflict,
   postgresUniqueConflictTargets,
-} from "../rules/postgres-unique-conflict.rules";
-import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
-import type { ExperimentRepository } from "../repositories/experiment.repository";
-import type { ExperimentSlugService } from "./experiment-slug.service";
-import type { ExperimentWorkbenchReferencesService } from "./experiment-workbench-references.service";
+} from "../rules/postgres-unique-conflict.rules.ts";
+import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import type { ExperimentRepository } from "../repositories/experiment.repository.ts";
+import type { ExperimentSlugService } from "./experiment-slug.service.ts";
+import type { ExperimentWorkbenchReferencesService } from "./experiment-workbench-references.service.ts";
 
 /**
  * The one thing this needs from the experiment service that owns it: an

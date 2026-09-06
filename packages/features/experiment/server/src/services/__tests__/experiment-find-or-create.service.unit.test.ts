@@ -11,7 +11,7 @@
 import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ExperimentFindOrCreateService } from "../experiment-find-or-create.service";
+import { ExperimentFindOrCreateService } from "../experiment-find-or-create.service.ts";
 
 describe("given an SDK naming an experiment by slug", () => {
   describe("when the slug is free", () => {

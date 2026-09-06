@@ -1,6 +1,6 @@
-import { useAllPromptsForProject } from "../../../behavior/use-all-prompts-for-project";
-import { NoPromptsOnboardingState } from "./no-prompts-onboarding-state";
-import { NoTabsOpenState } from "./no-tabs-open-state";
+import { useAllPromptsForProject } from "../../../behavior/use-all-prompts-for-project.ts";
+import { NoPromptsOnboardingState } from "./no-prompts-onboarding-state.tsx";
+import { NoTabsOpenState } from "./no-tabs-open-state.tsx";
 
 /**
  * Empty state component for the main content area when no tabs are open.

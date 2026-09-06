@@ -7,10 +7,10 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections";
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
-import { TracesV2TrpcApi } from "../traces-v2.api";
-import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support";
+import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections.ts";
+import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TracesV2TrpcApi } from "../traces-v2.api.ts";
+import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";

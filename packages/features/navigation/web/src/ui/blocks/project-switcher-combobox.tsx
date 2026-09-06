@@ -1,14 +1,14 @@
 import { Button, Combobox, Text } from "@chakra-ui/react";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-import { useNavigationHost } from "../../model/navigation-host";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   type ProjectPickGroup,
   resolvePickOutcome,
   useProjectPickItems,
-} from "../../model/project-pick-items";
-import { ProjectAvatar } from "../elements/project-avatar";
-import { ProjectComboboxPopup } from "./project-switcher-combobox-popup";
+} from "../../model/project-pick-items.ts";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { ProjectComboboxPopup } from "./project-switcher-combobox-popup.tsx";
 
 /**
  * The project switch chip for an organization with a long project list:

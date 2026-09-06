@@ -5,9 +5,9 @@
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service";
-import { ApiKeyLifecycleService } from "../api-key-lifecycle.service";
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository";
+import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
+import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
+import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 
 const ORG_ID = "org_1";
 const USER_ID = "user_1";

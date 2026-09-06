@@ -37,8 +37,8 @@ import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import {
   duplicateLangWatchQLColumnNames,
   readLangWatchQLCell,
-} from "../../model/lwql-value-format";
-import { LangWatchQLValueCell } from "../elements/langwatch-ql-value-cell";
+} from "../../model/lwql-value-format.ts";
+import { LangWatchQLValueCell } from "../elements/langwatch-ql-value-cell.tsx";
 
 type LangWatchQLRow = Record<string, unknown>;
 

@@ -4,7 +4,7 @@ import {
   AnnotationBackfillSourcePort,
   type BackfillableAnnotation,
   TraceAnnotationSyncPort,
-} from "../ports/annotation-backfill.port";
+} from "../ports/annotation-backfill.port.ts";
 
 const logger = createLogger("langwatch:tasks:backfill-annotations-to-clickhouse");
 

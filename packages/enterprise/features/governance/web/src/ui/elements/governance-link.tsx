@@ -13,7 +13,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
-import { useGovernanceHost } from "../../model/governance-host";
+import { useGovernanceHost } from "../../model/governance-host.ts";
 
 type LinkProps = {
   href: string | undefined;

@@ -18,8 +18,8 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useInsideDrawer } from "../elements/studio-drawer-footer";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
+import { useInsideDrawer } from "../elements/studio-drawer-footer.tsx";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type {
   Component,
   ComponentType,
@@ -33,8 +33,8 @@ import {
   nameToId,
   validateNodeName,
 } from "@langwatch/workflow-contract";
-import { ComponentExecutionButton } from "./workflow-node-execution";
-import { getNodeDisplayName, isExecutableComponent } from "./workflow-nodes";
+import { ComponentExecutionButton } from "./workflow-node-execution.tsx";
+import { getNodeDisplayName, isExecutableComponent } from "./workflow-nodes.tsx";
 
 export type WorkflowPropertySectionTitleProps = {
   children: ReactNode;

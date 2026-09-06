@@ -24,9 +24,9 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { WebhookIdPort } from "../../../ports/webhook-id.port";
-import type { WebhookSecretPort } from "../../../ports/webhook-secret.port";
-import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository";
+import type { WebhookIdPort } from "../../../ports/webhook-id.port.ts";
+import type { WebhookSecretPort } from "../../../ports/webhook-secret.port.ts";
+import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { ArchitectureViolation, FeatureCatalogueEntry, FeatureClassification } from "./types";
+import type { ArchitectureViolation, FeatureCatalogueEntry, FeatureClassification } from "./types.ts";
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const featureNameSchema = z.string().regex(NAME);

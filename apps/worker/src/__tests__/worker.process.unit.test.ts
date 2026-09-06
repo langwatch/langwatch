@@ -32,7 +32,7 @@ vi.mock("@langwatch/observability/node", () => ({
   startOtlpMetricsExport: () => undefined,
 }));
 
-import { bootWorker } from "../worker.process";
+import { bootWorker } from "../worker.process.ts";
 
 describe("bootWorker", () => {
   beforeEach(() => {

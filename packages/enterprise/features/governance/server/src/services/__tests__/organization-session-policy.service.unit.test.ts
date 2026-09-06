@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   OrganizationSessionPolicyPort,
   type OrganizationSessionPolicy,
-} from "../../ports/session-policy.port";
+} from "../../ports/session-policy.port.ts";
 import {
   OrganizationSessionPolicyService,
   SESSION_POLICY_MAX_DAYS,
   SessionPolicyOutOfRangeError,
-} from "../organization-session-policy.service";
+} from "../organization-session-policy.service.ts";
 
 class MemoryRepository extends OrganizationSessionPolicyPort {
   readonly values = new Map<string, number>();

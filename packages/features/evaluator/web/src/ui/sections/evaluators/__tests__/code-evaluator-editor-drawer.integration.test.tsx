@@ -72,7 +72,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { CodeEvaluatorEditorDrawer } from "../code-evaluator-editor-drawer";
+import { CodeEvaluatorEditorDrawer } from "../code-evaluator-editor-drawer.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -15,7 +15,7 @@ import {
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,
   getRequiredCredentialKeys,
-} from "../model-provider-helpers";
+} from "../model-provider-helpers.ts";
 
 /** The exact inputs the drawer feeds the rule for a given provider. */
 function requiredKeysFor(

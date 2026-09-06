@@ -5,16 +5,16 @@ import { startTransition, useMemo, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
-import { useErrorCount } from "../hooks/use-error-count";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
-import type { LensConfig } from "../../../../behavior/view.store";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { COST_LENS_IDS, PERFORMANCE_LENS_IDS, useViewStore } from "../../../../behavior/view.store";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
-import { CreateLensButton } from "./create-lens-button";
-import { LensNameDialog } from "./lens-name-dialog";
-import { LensTab } from "./lens-tab";
-import { UnsavedLensDialog } from "./unsaved-lens-dialog";
+import { useErrorCount } from "../hooks/use-error-count.ts";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { COST_LENS_IDS, PERFORMANCE_LENS_IDS, useViewStore } from "../../../../behavior/view.store.ts";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { CreateLensButton } from "./create-lens-button.tsx";
+import { LensNameDialog } from "./lens-name-dialog.tsx";
+import { LensTab } from "./lens-tab.tsx";
+import { UnsavedLensDialog } from "./unsaved-lens-dialog.tsx";
 
 const ERRORS_LENS_ID = "errors";
 

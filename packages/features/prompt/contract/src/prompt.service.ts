@@ -4,7 +4,7 @@ import type {
   PromptReference,
   UpdatePromptCommand,
   UpdatePromptHandleCommand,
-} from "./prompt.commands";
+} from "./prompt.commands.ts";
 import type {
   PromptCopySource,
   PromptCopySummary,
@@ -14,7 +14,7 @@ import type {
   PromptTag,
   PromptTagAssignment,
   VersionedPrompt,
-} from "./prompt";
+} from "./prompt.ts";
 
 export abstract class PromptService {
   abstract getAllPrompts(input: {

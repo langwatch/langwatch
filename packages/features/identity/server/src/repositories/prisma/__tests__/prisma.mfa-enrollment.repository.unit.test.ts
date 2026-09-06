@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { guardOrganizationId } from "@langwatch/prisma-client";
-import { PrismaMfaEnrollmentRepository } from "../prisma.mfa-enrollment.repository";
+import { PrismaMfaEnrollmentRepository } from "../prisma.mfa-enrollment.repository.ts";
 
 /**
  * `findRequiringOrganizationSlugs` asks which of ONE person's organizations

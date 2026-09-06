@@ -1,12 +1,12 @@
 import { Box, Flex } from "@chakra-ui/react";
 import React from "react";
-import { EmptyStateOverlay } from "../onboarding/empty-state-overlay";
-import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner";
-import { OnboardingAurora } from "../onboarding/effects/onboarding-aurora";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { Toolbar } from "../toolbar/toolbar";
-import { TraceTable } from "../trace-table/trace-table";
+import { EmptyStateOverlay } from "../onboarding/empty-state-overlay.tsx";
+import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
+import { OnboardingAurora } from "../onboarding/effects/onboarding-aurora.tsx";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { Toolbar } from "../toolbar/toolbar.tsx";
+import { TraceTable } from "../trace-table/trace-table.tsx";
 
 export const EmptyResultsPane: React.FC = React.memo(() => {
   // The trace list query short-circuits to `SAMPLE_PREVIEW_TRACES`

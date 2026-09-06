@@ -1,5 +1,5 @@
-export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan";
-export { EntitlementService } from "./entitlement.service";
+export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
+export { EntitlementService } from "./entitlement.service.ts";
 export type {
   BaselinePlanSource,
   AuthorizationContextResolver,
@@ -8,14 +8,14 @@ export type {
   PlanProvider,
   PlanProviderUser,
   ResolvePlanInput,
-} from "./provider";
-export { planProviderUserSchema, resolvePlanInputSchema } from "./provider";
-export { moneyByCurrencySchema, planSchema, planSourceSchema, PricingModel } from "./plan";
+} from "./provider.ts";
+export { planProviderUserSchema, resolvePlanInputSchema } from "./provider.ts";
+export { moneyByCurrencySchema, planSchema, planSourceSchema, PricingModel } from "./plan.ts";
 export {
   isAccountManagedPlan,
   planNextStepSchema,
   type PlanCurrency,
   type PlanNextStep,
-} from "./plan-next-step";
-export * from "./usage";
-export * from "./usage.errors";
+} from "./plan-next-step.ts";
+export * from "./usage.ts";
+export * from "./usage.errors.ts";

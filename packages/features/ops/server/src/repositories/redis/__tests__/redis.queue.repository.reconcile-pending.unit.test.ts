@@ -1,6 +1,6 @@
 import type { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QueueRedisRepository } from "../queue.repository";
+import { QueueRedisRepository } from "../queue.repository.ts";
 
 const QUEUE_NAME = "test-queue";
 const PREFIX = `${QUEUE_NAME}:gq:`;

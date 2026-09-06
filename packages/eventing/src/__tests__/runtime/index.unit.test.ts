@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { Event, Projection } from "../../domain/types";
-import type { EventSourcingPipelineDefinition } from "../../pipeline/types";
-import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import { EventSourcingPipeline } from "../../runtimePipeline";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { Event, Projection } from "../../domain/types.ts";
+import type { EventSourcingPipelineDefinition } from "../../pipeline/types.ts";
+import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import { EventSourcingPipeline } from "../../runtimePipeline.ts";
 import {
   createMockEventStore,
   createTestAggregateType,
-} from "../../services/__tests__/testHelpers";
-import { EventSourcingService } from "../../services/eventSourcingService";
+} from "../../services/__tests__/testHelpers.ts";
+import { EventSourcingService } from "../../services/eventSourcingService.ts";
 
 describe("EventSourcingPipeline", () => {
   let mockEventStore: ReturnType<typeof createMockEventStore<Event>>;

@@ -33,7 +33,7 @@ import type {
 import {
   type LangWatchQLVegaViewState,
   useLangWatchQLVegaView,
-} from "./use-langwatch-ql-vega-view";
+} from "./use-langwatch-ql-vega-view.ts";
 
 export interface LangWatchQLChartModel {
   /** Where the running view attaches, or would attach. */

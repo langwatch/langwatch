@@ -5,7 +5,7 @@
  */
 
 import { Play } from "lucide-react";
-import { SmallButton } from "../shared/small-button";
+import { SmallButton } from "../shared/small-button.tsx";
 
 export type RunCaseButtonProps = {
   caseName: string;

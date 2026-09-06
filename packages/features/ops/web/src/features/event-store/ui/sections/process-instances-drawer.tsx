@@ -11,12 +11,12 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useState } from "react";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
-import { api } from "../../../../behavior/ops-api";
-import { describeNextWake } from "../../model/process-presentation";
+import { api } from "../../../../behavior/ops-api.ts";
+import { describeNextWake } from "../../model/process-presentation.ts";
 
 const PAGE_SIZE = 25;
 

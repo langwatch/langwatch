@@ -83,7 +83,7 @@ const mockSuites = [
   },
 ];
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     featureFlag: {
       isEnabled: {
@@ -161,7 +161,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "my-project" },
     hasAnyPermission: () => true,
@@ -176,24 +176,24 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../dashboard-layout", () => ({
+vi.mock("../../dashboard-layout.tsx", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dashboard-layout">{children}</div>
   ),
 }));
 
-vi.mock("../run-history-panel", () => ({
+vi.mock("../run-history-panel.tsx", () => ({
   RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
-vi.mock("../suite-detail-panel", () => ({
+vi.mock("../suite-detail-panel.tsx", () => ({
   SuiteDetailPanel: ({ suite }: { suite: { name: string } }) => (
     <div data-testid="suite-detail-panel">{suite.name} details</div>
   ),
   SuiteEmptyState: () => <div data-testid="suite-empty-state">No run plan selected</div>,
 }));
 
-vi.mock("../external-set-detail-panel", () => ({
+vi.mock("../external-set-detail-panel.tsx", () => ({
   ExternalSetDetailPanel: ({ scenarioSetId }: { scenarioSetId: string }) => (
     <div data-testid="external-set-panel">{scenarioSetId} details</div>
   ),
@@ -213,7 +213,7 @@ describe("Simulation Page URL Routing", () => {
   // The page drags the whole suites graph behind it, and a cold transform of it
   // costs more than a test's own budget, so it is imported once for the file.
   beforeAll(async () => {
-    SimulationsPage = (await import("../simulations-page")).default;
+    SimulationsPage = (await import("../simulations-page.tsx")).default;
   }, 60_000);
 
   beforeEach(() => {

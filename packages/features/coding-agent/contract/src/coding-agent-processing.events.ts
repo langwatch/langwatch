@@ -5,12 +5,12 @@ import {
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
   SPAN_FACTS_LIFTED_PAYLOAD_VERSIONS,
-} from "./coding-agent-processing.constants";
+} from "./coding-agent-processing.constants.ts";
 import {
   logFactsContributionSchema,
   metricFactsContributionSchema,
   spanFactsContributionSchema,
-} from "./coding-agent-processing";
+} from "./coding-agent-processing.ts";
 
 const aggregateTypeSchema = z.string().trim().min(1);
 const tenantIdSchema = z

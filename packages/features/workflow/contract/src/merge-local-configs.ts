@@ -11,8 +11,8 @@ import {
   type LocalPromptConfig,
   type Signature,
   type StudioNode,
-} from "./studio-workflow";
-import { buildWorkflowLlmConfig } from "./workflow-llm-config";
+} from "./studio-workflow.ts";
+import { buildWorkflowLlmConfig } from "./workflow-llm-config.ts";
 
 type LocalComponentConfig = {
   name?: string;

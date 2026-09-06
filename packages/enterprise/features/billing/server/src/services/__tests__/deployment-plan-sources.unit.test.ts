@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
-} from "../../ports/subscription.port";
-import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service";
+} from "../../ports/subscription.port.ts";
+import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service.ts";
 
 /**
  * Spec: packages/enterprise/features/billing/specs/deployment-plan-sources.feature

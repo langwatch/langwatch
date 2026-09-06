@@ -10,8 +10,8 @@ import {
 } from "@langwatch/api/rest";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { registerConnectEndpoints } from "../agent-connect.api";
-import type { LongPollTransportService } from "../../../services/connected-agent-long-poll.service";
+import { registerConnectEndpoints } from "../agent-connect.api.ts";
+import type { LongPollTransportService } from "../../../services/connected-agent-long-poll.service.ts";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   const handled = error as Error & { code?: string; httpStatus?: number };

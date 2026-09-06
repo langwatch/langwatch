@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_VALIDATION_ISSUES, validationMeta } from "../validation/validationMeta";
+import { MAX_VALIDATION_ISSUES, validationMeta } from "../validation/validationMeta.ts";
 
 /**
  * The issues are hand-built rather than produced by zod on purpose: this

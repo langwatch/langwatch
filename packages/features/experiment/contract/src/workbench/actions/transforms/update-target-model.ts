@@ -1,7 +1,7 @@
-import type { TargetConfig } from "../../../experiment-workbench";
-import { type UpdateTargetModelPayload, updateTargetModelPayloadSchema } from "../schemas";
-import { requireTarget } from "./helpers";
-import { type Transform, TransformError } from "./types";
+import type { TargetConfig } from "../../../experiment-workbench.ts";
+import { type UpdateTargetModelPayload, updateTargetModelPayloadSchema } from "../schemas.ts";
+import { requireTarget } from "./helpers.ts";
+import { type Transform, TransformError } from "./types.ts";
 
 /**
  * Point a target's draft prompt at another model.

@@ -10,24 +10,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../hooks/use-trace-facets", () => ({
+vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
 // query) at the top level. This suite renders SearchBar without a tRPC
 // provider, so stub the hook out — server search has its own dedicated suite.
-vi.mock("../../hooks/use-facet-search", () => ({
+vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
 // This suite exercises the inline search editor wiring, so Langy is gated
 // off — the gate hooks carry session/tRPC wiring this suite doesn't mount.
 // The Langy-owned ask affordance is covered by SearchBar.integration.
-vi.mock("../../../langy/hooks/use-show-langy", () => ({
+vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => false,
 }));
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => false,
 }));
 vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
@@ -43,8 +43,8 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
   return { ...actual, useLangyStore };
 });
 
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { SearchBar } from "../search-bar";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { SearchBar } from "../search-bar.tsx";
 
 function renderSearchBar() {
   return render(

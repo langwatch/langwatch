@@ -26,13 +26,13 @@ vi.mock("@langwatch/observability/node", () => ({
   createProcessObservability: mocks.createObservability,
 }));
 
-vi.mock("../api-http.listener", () => ({
+vi.mock("../api-http.listener.ts", () => ({
   ApiHttpListener: { create: mocks.createListener },
 }));
 
-import { ApiProcess } from "../api.process";
-import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../api.process";
-import { ApiReadinessPort } from "../api-process.lifecycle";
+import { ApiProcess } from "../api.process.ts";
+import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../api.process.ts";
+import { ApiReadinessPort } from "../api-process.lifecycle.ts";
 
 class TestAgentService extends AgentService {
   getById() {

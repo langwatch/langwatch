@@ -1,5 +1,5 @@
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 
 /**
  * The project the open drawer reads from.

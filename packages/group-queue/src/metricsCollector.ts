@@ -14,9 +14,9 @@ import {
   gqParkedGroups,
   gqPendingGroups,
   STAGING_DEPTH_REPORT_FLOOR,
-} from "./metrics";
-import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore";
-import { type DispatchResult, type GroupStagingScripts, pendingGroupsKey } from "./scripts";
+} from "./metrics.ts";
+import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
+import { type DispatchResult, type GroupStagingScripts, pendingGroupsKey } from "./scripts.ts";
 
 /**
  * How many of the soonest-future-scored ("nearest deferred") ready groups the

@@ -4,7 +4,7 @@
  * audio, nano, mini, dated, etc.).
  */
 
-import { llmModels } from "./model-catalog";
+import { llmModels } from "./model-catalog.ts";
 
 const registry = llmModels;
 

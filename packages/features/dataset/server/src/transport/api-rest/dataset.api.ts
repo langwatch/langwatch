@@ -47,8 +47,8 @@ import {
 import { type DatasetNotReadyError, UploadValidationError } from "@langwatch/dataset-contract";
 import { z } from "zod";
 import type { DatasetApp } from "#app/dataset.app";
-import { createDatasetErrorHandler } from "./dataset-error-handler.api";
-import { datasetOutputSchema } from "../../rules/dataset-schemas.rules";
+import { createDatasetErrorHandler } from "./dataset-error-handler.api.ts";
+import { datasetOutputSchema } from "../../rules/dataset-schemas.rules.ts";
 
 /**
  * The read ceiling for `GET /api/dataset/:slugOrId`, which answers with the

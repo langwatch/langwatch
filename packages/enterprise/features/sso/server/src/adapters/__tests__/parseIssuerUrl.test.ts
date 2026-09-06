@@ -8,7 +8,7 @@
  * clear error message for genuinely unparseable input.
  */
 import { describe, expect, it } from "vitest";
-import { parseIssuerUrl } from "../better-auth.better-auth.adapter";
+import { parseIssuerUrl } from "../better-auth.better-auth.adapter.ts";
 
 describe("parseIssuerUrl", () => {
   describe("when given a URL with https scheme", () => {

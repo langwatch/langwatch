@@ -8,14 +8,14 @@ import {
   LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
-} from "../rules/langy-streaming-constants.rules";
-import { langyEmptyTurnLine } from "../rules/langy-empty-turn.rules";
+} from "../rules/langy-streaming-constants.rules.ts";
+import { langyEmptyTurnLine } from "../rules/langy-empty-turn.rules.ts";
 import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import {
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,
-} from "../ports/langy-token-buffer.port";
+} from "../ports/langy-token-buffer.port.ts";
 
 const PAYLOAD_FIELD = "p";
 

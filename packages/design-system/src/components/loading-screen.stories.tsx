@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { LoadingScreen } from "./loading-screen";
+import { LoadingScreen } from "./loading-screen.tsx";
 
 const meta = {
   title: "Patterns/Loading screen",

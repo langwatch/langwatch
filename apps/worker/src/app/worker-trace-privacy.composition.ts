@@ -9,8 +9,8 @@ import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan, PIIRedactionLevel } from "@langwatch/trace-contract";
 import { TraceSpanPiiRedactionPort } from "@langwatch/trace-server";
-import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-analysis.adapter";
-import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config";
+import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-analysis.adapter.ts";
+import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The PII redaction this process would scrub an incoming span with.

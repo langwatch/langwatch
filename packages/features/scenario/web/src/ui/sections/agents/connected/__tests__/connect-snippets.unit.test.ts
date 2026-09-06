@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { pythonSnippet, typescriptSnippet } from "../connect-snippets";
+import { pythonSnippet, typescriptSnippet } from "../connect-snippets.ts";
 
 describe("connect snippets", () => {
   describe("given an agent name that holds a quote", () => {

@@ -11,7 +11,7 @@ import { ScenarioGridCard } from "@langwatch/suite-web/surfaces/run-cards";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
-vi.mock("../use-prefetch-run-state", () => ({
+vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => prefetchMock,
 }));
 

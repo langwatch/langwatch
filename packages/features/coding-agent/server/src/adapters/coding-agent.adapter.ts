@@ -8,35 +8,35 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { CodingAgentClickHousePort } from "../ports/coding-agent-clickhouse.port";
-import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
+import type { CodingAgentClickHousePort } from "../ports/coding-agent-clickhouse.port.ts";
+import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter.ts";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 import {
   CodingAgentReadMetricsPort,
   NoopCodingAgentReadMetricsPort,
-} from "./coding-agent-read-metrics.adapter";
-import { CodingAgentSessionEventsClickHouseRepository } from "../repositories/coding-agent-session-event/clickhouse.repository";
-import { CodingAgentSessionClickHouseRepository } from "../repositories/coding-agent-session/clickhouse.repository";
-import { CodingAgentTraceSessionClickHouseRepository } from "../repositories/coding-agent-trace-session/clickhouse.repository";
-import { SessionMetricSeriesClickHouseRepository } from "../repositories/session-metric-series/clickhouse.repository";
+} from "./coding-agent-read-metrics.adapter.ts";
+import { CodingAgentSessionEventsClickHouseRepository } from "../repositories/coding-agent-session-event/clickhouse.repository.ts";
+import { CodingAgentSessionClickHouseRepository } from "../repositories/coding-agent-session/clickhouse.repository.ts";
+import { CodingAgentTraceSessionClickHouseRepository } from "../repositories/coding-agent-trace-session/clickhouse.repository.ts";
+import { SessionMetricSeriesClickHouseRepository } from "../repositories/session-metric-series/clickhouse.repository.ts";
 import {
   CodingAgentSessionEventRepository,
   NullCodingAgentSessionEventRepository,
-} from "../repositories/coding-agent-session-event.repository";
+} from "../repositories/coding-agent-session-event.repository.ts";
 import {
   CodingAgentSessionRepository,
   NullCodingAgentSessionRepository,
-} from "../repositories/coding-agent-session.repository";
+} from "../repositories/coding-agent-session.repository.ts";
 import {
   CodingAgentTraceSessionRepository,
   NullCodingAgentTraceSessionRepository,
-} from "../repositories/coding-agent-trace-session.repository";
+} from "../repositories/coding-agent-trace-session.repository.ts";
 import {
   NullSessionMetricSeriesRepository,
   SessionMetricSeriesRepository,
-} from "../repositories/session-metric-series.repository";
-import { CodingAgentFeatureService } from "../services/coding-agent.service";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port";
+} from "../repositories/session-metric-series.repository.ts";
+import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
+import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
 
 type CodingAgentRepositories = {
   sessions: CodingAgentSessionRepository;

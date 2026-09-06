@@ -49,14 +49,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
-import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
+import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config.ts";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import {
   analyticsRouters,
   type AnalyticsFeaturePorts,
   type ApiAnalyticsReadPorts,
   type ApiFilterField,
-} from "./analytics-trpc.routers";
+} from "./analytics-trpc.routers.ts";
 
 /**
  * The retention floor an evaluation read is bounded by when a project names no policy of
@@ -98,7 +98,7 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   ) => Record<string, unknown>;
 }>;
 
-import type { ComposedAnalyticsFeature } from "./analytics.composition.types";
+import type { ComposedAnalyticsFeature } from "./analytics.composition.types.ts";
 
 /**
  * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag. Dashboard

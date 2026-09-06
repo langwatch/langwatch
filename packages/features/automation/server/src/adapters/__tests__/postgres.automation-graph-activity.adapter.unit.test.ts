@@ -1,8 +1,8 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
-import { AutomationEmailCapService } from "../../services/email-cap.service";
-import { PostgresAutomationGraphActivityAdapter } from "../postgres.automation-graph-activity.adapter";
+import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { PostgresAutomationGraphActivityAdapter } from "../postgres.automation-graph-activity.adapter.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -12,7 +12,7 @@ import {
   RecordingDelivery,
   SilentLogger,
   TestDispatchErrors,
-} from "../../fixtures/graph-activity.fixture";
+} from "../../fixtures/graph-activity.fixture.ts";
 
 /**
  * Spec: packages/features/automation/specs/graph-alert-worker-composition.feature

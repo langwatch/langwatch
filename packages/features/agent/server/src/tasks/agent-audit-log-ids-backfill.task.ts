@@ -6,7 +6,7 @@ import type {
   AgentAuditLogArgsValue,
   AgentAuditLogBackfillRepository,
   AgentAuditLogRow,
-} from "../repositories/prisma/prisma.agent-audit-log-backfill.repository";
+} from "../repositories/prisma/prisma.agent-audit-log-backfill.repository.ts";
 
 const logger = createLogger("langwatch:task:agent-audit-log-ids-backfill");
 

@@ -1,4 +1,4 @@
-import type { AggregateType } from "../domain/aggregateType";
+import type { AggregateType } from "../domain/aggregateType.ts";
 
 /**
  * The four kinds of pipeline component an operator can stop. State

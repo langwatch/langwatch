@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiBootFailurePort, startApiExecutable } from "../api.executable";
+import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
-} from "../api.main";
+} from "../api.main.ts";
 
 class TestProcess extends ApiRuntimeProcessPort {
   readonly start = vi.fn(async () => undefined);

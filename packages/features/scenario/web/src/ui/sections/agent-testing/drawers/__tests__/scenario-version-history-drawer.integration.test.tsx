@@ -8,8 +8,8 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer";
-import { ScenarioVersionHistoryDrawer } from "../scenario-version-history-drawer";
+import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer.tsx";
+import { ScenarioVersionHistoryDrawer } from "../scenario-version-history-drawer.tsx";
 
 const mocks = vi.hoisted(() => ({
   mockUpdateMutateAsync: vi.fn(),
@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   persistedTarget: null as { type: string; id: string } | null,
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
@@ -107,13 +107,13 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../scenarios/save-and-run-menu", () => ({
+vi.mock("../../../scenarios/save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: () => null,
 }));
-vi.mock("../../../scenarios/scenario-editor-sidebar", () => ({
+vi.mock("../../../scenarios/scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
-vi.mock("../../../scenarios/scenario-run-model-dialog", () => ({
+vi.mock("../../../scenarios/scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: () => null,
 }));
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
@@ -134,7 +134,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -151,11 +151,11 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../use-run-scenario", () => ({
+vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
 
-vi.mock("../../../use-scenario-target", () => ({
+vi.mock("../../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: mocks.persistedTarget,
     setTarget: vi.fn(),
@@ -164,7 +164,7 @@ vi.mock("../../../use-scenario-target", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({
     can: () => mocks.canManage,
     isLoading: false,

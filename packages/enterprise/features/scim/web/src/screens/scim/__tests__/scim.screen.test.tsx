@@ -25,7 +25,7 @@ const { state, calls } = vi.hoisted(() => ({
   calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn() },
 }));
 
-vi.mock("../../../behavior/scim-api", () => ({
+vi.mock("../../../behavior/scim-api.ts", () => ({
   scimApi: {
     useUtils: () => ({ scimToken: { list: { invalidate: calls.invalidate } } }),
     scimToken: {
@@ -55,8 +55,8 @@ vi.mock("../../../behavior/scim-api", () => ({
   },
 }));
 
-import { FakeScimHost, renderWithScimHost } from "../../../testing";
-import ScimScreen from "../scim.screen";
+import { FakeScimHost, renderWithScimHost } from "../../../testing.tsx";
+import ScimScreen from "../scim.screen.tsx";
 
 const token = (overrides: Record<string, unknown> = {}) => ({
   id: "token-1",

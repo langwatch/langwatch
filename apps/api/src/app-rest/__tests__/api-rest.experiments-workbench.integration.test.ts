@@ -29,11 +29,11 @@ import { nanoid } from "nanoid";
 import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
-import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount";
-import { allRegisteredRoutes, policyPermissions } from "../index";
-import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
+import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount.ts";
+import { allRegisteredRoutes, policyPermissions } from "../index.ts";
+import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /**
  * This suite writes and reads its own rows and exercises no multi-tenant guard

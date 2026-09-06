@@ -22,17 +22,17 @@ import {
   useWatch,
 } from "react-hook-form";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types";
-import { api } from "../../behavior/organization-api";
-import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints";
-import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+import { api } from "../../behavior/organization-api.ts";
+import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
+import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form.ts";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { useUiSeatTypeCopy } from "@langwatch/ui-host/slots";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,
   teamRolesOptions,
-} from "./team-user-role-field";
+} from "./team-user-role-field.tsx";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Select } from "@langwatch/design-system/select";
 

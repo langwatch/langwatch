@@ -5,7 +5,7 @@ import type {
   HttpHeader,
   HttpMethod,
 } from "@langwatch/workflow-contract";
-import { WorkflowBasePropertiesPanel } from "../workflow-base-properties-panel";
+import { WorkflowBasePropertiesPanel } from "../workflow-base-properties-panel.tsx";
 
 export type WorkflowVariable = { identifier: string; type: Field["type"] };
 

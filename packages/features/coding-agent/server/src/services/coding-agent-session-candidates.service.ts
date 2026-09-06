@@ -1,9 +1,9 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port";
-import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository";
-import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
-import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service";
-import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service";
+import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
+import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
+import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
 
 type CodingAgentSessionCandidatesDependencies = {
   sessions: CodingAgentSessionRepository;

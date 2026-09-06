@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SharedDef } from "../provider-types";
+import type { SharedDef } from "../provider-types.ts";
 
 export const annotationQueueActionParamsSchema = z.object({
   annotators: z

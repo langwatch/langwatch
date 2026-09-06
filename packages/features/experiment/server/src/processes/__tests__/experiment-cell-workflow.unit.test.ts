@@ -20,7 +20,7 @@ import {
   buildSignatureNodeFromAgent,
   buildSignatureNodeFromLocalConfig,
   buildSignatureNodeFromPrompt,
-} from "../experiment-cell-workflow.process";
+} from "../experiment-cell-workflow.process.ts";
 
 describe("buildEvaluatorNode", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({

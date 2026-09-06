@@ -1,5 +1,5 @@
 import { type Dispatch, type RefObject, type SetStateAction, useEffect, useState } from "react";
-import { EASTER_EGG_IMAGE_URL } from "../use-konami-easter-egg";
+import { EASTER_EGG_IMAGE_URL } from "../use-konami-easter-egg.ts";
 
 // Mermaid is loaded via a true `await import()` inside the effect so it stays in its
 // own chunk.

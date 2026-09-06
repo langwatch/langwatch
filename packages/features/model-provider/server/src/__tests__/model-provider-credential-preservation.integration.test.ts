@@ -6,12 +6,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderCommandService } from "../services/model-provider-command.service";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service";
-import { ModelProviderKeysService } from "../services/model-provider-keys.service";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
+import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -25,7 +25,7 @@ import {
   noopOnboardingDefaults,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 const alwaysPermitAuthz = {
   getDecision: async () => ({ permitted: true }),

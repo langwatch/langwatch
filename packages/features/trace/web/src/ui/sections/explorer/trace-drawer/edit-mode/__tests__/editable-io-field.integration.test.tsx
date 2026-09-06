@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EditableIOField } from "../editable-io-field";
+import { EditableIOField } from "../editable-io-field.tsx";
 
 const CAPTURED_JSON = '{"answer":"42","source":"almanac"}';
 

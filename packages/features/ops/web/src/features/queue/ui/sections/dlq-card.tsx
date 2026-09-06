@@ -1,11 +1,11 @@
 import { Badge, Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { useMemo, useRef, useState } from "react";
-import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
-import { Link } from "../../../../ui/elements/ops-link";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
-import { type PendingDlqAction, useDlqActions } from "../../behavior/use-dlq-actions";
+import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { Link } from "../../../../ui/elements/ops-link.tsx";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { type PendingDlqAction, useDlqActions } from "../../behavior/use-dlq-actions.ts";
 
 const DLQ_VIEWPORT_HEIGHT = 360;
 const DLQ_ROW_HEIGHT = 36;

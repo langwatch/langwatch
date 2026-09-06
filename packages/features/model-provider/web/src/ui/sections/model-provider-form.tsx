@@ -8,16 +8,16 @@ import {
   findModelProviderById,
   isResolvableProviderId,
   useAllModelProvidersList,
-} from "../../behavior/use-all-model-providers-list";
-import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate";
+} from "../../behavior/use-all-model-providers-list.ts";
+import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
-import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation";
-import { useModelProviderForm } from "../../behavior/use-model-provider-form";
-import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit";
-import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys";
+import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation.ts";
+import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts";
+import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit.ts";
+import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
 import {
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
@@ -26,13 +26,13 @@ import {
   getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
-} from "../../model/model-provider-helpers";
-import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors";
-import { SmallLabel } from "../elements/small-label";
+} from "../../model/model-provider-helpers.ts";
+import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
+import { SmallLabel } from "../elements/small-label.tsx";
 import { Switch } from "@langwatch/design-system/switch";
-import { useModelProviderToaster } from "../../behavior/model-provider-feedback";
-import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask";
-import { CodexSignIn } from "./codex-sign-in";
+import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
+import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask.tsx";
+import { CodexSignIn } from "./codex-sign-in.tsx";
 import {
   ADVANCED_ACCORDION_VALUE,
   draftFromProvider,
@@ -41,15 +41,15 @@ import {
   ModelProviderAdvancedSection,
   parseAdvancedDraft,
   parseSkipPermissionsDraft,
-} from "./model-provider-advanced-section";
-import { CredentialsSection } from "./model-provider-credentials-section";
-import { CustomModelInputSection } from "./model-provider-custom-model-input";
+} from "./model-provider-advanced-section.tsx";
+import { CredentialsSection } from "./model-provider-credentials-section.tsx";
+import { CustomModelInputSection } from "./model-provider-custom-model-input.tsx";
 // DefaultProviderSection has been moved out of this drawer to a page-level
 // section on the model-providers settings page (DefaultModelsSection). See
 // specs/model-providers/hierarchical-default-models.feature.
-import { ExtraHeadersSection } from "./model-provider-extra-headers-section";
-import { ModelProviderRoutingSection } from "./model-provider-routing-section";
-import { ProviderScopeSection } from "./model-provider-scope-section";
+import { ExtraHeadersSection } from "./model-provider-extra-headers-section.tsx";
+import { ModelProviderRoutingSection } from "./model-provider-routing-section.tsx";
+import { ProviderScopeSection } from "./model-provider-scope-section.tsx";
 
 /**
  * The message the server attached to the skip-permissions field, or null when

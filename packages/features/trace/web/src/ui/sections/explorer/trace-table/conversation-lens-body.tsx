@@ -7,24 +7,24 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useConversationTurns } from "../hooks/use-conversation-turns";
-import type { LensConfig } from "../../../../behavior/view.store";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { mapTraceListPayload } from "../utils/map-trace-list-payload";
-import { buildConversationColumns } from "./columns";
-import type { ConversationGroup } from "./conversation-groups";
-import { conversationRegistry, RegistryRow } from "./registry";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useConversationTurns } from "../hooks/use-conversation-turns.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
+import { buildConversationColumns } from "./columns.ts";
+import type { ConversationGroup } from "./conversation-groups.ts";
+import { conversationRegistry, RegistryRow } from "./registry/index.ts";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,
-} from "../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles";
-import { conversationSelectColumnDef } from "./select-column";
-import { buildConversationPlaceholderRows } from "./skeleton-placeholders";
-import { TraceTableShell } from "./trace-table-shell";
-import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer";
-import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer";
+} from "../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles.ts";
+import { conversationSelectColumnDef } from "./select-column.tsx";
+import { buildConversationPlaceholderRows } from "./skeleton-placeholders.ts";
+import { TraceTableShell } from "./trace-table-shell.tsx";
+import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer.ts";
+import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 
 const CONVERSATION_MIN_WIDTH = "1000px";
 

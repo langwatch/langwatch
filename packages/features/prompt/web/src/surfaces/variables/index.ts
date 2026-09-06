@@ -11,21 +11,21 @@
  * @see specs/variables-ui/prompt-textarea.feature
  */
 
-export { FormVariablesSection } from "./form-variables-section";
-export { type SelectedField, VariableInsertMenu } from "./variable-insert-menu";
+export { FormVariablesSection } from "./form-variables-section.tsx";
+export { type SelectedField, VariableInsertMenu } from "./variable-insert-menu.tsx";
 export {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
   type SourceType,
   VariableMappingInput,
-} from "./variable-mapping-input";
-export { type Variable, VariablesSection, type VariablesSectionProps } from "./variables-section";
-export { PromptTextAreaWithVariables } from "./prompt-textarea";
+} from "./variable-mapping-input.tsx";
+export { type Variable, VariablesSection, type VariablesSectionProps } from "./variables-section.tsx";
+export { PromptTextAreaWithVariables } from "./prompt-textarea/index.ts";
 export type {
   PromptTextAreaOnAddMention,
   PromptTextAreaWithVariablesProps,
-} from "./prompt-textarea";
+} from "./prompt-textarea/index.ts";
 export {
   FieldTypeSelect,
   type FieldTypeOption,
@@ -33,4 +33,4 @@ export {
   TYPE_LABELS,
   VariableTypeBadge,
   VariableTypeIcon,
-} from "./variable-type";
+} from "./variable-type/index.ts";

@@ -15,7 +15,7 @@ import {
   createTestPrismaClient,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 const MIGRATION_FILE = join(

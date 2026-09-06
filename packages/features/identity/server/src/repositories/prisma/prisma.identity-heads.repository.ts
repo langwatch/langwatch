@@ -1,7 +1,7 @@
 import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IdentityHeadsRepository } from "../identity-heads.repository";
-import { identifierRowToFact } from "./prisma.identifier.mapper";
+import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
+import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
 
 /**
  * The two models the identity heads are read off, and nothing else in the

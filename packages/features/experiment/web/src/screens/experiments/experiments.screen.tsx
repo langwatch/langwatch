@@ -20,19 +20,19 @@ import {
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
-import { CreateExperimentButton } from "../../ui/elements/experiments/create-experiment-button";
+import { CreateExperimentButton } from "../../ui/elements/experiments/create-experiment-button.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { FullWidthListPageContent } from "../../ui/elements/ui/layouts/full-width-list-page-content";
+import { FullWidthListPageContent } from "../../ui/elements/ui/layouts/full-width-list-page-content.tsx";
 import { Link } from "@langwatch/ui-host/link";
 import { LangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
 import { experimentContextChip } from "@langwatch/langy-web/surfaces/langy-context";
-import type { ExperimentType } from "../../model/prisma-types";
+import type { ExperimentType } from "../../model/prisma-types.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { formatEvaluationSummary } from "../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary";
-import { CopyExperimentDialog } from "../../ui/elements/experiments/copy-experiment-dialog";
-import { NavigationFooter, useNavigationFooter } from "../../ui/elements/navigation-footer";
+import { formatEvaluationSummary } from "../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
+import { CopyExperimentDialog } from "../../ui/elements/experiments/copy-experiment-dialog.tsx";
+import { NavigationFooter, useNavigationFooter } from "../../ui/elements/navigation-footer.tsx";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";

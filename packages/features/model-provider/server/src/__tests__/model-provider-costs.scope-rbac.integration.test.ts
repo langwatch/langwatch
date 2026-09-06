@@ -8,10 +8,10 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
-import { ModelProviderCostsService } from "../services/model-provider-costs.service";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service";
+import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderCostsService } from "../services/model-provider-costs.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
 import {
   DB_URL,
   PrismaProjects,
@@ -22,7 +22,7 @@ import {
   idService,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 /** Permits every scope the named actors manage, and nothing else. */
 function authzFor(managers: Set<string>): AuthzService {

@@ -7,9 +7,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { TestProjectService } from "./support/test-project-service";
+import { TestProjectService } from "./support/test-project-service.ts";
 
-import { PostgresVirtualKeyAdapter } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";

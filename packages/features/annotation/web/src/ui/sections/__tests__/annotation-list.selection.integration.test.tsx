@@ -21,7 +21,7 @@ import {
   AnnotationTestHarness,
   StubAnnotationHost,
   type StubAnnotationHostOptions,
-} from "../../../testing";
+} from "../../../testing.tsx";
 
 type QueueItem = { id: string; traceId: string; doneAt: Date | null };
 
@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   invalidateQueues: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-annotation-queues", () => ({
+vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   useAnnotationQueues: () => ({
     assignedQueueItems: mocks.items,
     totalCount: mocks.items.length,
@@ -46,7 +46,7 @@ vi.mock("../../../behavior/use-annotation-queues", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/annotation-api", () => ({
+vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
     useUtils: () => ({
       annotation: {
@@ -106,7 +106,7 @@ vi.mock("../../../behavior/annotation-api", () => ({
 }));
 
 // The dataset gate has its own suite; here it only has to answer.
-vi.mock("../../../behavior/use-personal-feature-gate", () => ({
+vi.mock("../../../behavior/use-personal-feature-gate.ts", () => ({
   usePersonalDatasetGate: () => ({
     isGated: false,
     requestEnable: mocks.requestEnable,
@@ -117,7 +117,7 @@ vi.mock("../../../behavior/use-personal-feature-gate", () => ({
 // The participants picker is a Chakra multi-select the dialog only composes.
 // The stub keeps the contract the list depends on (who the picker opens on, who
 // it sends to) without driving Ark's select in jsdom.
-vi.mock("../../blocks/queue-participants", () => ({
+vi.mock("../../blocks/queue-participants.tsx", () => ({
   QueueParticipants: ({
     annotators,
     setAnnotators,
@@ -146,8 +146,8 @@ vi.mock("../../blocks/queue-participants", () => ({
   ),
 }));
 
-const { AnnotationList } = await import("../annotation-list");
-const { groupedAnnotationsToRows } = await import("../../../model/annotation-row");
+const { AnnotationList } = await import("../annotation-list.tsx");
+const { groupedAnnotationsToRows } = await import("../../../model/annotation-row.ts");
 
 type ListProps = Omit<Parameters<typeof AnnotationList>[0], "host">;
 

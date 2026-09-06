@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
 import type { WebhookDeliveryProcessDeps } from "@langwatch/enterprise-webhook-server";
-import { AppGovernanceWebhookPort } from "../governance-webhook.adapter";
+import { AppGovernanceWebhookPort } from "../governance-webhook.adapter.ts";
 
 function endpoint(
   overrides: Partial<WebhookEndpointView> & { id: string; enabledEvents: string[] },

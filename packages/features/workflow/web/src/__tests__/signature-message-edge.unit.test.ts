@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeMessageEdgeUpdate } from "../model/signature-message-edge";
+import { computeMessageEdgeUpdate } from "../model/signature-message-edge.ts";
 
 describe("computeMessageEdgeUpdate", () => {
   const formMessages = [

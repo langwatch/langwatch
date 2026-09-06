@@ -1,8 +1,8 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
-import { recordValueType } from "./canonical-extraction.rules";
-import { isNonEmptyString, isRecord } from "./canonical-guard.rules";
-import { extractSystemInstructionFromMessages } from "./canonical-message.rules";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { recordValueType } from "./canonical-extraction.rules.ts";
+import { isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
+import { extractSystemInstructionFromMessages } from "./canonical-message.rules.ts";
 
 const VERCEL_RULE_PREFIX = "vercel";
 

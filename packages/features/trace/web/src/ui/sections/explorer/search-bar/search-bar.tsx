@@ -4,38 +4,38 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { IsolatedErrorBoundary } from "../../isolated-error-boundary";
-import { explainAnyError } from "../../errors";
+import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
+import { explainAnyError } from "../../errors/index.ts";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useModelProvidersSettings } from "../../use-model-providers-settings";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
-import { useTraceFacets } from "../hooks/use-trace-facets";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import { editorStyles } from "../../../../behavior/editor-styles";
-import { useFacetHoverStore } from "../../../../behavior/facet-hover.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useFloatRect } from "../../../../behavior/use-float-rect";
-import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut";
-import { AskAiButton } from "../ai/ask-ai-button";
-import { ActiveSearchEditor } from "./active-search-editor";
-import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail";
-import { FloatingAiBar } from "./floating-ai-bar";
-import { FloatingLangyBar } from "./floating-langy-bar";
-import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight";
-import { PlaceholderEditor, searchBarPlaceholder } from "./placeholder-editor";
+import { useTraceFacets } from "../hooks/use-trace-facets.ts";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { editorStyles } from "../../../../behavior/editor-styles.ts";
+import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
+import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
+import { AskAiButton } from "../ai/ask-ai-button.tsx";
+import { ActiveSearchEditor } from "./active-search-editor.tsx";
+import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
+import { FloatingAiBar } from "./floating-ai-bar.tsx";
+import { FloatingLangyBar } from "./floating-langy-bar.tsx";
+import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
+import { PlaceholderEditor, searchBarPlaceholder } from "./placeholder-editor.tsx";
 import {
   ClearButton,
   type SearchBarStatus,
   StatusBadge,
   statusBackgroundColor,
   statusBorderColor,
-} from "./search-bar-indicators";
-import { SyntaxHelpDrawerHost } from "./syntax-help-drawer";
-import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker";
-import { useAskLangyFromSearch } from "./use-ask-langy-from-search";
-import type { ValueResolver } from "./use-filter-editor";
+} from "./search-bar-indicators.tsx";
+import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
+import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
+import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
+import type { ValueResolver } from "./use-filter-editor.ts";
 
 const MAX_DYNAMIC_ITEMS = 10;
 

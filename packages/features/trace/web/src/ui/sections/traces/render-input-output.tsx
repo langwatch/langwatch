@@ -1,15 +1,15 @@
 import type { CollapsedFieldProps } from "@microlink/react-json-view";
 import React from "react";
-import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output";
-import { collectMediaParts, type MediaPartData } from "../../../behavior/shared/traces/media-parts";
+import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output.tsx";
+import { collectMediaParts, type MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
 import { isPythonRepr, parsePythonInsideJson } from "@langwatch/trace-contract";
-import dynamic from "../../../behavior/compat/next-dynamic";
-import { CopyIcon } from "../../elements/icons/copy";
+import dynamic from "../../../behavior/compat/next-dynamic.ts";
+import { CopyIcon } from "../../elements/icons/copy.tsx";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../errors";
+import { showErrorToast } from "../errors/index.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { TraceMediaPart } from "./trace-media-part";
+import { TraceMediaPart } from "./trace-media-part.tsx";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
   loading: () => <div />,

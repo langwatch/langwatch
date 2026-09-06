@@ -9,10 +9,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../../repositories/__tests__/support/authz-read.stub";
-import { AuthzService } from "../authz.service";
+import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
+import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { AuthzService } from "../authz.service.ts";
 
 const PROJECT = { projectId: "proj-1", teamId: "team-1", organizationId: "org-1" };
 

@@ -28,8 +28,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
-} from "../ui/blocks/eligible-model-providers-preview";
-import type { OrgModelProvider } from "../model/eligible-model-providers";
+} from "../ui/blocks/eligible-model-providers-preview.tsx";
+import type { OrgModelProvider } from "../model/eligible-model-providers.ts";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

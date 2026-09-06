@@ -7,12 +7,12 @@ const clientConstructor = vi.fn();
 
 vi.mock("pg", () => ({ Pool: poolConstructor }));
 vi.mock("@prisma/adapter-pg", () => ({ PrismaPg: adapterConstructor }));
-vi.mock("./generated/client", () => ({ PrismaClient: clientConstructor }));
+vi.mock("./generated/client.ts", () => ({ PrismaClient: clientConstructor }));
 
 describe("package import", () => {
   /** @scenario "Importing the Prisma client package has no process side effects" */
   it("constructs no client, adapter, or pool and exports no ready-made client", async () => {
-    const exports = await import("./index");
+    const exports = await import("./index.ts");
 
     expect(clientConstructor).not.toHaveBeenCalled();
     expect(adapterConstructor).not.toHaveBeenCalled();

@@ -2,14 +2,14 @@ import { HStack, Icon, Link, Text } from "@chakra-ui/react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { useFeatureFlag } from "../../../behavior/use-feature-flag";
+import { useFeatureFlag } from "../../../behavior/use-feature-flag.ts";
 import {
   clearLegacySimulationsPreference,
   useLegacySimulationsPreference,
-} from "../../../behavior/suites/use-legacy-simulations-preference";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+} from "../../../behavior/suites/use-legacy-simulations-preference.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { clearNewSimulationsCalloutSnooze } from "./new-simulations-callout";
+import { clearNewSimulationsCalloutSnooze } from "./new-simulations-callout.tsx";
 
 /**
  * The way back to the new simulations screens, on the previous ones.

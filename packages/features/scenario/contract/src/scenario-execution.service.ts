@@ -1,12 +1,12 @@
-import type { RunParameterValues } from "./scenario.parameters";
-import type { ResolvedRunModels } from "./run-models";
-import type { RunSecretCiphertext } from "./run-secret-ciphertext";
+import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { ResolvedRunModels } from "./run-models.ts";
+import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
 import type {
   ChildProcessJobData,
   ExecutionContext,
   ScenarioAgentInstance,
   TargetConfig,
-} from "./scenario-execution-data";
+} from "./scenario-execution-data.ts";
 
 export interface ScenarioExecutionJob {
   projectId: string;

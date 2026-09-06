@@ -1,7 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 
-import { incrementEsProcessOutboxStuckDrains } from "../../metrics";
-import type { OutboxDispatcherService } from "./outboxDispatcherService";
+import { incrementEsProcessOutboxStuckDrains } from "../../metrics.ts";
+import type { OutboxDispatcherService } from "./outboxDispatcherService.ts";
 
 const DEFAULT_INTERVAL_MS = 1_000;
 const DEFAULT_BATCH_SIZE = 10;

@@ -1,4 +1,4 @@
-import { api } from "../../../behavior/ops-api";
+import { api } from "../../../behavior/ops-api.ts";
 
 export function useReplayStatus({
   refetchInterval = 2000,

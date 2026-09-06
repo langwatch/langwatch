@@ -15,7 +15,7 @@ import {
   SNIPPET_LANGUAGE_LABELS,
   SNIPPET_LANGUAGES,
   type SnippetLanguage,
-} from "./connect-snippets";
+} from "./connect-snippets.ts";
 
 /** The install line of each language, above its snippet. */
 const INSTALL_COMMANDS: Record<SnippetLanguage, string> = {

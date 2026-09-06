@@ -6,15 +6,15 @@
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiTracesRestCollaborators } from "../../features/trace/trace-rest.mount";
+import type { ApiTracesRestCollaborators } from "../../features/trace/trace-rest.mount.ts";
 import {
   REST_AUTH_ORGANIZATION,
   REST_AUTH_PROJECT,
   RestAuthWorld,
   type RestAuthKey,
   type RestAuthProject,
-} from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+} from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /** A second team's project in the SAME organization: what the owner loses. */
 const OTHER_TEAM_PROJECT: RestAuthProject = {

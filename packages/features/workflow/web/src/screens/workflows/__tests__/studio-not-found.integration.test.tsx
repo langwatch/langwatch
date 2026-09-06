@@ -5,13 +5,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { WorkflowHostProvider } from "../../../model/workflow-host";
+import { WorkflowHostProvider } from "../../../model/workflow-host.ts";
 
 const { workflowRef } = vi.hoisted(() => ({
   workflowRef: { current: {} as Record<string, unknown> },
 }));
 
-vi.mock("../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: () => ({
     reset: vi.fn(),
     setWorkflow: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock("../../../behavior/use-workflow-store", () => ({
     getState: () => ({ getWorkflow: () => ({}) }),
   },
 }));
-vi.mock("../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { slug: "ux-review" } }),
 }));
 
@@ -34,22 +34,22 @@ vi.mock("@langwatch/ui-host/link", () => ({
   ),
 }));
 
-vi.mock("../../../behavior/optimization_studio/use-load-workflow", () => ({
+vi.mock("../../../behavior/optimization_studio/use-load-workflow.ts", () => ({
   useLoadWorkflow: () => ({ workflow: workflowRef.current }),
 }));
 
-vi.mock("../../../ui/sections/optimization_studio/optimization-studio", () => ({
+vi.mock("../../../ui/sections/optimization_studio/optimization-studio.tsx", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-vi.mock("../../../model/workflow-api-client", () => ({
+vi.mock("../../../model/workflow-api-client.ts", () => ({
   api: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },
 }));
 
-import Studio from "../studio.screen";
-import { FakeWorkflowHost } from "../../../testing";
+import Studio from "../studio.screen.tsx";
+import { FakeWorkflowHost } from "../../../testing.tsx";
 
 // The screen binds the studio's two module-scope singletons (feedback and
 // error reporting) to the mounted host on render, so it needs a host above it

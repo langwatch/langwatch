@@ -7,8 +7,8 @@ import { PromptEditorDrawer } from "@langwatch/prompt-web/surfaces/prompt-editor
 import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-web/surfaces/llm-prompt-config-utils";
-import { useSmartSetNode } from "../../../../behavior/use-smart-set-node";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   type Component,
   type Field,
@@ -19,7 +19,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../../model/edge-mapping";
+} from "../../../../model/edge-mapping.ts";
 
 /** Check whether two sets of fields have identical identifiers and types (order-independent). */
 function fieldsMatch(a: Field[], b: { identifier: string; type: string }[]): boolean {

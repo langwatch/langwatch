@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port";
+import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port.ts";
 import {
   GovernanceSignalPort,
   type GovernanceResolvedBudgetCrossing,
-} from "../governance-signal.port";
-import type { GatewayBudgetCrossingCandidate } from "../gateway-debit.port";
+} from "../governance-signal.port.ts";
+import type { GatewayBudgetCrossingCandidate } from "../gateway-debit.port.ts";
 import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,
-} from "../governance-webhook.port";
-import { GovernanceSignalService } from "../../services/governance-signal.service";
+} from "../governance-webhook.port.ts";
+import { GovernanceSignalService } from "../../services/governance-signal.service.ts";
 
 class RecordingDiagnostics extends GovernanceDiagnosticsPort {
   readonly warnings: Array<{

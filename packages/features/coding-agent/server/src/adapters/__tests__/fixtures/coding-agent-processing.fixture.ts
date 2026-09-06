@@ -7,10 +7,10 @@ import {
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import Redis from "ioredis";
-import { EventingCodingAgentProcessingAdapter } from "../../eventing.coding-agent-processing.adapter";
-import { InMemorySessionContextMemoAdapter } from "../../in-memory.session-context-memo.adapter";
-import { CodingAgentCostMetricsPort } from "../../../ports/coding-agent-cost-metrics.port";
-import { TestClock, TestProjectService } from "../../../__tests__/fixtures/coding-agent.fixture";
+import { EventingCodingAgentProcessingAdapter } from "../../eventing.coding-agent-processing.adapter.ts";
+import { InMemorySessionContextMemoAdapter } from "../../in-memory.session-context-memo.adapter.ts";
+import { CodingAgentCostMetricsPort } from "../../../ports/coding-agent-cost-metrics.port.ts";
+import { TestClock, TestProjectService } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 
 class NoopCostMetrics extends CodingAgentCostMetricsPort {
   recordComputed(): void {}

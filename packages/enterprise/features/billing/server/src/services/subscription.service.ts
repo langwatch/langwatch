@@ -16,18 +16,18 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port";
-import type { BillingOrganizationPort } from "../ports/organization.port";
-import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port";
+import type { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port.ts";
+import type { BillingOrganizationPort } from "../ports/organization.port.ts";
+import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port.ts";
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
-} from "../ports/subscription.port";
-import { SeatEventSubscriptionService } from "./seat-event-subscription.service";
+} from "../ports/subscription.port.ts";
+import { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import {
   SubscriptionItemCalculatorService,
   type SubscriptionItemUpdate,
-} from "./subscription-item-calculator.service";
+} from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionService");
 

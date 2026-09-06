@@ -15,7 +15,7 @@ const configured = vi.hoisted(() => ({
   current: null as null | { provider: string; defaultModel: string },
 }));
 
-vi.mock("../model-provider/model-provider-setup", () => ({
+vi.mock("../model-provider/model-provider-setup.tsx", () => ({
   ModelProviderSetup: ({
     providerKey,
     onComplete,
@@ -35,7 +35,7 @@ vi.mock("../model-provider/model-provider-setup", () => ({
   ),
 }));
 
-import { ModelProviderStepScreen } from "../model-provider-step-screen";
+import { ModelProviderStepScreen } from "../model-provider-step-screen.tsx";
 
 function renderStep() {
   const onContinue = vi.fn();

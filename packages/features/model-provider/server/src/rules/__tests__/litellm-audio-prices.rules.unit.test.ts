@@ -3,7 +3,7 @@ import {
   litellmPricingById,
   mapLitellmAudioModels,
   type LitellmPriceEntry,
-} from "../litellm-audio-prices.rules";
+} from "../litellm-audio-prices.rules.ts";
 
 // Shapes lifted from litellm's real model_prices_and_context_window.json.
 const FIXTURE: Record<string, LitellmPriceEntry> = {

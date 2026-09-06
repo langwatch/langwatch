@@ -7,14 +7,14 @@
  * halves as `prisma.account` statements of its own — never sees the column.
  */
 import { describe, expect, it, vi } from "vitest";
-import { UserPasswordHasherPort } from "../../ports/user.port";
+import { UserPasswordHasherPort } from "../../ports/user.port.ts";
 import {
   type UnlinkUserAccountOutcome,
   type UserCredentialAccount,
   UserCredentialRepository,
   type UserLinkedAccount,
-} from "../../repositories/user-signin-credential.repository";
-import { UserCredentialService } from "../user-signin-credential.service";
+} from "../../repositories/user-signin-credential.repository.ts";
+import { UserCredentialService } from "../user-signin-credential.service.ts";
 
 const USER_ID = "user-1";
 const ACCOUNT_ID = "account-credential";

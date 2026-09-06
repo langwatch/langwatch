@@ -7,16 +7,16 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHost = { succeeded: vi.fn(), failed: vi.fn() };
-vi.mock("../../../../model/prompt-host", () => ({
+vi.mock("../../../../model/prompt-host.ts", () => ({
   usePromptHost: () => mockHost,
 }));
 
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project-1" } }),
 }));
 
 const mockVersionsQuery = vi.fn();
-vi.mock("../../../../behavior/prompt-api", () => ({
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: () => mockVersionsQuery() },
@@ -25,7 +25,7 @@ vi.mock("../../../../behavior/prompt-api", () => ({
   },
 }));
 
-import { VersionHistoryListPopover } from "../version-history-list-popover";
+import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 function renderPopover() {
   return render(

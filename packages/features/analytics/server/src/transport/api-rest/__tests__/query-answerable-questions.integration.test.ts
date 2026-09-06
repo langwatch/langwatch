@@ -9,12 +9,12 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SHIPPED_LWQL_DEDUP } from "../../../services/langwatch-ql-view-statements.service";
-import { LangWatchQLViewProvisioningService } from "../../../services/langwatch-ql-view-provisioning.service";
-import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-capability.service";
+import { SHIPPED_LWQL_DEDUP } from "../../../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../../services/langwatch-ql-view-provisioning.service.ts";
+import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-capability.service.ts";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../../adapters/clickhouse.langwatch-ql-executor.adapter";
-import { LangWatchQLService } from "../../../services/langwatch-ql.service";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
+import { LangWatchQLService } from "../../../services/langwatch-ql.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
@@ -22,8 +22,8 @@ import {
   postgresTenantSeedStatements,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
-} from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness";
-import { createQueryRestApp } from "../query.api";
+} from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
+import { createQueryRestApp } from "../query.api.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 

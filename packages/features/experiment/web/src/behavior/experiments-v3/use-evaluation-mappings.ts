@@ -9,8 +9,8 @@ import {
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
-import { convertToUIMapping } from "../../model/experiments-v3/field-mapping-converters";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import { convertToUIMapping } from "../../model/experiments-v3/field-mapping-converters.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 type UseEvaluationMappingsResult = {
   /** Available sources for variable mapping (active dataset columns) */

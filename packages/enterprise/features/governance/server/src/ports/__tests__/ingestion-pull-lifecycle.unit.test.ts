@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port";
+import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port.ts";
 import {
   IngestionPullLifecycleCommandPort,
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleSource,
   IngestionPullTenantPort,
-} from "../ingestion-pull-lifecycle.port";
-import { IngestionPullLifecycleService } from "../../services/ingestion-pull-lifecycle.service";
+} from "../ingestion-pull-lifecycle.port.ts";
+import { IngestionPullLifecycleService } from "../../services/ingestion-pull-lifecycle.service.ts";
 
 const source = (
   overrides: Partial<IngestionPullLifecycleSource> = {},

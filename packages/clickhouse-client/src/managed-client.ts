@@ -2,19 +2,19 @@ import {
   ClickHouseClientFactory,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
-} from "./connection";
-import type { AbortSignalLike } from "./query";
-import { ConcurrencyLimiter, QueueFullError, type LimiterStats } from "./rateLimit";
+} from "./connection.ts";
+import type { AbortSignalLike } from "./query.ts";
+import { ConcurrencyLimiter, QueueFullError, type LimiterStats } from "./rateLimit.ts";
 import {
   checkStatementTenantScope,
   describeTenantScopeViolation,
   tableNamedBy,
-} from "./tenantGuard";
+} from "./tenantGuard.ts";
 import {
   VendorClientResiliencePolicy,
   type VendorClientPolicy,
   type VendorClientResilienceOptions,
-} from "./vendorClient";
+} from "./vendorClient.ts";
 
 declare const performance: { now(): number };
 declare const AbortController: new () => { abort(): void; signal: AbortSignalLike };

@@ -1,5 +1,5 @@
-import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules";
-import { isRecord } from "../rules/canonical-guard.rules";
+import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
+import { isRecord } from "../rules/canonical-guard.rules.ts";
 
 /** claude appends this marker where it cut an oversized inline body. */
 const CLAUDE_TRUNCATION_MARKER = /\s*\[TRUNCATED - [^\]]*\]\s*$/;

@@ -2,8 +2,8 @@ import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/reac
 import { useState } from "react";
 import { LuArrowRight } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { truncateId } from "../../../../../model/display-formatters";
-import { type EvalEntry, isNoVerdict, STATUS } from "./utils";
+import { truncateId } from "../../../../../model/display-formatters.ts";
+import { type EvalEntry, isNoVerdict, STATUS } from "./utils.ts";
 
 export function EvalHistoryStack({
   entries,

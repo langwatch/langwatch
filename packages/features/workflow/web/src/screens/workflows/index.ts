@@ -7,15 +7,15 @@ import type { ComponentType } from "react";
 export type WorkflowScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const workflowScreens = {
-  workflows: () => import("./workflows.screen"),
-  workflowChat: () => import("./workflow-chat.screen"),
+  workflows: () => import("./workflows.screen.tsx"),
+  workflowChat: () => import("./workflow-chat.screen.tsx"),
 } as const satisfies Record<string, WorkflowScreenLoader>;
 
 export type WorkflowScreenName = keyof typeof workflowScreens;
 
-export { WORKFLOWS_PAGE_PERMISSION } from "./workflows.screen";
-export { workflowApi } from "../../model/workflow-api";
-export type { WorkflowApiMap, WorkflowOrganizationGraph } from "../../model/workflow-api";
+export { WORKFLOWS_PAGE_PERMISSION } from "./workflows.screen.tsx";
+export { workflowApi } from "../../model/workflow-api.ts";
+export type { WorkflowApiMap, WorkflowOrganizationGraph } from "../../model/workflow-api.ts";
 export {
   WorkflowHostPort,
   WorkflowHostProvider,
@@ -24,7 +24,7 @@ export {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "../../model/workflow-host";
+} from "../../model/workflow-host.ts";
 
 /**
  * The Optimization Studio, `/:project/studio/:workflow` — the third
@@ -34,7 +34,7 @@ export {
 export type StudioScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const studioScreens = {
-  studio: () => import("./studio.screen"),
+  studio: () => import("./studio.screen.tsx"),
 } as const satisfies Record<string, StudioScreenLoader>;
 
 export type StudioScreenName = keyof typeof studioScreens;

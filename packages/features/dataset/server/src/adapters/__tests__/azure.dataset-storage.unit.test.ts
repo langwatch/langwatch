@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter";
-import { CHUNK_MAX_BYTES } from "../../rules/dataset-chunking.rules";
+import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter.ts";
+import { CHUNK_MAX_BYTES } from "../../rules/dataset-chunking.rules.ts";
 import {
   ChunkTooLargeError,
   MissingChunkError,
@@ -10,7 +10,7 @@ import {
 import {
   DatasetAzureConfigResolver,
   type DatasetBlobDriver,
-} from "../../ports/dataset-storage.port";
+} from "../../ports/dataset-storage.port.ts";
 
 /**
  * Duck-typed by the adapter (`error.name === "ObjectNotFoundError"`, see

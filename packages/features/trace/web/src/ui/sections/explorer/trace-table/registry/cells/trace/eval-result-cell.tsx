@@ -1,14 +1,14 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
-import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results";
+import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results.ts";
 import {
   EVAL_FIELD_LABELS,
   type EvalColumnField,
-} from "../../../../../../../model/lens-eval-column-id";
-import type { TraceListItem } from "../../../../types/trace";
-import { latestEvalForKey } from "../../../eval-columns";
-import type { CellDef } from "../../types";
-import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder";
+} from "../../../../../../../model/lens-eval-column-id.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { latestEvalForKey } from "../../../eval-columns.ts";
+import type { CellDef } from "../../types.ts";
+import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 
 type Density = "compact" | "comfortable";
 

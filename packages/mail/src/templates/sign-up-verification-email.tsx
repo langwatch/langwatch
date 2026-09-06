@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
-import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
-import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps";
-import { defineTemplate, renderMailTemplate } from "./registry";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
+import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
  * The email that carries a sign-up address's confirmation link (D13,

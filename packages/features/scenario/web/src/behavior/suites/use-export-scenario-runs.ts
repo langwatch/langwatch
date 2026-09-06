@@ -7,7 +7,7 @@ import type {
   ScenarioRunExportRequest,
   ScenarioRunExportStatusFilter,
 } from "@langwatch/scenario-contract";
-import { api } from "../scenario-api";
+import { api } from "../scenario-api.ts";
 
 /**
  * Orchestrates the scenario run CSV export: dialog state, the streaming download, and

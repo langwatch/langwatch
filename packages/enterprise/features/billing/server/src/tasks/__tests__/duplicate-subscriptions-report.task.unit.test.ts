@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
-} from "../../repositories/duplicate-subscriptions-report.repository";
-import { reportDuplicateSubscriptions } from "../duplicate-subscriptions-report.task";
+} from "../../repositories/duplicate-subscriptions-report.repository.ts";
+import { reportDuplicateSubscriptions } from "../duplicate-subscriptions-report.task.ts";
 
 function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
   return {

@@ -16,14 +16,14 @@ import {
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection";
+} from "../projections/evaluation-analytics-fold.projection.ts";
 import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
-} from "../projections/evaluation-analytics-rollup.projection";
-import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent";
-import { EvaluationCommandAdapter } from "./evaluation-command.adapter";
+} from "../projections/evaluation-analytics-rollup.projection.ts";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection.ts";
+import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
+import { EvaluationCommandAdapter } from "./evaluation-command.adapter.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 

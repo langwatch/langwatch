@@ -13,19 +13,19 @@ import {
   handleTerminal,
   SimulationRunExecutionEvolution,
   simulationRunExecutionWake,
-} from "./simulation-run-execution-evolution.process";
+} from "./simulation-run-execution-evolution.process.ts";
 import {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
-} from "../intents/simulation-run-execution.intent";
+} from "../intents/simulation-run-execution.intent.ts";
 import {
   cancelExecutionIntentSchema,
   executeRunIntentSchema,
   finishRunIntentSchema,
   INITIAL_SIMULATION_RUN_EXECUTION_STATE,
   SIMULATION_RUN_EXECUTION_INTENT_TYPES,
-} from "../processes/simulation-run-execution-data.process";
+} from "../processes/simulation-run-execution-data.process.ts";
 
 export {
   handleCancelRequested,
@@ -34,12 +34,12 @@ export {
   handleTerminal,
   SimulationRunExecutionEvolution,
   simulationRunExecutionWake,
-} from "./simulation-run-execution-evolution.process";
+} from "./simulation-run-execution-evolution.process.ts";
 export {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
-} from "../intents/simulation-run-execution.intent";
+} from "../intents/simulation-run-execution.intent.ts";
 export {
   CANCEL_GRACE_MS,
   type CancelExecutionIntent,
@@ -56,7 +56,7 @@ export {
   type SimulationRunExecutionProcessState,
   type SimulationRunProcessEventView,
   simulationRunProcessEventViewSchema,
-} from "../processes/simulation-run-execution-data.process";
+} from "../processes/simulation-run-execution-data.process.ts";
 
 /**
  * The `simulation_run_execution` process-manager topology, exported

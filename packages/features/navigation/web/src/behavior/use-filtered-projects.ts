@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MIN_CATEGORY_MATCH_LENGTH } from "../model/command-bar-constants";
+import { MIN_CATEGORY_MATCH_LENGTH } from "../model/command-bar-constants.ts";
 
 export interface FilteredProject {
   slug: string;

@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection";
+import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";

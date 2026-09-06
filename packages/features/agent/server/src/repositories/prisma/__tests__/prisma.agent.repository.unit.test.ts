@@ -5,7 +5,7 @@
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
-import { PrismaAgentRepository } from "../prisma.agent.repository";
+import { PrismaAgentRepository } from "../prisma.agent.repository.ts";
 
 type Row = Record<string, unknown>;
 

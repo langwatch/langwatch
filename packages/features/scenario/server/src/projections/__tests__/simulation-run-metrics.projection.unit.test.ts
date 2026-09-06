@@ -9,10 +9,10 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import type { SimulationRunMetricsComputedEvent } from "@langwatch/scenario-contract";
-import { SimulationRunMetricsMapProjection } from "../simulation-run-metrics.projection";
-import { SimulationRunMetricsAppendStore } from "../../stores/eventing/eventing.simulation-run-metrics.store";
-import type { SimulationRunMetricsRepository } from "../../repositories/simulation-run-metrics.repository";
-import type { SimulationRunMetricsProjectionRecord } from "../simulation-run-metrics.projection";
+import { SimulationRunMetricsMapProjection } from "../simulation-run-metrics.projection.ts";
+import { SimulationRunMetricsAppendStore } from "../../stores/eventing/eventing.simulation-run-metrics.store.ts";
+import type { SimulationRunMetricsRepository } from "../../repositories/simulation-run-metrics.repository.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../simulation-run-metrics.projection.ts";
 
 const projectionStoreContext: ProjectionStoreContext = {
   aggregateId: "run-1",

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return {
     ...actual,
     incrementEsReactorTotal: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock("../../metrics", async (importOriginal) => {
   };
 });
 
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -20,9 +20,9 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
-import { ProjectionRouter } from "../projectionRouter";
+} from "../../services/__tests__/testHelpers.ts";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
 /**
  * A subscriber's `makeJobId` is its collapse key: the queue dedups on it, so N

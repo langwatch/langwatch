@@ -1,13 +1,13 @@
 import { Box, Card, Collapsible, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { ReplayProgressDrawer } from "./replay-progress-drawer";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
-import { BulkReplayWizard } from "./bulk-replay-wizard";
-import { ReplayHistoryTable } from "./replay-history-table";
-import { ReplayStatusBanner } from "./replay-status-banner";
-import { SingleAggregateReplay } from "./single-aggregate-replay";
+import { ReplayProgressDrawer } from "./replay-progress-drawer.tsx";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { BulkReplayWizard } from "./bulk-replay-wizard.tsx";
+import { ReplayHistoryTable } from "./replay-history-table.tsx";
+import { ReplayStatusBanner } from "./replay-status-banner.tsx";
+import { SingleAggregateReplay } from "./single-aggregate-replay.tsx";
 
 export function ReplayWizardContent() {
   const { hasAccess } = useOpsPermission();

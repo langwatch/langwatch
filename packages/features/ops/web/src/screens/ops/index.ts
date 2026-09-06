@@ -35,26 +35,26 @@ import type { ComponentType } from "react";
 export type OpsScreenLoader = () => Promise<{ default: ComponentType<never> }>;
 
 export const opsScreens = {
-  dashboard: () => import("./ops-dashboard.screen"),
-  eventSourcing: () => import("./ops-event-sourcing.screen"),
-  deadLetters: () => import("./ops-dead-letters.screen"),
-  processes: () => import("./ops-processes.screen"),
-  projections: () => import("./ops-projections.screen"),
-  subscribers: () => import("./ops-subscribers.screen"),
-  schedules: () => import("./ops-schedules.screen"),
-  payloadStore: () => import("./ops-payload-store.screen"),
-  dejaView: () => import("./ops-deja-view.screen"),
-  featureFlags: () => import("./ops-feature-flags.screen"),
-  foundry: () => import("./ops-foundry.screen"),
-  migrations: () => import("./ops-migrations.screen"),
-  replayProgress: () => import("./ops-replay-progress.screen"),
-  backoffice: () => import("./ops-backoffice.screen"),
+  dashboard: () => import("./ops-dashboard.screen.tsx"),
+  eventSourcing: () => import("./ops-event-sourcing.screen.tsx"),
+  deadLetters: () => import("./ops-dead-letters.screen.tsx"),
+  processes: () => import("./ops-processes.screen.tsx"),
+  projections: () => import("./ops-projections.screen.tsx"),
+  subscribers: () => import("./ops-subscribers.screen.tsx"),
+  schedules: () => import("./ops-schedules.screen.tsx"),
+  payloadStore: () => import("./ops-payload-store.screen.tsx"),
+  dejaView: () => import("./ops-deja-view.screen.tsx"),
+  featureFlags: () => import("./ops-feature-flags.screen.tsx"),
+  foundry: () => import("./ops-foundry.screen.tsx"),
+  migrations: () => import("./ops-migrations.screen.tsx"),
+  replayProgress: () => import("./ops-replay-progress.screen.tsx"),
+  backoffice: () => import("./ops-backoffice.screen.tsx"),
 } as const satisfies Record<string, OpsScreenLoader>;
 
 export type OpsScreenName = keyof typeof opsScreens;
 
-export { BACKOFFICE_RESOURCES, type BackofficeResource } from "./ops-backoffice.screen";
-export { opsApi } from "../../behavior/ops-api";
+export { BACKOFFICE_RESOURCES, type BackofficeResource } from "./ops-backoffice.screen.tsx";
+export { opsApi } from "../../behavior/ops-api.ts";
 export {
   OpsHostPort,
   OpsHostProvider,
@@ -62,4 +62,4 @@ export {
   type OpsProject,
   type OpsRouteReading,
   type OpsSuccessNotice,
-} from "../../model/ops-host";
+} from "../../model/ops-host.ts";

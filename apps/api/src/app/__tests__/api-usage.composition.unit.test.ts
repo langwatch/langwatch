@@ -12,7 +12,7 @@ import {
   composeApiPlanProvider,
   composeApiUsageEnforcement,
   composeApiUsageStats,
-} from "../api-usage.composition";
+} from "../api-usage.composition.ts";
 
 /**
  * What this file pins is this root's WIRING, not the plan policy.

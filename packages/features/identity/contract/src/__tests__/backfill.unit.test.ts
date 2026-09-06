@@ -4,7 +4,7 @@ import {
   backfillParityDiffs,
   type ExpectedIdentifier,
   orphanedIdentifierRows,
-} from "../backfill";
+} from "../backfill.ts";
 
 function row(overrides: Partial<BackfillIdentifierRow>): BackfillIdentifierRow {
   return {

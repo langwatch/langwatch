@@ -1,14 +1,14 @@
-import type { IconData } from "../../../model/shared/types";
+import type { IconData } from "../../../model/shared/types.ts";
 import {
   deriveFrameworksByPlatform,
   derivePlatformsForCategory,
   type IntegrationCategory,
-} from "./codegen/registry";
+} from "./codegen/registry.tsx";
 import type {
   Option as BaseOption,
   FrameworkKey,
   PlatformKey,
-} from "../../../model/observability/types";
+} from "../../../model/observability/types.ts";
 
 type PlatformOption = BaseOption<PlatformKey> & { iconUrl?: string };
 

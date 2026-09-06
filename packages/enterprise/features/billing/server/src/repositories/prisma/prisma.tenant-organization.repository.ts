@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingTenantOrganizationPort } from "../../ports/tenant-organization.port";
+import { BillingTenantOrganizationPort } from "../../ports/tenant-organization.port.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

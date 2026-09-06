@@ -5,8 +5,8 @@ import type { AggregationTypes } from "@langwatch/analytics-contract";
 import {
   buildDataForFilterQuery,
   buildTimeseriesQuery,
-} from "../clickhouse.aggregation-builder.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+} from "../clickhouse.aggregation-builder.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
  * Every table subquery the analytics builders emit sits inside a query over

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EventSourcing } from "../../eventSourcing";
-import { EventStoreMemory } from "../eventStoreMemory";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { EventStoreMemory } from "../eventStoreMemory.ts";
 
 describe("EventStoreMemory runtime usage policy", () => {
   it("fails closed when no non-production fallback is explicitly configured", () => {

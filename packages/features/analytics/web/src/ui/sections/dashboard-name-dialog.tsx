@@ -18,8 +18,8 @@ import { useEffect, useState } from "react";
 
 import { Dialog } from "@langwatch/design-system/dialog";
 
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 
 export function DashboardNameDialog({
   open,

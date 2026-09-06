@@ -11,7 +11,7 @@ import {
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
-} from "../direct-upload";
+} from "../direct-upload.ts";
 
 const mockFetch = () => global.fetch as ReturnType<typeof vi.fn>;
 

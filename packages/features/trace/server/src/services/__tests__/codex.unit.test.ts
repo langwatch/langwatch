@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CodexCanonicaliserService } from "../codex-canonicaliser.service";
-import { createExtractorContext, createLogExtractorContext } from "./test-helpers";
+import { CodexCanonicaliserService } from "../codex-canonicaliser.service.ts";
+import { createExtractorContext, createLogExtractorContext } from "./test-helpers.ts";
 
 const SCOPE = "openai.codex"; // scope-agnostic; gating is on event.name
 

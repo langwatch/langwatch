@@ -10,7 +10,7 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
-import type { WorkflowRowPort } from "../ports/workflow.port";
+import type { WorkflowRowPort } from "../ports/workflow.port.ts";
 
 export type WorkflowStudioCopyServiceOptions = {
   datasets: DatasetService;

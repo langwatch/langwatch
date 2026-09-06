@@ -24,7 +24,7 @@ import {
   spendProbeSchema,
   timeseriesProbeSchema,
   type MeasuredCardKind,
-} from "./schemas.js";
+} from "./schemas.ts";
 
 /**
  * ── SHAPE-DRIVEN PROMOTION ─────────────────────────────────────────────────

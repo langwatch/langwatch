@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type LangWatchQLParametersChange,
   LangWatchQLParametersEditor,
-} from "../langwatch-ql-parameters-editor";
+} from "../langwatch-ql-parameters-editor.tsx";
 
 /** Renders the editor open, returning the spy holding every change it emits. */
 function renderEditor() {

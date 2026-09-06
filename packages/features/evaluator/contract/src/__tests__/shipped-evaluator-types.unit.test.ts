@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { AVAILABLE_EVALUATORS } from "../index";
+import { AVAILABLE_EVALUATORS } from "../index.ts";
 
 // Walked up to rather than counted with `..`: the count was right for exactly
 // one package directory and silently wrong the moment the suite moved.

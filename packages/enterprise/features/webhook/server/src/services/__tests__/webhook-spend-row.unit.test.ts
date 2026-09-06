@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { WebhookDeliveryService } from "../webhook-delivery.service";
+import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 
 const row = (over: Record<string, unknown> = {}) =>
   WebhookDeliveryService.payloadToRow({

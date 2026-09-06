@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renameWorkspaceReference } from "../src/workspace-package-rename";
+import { renameWorkspaceReference } from "../src/workspace-package-rename.ts";
 
 describe("workspace package rename", () => {
   it("renames module specifiers without changing comments or ordinary strings", () => {

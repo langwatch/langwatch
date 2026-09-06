@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
-import { DataTable, EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
-import { defineTemplate, renderMailTemplate } from "./registry";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
+import { DataTable, EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
  * "The person you invited says their link expired" (D11).

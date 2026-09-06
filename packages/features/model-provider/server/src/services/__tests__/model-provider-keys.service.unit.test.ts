@@ -1,6 +1,6 @@
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
-import { ModelProviderKeysService } from "../model-provider-keys.service";
+import { ModelProviderKeysService } from "../model-provider-keys.service.ts";
 
 const policy = ModelProviderKeysService.create();
 const stored = [

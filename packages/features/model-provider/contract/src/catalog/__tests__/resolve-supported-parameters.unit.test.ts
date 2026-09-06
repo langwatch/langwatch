@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { CustomModelEntry } from "../../custom-model";
+import type { CustomModelEntry } from "../../custom-model.ts";
 import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
-} from "../resolve-supported-parameters";
+} from "../resolve-supported-parameters.ts";
 
 describe("resolveSupportedParameters", () => {
   describe("when the model has a project-level customModel override", () => {

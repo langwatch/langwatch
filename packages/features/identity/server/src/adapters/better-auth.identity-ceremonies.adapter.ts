@@ -1,16 +1,16 @@
 import { identifierProviderFor } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
-import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
-import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules";
-import { BetterAuthAccountQueriesAdapter } from "./better-auth.account-queries.adapter";
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
+import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules.ts";
+import { BetterAuthAccountQueriesAdapter } from "./better-auth.account-queries.adapter.ts";
 import type {
   CeremonyAccountRow,
   IdentityAccountCeremonies,
   IdentityCeremonyClock,
-} from "../rules/ceremony-types.rules";
+} from "../rules/ceremony-types.rules.ts";
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
 

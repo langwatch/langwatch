@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { OrganizationSettingsSecretPort } from "../../../ports/organization.port";
-import { PrismaOrganizationRepository } from "../prisma.organization.repository";
+import { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
+import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 class TestSettingsSecrets extends OrganizationSettingsSecretPort {
   encrypt(value: string): string {

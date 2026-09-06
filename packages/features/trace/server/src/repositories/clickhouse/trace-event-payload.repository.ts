@@ -1,6 +1,6 @@
 import { Ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
-import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port";
+import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port.ts";
 
 /**
  * Half-width (ms) of the `EventOccurredAt` window applied to event_log blob

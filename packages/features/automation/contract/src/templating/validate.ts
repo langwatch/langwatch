@@ -1,4 +1,4 @@
-import { getLiquidEngine } from "./engine";
+import { getLiquidEngine } from "./engine.ts";
 
 export interface LiquidValidationResult {
   valid: boolean;

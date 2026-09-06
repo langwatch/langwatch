@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ProjectSlugService } from "../project-slug.service";
+import { ProjectSlugService } from "../project-slug.service.ts";
 
 const mint = (name: string, projectId = "abcdef0123") => ProjectSlugService.mint(name, projectId);
 

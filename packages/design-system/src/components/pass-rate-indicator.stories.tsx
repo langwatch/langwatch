@@ -1,6 +1,6 @@
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { PassRateCircle, PassRateDisplay } from "./pass-rate-indicator";
+import { PassRateCircle, PassRateDisplay } from "./pass-rate-indicator.tsx";
 
 const RATES = [0, 25, 50, 75, 100];
 

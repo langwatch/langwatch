@@ -22,12 +22,12 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import { AuthzGrantsCommandDispatcher } from "../../ports/authz-grants-command-dispatcher.port";
-import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port";
-import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port";
-import { PostgresAuthzAdapter } from "../postgres.authz.adapter";
-import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter";
-import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter";
+import { AuthzGrantsCommandDispatcher } from "../../ports/authz-grants-command-dispatcher.port.ts";
+import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port.ts";
+import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port.ts";
+import { PostgresAuthzAdapter } from "../postgres.authz.adapter.ts";
+import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter.ts";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter.ts";
 
 const ORGANIZATION = "organization-1";
 const ACTOR = { type: "user", id: "user-1" } as const;

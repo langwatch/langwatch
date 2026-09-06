@@ -2,8 +2,8 @@ import { useCallback, useMemo } from "react";
 import {
   selectTraceOutputBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
-import { EditableIOField } from "./editable-io-field";
+} from "../../../../../behavior/trace-edit.store.ts";
+import { EditableIOField } from "./editable-io-field.tsx";
 
 /**
  * The trace's own output editor. This is the field the curation loop cares

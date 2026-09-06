@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   getLangWatchTracer: vi.fn(),
 }));
 
-vi.mock("../logger", () => ({
+vi.mock("../logger.ts", () => ({
   createLogger: vi.fn(() => mocks.logger),
 }));
 
@@ -24,7 +24,7 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: mocks.getLangWatchTracer,
 }));
 
-import { createProcessObservability } from "../node/process-observability";
+import { createProcessObservability } from "../node/process-observability.ts";
 
 describe("createProcessObservability", () => {
   beforeEach(() => {

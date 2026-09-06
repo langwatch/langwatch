@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   scenarioDeferredComputeRunMetricsJob,
-} from "../compute-run-metrics.adapter";
+} from "../compute-run-metrics.adapter.ts";
 
 function payload(
   overrides: Partial<ComputeRunMetricsCommandData> = {},

@@ -13,14 +13,14 @@ import type {
   TracesV2TrpcPorts,
 } from "@langwatch/trace-server";
 import type { TraceApp } from "@langwatch/trace-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTraceReadStackPort } from "./trace-read-stack.port";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
 import type {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
-} from "./trace-trpc.mount";
-import type { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount";
+} from "./trace-trpc.mount.ts";
+import type { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount.ts";
 
 /** The application slices and the group's ports, composed together. */
 export type ComposedTraceFeature = Readonly<{

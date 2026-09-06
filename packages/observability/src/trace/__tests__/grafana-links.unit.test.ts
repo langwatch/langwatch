@@ -5,7 +5,7 @@ import {
   grafanaLinksForTrace,
   grafanaLogsUrlByTrace,
   grafanaTraceUrl,
-} from "../grafana-links";
+} from "../grafana-links.ts";
 
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 

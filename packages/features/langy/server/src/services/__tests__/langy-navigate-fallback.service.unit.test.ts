@@ -3,10 +3,10 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { describe, expect, it } from "vitest";
-import { LangyNavigateProjectPort } from "../../ports/langy-navigate-project.port";
-import { LangyNavigateResourcePort } from "../../ports/langy-navigate-resource.port";
-import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules";
-import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service";
+import { LangyNavigateProjectPort } from "../../ports/langy-navigate-project.port.ts";
+import { LangyNavigateResourcePort } from "../../ports/langy-navigate-resource.port.ts";
+import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
+import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";
 
 class FakeProjects extends LangyNavigateProjectPort {
   constructor(private readonly slugs: Record<string, string>) {

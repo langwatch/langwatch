@@ -1,6 +1,6 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createHomeTrpcRouter } from "./project-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createHomeTrpcRouter } from "./project-trpc.mount.ts";
 
 /** The one namespace this feature mounts. */
 export type ComposedHomeFeature = Readonly<{

@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   GovernanceOcsfEventPort,
   type GovernanceOcsfEvent,
-} from "../../ports/governance-subscriber.port";
-import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber";
+} from "../../ports/governance-subscriber.port.ts";
+import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
   SilentSubscriberDiagnostics,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures";
+} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
 
 class ReplacingOcsfEvents extends GovernanceOcsfEventPort {
   readonly rows = new Map<string, GovernanceOcsfEvent>();

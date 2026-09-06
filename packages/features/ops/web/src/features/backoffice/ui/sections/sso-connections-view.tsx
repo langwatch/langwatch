@@ -12,16 +12,16 @@ import {
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { Dialog } from "../../../../ui/elements/ops-dialog";
+import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 
-import { api } from "../../../../behavior/ops-api";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
-import { EmptyCell, formatDateTime } from "../elements/backoffice-cells";
-import { BackofficeTable } from "./backoffice-table-shell";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { EmptyCell, formatDateTime } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
 

@@ -21,7 +21,7 @@ type BadgeCounts = { blockedCount: number; dlqCount: number; computedAt: Date | 
 let badgeCounts: { data?: BadgeCounts } = {};
 const badgeQueryOptions = vi.fn();
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     ops: {
       getBadgeCounts: {
@@ -44,8 +44,8 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost } from "../../../testing";
-import { SidebarContent } from "../product-sidebar";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { SidebarContent } from "../product-sidebar.tsx";
 
 const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };

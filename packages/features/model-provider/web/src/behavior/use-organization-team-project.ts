@@ -21,7 +21,7 @@
 
 import { useMemo } from "react";
 
-import { useModelProviderHost } from "../model/model-provider-host";
+import { useModelProviderHost } from "../model/model-provider-host.ts";
 
 export type OrganizationTeamProjectReading = {
   organization:

@@ -8,8 +8,8 @@ import { describe, expect, it } from "vitest";
 import {
   OpsEventingIntrospectionPort,
   type OpsKillSwitchDescriptor,
-} from "../../ports/eventing-introspection.port";
-import { OpsApp, type OpsCapability } from "../ops.app";
+} from "../../ports/eventing-introspection.port.ts";
+import { OpsApp, type OpsCapability } from "../ops.app.ts";
 
 const liveSwitch: OpsKillSwitchDescriptor = {
   key: "es-trace-subscriber-evaluationTrigger-killswitch",

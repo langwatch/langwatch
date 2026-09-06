@@ -1,7 +1,7 @@
 import { getCurrentContext, runWithContext } from "@langwatch/observability/context";
 import { describe, expect, it } from "vitest";
-import { ApiGroupQueueContextAdapter } from "../api-group-queue-context.adapter";
-import { ApiQueueInfrastructure } from "../api-queue.infrastructure";
+import { ApiGroupQueueContextAdapter } from "../api-group-queue-context.adapter.ts";
+import { ApiQueueInfrastructure } from "../api-queue.infrastructure.ts";
 import { ResourceScope } from "@langwatch/runtime-composition";
 
 describe("ApiGroupQueueContextAdapter", () => {

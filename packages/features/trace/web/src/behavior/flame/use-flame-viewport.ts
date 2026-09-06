@@ -3,8 +3,8 @@ import {
   MIN_VIEWPORT_MS,
   WHEEL_ZOOM_SENSITIVITY,
   ZOOM_ANIMATION_MS,
-} from "../../model/flame/constants";
-import type { Viewport } from "./types";
+} from "../../model/flame/constants.ts";
+import type { Viewport } from "./types.ts";
 
 export interface UseFlameViewportResult {
   viewport: Viewport;

@@ -1,19 +1,19 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import type { TopicService as TopicServiceContract } from "@langwatch/topic-contract";
-import type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection";
-import type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection";
-import type { TopicModelData } from "../projections/topic-model.projection";
+import type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection.ts";
+import type { TopicModelData } from "../projections/topic-model.projection.ts";
 import {
   PrismaTopicClusteringRepository,
   type TopicClusteringDatabase,
-} from "../repositories/prisma/prisma.topic-clustering.repository";
-import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-history-projection.repository";
-import { PrismaTopicClusteringRunProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-projection.repository";
-import { PrismaTopicModelProjectionRepository } from "../repositories/prisma/prisma.topic-model-projection.repository";
-import { PrismaTopicRepository } from "../repositories/prisma/prisma.topic.repository";
-import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository";
-import { TopicService } from "../services/topic.service";
-import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port";
+} from "../repositories/prisma/prisma.topic-clustering.repository.ts";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-history-projection.repository.ts";
+import { PrismaTopicClusteringRunProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-projection.repository.ts";
+import { PrismaTopicModelProjectionRepository } from "../repositories/prisma/prisma.topic-model-projection.repository.ts";
+import { PrismaTopicRepository } from "../repositories/prisma/prisma.topic.repository.ts";
+import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import { TopicService } from "../services/topic.service.ts";
+import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port.ts";
 
 /** The clustering pipeline's Postgres persistence, keyed as the registry expects it. */
 export interface TopicClusteringPersistence {

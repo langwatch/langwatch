@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { create } from "zustand";
-import type { ChatLayout } from "./transcript";
+import type { ChatLayout } from "./transcript/index.ts";
 
 export type ViewFormat = "pretty" | "text" | "json" | "markdown";
 export type MarkdownSubmode = "rendered" | "source";

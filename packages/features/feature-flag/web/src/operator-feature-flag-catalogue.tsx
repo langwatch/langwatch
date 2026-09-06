@@ -22,8 +22,8 @@ export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> &
 };
 import { useMemo, useState } from "react";
 import { Switch } from "@langwatch/design-system/switch";
-import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog";
-import { summarizeTargeting, targetingLabel } from "./model/targeting-summary";
+import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog.tsx";
+import { summarizeTargeting, targetingLabel } from "./model/targeting-summary.ts";
 
 /**
  * The catalogue as the BROWSER receives it.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { TraceAttributeCapService } from "../trace-attribute-cap.service";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules";
+import { TraceAttributeCapService } from "../trace-attribute-cap.service.ts";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules.ts";
 
 const traceAttributeCapService = TraceAttributeCapService.create();
 

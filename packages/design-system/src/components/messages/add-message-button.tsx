@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { LuPlus } from "react-icons/lu";
-import { Menu } from "../menu";
+import { Menu } from "../menu.tsx";
 
 export type AddMessageButtonProps = {
   onAdd: (role: "user" | "assistant") => void;

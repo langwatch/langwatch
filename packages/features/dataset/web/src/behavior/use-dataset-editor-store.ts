@@ -5,8 +5,8 @@
 import { createStore, type StoreApi } from "zustand";
 
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type { AutosaveState, CellPosition, RowHeightMode } from "../model/dataset-table-context";
-import type { PendingSavedChanges } from "../model/pending-saved-changes";
+import type { AutosaveState, CellPosition, RowHeightMode } from "../model/dataset-table-context.tsx";
+import type { PendingSavedChanges } from "../model/pending-saved-changes.ts";
 
 export type EditorColumn = {
   id: string;

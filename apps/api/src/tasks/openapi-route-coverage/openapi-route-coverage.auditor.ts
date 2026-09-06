@@ -9,7 +9,7 @@
 // outlive the routes it was written for.
 // See `packages/api/specs/openapi-route-coverage.feature`.
 
-import type { Exclusion } from "./openapi-route-coverage.exclusions";
+import type { Exclusion } from "./openapi-route-coverage.exclusions.ts";
 
 /** One route the composed process mounts, as the audit reads it. */
 export interface CoverageRoute {

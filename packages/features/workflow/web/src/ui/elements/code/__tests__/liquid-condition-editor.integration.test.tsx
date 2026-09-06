@@ -15,11 +15,11 @@ vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-vi.mock("../workflow-code-editor", () => ({
+vi.mock("../workflow-code-editor.tsx", () => ({
   vscodeThemeName: () => "vs",
 }));
 
-import { LiquidConditionEditor } from "../liquid-condition-editor";
+import { LiquidConditionEditor } from "../liquid-condition-editor.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

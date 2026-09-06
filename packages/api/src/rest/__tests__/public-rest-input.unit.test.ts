@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { parsePublicRestInput } from "../public-rest-input.js";
+import { parsePublicRestInput } from "../public-rest-input.ts";
 
 describe("public REST input parsing", () => {
   it("keeps repeated GET query values as arrays while preserving scalar query values", async () => {

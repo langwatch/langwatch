@@ -3,12 +3,12 @@
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
-import { TraceEventRefParsingService } from "./trace-eventref-parsing.service";
-import type { TraceBlobStoreService } from "./trace-blob-store.service";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service";
+import { TraceEventRefParsingService } from "./trace-eventref-parsing.service.ts";
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
-import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service";
+import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service.ts";
 
 /**
  * Maximum concurrent `event_log` reads in flight across an entire result set. It bounds the bulk

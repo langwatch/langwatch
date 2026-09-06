@@ -6,15 +6,15 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
-import { AgentTestScriptAdapter } from "./agent-test-script.adapter";
-import { buildRemoteTraceRunConfig } from "./remote-trace-run.adapter";
-import type { NlpFetchTimeouts } from "./nlp-fetch.adapter";
-import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.adapter";
-import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.adapter";
-import { selectRoleModelParams } from "./scenario-role-model.adapter";
-import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
+import { AgentTestScriptAdapter } from "./agent-test-script.adapter.ts";
+import { buildRemoteTraceRunConfig } from "./remote-trace-run.adapter.ts";
+import type { NlpFetchTimeouts } from "./nlp-fetch.adapter.ts";
+import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.adapter.ts";
+import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.adapter.ts";
+import { selectRoleModelParams } from "./scenario-role-model.adapter.ts";
+import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter.ts";
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
-import type { ScenarioHttpPort } from "../ports/scenario-http.port";
+import type { ScenarioHttpPort } from "../ports/scenario-http.port.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface

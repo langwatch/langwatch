@@ -2,12 +2,12 @@ import {
   deriveFollowUps as derivePackageFollowUps,
   followUpsForResult as followPackageUpsForResult,
   SUGGESTION_LABEL,
-} from "../../../../model/langy-cli-follow-ups";
-import type { FollowUpSuggestion, SettledToolResult } from "../../../../model/langy-cli-follow-ups";
+} from "../../../../model/langy-cli-follow-ups.ts";
+import type { FollowUpSuggestion, SettledToolResult } from "../../../../model/langy-cli-follow-ups.ts";
 import {
   featureForCliToolName,
   featuresConsuming,
-} from "../../../../model/shared/langy/feature-map";
+} from "../../../../model/shared/langy/feature-map.ts";
 
 const featureMap = { featureForCliToolName, featuresConsuming };
 

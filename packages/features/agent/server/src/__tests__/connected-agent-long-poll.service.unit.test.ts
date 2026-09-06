@@ -13,15 +13,15 @@ import {
   type AgentService,
 } from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules";
+import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import type { StoredCall } from "@langwatch/agent-contract";
-import type { AgentRepository } from "../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
-import { AgentSessionService } from "../services/connected-agent-session.service";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service";
+import type { AgentRepository } from "../repositories/agent.repository.ts";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import { AgentSessionService } from "../services/connected-agent-session.service.ts";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 
 const projectId = "project_poll";
 const instanceId = "inst_poll";
@@ -414,7 +414,7 @@ describe("LongPollTransportService registration and polling, against a memory st
       // No poll came in: force the instance's last-seen score past the
       // presence TTL, the way a stalled process reads once no watch's clock
       // extends it.
-      const { instanceSetKey } = await import("../rules/connected-agent-keys.rules");
+      const { instanceSetKey } = await import("../rules/connected-agent-keys.rules.ts");
       await store.zadd({
         key: instanceSetKey(projectId, registeredAgentId),
         score: Date.now() - (PRESENCE_TTL_SECONDS + 5) * 1000,

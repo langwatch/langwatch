@@ -7,7 +7,7 @@ import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   TrackedEventSync,
   type TrackedEventSyncSubscriberDeps,
-} from "../tracked-event-sync.subscriber";
+} from "../tracked-event-sync.subscriber.ts";
 
 type FeedbackEvent = {
   type?: string;

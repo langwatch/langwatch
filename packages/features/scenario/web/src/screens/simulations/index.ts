@@ -5,18 +5,18 @@ import type { ComponentType } from "react";
 export type ScenarioScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const scenarioScreens = {
-  simulations: () => import("./simulations.screen"),
-  scenarioLibrary: () => import("./scenario-library.screen"),
-  agentTesting: () => import("./agent-testing.screen"),
+  simulations: () => import("./simulations.screen.tsx"),
+  scenarioLibrary: () => import("./scenario-library.screen.tsx"),
+  agentTesting: () => import("./agent-testing.screen.tsx"),
 } as const satisfies Record<string, ScenarioScreenLoader>;
 
 export type ScenarioScreenName = keyof typeof scenarioScreens;
 
-export { api as scenarioApi, api as scenarioApiHooks } from "../../behavior/scenario-api";
+export { api as scenarioApi, api as scenarioApiHooks } from "../../behavior/scenario-api.ts";
 export type {
   RouterOutputs as ScenarioRouterOutputs,
   ScenarioApiMap,
-} from "../../behavior/scenario-api";
+} from "../../behavior/scenario-api.ts";
 export {
   ScenarioHostPort,
   ScenarioHostProvider,
@@ -30,7 +30,7 @@ export {
   type ScenarioHostUser,
   type ScenarioRouteReading,
   type ScenarioSuccessNotice,
-} from "../../model/scenario-host";
+} from "../../model/scenario-host.ts";
 
 /**
  * The connected agents' own card grid (ADR-128), for `@langwatch/agent-web`'s agents

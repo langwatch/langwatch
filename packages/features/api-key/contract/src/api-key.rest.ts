@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 
-import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key";
+import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
 
 const restBindingSchema = z.object({
   id: z.string().min(1),

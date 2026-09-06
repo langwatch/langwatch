@@ -1,28 +1,28 @@
 import { vi } from "vitest";
 import { z } from "zod";
-import type { Command } from "../../commands/command";
-import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
-import type { CommandSchema } from "../../commands/commandSchema";
-import { defineCommandSchema } from "../../commands/commandSchema";
-import type { AggregateType } from "../../domain/aggregateType";
-import { defineAggregate, defineEvents } from "../../domain/definitions";
-import type { CommandType } from "../../domain/commandType";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event, Projection } from "../../domain/types";
+import type { Command } from "../../commands/command.ts";
+import type { CommandHandlerClass } from "../../commands/commandHandlerClass.ts";
+import type { CommandSchema } from "../../commands/commandSchema.ts";
+import { defineCommandSchema } from "../../commands/commandSchema.ts";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import type { CommandType } from "../../domain/commandType.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event, Projection } from "../../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
-} from "../../projections/foldProjection.types";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
-import type { EventSourcedQueueProcessor } from "../../queues";
+} from "../../projections/foldProjection.types.ts";
+import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
 import {
   createTestEvent,
   TEST_COMMAND_TYPES,
   TEST_EVENT_TYPES,
-} from "../../services/__tests__/testHelpers";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import type { EventStore } from "../../stores/eventStore.types";
-import { definePipeline } from "../staticBuilder";
+} from "../../services/__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
+import type { EventStore } from "../../stores/eventStore.types.ts";
+import { definePipeline } from "../staticBuilder.ts";
 
 /**
  * Creates a mock EventStore with spyable methods.

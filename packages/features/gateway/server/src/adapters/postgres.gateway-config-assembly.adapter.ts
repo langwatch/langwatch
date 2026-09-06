@@ -3,13 +3,13 @@
  */
 import { createHash } from "node:crypto";
 import type { ModelProvider, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
+import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
+import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 
 const logger = createLogger("langwatch:gateway:config-assembly");
 

@@ -20,7 +20,7 @@ import {
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
   withoutParameterNames,
-} from "../index";
+} from "../index.ts";
 
 const definition = (name: string, defaultValue?: string | number | boolean) => ({
   name,

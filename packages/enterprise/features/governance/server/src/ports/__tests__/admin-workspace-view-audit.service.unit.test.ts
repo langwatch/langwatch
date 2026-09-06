@@ -4,9 +4,9 @@ import {
   AdminWorkspaceViewAuditRepository,
   AdminWorkspaceViewOcsfPort,
   type AdminWorkspaceTarget,
-} from "../admin-workspace-view-audit.port";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../admin-workspace-view-audit.port.ts";
+import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
   target: AdminWorkspaceTarget | null = {

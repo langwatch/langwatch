@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
-} from "../../adapters/governance-events.adapter";
-import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process";
+} from "../../adapters/governance-events.adapter.ts";
+import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process.ts";
 
 const lifecycle = (action: "created" | "rotated" | "disabled" | "enabled" | "revoked") => ({
   tenantId: "proj_1",

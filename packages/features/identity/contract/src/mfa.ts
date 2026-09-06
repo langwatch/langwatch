@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { userTenantedCommandSchema } from "./facts";
-import { identityActorSchema } from "./vocabulary";
+import { userTenantedCommandSchema } from "./facts.ts";
+import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * The two-step verification facts (D06). One enrollment per PERSON: the

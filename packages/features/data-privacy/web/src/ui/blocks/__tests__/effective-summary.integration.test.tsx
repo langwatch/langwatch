@@ -21,7 +21,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { EffectiveSummary } from "../effective-summary";
+import { EffectiveSummary } from "../effective-summary.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

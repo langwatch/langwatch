@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { JoinRequestAudiencePort } from "../../ports/join-request-audience.port";
+import { JoinRequestAudiencePort } from "../../ports/join-request-audience.port.ts";
 
 /** Every model a join-request notification reads, and no other. */
 export type PrismaJoinRequestAudienceDatabase = Pick<

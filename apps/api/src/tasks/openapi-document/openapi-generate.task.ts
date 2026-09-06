@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { Task } from "@langwatch/task";
-import { DEFAULT_SCRATCH_PATH, generateOpenApiDocument } from "./openapi-document.generator";
+import { DEFAULT_SCRATCH_PATH, generateOpenApiDocument } from "./openapi-document.generator.ts";
 
 /**
  * The runnable OpenAPI description — `pnpm --filter @langwatch/platform-api

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { EffectiveTeamRoleUpdatesService } from "../compute-effective-team-role-updates.service";
+import { EffectiveTeamRoleUpdatesService } from "../compute-effective-team-role-updates.service.ts";
 
 const service = EffectiveTeamRoleUpdatesService.create();
 

@@ -3,14 +3,14 @@
  * Unit tests for TraceBlobStoreService.getFromEventLog (event_log read path) and putSpool/deleteSpool (transient S3 spool). event_log is the single durable source; getFromEventLog SELECTs by (TenantId, AggregateType, AggregateId, EventId) with TenantId FIRST, structurally blocking cross-tenant reads. These tests FAIL at unit runtime (methods throw "not implemented") but pass typecheck, serving as the TDD contract.
  */
 
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
@@ -21,13 +21,13 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { type WarnLogger } from "../trace-offload-resolution.service";
+import { type WarnLogger } from "../trace-offload-resolution.service.ts";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
   TraceBlobStoreService,
   type S3ClientResolver,
-} from "../trace-blob-store.service";
+} from "../trace-blob-store.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock

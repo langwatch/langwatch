@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
-import { ProcessFleetCard } from "../ui/elements/process-fleet-card";
+import { ProcessFleetCard } from "../ui/elements/process-fleet-card.tsx";
 
 function makeRow(overrides: Partial<ProcessFleetSummary> = {}): ProcessFleetSummary {
   return {

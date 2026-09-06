@@ -1,6 +1,6 @@
 import { emailSuppressionSchema, type EmailSuppression } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { EmailSuppressionRepository } from "../email-suppression.repository";
+import { EmailSuppressionRepository } from "../email-suppression.repository.ts";
 const map = (row: unknown): EmailSuppression => emailSuppressionSchema.parse(row);
 export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository {
   private constructor(private readonly database: PrismaClient) {

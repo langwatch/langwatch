@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEditedValue } from "../range-controls";
+import { parseEditedValue } from "../range-controls.tsx";
 
 describe("parseEditedValue", () => {
   describe("given a formatted label with a unit suffix", () => {

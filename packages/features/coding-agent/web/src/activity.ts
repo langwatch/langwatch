@@ -16,7 +16,7 @@
  * `@langwatch/user-web`'s `screens/personal-workspace`.
  */
 
-export { codingAgentApi, type CodingAgentApiMap } from "./coding-agent-api";
+export { codingAgentApi, type CodingAgentApiMap } from "./coding-agent-api.ts";
 export {
   CodingAgentActivityHostPort,
   CodingAgentActivityHostProvider,
@@ -24,12 +24,12 @@ export {
   type CodingAgentFailure,
   type CodingAgentNotice,
   type CodingAgentRouteReading,
-} from "./coding-agent-activity-host";
-export { PullRequestsTable } from "./pull-requests-table";
-export { SessionsTable } from "./sessions-table";
+} from "./coding-agent-activity-host.ts";
+export { PullRequestsTable } from "./pull-requests-table.tsx";
+export { SessionsTable } from "./sessions-table.tsx";
 export {
   decodePullRequestRef,
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
   type PullRequestDetailRef,
-} from "./pull-request-detail-address";
+} from "./pull-request-detail-address.ts";

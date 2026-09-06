@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities";
-import { setUiFeedbackHost, toaster } from "../toaster";
+import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
+import { setUiFeedbackHost, toaster } from "../toaster.ts";
 
 function recordingHost() {
   const succeeded: UiSuccessNotice[] = [];

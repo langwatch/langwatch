@@ -1,1 +1,1 @@
-export * from "../../ui/elements/ops-kbd";
+export * from "../../ui/elements/ops-kbd.tsx";

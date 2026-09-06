@@ -1,9 +1,9 @@
-import type { ProjectDiagnosticsPort } from "../ports/project.port";
+import type { ProjectDiagnosticsPort } from "../ports/project.port.ts";
 import {
   PrismaProjectRepository,
   type PrismaProjectDatabase,
-} from "../repositories/prisma/prisma.project.repository";
-import { ProjectMetadataService } from "../services/project-metadata.service";
+} from "../repositories/prisma/prisma.project.repository.ts";
+import { ProjectMetadataService } from "../services/project-metadata.service.ts";
 
 /** The models the ingestion seam needs from the client. */
 export type ProjectMetadataDatabase = PrismaProjectDatabase;

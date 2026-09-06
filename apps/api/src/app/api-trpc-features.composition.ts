@@ -6,15 +6,15 @@
 import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application";
-import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
-import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed";
+import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed.ts";
 import {
   ApiTrpcCollaboratorsAbsence,
   type ApiTrpcCollaborators,
-} from "../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
-import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
+} from "../app-trpc/app-trpc.collaborators.ts";
+import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context.ts";
+import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features.ts";
 
 /**
  * Everything the record is composed from: the shared infrastructure a feature composes

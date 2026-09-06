@@ -1,6 +1,6 @@
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
-import { SystemMigrationsPassTask } from "../system-migrations-pass.task";
+import { SystemMigrationsPassTask } from "../system-migrations-pass.task.ts";
 
 function summary(overrides: Partial<MigrationPassSummary> = {}): MigrationPassSummary {
   return {

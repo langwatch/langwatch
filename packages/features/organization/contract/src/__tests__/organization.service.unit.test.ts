@@ -7,7 +7,7 @@ import {
   organizationGroupBindingInputSchema,
   organizationBillingProfileSchema,
   type OrganizationService,
-} from "../index";
+} from "../index.ts";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 describe("OrganizationService contract", () => {

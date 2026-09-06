@@ -5,8 +5,8 @@ import {
   StoredObjectLegacySourcePort,
   StoredObjectLegacyWriterDrainPort,
   StoredObjectProjectSourcePort,
-} from "../index";
-import { InMemoryStoredObjectStore } from "../testing";
+} from "../index.ts";
+import { InMemoryStoredObjectStore } from "../testing.ts";
 
 class OneProject extends StoredObjectProjectSourcePort {
   async listForOrganization() {

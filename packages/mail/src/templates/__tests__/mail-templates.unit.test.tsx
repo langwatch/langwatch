@@ -2,9 +2,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { expressive } from "../email-layout";
-import { mailTemplates } from "../index";
-import { renderMailTemplate, type MailTemplate } from "../registry";
+import { expressive } from "../email-layout.tsx";
+import { mailTemplates } from "../index.ts";
+import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 
 /**
  * The output IS the product here, so these are snapshot tests on purpose.

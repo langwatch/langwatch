@@ -1,10 +1,10 @@
-import type { Event } from "../domain/types";
+import type { Event } from "../domain/types.ts";
 import {
   CUTOFF_KEY_PREFIX,
   doneMarkerKey,
   isAtOrBeforeCutoffMarker,
-} from "../replay/replayConstants";
-import { RecoverableError } from "../services/errorHandling";
+} from "../replay/replayConstants.ts";
+import { RecoverableError } from "../services/errorHandling.ts";
 
 /**
  * Thrown when a fold projection event must be deferred because projection-replay

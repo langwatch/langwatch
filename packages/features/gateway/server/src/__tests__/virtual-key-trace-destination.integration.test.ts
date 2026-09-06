@@ -15,10 +15,10 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter";
-import { TraceDestinationProjectService } from "./support/trace-destination-project-service";
+import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
+import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
 
-import { PostgresVirtualKeyAdapter } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();

@@ -6,11 +6,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NavigationProject } from "../../../model/navigation-host";
-import { WithStubNavigationHost } from "../../../testing";
-import { MainMenuSections } from "../main-menu";
+import type { NavigationProject } from "../../../model/navigation-host.ts";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { MainMenuSections } from "../main-menu.tsx";
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({}) } },
   },

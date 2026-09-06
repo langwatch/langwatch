@@ -9,8 +9,8 @@ import {
   organizationRoleSchema,
   roleBindingScopeTypeSchema,
   teamUserRoleSchema,
-} from "./authz";
-import { authzPermissionSchema } from "./registry";
+} from "./authz.ts";
+import { authzPermissionSchema } from "./registry.ts";
 
 export const authzCheckInputSchema = z
   .object({

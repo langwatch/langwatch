@@ -3,12 +3,12 @@ import {
   getLatestOpenAIChatFlagship,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
-import { parameterRegistry } from "../parameter-registry";
+import { parameterRegistry } from "../parameter-registry.ts";
 import {
   buildModelChangeValues,
   calculateSensibleDefaults,
   normalizeMaxTokens,
-} from "../max-tokens.utils";
+} from "../max-tokens.utils.ts";
 
 const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 

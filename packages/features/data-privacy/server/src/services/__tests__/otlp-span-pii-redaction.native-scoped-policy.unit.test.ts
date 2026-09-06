@@ -7,7 +7,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
-import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service";
+import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
 /** The analysis-service batch call the strict level escalates to. */
 type BatchClearPIIFunction = (
@@ -17,7 +17,7 @@ type BatchClearPIIFunction = (
 
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture";
+import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture.ts";
 
 const TENANT = createTenantId("project-web-app");
 

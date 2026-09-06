@@ -16,30 +16,30 @@ let mockDescriptors: unknown[] = [];
 
 // ─── Dependency mocks ─────────────────────────────────────────────────────────
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-sidebar-test" },
     organization: { id: "org-1" },
   }),
 }));
 
-vi.mock("../../../../../behavior/explorer/use-project-has-traces", () => ({
+vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: mockHasAnyTraces }),
 }));
 
-vi.mock("../../hooks/use-trace-facets", () => ({
+vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({
     data: mockDescriptors,
     isLoading: mockFacetsLoading,
   }),
 }));
 
-vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ density: "comfortable" }),
 }));
-vi.mock("../../../../../behavior/facet-visibility.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/facet-visibility.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
@@ -50,7 +50,7 @@ vi.mock("../../../../../behavior/facet-visibility.store", async (importOriginal)
     }),
   selectVisibilityFor: () => ({ hidden: [], shown: [] }),
 }));
-vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
@@ -62,7 +62,7 @@ vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       ast: { type: "group", combinator: "and", filters: [] },
@@ -71,7 +71,7 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -81,7 +81,7 @@ vi.mock("../../../../../behavior/view.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/facet-lens.store", () => ({
+vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
       lens: { sectionOrder: [], groupOrder: [] },
@@ -107,21 +107,21 @@ vi.mock("@langwatch/trace-contract", async (importOriginal) => {
 });
 
 // Stub the heavy sub-components so we only test the visibility decision
-vi.mock("../facet-manager-popover", () => ({
+vi.mock("../facet-manager-popover.tsx", () => ({
   FacetManagerPopover: () => <div data-testid="facet-manager" />,
 }));
 
-vi.mock("../section-renderer", () => ({
+vi.mock("../section-renderer.tsx", () => ({
   SectionRenderer: () => <div data-testid="section-renderer" />,
 }));
 
-vi.mock("../../../../elements/explorer/filter-sidebar/sortable-section", () => ({
+vi.mock("../../../../elements/explorer/filter-sidebar/sortable-section.tsx", () => ({
   SortableSection: ({ children }: { children: (p: unknown) => React.ReactNode }) => (
     <div>{children({})}</div>
   ),
 }));
 
-vi.mock("../../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton", () => ({
+vi.mock("../../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx", () => ({
   FilterSidebarSkeleton: () => <div data-testid="filter-sidebar-skeleton" />,
 }));
 
@@ -150,7 +150,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 // ─── Module under test ────────────────────────────────────────────────────────
 
 import type React from "react";
-import { FilterSidebar } from "../filter-sidebar";
+import { FilterSidebar } from "../filter-sidebar.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

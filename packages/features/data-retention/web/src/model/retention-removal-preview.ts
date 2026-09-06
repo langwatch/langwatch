@@ -1,4 +1,4 @@
-import type { RetentionScopeGroup } from "./retention-grouping";
+import type { RetentionScopeGroup } from "./retention-grouping.ts";
 
 /**
  * The input and the enable flag for the remove-confirmation preview read.

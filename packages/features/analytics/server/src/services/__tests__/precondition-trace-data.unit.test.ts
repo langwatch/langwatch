@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { PreconditionTraceDataService } from "../precondition-trace-data.service";
+import { PreconditionTraceDataService } from "../precondition-trace-data.service.ts";
 
 const SUBJECT = PreconditionTraceDataService.create();
 

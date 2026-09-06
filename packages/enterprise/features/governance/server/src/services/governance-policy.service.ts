@@ -1,9 +1,9 @@
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
-import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository";
+import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import {
   NullGovernanceDiagnosticsPort,
   type GovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port";
+} from "../ports/governance-diagnostics.port.ts";
 import { z } from "zod";
 
 const UNASSIGNED_DEPARTMENT = "unassigned";

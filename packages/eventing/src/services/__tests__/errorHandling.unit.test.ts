@@ -12,7 +12,7 @@ import {
   SecurityError,
   StoreError,
   ValidationError,
-} from "../errorHandling";
+} from "../errorHandling.ts";
 
 const TRANSIENT_NETWORK_CODES = [
   "ECONNRESET",

@@ -26,8 +26,8 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api";
-import { useEvaluatorHost } from "../../model/evaluator-host";
+import { evaluatorApi } from "../../behavior/evaluator-api.ts";
+import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 export function EvaluatorReplicateDialog({
   open,

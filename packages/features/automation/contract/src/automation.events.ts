@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { NOTIFICATION_CADENCES } from "./cadences";
-import { triggerActionSchema } from "./trigger";
+import { NOTIFICATION_CADENCES } from "./cadences.ts";
+import { triggerActionSchema } from "./trigger.ts";
 
 export const RECORD_TRIGGER_MATCH_COMMAND_TYPE = "lw.automation.trigger.record_match" as const;
 export const TRIGGER_MATCH_RECORDED_EVENT_TYPE = "lw.automation.trigger.match_recorded" as const;

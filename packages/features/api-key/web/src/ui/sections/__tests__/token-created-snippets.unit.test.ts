@@ -35,7 +35,7 @@ import {
   CODE_ASSISTANTS,
   TOKEN_SNIPPET_LANGUAGES,
   type CodeAssistant,
-} from "../token-created-dialog";
+} from "../token-created-dialog.tsx";
 
 const PACKAGE_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const emptyQuery = { data: undefined, isLoading: false };
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     prompts: { getAllPromptsForProject: { useQuery: () => emptyQuery } },
     agents: { getAll: { useQuery: () => emptyQuery } },
@@ -19,8 +19,8 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost } from "../../../testing";
-import { CommandPalette } from "../command-palette";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { CommandPalette } from "../command-palette.tsx";
 
 function renderPalette({ query }: { query: string }) {
   const openSupportChat = vi.fn();

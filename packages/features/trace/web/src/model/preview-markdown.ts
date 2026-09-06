@@ -1,4 +1,4 @@
-import type { NewlineTreatment } from "./preview-types";
+import type { NewlineTreatment } from "./preview-types.ts";
 
 export interface MarkdownNoiseResult {
   text: string;

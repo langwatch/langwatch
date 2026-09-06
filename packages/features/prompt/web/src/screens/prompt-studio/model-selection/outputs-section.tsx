@@ -10,7 +10,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { WorkflowCodeEditor } from "@langwatch/workflow-web/surfaces/workflow-code-editor";
 import type { Field } from "@langwatch/workflow-contract";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "../../../surfaces/variables";
+import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "../../../surfaces/variables/index.ts";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 

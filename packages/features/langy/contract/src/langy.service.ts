@@ -5,13 +5,13 @@ import type {
   LangyStopTurnInput,
   LangyCredentials,
   LangyMirrorTier,
-} from "./langy";
-import type { LangyMessagePart, LangyMessageRole } from "./json";
-import type { CliResultDigest } from "./cards/digest";
-import type { CliToolResult } from "./cards/tool-result";
-import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire";
-import type { LangyEventCursor } from "./event-sourcing/contracts/cursor";
-import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold";
+} from "./langy.ts";
+import type { LangyMessagePart, LangyMessageRole } from "./json.ts";
+import type { CliResultDigest } from "./cards/digest.ts";
+import type { CliToolResult } from "./cards/tool-result.ts";
+import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire.ts";
+import type { LangyEventCursor } from "./event-sourcing/contracts/cursor.ts";
+import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 
 export type LangyConversationListItem = {
   id: string;

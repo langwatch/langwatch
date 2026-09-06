@@ -1,7 +1,7 @@
-import type { Currency } from "./pricing";
-import { InvalidSeatCountError } from "./billing.errors";
-import { GROWTH_SEAT_PLAN_TYPES } from "./plan-types";
-import type { StripePriceMap, StripePriceName } from "./stripe-prices";
+import type { Currency } from "./pricing.ts";
+import { InvalidSeatCountError } from "./billing.errors.ts";
+import { GROWTH_SEAT_PLAN_TYPES } from "./plan-types.ts";
+import type { StripePriceMap, StripePriceName } from "./stripe-prices.ts";
 
 /** Set of all GROWTH_SEAT price IDs resolved from the Stripe catalog. */
 const priceIds = (prices: StripePriceMap, names: readonly StripePriceName[]) =>

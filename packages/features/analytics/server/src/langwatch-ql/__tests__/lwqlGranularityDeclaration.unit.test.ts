@@ -10,11 +10,11 @@ import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLReservedGranularityTypeError,
 } from "@langwatch/analytics-contract";
-import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service";
+import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();
-import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
-import { validateLangWatchQL } from "./lwql-validate";
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
 
 /** The same minimal catalog the validator's own unit test drives. */
 const POLICY = {

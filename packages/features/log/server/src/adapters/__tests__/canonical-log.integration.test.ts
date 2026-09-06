@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { CanonicalLogAdapter } from "../canonical-log.adapter";
-import type { LogPreparationInput } from "../../ports/log-preparation.port";
-import type { LogRedactionPort } from "../../ports/log-redaction.port";
+import { CanonicalLogAdapter } from "../canonical-log.adapter.ts";
+import type { LogPreparationInput } from "../../ports/log-preparation.port.ts";
+import type { LogRedactionPort } from "../../ports/log-redaction.port.ts";
 import type { AppendStore } from "@langwatch/eventing";
 import {
   DEFAULT_LOG_COMMAND_SHARDS,
@@ -11,7 +11,7 @@ import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type CanonicalLogRecord,
 } from "@langwatch/log-contract";
-import { CanonicalLogStorageMapProjection } from "../../projections/canonical-log-storage.projection";
+import { CanonicalLogStorageMapProjection } from "../../projections/canonical-log-storage.projection.ts";
 
 const noRedaction: LogRedactionPort = {
   redactLog: async () => undefined,

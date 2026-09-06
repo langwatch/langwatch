@@ -15,7 +15,7 @@ import {
   gqOldestPendingAgeMilliseconds,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
-} from "../metrics";
+} from "../metrics.ts";
 
 const routingLabels = {
   queue_name: "test-queue",

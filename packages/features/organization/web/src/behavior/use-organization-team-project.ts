@@ -18,7 +18,7 @@ import {
   useOrganizationHost,
   type OrganizationProjectReading,
   type OrganizationReading,
-} from "../model/organization-host";
+} from "../model/organization-host.ts";
 
 export type OrganizationTeamProjectReading = {
   organization: OrganizationReading | undefined;

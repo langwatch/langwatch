@@ -3,7 +3,7 @@ import type {
   DataPrivacyPolicy,
   DataPrivacyScope,
   ResolvedDataPrivacy,
-} from "./data-privacy";
+} from "./data-privacy.ts";
 
 export abstract class DataPrivacyService {
   abstract getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;

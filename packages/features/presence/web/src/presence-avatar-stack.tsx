@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { PresenceSession } from "@langwatch/presence-contract";
-import { PresenceAvatar } from "./presence-avatar";
+import { PresenceAvatar } from "./presence-avatar.tsx";
 
 export interface PresenceAvatarStackProps {
   sessions: PresenceSession[];

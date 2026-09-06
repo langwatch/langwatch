@@ -8,11 +8,11 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHost = { succeeded: vi.fn(), failed: vi.fn() };
-vi.mock("../../../../model/prompt-host", () => ({
+vi.mock("../../../../model/prompt-host.ts", () => ({
   usePromptHost: () => mockHost,
 }));
 
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project-1", apiKey: "test-api-key" } }),
 }));
 
@@ -25,7 +25,7 @@ const STABLE_TAGS = [
   { name: "staging", id: "staging-id" },
 ];
 const mockRefetchTags = vi.fn().mockResolvedValue(undefined);
-vi.mock("../../../../behavior/use-prompt-tags", () => ({
+vi.mock("../../../../behavior/use-prompt-tags.ts", () => ({
   usePromptTags: () => ({
     data: STABLE_TAGS,
     refetch: mockRefetchTags,
@@ -39,7 +39,7 @@ const mockTagsQuery = vi.fn();
 const mockMutateAsync = vi.fn().mockResolvedValue({});
 const mockInvalidate = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../../../../behavior/prompt-api", () => ({
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: () => mockVersionsQuery() },
@@ -57,7 +57,7 @@ vi.mock("../../../../behavior/prompt-api", () => ({
   },
 }));
 
-vi.mock("../generate-prompt-api-snippet-dialog", () => {
+vi.mock("../generate-prompt-api-snippet-dialog.tsx", () => {
   const Dialog = ({ children }: { children: ReactNode }) => (
     <div data-testid="snippet-dialog">{children}</div>
   );
@@ -67,7 +67,7 @@ vi.mock("../generate-prompt-api-snippet-dialog", () => {
   return { GeneratePromptApiSnippetDialog: Dialog };
 });
 
-vi.mock("../../../../ui/blocks/delete-confirmation-dialog", () => ({
+vi.mock("../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 
@@ -121,7 +121,7 @@ vi.mock("@langwatch/design-system/select", () => {
   };
 });
 
-import { DeployPromptDialog } from "../deploy-prompt-dialog";
+import { DeployPromptDialog } from "../deploy-prompt-dialog.tsx";
 
 const defaultProps = {
   isOpen: true,

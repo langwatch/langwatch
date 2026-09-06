@@ -12,7 +12,7 @@ const overlayRow = vi.hoisted(() => ({
   current: null as { traceId: string; patch: TraceEditOverlayPatch } | null,
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     traceEditOverlay: {
       getByTraceId: {
@@ -22,20 +22,20 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../context/shared-trace-context", () => ({
+vi.mock("../../context/shared-trace-context.tsx", () => ({
   useSharedTrace: () => null,
 }));
 
-vi.mock("../use-trace-query-args", () => ({
+vi.mock("../use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({
     isReady: true,
     queryArgs: { projectId: "project-1", traceId: openTraceId.current },
   }),
 }));
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
-import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../use-trace-edit-overlay";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../use-trace-edit-overlay.ts";
 
 const patch = (name: string): TraceEditOverlayPatch => ({
   version: 1,

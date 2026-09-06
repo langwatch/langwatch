@@ -5,21 +5,21 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
-import { HandledErrorAlert } from "../../../../behavior/errors";
-import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips";
-import { MissingProviderNotice } from "../../../elements/agent-testing/run/missing-provider-notice";
-import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field";
-import { RunParametersSection } from "./run-parameters-section";
-import { TargetSection } from "./target-section";
-import type { RunDialogForm } from "./use-run-dialog-form";
+import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
+import { MissingProviderNotice } from "../../../elements/agent-testing/run/missing-provider-notice.tsx";
+import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field.tsx";
+import { RunParametersSection } from "./run-parameters-section.tsx";
+import { TargetSection } from "./target-section.tsx";
+import type { RunDialogForm } from "./use-run-dialog-form.ts";
 import { useEffect, useRef } from "react";
-import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
-import { CompareAgentsSection } from "./compare-agents-section";
-import { OfflineTargetsNotice } from "./offline-targets-notice";
-import { ParameterRowsEditor } from "./parameter-rows-editor";
-import { RunNameField } from "./run-name-field";
-import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections";
-import { RunScopeSection } from "./run-scope-section";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { CompareAgentsSection } from "./compare-agents-section.tsx";
+import { OfflineTargetsNotice } from "./offline-targets-notice.tsx";
+import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
+import { RunNameField } from "./run-name-field.tsx";
+import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections.tsx";
+import { RunScopeSection } from "./run-scope-section.tsx";
 
 /** The blocks a chip added, in the order the chips offer them. */
 function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean }) {

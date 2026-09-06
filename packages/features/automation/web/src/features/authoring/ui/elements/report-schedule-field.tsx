@@ -18,7 +18,7 @@ import {
   supportedTimezones,
   timeOfDay,
   WEEKDAY_OPTIONS,
-} from "../../model/report-schedule";
+} from "../../model/report-schedule.ts";
 
 const FREQUENCIES: Frequency[] = ["daily", "weekly", "monthly"];
 const DAYS_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);

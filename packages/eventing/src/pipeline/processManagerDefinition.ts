@@ -1,9 +1,9 @@
 import type { ZodTypeAny, z } from "zod";
 
-import type { Event } from "../domain/types";
-import type { ProcessEventEnvelope, ProcessIntent } from "../process-manager/processManager.types";
-import type { DeduplicationConfig } from "../queues/queue.types";
-import type { ExecutionTarget } from "../runtime.types";
+import type { Event } from "../domain/types.ts";
+import type { ProcessEventEnvelope, ProcessIntent } from "../process-manager/processManager.types.ts";
+import type { DeduplicationConfig } from "../queues/queue.types.ts";
+import type { ExecutionTarget } from "../runtime.types.ts";
 
 /** Shared delivery descriptor for lightweight subscribers. */
 export type TriggerSpec =

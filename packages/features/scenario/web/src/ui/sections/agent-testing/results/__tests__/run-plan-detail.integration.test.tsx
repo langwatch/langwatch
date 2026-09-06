@@ -10,15 +10,15 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
-import { NOT_IN_RUN_LABEL } from "../comparison-results-row";
-import { RunPlanDetail } from "../run-plan-detail";
-import { RUN_AGAIN_LABEL } from "../run-plan-detail-header";
-import { PROJECT_DEFAULT_MODEL } from "../run-settings-block";
-import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry";
-import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans";
-import { passRateColor } from "../../../../elements/agent-testing/shared/pass-rate-color";
-import { TARGET_COLORS } from "../../../../elements/agent-testing/shared/target-colors";
-import { useAgentTestingStore } from "../../use-agent-testing-store";
+import { NOT_IN_RUN_LABEL } from "../comparison-results-row.tsx";
+import { RunPlanDetail } from "../run-plan-detail.tsx";
+import { RUN_AGAIN_LABEL } from "../run-plan-detail-header.tsx";
+import { PROJECT_DEFAULT_MODEL } from "../run-settings-block.tsx";
+import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
+import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { passRateColor } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
+import { TARGET_COLORS } from "../../../../elements/agent-testing/shared/target-colors.ts";
+import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 const mockGetBatchRunCount = vi.hoisted(() => vi.fn());
@@ -66,7 +66,7 @@ const mockGetAgents = vi.hoisted(() =>
   ),
 );
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -135,11 +135,11 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -161,7 +161,7 @@ vi.mock("@langwatch/ui-host/format-time-ago", () => ({
 // The settings block names the reader by comparing the run's actor with the
 // signed-in user, so the test controls who is reading.
 const VIEWER_USER_ID = "user_lena";
-vi.mock("../../../../../behavior/auth-session", () => ({
+vi.mock("../../../../../behavior/auth-session.ts", () => ({
   useSession: () => ({
     data: { user: { id: VIEWER_USER_ID } },
     status: "authenticated",

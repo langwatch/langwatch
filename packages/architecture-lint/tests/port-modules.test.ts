@@ -8,7 +8,7 @@ import {
   lintStrictPortBaseline,
   lintStrictPortModules,
   type ClassifiedPackage,
-} from "../src";
+} from "../src/index.ts";
 
 let root = "";
 

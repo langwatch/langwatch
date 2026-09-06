@@ -1,7 +1,7 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { type DispatchResult, GroupStagingScripts } from "../scripts";
+import { type DispatchResult, GroupStagingScripts } from "../scripts.ts";
 
 let redis: Redis;
 let scripts: GroupStagingScripts;

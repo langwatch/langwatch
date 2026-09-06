@@ -4,5 +4,5 @@ export {
   SSO_FEATURE_ID,
   ssoConfigurationSchema,
   type SsoConfiguration,
-} from "./sso.contract";
-export * from "./sso.service";
+} from "./sso.contract.ts";
+export * from "./sso.service.ts";

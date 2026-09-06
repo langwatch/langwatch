@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cliSessionSchema, cliTokenRecordSchema } from "../cli-sessions";
+import { cliSessionSchema, cliTokenRecordSchema } from "../cli-sessions.ts";
 
 describe("CLI sessions contract", () => {
   it("rejects malformed token records and session outputs", () => {

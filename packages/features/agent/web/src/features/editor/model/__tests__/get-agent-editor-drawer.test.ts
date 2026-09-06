@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAgentEditorDrawer } from "../get-agent-editor-drawer";
+import { getAgentEditorDrawer } from "../get-agent-editor-drawer.ts";
 
 describe("getAgentEditorDrawer", () => {
   /** @scenario "Agents page routes each agent type to its matching editor drawer" */

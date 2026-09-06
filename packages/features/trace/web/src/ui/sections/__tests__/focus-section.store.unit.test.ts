@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useFocusSectionStore } from "../../../behavior/focus-section.store";
+import { useFocusSectionStore } from "../../../behavior/focus-section.store.ts";
 
 describe("useFocusSectionStore", () => {
   beforeEach(() => {

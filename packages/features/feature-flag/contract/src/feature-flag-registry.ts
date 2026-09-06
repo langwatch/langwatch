@@ -4,16 +4,16 @@ import {
   FEATURE_FLAGS,
   type FeatureFlagDefinition,
   type FeatureFlagFamily,
-} from "./feature-flag";
+} from "./feature-flag.ts";
 import {
   findExperimentDefinitionViolations,
   type FeatureFlagExperiment,
-} from "./feature-flag-experiment";
-import { FRONTEND_FEATURE_FLAGS, type FrontendFeatureFlag } from "./frontend-feature-flags";
+} from "./feature-flag-experiment.ts";
+import { FRONTEND_FEATURE_FLAGS, type FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 import {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,
   type PublicAnonymousFlagMap,
-} from "./public-anonymous-feature-flags";
+} from "./public-anonymous-feature-flags.ts";
 
 export interface RegisteredExperiment {
   key: FrontendFeatureFlag;

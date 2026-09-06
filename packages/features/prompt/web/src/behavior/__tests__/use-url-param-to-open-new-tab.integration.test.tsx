@@ -4,15 +4,15 @@
 
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PromptBrowserStorage } from "../../model/browser-capabilities";
-import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store";
-import { useUrlParamToOpenNewTab } from "../use-url-param-to-open-new-tab";
+import type { PromptBrowserStorage } from "../../model/browser-capabilities.ts";
+import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store.ts";
+import { useUrlParamToOpenNewTab } from "../use-url-param-to-open-new-tab.ts";
 
-vi.mock("../use-prompt-project", () => ({
+vi.mock("../use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 
-vi.mock("../use-prompt-id-query-param", () => ({
+vi.mock("../use-prompt-id-query-param.ts", () => ({
   usePromptIdQueryParam: () => ({
     selectedPromptId: null,
     setSelectedPromptId: vi.fn(),
@@ -24,7 +24,7 @@ const { mockGetResolvedDefault } = vi.hoisted(() => ({
   mockGetResolvedDefault: vi.fn(),
 }));
 
-vi.mock("../prompt-api", () => ({
+vi.mock("../prompt-api.ts", () => ({
   promptApi: {
     modelProvider: {
       getResolvedDefault: { useQuery: mockGetResolvedDefault },
@@ -57,7 +57,7 @@ const capabilities = {
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 };
 
-vi.mock("../../model/prompt-host", () => ({
+vi.mock("../../model/prompt-host.ts", () => ({
   usePromptHost: () => ({ tabCapabilities: () => capabilities }),
 }));
 

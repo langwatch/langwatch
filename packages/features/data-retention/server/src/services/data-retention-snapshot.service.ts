@@ -11,9 +11,9 @@ import type {
 import type {
   DataRetentionDirectoryPort,
   RetentionScopeTarget,
-} from "../ports/data-retention-directory.port";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port";
-import type { DataRetentionPolicyService, RetentionActor } from "./data-retention-policy.service";
+} from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
+import type { DataRetentionPolicyService, RetentionActor } from "./data-retention-policy.service.ts";
 
 export type RetentionRule = Readonly<{
   scopeType: RetentionScopeTarget["scopeType"];

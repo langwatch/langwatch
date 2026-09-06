@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
-import { QueueService } from "../../services/queue.service";
-import { NullQueueRepository } from "../queue.repository";
-import type { DlqGroupInfo, QueueRepository } from "../queue.repository";
+import { QueueService } from "../../services/queue.service.ts";
+import { NullQueueRepository } from "../queue.repository.ts";
+import type { DlqGroupInfo, QueueRepository } from "../queue.repository.ts";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {

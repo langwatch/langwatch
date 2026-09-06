@@ -1,14 +1,14 @@
-import { goErrorCodes, nodeErrorCodes } from "./codes.generated";
+import { goErrorCodes, nodeErrorCodes } from "./codes.generated.ts";
 import {
   type HandledErrorFault,
   serializedReasonSchema,
   type SerializedHandledError,
   type SerializedReason,
-} from "./serialized-handled-error";
+} from "./serialized-handled-error.ts";
 
 import { canonicalDocsBaseUrl, docsBaseUrl } from "@langwatch/config/docs-url";
 
-import { APP_ERROR_CODES } from "./app-codes";
+import { APP_ERROR_CODES } from "./app-codes.ts";
 
 /**
  * The client-side view of a handled error, lifted off whatever transport

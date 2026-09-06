@@ -27,10 +27,10 @@
  * and travel with its conversion. Every function the walk actually calls is
  * here, byte for byte.
  */
-import { containsMediaMarkers } from "./trace-media-markers";
-import { parseBase64DataUri } from "./trace-content-part.file-decoder";
-import { visitContentPart } from "./trace-content-part.dispatcher";
-import { isMediaPartRole, type MediaPartRole } from "./trace-media-role";
+import { containsMediaMarkers } from "./trace-media-markers.ts";
+import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
+import { visitContentPart } from "./trace-content-part.dispatcher.ts";
+import { isMediaPartRole, type MediaPartRole } from "./trace-media-role.ts";
 
 /**
  * A single renderable media content part, as produced after content

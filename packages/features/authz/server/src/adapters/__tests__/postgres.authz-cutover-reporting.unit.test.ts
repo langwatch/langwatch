@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ObservabilityAuthzCutoverAdapter } from "../observability.authz-cutover.adapter";
-import { ENGINE_GATE_CACHE_TTL_MS } from "../postgres.authz-cutover.adapter";
+import { ObservabilityAuthzCutoverAdapter } from "../observability.authz-cutover.adapter.ts";
+import { ENGINE_GATE_CACHE_TTL_MS } from "../postgres.authz-cutover.adapter.ts";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 vi.mock("@langwatch/observability", () => ({

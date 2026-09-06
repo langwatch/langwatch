@@ -1,14 +1,14 @@
 import type { GithubPullRequest, GithubPullRequestEvent } from "@langwatch/github-contract";
 
-import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository";
+import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
 import type {
   BranchMappingRequest,
   GithubBranchDemandService,
-} from "./github-branch-demand.service";
-import type { GithubBranchMaintenanceService } from "./github-branch-maintenance.service";
-import type { GithubBranchMappingService } from "./github-branch-mapping.service";
+} from "./github-branch-demand.service.ts";
+import type { GithubBranchMaintenanceService } from "./github-branch-maintenance.service.ts";
+import type { GithubBranchMappingService } from "./github-branch-mapping.service.ts";
 
-export type { BranchMappingRequest } from "./github-branch-demand.service";
+export type { BranchMappingRequest } from "./github-branch-demand.service.ts";
 
 export class GithubPullRequestMappingService {
   static create(deps: {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config";
+import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * Which hops in front of this process are allowed to name the caller. Empty is the default and

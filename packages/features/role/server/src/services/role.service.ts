@@ -13,8 +13,8 @@ import {
   type RoleUpdate,
   RoleService as RoleServiceContract,
 } from "@langwatch/role-contract";
-import { RolePermissionPort, RoleScopePort } from "../ports/role.port";
-import { RoleRepository } from "../repositories/role.repository";
+import { RolePermissionPort, RoleScopePort } from "../ports/role.port.ts";
+import { RoleRepository } from "../repositories/role.repository.ts";
 
 export interface RoleServiceDependencies {
   repository: RoleRepository;

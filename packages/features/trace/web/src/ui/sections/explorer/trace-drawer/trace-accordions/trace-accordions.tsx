@@ -1,9 +1,9 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { SpanAccordions } from "./span-accordions";
-import { useSyncSectionPresence } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence";
-import { TraceSummaryAccordions } from "./trace-summary-accordions";
+import { SpanAccordions } from "./span-accordions.tsx";
+import { useSyncSectionPresence } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import { TraceSummaryAccordions } from "./trace-summary-accordions.tsx";
 
 interface TraceAccordionsProps {
   trace: TraceHeader;

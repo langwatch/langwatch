@@ -2,7 +2,7 @@ import { HStack, IconButton, Link, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, Info } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Popover } from "./popover";
+import { Popover } from "./popover.tsx";
 
 type FieldInfoTooltipProps = {
   description: string;

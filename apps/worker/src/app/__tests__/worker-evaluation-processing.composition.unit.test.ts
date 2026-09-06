@@ -22,7 +22,7 @@ import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
   type WorkerEvaluationExecutionCollaborators,
-} from "../worker-evaluation-processing.composition";
+} from "../worker-evaluation-processing.composition.ts";
 
 /**
  * Spec: specs/monitors/online-evaluator-loop-prevention.feature

@@ -7,22 +7,22 @@ import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { SetupWithAgentButton } from "../../setup-with-agent-button";
+import { SetupWithAgentButton } from "../../setup-with-agent-button.tsx";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
 } from "@langwatch/onboarding-web/surfaces/active-project-context";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { usePublicEnv } from "../../use-public-env";
-import { ApiKeyIntegrationInfoCard } from "../onboarding/api-key-integration-info-card";
-import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup";
-import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint";
-import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights";
-import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { SearchBar } from "../search-bar/search-bar";
-import { Toolbar } from "../toolbar/toolbar";
-import { IntegratePaneShell } from "../../../elements/explorer/traces-page/integrate-pane-shell";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../use-public-env.ts";
+import { ApiKeyIntegrationInfoCard } from "../onboarding/api-key-integration-info-card.tsx";
+import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
+import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
+import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { SearchBar } from "../search-bar/search-bar.tsx";
+import { Toolbar } from "../toolbar/toolbar.tsx";
+import { IntegratePaneShell } from "../../../elements/explorer/traces-page/integrate-pane-shell.tsx";
 
 export const IntegratePane: React.FC = () => {
   const setShowSamplePreview = useOnboardingStore((s) => s.setShowSamplePreview);

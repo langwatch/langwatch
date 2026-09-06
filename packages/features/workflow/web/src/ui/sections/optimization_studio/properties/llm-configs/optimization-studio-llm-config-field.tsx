@@ -5,8 +5,8 @@ import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
-import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project";
-import { useWorkflowStore } from "../../../../../behavior/use-workflow-store";
+import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 

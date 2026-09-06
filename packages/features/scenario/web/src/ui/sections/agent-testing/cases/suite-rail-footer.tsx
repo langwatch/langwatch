@@ -6,8 +6,8 @@
 
 import { HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
-import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker";
-import type { SuiteRailProps } from "./suite-rail";
+import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import type { SuiteRailProps } from "./suite-rail.tsx";
 
 export type SuiteRailFooterProps = Pick<
   SuiteRailProps,

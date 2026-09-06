@@ -32,21 +32,21 @@ const { fetchMock, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() =
 
 // The session hook polls a live endpoint on mount; the screen under test is the
 // signed-out one. Everything below it, `signIn` included, stays real.
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return { ...actual, useSession: () => sessionRef.current };
 });
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -54,7 +54,7 @@ vi.mock("../../../ui/elements/router-link", () => ({
   ),
 }));
 
-import SignIn from "../signin.screen";
+import SignIn from "../signin.screen.tsx";
 
 /** What the server puts on the wire for the sign-in call. */
 const serverAnswers = (status: number, body: Record<string, unknown>) => {

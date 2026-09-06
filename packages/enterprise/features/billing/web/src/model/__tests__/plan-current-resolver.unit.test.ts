@@ -5,7 +5,7 @@ vi.mock("@langwatch/enterprise-billing-contract", async (importOriginal) => ({
   isGrowthSeatEventPlan: (planType: string) => planType.startsWith("GROWTH_SEAT_"),
 }));
 
-import { resolveCurrentComparisonPlan } from "../plan-current-resolver";
+import { resolveCurrentComparisonPlan } from "../plan-current-resolver.ts";
 
 describe("resolveCurrentComparisonPlan()", () => {
   describe("when activePlan is undefined", () => {

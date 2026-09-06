@@ -9,19 +9,19 @@ import { z } from "zod";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHousePort,
-} from "../../ports/coding-agent-clickhouse.port";
-import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port";
+} from "../../ports/coding-agent-clickhouse.port.ts";
+import type { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
 import {
   type CodingAgentReadMetricsPort,
   type CodingAgentSessionListReadOutcome,
-} from "../../adapters/coding-agent-read-metrics.adapter";
-import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository";
+} from "../../adapters/coding-agent-read-metrics.adapter.ts";
+import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import {
   groupTenantsByClient,
   asNumber,
   asStringArray,
   parseClickHouseDateTimeMs,
-} from "../coding-agent-clickhouse/clickhouse.mapper";
+} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 type CodingAgentSessionRow = CodingAgentSession;

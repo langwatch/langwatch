@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Event } from "../../domain/types";
-import type { ProcessManagerInitialStage } from "../processBuilder";
-import { buildProcessManager } from "../processBuilder";
-import type { IntentSpec, WakeHandler } from "../processManagerDefinition";
+import type { Event } from "../../domain/types.ts";
+import type { ProcessManagerInitialStage } from "../processBuilder.ts";
+import { buildProcessManager } from "../processBuilder.ts";
+import type { IntentSpec, WakeHandler } from "../processManagerDefinition.ts";
 
 const payloadSchema = z.object({ traceId: z.string() });
 const TEST_PROCESS_EVENT_TYPE = "test.process.triggered";

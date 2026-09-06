@@ -7,8 +7,8 @@ import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 
-import { GATE_FIELD, GATE_HANDLE_ID } from "../model/control-flow";
-import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store";
+import { GATE_FIELD, GATE_HANDLE_ID } from "../model/control-flow.ts";
+import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store.ts";
 
 const node = (
   id: string,

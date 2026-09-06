@@ -14,7 +14,7 @@ import {
   type TargetAdapterData,
   type TargetConfig,
 } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service";
+import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 
 /** The project fields the run reads, or why they could not be read. */
 export type ProjectRead =

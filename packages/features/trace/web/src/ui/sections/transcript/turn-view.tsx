@@ -1,9 +1,9 @@
-import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role";
-import { AssistantTurnCard } from "./assistant-turn-card";
-import { BlockStack } from "./block-stack";
-import { SystemTurnView } from "./system-turn-view";
-import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types";
-import { UserTurnBubble } from "./user-turn-bubble";
+import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role.tsx";
+import { AssistantTurnCard } from "./assistant-turn-card.tsx";
+import { BlockStack } from "./block-stack.tsx";
+import { SystemTurnView } from "./system-turn-view.tsx";
+import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types.ts";
+import { UserTurnBubble } from "./user-turn-bubble.tsx";
 
 export function TurnView({
   turn,

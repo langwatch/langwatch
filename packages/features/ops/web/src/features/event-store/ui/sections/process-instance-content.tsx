@@ -1,6 +1,6 @@
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view.tsx";
 import type { ProcessInstanceDetail as StoredProcessInstanceDetail } from "@langwatch/ops-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 
@@ -10,9 +10,9 @@ import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from 
 
 /** One outbox row as the browser receives it. */
 type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;
-import type { GrafanaDeepLinkConfig } from "../../../../model/grafana-links";
-import { describeNextWake } from "../../model/process-presentation";
-import { OutboxMessageCard } from "./outbox-message-card";
+import type { GrafanaDeepLinkConfig } from "../../../../model/grafana-links.ts";
+import { describeNextWake } from "../../model/process-presentation.ts";
+import { OutboxMessageCard } from "./outbox-message-card.tsx";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 

@@ -32,7 +32,7 @@ import {
   PARSER_FIELDS,
   reconcileParserValues,
   seedComposerParserConfig,
-} from "../governance-inventory.screen";
+} from "../governance-inventory.screen.tsx";
 
 const fieldFor = (key: string) => {
   const field = PARSER_FIELDS.anthropic_admin.find((f) => f.key === key);

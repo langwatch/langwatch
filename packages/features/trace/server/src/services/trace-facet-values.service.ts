@@ -12,10 +12,10 @@ import type {
 } from "@langwatch/trace-contract";
 import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 
-import { facetValuesCacheKey, type FacetValuesParams } from "../rules/trace-list-cache-key.rules";
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules";
-import { TtlCache } from "./trace-ttl-cache.service";
-import type { TraceTopicNamingService } from "./trace-topic-naming.service";
+import { facetValuesCacheKey, type FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { TtlCache } from "./trace-ttl-cache.service.ts";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 

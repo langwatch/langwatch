@@ -9,7 +9,7 @@ import {
   SimulationClickHouseRepository,
   FULL_MESSAGES_PAGE_LIMIT,
   LIST_PAGE_LIMIT,
-} from "../simulation-clickhouse.repository";
+} from "../simulation-clickhouse.repository.ts";
 
 describe("SimulationClickHouseRepository.clampPageLimit()", () => {
   describe("when the caller reads the trimmed projection", () => {

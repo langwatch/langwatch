@@ -14,7 +14,7 @@ import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import { CodeBlockEditor } from "@langwatch/workflow-web/surfaces/code-block-editor";
-import { AgentTestPanel } from "./agent-test-panel";
+import { AgentTestPanel } from "./agent-test-panel.tsx";
 import {
   CODE_OUTPUT_TYPES,
   type Output,
@@ -24,7 +24,7 @@ import {
 import {
   isScenarioMappingValid,
   ScenarioInputMappingSection,
-} from "../../elements/suites/scenario-input-mapping-section";
+} from "../../elements/suites/scenario-input-mapping-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -40,7 +40,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { CodeEditorModal } from "@langwatch/workflow-web/surfaces/code-editor-transport";
 import type { CodeComponentConfig, Field as DSLField } from "@langwatch/workflow-contract";
 import {
@@ -53,7 +53,7 @@ import type {
   AgentWithFields,
 } from "@langwatch/agent-contract";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
 const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];

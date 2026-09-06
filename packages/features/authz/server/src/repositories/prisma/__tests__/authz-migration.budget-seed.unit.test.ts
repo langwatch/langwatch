@@ -10,7 +10,7 @@
  * integration lane's question.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { PrismaAuthzMigrationRepository } from "../prisma.authz-migration.repository";
+import { PrismaAuthzMigrationRepository } from "../prisma.authz-migration.repository.ts";
 
 const ORG = "org_acme";
 

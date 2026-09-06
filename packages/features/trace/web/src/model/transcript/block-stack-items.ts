@@ -1,4 +1,4 @@
-import type { ContentBlock, KeyedContentBlock } from "./types";
+import type { ContentBlock, KeyedContentBlock } from "./types.ts";
 
 type KeyedBlock<K extends ContentBlock["kind"]> = Extract<KeyedContentBlock, { kind: K }>;
 

@@ -1,4 +1,4 @@
-import { GithubHostPort } from "../ports/github-host.port";
+import { GithubHostPort } from "../ports/github-host.port.ts";
 
 const GITHUB_DOT_COM = "github.com";
 

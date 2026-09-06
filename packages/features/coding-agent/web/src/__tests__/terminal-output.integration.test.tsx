@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TerminalOutput } from "../trace/terminal-output";
+import { TerminalOutput } from "../trace/terminal-output.tsx";
 
 afterEach(cleanup);
 

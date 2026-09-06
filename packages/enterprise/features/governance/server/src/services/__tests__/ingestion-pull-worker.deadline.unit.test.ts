@@ -5,8 +5,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
-import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service";
-import { createWorkerService } from "../../__tests__/support/puller-test-ports";
+import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service.ts";
+import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 

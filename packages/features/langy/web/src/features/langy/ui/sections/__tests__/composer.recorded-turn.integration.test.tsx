@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -27,11 +27,11 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { Composer } from "../composer";
+import { Composer } from "../composer.tsx";
 
 const CONVERSATION_ID = "conv-recorded";
 const TURN_ID = "turn-recorded";

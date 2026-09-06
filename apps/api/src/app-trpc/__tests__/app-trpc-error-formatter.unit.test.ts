@@ -9,7 +9,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { z as z4 } from "zod/v4";
-import { appTrpcErrorFormatter as errorFormatter } from "../app-trpc.error-formatter";
+import { appTrpcErrorFormatter as errorFormatter } from "../app-trpc.error-formatter.ts";
 
 function format(error: TRPCError) {
   return errorFormatter({

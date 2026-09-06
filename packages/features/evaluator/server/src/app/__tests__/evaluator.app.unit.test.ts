@@ -11,7 +11,7 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluatorApp } from "../evaluator.app";
+import { EvaluatorApp } from "../evaluator.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

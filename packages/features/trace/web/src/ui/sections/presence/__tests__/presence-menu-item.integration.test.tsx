@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { usePresencePreferencesStore } from "@langwatch/presence-web/surfaces/presence-state";
 
-import { PresenceMenuItem, type PresenceMenuItemProps } from "../presence-menu-item";
+import { PresenceMenuItem, type PresenceMenuItemProps } from "../presence-menu-item.tsx";
 
 function renderInOpenMenu(switches: PresenceMenuItemProps) {
   return render(

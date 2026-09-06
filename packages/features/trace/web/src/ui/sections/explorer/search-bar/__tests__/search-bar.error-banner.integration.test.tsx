@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,
     organization: undefined,
@@ -18,7 +18,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../use-model-providers-settings", () => ({
+vi.mock("../../../use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     modelProviders: [],
     customDefaultModel: null,
@@ -26,14 +26,14 @@ vi.mock("../../../use-model-providers-settings", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-facets", () => ({
+vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
 // top level. These tests don't wrap with a tRPC provider, so stub the hook
 // out — server search is covered by its own dedicated suite.
-vi.mock("../../hooks/use-facet-search", () => ({
+vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
@@ -44,10 +44,10 @@ vi.mock("@paper-design/shaders-react", () => ({
 // These banner tests exercise the inline Ask AI composer path, so Langy is
 // gated off — the gate hooks carry session/tRPC wiring this suite doesn't
 // mount. The Langy-owned affordance is covered by SearchBar.integration.
-vi.mock("../../../langy/hooks/use-show-langy", () => ({
+vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => false,
 }));
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => false,
 }));
 vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
@@ -63,10 +63,10 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
   return { ...actual, useLangyStore };
 });
 
-import { explainAnyError } from "../../../errors";
+import { explainAnyError } from "../../../errors/index.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { SearchBar } from "../search-bar";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { SearchBar } from "../search-bar.tsx";
 
 /**
  * A handled failure exactly as tRPC delivers it — the code under `data.error`,

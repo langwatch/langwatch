@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { scopeFromRunPayload } from "../run-scope";
-import { runPayloadSchema } from "../schemas";
+import { scopeFromRunPayload } from "../run-scope.ts";
+import { runPayloadSchema } from "../schemas.ts";
 
 describe("scopeFromRunPayload", () => {
   describe("when the payload names both targets and rows", () => {

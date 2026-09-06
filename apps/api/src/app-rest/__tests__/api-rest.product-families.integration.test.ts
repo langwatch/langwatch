@@ -18,7 +18,7 @@ import type { ShareService } from "@langwatch/share-contract";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features";
+import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 

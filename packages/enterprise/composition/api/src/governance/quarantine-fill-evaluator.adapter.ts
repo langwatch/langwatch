@@ -7,7 +7,7 @@ import {
   QuarantineTenantPort,
   QuarantineTraceActivityPort,
 } from "@langwatch/enterprise-governance-server";
-import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository";
+import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository.ts";
 
 const logger = createLogger("langwatch:governance:quarantine-fill-evaluator");
 

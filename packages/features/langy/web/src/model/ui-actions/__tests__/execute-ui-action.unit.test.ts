@@ -5,8 +5,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { executeUiAction } from "../execute-ui-action";
-import type { LangyUiActionHandlers } from "../langy-ui-action-types";
+import { executeUiAction } from "../execute-ui-action.ts";
+import type { LangyUiActionHandlers } from "../langy-ui-action-types.ts";
 
 const ENTRY = {
   actionId: "a1",

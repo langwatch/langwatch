@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   generateOpenApiDocument,
   type GeneratedOpenApiDocument,
-} from "../openapi-document.generator";
+} from "../openapi-document.generator.ts";
 
 /** Every operation the family publishes, at the address the document uses. */
 const OPERATIONS = [

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard";
-import { computeScoreBarScale } from "../leaderboard-verdict-panel";
+import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { computeScoreBarScale } from "../leaderboard-verdict-panel.tsx";
 
 /**
  * The score-bar scale, and specifically which entries get a vote on it.

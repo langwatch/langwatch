@@ -1,7 +1,7 @@
 import { HStack, Image, Text } from "@chakra-ui/react";
-import { assistantKindOfAgent } from "./assistant-identity";
+import { assistantKindOfAgent } from "./assistant-identity.ts";
 
-import { ASSISTANT_PRESETS } from "./assistant-presets";
+import { ASSISTANT_PRESETS } from "./assistant-presets.ts";
 
 /**
  * Which agent did the work, read as its product name next to its own mark.

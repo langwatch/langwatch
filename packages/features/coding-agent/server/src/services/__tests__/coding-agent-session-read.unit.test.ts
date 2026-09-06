@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionEvent } from "@langwatch/coding-agent-contract";
-import { MAX_SESSION_EVENTS_PAGE_SIZE } from "../coding-agent.service";
-import { CodingAgentFeatureService } from "../coding-agent.service";
-import { CODING_AGENT_SESSION_READ_WINDOW_MS } from "../coding-agent-session-read.service";
+import { MAX_SESSION_EVENTS_PAGE_SIZE } from "../coding-agent.service.ts";
+import { CodingAgentFeatureService } from "../coding-agent.service.ts";
+import { CODING_AGENT_SESSION_READ_WINDOW_MS } from "../coding-agent-session-read.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -14,7 +14,7 @@ import {
   TestSessions,
   TestTraceSessions,
   session,
-} from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 const PROJECT = "project-1";
 const SESSION = "session-1";

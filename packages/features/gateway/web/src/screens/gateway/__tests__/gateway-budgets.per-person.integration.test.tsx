@@ -10,26 +10,26 @@
  */
 import { cleanup, screen, within } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listQuery = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="ai-gateway-layout">{children}</div>
   ),
 }));
 
-vi.mock("../../../features/budgets/ui/sections/budget-create-drawer", () => ({
+vi.mock("../../../features/budgets/ui/sections/budget-create-drawer.tsx", () => ({
   BudgetCreateDrawer: () => null,
 }));
 
-vi.mock("../../../features/budgets/ui/sections/budget-edit-drawer", () => ({
+vi.mock("../../../features/budgets/ui/sections/budget-edit-drawer.tsx", () => ({
   BudgetEditDrawer: () => null,
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     gatewayBudgets: {
       list: { useQuery: listQuery },
@@ -48,7 +48,7 @@ const host = fakeGatewayHost({
   project: { id: "project_1", name: "ACME project", slug: "acme-project", teamId: "team_1" },
 });
 
-import BudgetsPage from "../gateway-budgets.screen";
+import BudgetsPage from "../gateway-budgets.screen.tsx";
 
 function templateRow(overrides: Record<string, unknown> = {}) {
   return {

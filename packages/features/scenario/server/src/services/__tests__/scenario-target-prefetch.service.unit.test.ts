@@ -20,10 +20,10 @@ import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
-import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service";
+import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { ScenarioModelParametersService } from "../scenario-model-parameters.service";
-import { ScenarioWorkflowHydratorService } from "../scenario-workflow-hydrator.service";
+import { ScenarioModelParametersService } from "../scenario-model-parameters.service.ts";
+import { ScenarioWorkflowHydratorService } from "../scenario-workflow-hydrator.service.ts";
 
 const PROJECT_ID = "project-1";
 

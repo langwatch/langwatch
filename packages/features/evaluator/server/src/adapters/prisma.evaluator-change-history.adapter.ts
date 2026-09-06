@@ -7,7 +7,7 @@
  * a run, and `newEvaluatorId` on a copy, so dropping any of them silently
  * shortens a customer's history rather than failing.
  */
-import { EvaluatorAuditLogPort } from "../ports/evaluator.port";
+import { EvaluatorAuditLogPort } from "../ports/evaluator.port.ts";
 
 /** The two tables this adapter reads, named structurally. */
 export type EvaluatorAuditLogDatabase = {

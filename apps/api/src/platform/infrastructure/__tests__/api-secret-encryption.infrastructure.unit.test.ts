@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiSecretEncryptionAbsenceReportPort,
   ApiSecretEncryptionInfrastructure,
-} from "../api-secret-encryption.infrastructure";
+} from "../api-secret-encryption.infrastructure.ts";
 
 const KEY = "0f".repeat(32);
 

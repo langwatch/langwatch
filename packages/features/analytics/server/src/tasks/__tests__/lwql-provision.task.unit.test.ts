@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LwqlProvisionTask, type LwqlProvisioningDatabase } from "../lwql-provision.task";
+import { LwqlProvisionTask, type LwqlProvisioningDatabase } from "../lwql-provision.task.ts";
 
 describe("LwqlProvisionTask", () => {
   describe("given no LWQL_* environment is configured", () => {

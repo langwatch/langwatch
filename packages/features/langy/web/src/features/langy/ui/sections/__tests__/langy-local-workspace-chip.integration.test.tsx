@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const disconnectWorkspace = vi.fn();
 let workspaceData: unknown = null;
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       getLocalWorkspace: {
@@ -30,7 +30,7 @@ vi.mock("../../../../../behavior/langy-api", () => ({
   },
 }));
 
-import { LangyLocalWorkspaceChip } from "../langy-local-workspace-chip";
+import { LangyLocalWorkspaceChip } from "../langy-local-workspace-chip.tsx";
 
 afterEach(cleanup);
 beforeEach(() => disconnectWorkspace.mockClear());

@@ -16,10 +16,10 @@ import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { BetaPill } from "../elements/beta-pill";
-import { LegacyPill } from "../elements/legacy-pill";
-import { NavigationLink } from "../elements/navigation-link";
-import { SIDE_MENU_DENSITIES, useSideMenuDensity } from "../elements/side-menu-density";
+import { BetaPill } from "../elements/beta-pill.tsx";
+import { LegacyPill } from "../elements/legacy-pill.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { SIDE_MENU_DENSITIES, useSideMenuDensity } from "../elements/side-menu-density.tsx";
 
 export const MENU_ITEM_HEIGHT = SIDE_MENU_DENSITIES.comfortable.height;
 

@@ -6,7 +6,7 @@ import {
 import {
   CONSOLE_COLORS,
   STATUS_DISPLAY_TEXT_MAP,
-} from "../../../model/simulation-console/constants";
+} from "../../../model/simulation-console/constants.ts";
 
 interface StatusDisplayProps {
   status?: ScenarioRunStatus;

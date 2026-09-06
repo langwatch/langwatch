@@ -12,7 +12,7 @@ import type {
   StorageMeterTenantInput,
   StorageMeterTenantsInput,
   UnpinTraceInput,
-} from "./data-retention";
+} from "./data-retention.ts";
 
 export class ScopeTargetNotFoundError extends Error {
   readonly name = "ScopeTargetNotFoundError" as const;

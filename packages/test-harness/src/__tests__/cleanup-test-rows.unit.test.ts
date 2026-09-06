@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "../cleanup-test-rows";
+import { cleanupTestRows } from "../cleanup-test-rows.ts";
 
 function recordingPrisma() {
   const calls: Array<{ model: string; where: unknown }> = [];

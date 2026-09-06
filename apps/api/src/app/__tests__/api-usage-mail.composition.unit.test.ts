@@ -5,8 +5,8 @@ import {
   ApiEntitlementAbsenceReport,
   composeApiPlanProvider,
   composeApiUsageStats,
-} from "../api-usage.composition";
-import type { ApiMailComposition } from "../api-mail.composition";
+} from "../api-usage.composition.ts";
+import type { ApiMailComposition } from "../api-mail.composition.ts";
 
 /**
  * The approaching-limit mail, driven through the REAL warning service.

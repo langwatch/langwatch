@@ -10,7 +10,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service";
+import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-content-drop.feature

@@ -24,11 +24,11 @@ import {
   type ScimPatchRequest,
 } from "@langwatch/enterprise-scim-contract";
 
-import { GrantsFake } from "../../__tests__/support/grants-fake";
-import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle";
-import { PrismaScimRepository } from "../../repositories/prisma/scim.repository";
-import type { ScimUserProvisioning } from "../scim-provisioning.service";
-import { ScimService } from "../scim.service";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { QuietScimSyncLifecycle } from "../../ports/__tests__/support/quiet-scim-sync-lifecycle.ts";
+import { PrismaScimRepository } from "../../repositories/prisma/scim.repository.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import { ScimService } from "../scim.service.ts";
 
 const CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
 const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";

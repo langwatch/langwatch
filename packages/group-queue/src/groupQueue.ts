@@ -28,7 +28,7 @@ import {
   latencyBucketField,
   latencyHourBucketKey,
   latencyMinuteBucketKey,
-} from "./latency";
+} from "./latency.ts";
 import type {
   DeduplicationConfig,
   GroupQueueActivityPort,
@@ -40,17 +40,17 @@ import type {
   JobDelivery,
   QueueAuditAdapter,
   QueueSendOptions,
-} from "./contracts";
-import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors";
-import { getBackoffMs, JOB_RETRY_CONFIG } from "./retry";
+} from "./contracts.ts";
+import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors.ts";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "./retry.ts";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
   tenantIdFromGroupId,
-} from "./storage";
+} from "./storage.ts";
 
-import { GroupQueueDispatcher } from "./dispatcher";
-import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
+import { GroupQueueDispatcher } from "./dispatcher.ts";
+import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle.ts";
 import {
   DecodeFailureError,
   type DecodeFailureReason,
@@ -60,7 +60,7 @@ import {
   readJobPayloadBytes,
   readJobRoutingMeta,
   withJobAttempt,
-} from "./jobEnvelope";
+} from "./jobEnvelope.ts";
 import {
   gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
@@ -81,9 +81,9 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
-} from "./metrics";
-import { GroupQueueMetricsCollector } from "./metricsCollector";
-import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore";
+} from "./metrics.ts";
+import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
+import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import {
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
   DEFAULT_CONFIRMED_DEATH_THRESHOLD,
@@ -92,8 +92,8 @@ import {
   type DrainedJob,
   GroupStagingScripts,
   WORKER_LIVENESS_REFRESH_MS,
-} from "./scripts";
-import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
+} from "./scripts.ts";
+import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {

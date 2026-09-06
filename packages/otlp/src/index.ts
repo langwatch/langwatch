@@ -19,9 +19,9 @@ export {
   otlpKeyValueSchema,
   type OtlpAnyValue,
   type OtlpKeyValue,
-} from "./any-value";
-export { normalizeOtlpAttributeMap, otlpScalarValue } from "./attribute-map";
-export { bytesToHex, decodeBase64OpenTelemetryId } from "./id";
+} from "./any-value.ts";
+export { normalizeOtlpAttributeMap, otlpScalarValue } from "./attribute-map.ts";
+export { bytesToHex, decodeBase64OpenTelemetryId } from "./id.ts";
 export {
   OTLP_MAX_BODY_BYTES,
   otlpProtobufRoot,
@@ -30,16 +30,16 @@ export {
   parseOtlpTraces,
   readOtlpBody,
   type OtlpParseResult,
-} from "./body";
+} from "./body.ts";
 export {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
   OtlpUnsupportedEncodingError,
-} from "./errors";
+} from "./errors.ts";
 export {
   CANONICAL_OTLP_BASE_PATH,
   canonicalOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
   readCorrectedPath,
   stampCorrectedPath,
-} from "./path-canonicalisation";
+} from "./path-canonicalisation.ts";

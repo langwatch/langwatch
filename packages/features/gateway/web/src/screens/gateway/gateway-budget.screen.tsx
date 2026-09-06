@@ -18,18 +18,18 @@ import {
 import { Archive, ArrowLeft, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
-import { BudgetEditDrawer } from "../../features/budgets/ui/sections/budget-edit-drawer";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
+import { BudgetEditDrawer } from "../../features/budgets/ui/sections/budget-edit-drawer.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { formatBudgetUsd } from "../../model/format-budget-usd";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Link } from "../../ui/elements/gateway-link";
+import { Link } from "../../ui/elements/gateway-link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
-import { useGatewayRouter } from "../../behavior/gateway-router";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
+import { useGatewayRouter } from "../../behavior/gateway-router.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 function BudgetDetailPage() {
   const showErrorToast = useShowErrorToast();

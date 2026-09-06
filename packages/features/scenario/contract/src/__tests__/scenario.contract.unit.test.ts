@@ -2,7 +2,7 @@ import {
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
   scenarioSchema,
-} from "../index";
+} from "../index.ts";
 import { describe, expect, it } from "vitest";
 
 describe("Scenario contract", () => {

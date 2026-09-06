@@ -5,8 +5,8 @@ import {
   type FoldProjectionStore,
 } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { SuiteRunCommandsAdapter } from "./suite-run-commands.adapter";
-import { SuiteRunStateFoldProjection } from "../projections/suite-run-state.projection";
+import { SuiteRunCommandsAdapter } from "./suite-run-commands.adapter.ts";
+import { SuiteRunStateFoldProjection } from "../projections/suite-run-state.projection.ts";
 import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "@langwatch/suite-contract";
 import type { SuiteRunProcessingEvent } from "@langwatch/suite-contract";
 

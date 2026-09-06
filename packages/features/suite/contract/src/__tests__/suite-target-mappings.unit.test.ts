@@ -4,7 +4,7 @@
 
 import { FieldMappingSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import { suiteTargetSchema } from "../suite";
+import { suiteTargetSchema } from "../suite.ts";
 
 describe("suiteTargetSchema", () => {
   describe("given a suite target carrying a source mapping and a literal mapping", () => {

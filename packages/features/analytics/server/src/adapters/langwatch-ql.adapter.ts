@@ -1,14 +1,14 @@
 /**
  * Process composition binds the restricted LangWatchQL identity to its service.
  */
-import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port";
-import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service";
+import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
+import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
-} from "../services/langwatch-ql.service";
-import { ClickHouseLangWatchQLExecutorAdapter } from "./clickhouse.langwatch-ql-executor.adapter";
+} from "../services/langwatch-ql.service.ts";
+import { ClickHouseLangWatchQLExecutorAdapter } from "./clickhouse.langwatch-ql-executor.adapter.ts";
 
 const executorService = LangWatchQLExecutorService.create();
 

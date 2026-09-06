@@ -11,8 +11,8 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryProjectionPort } from "../../../ports/trace-summary-projection.port";
-import { TraceSummaryStore } from "../eventing.trace-summary.store";
+import type { TraceSummaryProjectionPort } from "../../../ports/trace-summary-projection.port.ts";
+import { TraceSummaryStore } from "../eventing.trace-summary.store.ts";
 
 const context = {
   tenantId: "project_test",

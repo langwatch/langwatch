@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIMIT_TYPE_LABELS } from "../license-limit-labels";
+import { LIMIT_TYPE_LABELS } from "../license-limit-labels.ts";
 import { type LimitType, limitTypes } from "@langwatch/enterprise-licensing-contract";
 
 describe("LIMIT_TYPE_LABELS", () => {

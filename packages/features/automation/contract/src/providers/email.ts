@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PreviewEnvelope, SharedDef } from "../provider-types";
+import type { PreviewEnvelope, SharedDef } from "../provider-types.ts";
 
 export const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const emailActionParamsSchema = z.object({

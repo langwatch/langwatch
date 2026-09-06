@@ -15,7 +15,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
-import { useCodingAgentActivityHost } from "./coding-agent-activity-host";
+import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 
 type LinkProps = {
   href: string | undefined;

@@ -1,8 +1,8 @@
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
-import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository";
+import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 

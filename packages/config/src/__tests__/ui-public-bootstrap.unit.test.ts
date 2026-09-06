@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InvalidRuntimeConfigError } from "@langwatch/config";
-import { resolveUiPublicBootstrap } from "../public-app-config.projection";
+import { resolveUiPublicBootstrap } from "../public-app-config.projection.ts";
 
 describe("UI public bootstrap", () => {
   it("parses one UI process projection and returns only browser-safe values", () => {

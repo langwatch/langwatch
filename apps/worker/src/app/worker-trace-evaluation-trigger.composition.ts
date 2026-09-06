@@ -13,7 +13,7 @@ import {
 import {
   createWorkerTraceEvaluationMonitorPort,
   type TraceEvaluationMonitorReader,
-} from "./worker-trace-narrow-ports.composition";
+} from "./worker-trace-narrow-ports.composition.ts";
 
 /**
  * The online evaluations this process would dispatch for an ingested trace.

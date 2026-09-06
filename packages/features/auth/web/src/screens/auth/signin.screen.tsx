@@ -14,19 +14,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { FrontDoorShell } from "../../ui/sections/front-door-shell";
-import { IdentifierFirstSignIn } from "../../ui/sections/identifier-first-sign-in";
-import { useShowErrorToast } from "../../behavior/auth-feedback";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
-import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client";
-import { replaceLocation } from "../../behavior/browser-navigation";
-import Link from "../../ui/elements/router-link";
-import { useSearchParams } from "../../behavior/use-route";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
-import { LogoIcon } from "../../ui/elements/logo-icon";
-import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
-import { authFailureMessage } from "../../model/auth-failure-message";
-import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error.screen";
+import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";
+import { IdentifierFirstSignIn } from "../../ui/sections/identifier-first-sign-in.tsx";
+import { useShowErrorToast } from "../../behavior/auth-feedback.ts";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
+import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import Link from "../../ui/elements/router-link.tsx";
+import { useSearchParams } from "../../behavior/use-route.ts";
+import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
+import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env.ts";
+import { authFailureMessage } from "../../model/auth-failure-message.ts";
+import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error.screen.tsx";
 
 /**
  * Which sign-in screen this deployment has (ADR-117 §7).

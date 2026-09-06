@@ -1,1 +1,1 @@
-export { FORMULA_LEADERS, neutralizeFormula, neutralizeRows } from "./formula-guard";
+export { FORMULA_LEADERS, neutralizeFormula, neutralizeRows } from "./formula-guard.ts";

@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import "../elements/auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme";
-import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled";
-import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field";
-import { MethodDivider } from "./sign-in-method-picker";
+import { SHAPE } from "../../model/front-door-theme.ts";
+import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
+import { MethodDivider } from "./sign-in-method-picker.tsx";
 
 const identifierSchema = z.object({
   email: z

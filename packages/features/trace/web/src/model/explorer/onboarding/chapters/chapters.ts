@@ -1,4 +1,4 @@
-import type { StageId } from "./onboarding-journey-config";
+import type { StageId } from "./onboarding-journey-config.ts";
 
 /**
  * Chapter is the user-facing grouping of the journey — six stops on a narrative arc.

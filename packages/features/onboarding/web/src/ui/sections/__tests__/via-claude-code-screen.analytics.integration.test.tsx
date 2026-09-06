@@ -22,13 +22,13 @@ vi.mock("react-contextual-analytics", () => ({
 
 const API_KEY = "sk-lw-test-SUPERSECRET-000";
 
-vi.mock("../active-project-context", () => ({
+vi.mock("../active-project-context.tsx", () => ({
   useActiveProject: () => ({
     project: { id: "project-1", apiKey: API_KEY },
   }),
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({
     data: { IS_SAAS: true, BASE_HOST: "https://app.langwatch.ai" },
     isLoading: false,
@@ -39,7 +39,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { ViaClaudeCodeScreen } from "../via-claude-code-screen";
+import { ViaClaudeCodeScreen } from "../via-claude-code-screen.tsx";
 
 type EmitCall = [string, string, Record<string, unknown> | undefined];
 

@@ -1,7 +1,7 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringTopicsRecordedEvent } from "../../adapters/eventing.topic-events.adapter";
-import { type TopicModelData, TopicModelFoldProjection } from "../topic-model.projection";
+import type { TopicClusteringTopicsRecordedEvent } from "../../adapters/eventing.topic-events.adapter.ts";
+import { type TopicModelData, TopicModelFoldProjection } from "../topic-model.projection.ts";
 
 const stubStore: StateProjectionStore<TopicModelData> = {
   tryLoad: async () => null,

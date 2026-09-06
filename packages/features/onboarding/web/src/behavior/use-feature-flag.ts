@@ -12,7 +12,7 @@
  * targets as absent — so there is nothing for the host to narrow by.
  */
 
-import { useOnboardingHost } from "../model/onboarding-host";
+import { useOnboardingHost } from "../model/onboarding-host.ts";
 
 export function useFeatureFlag(
   flag: string,

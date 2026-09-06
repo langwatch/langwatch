@@ -4,7 +4,7 @@ import {
   secretNameSchema,
   secretPublicSchema,
   secretValueSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("Secret contract", () => {
   it("accepts upper-snake-case names only", () => {

@@ -4,10 +4,10 @@ import {
   presenceUserDisplayName,
 } from "@langwatch/presence-web/surfaces/presence-indicators";
 import { memo, useRef } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useCursorBroadcast } from "./hooks/use-cursor-broadcast";
-import { type PeerCursor, usePeerCursors } from "./hooks/use-peer-cursors";
-import { usePresenceFeatureEnabled } from "../../../behavior/presence/use-presence-feature-enabled";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useCursorBroadcast } from "./hooks/use-cursor-broadcast.ts";
+import { type PeerCursor, usePeerCursors } from "./hooks/use-peer-cursors.ts";
+import { usePresenceFeatureEnabled } from "../../../behavior/presence/use-presence-feature-enabled.ts";
 
 interface PeerCursorOverlayProps {
   /**

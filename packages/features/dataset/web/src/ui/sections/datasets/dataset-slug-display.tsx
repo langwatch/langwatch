@@ -1,9 +1,9 @@
 import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
-import { SlugChangeWarningAlert } from "../../elements/slug-change-warning-alert";
-import { SlugConflictAlert } from "../../elements/slug-conflict-alert";
+import { SlugChangeWarningAlert } from "../../elements/slug-change-warning-alert.tsx";
+import { SlugConflictAlert } from "../../elements/slug-conflict-alert.tsx";
 import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
-import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation";
+import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 
 /**
  * Props for DatasetSlugDisplay.

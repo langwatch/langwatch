@@ -6,8 +6,8 @@ import {
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port";
-import { OpsSnapshotRepository } from "../ops-snapshot.repository";
+import { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port.ts";
+import { OpsSnapshotRepository } from "../ops-snapshot.repository.ts";
 
 /**
  * The `{snapshot}` hash tag is load-bearing, not decoration.

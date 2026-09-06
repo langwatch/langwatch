@@ -1,10 +1,10 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { BLOB_BACKSTOP_TTL_SECONDS, BLOB_RELEASE_GRACE_TTL_SECONDS } from "../blobConstants";
-import { BlobLeases } from "../blobLeases";
-import { GroupStagingScripts } from "../scripts";
-import { createTenantId } from "../storage";
+import { BLOB_BACKSTOP_TTL_SECONDS, BLOB_RELEASE_GRACE_TTL_SECONDS } from "../blobConstants.ts";
+import { BlobLeases } from "../blobLeases.ts";
+import { GroupStagingScripts } from "../scripts.ts";
+import { createTenantId } from "../storage.ts";
 
 /**
  * GQ2 blob leases move INSIDE the stage eval, atomic with the squash that

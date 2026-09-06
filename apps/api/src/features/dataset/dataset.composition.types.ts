@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { DatasetApp } from "@langwatch/dataset-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount.ts";
 
 /** The two namespaces and the `ctx.app.dataset` slice the REST family reads. */
 export type ComposedDatasetFeature = Readonly<{

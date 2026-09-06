@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
 import {
   coerceStringNumberAttrs,
   extractInputMessages,
@@ -8,12 +8,12 @@ import {
   extractUsageTokens,
   recordValueType,
   spanTypeToGenAiOperationName,
-} from "../rules/canonical-extraction.rules";
-import { asBoolean, asNumber, coerceToStringArray, isRecord } from "../rules/canonical-guard.rules";
+} from "../rules/canonical-extraction.rules.ts";
+import { asBoolean, asNumber, coerceToStringArray, isRecord } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
-} from "../rules/canonical-message.rules";
+} from "../rules/canonical-message.rules.ts";
 
 const GEN_AI_RULE_PREFIX = "genai";
 

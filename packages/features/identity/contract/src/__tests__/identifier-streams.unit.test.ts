@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identityStreamsFor } from "../identifier-aggregate";
+import { identityStreamsFor } from "../identifier-aggregate.ts";
 import {
   T0,
   USER,
@@ -11,7 +11,7 @@ import {
   primaryChanged,
   proposed,
   verified,
-} from "./support/identifier-facts";
+} from "./support/identifier-facts.ts";
 
 describe("identityStreamsFor", () => {
   describe("given the facts stated about one person", () => {

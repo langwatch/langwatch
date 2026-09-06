@@ -11,7 +11,7 @@ import {
   ConversationTraceAssemblyService,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
-} from "./conversation-trace-assembly.service";
+} from "./conversation-trace-assembly.service.ts";
 import {
   DROPPED_THOUGHT_TYPE,
   MS_THRESHOLD,
@@ -20,8 +20,8 @@ import {
   type GenieAttachment,
   type GenieMessageFrame,
   type GenieThought,
-} from "../rules/genie-message.rules";
-import { GENIE_QUERY_SPAN_NAME } from "./genie-trace-mapper.service";
+} from "../rules/genie-message.rules.ts";
+import { GENIE_QUERY_SPAN_NAME } from "./genie-trace-mapper.service.ts";
 
 export class GenieSpanAttributesService {
   private constructor() {}

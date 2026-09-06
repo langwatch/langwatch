@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { WebhookTenantsRepository } from "../webhook-tenants.repository";
+import { WebhookTenantsRepository } from "../webhook-tenants.repository.ts";
 
 export class PrismaWebhookTenantsRepository extends WebhookTenantsRepository {
   private constructor(private readonly client: PrismaClient) {

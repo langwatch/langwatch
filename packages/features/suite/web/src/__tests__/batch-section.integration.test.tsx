@@ -11,14 +11,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { BatchSection } from "../batch-section";
-import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
+import { BatchSection } from "../batch-section.tsx";
+import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 
-vi.mock("../summary-status-icon", () => ({
+vi.mock("../summary-status-icon.tsx", () => ({
   SummaryStatusIcon: () => <span data-testid="summary-status-icon" />,
 }));
 
-vi.mock("../scenario-run-content", () => ({
+vi.mock("../scenario-run-content.tsx", () => ({
   ScenarioRunContent: ({
     scenarioRuns,
     viewMode,

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration";
-import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository";
+import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
+import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository.ts";
 
 /**
  * Unit tests for the ADR-051 one-time topic-model seed.

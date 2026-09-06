@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type EditorColumn, rekeyEditorRecords } from "../use-dataset-editor-store";
+import { type EditorColumn, rekeyEditorRecords } from "../use-dataset-editor-store.ts";
 
 const columns = (...names: string[]): EditorColumn[] =>
   names.map((name, index) => ({

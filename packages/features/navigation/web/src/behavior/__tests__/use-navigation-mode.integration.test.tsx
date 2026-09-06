@@ -11,8 +11,8 @@ import {
   loadStoredNavigationMode,
   NAVIGATION_MODE_STORAGE_KEY,
   useNavigationModeStore,
-} from "../navigation-mode.store";
-import { useNavigationMode } from "../use-navigation-mode";
+} from "../navigation-mode.store.ts";
+import { useNavigationMode } from "../use-navigation-mode.ts";
 
 const STORAGE_KEY = NAVIGATION_MODE_STORAGE_KEY;
 

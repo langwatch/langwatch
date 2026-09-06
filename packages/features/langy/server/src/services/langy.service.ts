@@ -24,11 +24,11 @@ import {
   type ConversationDetail,
   type ConversationListItem,
   type ConversationListPage,
-} from "./langy-conversation.service";
-import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service";
-import { LangyTurnService } from "./langy-turn.service";
-import { LangyCredentialService } from "./langy-credential.service";
-import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
+} from "./langy-conversation.service.ts";
+import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service.ts";
+import { LangyTurnService } from "./langy-turn.service.ts";
+import { LangyCredentialService } from "./langy-credential.service.ts";
+import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port.ts";
 
 /**
  * How this process opens a relay connection for a conversation runtime.

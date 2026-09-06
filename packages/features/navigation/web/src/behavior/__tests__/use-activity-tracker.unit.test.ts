@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseEntityUrl } from "../use-activity-tracker";
+import { parseEntityUrl } from "../use-activity-tracker.ts";
 
 describe("useActivityTracker URL parsing", () => {
   describe("trace detection", () => {

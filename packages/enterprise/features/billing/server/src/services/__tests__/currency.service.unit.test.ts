@@ -19,7 +19,7 @@ import { Currency } from "@langwatch/enterprise-billing-contract";
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("geoip-country", () => ({ default: { lookup } }));
 
-const { CurrencyService, EUR_COUNTRIES } = await import("../currency.service");
+const { CurrencyService, EUR_COUNTRIES } = await import("../currency.service.ts");
 
 const service = CurrencyService.create();
 

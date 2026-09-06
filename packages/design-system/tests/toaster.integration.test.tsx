@@ -9,8 +9,8 @@
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Toaster, toaster } from "../src/components/toaster";
-import { renderWithDesignSystem } from "../src/testing";
+import { Toaster, toaster } from "../src/components/toaster.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 beforeEach(() => {
   toaster.remove();

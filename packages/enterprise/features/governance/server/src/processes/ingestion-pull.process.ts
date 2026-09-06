@@ -13,14 +13,14 @@ import type { IntentSpec } from "@langwatch/eventing";
 import {
   IngestionPullIntent,
   ingestionPullRunIntentSchema,
-} from "../intents/ingestion-pull.intent";
-import type { IngestionPullSchedulePort } from "../ports/ingestion-pull.port";
+} from "../intents/ingestion-pull.intent.ts";
+import type { IngestionPullSchedulePort } from "../ports/ingestion-pull.port.ts";
 import {
   INGESTION_PULL_CONCURRENCY,
   INGESTION_PULL_LEASE_DURATION_MS,
   INGESTION_PULL_MAX_ATTEMPTS,
   IngestionPullService,
-} from "../services/ingestion-pull.service";
+} from "../services/ingestion-pull.service.ts";
 
 export const INGESTION_PULL_PROCESS_NAME = "ingestionPull" as const;
 export const INGESTION_PULL_STALE_RUN_MS = 30 * 60 * 1_000;

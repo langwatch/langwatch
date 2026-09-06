@@ -21,7 +21,7 @@ import {
   AppGovernanceSignalsService,
   GovernanceSignalDeliveryPort,
   GovernanceSignalStoragePort,
-} from "./governance-signals.adapter";
+} from "./governance-signals.adapter.ts";
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { llmConfigSchema } from "./studio-workflow";
+import { llmConfigSchema } from "./studio-workflow.ts";
 
 export const studioOptimizerIds = [
   "MIPROv2",

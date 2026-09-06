@@ -14,7 +14,7 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./langy-database.mapper";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 /**
  * `status` is TEXT in the database, so this parse stands in for the Postgres

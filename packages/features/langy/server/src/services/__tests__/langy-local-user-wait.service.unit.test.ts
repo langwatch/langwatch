@@ -19,7 +19,7 @@ import {
   type UserWaitBuffer,
   type UserWaitEvents,
   UserWaitService,
-} from "../langy-local-user-wait.service";
+} from "../langy-local-user-wait.service.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";

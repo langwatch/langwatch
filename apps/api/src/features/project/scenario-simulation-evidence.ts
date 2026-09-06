@@ -7,7 +7,7 @@
  * where the step's copy is written.
  */
 import type { SimulationService } from "@langwatch/scenario-contract";
-import { ApiSimulationEvidencePort } from "./integrations-checks.composition";
+import { ApiSimulationEvidencePort } from "./integrations-checks.composition.ts";
 
 export class ApiScenarioSimulationEvidence extends ApiSimulationEvidencePort {
   static create(

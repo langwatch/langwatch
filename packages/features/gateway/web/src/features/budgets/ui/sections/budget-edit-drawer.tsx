@@ -13,9 +13,9 @@ import { useEffect, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import { api } from "../../../../behavior/gateway-api";
-import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { api } from "../../../../behavior/gateway-api.ts";
+import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
 
 type BudgetRow = {
   id: string;

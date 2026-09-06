@@ -21,8 +21,8 @@ import {
   relayPayloadCaps,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api";
-import { resultCapViolation } from "../rules/connected-agent-caps.rules";
+import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api.ts";
+import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
 import {
   type InstanceGone,
   type ReplyNudge,
@@ -36,17 +36,17 @@ import {
   INSTANCE_GONE_CHANNEL,
   replyChannel,
   resultKey,
-} from "../rules/connected-agent-keys.rules";
-import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service";
+} from "../rules/connected-agent-keys.rules.ts";
+import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
 import {
   ConnectedAgentPresenceProjection,
   type AgentLastSeenWriter,
-} from "../projections/connected-agent-presence.projection";
-import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port";
+} from "../projections/connected-agent-presence.projection.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
 import {
   type ConnectCredentialPort,
   type ResolvedConnectCredential,
-} from "../ports/connect-credential.port";
+} from "../ports/connect-credential.port.ts";
 
 const logger = createLogger("langwatch:connected-agents:session");
 

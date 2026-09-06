@@ -14,16 +14,16 @@ import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { VariableInfoIcon } from "../../../liquid-editor";
-import { LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor";
-import { FieldHeader, LiquidEditor } from "./template-authoring";
-import { AutomationTestFireButton } from "../elements/test-fire-button";
+import { VariableInfoIcon } from "../../../liquid-editor/index.ts";
+import { LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
+import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
+import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import type {
   ConfigFormCtx,
   ConfigFormProps,
   NotifyClientDef,
   SummaryIdentity,
-} from "../../../../model/provider-types";
+} from "../../../../model/provider-types.ts";
 
 /** A template field, mirroring the Slack provider's `FieldDraft`: empty +
  *  `usingDefault` means the framework default envelope applies. */

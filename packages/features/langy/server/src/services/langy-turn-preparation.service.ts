@@ -13,17 +13,17 @@ import { trace } from "@opentelemetry/api";
 import {
   LANGY_REFERENT_POLICY,
   LangyConversationMemoryService,
-} from "./langy-conversation-memory.service";
-import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
-import { LangyTurnOverrideService } from "./langy-turn-override.service";
+} from "./langy-conversation-memory.service.ts";
+import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
+import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
   LANGY_OVERRIDE,
   LANGY_USER_MESSAGE_LABEL,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
-} from "./langy-turn-shared.service";
-import { LangyTurnSharedService } from "./langy-turn-shared.service";
-import { mintRunToken } from "../ports/langy-frame-auth.port";
+} from "./langy-turn-shared.service.ts";
+import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
+import { mintRunToken } from "../ports/langy-frame-auth.port.ts";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();

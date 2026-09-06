@@ -3,10 +3,10 @@ import type { AnnotationAnchorKind } from "@langwatch/annotation-contract";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
-} from "../../use-annotations-by-trace-ids";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+} from "../../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /** The part of the open trace a surface points at. */
 export interface TraceAnchor {

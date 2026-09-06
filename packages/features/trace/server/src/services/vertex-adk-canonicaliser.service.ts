@@ -1,8 +1,8 @@
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
-import { canonicaliseVertexAdkCore, isVertexAdkSpan } from "../rules/vertex-adk-core.rules";
-import { canonicaliseVertexAdkRequest } from "../rules/vertex-adk-request.rules";
-import { canonicaliseVertexAdkResponse } from "../rules/vertex-adk-response.rules";
-import { canonicaliseVertexAdkToolCall } from "../rules/vertex-adk-tool-call.rules";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { canonicaliseVertexAdkCore, isVertexAdkSpan } from "../rules/vertex-adk-core.rules.ts";
+import { canonicaliseVertexAdkRequest } from "../rules/vertex-adk-request.rules.ts";
+import { canonicaliseVertexAdkResponse } from "../rules/vertex-adk-response.rules.ts";
+import { canonicaliseVertexAdkToolCall } from "../rules/vertex-adk-tool-call.rules.ts";
 
 export class VertexAdkCanonicaliserService implements CanonicalAttributesPort {
   static create(): VertexAdkCanonicaliserService {

@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EvaluatorListDrawer } from "../evaluator-list-drawer";
+import { EvaluatorListDrawer } from "../evaluator-list-drawer.tsx";
 
 const mockEvaluators = [
   {
@@ -35,13 +35,13 @@ const mockEvaluators = [
 
 let evaluatorsQueryData: typeof mockEvaluators | [] = mockEvaluators;
 
-vi.mock("../../../model/evaluator-host", () => ({
+vi.mock("../../../model/evaluator-host.ts", () => ({
   useEvaluatorHost: () => ({
     scope: () => ({ projectId: "test-project-id", projectSlug: "test-project" }),
   }),
 }));
 
-vi.mock("../../../behavior/evaluator-api", () => ({
+vi.mock("../../../behavior/evaluator-api.ts", () => ({
   evaluatorApi: {
     useUtils: () => ({
       evaluators: { getAll: { invalidate: vi.fn() } },

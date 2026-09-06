@@ -18,7 +18,7 @@
  *   - QuarantineFillEvaluator — per-source span-rate breakdown for the
  *     quarantine-fill Alert
  */
-import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port";
+import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
 import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,

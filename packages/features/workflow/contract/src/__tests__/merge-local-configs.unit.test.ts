@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeLocalConfigsIntoDsl } from "../merge-local-configs";
+import { mergeLocalConfigsIntoDsl } from "../merge-local-configs.ts";
 import type {
   AgentComponent,
   Evaluator,
   LlmPromptConfigComponent,
   LocalPromptConfig,
   StudioNode,
-} from "../studio-workflow";
+} from "../studio-workflow.ts";
 
 const localPromptConfig: LocalPromptConfig = {
   llm: {

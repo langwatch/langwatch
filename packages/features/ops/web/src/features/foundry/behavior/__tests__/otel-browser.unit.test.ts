@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { createFoundryProvider } from "../otel-browser";
+import { createFoundryProvider } from "../otel-browser.ts";
 
 describe("given the Foundry's browser exporter", () => {
   describe("when a legacy project key names its project", () => {

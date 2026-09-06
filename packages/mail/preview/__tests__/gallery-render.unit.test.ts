@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mailTemplates, renderMailTemplate } from "../../src/templates";
-import { buildGalleryEntries } from "../gallery-render";
+import { mailTemplates, renderMailTemplate } from "../../src/templates/index.ts";
+import { buildGalleryEntries } from "../gallery-render.ts";
 
 describe("buildGalleryEntries", () => {
   describe("given the default view", () => {

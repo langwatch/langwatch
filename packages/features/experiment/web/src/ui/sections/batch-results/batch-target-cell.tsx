@@ -8,7 +8,7 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
-import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils";
+import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
 import {
   type DescribeBatchCellFailure,
   formatCost,
@@ -17,8 +17,8 @@ import {
   type RenderBatchEvaluatorResult,
   type RenderTracePeek,
   useEscapeKey,
-} from "./presentation";
-import type { BatchTargetOutput } from "../batch-evaluation-results.types";
+} from "./presentation.tsx";
+import type { BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;

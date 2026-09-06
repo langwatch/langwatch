@@ -45,17 +45,17 @@ import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
-} from "../../rules/analytics-payload-blocklist.rules";
+} from "../../rules/analytics-payload-blocklist.rules.ts";
 import {
   collectStringValues,
   EVAL_METRIC_KEYS,
   type EvalMetricKey,
   hasFilterValues,
-} from "./clickhouse.timeseries-query-shared.mapper";
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
-} from "../../rules/analytics-field-availability.rules";
+} from "../../rules/analytics-field-availability.rules.ts";
 
 /** The six destination tables routed between. */
 export type AnalyticsTable =

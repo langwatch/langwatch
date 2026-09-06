@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useSharedTrace } from "../context/shared-trace-context";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;

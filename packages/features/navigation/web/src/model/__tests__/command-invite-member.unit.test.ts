@@ -4,8 +4,8 @@
  * @see specs/settings/add-member-drawer.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { allStaticCommands } from "../command-catalogue";
-import { handleCommandSelect } from "../command-select-handlers";
+import { allStaticCommands } from "../command-catalogue.ts";
+import { handleCommandSelect } from "../command-select-handlers.ts";
 
 describe("the command bar's invite command", () => {
   describe("given the bar is open", () => {

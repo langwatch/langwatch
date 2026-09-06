@@ -6,7 +6,7 @@
  * it hit and a reviewer can see the whole envelope in one place.
  */
 
-import { EXPRESSION_BEARING_KEYS, screenVegaExpression } from "./vega-lite-expressions";
+import { EXPRESSION_BEARING_KEYS, screenVegaExpression } from "./vega-lite-expressions.ts";
 import {
   collectViewNodes,
   countUnitViews,
@@ -19,8 +19,8 @@ import {
   measureUtf8Bytes,
   visitJsonObjects,
   visitPredicate,
-} from "./vega-lite-structure";
-import { TRANSFORM_ANALYZERS } from "./vega-lite-transforms";
+} from "./vega-lite-structure.ts";
+import { TRANSFORM_ANALYZERS } from "./vega-lite-transforms.ts";
 import {
   type DatasetRowCounts,
   type LangWatchQLVegaRuleId,
@@ -28,7 +28,7 @@ import {
   type VegaValidationError,
   type VegaValidationErrorCode,
   type VegaValidationWarning,
-} from "./visualization-types";
+} from "./visualization-types.ts";
 
 /**
  * Every named ceiling, in one object. A chart that sits on a ceiling renders;

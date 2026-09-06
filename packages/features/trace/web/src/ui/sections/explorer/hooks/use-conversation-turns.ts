@@ -1,8 +1,8 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "../../../../behavior/trace-api";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
-import { useDrawerProjectId } from "./use-drawer-project-id";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
+import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_DAYS = 90;

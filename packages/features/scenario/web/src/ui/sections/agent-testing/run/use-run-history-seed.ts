@@ -4,12 +4,12 @@
  */
 
 import { useEffect, useRef } from "react";
-import type { TargetValue } from "../../../../model/scenario-target";
-import { applyConfigurationTo } from "./apply-configuration";
-import type { RunConfigurationEntry } from "./run-configuration";
-import type { RunDialogSubject } from "./run-dialog-types";
-import type { RunDialogFields } from "./use-run-dialog-form";
-import type { RunPlanFields } from "./use-run-plan-fields";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { applyConfigurationTo } from "./apply-configuration.ts";
+import type { RunConfigurationEntry } from "./run-configuration.ts";
+import type { RunDialogSubject } from "./run-dialog-types.ts";
+import type { RunDialogFields } from "./use-run-dialog-form.ts";
+import type { RunPlanFields } from "./use-run-plan-fields.ts";
 
 /** Whether the dialog still holds exactly what it opened with. */
 function isUntouched({

@@ -1,1 +1,1 @@
-export { FindBar } from "./find-bar";
+export { FindBar } from "./find-bar.tsx";

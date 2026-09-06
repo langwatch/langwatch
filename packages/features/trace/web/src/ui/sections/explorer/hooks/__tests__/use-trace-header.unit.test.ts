@@ -2,13 +2,13 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useTraceHeader } from "../use-trace-header";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceHeader } from "../use-trace-header.ts";
 
 const headerData: { traceId?: string; timestamp?: number } = {};
 const capturedHeaderInputs: Array<{ full?: boolean }> = [];
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     tracesV2: {
       header: {
@@ -26,7 +26,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../use-trace-query-args", () => ({
+vi.mock("../use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({
     isLive: false,
     isReady: true,
@@ -34,7 +34,7 @@ vi.mock("../use-trace-query-args", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/sse-status.store", () => ({
+vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: () => false,
 }));
 

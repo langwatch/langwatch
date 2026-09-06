@@ -3,7 +3,7 @@
  * wall-clock time across a clock change, and a day starts at local midnight.
  */
 
-import { toDate, toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned";
+import { toDate, toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned.ts";
 
 /** The same time of day, `amount` days later. */
 export function addDays(value: TimeInput, amount: number, options?: ZoneOptions): Date {

@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CommandHandler } from "../../../commands/command";
-import type { CommandSchema } from "../../../commands/commandSchema";
-import type { AggregateType } from "../../../domain/aggregateType";
-import type { CommandType } from "../../../domain/commandType";
-import { createTenantId } from "../../../domain/tenantId";
-import type { Event } from "../../../domain/types";
+import type { CommandHandler } from "../../../commands/command.ts";
+import type { CommandSchema } from "../../../commands/commandSchema.ts";
+import type { AggregateType } from "../../../domain/aggregateType.ts";
+import type { CommandType } from "../../../domain/commandType.ts";
+import { createTenantId } from "../../../domain/tenantId.ts";
+import type { Event } from "../../../domain/types.ts";
 import {
   createTestAggregateType,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../__tests__/testHelpers";
-import { ValidationError } from "../../errorHandling";
-import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher";
-import { processCommand, processCommandBatch } from "../commandDispatcher";
+} from "../../__tests__/testHelpers.ts";
+import { ValidationError } from "../../errorHandling.ts";
+import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher.ts";
+import { processCommand, processCommandBatch } from "../commandDispatcher.ts";
 
 describe("processCommand", () => {
   const aggregateType: AggregateType = createTestAggregateType();

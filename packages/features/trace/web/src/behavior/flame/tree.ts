@@ -1,5 +1,5 @@
-import { formatDuration } from "../../model/display-formatters";
-import type { BuiltTree, FlameNode, SpanContext, TraceFlameSpan, Viewport } from "./types";
+import { formatDuration } from "../../model/display-formatters.ts";
+import type { BuiltTree, FlameNode, SpanContext, TraceFlameSpan, Viewport } from "./types.ts";
 
 export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
   const spanById = new Map<string, TraceFlameSpan>();

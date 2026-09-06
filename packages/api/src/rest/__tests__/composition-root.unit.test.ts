@@ -7,8 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
-import type { MountedRoute } from "../types.js";
+import { createTestService as createService } from "./test-service.ts";
+import type { MountedRoute } from "../types.ts";
 
 /** One family's own file: it builds its own app and knows only its own routes. */
 function buildInvoicesFamily(onRouteMounted: (route: MountedRoute) => void) {

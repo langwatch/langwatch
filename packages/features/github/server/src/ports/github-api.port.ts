@@ -5,7 +5,7 @@ import type {
   GithubInstallationToken,
   GithubPullRequestSummary,
   MintInstallationTokenInput,
-} from "./github-app-token.port";
+} from "./github-app-token.port.ts";
 
 export abstract class GithubApiPort {
   abstract readonly configured: boolean;

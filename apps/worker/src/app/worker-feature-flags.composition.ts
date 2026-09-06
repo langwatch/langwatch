@@ -5,7 +5,7 @@ import {
   type FeatureFlagDatabase,
   type FeatureFlagExperimentDatabase,
 } from "@langwatch/feature-flag-server";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** The two models the flag store reads from the client. */
 export type WorkerFeatureFlagDatabase = FeatureFlagDatabase & FeatureFlagExperimentDatabase;

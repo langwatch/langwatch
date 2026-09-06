@@ -1,2 +1,2 @@
-export * from "../model/rule-editing";
-export * from "../model/targeting-summary";
+export * from "../model/rule-editing.ts";
+export * from "../model/targeting-summary.ts";

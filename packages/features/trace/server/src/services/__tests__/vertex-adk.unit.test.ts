@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { VertexAdkCanonicaliserService } from "../vertex-adk-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { VertexAdkCanonicaliserService } from "../vertex-adk-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 /**
  * Anonymised replicas of real Google ADK / Vertex AI Agent Engine span

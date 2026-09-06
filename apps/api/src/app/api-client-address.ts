@@ -2,7 +2,7 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import type { Context } from "hono";
 
-import { configuredTrustedProxies } from "../platform/config/trusted-proxies.config";
+import { configuredTrustedProxies } from "../platform/config/trusted-proxies.config.ts";
 
 /**
  * Which address a request came from: the socket, unless the request arrived from a hop

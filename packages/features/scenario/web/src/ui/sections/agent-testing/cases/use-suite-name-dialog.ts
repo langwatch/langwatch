@@ -5,8 +5,8 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
-import type { SuiteMutations } from "../../../../behavior/agent-testing/cases/use-test-cases-mutations";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { SuiteMutations } from "../../../../behavior/agent-testing/cases/use-test-cases-mutations.ts";
 
 export type SuiteNameDialogModel = {
   isOpen: boolean;

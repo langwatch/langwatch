@@ -16,7 +16,7 @@ import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contrac
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { IntegrationsChecksTrpcApi } from "../integrations-checks.api";
+import { IntegrationsChecksTrpcApi } from "../integrations-checks.api.ts";
 
 type TestContext = {
   session: { user: { id: string } } | null;

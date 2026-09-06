@@ -4,18 +4,18 @@ import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-derived.projection";
+} from "../trace-derived.projection.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
   msToUnixNano,
-} from "./fixtures/trace-summary-test.fixtures";
+} from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * The read-back boundary is a DESERIALIZE, not a rebuild: a fold resumed from

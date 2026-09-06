@@ -1,11 +1,11 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/trace-api";
-import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { type DiscoverDescriptors, getCachedDiscover, setCachedDiscover } from "./discover-cache";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors.ts";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { type DiscoverDescriptors, getCachedDiscover, setCachedDiscover } from "./discover-cache.ts";
 
 const EMPTY: never[] = [];
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {

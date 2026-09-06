@@ -3,13 +3,13 @@
  * row, shared by the server's Postgres map projection and (ADR-059 Phase 4,
  * client half) the browser's local message list.
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants.ts";
 import type {
   LangyAgentRespondedEventData,
   LangyMessageImportedEventData,
   LangyMessageRecordedEventData,
-} from "../contracts/langy.events";
-import type { LangyMessagePart, LangyMessageRole } from "../../json";
+} from "../contracts/langy.events.ts";
+import type { LangyMessagePart, LangyMessageRole } from "../../json.ts";
 
 export interface LangyMessageProjectionRecord {
   ConversationId: string;

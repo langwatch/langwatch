@@ -9,15 +9,15 @@ import { useState } from "react";
 
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { describeError, readHandledError } from "../../../../behavior/errors";
-import { api } from "../../../../behavior/langy-api";
+import { describeError, readHandledError } from "../../../../behavior/errors.tsx";
+import { api } from "../../../../behavior/langy-api.ts";
 
 import type {
   LangyPermissionAnswerSource,
   LangyPermissionCardData,
   LangyPermissionDecision,
-} from "../../../../model/langy-local-waits";
-import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store";
+} from "../../../../model/langy-local-waits.ts";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 
 /** What the disabled skip switch says, and where it sends the reader. */
 export const SKIP_NOT_ALLOWED_HINT =

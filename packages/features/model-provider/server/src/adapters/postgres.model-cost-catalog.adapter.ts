@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelCostProjectPort } from "../ports/model-provider.port";
-import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository";
-import { ModelCostCatalogService } from "../services/model-cost-catalog.service";
-import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service";
+import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
+import { ModelCostCatalogService } from "../services/model-cost-catalog.service.ts";
+import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service.ts";
 
 /** The one model the cost listing needs from the client. */
 export type ModelCostCatalogDatabase = Pick<PrismaClient, "customLLMModelCost">;

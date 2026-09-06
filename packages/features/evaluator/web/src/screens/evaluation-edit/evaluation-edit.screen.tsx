@@ -15,7 +15,7 @@ import { MoreVertical } from "react-feather";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import CheckConfigForm, {
   type CheckConfigFormData,
-} from "../../ui/sections/checks/check-config-form";
+} from "../../ui/sections/checks/check-config-form.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";

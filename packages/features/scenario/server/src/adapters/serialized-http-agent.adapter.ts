@@ -16,11 +16,11 @@ import {
   renderUrlTemplate,
 } from "@langwatch/scenario-contract";
 import { JSONPath } from "jsonpath-plus";
-import { applyAuthentication } from "./http-auth.adapter";
+import { applyAuthentication } from "./http-auth.adapter.ts";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
-import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter";
-import type { ScenarioHttpPort } from "../ports/scenario-http.port";
-import { SerializedAgentPort } from "../ports/serialized-agent.port";
+import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter.ts";
+import type { ScenarioHttpPort } from "../ports/scenario-http.port.ts";
+import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in

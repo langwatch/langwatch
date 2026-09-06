@@ -59,8 +59,8 @@ import type {
   ReplayStatus,
 } from "@langwatch/ops-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
-import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules";
+import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 
 /** One process ref, the triple every process-manager read is keyed by. */
 export type OpsProcessRef = {

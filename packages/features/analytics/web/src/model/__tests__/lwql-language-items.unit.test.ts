@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_LANGUAGE_ITEMS } from "../lwql-language-items";
+import { LWQL_LANGUAGE_ITEMS } from "../lwql-language-items.ts";
 
 const labels = LWQL_LANGUAGE_ITEMS.map((item) => item.label);
 

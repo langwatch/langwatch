@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveExperimentVerdictLabel } from "../experiment-comparison";
+import { resolveExperimentVerdictLabel } from "../experiment-comparison.ts";
 
 describe("resolveExperimentVerdictLabel", () => {
   it("maps legacy slot labels by position", () => {

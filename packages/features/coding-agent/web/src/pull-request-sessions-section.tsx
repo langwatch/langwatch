@@ -1,15 +1,15 @@
 import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
-import { AgentLabel } from "./agent-label";
-import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail";
-import { formatShortDate } from "./short-date";
+import { AgentLabel } from "./agent-label.tsx";
+import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
+import { formatShortDate } from "./short-date.ts";
 import type React from "react";
 
 import { ListTable } from "@langwatch/design-system/list-table";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 
-import { useTerminalReplay } from "./use-terminal-replay";
-import { ContributorName } from "./contributor-name";
-import { EmptySection, Section } from "./detail-section";
+import { useTerminalReplay } from "./use-terminal-replay.ts";
+import { ContributorName } from "./contributor-name.tsx";
+import { EmptySection, Section } from "./detail-section.tsx";
 
 /** One session as the pull request detail lists it. */
 type DetailSession = DetailPayload["sessions"][number];

@@ -1,6 +1,6 @@
 import { Button, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import type { ScenarioArchiveItem } from "../../model/scenario-list.types";
+import type { ScenarioArchiveItem } from "../../model/scenario-list.types.ts";
 
 export type ScenarioArchiveDialogProps = {
   open: boolean;

@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { automationLimitEmailTemplate } from "../automation-limit-email";
-import { budgetIncreaseRequestEmailTemplate } from "../budget-increase-request-email";
-import { DOCUMENTATION_URL } from "../email-layout";
-import { mailTemplates } from "../index";
-import { inviteEmailTemplate } from "../invite-email";
-import { inviteReRequestEmailTemplate } from "../invite-re-request-email";
+import { automationLimitEmailTemplate } from "../automation-limit-email.tsx";
+import { budgetIncreaseRequestEmailTemplate } from "../budget-increase-request-email.tsx";
+import { DOCUMENTATION_URL } from "../email-layout.tsx";
+import { mailTemplates } from "../index.ts";
+import { inviteEmailTemplate } from "../invite-email.tsx";
+import { inviteReRequestEmailTemplate } from "../invite-re-request-email.tsx";
 import {
   domainAutoJoinedTemplate,
   joinRequestApprovedTemplate,
   joinRequestArrivedTemplate,
   joinRequestExpiredTemplate,
-} from "../join-request-emails";
-import { licenseEmailTemplate } from "../license-email";
-import { renderMailTemplate, type MailTemplate } from "../registry";
-import { FIRST_STEPS_LINKS } from "../onboarding/first-steps";
-import { signUpVerificationEmailTemplate } from "../sign-up-verification-email";
-import { triggerDigestEmailTemplate } from "../trigger-digest-email";
-import { usageLimitEmailTemplate } from "../usage-limit-email";
+} from "../join-request-emails.tsx";
+import { licenseEmailTemplate } from "../license-email.tsx";
+import { renderMailTemplate, type MailTemplate } from "../registry.ts";
+import { FIRST_STEPS_LINKS } from "../onboarding/first-steps.tsx";
+import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";
+import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
+import { usageLimitEmailTemplate } from "../usage-limit-email.tsx";
 
 /**
  * Every hook is optional data behind a gate, so every hook is two assertions:

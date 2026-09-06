@@ -5,7 +5,7 @@ import {
   type PresenceAvailability,
 } from "@langwatch/presence-web/surfaces/presence-state";
 
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 /**
  * Whether multiplayer presence is enabled for the active project, read off the

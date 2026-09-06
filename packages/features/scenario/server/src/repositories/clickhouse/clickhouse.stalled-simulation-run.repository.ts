@@ -1,7 +1,7 @@
 import {
   type StalledHistoricalRun,
   type StalledSimulationRunRepository,
-} from "../stalled-simulation-run.repository";
+} from "../stalled-simulation-run.repository.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
 

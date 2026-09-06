@@ -9,9 +9,9 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features";
-import type { ApiAuthoringRestComposition } from "../../app/api-authoring-rest.composition";
-import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
+import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import type { ApiAuthoringRestComposition } from "../../app/api-authoring-rest.composition.ts";
+import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
 
 describe("given the Studio's run dispatch door", () => {
   describe("when a permitted person posts a runnable event", () => {

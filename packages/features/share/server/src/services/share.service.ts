@@ -32,8 +32,8 @@ import {
   ShareLinkNotFoundError,
   TraceSharingDisabledError,
 } from "@langwatch/share-contract";
-import type { ShareCacheRepository } from "../repositories/share-cache.repository";
-import type { ShareRepository } from "../repositories/share.repository";
+import type { ShareCacheRepository } from "../repositories/share-cache.repository.ts";
+import type { ShareRepository } from "../repositories/share.repository.ts";
 
 const logger = createLogger("langwatch:share-service");
 const generateShareToken = customAlphabet(

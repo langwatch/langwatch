@@ -2,10 +2,10 @@ import type { Context, MiddlewareHandler } from "hono";
 import { uniqueSymbol, validator as zValidator } from "hono-openapi";
 import { z } from "zod";
 
-import { declaredSize, drainWithinCap } from "./body-limit.js";
-import { routeParameterNames } from "./definition.js";
-import { createApiSchemaError, parseApiSchema, type ApiSchema } from "../schema.js";
-import type { EndpointRegistration } from "./types.js";
+import { declaredSize, drainWithinCap } from "./body-limit.ts";
+import { routeParameterNames } from "./definition.ts";
+import { createApiSchemaError, parseApiSchema, type ApiSchema } from "../schema.ts";
+import type { EndpointRegistration } from "./types.ts";
 
 const inputObjectSchema = z.record(z.string(), z.unknown());
 

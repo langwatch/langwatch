@@ -13,8 +13,8 @@ class ForbiddenTestError extends HandledError {
     super("forbidden", "forbidden", { httpStatus: 403 });
   }
 }
-import { ApiConnectCredentialAdapter } from "../agent-connect-credential.adapter";
-import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential";
+import { ApiConnectCredentialAdapter } from "../agent-connect-credential.adapter.ts";
+import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential.ts";
 
 function apiKeyToken(overrides: Partial<ResolvedApiKeyToken> = {}): ResolvedApiKeyToken {
   return {

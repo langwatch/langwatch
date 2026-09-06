@@ -3,14 +3,14 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { OrganizationMembershipService } from "../organization-membership.service";
+import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
-} from "../../ports/organization-membership.port";
-import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository";
+} from "../../ports/organization-membership.port.ts";
+import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();

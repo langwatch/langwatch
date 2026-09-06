@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { langyDraftToRestore } from "../langy-draft-recovery";
+import { langyDraftToRestore } from "../langy-draft-recovery.ts";
 
 describe("langyDraftToRestore", () => {
   describe("given a send the reader typed", () => {

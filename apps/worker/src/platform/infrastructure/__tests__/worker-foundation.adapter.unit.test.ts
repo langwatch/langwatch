@@ -26,7 +26,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WorkerInfrastructureAdapter,
   WorkerStorageFactoryPort,
-} from "../worker-foundation.adapter";
+} from "../worker-foundation.adapter.ts";
 import { OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import type { RedisConfigResolution } from "@langwatch/redis-client";

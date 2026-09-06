@@ -5,7 +5,7 @@
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { LangyTrpcApi, type LangyTrpcContext } from "../langy.api";
+import { LangyTrpcApi, type LangyTrpcContext } from "../langy.api.ts";
 
 const PROJECT_ID = "project_1";
 const USER_ID = "user_1";

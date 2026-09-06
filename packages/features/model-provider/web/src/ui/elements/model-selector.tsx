@@ -11,7 +11,7 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map";
+import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map.tsx";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 import {
@@ -28,7 +28,7 @@ import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "@langwatch/prompt-web/surfaces/llm-config-constants";
-import { NoModelsConfiguredCallout } from "./no-models-configured-callout";
+import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Link } from "@langwatch/ui-host/link";
 import { Select } from "@langwatch/design-system/select";

@@ -25,7 +25,7 @@ import {
   type TokenCredential,
   WorkloadIdentityCredential,
 } from "@azure/identity";
-import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.adapter";
+import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.adapter.ts";
 
 export type TokenModeCredentials = Extract<AzureCredentials, { mode: AzureTokenAuthMode }>;
 

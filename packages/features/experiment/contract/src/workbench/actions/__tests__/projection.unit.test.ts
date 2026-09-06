@@ -4,9 +4,9 @@ import type {
   EvaluationResults,
   EvaluatorConfig,
   TargetConfig,
-} from "../../../experiment-workbench";
-import { PROJECTION_BUDGET_BYTES, projectWorkbenchState } from "../projection";
-import type { WorkbenchState } from "../transforms";
+} from "../../../experiment-workbench.ts";
+import { PROJECTION_BUDGET_BYTES, projectWorkbenchState } from "../projection.ts";
+import type { WorkbenchState } from "../transforms/index.ts";
 
 const dataset = (): DatasetReference => ({
   id: "ds-1",

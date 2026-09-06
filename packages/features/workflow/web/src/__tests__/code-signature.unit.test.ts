@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { rewriteCodeSignature } from "../model/code-signature";
+import { rewriteCodeSignature } from "../model/code-signature.ts";
 
 describe("rewriteCodeSignature", () => {
   describe("given inputs to sync", () => {

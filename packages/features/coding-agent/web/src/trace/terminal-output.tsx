@@ -1,9 +1,9 @@
 import { Box, Text } from "@chakra-ui/react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
-import { stripAnsi } from "./terminal-ansi-parser";
-import { AnsiText } from "./terminal-ansi-text";
-import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
+import { stripAnsi } from "./terminal-ansi-parser.ts";
+import { AnsiText } from "./terminal-ansi-text.tsx";
+import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 /** How many lines show before the output collapses — the same handful Claude Code itself shows. */
 const COLLAPSE_AT_LINES = 6;

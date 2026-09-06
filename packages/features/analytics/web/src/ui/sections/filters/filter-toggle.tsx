@@ -2,12 +2,12 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import qs from "qs";
 import { X } from "react-feather";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { type FilterParam, useFilterParams } from "../use-filter-params";
-import { filterOutEmptyFilters } from "../analytics/utils";
-import type { FilterField } from "../../../model/filters/types";
-import { URL_QS_PARSE_OPTIONS } from "../../../model/utils/qs-parse-options";
+import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
+import { filterOutEmptyFilters } from "../analytics/utils.ts";
+import type { FilterField } from "../../../model/filters/types.ts";
+import { URL_QS_PARSE_OPTIONS } from "../../../model/utils/qs-parse-options.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FilterIconWithBadge } from "./filter-icon-with-badge";
+import { FilterIconWithBadge } from "./filter-icon-with-badge.tsx";
 
 /**
  * Utility to get filter count from a filters object

@@ -19,11 +19,11 @@ const {
   mockValidateApiKey: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: (...args: unknown[]) => mockUseModelProvidersSettings(...args),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const modelProvider = {
     listAllForOrganizationForFrontend: { useQuery: mockListAllForOrganizationForFrontendQuery },
     listAllForProjectForFrontend: { useQuery: mockListAllForProjectForFrontendQuery },
@@ -52,7 +52,7 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
-vi.mock("../../../behavior/use-model-provider-api-key-validation", () => ({
+vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
   useModelProviderApiKeyValidation: () => ({
     validate: mockValidateApiKey,
     validateWithCustomUrl: vi.fn().mockResolvedValue(true),
@@ -63,8 +63,8 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation", () => ({
 }));
 
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import {
   eitherOrProviders,
   inputFor,
@@ -73,7 +73,7 @@ import {
   makePrimeQueries,
   SELF_HOSTED_URL,
   Wrapper,
-} from "./model-provider-drawer-harness";
+} from "./model-provider-drawer-harness.tsx";
 
 const primeQueries = makePrimeQueries({
   providersSettingsMock: mockUseModelProvidersSettings,

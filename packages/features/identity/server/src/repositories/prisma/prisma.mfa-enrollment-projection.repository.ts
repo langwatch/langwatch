@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper";
-import type { MfaFoldState } from "../../projections/mfa-enrollment-state.projection";
+import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper.ts";
+import type { MfaFoldState } from "../../projections/mfa-enrollment-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

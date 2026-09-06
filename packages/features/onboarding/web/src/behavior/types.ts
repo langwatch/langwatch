@@ -1,5 +1,5 @@
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import type { Attribution } from "./attribution";
+import type { Attribution } from "./attribution.ts";
 
 // Enum values are identities, not positions — order comes from
 // OnboardingFlowConfig.visibleScreens (ADR-038: INTENT renders second).

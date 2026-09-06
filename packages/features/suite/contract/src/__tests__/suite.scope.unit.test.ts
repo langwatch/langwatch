@@ -4,7 +4,7 @@
  * @see specs/suites/run-plan-dynamic-scopes.feature
  */
 import { describe, expect, it } from "vitest";
-import { SCENARIOS_SCOPE, isDynamicScope, parseSuiteScope, suiteScopeSchema } from "../suite.scope";
+import { SCENARIOS_SCOPE, isDynamicScope, parseSuiteScope, suiteScopeSchema } from "../suite.scope.ts";
 
 describe("suite scope", () => {
   /** @scenario "The stored shape of every mode is known" */

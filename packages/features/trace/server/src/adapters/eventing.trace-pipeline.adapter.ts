@@ -15,29 +15,29 @@ import {
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port";
-import { TraceMediaReferencePort } from "../ports/trace-media-reference.port";
-import { TraceModelCostPort } from "../ports/trace-model-cost.port";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port";
+import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port.ts";
+import { TraceMediaReferencePort } from "../ports/trace-media-reference.port.ts";
+import { TraceModelCostPort } from "../ports/trace-model-cost.port.ts";
+import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
 import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
-} from "../projections/trace-derived.projection";
+} from "../projections/trace-derived.projection.ts";
 import {
   type TraceAnalyticsRollupRow,
   TraceAnalyticsRollupMapProjection,
-} from "../projections/trace-rollup.projection";
-import { SpanStorageMapProjection } from "../projections/span-storage.projection";
-import { TraceSummaryFoldProjection } from "../projections/trace-summary.projection";
-import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
+} from "../projections/trace-rollup.projection.ts";
+import { SpanStorageMapProjection } from "../projections/span-storage.projection.ts";
+import { TraceSummaryFoldProjection } from "../projections/trace-summary.projection.ts";
+import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import {
   EventingRecordSpanAdapter,
   RECORD_SPAN_DEDUPLICATION,
-} from "./eventing.record-span.adapter";
-import { EventingTraceOriginAdapter } from "./eventing.trace-origin.adapter";
-import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.adapter";
-import { EventingTraceTopicAdapter } from "./eventing.trace-topic-assignment.adapter";
-import { clampSpanShardCount, spanCommandGroupKey } from "../rules/trace-span-command-shard.rules";
+} from "./eventing.record-span.adapter.ts";
+import { EventingTraceOriginAdapter } from "./eventing.trace-origin.adapter.ts";
+import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.adapter.ts";
+import { EventingTraceTopicAdapter } from "./eventing.trace-topic-assignment.adapter.ts";
+import { clampSpanShardCount, spanCommandGroupKey } from "../rules/trace-span-command-shard.rules.ts";
 
 export type EventingTracePipelineAdapterOptions = {
   spanStore: AppendStore<NormalizedSpan>;

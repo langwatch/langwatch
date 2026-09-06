@@ -1,7 +1,7 @@
 import { Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Filter, PanelRightOpen, Sparkles } from "lucide-react";
 import type React from "react";
-import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
+import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 
 interface HubOption {
   label: string;

@@ -6,9 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   TraceEditOverlayRepository,
   TraceEditOverlayRow,
-} from "../../repositories/trace-edit-overlay.repository";
+} from "../../repositories/trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { TraceEditOverlayService } from "../trace-edit-overlay.service";
+import { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
   ({

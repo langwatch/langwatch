@@ -3,12 +3,12 @@ import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
 } from "@langwatch/langy-contract";
-import type { LangyUiActionDefinition } from "../ports/langy-ui-action-catalog.port";
+import type { LangyUiActionDefinition } from "../ports/langy-ui-action-catalog.port.ts";
 import {
   type LangyBackendActor,
   LangyUiActionBackendPort,
-} from "../ports/langy-ui-action-backend.port";
-import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules";
+} from "../ports/langy-ui-action-backend.port.ts";
+import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 
 /**
  * The away-fallback half of the UI-action channel: the same action kinds the

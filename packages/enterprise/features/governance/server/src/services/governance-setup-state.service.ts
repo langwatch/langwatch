@@ -2,7 +2,7 @@ import { type GovernanceSetupState } from "@langwatch/enterprise-governance-cont
 import type {
   GovernanceSetupActivityPort,
   GovernanceSetupStateRepository,
-} from "../ports/governance-setup-state.port";
+} from "../ports/governance-setup-state.port.ts";
 
 const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 

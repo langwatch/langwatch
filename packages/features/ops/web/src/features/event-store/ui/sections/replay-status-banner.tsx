@@ -1,9 +1,9 @@
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
-import { parseActiveProjections } from "../../model/replay-presentation";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { useReplayStatus } from "../../behavior/use-replay-status";
-import { api } from "../../../../behavior/ops-api";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
+import { parseActiveProjections } from "../../model/replay-presentation.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 
 export function ReplayStatusBanner() {
   const router = useRouter();

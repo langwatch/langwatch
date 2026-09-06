@@ -23,15 +23,15 @@ import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-import { useDrawerRouter } from "../../behavior/drawer-router";
+import { useDrawerRouter } from "../../behavior/drawer-router.ts";
 import {
   getComplexProps,
   getDrawerPropsVersion,
   getFlowCallbacks,
   subscribeDrawerProps,
-} from "../../behavior/use-drawer";
-import type { UiDrawerRegistry } from "../../model/drawer-registry";
-import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options";
+} from "../../behavior/use-drawer.ts";
+import type { UiDrawerRegistry } from "../../model/drawer-registry.ts";
+import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options.ts";
 
 /**
  * The host's rule about who may open what.

@@ -4,7 +4,7 @@ import type {
   GatewayTraceDestinationReportRepository,
   TraceDestinationKeyRow,
   TraceDestinationProjectRow,
-} from "../repositories/gateway-trace-destination-report.repository";
+} from "../repositories/gateway-trace-destination-report.repository.ts";
 
 const logger = createLogger("langwatch:task:trace-destination-report");
 

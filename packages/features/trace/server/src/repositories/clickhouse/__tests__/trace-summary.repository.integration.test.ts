@@ -15,11 +15,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.repository";
+import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;

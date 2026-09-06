@@ -1,8 +1,8 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toJsonlChunks } from "../../rules/dataset-chunking.rules";
-import { DatasetNormalizeAdapter } from "../dataset-normalize.adapter";
-import type { DatasetNormalizeDeps } from "../dataset-normalize.adapter";
+import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
+import { DatasetNormalizeAdapter } from "../dataset-normalize.adapter.ts";
+import type { DatasetNormalizeDeps } from "../dataset-normalize.adapter.ts";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 
 /** The adapter's one operation, as the queue calls it. */

@@ -15,16 +15,16 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
 import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 class AllowTestQueries extends PrismaQueryGuard {

@@ -1,5 +1,5 @@
 import type { ModelDefaultEffective } from "@langwatch/model-provider-contract";
-import type { ScopeTier } from "../../../../model/langy-host";
+import type { ScopeTier } from "../../../../model/langy-host.ts";
 
 /**
  * Whether picking a model in the composer earns the "make it the default?" ask, and

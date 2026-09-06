@@ -10,11 +10,11 @@ import "@testing-library/jest-dom/vitest";
 
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
 // "finance-prod-99" proves the search reached past the top-N), plus the
 // namespaced "openai/gpt-4o-mini" — the server's ANCHORED prefix "gpt-4o"
 // misses it, so it exercises the supplement (preloaded ∪ server) regression.
-vi.mock("../../hooks/use-trace-facets", () => ({
+vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({
     data: [
       {
@@ -41,7 +41,7 @@ vi.mock("../../hooks/use-trace-facets", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),
@@ -49,12 +49,12 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
 }));
 
-import { TokenValuePicker } from "../token-value-picker";
+import { TokenValuePicker } from "../token-value-picker.tsx";
 
 const anchor = {
   rect: { bottom: 100, left: 100, top: 80, right: 220 } as DOMRect,

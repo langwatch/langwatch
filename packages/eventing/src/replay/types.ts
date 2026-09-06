@@ -1,10 +1,10 @@
 import type IORedis from "ioredis";
-import type { RetentionPolicyResolver } from "../runtime.types";
-import type { Event } from "../domain/types";
-import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import type { Event } from "../domain/types.ts";
+import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
 
 export interface RegisteredFoldProjection {
   projectionName: string;

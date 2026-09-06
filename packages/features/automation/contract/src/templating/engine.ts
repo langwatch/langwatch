@@ -1,5 +1,5 @@
 import type { Liquid, Template } from "liquidjs";
-import { createSandboxedLiquid } from "./sandboxed-liquid";
+import { createSandboxedLiquid } from "./sandboxed-liquid.ts";
 
 /**
  * Per-template wall-clock budget. A render that exceeds it is abandoned and the caller falls

@@ -1,6 +1,6 @@
 import { Alert, Button, HStack, Progress, Spacer, VStack } from "@chakra-ui/react";
 
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 
 /** Workflow progress overlay with process-specific execution actions supplied by the app. */
 export function WorkflowProgressToast({

@@ -2,7 +2,7 @@ import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
 import { getCurrentContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
 
 const agent: AgentWithFields = {
   id: "agent-1",

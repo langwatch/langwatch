@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { AuthApp } from "@langwatch/auth-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount.ts";
 
 /** The two signed-out doors, and the application both answer from. */
 export type ComposedAuthFeature = Readonly<{

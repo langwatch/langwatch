@@ -2,7 +2,7 @@ import type {
   UsageStatsClickHouseRepositoryPort,
   UsageStatsProjectRepositoryPort,
   UsageStatsReport,
-} from "../ports/usage-stats-worker.port";
+} from "../ports/usage-stats-worker.port.ts";
 
 export interface UsageStatsCollectionServiceOptions {
   projects: UsageStatsProjectRepositoryPort;

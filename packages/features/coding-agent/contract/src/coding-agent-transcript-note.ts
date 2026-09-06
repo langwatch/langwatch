@@ -1,5 +1,5 @@
-import type { TranscriptEntry } from "./coding-agent-transcript";
-import { readNumber, readString } from "./coding-agent-transcript-value";
+import type { TranscriptEntry } from "./coding-agent-transcript.ts";
+import { readNumber, readString } from "./coding-agent-transcript-value.ts";
 
 type NoteEntry = Extract<TranscriptEntry, { kind: "note" }>;
 

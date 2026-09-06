@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { agentInputBindingSchema } from "../fields";
-import { baseAgentConfigSchema } from "./base";
+import { agentInputBindingSchema } from "../fields.ts";
+import { baseAgentConfigSchema } from "./base.ts";
 
 export const workflowAgentConfigSchema = baseAgentConfigSchema.extend({
   isCustom: z.boolean().optional(),

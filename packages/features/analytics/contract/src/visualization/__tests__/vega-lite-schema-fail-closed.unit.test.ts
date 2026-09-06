@@ -35,7 +35,7 @@ vi.mock("../vega-lite-schema-validator.generated.js", () => {
   return { default: validate };
 });
 
-const { validateAgainstVegaLiteSchema } = await import("../vega-lite-schema");
+const { validateAgainstVegaLiteSchema } = await import("../vega-lite-schema.ts");
 
 describe("given a specification the schema refuses", () => {
   beforeEach(() => {

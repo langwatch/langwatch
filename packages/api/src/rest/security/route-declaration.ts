@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import type { RegisteredRoute } from "./route-registry.js";
+import type { RegisteredRoute } from "./route-registry.ts";
 
 /**
  * The mounted route table a composed app publishes. Hono's own `routes` array,

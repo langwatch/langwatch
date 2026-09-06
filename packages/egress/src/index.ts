@@ -1,9 +1,9 @@
-export { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrf/blocked-hosts";
+export { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrf/blocked-hosts.ts";
 export {
   createSsrfUrlValidator,
   isBlockedCloudDomain,
   isPrivateOrLocalhostIP,
-} from "./ssrf/url-validator";
+} from "./ssrf/url-validator.ts";
 export type {
   SsrfAllowlistedResult,
   SsrfPolicy,
@@ -11,13 +11,13 @@ export type {
   SsrfUnresolvedResult,
   SsrfUrlValidator,
   SsrfValidationResult,
-} from "./ssrf/url-validator";
-export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch";
-export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch";
+} from "./ssrf/url-validator.ts";
+export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch.ts";
+export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts";
 
-export { WebhookDispatchRateLimiterPort } from "./ports/webhook-dispatch-rate-limiter.port";
-export type { WebhookDispatchRateLimitResult } from "./ports/webhook-dispatch-rate-limiter.port";
-export { InMemoryWebhookDispatchRateLimiterAdapter } from "./adapters/in-memory.webhook-dispatch-rate-limiter.adapter";
+export { WebhookDispatchRateLimiterPort } from "./ports/webhook-dispatch-rate-limiter.port.ts";
+export type { WebhookDispatchRateLimitResult } from "./ports/webhook-dispatch-rate-limiter.port.ts";
+export { InMemoryWebhookDispatchRateLimiterAdapter } from "./adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
 
 export {
   assertWebhookDelivered,
@@ -26,40 +26,40 @@ export {
   WEBHOOK_DELIVERY_ID_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_TEST_FIRE_HEADER,
-} from "./webhook/delivery-classification";
-export type { WebhookSendResult } from "./webhook/delivery-classification";
+} from "./webhook/delivery-classification.ts";
+export type { WebhookSendResult } from "./webhook/delivery-classification.ts";
 export {
   assertDispatchBudget,
   WEBHOOK_DISPATCH_HOURLY_CAP,
   WEBHOOK_DISPATCH_WINDOW_SECONDS,
   webhookDispatchBudgetKey,
-} from "./webhook/dispatch-budget";
-export { sendHttpDestination } from "./webhook/http-destination";
-export type { HttpDestinationRequest, HttpDestinationResponse } from "./webhook/http-destination";
+} from "./webhook/dispatch-budget.ts";
+export { sendHttpDestination } from "./webhook/http-destination.ts";
+export type { HttpDestinationRequest, HttpDestinationResponse } from "./webhook/http-destination.ts";
 export {
   signWebhookPayload,
   verifyWebhookSignature,
   WEBHOOK_PREVIOUS_SECRET_TTL_MS,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "./webhook/signature";
-export { buildVectors, serializeVectors, VECTORS_RELATIVE_PATH } from "./webhook/signature-vectors";
+} from "./webhook/signature.ts";
+export { buildVectors, serializeVectors, VECTORS_RELATIVE_PATH } from "./webhook/signature-vectors.ts";
 export type {
   SignatureVectorFile,
   SigningVector,
   VectorOutcome,
   VerificationVector,
-} from "./webhook/signature-vectors";
+} from "./webhook/signature-vectors.ts";
 export {
   assertWebhookUrlAllowed,
   inspectWebhookUrl,
   webhookUrlValidator,
-} from "./webhook/url-policy";
+} from "./webhook/url-policy.ts";
 
-export { WebhookEgressService } from "./services/webhook-egress.service";
-export type { WebhookSendInput } from "./services/webhook-egress.service";
+export { WebhookEgressService } from "./services/webhook-egress.service.ts";
+export type { WebhookSendInput } from "./services/webhook-egress.service.ts";
 
-export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.task";
+export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.task.ts";
 
 /**
  * The corporate proxy a self-hosted deployment's outbound vendor calls leave
@@ -80,4 +80,4 @@ export {
   parseOutboundProxyConfig,
   resolveProxyForHost,
   type OutboundProxyConfig,
-} from "./proxy/outbound-proxy";
+} from "./proxy/outbound-proxy.ts";

@@ -14,9 +14,9 @@
 
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
-import { analyticsApi } from "./analytics-api";
+import { analyticsApi } from "./analytics-api.ts";
 
-import type { LangWatchQLParameterValue } from "../model/lwql-request-state";
+import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
 /** The definition a save writes, assembled from what is on screen. */
 export interface WorkbenchChartDraft {

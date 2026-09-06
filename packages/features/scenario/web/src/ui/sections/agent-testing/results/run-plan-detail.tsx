@@ -10,14 +10,14 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import { RunPlanResultsColumn } from "./run-plan-results-column";
-import { RunsSidebar } from "./runs-sidebar";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
+import { RunsSidebar } from "./runs-sidebar.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import {
   useRunPlanBatches,
   useSelectedBatch,
-} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
 
 export type RunPlanDetailProps = {
   plan: RunPlan;

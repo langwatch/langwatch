@@ -18,8 +18,8 @@ import {
   langyConversationTurnEventSchema,
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
-import { LangyConversationTurnFoldProjection } from "../../projections/langy-conversation-turn.projection";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import { LangyConversationTurnFoldProjection } from "../../projections/langy-conversation-turn.projection.ts";
 
 const TENANT = createTenantId("project-1");
 const CONVERSATION = "conv-1";

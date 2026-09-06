@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bootstrapMeanCI } from "../model/batch-evaluation-results.bootstrap-ci";
+import { bootstrapMeanCI } from "../model/batch-evaluation-results.bootstrap-ci.ts";
 
 /**
  * The horizontal arm of the trade-off chart's error cross.

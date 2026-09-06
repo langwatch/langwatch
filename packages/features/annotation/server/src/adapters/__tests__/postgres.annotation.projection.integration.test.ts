@@ -8,11 +8,11 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { PostgresAnnotationAdapter } from "../postgres.annotation.adapter";
+import { PostgresAnnotationAdapter } from "../postgres.annotation.adapter.ts";
 import {
   createAnnotationTestOrganizations,
   createAnnotationTestProjects,
-} from "./support/annotation-test-services";
+} from "./support/annotation-test-services.ts";
 
 import {
   PrismaConfigService,

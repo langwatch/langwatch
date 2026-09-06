@@ -2,7 +2,7 @@ import { Button, Icon, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import type { IconType } from "react-icons";
 import { LuCalendarClock } from "react-icons/lu";
-import { Link } from "../../../link";
+import { Link } from "../../../link.tsx";
 
 export function EmptyHint({ children }: { children: ReactNode }) {
   return (

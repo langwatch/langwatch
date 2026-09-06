@@ -1,7 +1,7 @@
 import { AzureBlobStoredObjectDriverAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it } from "vitest";
-import { createWorkerAzureBlobDriver } from "../worker-object-storage.composition";
-import type { WorkerStorageConfig } from "../../platform/config/worker.config";
+import { createWorkerAzureBlobDriver } from "../worker-object-storage.composition.ts";
+import type { WorkerStorageConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Dataset normalization reuses this factory rather than the general registry's Azure driver, so

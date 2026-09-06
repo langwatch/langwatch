@@ -1,31 +1,31 @@
-import { AutomationService } from "../services/automation.service";
+import { AutomationService } from "../services/automation.service.ts";
 import type { AutomationService as AutomationCapability } from "@langwatch/automation-contract";
-import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port";
-import type { SchedulerWakePort } from "../ports/scheduler-wake.port";
-import { ReportScheduleService } from "../services/report-schedule.service";
-import { AutomationGraphService } from "../services/trigger-graph.service";
-import { AutomationTemplateService } from "../services/automation-template.service";
-import { PrismaCustomGraphRepository } from "../repositories/prisma/prisma.custom-graph.repository";
-import { PrismaEmailSuppressionNameRepository } from "../repositories/prisma/prisma.email-suppression-name.repository";
-import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository";
-import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository";
-import { PrismaTriggerFireHistoryRepository } from "../repositories/prisma/prisma.trigger-fire-history.repository";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
-import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository";
+import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
+import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import { AutomationGraphService } from "../services/trigger-graph.service.ts";
+import { AutomationTemplateService } from "../services/automation-template.service.ts";
+import { PrismaCustomGraphRepository } from "../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionNameRepository } from "../repositories/prisma/prisma.email-suppression-name.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import { PrismaTriggerFireHistoryRepository } from "../repositories/prisma/prisma.trigger-fire-history.repository.ts";
+import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type {
   AutomationGraphNotifierPort,
   AutomationLoggerPort,
   AutomationHeartbeatPort,
   AutomationSlackBotTokenDecryptorPort,
   AutomationDispatchErrorPort,
-} from "../ports/automation-graph.port";
-import type { AutomationRunawayPort } from "../ports/automation-runaway.port";
+} from "../ports/automation-graph.port.ts";
+import type { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { AutomationTestFirePort } from "../ports/automation-test-fire.port";
-import type { AutomationPersistCapService } from "../services/persist-cap.service";
+import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
+import type { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 
 /** Canonical process binding. The app supplies its already-created database
  * capability; this adapter never reaches for a global Prisma client. */

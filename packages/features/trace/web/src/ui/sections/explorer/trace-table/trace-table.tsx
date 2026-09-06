@@ -1,18 +1,18 @@
 import type React from "react";
-import { HandledErrorState } from "../../errors";
+import { HandledErrorState } from "../../errors/index.ts";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
   useSessionGroups,
-} from "../hooks/use-session-groups";
-import { useTraceList } from "../hooks/use-trace-list";
-import type { PageCursor } from "../../../../behavior/filter.store";
-import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store";
-import { ConversationLensBody } from "./conversation-lens-body";
-import { EmptyFilterState } from "./empty-filter-state";
-import { GroupLensBody } from "./group-lens-body";
-import { TraceLensBody } from "./trace-lens-body";
-import { TraceTableLayout } from "./trace-table-layout";
+} from "../hooks/use-session-groups.ts";
+import { useTraceList } from "../hooks/use-trace-list.ts";
+import type { PageCursor } from "../../../../behavior/filter.store.ts";
+import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store.ts";
+import { ConversationLensBody } from "./conversation-lens-body.tsx";
+import { EmptyFilterState } from "./empty-filter-state.tsx";
+import { GroupLensBody } from "./group-lens-body.tsx";
+import { TraceLensBody } from "./trace-lens-body.tsx";
+import { TraceTableLayout } from "./trace-table-layout.tsx";
 
 /**
  * What the table shell (totals copy, pagination, empty state) reads, from

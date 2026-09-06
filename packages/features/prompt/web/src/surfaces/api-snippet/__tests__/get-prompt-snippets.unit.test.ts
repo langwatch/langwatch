@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getGetPromptSnippets } from "../get-prompt-snippets";
+import { getGetPromptSnippets } from "../get-prompt-snippets.ts";
 
 describe("getGetPromptSnippets()", () => {
   describe("when no label is provided", () => {

@@ -9,8 +9,8 @@
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
-import { PostgresOpsAdapter } from "../../adapters/postgres.ops.adapter";
-import { AuditStub, AuthStub, organizationEdit, UsersStub } from "./support/backoffice-doubles";
+import { PostgresOpsAdapter } from "../../adapters/postgres.ops.adapter.ts";
+import { AuditStub, AuthStub, organizationEdit, UsersStub } from "./support/backoffice-doubles.ts";
 
 /** Reached only if the refusal fails to happen; every call here is a failure. */
 const refuseEveryQuery = new Proxy(

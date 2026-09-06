@@ -10,8 +10,8 @@ import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BatchComparisonColumn } from "../../batch-evaluation-results.types";
-import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../win-rate-chart";
+import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
+import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the
 // mock surfaces the geometry the component hands it instead. `margin.top` is

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { validateAgainstVegaLiteSchema } from "../vega-lite-schema";
+import { validateAgainstVegaLiteSchema } from "../vega-lite-schema.ts";
 
 /**
  * `description` must be a string (shallow failure, long pointer) and the `x`

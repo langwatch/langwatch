@@ -2,9 +2,9 @@ import type {
   CanonicalAttributesPort,
   ExtractorContext,
   LogExtractorContext,
-} from "../ports/canonical-attributes.port";
-import { canonicaliseGenAILog } from "../rules/gen-ai-log.rules";
-import { GenAiSpanService } from "./gen-ai-span.service";
+} from "../ports/canonical-attributes.port.ts";
+import { canonicaliseGenAILog } from "../rules/gen-ai-log.rules.ts";
+import { GenAiSpanService } from "./gen-ai-span.service.ts";
 
 const genAiSpanService = GenAiSpanService.create();
 

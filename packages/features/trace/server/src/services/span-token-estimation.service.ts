@@ -1,7 +1,7 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceTokenCounterPort } from "../ports/trace-token-counter.port";
-import { SpanModelNameService } from "./span-model-name.service";
+import type { TraceTokenCounterPort } from "../ports/trace-token-counter.port.ts";
+import { SpanModelNameService } from "./span-model-name.service.ts";
 
 /**
  * Attribute keys checked for model name (priority order).

@@ -9,8 +9,8 @@
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import type { UserApp } from "../../../app/user.app";
-import { UserTrpcApi } from "../user.api";
+import type { UserApp } from "../../../app/user.app.ts";
+import { UserTrpcApi } from "../user.api.ts";
 
 const SELF = { id: "user_1", email: "person@example.test" };
 

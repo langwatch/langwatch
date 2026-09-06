@@ -4,11 +4,11 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStickToBottom } from "../use-langy-stick-to-bottom";
+import { useLangyStickToBottom } from "../use-langy-stick-to-bottom.ts";
 
 // Motion ON — so the tests drive the real default path (smooth scrollIntoView),
 // not the reduced-motion fallback.
-vi.mock("../../../../behavior/use-reduced-motion", () => ({
+vi.mock("../../../../behavior/use-reduced-motion.ts", () => ({
   useReducedMotion: () => false,
 }));
 

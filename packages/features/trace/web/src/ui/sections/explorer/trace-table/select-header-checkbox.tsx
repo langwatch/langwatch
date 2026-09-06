@@ -4,7 +4,7 @@ const ChakraButton = chakra("button");
 
 import type React from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useSelectionStore } from "../../../../behavior/selection.store";
+import { useSelectionStore } from "../../../../behavior/selection.store.ts";
 
 interface SelectHeaderCheckboxProps {
   /** Every trace id currently rendered on this page across every row. */

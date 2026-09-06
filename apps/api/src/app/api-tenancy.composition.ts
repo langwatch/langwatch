@@ -23,7 +23,7 @@ import {
   ProjectDiagnosticsPort,
 } from "@langwatch/project-server";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { ApiOrganizationSettingsSecretAdapter } from "./api-organization-settings-secret.adapter";
+import { ApiOrganizationSettingsSecretAdapter } from "./api-organization-settings-secret.adapter.ts";
 
 /** Reports the composition decision a missing collaborator would otherwise hide. */
 export abstract class ApiTenancyAbsenceReportPort {

@@ -8,8 +8,8 @@ import {
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,
   type WorkflowLlmParameterResolution,
-} from "../../ports/workflow.port";
-import { StudioWorkflowEventEnricherService } from "../studio-workflow-event-enricher.service";
+} from "../../ports/workflow.port.ts";
+import { StudioWorkflowEventEnricherService } from "../studio-workflow-event-enricher.service.ts";
 
 const projectId = "project-123";
 

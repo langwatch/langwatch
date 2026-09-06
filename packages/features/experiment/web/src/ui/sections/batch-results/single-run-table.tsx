@@ -13,15 +13,15 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { BatchTargetCell } from "./batch-target-cell";
-import { BatchTargetHeader } from "./batch-target-header";
-import { ComparisonWinnerCell } from "./comparison-winner-cell";
+import { BatchTargetCell } from "./batch-target-cell.tsx";
+import { BatchTargetHeader } from "./batch-target-header.tsx";
+import { ComparisonWinnerCell } from "./comparison-winner-cell.tsx";
 import {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
-} from "../batch-evaluation-results.aggregates";
-import { ExpandableDatasetCell } from "./expandable-dataset-cell";
-import { TableSkeleton } from "../../elements/batch-results/table-skeleton";
+} from "../batch-evaluation-results.aggregates.ts";
+import { ExpandableDatasetCell } from "./expandable-dataset-cell.tsx";
+import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import {
   calculateMinTableWidth,
   DEFAULT_ROW_HEIGHT,
@@ -29,21 +29,21 @@ import {
   getTableStyles,
   inferColumnType,
   type RowHeight,
-} from "./table-utils";
+} from "./table-utils.ts";
 import {
   type DescribeBatchCellFailure,
   getImageUrl,
   type RenderBatchEvaluatorResult,
   type RenderDatasetImage,
   type RenderTracePeek,
-} from "./presentation";
+} from "./presentation.tsx";
 import type {
   BatchComparisonColumn,
   BatchDatasetColumn,
   BatchEvaluationData,
   BatchResultRow,
   BatchTargetColumn,
-} from "../batch-evaluation-results.types";
+} from "../batch-evaluation-results.types.ts";
 
 type SingleRunTableProps = {
   /** Transformed batch evaluation data */

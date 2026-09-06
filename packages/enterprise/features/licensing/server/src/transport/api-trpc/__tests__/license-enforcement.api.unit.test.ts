@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
-} from "../license-enforcement.api";
-import { LicensingApp } from "../../../app/licensing.app";
+} from "../license-enforcement.api.ts";
+import { LicensingApp } from "../../../app/licensing.app.ts";
 
 const checkLimit = vi.fn();
 const notifyResourceLimitReached = vi.fn();

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
+import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 

@@ -17,18 +17,18 @@ import {
 } from "@langwatch/experiment-contract";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
-import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process";
+import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
 import {
   extractTargetOutput,
   mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
-} from "../processes/experiment-result-mapping.process";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
-import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
-import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
+} from "../processes/experiment-result-mapping.process.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 const sandboxKey = ExperimentRunSandboxKeyService.create();

@@ -4,7 +4,7 @@
  * beside it is what says how to read it — so every tile narrows it at the point it renders.
  */
 
-import type { AiToolConfigEnvelope } from "./ai-tool-catalog";
+import type { AiToolConfigEnvelope } from "./ai-tool-catalog.ts";
 
 /** The `config` shape a tile of the given type stores. */
 export type AiToolConfigOf<TType extends AiToolConfigEnvelope["type"]> = Extract<

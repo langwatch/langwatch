@@ -6,11 +6,11 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-import { type AttributeEditing, AttributeTable } from "../attribute-table";
+import { type AttributeEditing, AttributeTable } from "../attribute-table.tsx";
 
 const CAPTURED = {
   "gen_ai.request.model": "gpt-5-mini",

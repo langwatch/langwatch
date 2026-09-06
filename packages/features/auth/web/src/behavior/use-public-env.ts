@@ -12,8 +12,8 @@
  * and never loading, `usePublicEnvWithCapabilities` is a query.
  */
 
-import { authApi, type AuthViewerCapabilities } from "./auth-api";
-import { useAuthHost, type AuthPublicEnvironment } from "../model/auth-host";
+import { authApi, type AuthViewerCapabilities } from "./auth-api.ts";
+import { useAuthHost, type AuthPublicEnvironment } from "../model/auth-host.ts";
 
 type CapabilityQuery = ReturnType<typeof authApi.publicEnv.useQuery>;
 

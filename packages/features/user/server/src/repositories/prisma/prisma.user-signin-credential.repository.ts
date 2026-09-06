@@ -4,7 +4,7 @@ import {
   type UserCredentialAccount,
   UserCredentialRepository,
   type UserLinkedAccount,
-} from "../user-signin-credential.repository";
+} from "../user-signin-credential.repository.ts";
 
 /**
  * The one model and the one transaction runner these five statements need.

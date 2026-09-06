@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { deriveSessionBanner } from "../trace/terminal-session-banner";
+import { deriveSessionBanner } from "../trace/terminal-session-banner.ts";
 
 function modelSpan(model: string, atMs: number): SpanDetail {
   return {

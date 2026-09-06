@@ -1,9 +1,9 @@
 import type { SeriesInputType } from "@langwatch/analytics-web/surfaces/analytics-registry";
 import { buildSeriesName, type TimeseriesBucket } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
-import { type AttentionInboxSignals, buildAttentionInbox } from "../../attention-inbox";
-import type { BriefingReceipt } from "../../types";
-import { readGroupedSummaryMetric, readSummaryMetric } from "../use-langy-briefing";
+import { type AttentionInboxSignals, buildAttentionInbox } from "../../attention-inbox.ts";
+import type { BriefingReceipt } from "../../types.ts";
+import { readGroupedSummaryMetric, readSummaryMetric } from "../use-langy-briefing.ts";
 
 /**
  * `readSummaryMetric` reads a `getTimeseries` value back out of the

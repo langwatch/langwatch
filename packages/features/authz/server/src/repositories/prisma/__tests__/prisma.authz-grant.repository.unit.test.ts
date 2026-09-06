@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository";
+import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository.ts";
 
 /**
  * The tenancy lookups every write path validates with - the Prisma queries

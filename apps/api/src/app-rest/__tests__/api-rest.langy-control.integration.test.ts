@@ -25,7 +25,7 @@ import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features";
+import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 const OWNER = "user-1";

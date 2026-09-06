@@ -11,4 +11,4 @@ export {
   LITE_MEMBER_NEEDS_TEAM_WARNING,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
-} from "../../model/seat-type-copy";
+} from "../../model/seat-type-copy.ts";

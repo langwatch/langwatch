@@ -1,7 +1,7 @@
-import type { TraceListItem } from "../../../../types/trace";
-import { useTraceStatistics } from "../../../trace-statistics-context";
-import type { CellDef } from "../../types";
-import { LatencyCellContent } from "./latency-cell-parts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { useTraceStatistics } from "../../../trace-statistics-context.tsx";
+import type { CellDef } from "../../types.ts";
+import { LatencyCellContent } from "./latency-cell-parts.tsx";
 
 function DurationCellInner({
   durationMs,

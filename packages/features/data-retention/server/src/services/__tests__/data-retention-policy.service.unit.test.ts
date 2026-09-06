@@ -3,18 +3,18 @@
  * persist, and who may switch retention off entirely.
  */
 import { describe, expect, it } from "vitest";
-import { DataRetentionAdministratorPort } from "../../ports/data-retention-administrator.port";
+import { DataRetentionAdministratorPort } from "../../ports/data-retention-administrator.port.ts";
 import {
   DataRetentionDirectoryPort,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-} from "../../ports/data-retention-directory.port";
-import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port";
+} from "../../ports/data-retention-directory.port.ts";
+import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port.ts";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
-} from "../../ports/data-retention-plan.port";
-import { DataRetentionPolicyService } from "../data-retention-policy.service";
+} from "../../ports/data-retention-plan.port.ts";
+import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 

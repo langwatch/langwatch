@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import type { GithubHostPort } from "../ports/github-host.port";
-import type { GithubProjectActivityPort } from "../ports/github-project-activity.port";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
-} from "./github-branch-mapping.service";
+} from "./github-branch-mapping.service.ts";
 
 const logger = createLogger("langwatch:github:branch-demand");
 

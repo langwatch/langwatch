@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store";
-import { useTraceEditOverlay } from "./use-trace-edit-overlay";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import { useTraceEditOverlay } from "./use-trace-edit-overlay.ts";
 
 /**
  * Keeps an editing session honest for as long as it is open:

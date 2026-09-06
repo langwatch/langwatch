@@ -1,7 +1,7 @@
-import { ClickHouseStoredObjectOwnerRepository } from "../repositories/clickhouse/clickhouse.stored-object-owner.repository";
-import { StoredObjectOwnerLookupService } from "../services/stored-object-owner-lookup.service";
-import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-owner-lookup-telemetry.port";
-import { StoredObjectOwnerInstanceDirectoryPort } from "../ports/stored-object-owner-instance-directory.port";
+import { ClickHouseStoredObjectOwnerRepository } from "../repositories/clickhouse/clickhouse.stored-object-owner.repository.ts";
+import { StoredObjectOwnerLookupService } from "../services/stored-object-owner-lookup.service.ts";
+import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-owner-lookup-telemetry.port.ts";
+import { StoredObjectOwnerInstanceDirectoryPort } from "../ports/stored-object-owner-instance-directory.port.ts";
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 
 /** Process-composed compatibility graph for legacy id-only stored-object URLs. */

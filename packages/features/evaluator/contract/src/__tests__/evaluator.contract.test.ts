@@ -12,7 +12,7 @@ import {
   getEvaluatorDefinitions,
   isNativeEvaluatorType,
   isCodeEvaluatorCheckType,
-} from "../index";
+} from "../index.ts";
 
 describe("evaluator contract", () => {
   it("keeps the public evaluator type vocabulary explicit", () => {

@@ -1,4 +1,4 @@
-import type { ContributionFacts } from "../coding-agent-processing";
+import type { ContributionFacts } from "../coding-agent-processing.ts";
 
 /**
  * The LangWatch session-context vocabulary: the companion event a `langwatch

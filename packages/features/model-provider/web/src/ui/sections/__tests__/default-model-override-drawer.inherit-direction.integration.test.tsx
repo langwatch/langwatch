@@ -15,9 +15,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { featuresByRole } from "@langwatch/model-provider-contract";
-import { DefaultModelOverrideDrawer } from "../default-model-override-drawer";
-import { FakeModelProviderHost } from "../../../testing";
-import { ModelProviderHostProvider } from "../../../model/model-provider-host";
+import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
+import { FakeModelProviderHost } from "../../../testing.tsx";
+import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
 
 const mockCloseDrawer = vi.fn();
 const mockGetDefaultModels = vi.fn();
@@ -61,7 +61,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
   };
 });
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {

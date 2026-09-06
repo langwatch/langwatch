@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import { GatewayScopeOrgMismatchError } from "../index";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayScopeOrgMismatchError } from "../index.ts";
 
 /**
  * The process's own composition, over the fake database.

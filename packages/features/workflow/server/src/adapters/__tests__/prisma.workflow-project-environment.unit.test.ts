@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PrismaWorkflowProjectEnvironmentAdapter } from "../prisma.workflow-project-environment.adapter";
+import { PrismaWorkflowProjectEnvironmentAdapter } from "../prisma.workflow-project-environment.adapter.ts";
 
 type ProjectQuery = {
   where: { id: string };

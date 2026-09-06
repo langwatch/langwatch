@@ -1,4 +1,4 @@
-import { useOpsPermission } from "./use-ops-permission";
+import { useOpsPermission } from "./use-ops-permission.ts";
 
 export function useDejaViewLink(params: {
   aggregateId: string | undefined;

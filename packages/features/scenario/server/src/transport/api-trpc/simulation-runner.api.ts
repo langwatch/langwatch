@@ -24,11 +24,11 @@ import {
 } from "@trpc/server";
 import { z } from "zod";
 import type { ScenarioApp } from "#app/scenario.app";
-import { projectSchema } from "../../rules/scenario-schemas.rules";
+import { projectSchema } from "../../rules/scenario-schemas.rules.ts";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcProcedures,
-} from "../../rules/scenario-trpc-context.rules";
+} from "../../rules/scenario-trpc-context.rules.ts";
 
 const logger = createLogger("SimulationRunnerRouter");
 

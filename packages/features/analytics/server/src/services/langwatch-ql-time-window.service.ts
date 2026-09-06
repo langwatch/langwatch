@@ -26,7 +26,7 @@ import {
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
-import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules";
+import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** What a statement's reserved names mean for the request about to be made. */
 export interface LangWatchQLTimeWindowResolution {

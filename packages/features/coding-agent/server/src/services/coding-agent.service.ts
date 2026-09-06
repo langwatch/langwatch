@@ -23,21 +23,21 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
-import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
-import { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository";
-import { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service";
-import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service";
-import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service";
-import { CodingAgentPullRequestMappingBackfillService } from "./coding-agent-pull-request-mapping-backfill.service";
-import { CodingAgentPullRequestReadService } from "./coding-agent-pull-request-read.service";
-import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service";
-import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service";
-import { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
-import { CodingAgentTracePullRequestService } from "./coding-agent-trace-pull-request.service";
+import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
+import { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
+import { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service.ts";
+import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
+import { CodingAgentPullRequestMappingBackfillService } from "./coding-agent-pull-request-mapping-backfill.service.ts";
+import { CodingAgentPullRequestReadService } from "./coding-agent-pull-request-read.service.ts";
+import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
+import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
+import { CodingAgentTracePullRequestService } from "./coding-agent-trace-pull-request.service.ts";
 
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 

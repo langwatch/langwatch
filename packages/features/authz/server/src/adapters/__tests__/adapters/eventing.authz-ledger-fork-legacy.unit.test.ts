@@ -18,7 +18,7 @@ import {
   legacyRow,
   ORG_ID,
   uniqueViolation,
-} from "../support/eventing.authz-ledger-fork.harness";
+} from "../support/eventing.authz-ledger-fork.harness.ts";
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -1,4 +1,4 @@
-import { safeParseErrText } from "../../parseErrorText";
+import { safeParseErrText } from "../../parseErrorText.ts";
 /**
  * Wire shape of a cached fold state.
  *

@@ -6,10 +6,10 @@ import {
   readJobAttempt,
   splitEnvelope,
   withJobAttempt,
-} from "../jobEnvelope";
-import { createTenantId } from "../storage";
-import { TieredBlobStore } from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
+} from "../jobEnvelope.ts";
+import { createTenantId } from "../storage.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-1");
 

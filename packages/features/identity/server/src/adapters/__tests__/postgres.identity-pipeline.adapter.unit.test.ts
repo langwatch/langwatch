@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type IdentityPipelineDatabase,
   PostgresIdentityPipelineAdapter,
-} from "../postgres.identity-pipeline.adapter";
-import type { IdentityFoldState } from "../../projections/identity-state.projection";
-import type { IdentityPipeline } from "../identity-pipeline-definition.adapter";
+} from "../postgres.identity-pipeline.adapter.ts";
+import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";
+import type { IdentityPipeline } from "../identity-pipeline-definition.adapter.ts";
 
 const USER = "user_sam";
 const IDENTIFIER = "idf_1";

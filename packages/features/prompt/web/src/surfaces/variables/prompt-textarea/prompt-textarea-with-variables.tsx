@@ -11,25 +11,25 @@ import {
 } from "react";
 import type { CaretPosition } from "rich-textarea";
 import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
-import { useLayoutMode } from "../../../model/layout-mode";
-import { VariableInsertMenu } from "../variable-insert-menu";
-import type { AvailableSource } from "../variable-mapping-input";
-import { AddLogicButton } from "./components/add-logic-button";
-import { AddVariableButton } from "./components/add-variable-button";
-import { GripHandles, LineHighlights } from "./components/paragraph-overlay";
-import { TemplateLogicMenu } from "./components/template-logic-menu";
-import { useDebouncedTextarea } from "./hooks/use-debounced-textarea";
-import { useParagraphDragDrop } from "./hooks/use-paragraph-drag-drop";
-import { useTemplateLogicMenu } from "./hooks/use-template-logic-menu";
-import { useTextareaResize } from "./hooks/use-textarea-resize";
-import { useVariableMenu } from "./hooks/use-variable-menu";
+import { useLayoutMode } from "../../../model/layout-mode.ts";
+import { VariableInsertMenu } from "../variable-insert-menu.tsx";
+import type { AvailableSource } from "../variable-mapping-input.tsx";
+import { AddLogicButton } from "./components/add-logic-button.tsx";
+import { AddVariableButton } from "./components/add-variable-button.tsx";
+import { GripHandles, LineHighlights } from "./components/paragraph-overlay.tsx";
+import { TemplateLogicMenu } from "./components/template-logic-menu.tsx";
+import { useDebouncedTextarea } from "./hooks/use-debounced-textarea.ts";
+import { useParagraphDragDrop } from "./hooks/use-paragraph-drag-drop.ts";
+import { useTemplateLogicMenu } from "./hooks/use-template-logic-menu.ts";
+import { useTextareaResize } from "./hooks/use-textarea-resize.ts";
+import { useVariableMenu } from "./hooks/use-variable-menu.ts";
 import { extractLiquidVariables, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
-import type { PromptTextAreaWithVariablesProps } from "./prompt-textarea.types";
+import type { PromptTextAreaWithVariablesProps } from "./prompt-textarea.types.ts";
 import {
   findJustCompletedVariable,
   findUnclosedBraces,
   findUnclosedPercentBraces,
-} from "./prompt-textarea.utils";
+} from "./prompt-textarea.utils.ts";
 
 export const PromptTextAreaWithVariables = ({
   value,

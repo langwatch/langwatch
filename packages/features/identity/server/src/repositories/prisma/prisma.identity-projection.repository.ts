@@ -1,10 +1,10 @@
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
-import type { IdentityReservationRepository } from "../identity-reservations.repository";
-import { BetterAuthAccountQueriesAdapter } from "../../adapters/better-auth.account-queries.adapter";
+import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
+import { BetterAuthAccountQueriesAdapter } from "../../adapters/better-auth.account-queries.adapter.ts";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IdentityFoldState } from "../../projections/identity-state.projection";
+import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
@@ -13,7 +13,7 @@ import type {
 import {
   identifierFactToRow as factToRow,
   identifierRowToFact as rowToFact,
-} from "./prisma.identifier.mapper";
+} from "./prisma.identifier.mapper.ts";
 
 /**
  * Secrets are absent deliberately, and the list is narrow on purpose: a replay that rewrote

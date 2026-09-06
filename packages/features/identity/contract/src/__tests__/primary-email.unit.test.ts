@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { IdentifierFact, IdentityHeads } from "../facts";
-import { primaryEmailOf } from "../primary-email";
+import type { IdentifierFact, IdentityHeads } from "../facts.ts";
+import { primaryEmailOf } from "../primary-email.ts";
 
 const USER = "user_sam";
 const T0 = 1_690_000_000_000;

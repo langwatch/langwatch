@@ -1,16 +1,16 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
-import { ActionRow, DataTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
+import { ActionRow, DataTable, EmailLayout, InlineLink, Muted, Paragraph } from "./email-layout.tsx";
 import {
   accountTeamStepSchema,
   meteredNoun,
   priceLine,
   selfServeStepFields,
   usageUnitSchema,
-} from "./next-step";
-import { defineTemplate, renderMailTemplate } from "./registry";
+} from "./next-step.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 const logger = createLogger("langwatch:mailer:automationLimitEmail");
 

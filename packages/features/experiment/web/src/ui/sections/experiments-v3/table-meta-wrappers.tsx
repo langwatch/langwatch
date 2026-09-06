@@ -6,11 +6,11 @@ import { Checkbox } from "@chakra-ui/react";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
-import type { TableMeta, TableRowData } from "../../../model/experiments-v3/types";
+import type { TableMeta, TableRowData } from "../../../model/experiments-v3/types.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { ComparisonCell } from "./comparison-cell";
-import { TargetCellContent } from "./TargetSection/target-cell";
-import { TargetHeader } from "./TargetSection/target-header";
+import { ComparisonCell } from "./comparison-cell.tsx";
+import { TargetCellContent } from "./TargetSection/target-cell.tsx";
+import { TargetHeader } from "./TargetSection/target-header.tsx";
 
 /**
  * Checkbox header that reads selection state from table meta.

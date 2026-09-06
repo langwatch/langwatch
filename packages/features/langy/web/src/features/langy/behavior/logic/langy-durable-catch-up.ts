@@ -4,9 +4,9 @@ import {
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
 
-import type { api } from "../../../../behavior/langy-api";
-import { useLangyDevLog } from "../stores/langy-dev-log";
-import { useLangyStore } from "../../../../behavior/langy.store";
+import type { api } from "../../../../behavior/langy-api.ts";
+import { useLangyDevLog } from "../stores/langy-dev-log.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 type ApiUtils = ReturnType<typeof api.useUtils>;
 

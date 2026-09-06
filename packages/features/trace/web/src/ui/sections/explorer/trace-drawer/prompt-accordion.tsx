@@ -1,12 +1,12 @@
 import { Badge, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
-import { Link } from "../../../blocks/link";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground";
+import { Link } from "../../../blocks/link.tsx";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle";
-import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes";
+import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
+import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
 
 export { hasPromptMetadata };
 

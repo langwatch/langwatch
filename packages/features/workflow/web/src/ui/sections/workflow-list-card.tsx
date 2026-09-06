@@ -4,17 +4,17 @@
 
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
-import { workflowApi, type WorkflowListRow } from "../../model/workflow-api";
+import { workflowApi, type WorkflowListRow } from "../../model/workflow-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import {
   WorkflowCardActions,
   WorkflowCardBase,
   WorkflowCardDisplay,
-} from "../elements/workflow-card";
-import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog";
-import { WorkflowPushToCopiesDialog } from "./workflow-push-to-copies-dialog";
-import { WorkflowReplicateDialog } from "./workflow-replicate-dialog";
+} from "../elements/workflow-card.tsx";
+import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
+import { WorkflowPushToCopiesDialog } from "./workflow-push-to-copies-dialog.tsx";
+import { WorkflowReplicateDialog } from "./workflow-replicate-dialog.tsx";
 
 export function WorkflowListCard({
   workflowId,

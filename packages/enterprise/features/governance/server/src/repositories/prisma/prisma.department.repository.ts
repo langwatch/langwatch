@@ -4,7 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DepartmentRepository } from "../../ports/department.port";
+import { DepartmentRepository } from "../../ports/department.port.ts";
 
 export class PrismaDepartmentRepository extends DepartmentRepository {
   private constructor(private readonly prisma: PrismaClient) {

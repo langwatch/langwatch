@@ -1,4 +1,4 @@
-import { isValidTimestamp } from "./span-timing.rules";
+import { isValidTimestamp } from "./span-timing.rules.ts";
 
 /**
  * The storage-anchor rule of ADR-071, shared by every trace-processing fold that

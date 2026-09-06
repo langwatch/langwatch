@@ -17,10 +17,10 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automation/automation-notification-delivery.adapter";
-import type { WorkerMailComposition } from "./worker-mail.composition";
-import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automation/automation-notification-delivery.adapter.ts";
+import type { WorkerMailComposition } from "./worker-mail.composition.ts";
+import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * What this process still has to be HANDED before the graph vertical composes.

@@ -9,7 +9,7 @@ import {
   withRuleAdded,
   withRuleMoved,
   type UIRule,
-} from "../rule-editing";
+} from "../rule-editing.ts";
 
 /** A rule as the dialog holds it, named by scope so the order reads. */
 function uiRule(id: string, patch: Partial<UIRule> = {}): UIRule {

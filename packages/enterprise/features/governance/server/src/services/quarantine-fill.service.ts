@@ -7,11 +7,11 @@ import {
 import {
   GovernanceDiagnosticsPort,
   NullGovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port";
+} from "../ports/governance-diagnostics.port.ts";
 import type {
   QuarantineTenantPort,
   QuarantineTraceActivityPort,
-} from "../ports/quarantine-fill.port";
+} from "../ports/quarantine-fill.port.ts";
 
 export class QuarantineFillEvaluatorService {
   private constructor(

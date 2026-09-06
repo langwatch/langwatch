@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { formatRunStatusLabel } from "../format-run-status-label";
+import { formatRunStatusLabel } from "../format-run-status-label.ts";
 
 describe("formatRunStatusLabel()", () => {
   describe("when status is success", () => {

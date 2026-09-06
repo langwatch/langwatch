@@ -1,4 +1,4 @@
-import { buildStorageConnectSrc } from "./app-static.storage-connect-src";
+import { buildStorageConnectSrc } from "./app-static.storage-connect-src.ts";
 
 type SecurityHeaderEnvironment = Partial<
   Record<

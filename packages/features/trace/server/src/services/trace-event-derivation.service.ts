@@ -1,5 +1,5 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port";
+import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port.ts";
 
 /**
  * How long an unused memo entry lingers. Correctness comes from the fold

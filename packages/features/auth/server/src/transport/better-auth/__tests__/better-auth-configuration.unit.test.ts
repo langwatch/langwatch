@@ -6,7 +6,7 @@
  */
 import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
-import { betterAuthTransportFor } from "./better-auth-transport.test-helpers";
+import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
 
 type PasswordVerifier = (input: { password: string; hash: string }) => Promise<boolean>;
 

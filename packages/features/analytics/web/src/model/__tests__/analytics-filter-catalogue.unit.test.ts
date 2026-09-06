@@ -14,7 +14,7 @@
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { availableFilters } from "../analytics-filter-catalogue";
+import { availableFilters } from "../analytics-filter-catalogue.ts";
 
 describe("the analytics filter catalogue", () => {
   describe("given the contract's list of filter fields", () => {

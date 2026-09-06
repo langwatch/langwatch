@@ -1,18 +1,18 @@
-import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port";
+import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
 import {
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
-} from "../repositories/prisma/github-installations.repository";
+} from "../repositories/prisma/github-installations.repository.ts";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../repositories/prisma/github-pull-requests.repository";
-import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service";
-import { GithubBranchMappingService } from "../services/github-branch-mapping.service";
-import { GithubInstallationAccessService } from "../services/github-installation-access.service";
-import { GithubAppTokenAdapter } from "./github-app-token.adapter";
-import { GithubHostAdapter } from "./github-host.adapter";
-import { RedisGithubAdapter } from "./redis.github.adapter";
+} from "../repositories/prisma/github-pull-requests.repository.ts";
+import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
+import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
+import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
+import { GithubAppTokenAdapter } from "./github-app-token.adapter.ts";
+import { GithubHostAdapter } from "./github-host.adapter.ts";
+import { RedisGithubAdapter } from "./redis.github.adapter.ts";
 
 /** The two models the sweep reads, and nothing else in the client. */
 export type GithubBranchMaintenanceDatabase = PrismaGithubInstallationsDatabase &

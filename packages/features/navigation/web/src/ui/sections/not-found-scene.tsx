@@ -8,15 +8,15 @@ import { ArrowLeft, Home, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode, useColorModeValue } from "@langwatch/design-system/color-mode";
 import { SimpleSlider } from "@langwatch/design-system/slider";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { useNavigationHost } from "../../model/navigation-host";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   type CanvasColors,
   createNotFoundRenderer,
   defaultGridParams,
   type GridParams,
   MAX_CANVAS_DPR,
-} from "../../model/not-found-canvas-renderer";
+} from "../../model/not-found-canvas-renderer.ts";
 
 function ParamSlider({
   label,

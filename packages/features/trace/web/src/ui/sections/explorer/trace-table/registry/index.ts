@@ -1,13 +1,13 @@
-import type { TraceListItem } from "../../types/trace";
-import type { ConversationGroup } from "../conversation-groups";
-import { conversationAddons } from "./addons/conversation";
-import { groupAddons } from "./addons/group";
-import { traceAddons } from "./addons/trace";
-import { conversationCells } from "./cells/conversation";
-import { groupCells } from "./cells/group";
-import type { TraceGroup } from "./cells/group/types";
-import { traceCells } from "./cells/trace";
-import type { Registry } from "./types";
+import type { TraceListItem } from "../../types/trace.ts";
+import type { ConversationGroup } from "../conversation-groups.ts";
+import { conversationAddons } from "./addons/conversation/index.ts";
+import { groupAddons } from "./addons/group/index.ts";
+import { traceAddons } from "./addons/trace/index.ts";
+import { conversationCells } from "./cells/conversation/index.ts";
+import { groupCells } from "./cells/group/index.ts";
+import type { TraceGroup } from "./cells/group/types.ts";
+import { traceCells } from "./cells/trace/index.ts";
+import type { Registry } from "./types.ts";
 
 export const traceRegistry: Registry<TraceListItem> = {
   cells: traceCells,
@@ -24,6 +24,6 @@ export const groupRegistry: Registry<TraceGroup> = {
   addons: groupAddons,
 };
 
-export { buildGroups, type TraceGroup } from "./cells/group/types";
-export { RegistryRow } from "./registry-row";
-export type { Registry } from "./types";
+export { buildGroups, type TraceGroup } from "./cells/group/types.ts";
+export { RegistryRow } from "./registry-row.tsx";
+export type { Registry } from "./types.ts";

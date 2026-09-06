@@ -1,12 +1,12 @@
 import { RedisCachedFoldStore, RepositoryFoldStore } from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatch/suite-contract";
 import type { Cluster, Redis } from "ioredis";
-import { ClickHouseSuiteEventingAdapter } from "./clickhouse.suite-eventing.adapter";
+import { ClickHouseSuiteEventingAdapter } from "./clickhouse.suite-eventing.adapter.ts";
 import {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
-} from "./suite-run-processing.adapter";
-import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
+} from "./suite-run-processing.adapter.ts";
+import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port.ts";
 
 /**
  * The Redis keyspace the suite-run fold's read-through cache occupies. A

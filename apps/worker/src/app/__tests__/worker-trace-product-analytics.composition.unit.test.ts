@@ -1,7 +1,7 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { TraceProductAnalyticsPort } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition";
+import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/trace-product-analytics-worker-composition.feature

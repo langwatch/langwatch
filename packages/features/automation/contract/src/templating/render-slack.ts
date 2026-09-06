@@ -1,13 +1,13 @@
-import { testFireSlackBlock, testFireSlackText } from "./banner";
-import { filterBlockKit } from "./block-kit-allowlist";
-import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE, DEFAULT_SLACK_TEMPLATE } from "./defaults";
-import { renderLiquid } from "./engine";
-import { errorMessage, renderWithFallback } from "./render-with-fallback";
+import { testFireSlackBlock, testFireSlackText } from "./banner.ts";
+import { filterBlockKit } from "./block-kit-allowlist.ts";
+import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE, DEFAULT_SLACK_TEMPLATE } from "./defaults.ts";
+import { renderLiquid } from "./engine.ts";
+import { errorMessage, renderWithFallback } from "./render-with-fallback.ts";
 import type {
   GraphAlertTemplateContext,
   ReportTemplateContext,
   TemplateContext,
-} from "./template-context";
+} from "./template-context.ts";
 
 /**
  * Default-template overrides for `renderTriggerSlack` (ADR-034 Phase 8.1).

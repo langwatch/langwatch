@@ -3,8 +3,8 @@
  * Spec: specs/navigation/settings-shell-v2.feature
  */
 
-import { useNavigationHost } from "../model/navigation-host";
-import { settingsMenu, type SettingsMenuGroup } from "../model/settings-menu";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { settingsMenu, type SettingsMenuGroup } from "../model/settings-menu.ts";
 
 export function useSettingsMenu(): SettingsMenuGroup[] {
   const host = useNavigationHost();

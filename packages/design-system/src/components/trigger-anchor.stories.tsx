@@ -1,8 +1,8 @@
 import { Button } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Menu } from "./menu";
-import { Tooltip } from "./tooltip";
-import { TriggerAnchor } from "./trigger-anchor";
+import { Menu } from "./menu.tsx";
+import { Tooltip } from "./tooltip.tsx";
+import { TriggerAnchor } from "./trigger-anchor.tsx";
 
 const meta = {
   title: "Primitives/Trigger anchor",

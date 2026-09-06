@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
-import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port";
+import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port.ts";
 
 const logger = createLogger("langwatch:scim:group");
 

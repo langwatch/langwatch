@@ -1,4 +1,4 @@
-import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
+import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port.ts";
 
 /**
  * Input types for saved view operations.

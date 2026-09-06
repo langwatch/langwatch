@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { Span } from "@langwatch/trace-contract";
-import { TraceLegacySummaryMappingService } from "../trace-legacy-summary-mapping.service";
+import { TraceLegacySummaryMappingService } from "../trace-legacy-summary-mapping.service.ts";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 

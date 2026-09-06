@@ -13,13 +13,13 @@ import {
 } from "@chakra-ui/react";
 import { ArrowUpRight, Check, Copy, HelpCircle, Sparkles, Wand2, Zap } from "lucide-react";
 import type React from "react";
-import { Drawer } from "../../drawer";
+import { Drawer } from "../../drawer.tsx";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FIELD_VALUES, SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { QueryPreview } from "./query-preview";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { QueryPreview } from "./query-preview.tsx";
 
 interface Example {
   label: string;

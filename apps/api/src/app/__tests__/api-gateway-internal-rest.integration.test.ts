@@ -15,9 +15,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiRestSecurity } from "../../api-rest.security";
-import { composeApiGatewayInternalRest } from "../api-gateway-internal-rest.composition";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { composeApiGatewayInternalRest } from "../api-gateway-internal-rest.composition.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 
 const INTERNAL_SECRET = "shared-hmac-secret";
 const JWT_SECRET = "gateway-jwt-signing-secret";

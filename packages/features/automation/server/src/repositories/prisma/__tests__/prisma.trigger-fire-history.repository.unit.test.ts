@@ -5,7 +5,7 @@
  * the list hands a trace identifier to a viewer who may not read traces.
  */
 import { describe, expect, it } from "vitest";
-import { PrismaTriggerFireHistoryRepository } from "../prisma.trigger-fire-history.repository";
+import { PrismaTriggerFireHistoryRepository } from "../prisma.trigger-fire-history.repository.ts";
 
 const STORED_ROW = {
   id: "fire_1",

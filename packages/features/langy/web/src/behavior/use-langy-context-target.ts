@@ -7,7 +7,7 @@ import {
   type LangyContextTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
-} from "./langy-context-target.store";
+} from "./langy-context-target.store.ts";
 
 /**
  * Declare "I am a thing Langy can take as context".

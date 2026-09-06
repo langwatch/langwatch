@@ -1,4 +1,4 @@
-import { KNOWN_LANGY_ERROR_KINDS } from "./langy-error-explainer";
+import { KNOWN_LANGY_ERROR_KINDS } from "./langy-error-explainer.ts";
 
 /**
  * The CLIENT half of Langy's turn-recovery policy (ADR-045/046 follow-on).

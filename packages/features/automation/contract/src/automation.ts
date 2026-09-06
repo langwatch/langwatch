@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { triggerActionSchema, triggerKindSchema, triggerSchema } from "./trigger";
-import type { Trigger, TriggerAction, TriggerKind } from "./trigger";
+import { triggerActionSchema, triggerKindSchema, triggerSchema } from "./trigger.ts";
+import type { Trigger, TriggerAction, TriggerKind } from "./trigger.ts";
 
 /** Compatibility aliases for callers that still use the old noun. The
  * canonical domain model is Trigger; this file intentionally does not define

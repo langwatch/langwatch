@@ -4,7 +4,7 @@ import {
   type SsoGateLogger,
   SsoGateService,
   type SsoProviderMountInspector,
-} from "../services/sso-gate.service";
+} from "../services/sso-gate.service.ts";
 
 export interface LicensingSsoAdapterOptions {
   configuration: SsoConfiguration;

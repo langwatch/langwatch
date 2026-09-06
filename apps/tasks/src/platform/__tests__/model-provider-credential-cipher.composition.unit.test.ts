@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelProviderCredentialCipherFromEnv } from "../model-provider-credential-cipher.composition";
+import { modelProviderCredentialCipherFromEnv } from "../model-provider-credential-cipher.composition.ts";
 
 describe("modelProviderCredentialCipherFromEnv", () => {
   describe("given a configured key", () => {

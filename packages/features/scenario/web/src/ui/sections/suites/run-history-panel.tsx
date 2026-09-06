@@ -7,22 +7,22 @@ import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { SetupWithAgentButton } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
-import { ShadowDivider } from "../../elements/shadow-divider";
+import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { HandledErrorAlert } from "../../../behavior/errors";
+import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import {
   LangyContextTarget,
   scenarioContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
-import { useTargetNameMap } from "../../../behavior/use-target-name-map";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
+import { useTargetNameMap } from "../../../behavior/use-target-name-map.ts";
 import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   GroupRow,
@@ -48,10 +48,10 @@ import {
   useRunHistoryStore,
   useScrollToBatch,
 } from "@langwatch/suite-web/surfaces/run-history-store";
-import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run";
-import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs";
-import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination";
-import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state";
+import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run.ts";
+import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs.ts";
+import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination.ts";
+import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
 
 const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>

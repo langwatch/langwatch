@@ -1,9 +1,9 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import { OpsExplainRepository, type OpsExplainQueryClient } from "../ops-explain.repository";
+import { OpsExplainRepository, type OpsExplainQueryClient } from "../ops-explain.repository.ts";
 import type {
   OpsExplainClientPort,
   OpsExplainClientResolution,
-} from "../../ports/ops-explain-client.port";
+} from "../../ports/ops-explain-client.port.ts";
 
 /**
  * Resolves and queries the ClickHouse client behind the operator-only

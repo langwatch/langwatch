@@ -1,9 +1,9 @@
-import { useLatestPromptVersion } from "../../../../behavior/use-latest-prompt-version";
-import { NEW_PROMPT_TITLE } from "../../../../surfaces/prompt-reference";
-import { shouldShowVersionBadge } from "../../studio-internals";
-import { useHasUnsavedChanges } from "../../../../behavior/use-has-unsaved-changes";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store";
-import { useTabById } from "../../../../behavior/use-tab-by-id";
+import { useLatestPromptVersion } from "../../../../behavior/use-latest-prompt-version.ts";
+import { NEW_PROMPT_TITLE } from "../../../../surfaces/prompt-reference/index.ts";
+import { shouldShowVersionBadge } from "../../studio-internals.ts";
+import { useHasUnsavedChanges } from "../../../../behavior/use-has-unsaved-changes.ts";
+import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useTabById } from "../../../../behavior/use-tab-by-id.ts";
 
 /** What a prompt tab displays about itself, wherever it is displayed. */
 export interface PromptTabSummary {

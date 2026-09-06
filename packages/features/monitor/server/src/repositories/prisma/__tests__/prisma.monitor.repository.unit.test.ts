@@ -14,8 +14,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { Monitor } from "@langwatch/monitor-contract";
-import type { MonitorRepository } from "../../monitor.repository";
-import { PrismaMonitorRepository } from "../prisma.monitor.repository";
+import type { MonitorRepository } from "../../monitor.repository.ts";
+import { PrismaMonitorRepository } from "../prisma.monitor.repository.ts";
 
 type ExperimentUpsert = Parameters<MonitorRepository["upsertForExperiment"]>[0];
 

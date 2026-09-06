@@ -13,7 +13,7 @@
  * The two shapes are the same by test, not by import.
  */
 import { z } from "zod";
-import { baseAgentConfigSchema } from "./base";
+import { baseAgentConfigSchema } from "./base.ts";
 
 const connectedParameterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 

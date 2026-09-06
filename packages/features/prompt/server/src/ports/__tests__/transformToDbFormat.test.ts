@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCamelToSnakeMapping, transformCamelToSnake } from "../prompt-transform-db.port";
+import { buildCamelToSnakeMapping, transformCamelToSnake } from "../prompt-transform-db.port.ts";
 
 const BASE_CONFIG = { model: "openai/gpt-5" };
 const CAMEL_CASE_PARAMS = {

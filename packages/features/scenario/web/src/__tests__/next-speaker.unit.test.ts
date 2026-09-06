@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { nextSpeakerOf } from "../ui/elements/next-speaker";
+import { nextSpeakerOf } from "../ui/elements/next-speaker.ts";
 
 const running = ScenarioRunStatus.IN_PROGRESS;
 

@@ -11,16 +11,16 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Command, CommandHandler } from "../../commands/command";
-import { defineCommandSchema } from "../../commands/commandSchema";
-import { defineAggregate, defineEvents } from "../../domain/definitions";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import { EventSourcing } from "../../eventSourcing";
-import { definePipeline } from "../../pipeline/staticBuilder";
-import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { EventUtils } from "../../utils/event.utils";
+import type { Command, CommandHandler } from "../../commands/command.ts";
+import { defineCommandSchema } from "../../commands/commandSchema.ts";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+import { EventUtils } from "../../utils/event.utils.ts";
 
 const TENANT_ID = "organization-1";
 const AGGREGATE_ID = "aggregate-1";

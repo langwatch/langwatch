@@ -2,7 +2,7 @@ import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
-import { SmallLabel } from "../elements/small-label";
+import { SmallLabel } from "../elements/small-label.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,

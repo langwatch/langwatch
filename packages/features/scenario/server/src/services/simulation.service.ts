@@ -53,8 +53,8 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import type { SimulationExecutionPort } from "../ports/simulation-execution.port";
-import type { SimulationRepository } from "../repositories/simulation.repository";
+import type { SimulationExecutionPort } from "../ports/simulation-execution.port.ts";
+import type { SimulationRepository } from "../repositories/simulation.repository.ts";
 
 /** Canonical read capability; its only persistence dependency is Simulation's repository. */
 export class SimulationService extends SimulationServiceContract {

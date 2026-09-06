@@ -3,7 +3,7 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 import {
   CodingAgentSessionContextMemoPort,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,
-} from "../ports/coding-agent-session-context.port";
+} from "../ports/coding-agent-session-context.port.ts";
 
 /** The session-context memo over Redis, which owns the expiry. */
 export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMemoPort {

@@ -7,10 +7,10 @@ import {
   DatasetObjectStorageResolverAdapter,
   DatasetStorageDestinationPort,
   type DatasetStorageDestination,
-} from "../dataset-object-storage-resolver.adapter";
-import { LocalDatasetStorageAdapter } from "../local.dataset-storage.adapter";
-import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter";
-import { DatasetS3ClientResolver } from "../../ports/dataset-storage.port";
+} from "../dataset-object-storage-resolver.adapter.ts";
+import { LocalDatasetStorageAdapter } from "../local.dataset-storage.adapter.ts";
+import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter.ts";
+import { DatasetS3ClientResolver } from "../../ports/dataset-storage.port.ts";
 
 class FixedDestination extends DatasetStorageDestinationPort {
   constructor(private readonly destination: DatasetStorageDestination) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
-} from "../ops-system-migration-cohort.rules";
+} from "../ops-system-migration-cohort.rules.ts";
 
 /** The cohort question for a migration enrollment still paces. */
 function paced(args: Partial<Parameters<typeof organizationMigrates>[0]>): boolean {

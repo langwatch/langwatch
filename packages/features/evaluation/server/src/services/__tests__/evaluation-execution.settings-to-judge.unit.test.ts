@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
-import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service";
+import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service.ts";
 
 // A real, non-native builtin evaluator with no required fields, so the fixed
 // trace's default input/output pass straight through.

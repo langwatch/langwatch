@@ -1,10 +1,10 @@
 import { Badge, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import { useReplayStatus } from "../../behavior/use-replay-status";
-import { api } from "../../../../behavior/ops-api";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { api } from "../../../../behavior/ops-api.ts";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 export function SingleAggregateReplay({
   projections,
   onReplayStarted,

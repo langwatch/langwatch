@@ -1,4 +1,4 @@
-import { LinkedWorkflowCopyPort } from "../ports/linked-workflow-copy.port";
+import { LinkedWorkflowCopyPort } from "../ports/linked-workflow-copy.port.ts";
 
 /**
  * The linked-workflow copy of a process that composes no Workflow application.

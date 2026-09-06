@@ -4,7 +4,7 @@ import {
   isScopeTier,
   isStoredPrincipalKind,
   isStoredScopeTier,
-} from "../vocabulary";
+} from "../vocabulary.ts";
 
 describe("the vocabulary type guards", () => {
   describe("given an inherited Object.prototype key", () => {

@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
-import { useSSESubscription } from "../../../../behavior/use-sse-subscription";
+import { useSSESubscription } from "../../../../behavior/use-sse-subscription.ts";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import {
   usePresencePreferencesStore,
   usePresenceStore,
   useTabSessionId,
 } from "@langwatch/presence-web/surfaces/presence-state";
-import { api } from "../../../../behavior/trace-api";
+import { api } from "../../../../behavior/trace-api.ts";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const LOCATION_DEBOUNCE_MS = 250;

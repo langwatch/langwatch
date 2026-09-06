@@ -19,7 +19,7 @@ import {
   traceSearchBodyExtensions,
   type TraceSearchBody,
   type TracesRestPorts,
-} from "../traces.api";
+} from "../traces.api.ts";
 
 vi.mock("#services/trace-formatting.service", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),

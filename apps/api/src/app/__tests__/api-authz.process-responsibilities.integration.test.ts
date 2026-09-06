@@ -7,8 +7,8 @@ import { PrismaConnection } from "@langwatch/prisma-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { Registry } from "prom-client";
 import { describe, expect, it } from "vitest";
-import { ApiAuthzComposition } from "../api-authz.composition";
-import { ApiEventingInfrastructure } from "../../platform/infrastructure/api-eventing.infrastructure";
+import { ApiAuthzComposition } from "../api-authz.composition.ts";
+import { ApiEventingInfrastructure } from "../../platform/infrastructure/api-eventing.infrastructure.ts";
 
 const AUTHZ_GRANT_PIPELINE = "authz_grant";
 

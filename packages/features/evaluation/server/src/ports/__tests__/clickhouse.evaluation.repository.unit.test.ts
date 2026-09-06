@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository";
+import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
   EvaluationClickHouseQuery,
-} from "../evaluation.port";
-import { EvaluationRetentionFloorPort } from "../evaluation.port";
+} from "../evaluation.port.ts";
+import { EvaluationRetentionFloorPort } from "../evaluation.port.ts";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 const run: EvaluationRunData = {

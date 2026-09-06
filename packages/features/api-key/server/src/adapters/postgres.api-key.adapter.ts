@@ -2,18 +2,18 @@ import type { ApiKeyService as ApiKeyCapability } from "@langwatch/api-key-contr
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port";
-import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port";
+import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
+import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
 import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
-} from "../repositories/prisma/prisma.api-key.repository";
-import { ApiKeyService } from "../services/api-key.service";
+} from "../repositories/prisma/prisma.api-key.repository.ts";
+import { ApiKeyService } from "../services/api-key.service.ts";
 import {
   LegacyApiKeyGrantService,
   type AuthzBindingIdDeriver,
-} from "../services/legacy-api-key-grant.service";
-import { ApiKeyTokenAdapter } from "./api-key-token.api-key-token.adapter";
+} from "../services/legacy-api-key-grant.service.ts";
+import { ApiKeyTokenAdapter } from "./api-key-token.api-key-token.adapter.ts";
 
 export class PostgresApiKeyAdapter {
   private constructor(

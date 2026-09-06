@@ -10,26 +10,26 @@ import {
   parseCliToolResult,
   toCliToolResult,
 } from "@langwatch/langy-contract";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { digestOfToolCall } from "../../../../../model/langy-capability-digest";
-import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { digestOfToolCall } from "../../../../../model/langy-capability-digest.ts";
+import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
 import {
   type CapabilityCardInput,
   type CapabilityDescriptor,
   isProposalOutput,
   resolveCapability,
   withDecidedCard,
-} from "../../../model/capabilities/capability-registry";
-import { deriveFollowUpChips } from "../../../model/capabilities/follow-up-chips";
-import { LangyDatasetCard } from "./langy-dataset-card";
-import { LangyDeclarativeCard } from "./langy-declarative-card";
-import { LangyEvalRunCard } from "./langy-eval-run-card";
-import { LangyFollowUpChips } from "./langy-follow-up-chips";
-import { LangyMetricsCard } from "./langy-metrics-card";
-import { LangyScenarioCard } from "./langy-scenario-card";
-import { LangyTimeseriesCard } from "./langy-timeseries-card";
-import { LangyTraceSampleCard } from "./langy-trace-sample-card";
-import { LangyTracesCard } from "./langy-traces-card";
+} from "../../../model/capabilities/capability-registry.ts";
+import { deriveFollowUpChips } from "../../../model/capabilities/follow-up-chips.ts";
+import { LangyDatasetCard } from "./langy-dataset-card.tsx";
+import { LangyDeclarativeCard } from "./langy-declarative-card.tsx";
+import { LangyEvalRunCard } from "./langy-eval-run-card.tsx";
+import { LangyFollowUpChips } from "./langy-follow-up-chips.tsx";
+import { LangyMetricsCard } from "./langy-metrics-card.tsx";
+import { LangyScenarioCard } from "./langy-scenario-card.tsx";
+import { LangyTimeseriesCard } from "./langy-timeseries-card.tsx";
+import { LangyTraceSampleCard } from "./langy-trace-sample-card.tsx";
+import { LangyTracesCard } from "./langy-traces-card.tsx";
 
 /** The slice of a tool call a capability card needs. */
 export interface CapabilityToolCall {

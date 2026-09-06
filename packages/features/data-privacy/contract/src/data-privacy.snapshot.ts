@@ -15,7 +15,7 @@
  * stay aligned.
  */
 
-import type { DataPrivacyConfig, DataPrivacyScopeType, ResolvedDataPrivacy } from "./data-privacy";
+import type { DataPrivacyConfig, DataPrivacyScopeType, ResolvedDataPrivacy } from "./data-privacy.ts";
 
 /** One stored rule: a scope, whether it covers personal projects, its config. */
 export type DataPrivacyRule = {

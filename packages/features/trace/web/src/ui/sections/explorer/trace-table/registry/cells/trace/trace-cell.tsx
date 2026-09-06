@@ -1,7 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { TracePresenceAvatars } from "@langwatch/presence-web/surfaces/presence-indicators";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
 
 export const TraceCell = {
   id: "trace",

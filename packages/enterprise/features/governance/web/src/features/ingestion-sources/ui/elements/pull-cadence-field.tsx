@@ -12,7 +12,7 @@ import {
   pullCadenceCronError,
   recommendedPullSchedule,
   summarizePullCadence,
-} from "../../model/pull-cadence";
+} from "../../model/pull-cadence.ts";
 
 const WEEKDAY_OPTIONS = [
   { value: 0, short: "Sun" },

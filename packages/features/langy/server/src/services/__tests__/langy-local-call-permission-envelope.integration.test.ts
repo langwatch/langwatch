@@ -15,8 +15,8 @@
 import { describe, expect, it } from "vitest";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
-import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
 
 const projectId = "project_envelope";
 const conversationId = "conv_envelope";

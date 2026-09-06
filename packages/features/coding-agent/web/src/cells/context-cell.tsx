@@ -3,9 +3,9 @@ import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatTokens } from "@langwatch/design-system/display-formatters";
-import type { SessionListRow } from "../session-list-row";
-import { ComparisonBar } from "./comparison-bar";
-import { MissingValue } from "./missing-value";
+import type { SessionListRow } from "../session-list-row.ts";
+import { ComparisonBar } from "./comparison-bar.tsx";
+import { MissingValue } from "./missing-value.tsx";
 
 /**
  * The two token figures that answer different questions, and a bar comparing

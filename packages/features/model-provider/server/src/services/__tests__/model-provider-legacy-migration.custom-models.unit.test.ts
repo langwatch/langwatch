@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 
-import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service";
+import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service.ts";
 
 const migrations = ModelProviderLegacyMigrationService.create();
 

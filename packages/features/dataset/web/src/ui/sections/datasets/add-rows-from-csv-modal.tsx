@@ -10,9 +10,9 @@ import {
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
-import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values";
+import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { CSVReaderComponent } from "./upload-csv-drawer";
+import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
 
 export function AddRowsFromCSVModal({
   isOpen,

@@ -4,13 +4,13 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter";
-import type { LangWatchQLExecutorPort } from "../../ports/langwatch-ql-executor.port";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
+import type { LangWatchQLExecutorPort } from "../../ports/langwatch-ql-executor.port.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
-} from "./lwql-clickhouse-harness";
+} from "./lwql-clickhouse-harness.ts";
 
 /** A name no dataset carries, distinctive enough to find in a failure. */
 const MISSING_COLUMN = "trace_idd_typo";

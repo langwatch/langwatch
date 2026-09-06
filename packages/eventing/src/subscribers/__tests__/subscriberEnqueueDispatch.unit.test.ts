@@ -6,9 +6,9 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import { KillSwitchPort, type KillSwitchQuery } from "../../kill-switch";
-import type { Event } from "../../domain/types";
-import { ProjectionRouter } from "../../projections/projectionRouter";
+import { KillSwitchPort, type KillSwitchQuery } from "../../kill-switch/index.ts";
+import type { Event } from "../../domain/types.ts";
+import { ProjectionRouter } from "../../projections/projectionRouter.ts";
 import {
   createMockEventStore,
   createTestAggregateType,
@@ -16,10 +16,10 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import { QueueManager } from "../../services/queues/queueManager";
-import type { EventSubscriberDefinition } from "../eventSubscriber.types";
+} from "../../services/__tests__/testHelpers.ts";
+import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import { QueueManager } from "../../services/queues/queueManager.ts";
+import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
 
 const aggregateType = createTestAggregateType();
 const tenantId = createTestTenantId();

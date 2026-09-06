@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage";
-import { BLOB_BACKSTOP_TTL_SECONDS } from "../blobConstants";
+import { createTenantId } from "../storage.ts";
+import { BLOB_BACKSTOP_TTL_SECONDS } from "../blobConstants.ts";
 import {
   type BlobRef,
   contentHash,
   type ObjectStore,
   TieredBlobStore,
   TransientBlobStoreError,
-} from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
+} from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-abc");
 

@@ -84,18 +84,18 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { UserApp } from "@langwatch/user-server";
 import { z } from "zod";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { composeApiOrganizationInvites } from "../../app/api-organization-invites.composition";
-import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
-import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { composeApiOrganizationInvites } from "../../app/api-organization-invites.composition.ts";
+import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
+import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition.ts";
 import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
   createOrganizationTrpcRouter,
-} from "./organization-trpc.mount";
+} from "./organization-trpc.mount.ts";
 
 /**
  * The questionnaire the sign-up form collects, as the ceremony forwards it. Opaque to the
@@ -183,7 +183,7 @@ export type OrganizationMembershipPeers = Readonly<{
   processName: string;
 }>;
 
-import type { ComposedOrganizationFeature } from "./organization.composition.types";
+import type { ComposedOrganizationFeature } from "./organization.composition.types.ts";
 
 /** Composes `organization.*` over this process's own graph. */
 export function composeOrganizationFeature(options: {

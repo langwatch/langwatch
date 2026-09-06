@@ -4,7 +4,7 @@ import {
   realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
   type RealtimeSessionReconciliationRepository,
-} from "../../services/gateway-realtime-session-reconciliation.service";
+} from "../../services/gateway-realtime-session-reconciliation.service.ts";
 
 const session = {
   id: "session-1",

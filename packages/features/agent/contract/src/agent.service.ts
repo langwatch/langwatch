@@ -1,12 +1,12 @@
-import type { Agent, AgentWithFields } from "./agent";
+import type { Agent, AgentWithFields } from "./agent.ts";
 import type {
   ArchiveAgentCommand,
   CopyAgentCommand,
   CreateAgentCommand,
   UpdateAgentCommand,
-} from "./agent.commands";
-import type { ConnectedAgentConfig } from "./config/connected";
-import type { ConnectedAgentIdentity } from "./connected-agent.identity";
+} from "./agent.commands.ts";
+import type { ConnectedAgentConfig } from "./config/connected.ts";
+import type { ConnectedAgentIdentity } from "./connected-agent.identity.ts";
 import type {
   AgentCopy,
   AgentHistoryEntry,
@@ -14,7 +14,7 @@ import type {
   AgentPage,
   AgentReferenceState,
   RelatedAgentEntities,
-} from "./agent.queries";
+} from "./agent.queries.ts";
 
 export abstract class AgentService {
   abstract getById(input: { id: string; projectId: string }): Promise<AgentWithFields>;

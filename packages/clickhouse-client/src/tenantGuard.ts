@@ -2,8 +2,8 @@
  * Refuses a statement that is not scoped to exactly one tenant.
  */
 
-import { quietly } from "./observability";
-import type { QueryRequest } from "./query";
+import { quietly } from "./observability.ts";
+import type { QueryRequest } from "./query.ts";
 
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }

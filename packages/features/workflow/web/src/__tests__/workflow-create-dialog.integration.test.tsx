@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   WorkflowCreateDialog,
   type WorkflowTemplateCardProps,
-} from "../ui/elements/workflow-create-dialog";
+} from "../ui/elements/workflow-create-dialog.tsx";
 
 function TemplateCard({ testId, name, onClick }: WorkflowTemplateCardProps) {
   return (

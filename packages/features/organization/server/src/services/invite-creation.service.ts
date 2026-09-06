@@ -20,11 +20,11 @@ import {
 } from "@langwatch/organization-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import type { RoleService } from "@langwatch/role-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
-import type { OrganizationInviteMailPort } from "../ports/invite.port";
-import { buildInviteAcceptUrl } from "../rules/invite-link.rules";
-import { InviteService } from "./invite.service";
-import { InviteTeamAssignmentService } from "./invite-team-assignment.service";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { InviteService } from "./invite.service.ts";
+import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
 import {
   INVITE_BATCH_TXN_MAX_WAIT_MS,
   INVITE_BATCH_TXN_TIMEOUT_MS,
@@ -33,7 +33,7 @@ import {
   type CreateInvitesInviteInput,
   type InviteServiceDependencies,
   type TeamAssignmentInput,
-} from "../rules/invite-contracts.rules";
+} from "../rules/invite-contracts.rules.ts";
 
 const logger = createLogger("langwatch:invites");
 

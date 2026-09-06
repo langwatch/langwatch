@@ -5,7 +5,7 @@ import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type {
   CheckPreconditionFields,
   CheckPreconditionRule,
-} from "../../../model/evaluations/types";
+} from "../../../model/evaluations/types.ts";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   fieldRequiresKey,
@@ -14,7 +14,7 @@ import {
   getFieldValueType,
   isRuleAllowedForField,
   RULE_LABELS,
-} from "../../../model/preconditions/precondition-field-utils";
+} from "../../../model/preconditions/precondition-field-utils.ts";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 
 export const PreconditionsField = ({

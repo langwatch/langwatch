@@ -8,10 +8,10 @@ import {
   gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   STAGING_DEPTH_REPORT_FLOOR,
-} from "../metrics";
-import { GroupQueueMetricsCollector } from "../metricsCollector";
-import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore";
-import type { GroupStagingScripts } from "../scripts";
+} from "../metrics.ts";
+import { GroupQueueMetricsCollector } from "../metricsCollector.ts";
+import { MIN_PLAUSIBLE_EPOCH_MS } from "../readyScore.ts";
+import type { GroupStagingScripts } from "../scripts.ts";
 
 const QUEUE = "test-queue";
 const PREFIX = "gq:test:";

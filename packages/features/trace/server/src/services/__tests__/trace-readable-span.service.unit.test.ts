@@ -1,4 +1,4 @@
-import { TraceReadableSpanService } from "../trace-readable-span.service";
+import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { describe, expect, it } from "vitest";
 import type { BaseSpan, LLMSpan, RAGSpan, Span, SpanTypes } from "@langwatch/trace-contract";

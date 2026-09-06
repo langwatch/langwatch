@@ -24,8 +24,8 @@
  */
 
 import { useMemo } from "react";
-import { useOptionalNavigationHost } from "../model/navigation-host";
-import type { ProjectPickGroup } from "../model/project-pick-items";
+import { useOptionalNavigationHost } from "../model/navigation-host.ts";
+import type { ProjectPickGroup } from "../model/project-pick-items.ts";
 
 /**
  * The address a project pick lands on: the reader's own, with the project

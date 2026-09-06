@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { LocalEvaluatorConfig } from "../types";
-import { createEvaluatorEditorCallbacks } from "../evaluator-editor-callbacks";
+import type { LocalEvaluatorConfig } from "../types.ts";
+import { createEvaluatorEditorCallbacks } from "../evaluator-editor-callbacks.ts";
 
 describe("createEvaluatorEditorCallbacks()", () => {
   describe("onLocalConfigChange()", () => {

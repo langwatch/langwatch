@@ -12,13 +12,13 @@ import {
   VariableMappingInput,
 } from "@langwatch/prompt-web/surfaces/variables";
 
-import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name";
-import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs";
+import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name.ts";
+import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs.ts";
 import type {
   ComparisonEvaluatorConfig,
   TargetConfig,
-} from "../../../../model/experiments-v3/types";
-import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns";
+} from "../../../../model/experiments-v3/types.ts";
+import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns.ts";
 import { disambiguateNames } from "@langwatch/experiment-contract";
 
 type Metric = "cost" | "duration";

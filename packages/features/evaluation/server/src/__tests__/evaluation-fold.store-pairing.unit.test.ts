@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection";
-import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store";
+import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection.ts";
+import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
 
 /**
  * The evaluation half of the `trustAbsentMiss` store pairing. A `get()`-only

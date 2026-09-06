@@ -3,7 +3,7 @@
  * ordered list, so an effective permission set is a few dozen bytes and a
  * membership test is a bit test.
  */
-import { ALL_PERMISSIONS, permissionIndex } from "./registry";
+import { ALL_PERMISSIONS, permissionIndex } from "./registry.ts";
 
 export function encodePermissionBitset(permissions: Iterable<string>): Uint8Array {
   const bytes = new Uint8Array(Math.ceil(ALL_PERMISSIONS.length / 8));

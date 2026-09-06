@@ -9,7 +9,7 @@ import {
 } from "@langwatch/authz-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AuthzGrantsEvent } from "./eventing.authz.adapter";
+import type { AuthzGrantsEvent } from "./eventing.authz.adapter.ts";
 
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
 export const AUTHZ_AUDIT_VERBS = [

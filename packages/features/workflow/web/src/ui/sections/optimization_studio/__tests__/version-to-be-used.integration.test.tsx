@@ -9,18 +9,18 @@ import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),
 }));
-vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../history", () => ({
+vi.mock("../history.tsx", () => ({
   useVersionState: () => ({
     previousVersion: { dsl: { nodes: [], edges: [] }, version: "2" },
     nextVersion: "3",
@@ -32,7 +32,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("../../../../model/workflow-api-client", () => ({
+vi.mock("../../../../model/workflow-api-client.ts", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {
@@ -51,7 +51,7 @@ vi.mock("../../../../model/workflow-api-client", () => ({
   },
 }));
 
-const { VersionToBeUsed } = await import("../version-to-be-used");
+const { VersionToBeUsed } = await import("../version-to-be-used.tsx");
 
 function Harness({ children }: { children: ReactNode }) {
   const form = useForm<{ version: string; commitMessage: string }>({

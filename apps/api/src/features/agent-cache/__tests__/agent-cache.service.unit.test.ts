@@ -16,8 +16,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-import { AgentCacheEntryStorePort } from "../agent-cache.repository";
-import { AgentCacheService } from "../agent-cache.service";
+import { AgentCacheEntryStorePort } from "../agent-cache.repository.ts";
+import { AgentCacheService } from "../agent-cache.service.ts";
 
 class InMemoryStore extends AgentCacheEntryStorePort {
   private readonly entries = new Map<string, string>();

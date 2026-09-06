@@ -13,10 +13,10 @@ import type {
   ModelCostRepository,
   ModelProviderCatalog,
   ModelProviderIdService,
-} from "../ports/model-provider.port";
-import { ModelCostCatalogService } from "./model-cost-catalog.service";
-import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
-import type { ModelProviderScopeService } from "./model-provider-scope.service";
+} from "../ports/model-provider.port.ts";
+import { ModelCostCatalogService } from "./model-cost-catalog.service.ts";
+import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderCostsOptions = {
   costs: ModelCostRepository;

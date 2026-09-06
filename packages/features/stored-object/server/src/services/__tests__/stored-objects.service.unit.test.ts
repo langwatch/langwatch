@@ -43,12 +43,12 @@ vi.mock("@langwatch/observability", () => ({
 // ---------------------------------------------------------------------------
 
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port";
-import type { StoredObject } from "../../rules/stored-object-row.rules";
-import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
-import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
-import type { MintStorageUri } from "../stored-objects.service";
-import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service";
+import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port.ts";
+import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
+import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port.ts";
+import type { MintStorageUri } from "../stored-objects.service.ts";
+import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service.ts";
 
 // ---------------------------------------------------------------------------
 // Test helpers

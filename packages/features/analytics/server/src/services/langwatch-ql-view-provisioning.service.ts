@@ -3,18 +3,18 @@
  * @see ./langwatch-ql-view-statements.service.ts — the views
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
-import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../rules/lwql-view-catalog.rules";
+import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
   type LangWatchQLTable,
-} from "./langwatch-ql-access-model.service";
+} from "./langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
   type LangWatchQLViewDefinition,
-} from "./langwatch-ql-catalog-shapes.service";
-import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service";
+} from "./langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();

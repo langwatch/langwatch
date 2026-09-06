@@ -10,19 +10,19 @@
  */
 import { cleanup, screen, within } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("../../../features/budgets/ui/sections/budget-create-drawer", () => ({
+vi.mock("../../../features/budgets/ui/sections/budget-create-drawer.tsx", () => ({
   BudgetCreateDrawer: () => null,
 }));
-vi.mock("../../../features/budgets/ui/sections/budget-edit-drawer", () => ({
+vi.mock("../../../features/budgets/ui/sections/budget-edit-drawer.tsx", () => ({
   BudgetEditDrawer: () => null,
 }));
 
@@ -122,7 +122,7 @@ const BUDGETS = [
   }),
 ];
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       gatewayBudgets: { list: { invalidate: vi.fn() } },
@@ -149,7 +149,7 @@ const host = fakeGatewayHost({
   project: { id: "proj-1", name: "web-app", slug: "web-app", teamId: "team-1" },
 });
 
-import BudgetsPage from "../gateway-budgets.screen";
+import BudgetsPage from "../gateway-budgets.screen.tsx";
 
 function renderPage() {
   return renderWithGatewayHost(<BudgetsPage />, { host });

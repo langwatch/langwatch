@@ -5,7 +5,7 @@ import {
   EVALUATION_DURATION_METRIC_NAME,
   EVALUATION_STATUS_METRIC_NAME,
   OtelEvaluationExecutionMetricsAdapter,
-} from "../otel.evaluation-execution-metrics.adapter";
+} from "../otel.evaluation-execution-metrics.adapter.ts";
 
 /**
  * Spec: packages/features/evaluation/specs/evaluation-service.feature

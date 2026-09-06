@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangevalsEvaluatorAdapter } from "../http.langevals-evaluator.adapter";
+import { HttpLangevalsEvaluatorAdapter } from "../http.langevals-evaluator.adapter.ts";
 
 const ENDPOINT = "http://langevals.internal.langwatch.svc.cluster.local:5562";
 

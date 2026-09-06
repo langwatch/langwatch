@@ -6,12 +6,12 @@ import {
   WorkflowNlpRuntimePort,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "../ports/workflow.port";
-import type { NlpLambdaInvokePort, NlpPayloadStagingPort } from "../ports/workflow-nlp-lambda.port";
+} from "../ports/workflow.port.ts";
+import type { NlpLambdaInvokePort, NlpPayloadStagingPort } from "../ports/workflow-nlp-lambda.port.ts";
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
-} from "./workflow-nlp-lambda.adapter";
+} from "./workflow-nlp-lambda.adapter.ts";
 
 /**
  * Origin tag for the `X-LangWatch-Origin` header. Set at the request boundary

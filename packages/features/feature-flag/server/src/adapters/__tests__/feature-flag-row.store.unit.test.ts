@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   FeatureFlagCachePort,
   type FeatureFlagCacheSlot,
-} from "../../ports/feature-flag-cache.port";
-import { MemoryFeatureFlagRepository } from "../../repositories/memory/feature-flag.repository";
-import { CachedFeatureFlagRowAdapter } from "../cached.feature-flag-row.adapter";
+} from "../../ports/feature-flag-cache.port.ts";
+import { MemoryFeatureFlagRepository } from "../../repositories/memory/feature-flag.repository.ts";
+import { CachedFeatureFlagRowAdapter } from "../cached.feature-flag-row.adapter.ts";
 
 class RecordingCache extends FeatureFlagCachePort {
   readonly values = new Map<string, FeatureFlagCacheSlot>();

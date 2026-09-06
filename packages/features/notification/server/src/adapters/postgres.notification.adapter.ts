@@ -2,8 +2,8 @@ import type { NotificationService as NotificationServiceContract } from "@langwa
 import {
   PrismaNotificationRepository,
   type NotificationDatabase,
-} from "../repositories/prisma/prisma.notification.repository";
-import { NotificationService } from "../services/notification.service";
+} from "../repositories/prisma/prisma.notification.repository.ts";
+import { NotificationService } from "../services/notification.service.ts";
 
 /** Process composition for the PostgreSQL-backed Notification capability. */
 export class PostgresNotificationAdapter {

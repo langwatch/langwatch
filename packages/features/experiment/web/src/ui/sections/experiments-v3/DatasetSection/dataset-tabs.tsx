@@ -13,8 +13,8 @@ import {
 import { useMemo } from "react";
 
 import { Menu } from "@langwatch/design-system/menu";
-import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
-import type { DatasetReference } from "../../../../model/experiments-v3/types";
+import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import type { DatasetReference } from "../../../../model/experiments-v3/types.ts";
 
 type DatasetTabsProps = {
   onSelectExisting: () => void;

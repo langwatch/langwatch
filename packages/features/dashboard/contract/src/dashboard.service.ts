@@ -1,11 +1,11 @@
-import type { Dashboard, DashboardSummary } from "./dashboard";
+import type { Dashboard, DashboardSummary } from "./dashboard.ts";
 import type {
   LangWatchQLProtections,
   LangWatchQLQueryResult,
   LangWatchQLRunContext,
 } from "@langwatch/analytics-contract";
-import type { Graph, GraphLayout } from "./graph";
-import type { SavedWorkbenchChart } from "./saved-workbench-chart";
+import type { Graph, GraphLayout } from "./graph.ts";
+import type { SavedWorkbenchChart } from "./saved-workbench-chart.ts";
 
 export abstract class DashboardService {
   abstract getAll(input: {

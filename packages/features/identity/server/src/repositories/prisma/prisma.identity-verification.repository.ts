@@ -1,7 +1,7 @@
 import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
-} from "../identity-verification.repository";
+} from "../identity-verification.repository.ts";
 import { z } from "zod";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 

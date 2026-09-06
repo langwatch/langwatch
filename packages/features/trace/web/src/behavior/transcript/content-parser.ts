@@ -1,6 +1,6 @@
-import type { ChatMessage, ContentBlock } from "../../model/transcript/types";
-import { mediaPartToMediaData } from "./media-part";
-import { isRecord } from "../../model/transcript/record";
+import type { ChatMessage, ContentBlock } from "../../model/transcript/types.ts";
+import { mediaPartToMediaData } from "./media-part.ts";
+import { isRecord } from "../../model/transcript/record.ts";
 
 function findJsonObjectEnd(text: string, start: number): number {
   let depth = 0;

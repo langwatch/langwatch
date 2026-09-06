@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   clusterTopicsForProject,
   fetchTracesFromClickHouse,
-} from "../topic-clustering-runner.intent";
-import { fakeRunnerDeps } from "./topic-clustering-runner.fixture";
+} from "../topic-clustering-runner.intent.ts";
+import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 
 describe("clusterTopicsForProject", () => {
   describe("when ClickHouse is available", () => {

@@ -1,5 +1,5 @@
 import Papa from "papaparse";
-import type { DatasetColumns } from "./dataset";
+import type { DatasetColumns } from "./dataset.ts";
 
 const getSafeColumnName = (columnName: string, existingNames: Set<string>): string => {
   const reserved = (value: string) => value === "id" || value === "selected";

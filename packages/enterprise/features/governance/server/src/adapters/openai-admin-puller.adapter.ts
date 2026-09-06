@@ -50,8 +50,8 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { AdminUsageReportAdapter } from "./admin-usage-report.adapter";
+import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 

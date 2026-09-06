@@ -1,7 +1,7 @@
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import { TRPCError } from "@trpc/server";
 
-import { isEnterpriseTier } from "./plan-gate.errors";
+import { isEnterpriseTier } from "./plan-gate.errors.ts";
 
 /**
  * The shape a tRPC procedure presents to the gate.

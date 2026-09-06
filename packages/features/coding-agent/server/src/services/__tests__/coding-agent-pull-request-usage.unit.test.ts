@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
-import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-pull-request-read.service";
-import { CodingAgentFeatureService } from "../coding-agent.service";
+import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-pull-request-read.service.ts";
+import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -14,7 +14,7 @@ import {
   TestTraceSessions,
   branchSession,
   pullRequest,
-} from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function serviceWith(input: {
   sessions: TestSessions;

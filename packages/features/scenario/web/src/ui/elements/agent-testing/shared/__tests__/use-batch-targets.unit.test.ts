@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { TargetIdentity } from "../../../../../behavior/use-target-name-map";
+import type { TargetIdentity } from "../../../../../behavior/use-target-name-map.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
@@ -14,8 +14,8 @@ import {
   isComparison,
   runsOfTarget,
   summaryOfTarget,
-} from "../../../../sections/agent-testing/results/use-batch-targets";
-import { TARGET_COLORS } from "../target-colors";
+} from "../../../../sections/agent-testing/results/use-batch-targets.ts";
+import { TARGET_COLORS } from "../target-colors.ts";
 
 const NAMES = new Map<string, TargetIdentity>([
   [

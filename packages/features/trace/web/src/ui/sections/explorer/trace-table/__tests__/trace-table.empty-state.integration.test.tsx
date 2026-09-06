@@ -22,7 +22,7 @@ let mockTraceListResult = {
   newIds: new Set<string>(),
 };
 
-vi.mock("../../hooks/use-trace-list", () => ({
+vi.mock("../../hooks/use-trace-list.ts", () => ({
   useTraceList: () => mockTraceListResult,
 }));
 
@@ -39,7 +39,7 @@ let mockSessionGroupsResult = {
   error: null as unknown,
 };
 
-vi.mock("../../hooks/use-session-groups", () => ({
+vi.mock("../../hooks/use-session-groups.ts", () => ({
   useSessionGroups: () => mockSessionGroupsResult,
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
@@ -51,7 +51,7 @@ vi.mock("../../hooks/use-session-groups", () => ({
 // gating through the same table shell.
 let mockGrouping: "flat" | "by-conversation" = "flat";
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -69,23 +69,23 @@ vi.mock("../../../../../behavior/view.store", () => ({
 
 // ─── Lens body stubs ──────────────────────────────────────────────────────────
 
-vi.mock("../trace-lens-body", () => ({
+vi.mock("../trace-lens-body.tsx", () => ({
   TraceLensBody: () => <div data-testid="trace-lens-body">Lens body</div>,
 }));
 
-vi.mock("../conversation-lens-body", () => ({
+vi.mock("../conversation-lens-body.tsx", () => ({
   ConversationLensBody: () => <div data-testid="conversation-lens-body" />,
 }));
 
-vi.mock("../group-lens-body", () => ({
+vi.mock("../group-lens-body.tsx", () => ({
   GroupLensBody: () => <div data-testid="group-lens-body" />,
 }));
 
-vi.mock("../empty-filter-state", () => ({
+vi.mock("../empty-filter-state.tsx", () => ({
   EmptyFilterState: () => <div data-testid="empty-filter-state">Nothing matches</div>,
 }));
 
-vi.mock("../trace-table-layout", () => ({
+vi.mock("../trace-table-layout.tsx", () => ({
   TraceTableLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="trace-table-layout">{children}</div>
   ),
@@ -93,15 +93,15 @@ vi.mock("../trace-table-layout", () => ({
 
 // ─── Other dependency stubs ───────────────────────────────────────────────────
 
-vi.mock("../../../../../behavior/explorer/use-project-has-traces", () => ({
+vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: true }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       setupDismissedByProject: {},
@@ -110,7 +110,7 @@ vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", ()
     }),
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       queryText: "",
@@ -124,14 +124,14 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../query-breakdown-chips", () => ({
+vi.mock("../query-breakdown-chips.tsx", () => ({
   QueryBreakdownChips: () => null,
 }));
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
 import type React from "react";
-import { TraceTable } from "../trace-table";
+import { TraceTable } from "../trace-table.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

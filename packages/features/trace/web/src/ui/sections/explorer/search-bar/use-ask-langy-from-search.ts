@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy";
-import { useShowLangy } from "../../langy/hooks/use-show-langy";
+import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
+import { useShowLangy } from "../../langy/hooks/use-show-langy.ts";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { handOffSearchToLangy } from "./search-langy-handoff";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { handOffSearchToLangy } from "./search-langy-handoff.ts";
 
 /**
  * Does Langy own the search bar's ask affordance — and the handoff when it does.

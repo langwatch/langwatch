@@ -31,7 +31,7 @@ import {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
   WorkerStoredObjectStorageRuntimeFactory,
-} from "../worker-stored-object-storage.adapter";
+} from "../worker-stored-object-storage.adapter.ts";
 
 class ProjectSource extends WorkerProjectS3SourcePort {
   constructor(

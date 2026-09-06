@@ -1,7 +1,7 @@
 import type { Context, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { createFoundryProvider } from "./otel-browser";
-import type { SpanConfig, TraceConfig } from "../model/foundry-types";
+import { createFoundryProvider } from "./otel-browser.ts";
+import type { SpanConfig, TraceConfig } from "../model/foundry-types.ts";
 
 interface ExecutorOpts {
   apiKey: string;

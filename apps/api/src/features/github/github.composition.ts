@@ -7,9 +7,9 @@ import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createGithubTrpcRouter, type GithubTrpcMountPorts } from "./github-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createGithubTrpcRouter, type GithubTrpcMountPorts } from "./github-trpc.mount.ts";
 
 /** Builds `github.*` on this process's root, over this process's own graph. */
 export function composeGithubTrpcRouter(options: {

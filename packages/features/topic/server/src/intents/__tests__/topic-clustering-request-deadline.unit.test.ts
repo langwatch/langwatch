@@ -10,14 +10,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
-import { classifyClusteringError } from "../topic-clustering.intent";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "../topic-clustering.intent";
+import { classifyClusteringError } from "../topic-clustering.intent.ts";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "../topic-clustering.intent.ts";
 import {
   fetchTopicsBatchClustering,
   fetchTopicsIncrementalClustering,
   TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
-} from "../topic-clustering-runner.intent";
-import { fakeRunnerDeps } from "./topic-clustering-runner.fixture";
+} from "../topic-clustering-runner.intent.ts";
+import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 
 const batchParams = {
   project_id: "proj-1",

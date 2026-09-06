@@ -1,6 +1,6 @@
 import { Button, Card, Heading, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import type { RetentionCategory } from "@langwatch/data-retention-contract";
-import { CATEGORY_LABELS } from "../../model/retention-constants";
+import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 
 /** The fields the progress card reads off a ClickHouse mutation. The
  *  canonical shape lives server-side (`MutationProgress`); this is the

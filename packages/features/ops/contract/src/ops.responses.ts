@@ -14,20 +14,20 @@
  */
 import { z } from "zod";
 import { searchProjectsResultSchema } from "@langwatch/project-contract";
-import { anomalySchema } from "./ops-anomaly";
+import { anomalySchema } from "./ops-anomaly.ts";
 import {
   deadLetterCountSchema,
   deadOutboxMessageViewSchema,
   processInstanceRowSchema,
   processOutboxMessageViewSchema,
-} from "./ops-process";
-import { opsScheduledJobSchema } from "./ops-scheduler";
+} from "./ops-process.ts";
+import { opsScheduledJobSchema } from "./ops-scheduler.ts";
 import {
   aggregateEventViewSchema,
   aggregateDiscoverySchema,
   aggregateSearchResultSchema,
   projectionStateAtEventSchema,
-} from "./ops-event-log";
+} from "./ops-event-log.ts";
 
 /**
  * The operator's reach, as the process resolved it.

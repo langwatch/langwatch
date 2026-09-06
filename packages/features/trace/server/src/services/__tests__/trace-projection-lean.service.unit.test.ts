@@ -3,7 +3,7 @@
  * Unit tests for leanForProjection. These tests FAIL at unit runtime (throws "not implemented") but pass typecheck — the TDD contract for Step 5 of the ADR-022 plan.
  */
 
-import { TraceProjectionLeanService } from "../trace-projection-lean.service";
+import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
 import type { Event } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
@@ -17,7 +17,7 @@ import {
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/trace-server";
-import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
+import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

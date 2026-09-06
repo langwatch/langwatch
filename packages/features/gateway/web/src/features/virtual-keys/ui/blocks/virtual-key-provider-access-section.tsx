@@ -9,8 +9,8 @@ import {
   type OrgModelProvider,
   resolveEligible,
   type VirtualKeyScopeEntry,
-} from "../../model/eligible-model-providers";
-import { ProviderRow } from "./virtual-key-provider-row";
+} from "../../model/eligible-model-providers.ts";
+import { ProviderRow } from "./virtual-key-provider-row.tsx";
 
 /**
  * Which providers a key may dispatch to.

@@ -10,15 +10,15 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer";
+import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer.tsx";
 
 const ORG_ID = "org-empty";
 const USER_ID = "user-1";
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: {

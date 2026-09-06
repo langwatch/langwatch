@@ -1,18 +1,18 @@
-import type { TranscriptEntry } from "./coding-agent-transcript";
+import type { TranscriptEntry } from "./coding-agent-transcript.ts";
 import {
   WITHHELD_PROMPT_TEXT,
   normalizeEventName,
   parseMcpToolName,
   resolveConversationKey,
-} from "./telemetry/coding-agent-normalization";
-import { geminiResponseText } from "./coding-agent-transcript-content";
-import { transcriptNoteEntry } from "./coding-agent-transcript-note";
+} from "./telemetry/coding-agent-normalization.ts";
+import { geminiResponseText } from "./coding-agent-transcript-content.ts";
+import { transcriptNoteEntry } from "./coding-agent-transcript-note.ts";
 import {
   type ClaimedToolCalls,
   type TranscriptLogRecord,
   fillToolCallGaps,
-} from "./coding-agent-transcript-state";
-import { parseMaybeJson, readNumber, readString } from "./coding-agent-transcript-value";
+} from "./coding-agent-transcript-state.ts";
+import { parseMaybeJson, readNumber, readString } from "./coding-agent-transcript-value.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],

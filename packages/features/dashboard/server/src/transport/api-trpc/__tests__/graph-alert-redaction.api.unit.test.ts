@@ -4,8 +4,8 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { DashboardApp } from "../../../app/dashboard.app";
-import { GraphTrpcApi } from "../graph.api";
+import type { DashboardApp } from "../../../app/dashboard.app.ts";
+import { GraphTrpcApi } from "../graph.api.ts";
 
 const WEBHOOK_URL = "https://hooks.slack.example/services/T000/B000/TheRealWebhookToken";
 

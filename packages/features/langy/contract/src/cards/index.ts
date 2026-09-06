@@ -31,13 +31,13 @@
  * which the CLI has no use for and should not pay to load.
  */
 
-export * from "./primitives.js";
-export * from "./cli-json.js";
-export * from "./schemas.js";
-export * from "./derived-safe.js";
-export * from "./registry.js";
-export * from "./digest.js";
-export * from "./tool-result.js";
+export * from "./primitives.ts";
+export * from "./cli-json.ts";
+export * from "./schemas.ts";
+export * from "./derived-safe.ts";
+export * from "./registry.ts";
+export * from "./digest.ts";
+export * from "./tool-result.ts";
 
 /**
  * The handled-error reading is zod-free and also importable on its own
@@ -46,4 +46,4 @@ export * from "./tool-result.js";
  * invocation. Importing it from here, alongside the schemas, is the right call
  * for the app, which has zod loaded already.
  */
-export * from "./handled-error.js";
+export * from "./handled-error.ts";

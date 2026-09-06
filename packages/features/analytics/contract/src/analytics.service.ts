@@ -4,14 +4,14 @@ import type {
   AnalyticsTopDocumentsResult,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
-} from "./analytics.timeseries";
+} from "./analytics.timeseries.ts";
 import type {
   AnalyticsEvaluationReadInput,
   AnalyticsEvaluationRollupAppendBatchInput,
   AnalyticsEvaluationRollupAppendInput,
   AnalyticsEvaluationRow,
   AnalyticsEvaluationUpsertInput,
-} from "./analytics.evaluation";
+} from "./analytics.evaluation.ts";
 
 export interface AnalyticsTimeseriesReadOptions {
   readonly maxResultRows?: number;

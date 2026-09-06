@@ -27,7 +27,7 @@ import {
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeApiGithubRest } from "../github-rest.mount";
+import { composeApiGithubRest } from "../github-rest.mount.ts";
 
 const ORGANIZATION_ID = "org_1";
 const PROJECT_ID = "project_1";

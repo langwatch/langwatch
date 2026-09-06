@@ -23,7 +23,7 @@ import {
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
-import { createApiKeyTrpcRouter } from "../api-key-trpc.mount";
+import { createApiKeyTrpcRouter } from "../api-key-trpc.mount.ts";
 
 const ORG_ID = "org_api_key_mount";
 const USER_ID = "user_api_key_mount";

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ApiRawRequestSurfacePort } from "../../api-http.listener";
+import { ApiRawRequestSurfacePort } from "../../api-http.listener.ts";
 import {
   ApiStaticSurface,
   CompositeApiRawSurface,
@@ -12,7 +12,7 @@ import {
   pathIsClaimedByTheApi,
   resolveClientDistDir,
   tryCreateApiStaticSurface,
-} from "../app-static.surface";
+} from "../app-static.surface.ts";
 
 describe("given the API process serves the browser bundle", () => {
   describe("when a path belongs to the API", () => {

@@ -8,8 +8,8 @@
  * can move without a search across the package.
  */
 
-export { AnomaliesCard } from "./ui/sections/anomalies-card";
-export { BlockedCard } from "./ui/sections/blocked-card";
-export { DlqCard } from "./ui/sections/dlq-card";
-export { GroupsCard } from "./ui/sections/groups-card";
-export { PipelineTreeCard } from "./ui/sections/pipeline-tree-card";
+export { AnomaliesCard } from "./ui/sections/anomalies-card.tsx";
+export { BlockedCard } from "./ui/sections/blocked-card.tsx";
+export { DlqCard } from "./ui/sections/dlq-card.tsx";
+export { GroupsCard } from "./ui/sections/groups-card.tsx";
+export { PipelineTreeCard } from "./ui/sections/pipeline-tree-card.tsx";

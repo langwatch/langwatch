@@ -7,7 +7,7 @@
  *
  * Client-safe: no Prisma, no env.
  */
-import { type AuthzPermission, permissionSatisfiedBy } from "./registry";
+import { type AuthzPermission, permissionSatisfiedBy } from "./registry.ts";
 
 export type BuiltinRoleKey =
   | "admin"

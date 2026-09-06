@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveComposerModel } from "../langy-composer-model";
+import { resolveComposerModel } from "../langy-composer-model.ts";
 
 const reachable = ["anthropic/claude-sonnet-4-5", "gemini/gemini-3.7-flash"];
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   createWorkerPlanProvider,
   WorkerEntitlementAbsenceReportPort,
-} from "../worker-plan-provider.composition";
+} from "../worker-plan-provider.composition.ts";
 
 /**
  * Spec: specs/automations/worker-plan-resolution.feature

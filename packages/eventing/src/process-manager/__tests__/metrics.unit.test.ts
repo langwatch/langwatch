@@ -22,7 +22,7 @@
  */
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { bindProcessFleetMetricsSource } from "../metrics";
+import { bindProcessFleetMetricsSource } from "../metrics.ts";
 
 const metrics = createRecordingMeterProvider();
 

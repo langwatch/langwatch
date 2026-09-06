@@ -2,26 +2,26 @@ import { Badge, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chak
 import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
-import type { Project } from "../../../model/prisma-types";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../behavior/prompts/use-load-span-into-prompt-playground";
+import type { Project } from "../../../model/prisma-types.ts";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import type { ErrorCapture, EvaluationResult, Span } from "@langwatch/trace-contract";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
   type PromptLookupSpan,
 } from "@langwatch/trace-contract";
-import { durationColor } from "../../../model/duration-color";
-import { formatMilliseconds } from "../../../model/format-milliseconds";
+import { durationColor } from "../../../model/duration-color.ts";
+import { formatMilliseconds } from "../../../model/format-milliseconds.ts";
 import {
   evaluationPassed,
   evaluationStatusColor,
 } from "@langwatch/evaluator-web/surfaces/evaluation-status";
-import { OverflownTextWithTooltip } from "../../elements/overflown-text";
-import { Link } from "../../blocks/link";
+import { OverflownTextWithTooltip } from "../../elements/overflown-text.tsx";
+import { Link } from "../../blocks/link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
-import { RedactedField } from "../redacted-field";
+import { RedactedField } from "../redacted-field.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { RenderInputOutput } from "./render-input-output";
+import { RenderInputOutput } from "./render-input-output.tsx";
 
 /**
  * @param props - Component props

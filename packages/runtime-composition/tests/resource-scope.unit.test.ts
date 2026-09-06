@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ResourceScope } from "../src";
+import { ResourceScope } from "../src/index.ts";
 
 describe("ResourceScope", () => {
   /** @scenario Combined shutdown drains work before closing shared clients */

@@ -2,15 +2,15 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
 import type {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
-} from "../ports/automation-settlement.port";
-import type { AutomationPersistActionService } from "./persist-action.service";
+} from "../ports/automation-settlement.port.ts";
+import type { AutomationPersistActionService } from "./persist-action.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");
 const CONFIRM_CONCURRENCY = 4;

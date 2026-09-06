@@ -10,11 +10,11 @@ import {
   type GithubAppTokenPort,
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
-} from "../ports/github-app-token.port";
+} from "../ports/github-app-token.port.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
-} from "../repositories/github-installations.repository";
+} from "../repositories/github-installations.repository.ts";
 
 const logger = createLogger("langwatch:github:installation-access");
 

@@ -11,9 +11,9 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaIdentityProjectionRepository } from "../prisma.identity-projection.repository";
-import { PrismaIdentityReservationRepository } from "../prisma.identity-reservations.repository";
-import type { IdentityFoldState } from "../../../projections/identity-state.projection";
+import { PrismaIdentityProjectionRepository } from "../prisma.identity-projection.repository.ts";
+import { PrismaIdentityReservationRepository } from "../prisma.identity-reservations.repository.ts";
+import type { IdentityFoldState } from "../../../projections/identity-state.projection.ts";
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { createTenantId } from "@langwatch/eventing";
 

@@ -1,7 +1,7 @@
-import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail";
-import { PullRequestStatusBadge } from "./pull-request-status-badge";
-import { derivePullRequestStatus } from "./pull-request-status";
-import { formatShortDate } from "./short-date";
+import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
+import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
+import { derivePullRequestStatus } from "./pull-request-status.ts";
+import { formatShortDate } from "./short-date.ts";
 import { Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import type React from "react";
@@ -10,11 +10,11 @@ import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
-import { codingAgentApi as api } from "./coding-agent-api";
-import { ContributorsSection } from "./contributors-section";
-import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip";
-import { ModelsSection } from "./models-section";
-import { SessionsSection } from "./pull-request-sessions-section";
+import { codingAgentApi as api } from "./coding-agent-api.ts";
+import { ContributorsSection } from "./contributors-section.tsx";
+import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
+import { ModelsSection } from "./models-section.tsx";
+import { SessionsSection } from "./pull-request-sessions-section.tsx";
 
 /**
  * One pull request in full: what it cost, who worked on it, what each model

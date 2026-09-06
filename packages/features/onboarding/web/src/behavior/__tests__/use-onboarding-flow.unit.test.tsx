@@ -5,20 +5,20 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OnboardingScreenIndex } from "../types";
-import { useOnboardingFlow } from "../use-onboarding-flow";
+import { OnboardingScreenIndex } from "../types.ts";
+import { useOnboardingFlow } from "../use-onboarding-flow.ts";
 
-vi.mock("../use-public-env", () => ({
+vi.mock("../use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { IS_SAAS: true }, isLoading: false }),
 }));
 
 const flagState = vi.hoisted(() => ({ enabled: true, isLoading: false }));
 
-vi.mock("../use-feature-flag", () => ({
+vi.mock("../use-feature-flag.ts", () => ({
   useFeatureFlag: () => ({ ...flagState }),
 }));
 
-vi.mock("../attribution", () => ({
+vi.mock("../attribution.ts", () => ({
   readAttribution: () => ({}),
 }));
 

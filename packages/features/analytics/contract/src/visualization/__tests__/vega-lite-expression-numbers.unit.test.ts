@@ -22,7 +22,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { screenVegaExpression } from "../vega-lite-expressions";
+import { screenVegaExpression } from "../vega-lite-expressions.ts";
 
 describe("numeric literals", () => {
   it("accepts scientific notation", () => {

@@ -5,11 +5,11 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ScimWebhookApi } from "../transport/api-rest/scim-webhook.api";
-import { ScimDirectoryService } from "../services/scim-directory.service";
-import { ScimGrantsService } from "../services/scim-grants.service";
-import type { ScimDirectoryRepository } from "../services/scim-directory.service";
-import { GrantsFake } from "./support/grants-fake";
+import { ScimWebhookApi } from "../transport/api-rest/scim-webhook.api.ts";
+import { ScimDirectoryService } from "../services/scim-directory.service.ts";
+import { ScimGrantsService } from "../services/scim-grants.service.ts";
+import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
+import { GrantsFake } from "./support/grants-fake.ts";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 
 function groupsRepository(): ScimDirectoryRepository {

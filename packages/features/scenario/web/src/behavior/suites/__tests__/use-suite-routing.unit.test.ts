@@ -26,7 +26,7 @@ import {
   deriveFromPath,
   EXTERNAL_SET_PREFIX,
   useSuiteRouting,
-} from "../use-suite-routing";
+} from "../use-suite-routing.ts";
 
 describe("useSuiteRouting()", () => {
   beforeEach(() => {

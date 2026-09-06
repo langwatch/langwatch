@@ -1,14 +1,14 @@
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { carriedOverCells } from "./run-results";
-import type { CarriedOverCell, ExecutionRequest, ExecutionScope } from "./types";
+import { carriedOverCells } from "./run-results.ts";
+import type { CarriedOverCell, ExecutionRequest, ExecutionScope } from "./types.ts";
 import type {
   DatasetReference,
   EvaluationResults,
   EvaluatorConfig,
   TargetConfig,
-} from "../../experiment-workbench";
-import { type CellId, computeExecutionCells } from "../execution-scope";
-import { toComparisonConfig } from "../normalize-comparison";
+} from "../../experiment-workbench.ts";
+import { type CellId, computeExecutionCells } from "../execution-scope.ts";
+import { toComparisonConfig } from "../normalize-comparison.ts";
 
 /**
  * The request one workbench run sends, built from state alone.

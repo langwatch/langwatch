@@ -1,6 +1,6 @@
-import type { GovernanceClickHouseResolverPort } from "../ports/ingestion-source-activity.port";
-import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.ingestion-source-activity.repository";
-import { ActivityMonitorService } from "../services/ingestion-source-activity.service";
+import type { GovernanceClickHouseResolverPort } from "../ports/ingestion-source-activity.port.ts";
+import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
+import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 
 /** Binds Postgres and ClickHouse infrastructure to the activity service. */
 export class PostgresIngestionSourceActivityAdapter {

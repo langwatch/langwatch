@@ -1,4 +1,4 @@
-import type { SignInBreakGlassLimiter } from "../services/signin-router.service";
+import type { SignInBreakGlassLimiter } from "../services/signin-router.service.ts";
 
 /**
  * audited"). already a per-process memo,

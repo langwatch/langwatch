@@ -4,11 +4,11 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunResult as ScenarioResults,
 } from "@langwatch/scenario-contract";
-import { CriteriaDetails } from "./criteria-details";
-import { CONSOLE_COLORS } from "../../../model/simulation-console/constants";
-import { ErrorDetails } from "./error-details";
-import { MetricsSummary } from "./metrics-summary";
-import { StatusDisplay } from "./status-display";
+import { CriteriaDetails } from "./criteria-details.tsx";
+import { CONSOLE_COLORS } from "../../../model/simulation-console/constants.ts";
+import { ErrorDetails } from "./error-details.tsx";
+import { MetricsSummary } from "./metrics-summary.tsx";
+import { StatusDisplay } from "./status-display.tsx";
 
 /** Width of the traffic-light cluster — mirrored on the right so the filename centers. */
 const TRAFFIC_LIGHTS_WIDTH = "44px";

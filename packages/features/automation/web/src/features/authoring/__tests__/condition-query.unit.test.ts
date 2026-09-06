@@ -4,7 +4,7 @@ import {
   operatorsForValueType,
   queryToConditions,
   serializeConditions,
-} from "../model/condition-query";
+} from "../model/condition-query.ts";
 
 /** Build a condition without the noise of an id in every test. */
 function cond(partial: Omit<Condition, "id"> & { id?: string }): Condition {

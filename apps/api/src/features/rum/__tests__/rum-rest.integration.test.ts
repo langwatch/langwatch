@@ -6,8 +6,8 @@ import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import { Hono, type ErrorHandler } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createRumRestApp, rateLimitKey } from "../rum-rest";
-import type { RumRateLimiter } from "../rum-ingest.service";
+import { createRumRestApp, rateLimitKey } from "../rum-rest.ts";
+import type { RumRateLimiter } from "../rum-ingest.service.ts";
 
 const oneSpan = JSON.stringify({
   resourceSpans: [{ resource: {}, scopeSpans: [{ spans: [{}] }] }],

@@ -21,7 +21,7 @@ import {
   readAnalyticsPageNumbers,
   seedMonitorPerformance,
   startMigratedClickHouse,
-} from "./support/monitor-performance.fixtures";
+} from "./support/monitor-performance.fixtures.ts";
 
 const clickHouseUrl =
   process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??

@@ -21,8 +21,8 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing";
-import { SourceEditDrawer } from "../governance-inventory.screen";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
+import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
 
 /**
  * `OttlEditor` sits inside the drawer's body and calls tRPC on render. It is
@@ -30,7 +30,7 @@ import { SourceEditDrawer } from "../governance-inventory.screen";
  * drawer mount: a starter query with no data and a validate mutation nobody
  * invokes.
  */
-vi.mock("../../../behavior/governance-api", () => {
+vi.mock("../../../behavior/governance-api.ts", () => {
   const api = {
     ingestionSources: {
       ottlStarter: {

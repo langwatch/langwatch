@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { UnsubscribeTokenPayload } from "../ports/unsubscribe-token.port";
+import type { UnsubscribeTokenPayload } from "../ports/unsubscribe-token.port.ts";
 
 /**
  * The signed unsubscribe token (ADR-031), as both halves of one format.

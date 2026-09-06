@@ -4,8 +4,8 @@ import {
   type LinkProposalReason,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules";
-import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules";
+import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules.ts";
+import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules.ts";
 import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
 
 /**

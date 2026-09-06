@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { prepareMetricDataPoints } from "../canonical-metric.adapter";
-import type { MetricRedactionPort } from "../../ports/metric-redaction.port";
-import { prepare, requestForMetric } from "./metric-processing/fixtures/canonical-metric.fixtures";
+import { prepareMetricDataPoints } from "../canonical-metric.adapter.ts";
+import type { MetricRedactionPort } from "../../ports/metric-redaction.port.ts";
+import { prepare, requestForMetric } from "./metric-processing/fixtures/canonical-metric.fixtures.ts";
 
 const a = { key: "a", value: { stringValue: "one" } };
 const b = { key: "b", value: { intValue: "2" } };

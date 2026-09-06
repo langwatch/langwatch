@@ -16,7 +16,7 @@ export {
   type ProtectedRange,
   redactEssentialPiiInText,
   subtractProtectedRanges,
-} from "./essentialPii.js";
+} from "./essentialPii.ts";
 export {
   compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
@@ -26,4 +26,4 @@ export {
   redactAttributeNative,
   type RedactionPolicy,
   redactStringNative,
-} from "./contentRedaction.js";
+} from "./contentRedaction.ts";

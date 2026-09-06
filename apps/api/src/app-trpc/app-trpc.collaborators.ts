@@ -3,7 +3,7 @@
  * be a list of ports and application slices grouped into "halves", each one a service no
  * package held.
  */
-import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
+import type { ApiTrpcFeatureApplication } from "./app-trpc.context.ts";
 
 export type ApiTrpcCollaborators = Readonly<{
   /**

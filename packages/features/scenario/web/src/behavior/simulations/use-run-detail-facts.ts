@@ -8,10 +8,10 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useTargetNameMap } from "../use-target-name-map";
+import { useTargetNameMap } from "../use-target-name-map.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { shouldShowNoResponse } from "../../model/scenario-run-status.utils";
-import type { ScenarioRunState } from "./use-run-state-stream";
+import { shouldShowNoResponse } from "../../model/scenario-run-status.utils.ts";
+import type { ScenarioRunState } from "./use-run-state-stream.ts";
 
 /**
  * The names of the secrets the run used, as recorded on it.

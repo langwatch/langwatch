@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSpanBarColor } from "../types";
+import { getSpanBarColor } from "../types.ts";
 
 describe("getSpanBarColor", () => {
   // Callers pass a SiblingGroup's shared type/name the same way they pass a

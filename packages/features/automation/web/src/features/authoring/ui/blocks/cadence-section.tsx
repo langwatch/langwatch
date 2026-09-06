@@ -7,11 +7,11 @@ import {
   type NotificationCadence,
 } from "@langwatch/automation-contract";
 import { useEffect, useState } from "react";
-import { AutomationCadenceField } from "../elements/cadence-field";
-import { describeCron, isValidCron } from "../../model/report-schedule";
-import { FacetSection, type FacetAccordionProps } from "../elements/facet-section";
-import { ReportScheduleField } from "../elements/report-schedule-field";
-import { AutomationTraceDebounceField } from "../elements/trace-debounce-field";
+import { AutomationCadenceField } from "../elements/cadence-field.tsx";
+import { describeCron, isValidCron } from "../../model/report-schedule.ts";
+import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
+import { ReportScheduleField } from "../elements/report-schedule-field.tsx";
+import { AutomationTraceDebounceField } from "../elements/trace-debounce-field.tsx";
 
 export type AutomationSource = "trace" | "customGraph" | "report";
 

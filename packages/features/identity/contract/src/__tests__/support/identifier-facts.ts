@@ -1,11 +1,11 @@
-import type { IdentifierFact, IdentityFact, IdentityHeads } from "../../facts";
-import { emptyIdentityHeads } from "../../facts";
+import type { IdentifierFact, IdentityFact, IdentityHeads } from "../../facts.ts";
+import { emptyIdentityHeads } from "../../facts.ts";
 import {
   type IdentifierHead,
   identityStreamsFor,
   reduceIdentifier,
-} from "../../identifier-aggregate";
-import { reduceIdentity } from "../../reduce";
+} from "../../identifier-aggregate.ts";
+import { reduceIdentity } from "../../reduce.ts";
 
 /**
  * The facts one person's identity streams are built from, and the two folds a

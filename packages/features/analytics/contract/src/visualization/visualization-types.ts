@@ -204,4 +204,4 @@ export type VegaLiteValidationResult =
 
 /** Row counts of the datasets a spec may reference, keyed by dataset name. */
 export type DatasetRowCounts = Readonly<Record<string, number>>;
-import type { LangWatchQLVegaColorMode, LangWatchQLVegaConfig } from "./langwatch-vega-config";
+import type { LangWatchQLVegaColorMode, LangWatchQLVegaConfig } from "./langwatch-vega-config.ts";

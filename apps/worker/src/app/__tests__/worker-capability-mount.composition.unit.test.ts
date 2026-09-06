@@ -2,17 +2,17 @@ import { readFileSync } from "node:fs";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { EventingMaintenanceWorkerFeatureInstaller } from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer";
-import { WorkerProductionComposition } from "../worker-production.composition";
-import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering.composition";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
-import { createWorkerProcessRedis } from "./support/worker-redis.double";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { EventingMaintenanceWorkerFeatureInstaller } from "../../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
+import { WorkerProductionComposition } from "../worker-production.composition.ts";
+import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering.composition.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
+import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
 
 /**
  * Spec: specs/worker/worker-capability-mount.feature

@@ -4,8 +4,8 @@ import {
   TraceEdgeMediaExtractionService,
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
-} from "./trace-edge-media-extraction.service";
-import { TraceIngressPayloadPort } from "./trace-ingestion.service";
+} from "./trace-edge-media-extraction.service.ts";
+import { TraceIngressPayloadPort } from "./trace-ingestion.service.ts";
 
 // Extraction runs FIRST, which is why `next` is a member here rather than an
 // ordering a composition root remembers: externalizing the heavy part usually

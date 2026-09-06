@@ -1,7 +1,7 @@
 import { Section, Text } from "@react-email/components";
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
 import {
   ActionRow,
   EmailLayout,
@@ -10,7 +10,7 @@ import {
   DataTable,
   Paragraph,
   expressive,
-} from "./email-layout";
+} from "./email-layout.tsx";
 import {
   accountTeamStepSchema,
   meteredNoun,
@@ -18,8 +18,8 @@ import {
   priceLine,
   selfServeStepFields,
   usageUnitSchema,
-} from "./next-step";
-import { defineTemplate, renderMailTemplate } from "./registry";
+} from "./next-step.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const usageLimitEmailProps = z.object({
   organizationName: z.string().min(1),

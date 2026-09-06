@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { baseAgentConfigSchema } from "./base";
+import { baseAgentConfigSchema } from "./base.ts";
 
 export const llmConfigSchema = z.object({
   model: z.string(),

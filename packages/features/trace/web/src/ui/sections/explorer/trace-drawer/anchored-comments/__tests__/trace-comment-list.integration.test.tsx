@@ -7,18 +7,18 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: () => true,
   }),
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
-import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store";
-import { TraceCommentList } from "../trace-comment-list";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store.ts";
+import { TraceCommentList } from "../trace-comment-list.tsx";
 
 const TRACE_ID = "trace-1";
 const SEARCH_SPAN = "span-7";

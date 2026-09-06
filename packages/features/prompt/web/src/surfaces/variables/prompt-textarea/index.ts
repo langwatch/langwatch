@@ -5,8 +5,8 @@
  * @see specs/variables-ui/prompt-textarea.feature
  */
 
-export { PromptTextAreaWithVariables } from "./prompt-textarea-with-variables";
+export { PromptTextAreaWithVariables } from "./prompt-textarea-with-variables.tsx";
 export type {
   PromptTextAreaOnAddMention,
   PromptTextAreaWithVariablesProps,
-} from "./prompt-textarea.types";
+} from "./prompt-textarea.types.ts";

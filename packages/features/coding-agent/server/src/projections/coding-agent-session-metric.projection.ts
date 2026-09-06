@@ -3,7 +3,7 @@ import {
   type CodingAgentSessionData,
   type MetricSeriesFact,
   CodingAgentSessionStateProjection,
-} from "./coding-agent-session-state.projection";
+} from "./coding-agent-session-state.projection.ts";
 
 const MAX_METRIC_SERIES = 200;
 

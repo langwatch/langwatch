@@ -1,5 +1,5 @@
-import { api } from "../../../../behavior/ops-api";
-import { UpcomingWorkCard as UpcomingWorkCardView } from "../elements/upcoming-work-card";
+import { api } from "../../../../behavior/ops-api.ts";
+import { UpcomingWorkCard as UpcomingWorkCardView } from "../elements/upcoming-work-card.tsx";
 
 /** App transport adapter for the controlled upcoming-work presentation. */
 export function UpcomingWorkCard() {

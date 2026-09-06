@@ -1,5 +1,5 @@
-import type { AgentsDatabase } from "../index";
-import { PrismaAgentAdapter } from "../index";
+import type { AgentsDatabase } from "../index.ts";
+import { PrismaAgentAdapter } from "../index.ts";
 import { describe, expect, it, vi } from "vitest";
 
 function row(overrides: Record<string, unknown> = {}) {

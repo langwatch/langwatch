@@ -7,7 +7,7 @@
 import { Box } from "@chakra-ui/react";
 import { Bot, Code, Globe, type LucideIcon, MessageSquare, Target, Workflow } from "lucide-react";
 
-import type { TargetKind } from "../../../../model/target-kind";
+import type { TargetKind } from "../../../../model/target-kind.ts";
 
 const KIND_ICONS: Record<TargetKind, LucideIcon> = {
   signature: MessageSquare,

@@ -12,11 +12,11 @@ import {
   computeIterationMap,
   groupRunsByBatchId,
 } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useRunHistoryPagination } from "../../suites/use-run-history-pagination";
-import { useOrganizationTeamProject } from "../../use-organization-team-project";
-import { api } from "../../scenario-api";
-import { batchNote, type RunPlan } from "./run-plans";
-import { runTitle } from "./run-titles";
+import { useRunHistoryPagination } from "../../suites/use-run-history-pagination.ts";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { api } from "../../scenario-api.ts";
+import { batchNote, type RunPlan } from "./run-plans.ts";
+import { runTitle } from "./run-titles.ts";
 
 export type RunPlanBatches = ReturnType<typeof useRunPlanBatches>;
 export type RunPlanSelection = ReturnType<typeof useSelectedBatch>;

@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   AutomationWebhookProviderPort,
   type AutomationWebhookStoredParams,
-} from "../ports/automation-provider.port";
+} from "../ports/automation-provider.port.ts";
 
 export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 

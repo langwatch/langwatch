@@ -10,7 +10,7 @@ import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 /**
  * Spec: specs/langy/langy-worker-prewarm.feature

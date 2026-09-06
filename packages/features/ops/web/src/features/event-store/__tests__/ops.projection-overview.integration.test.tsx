@@ -4,8 +4,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ProjectionsCard } from "../ui/elements/projections-card";
-import { ReplayHistorySection } from "../ui/blocks/replay-history-section";
+import { ProjectionsCard } from "../ui/elements/projections-card.tsx";
+import { ReplayHistorySection } from "../ui/blocks/replay-history-section.tsx";
 
 const renderWithChakra = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

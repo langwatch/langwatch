@@ -20,7 +20,7 @@ import {
   type MountableRestApp,
   organizationOf,
 } from "@langwatch/api/rest";
-import { optimisticBindingWire } from "../../rules/role-binding-read-back.rules";
+import { optimisticBindingWire } from "../../rules/role-binding-read-back.rules.ts";
 
 /** The handler context: the framework's variables plus the family's provider. */
 type RoleBindingsContext = OrganizationScopedContext<

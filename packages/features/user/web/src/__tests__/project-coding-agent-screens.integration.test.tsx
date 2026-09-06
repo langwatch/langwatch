@@ -27,9 +27,9 @@ vi.mock("@langwatch/coding-agent-web/surfaces/activity", () => ({
   codingAgentApi: {},
 }));
 
-import ProjectPullRequestsPage from "../screens/personal-workspace/project-pull-requests.screen";
-import ProjectSessionsPage from "../screens/personal-workspace/project-sessions.screen";
-import { fakePersonalWorkspaceHost, personalWorkspaceHostWrapper } from "../testing";
+import ProjectPullRequestsPage from "../screens/personal-workspace/project-pull-requests.screen.tsx";
+import ProjectSessionsPage from "../screens/personal-workspace/project-sessions.screen.tsx";
+import { fakePersonalWorkspaceHost, personalWorkspaceHostWrapper } from "../testing.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) =>
   personalWorkspaceHostWrapper(

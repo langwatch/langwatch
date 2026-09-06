@@ -13,13 +13,13 @@ import {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
-} from "../simulation-run-execution.intent";
+} from "../simulation-run-execution.intent.ts";
 import type {
   CancelExecutionIntent,
   ExecuteRunIntent,
   FinishRunIntent,
-} from "../../processes/simulation-run-execution-data.process";
-import { TestSimulationService } from "../../testing";
+} from "../../processes/simulation-run-execution-data.process.ts";
+import { TestSimulationService } from "../../testing.ts";
 
 const RUN_ID = "run-1";
 const PROJECT_ID = "project-1";

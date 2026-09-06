@@ -4,11 +4,11 @@
  * images, video, and file-attachment chips.
  */
 import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "@langwatch/trace-contract";
-import { containsMediaMarkers } from "../content-parts/media-markers";
+import { containsMediaMarkers } from "../content-parts/media-markers.ts";
 import {
   parseBase64DataUri,
   visitContentPart,
-} from "../../../model/shared/content-parts/visit-content-part";
+} from "../../../model/shared/content-parts/visit-content-part.ts";
 import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
 
 /**

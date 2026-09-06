@@ -11,7 +11,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 
-import { LICENSE_ERRORS, type LicenseError } from "./license-constants";
+import { LICENSE_ERRORS, type LicenseError } from "./license-constants.ts";
 
 /**
  * The organization a license action names does not exist.

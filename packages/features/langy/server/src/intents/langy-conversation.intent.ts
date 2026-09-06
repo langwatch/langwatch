@@ -34,14 +34,14 @@ import {
   langyUserWaitStartedEventDataSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
-import type { LangyEffectPorts } from "../ports/langy-effect.port";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
+import type { LangyEffectPorts } from "../ports/langy-effect.port.ts";
 import {
   langyGenerateTitleIntentSchema,
   langyWorkerDispatchIntentSchema,
   type LangyGenerateTitleIntent,
   type LangyWorkerDispatchIntent,
-} from "../ports/langy-conversation-process.port";
+} from "../ports/langy-conversation-process.port.ts";
 
 export const createLangyWorkerDispatchIntent =
   (ports: LangyEffectPorts): IntentExecutor<LangyWorkerDispatchIntent> =>

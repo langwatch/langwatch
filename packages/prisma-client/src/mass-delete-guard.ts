@@ -1,8 +1,8 @@
 // From: https://github.com/prisma/prisma/issues/20169
 
-import isEmpty from "lodash-es/isEmpty";
+import isEmpty from "lodash-es/isEmpty.js";
 
-import type { GuardMiddleware, GuardParams } from "./guard-middleware";
+import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
  * Middleware featured below

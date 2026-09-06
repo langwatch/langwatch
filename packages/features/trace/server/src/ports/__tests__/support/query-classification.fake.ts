@@ -1,4 +1,4 @@
-import { TraceQueryClassificationPort } from "../../trace-query-classification.port";
+import { TraceQueryClassificationPort } from "../../trace-query-classification.port.ts";
 
 export class TestTraceQueryClassification extends TraceQueryClassificationPort {
   classify() {

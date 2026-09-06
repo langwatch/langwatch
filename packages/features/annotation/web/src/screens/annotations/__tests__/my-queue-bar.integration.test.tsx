@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing";
+import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing.tsx";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
   invalidateQueues: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-annotation-queues", () => ({
+vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   useAnnotationQueues: () => ({
     assignedQueueItems: mocks.items,
     totalCount: mocks.items.length,
@@ -41,7 +41,7 @@ vi.mock("../../../behavior/use-annotation-queues", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: (permission: string) =>
@@ -66,11 +66,11 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../../ui/sections/annotation-queue-layout", () => ({
+vi.mock("../../../ui/sections/annotation-queue-layout.tsx", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../ui/elements/tasks-done-icon", () => ({
+vi.mock("../../../ui/elements/tasks-done-icon.tsx", () => ({
   TasksDone: () => <div data-testid="tasks-done" />,
 }));
 
@@ -96,11 +96,11 @@ vi.mock("@langwatch/trace-web/surfaces/conversation-turns", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-error-toast", () => ({
+vi.mock("../../../behavior/use-error-toast.ts", () => ({
   useShowErrorToast: () => vi.fn(),
 }));
 
-vi.mock("../../../behavior/annotation-api", () => ({
+vi.mock("../../../behavior/annotation-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -142,7 +142,7 @@ const {
   default: MyQueuePage,
   END_SESSION_QUESTION,
   ROUTE_SETTLE_MS,
-} = await import("../my-queue.screen");
+} = await import("../my-queue.screen.tsx");
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
 const LAST_VIEW_MODE_KEY = "langwatch:traces-v2:drawer-last-mode:v1";

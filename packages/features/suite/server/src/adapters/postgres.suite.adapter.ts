@@ -5,15 +5,15 @@ import type { SuiteService as SuiteServiceContract } from "@langwatch/suite-cont
 import {
   PrismaSuiteRepository,
   type SuiteDatabase,
-} from "../repositories/prisma/prisma.suite.repository";
-import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port";
-import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
-import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
-import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
-import type { ConnectedPresenceReader } from "../services/connected-target.service";
-import { SuiteService } from "../services/suite.service";
-import type { SuiteEventingCapabilities, SuiteRuntimePort } from "../ports/suite-runtime.port";
+} from "../repositories/prisma/prisma.suite.repository.ts";
+import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
+import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port.ts";
+import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
+import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
+import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
+import { SuiteService } from "../services/suite.service.ts";
+import type { SuiteEventingCapabilities, SuiteRuntimePort } from "../ports/suite-runtime.port.ts";
 
 export type PostgresSuiteAdapterOptions = {
   database: SuiteDatabase;

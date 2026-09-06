@@ -17,7 +17,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => router,
 }));
 
-import { useAgentTestingRouting } from "../use-agent-testing-routing";
+import { useAgentTestingRouting } from "../use-agent-testing-routing.ts";
 
 const openAt = (asPath: string, query: Record<string, string | string[] | undefined> = {}) => {
   router.asPath = asPath;

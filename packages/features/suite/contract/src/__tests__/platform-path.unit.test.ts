@@ -11,7 +11,7 @@ import {
   scenarioEditorPath,
   scenarioRunPath,
   scenarioSetPath,
-} from "../platform-path";
+} from "../platform-path.ts";
 
 describe("the addresses the platform hands out", () => {
   describe("given the project reads Agent Testing", () => {

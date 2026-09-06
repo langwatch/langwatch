@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import type { ScenarioFailureAction } from "../../model/scenario-host";
+import type { ScenarioFailureAction } from "../../model/scenario-host.ts";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import type { TargetValue } from "../../model/scenario-target";
+import type { TargetValue } from "../../model/scenario-target.ts";
 import { toaster } from "@langwatch/design-system/toaster";
-import { api } from "../../behavior/scenario-api";
-import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run";
+import { api } from "../../behavior/scenario-api.ts";
+import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run.ts";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 
 interface RunCompleteResult {

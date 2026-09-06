@@ -1,6 +1,6 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { QueueRedisRepository, RECONCILE_WRITE_LUA } from "../queue.repository";
+import { QueueRedisRepository, RECONCILE_WRITE_LUA } from "../queue.repository.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;

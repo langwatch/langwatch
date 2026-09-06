@@ -19,7 +19,7 @@ import {
   withAuditPageOffset,
   withAuditPageSize,
   withoutAuditTarget,
-} from "../audit-log-filters";
+} from "../audit-log-filters.ts";
 
 describe("given an address with no paging in it", () => {
   describe("when the table reads its page", () => {

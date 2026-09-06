@@ -40,11 +40,11 @@ import {
   type BudgetListWithHealth,
   type CreateBudgetInput,
   type UpdateBudgetInput,
-} from "../repositories/gateway-budget.repository";
-import { type GatewayBudgetScope } from "../repositories/gateway-budget.repository";
-import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service";
-import { GatewayCacheRuleService } from "./gateway-cache-rule.service";
-import { GatewayGuardrailService } from "./gateway-guardrail.service";
+} from "../repositories/gateway-budget.repository.ts";
+import { type GatewayBudgetScope } from "../repositories/gateway-budget.repository.ts";
+import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
+import { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
+import { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 

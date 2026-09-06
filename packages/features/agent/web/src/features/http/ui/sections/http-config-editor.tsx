@@ -2,12 +2,12 @@ import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react"
 import { useState } from "react";
 
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
-import { AuthConfigSection } from "../elements/http-auth-config-section";
-import { BodyTemplateEditor } from "../elements/http-body-template-editor";
-import { HeadersConfigSection } from "../elements/http-headers-config-section";
-import { HttpMethodSelector } from "../elements/http-method-selector";
-import { HttpTestPanel, type HttpTestResult } from "./http-test-panel";
-import { OutputPathInput } from "../elements/http-output-path-input";
+import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
+import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
+import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
+import { HttpMethodSelector } from "../elements/http-method-selector.tsx";
+import { HttpTestPanel, type HttpTestResult } from "./http-test-panel.tsx";
+import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 
 export type HttpConfigEditorProps = {
   url: string;

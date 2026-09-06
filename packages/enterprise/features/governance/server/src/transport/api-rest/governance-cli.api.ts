@@ -66,12 +66,12 @@ import {
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
 import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { z } from "zod";
 
-import { OrganizationSupportContactService } from "../../services/organization-support-contact.service";
+import { OrganizationSupportContactService } from "../../services/organization-support-contact.service.ts";
 
 const logger = createLogger("langwatch:governance-cli");
 

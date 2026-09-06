@@ -7,8 +7,8 @@
  * The sweep test walks the router and refuses any procedure whose chain
  * carries no declaration; this file is the vocabulary it reads.
  */
-import type { ScopeTierField } from "./declaration";
-import type { AuthzPermission } from "./registry";
+import type { ScopeTierField } from "./declaration.ts";
+import type { AuthzPermission } from "./registry.ts";
 
 /**
  * `Symbol.for` so the sweep test and the builders agree on the key even

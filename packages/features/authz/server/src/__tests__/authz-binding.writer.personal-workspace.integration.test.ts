@@ -7,12 +7,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
+import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
-} from "../repositories/prisma/prisma.authz-binding.repository";
-import { AuthzBindingWriterService } from "../services/authz-binding-writer.service";
+} from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
 

@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { AuditLogRepository } from "../../repositories/audit-log.repository";
-import { DefaultAuditLogService } from "../audit-log.service";
+import type { AuditLogRepository } from "../../repositories/audit-log.repository.ts";
+import { DefaultAuditLogService } from "../audit-log.service.ts";
 
 const command = (args?: unknown) => ({
   organizationId: "organization-1",

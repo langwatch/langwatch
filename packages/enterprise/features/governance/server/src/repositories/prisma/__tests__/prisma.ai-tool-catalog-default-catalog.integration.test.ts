@@ -25,7 +25,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository";
+import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the

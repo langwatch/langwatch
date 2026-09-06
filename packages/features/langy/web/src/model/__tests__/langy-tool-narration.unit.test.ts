@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stripToolNarration } from "../langy-tool-narration";
+import { stripToolNarration } from "../langy-tool-narration.ts";
 
 const strip = (text: string, hasActivity = true) => stripToolNarration({ text, hasActivity });
 

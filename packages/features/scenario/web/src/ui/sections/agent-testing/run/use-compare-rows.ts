@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from "react";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   addCompareRow,
   type CompareRow,
@@ -12,11 +12,11 @@ import {
   initialCompareRows,
   MAX_COMPARE_ROWS,
   type ParameterDefaults,
-} from "./compare-rows";
-import { lineFromRows, rowsFromLine } from "../../../../model/agent-testing/run/parameter-rows";
-import type { RunDialogAgent } from "./run-target-picker";
-import type { RunDialogFields } from "./use-run-dialog-form";
-import type { RunPlanFields } from "./use-run-plan-fields";
+} from "./compare-rows.ts";
+import { lineFromRows, rowsFromLine } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
+import type { RunDialogFields } from "./use-run-dialog-form.ts";
+import type { RunPlanFields } from "./use-run-plan-fields.ts";
 
 /** The two moves between the one-agent dialog and the comparison. */
 function useCompareTransitions({

@@ -19,7 +19,7 @@ import {
   type StoredRoutingPolicy,
   unansweredTiers,
   validateRoutingPolicyForm,
-} from "../model/routing-policy-form";
+} from "../model/routing-policy-form.ts";
 
 function storedPolicy(overrides: Partial<StoredRoutingPolicy> = {}): StoredRoutingPolicy {
   return {

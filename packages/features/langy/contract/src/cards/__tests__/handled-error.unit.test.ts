@@ -11,7 +11,7 @@ import {
   parseHandledError,
   readCliErrorDocument,
   toCliErrorDocument,
-} from "../handled-error.js";
+} from "../handled-error.ts";
 
 const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 

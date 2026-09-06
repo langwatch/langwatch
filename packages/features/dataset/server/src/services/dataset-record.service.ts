@@ -29,8 +29,8 @@ import {
   limitDatasetRecordsByBytes,
   sanitizedEntry,
   selectDatasetRecords,
-} from "../rules/dataset-selection.rules";
-import type { DatasetServiceOptions } from "./dataset.service";
+} from "../rules/dataset-selection.rules.ts";
+import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;

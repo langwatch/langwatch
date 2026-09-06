@@ -6,8 +6,8 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { LicensingApp } from "../../../app/licensing.app";
-import { LicenseTrpcApi, type LicenseTrpcContext } from "../license.api";
+import { LicensingApp } from "../../../app/licensing.app.ts";
+import { LicenseTrpcApi, type LicenseTrpcContext } from "../license.api.ts";
 
 const trpc = initTRPC.context<LicenseTrpcContext>().create();
 

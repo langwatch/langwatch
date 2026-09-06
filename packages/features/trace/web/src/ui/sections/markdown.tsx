@@ -4,12 +4,12 @@ import { Children, isValidElement, memo, type ReactNode, useState } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { stringifyIfObject } from "../../model/stringify-if-object";
-import { RenderCode } from "../blocks/code/render-code";
-import { getProxiedImageUrl } from "./external-image";
-import { ConfirmDialog } from "./gateway/confirm-dialog";
-import { Link as UiLink } from "../blocks/link";
-import { Prose } from "../elements/prose";
+import { stringifyIfObject } from "../../model/stringify-if-object.ts";
+import { RenderCode } from "../blocks/code/render-code.tsx";
+import { getProxiedImageUrl } from "./external-image.tsx";
+import { ConfirmDialog } from "./gateway/confirm-dialog.tsx";
+import { Link as UiLink } from "../blocks/link.tsx";
+import { Prose } from "../elements/prose.tsx";
 
 const logger = createLogger("langwatch:components:Markdown");
 

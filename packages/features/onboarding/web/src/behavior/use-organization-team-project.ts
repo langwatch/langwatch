@@ -13,7 +13,7 @@
  * so a call site that passed one still compiles.
  */
 
-import { useOnboardingHost } from "../model/onboarding-host";
+import { useOnboardingHost } from "../model/onboarding-host.ts";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

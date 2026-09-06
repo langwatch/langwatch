@@ -3,7 +3,7 @@ import {
   toAutomationActivityEntries,
   type AutomationActivityFire,
   type AutomationActivityTrigger,
-} from "../ui/elements/automation-history";
+} from "../ui/elements/automation-history.tsx";
 
 function makeTrigger(overrides: Partial<AutomationActivityTrigger>): AutomationActivityTrigger {
   return {

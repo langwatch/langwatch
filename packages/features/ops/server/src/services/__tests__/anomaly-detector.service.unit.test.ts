@@ -2,17 +2,17 @@ import type { Anomaly } from "@langwatch/ops-contract";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port";
-import { AnomalyRateTrackerPort } from "../../ports/anomaly-rate-tracker.port";
-import { AnomalyStatePort } from "../../ports/anomaly-state.port";
+import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port.ts";
+import { AnomalyRateTrackerPort } from "../../ports/anomaly-rate-tracker.port.ts";
+import { AnomalyStatePort } from "../../ports/anomaly-state.port.ts";
 import {
   AnomalyDetectorService,
   HARD_TIER_SUSTAIN_MINUTES,
   INSUFFICIENT_DATA_RECHECK_SECONDS,
   SURFACE_TIER_SUSTAIN_MINUTES,
-} from "../anomaly-detector.service";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules";
-import { percentile } from "../../rules/ops-anomaly-percentile.rules";
+} from "../anomaly-detector.service.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
+import { percentile } from "../../rules/ops-anomaly-percentile.rules.ts";
 
 /** The tenant a kill-switch resolution was asked about, or none. */
 function projectIdOf(target: FeatureFlagTarget): string | undefined {

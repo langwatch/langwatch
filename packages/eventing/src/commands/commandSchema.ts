@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ZodSchema, z } from "zod";
-import { mapValidationIssues } from "../utils/errors";
-import type { CommandType } from "../domain/commandType";
+import { mapValidationIssues } from "../utils/errors.ts";
+import type { CommandType } from "../domain/commandType.ts";
 
 const logger = createLogger("langwatch:event-sourcing:command-schema");
 

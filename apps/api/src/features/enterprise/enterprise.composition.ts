@@ -12,13 +12,13 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import type { ApiAuditPort } from "../../api-request.policy";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
 
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import {
   createEnterpriseTrpcRouters,
   type EnterpriseTrpcMountPorts,
-} from "./enterprise-trpc.mount";
+} from "./enterprise-trpc.mount.ts";
 
 /**
  * Whether one seat allowance still admits another member, over the process's OWN plan
@@ -54,7 +54,7 @@ export abstract class ApiEnterpriseApplicationPort {
   abstract backoffice(): ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>;
 }
 
-import type { ComposedEnterpriseFeature } from "./enterprise.composition.types";
+import type { ComposedEnterpriseFeature } from "./enterprise.composition.types.ts";
 
 /** Composes the four Enterprise tenant surfaces over this deployment's graph. */
 export function composeEnterpriseFeature(options: {

@@ -1,7 +1,7 @@
-import { computeMetricStats, type MetricStats } from "./metric-stats";
+import { computeMetricStats, type MetricStats } from "./metric-stats.ts";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
-import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "../experiment-workbench";
-import { resolveVerdictLabel, toComparisonConfig } from "./normalize-comparison";
+import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "../experiment-workbench.ts";
+import { resolveVerdictLabel, toComparisonConfig } from "./normalize-comparison.ts";
 
 /**
  * Aggregate statistics for a target's evaluator results.

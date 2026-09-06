@@ -5,10 +5,10 @@
 import {
   buildAutomationHref,
   readTraceSearchQuery,
-} from "../../../../model/langy-trace-explorer-link";
-import type { TraceSearchQuery, UnstatedWindow } from "../../../../model/langy-trace-explorer-link";
-import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry";
-import { followUpsForResult } from "./cli-follow-ups";
+} from "../../../../model/langy-trace-explorer-link.ts";
+import type { TraceSearchQuery, UnstatedWindow } from "../../../../model/langy-trace-explorer-link.ts";
+import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry.ts";
+import { followUpsForResult } from "./cli-follow-ups.ts";
 
 /**
  * At most this many chips under one card. Beyond three the row stops reading as

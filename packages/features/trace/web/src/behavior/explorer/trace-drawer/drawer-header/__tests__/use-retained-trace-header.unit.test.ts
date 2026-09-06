@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { useRetainedTraceHeader } from "../use-retained-trace-header";
+import { useRetainedTraceHeader } from "../use-retained-trace-header.ts";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {
   return {

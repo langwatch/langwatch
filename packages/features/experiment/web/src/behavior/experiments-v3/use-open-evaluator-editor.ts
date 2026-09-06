@@ -10,15 +10,15 @@ import type {
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types";
-import { isComparisonEvaluator } from "../../model/experiments-v3/types";
-import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks";
+import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types.ts";
+import { isComparisonEvaluator } from "../../model/experiments-v3/types.ts";
+import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import {
   convertFromUIMapping,
   convertToUIMapping,
-} from "../../model/experiments-v3/field-mapping-converters";
+} from "../../model/experiments-v3/field-mapping-converters.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * Opens the Comparison config form for an existing comparison evaluator.

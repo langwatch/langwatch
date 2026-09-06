@@ -14,12 +14,12 @@ import {
   type TraceAnnotation,
 } from "@langwatch/annotation-web/surfaces/annotation-form";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors";
-import { useAnnotationInvalidation } from "../../../use-annotation-invalidation";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api } from "../../../../../behavior/trace-api";
-import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store";
-import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store";
+import { showErrorToast } from "../../../errors/index.ts";
+import { useAnnotationInvalidation } from "../../../use-annotation-invalidation.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../../behavior/trace-api.ts";
+import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store.ts";
+import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
 
 /** The toast-and-invalidate pair every annotation write ends on. */
 function saveCallbacks({

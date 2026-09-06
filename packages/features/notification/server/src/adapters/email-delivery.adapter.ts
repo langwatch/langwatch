@@ -6,15 +6,15 @@ import {
   type EmailOutboundProxyConfig,
   type EmailProviderName,
   type MailerConfiguration,
-} from "../ports/email-delivery.port";
-import { EmailProviderService } from "../services/email-provider.service";
-import { ResendEmailGatewayAdapter } from "./resend.email-gateway.adapter";
-import { SendgridEmailGatewayAdapter } from "./sendgrid.email-gateway.adapter";
+} from "../ports/email-delivery.port.ts";
+import { EmailProviderService } from "../services/email-provider.service.ts";
+import { ResendEmailGatewayAdapter } from "./resend.email-gateway.adapter.ts";
+import { SendgridEmailGatewayAdapter } from "./sendgrid.email-gateway.adapter.ts";
 import {
   SesEmailGatewayAdapter,
   type SesAwsClientConfiguration,
-} from "./ses.email-gateway.adapter";
-import { SmtpEmailGatewayAdapter } from "./smtp.email-gateway.adapter";
+} from "./ses.email-gateway.adapter.ts";
+import { SmtpEmailGatewayAdapter } from "./smtp.email-gateway.adapter.ts";
 
 const logger = createLogger("langwatch:mailer:runtime");
 

@@ -1,4 +1,4 @@
-import type { TenantId } from "./storage";
+import type { TenantId } from "./storage.ts";
 
 /**
  * The single source of truth for the redis key layout of offloaded blobs and

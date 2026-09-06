@@ -1,8 +1,8 @@
 import { emptyIdentityHeads } from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../../services/identity-guards.service";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
+import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { describe, expect, it } from "vitest";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import {
   createTenantId,
   EventSourcing,
@@ -11,10 +11,10 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
-import type { IdentityFoldState } from "../../projections/identity-state.projection";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter.ts";
+import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

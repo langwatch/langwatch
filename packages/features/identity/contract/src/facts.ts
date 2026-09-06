@@ -6,7 +6,7 @@ import {
   identifierProviderSchema,
   identityActorSchema,
   verificationMethodSchema,
-} from "./vocabulary";
+} from "./vocabulary.ts";
 
 /**
  * The identity facts (ADR-101, D01): what an identity event SAYS, without

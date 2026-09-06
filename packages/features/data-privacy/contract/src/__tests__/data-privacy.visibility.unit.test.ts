@@ -7,8 +7,8 @@ import {
   isContentVisibleToPublic,
   needsAudienceFacts,
   type ViewerFacts,
-} from "../data-privacy.visibility";
-import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy";
+} from "../data-privacy.visibility.ts";
+import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy.ts";
 
 function audience(partial: Partial<ResolvedAudience>): ResolvedAudience {
   return { ...EMPTY_AUDIENCE, ...partial };

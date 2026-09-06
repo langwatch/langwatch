@@ -1,1 +1,1 @@
-export * from "../anonymous-id";
+export * from "../anonymous-id.ts";

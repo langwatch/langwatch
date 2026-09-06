@@ -10,7 +10,7 @@ import {
   conversationTitle,
   conversationUrl,
   disconnectMessage,
-} from "../langy-local-session-text.rules";
+} from "../langy-local-session-text.rules.ts";
 
 describe("conversationUrl", () => {
   describe("when the project the conversation belongs to is known", () => {

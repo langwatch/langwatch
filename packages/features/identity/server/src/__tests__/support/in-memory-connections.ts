@@ -9,7 +9,7 @@ import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
-} from "../../repositories/sso-connection.repository";
+} from "../../repositories/sso-connection.repository.ts";
 
 /**
  * The connection guards' three reads, in memory — and, deliberately, the SAME

@@ -1,10 +1,10 @@
-import { TraceProjectionLeanService } from "../trace-projection-lean.service";
+import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 
 const service = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 

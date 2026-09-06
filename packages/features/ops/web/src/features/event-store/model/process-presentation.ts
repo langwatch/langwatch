@@ -1,5 +1,5 @@
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
-import { formatTimeAgo } from "../../../model/ops-formatters";
+import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 
 /** Anything the summary counted as wrong — decides row tinting. */
 export function hasFleetTrouble(row: ProcessFleetSummary): boolean {

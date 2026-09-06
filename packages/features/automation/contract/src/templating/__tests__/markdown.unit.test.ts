@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markdownToEmailHtml } from "../markdown";
+import { markdownToEmailHtml } from "../markdown.ts";
 
 describe("markdownToEmailHtml", () => {
   describe("when given Markdown headings and links", () => {

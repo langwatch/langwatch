@@ -4,17 +4,17 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
-import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
-import { useSpanLangwatchSignals } from "../../hooks/use-span-langwatch-signals";
-import { useSpanLogs } from "../../hooks/use-span-logs";
-import { useTraceQueryArgs } from "../../hooks/use-trace-query-args";
-import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store";
-import { formatDuration } from "../../../../../model/display-formatters";
-import { GroupRow } from "./group-row";
-import { GroupTimelineBar, TimelineBar } from "./timeline-bar";
-import { TreeRow } from "./tree-row";
+import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
+import { useSpanLangwatchSignals } from "../../hooks/use-span-langwatch-signals.ts";
+import { useSpanLogs } from "../../hooks/use-span-logs.ts";
+import { useTraceQueryArgs } from "../../hooks/use-trace-query-args.ts";
+import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { formatDuration } from "../../../../../model/display-formatters.ts";
+import { GroupRow } from "./group-row.tsx";
+import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";
+import { TreeRow } from "./tree-row.tsx";
 import {
   buildTree,
   countDescendants,
@@ -23,7 +23,7 @@ import {
   getTraceRange,
   shouldShowTimeline,
   siblingGroupKey,
-} from "./tree";
+} from "./tree.ts";
 import {
   DEFAULT_TREE_PCT,
   type FlatRow,
@@ -34,10 +34,10 @@ import {
   MIN_TREE_WIDTH,
   ROW_HEIGHT,
   type WaterfallViewProps,
-} from "./types";
-import { useCorrectionMarks } from "./use-correction-marks";
-import { useScrollSelectedSpanIntoView } from "./use-scroll-selected-span-into-view";
-import { useWaterfallEditing } from "./use-waterfall-editing";
+} from "./types.ts";
+import { useCorrectionMarks } from "./use-correction-marks.ts";
+import { useScrollSelectedSpanIntoView } from "./use-scroll-selected-span-into-view.ts";
+import { useWaterfallEditing } from "./use-waterfall-editing.ts";
 
 // Shared fallback for spans without signals — a fresh `[]` per row per
 // render would defeat TreeRow's memo by changing prop identity.

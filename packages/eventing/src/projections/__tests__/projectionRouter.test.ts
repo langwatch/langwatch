@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { incrementEsReactorTotal } from "../../metrics";
-import { ProjectionRouter } from "../projectionRouter";
+import { incrementEsReactorTotal } from "../../metrics.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return {
     ...actual,
     incrementEsReactorTotal: vi.fn(),
   };
 });
 
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockAppendStore,
   createMockFoldProjectionDefinition,
@@ -20,9 +20,9 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
-import { ReplayDeferralError } from "../replayMarkerCheck";
+} from "../../services/__tests__/testHelpers.ts";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
+import { ReplayDeferralError } from "../replayMarkerCheck.ts";
 
 describe("ProjectionRouter", () => {
   const tenantId = createTestTenantId();

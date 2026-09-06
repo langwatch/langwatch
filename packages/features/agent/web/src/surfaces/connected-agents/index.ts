@@ -11,8 +11,8 @@ export {
   AgentCardShell,
   type AgentCardShellProps,
   CARD_MENU_CLASS,
-} from "../../features/management/ui/blocks/agent-card";
-export { ConnectedAgentsSection } from "../../features/management/ui/blocks/connected-agents-section";
+} from "../../features/management/ui/blocks/agent-card.tsx";
+export { ConnectedAgentsSection } from "../../features/management/ui/blocks/connected-agents-section.tsx";
 export {
   type ConnectedAgentScope,
   environmentTone,
@@ -22,4 +22,4 @@ export {
   scopeOf,
   sdkLabel,
   sortConnectedAgents,
-} from "../../model/connected-agent-rows";
+} from "../../model/connected-agent-rows.ts";

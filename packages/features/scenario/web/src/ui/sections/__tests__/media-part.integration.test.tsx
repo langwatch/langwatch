@@ -7,8 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MediaPart, type MediaProbeResult } from "../media-part";
-import type { MediaPartData } from "../../../model/media-parts";
+import { MediaPart, type MediaProbeResult } from "../media-part.tsx";
+import type { MediaPartData } from "../../../model/media-parts.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

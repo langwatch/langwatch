@@ -1,5 +1,5 @@
 import { type Mock, type Mocked, vi } from "vitest";
-import type { AuthzReadRepository } from "../../authz-read.repository";
+import type { AuthzReadRepository } from "../../authz-read.repository.ts";
 
 /**
  * Every port method as a mock. Spelled as a mapped type over the interface so

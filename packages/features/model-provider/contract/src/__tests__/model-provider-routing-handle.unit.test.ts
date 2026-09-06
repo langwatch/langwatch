@@ -5,7 +5,7 @@ import {
   ROUTING_HANDLE_MAX_LENGTH,
   routingHandleProblem,
   sanitizeRoutingHandleInput,
-} from "../model-provider-routing-handle";
+} from "../model-provider-routing-handle.ts";
 
 /** Reads a submitted handle the way the service does. */
 const check = (input: string | null | undefined) =>

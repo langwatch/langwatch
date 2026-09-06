@@ -7,11 +7,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -39,7 +39,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-import { SimulationModelSelect } from "../simulation-model-select";
+import { SimulationModelSelect } from "../simulation-model-select.tsx";
 
 afterEach(() => cleanup());
 

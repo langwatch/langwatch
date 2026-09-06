@@ -3,8 +3,8 @@ import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import type { SessionPullRequest } from "../session-list-row";
-import { MissingValue } from "./missing-value";
+import type { SessionPullRequest } from "../session-list-row.ts";
+import { MissingValue } from "./missing-value.tsx";
 
 /** How many pull requests a row names before the rest go behind a hover. */
 const MAX_LISTED_PULL_REQUESTS = 4;

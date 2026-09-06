@@ -17,7 +17,7 @@
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import type { PersonalFeatureGateDialogState } from "../../model/personal-feature-gate-state";
+import type { PersonalFeatureGateDialogState } from "../../model/personal-feature-gate-state.ts";
 
 export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGateDialogState }) {
   return (

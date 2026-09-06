@@ -10,33 +10,33 @@ import {
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLParameterValue } from "../../model/lwql-request-state";
+import type { LangWatchQLParameterValue } from "../../model/lwql-request-state.ts";
 import {
   isLangWatchQLResultStale,
   type LangWatchQLActionLabel,
   type LangWatchQLRequestState,
   type LangWatchQLTimeWindowValues,
-} from "../../model/lwql-request-state";
+} from "../../model/lwql-request-state.ts";
 import {
   type LangWatchQLEditorMarker,
   LWQL_PARAMETER_MISSING_CODE,
   LWQL_RESERVED_PARAMETER_SUPPLIED_CODE,
   lwqlEditorMarkers,
   readLangWatchQLFailure,
-} from "../../model/lwql-failure";
-import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model";
+} from "../../model/lwql-failure.ts";
+import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model.ts";
 import {
   LangWatchQLParametersEditor,
   type LangWatchQLParametersChange,
-} from "../elements/langwatch-ql-parameters-editor";
-import { LangWatchQLEditor } from "./langwatch-ql-editor";
-import { LangWatchQLGranularityPicker } from "../elements/langwatch-ql-granularity-picker";
+} from "../elements/langwatch-ql-parameters-editor.tsx";
+import { LangWatchQLEditor } from "./langwatch-ql-editor.tsx";
+import { LangWatchQLGranularityPicker } from "../elements/langwatch-ql-granularity-picker.tsx";
 import {
   LangWatchQLResultPane,
   type LangWatchQLResultView,
-} from "../blocks/langwatch-ql-result-pane";
-import { LangWatchQLSchemaBrowser } from "../elements/langwatch-ql-schema-browser";
-import { LangWatchQLTimeWindowEditor } from "../elements/langwatch-ql-time-window-editor";
+} from "../blocks/langwatch-ql-result-pane.tsx";
+import { LangWatchQLSchemaBrowser } from "../elements/langwatch-ql-schema-browser.tsx";
+import { LangWatchQLTimeWindowEditor } from "../elements/langwatch-ql-time-window-editor.tsx";
 
 export interface LangWatchQLWorkbenchQuery {
   readonly state: LangWatchQLRequestState;

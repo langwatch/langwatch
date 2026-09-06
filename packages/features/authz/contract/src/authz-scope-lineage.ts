@@ -1,4 +1,4 @@
-import type { BindingScopeTier, ScopeTierField } from "./vocabulary";
+import type { BindingScopeTier, ScopeTierField } from "./vocabulary.ts";
 
 export type AuthzScopeLineageInput = Readonly<Partial<Record<ScopeTierField, unknown>>>;
 

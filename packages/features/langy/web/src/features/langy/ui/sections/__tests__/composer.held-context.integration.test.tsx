@@ -22,12 +22,12 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { datasetContextChip, traceContextChip } from "../../../../../behavior/langy-context-chips";
-import { Composer } from "../composer";
+import { datasetContextChip, traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
+import { Composer } from "../composer.tsx";
 
 const held = [
   traceContextChip("abc123def456", "checkout flow"),

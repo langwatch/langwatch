@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import { walkFiles } from "./files.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
 const PROJECTION_WRITE_METHODS = new Set(["storeProjection", "storeProjectionBatch"]);

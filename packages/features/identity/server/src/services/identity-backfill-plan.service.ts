@@ -4,12 +4,12 @@ import {
   identifierProviderFor,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentityPort } from "../ports/identifier-identity.port";
+import type { IdentifierIdentityPort } from "../ports/identifier-identity.port.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
-} from "../repositories/identity-backfill.repository";
-import { adoptAccountCommandId, adoptUserEmailCommandId } from "../rules/identity-command-id.rules";
+} from "../repositories/identity-backfill.repository.ts";
+import { adoptAccountCommandId, adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 
 /**
  * What the legacy rows IMPLY — the plan a backfill pass states, and the

@@ -1,4 +1,4 @@
-import { useNavigationHost, type NavigationTeam } from "../model/navigation-host";
+import { useNavigationHost, type NavigationTeam } from "../model/navigation-host.ts";
 
 /**
  * Which project the LLM Ops product opens, from anywhere in the app.

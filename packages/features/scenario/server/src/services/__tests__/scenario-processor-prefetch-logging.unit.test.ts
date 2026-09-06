@@ -5,7 +5,7 @@
 import type { ScenarioModelParametersFailureReason } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ScenarioProcessorService } from "../scenario-processor.service";
+import { ScenarioProcessorService } from "../scenario-processor.service.ts";
 
 function logFor(reason: ScenarioModelParametersFailureReason | undefined) {
   const jobLogger = { warn: vi.fn(), error: vi.fn() };

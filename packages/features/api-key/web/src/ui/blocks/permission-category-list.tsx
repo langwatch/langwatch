@@ -18,7 +18,7 @@ import {
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
-import { categoryAccessAvailability } from "../../model/api-key-permissions";
+import { categoryAccessAvailability } from "../../model/api-key-permissions.ts";
 
 export type PermissionSelection = "none" | AccessLevel;
 

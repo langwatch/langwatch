@@ -7,12 +7,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 
-import type { GithubAppTokenPort } from "../ports/github-app-token.port";
+import type { GithubAppTokenPort } from "../ports/github-app-token.port.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
-} from "../repositories/github-installations.repository";
-import type { GithubInstallationAccessService } from "./github-installation-access.service";
+} from "../repositories/github-installations.repository.ts";
+import type { GithubInstallationAccessService } from "./github-installation-access.service.ts";
 
 const logger = createLogger("langwatch:github:installations");
 

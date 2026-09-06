@@ -4,7 +4,7 @@ import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
 import {
   useWorkflowAgentPickerFlow,
   type AgentPickerPort,
-} from "../use-workflow-agent-picker-flow";
+} from "../use-workflow-agent-picker-flow.ts";
 
 /** App composition adapter for the Workflow agent-selection state machine. */
 export function useAgentPickerFlow() {

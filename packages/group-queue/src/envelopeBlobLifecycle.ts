@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Cluster, type Redis as IORedis } from "ioredis";
-import { BlobLeases } from "./blobLeases";
+import { BlobLeases } from "./blobLeases.ts";
 import {
   decodeJobEnvelope,
   encodeJobEnvelope,
@@ -10,18 +10,18 @@ import {
   readEnvelopeRetirement,
   readEnvelopeTieredRefFromHeader,
   splitEnvelope,
-} from "./jobEnvelope";
-import { gqBlobReleaseGraceTotal } from "./metrics";
-import { hasRedisHashTag } from "./redisHashTag";
-import { RedisJobBlobStore } from "./redisJobBlobStore";
-import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
+} from "./jobEnvelope.ts";
+import { gqBlobReleaseGraceTotal } from "./metrics.ts";
+import { hasRedisHashTag } from "./redisHashTag.ts";
+import { RedisJobBlobStore } from "./redisJobBlobStore.ts";
+import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore.ts";
 import {
   createTenantId,
   type ProjectStorageDestination,
   redactStorageUrisInText,
   type TenantId,
   tenantIdFromGroupId,
-} from "./storage";
+} from "./storage.ts";
 
 const logger = createLogger("langwatch:group-queue:envelope-blob-lifecycle");
 

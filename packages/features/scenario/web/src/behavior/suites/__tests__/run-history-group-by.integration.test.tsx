@@ -17,7 +17,7 @@ import {
 import type { RunGroup } from "@langwatch/suite-web/surfaces/run-formatters";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
-vi.mock("../use-prefetch-run-state", () => ({
+vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
 

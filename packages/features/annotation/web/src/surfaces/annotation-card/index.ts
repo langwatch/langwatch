@@ -1,1 +1,1 @@
-export * from "../../ui/blocks/annotation-card";
+export * from "../../ui/blocks/annotation-card.tsx";

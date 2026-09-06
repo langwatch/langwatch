@@ -8,8 +8,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 
 import { Popover } from "@langwatch/design-system/popover";
-import { ParameterPopoverContent } from "./parameter-popover-content";
-import { getParameterIcon, type ParameterConfig } from "./parameter-config";
+import { ParameterPopoverContent } from "./parameter-popover-content.tsx";
+import { getParameterIcon, type ParameterConfig } from "./parameter-config.ts";
 
 // ============================================================================
 // Types

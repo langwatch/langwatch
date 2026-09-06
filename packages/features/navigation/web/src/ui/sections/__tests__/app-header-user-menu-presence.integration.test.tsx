@@ -14,7 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     featureFlag: {
       isEnabledForEachOrganization: {
@@ -24,8 +24,8 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing";
-import { AppHeaderUserMenu } from "../app-header-user-menu";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
+import { AppHeaderUserMenu } from "../app-header-user-menu.tsx";
 
 const PRESENCE_ROW = (
   <Menu.Item value="presence" closeOnSelect={false}>

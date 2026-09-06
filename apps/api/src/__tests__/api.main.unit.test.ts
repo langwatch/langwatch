@@ -4,8 +4,8 @@ import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
-} from "../api.main";
-import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers";
+} from "../api.main.ts";
+import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
 
 class TestProcess extends ApiRuntimeProcessPort {
   readonly start = vi.fn(async () => undefined);

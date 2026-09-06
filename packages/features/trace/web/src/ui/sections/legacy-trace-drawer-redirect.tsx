@@ -6,7 +6,7 @@
 
 import { useEffect } from "react";
 
-import { useDrawer } from "../../behavior/use-drawer";
+import { useDrawer } from "../../behavior/use-drawer.ts";
 
 export interface LegacyTraceDrawerRedirectProps {
   traceId?: string;

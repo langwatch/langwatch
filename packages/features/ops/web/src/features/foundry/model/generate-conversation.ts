@@ -1,5 +1,5 @@
-import type { ChatMessage, SpanConfig, TraceConfig } from "./foundry-types";
-import { shortId } from "./foundry-types";
+import type { ChatMessage, SpanConfig, TraceConfig } from "./foundry-types.ts";
+import { shortId } from "./foundry-types.ts";
 
 export interface ConversationOptions {
   turnCount: number;

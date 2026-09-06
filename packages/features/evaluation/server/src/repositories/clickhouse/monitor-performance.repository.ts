@@ -1,11 +1,11 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port";
+import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
-} from "../monitor-performance.repository";
+} from "../monitor-performance.repository.ts";
 
 const logger = createLogger("langwatch:evaluation:clickhouse.monitor-performance.repository");
 

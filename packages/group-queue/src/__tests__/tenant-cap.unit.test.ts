@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TENANT_CAP } from "../scripts";
-import { resolveGroupQueuePolicyFromEnv } from "../policy-env";
+import { DEFAULT_TENANT_CAP } from "../scripts.ts";
+import { resolveGroupQueuePolicyFromEnv } from "../policy-env.ts";
 
 /**
  * The tenant soft-cap is a defense added post-2026-05-11 incident.

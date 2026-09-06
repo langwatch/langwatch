@@ -5,7 +5,7 @@ import {
   langyChoiceSelectionSchema,
   renderLangyChoiceSelectionText,
   type LangyChoicesTimelineEntry,
-} from "../choices";
+} from "../choices.ts";
 
 describe("langyChoiceSelectionSchema", () => {
   describe("given a picked option", () => {

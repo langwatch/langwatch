@@ -42,7 +42,7 @@ vi.mock("@langwatch/trace-web/drawer.store", () => ({
   },
 }));
 
-vi.mock("../coding-agent-api", () => {
+vi.mock("../coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -75,12 +75,12 @@ vi.mock("../coding-agent-api", () => {
   return { codingAgentApi: makeNode("") };
 });
 
-import { SessionsTable } from "../sessions-table";
+import { SessionsTable } from "../sessions-table.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
-} from "../testing";
+} from "../testing.tsx";
 
 /** A fixed moment the fixtures hang off, well outside any relative preset. */
 const LONG_AGO = Date.parse("2026-07-01T09:00:00Z");

@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiCodingAgentScopeDirectory,
   ApiCodingAgentScopePermissions,
-} from "../../features/coding-agent/coding-agent.composition";
+} from "../../features/coding-agent/coding-agent.composition.ts";
 
 const ORGANIZATION = "organization-1";
 const KEY = "key-1";

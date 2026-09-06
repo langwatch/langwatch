@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AdminAccessService } from "../admin-access.service";
+import { AdminAccessService } from "../admin-access.service.ts";
 
 describe("AdminAccessService", () => {
   /** @scenario "Admin email matching is normalized" */

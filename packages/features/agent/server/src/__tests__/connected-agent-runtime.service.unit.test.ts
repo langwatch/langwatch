@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS } from "@langwatch/agent-contract";
 
 import { buildCallEnvelope, type StoredResult, storedCallSchema } from "@langwatch/agent-contract";
-import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import type { InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
 import {
   callAckKey,
   callKey,
@@ -16,9 +16,9 @@ import {
   instanceChannel,
   replyChannel,
   resultKey,
-} from "../rules/connected-agent-keys.rules";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
-import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port";
+} from "../rules/connected-agent-keys.rules.ts";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port.ts";
 
 const projectId = "proj_1";
 

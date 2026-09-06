@@ -4,18 +4,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { authApi as api } from "../../behavior/auth-api";
-import Link from "../elements/router-link";
+import { authApi as api } from "../../behavior/auth-api.ts";
+import Link from "../elements/router-link.tsx";
 import "../elements/auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme";
-import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled";
-import { useRetryCountdown } from "../../behavior/use-retry-countdown";
-import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in";
-import { describeRemainingWait } from "../../model/credential-sign-in";
-import { rememberLastUsedMethod } from "../../model/last-used-method";
-import { EmailPill } from "../elements/email-pill";
-import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field";
-import { PasswordInput } from "../elements/password-input";
+import { SHAPE } from "../../model/front-door-theme.ts";
+import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
+import { useRetryCountdown } from "../../behavior/use-retry-countdown.ts";
+import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
+import { describeRemainingWait } from "../../model/credential-sign-in.ts";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { EmailPill } from "../elements/email-pill.tsx";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
+import { PasswordInput } from "../elements/password-input.tsx";
 
 const credentialSchema = z.object({
   // Blank when the address arrived settled from the address step; the field

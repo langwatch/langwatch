@@ -4,8 +4,8 @@ import {
   clippedBandMask,
   computeBandClipping,
   computeScoreBarScale,
-} from "../leaderboard-verdict-panel";
-import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard";
+} from "../leaderboard-verdict-panel.tsx";
+import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard.ts";
 
 /**
  * The score bars scale to the SCORES, not to the intervals, so a wide interval

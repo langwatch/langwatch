@@ -5,15 +5,15 @@
 // `ErrorActions` is deliberately absent: the two inline surfaces below render
 // it themselves, and a consumer that wants the row on its own deep-imports
 // `../../elements/errors/error-actions`.
-export { FormServerError } from "./form-server-error";
-export type { HandledErrorAlertProps } from "./handled-error-alert";
-export { HandledErrorAlert } from "./handled-error-alert";
-export type { HandledErrorStateProps } from "./handled-error-state";
-export { HandledErrorState } from "./handled-error-state";
+export { FormServerError } from "./form-server-error.tsx";
+export type { HandledErrorAlertProps } from "./handled-error-alert.tsx";
+export { HandledErrorAlert } from "./handled-error-alert.tsx";
+export type { HandledErrorStateProps } from "./handled-error-state.tsx";
+export { HandledErrorState } from "./handled-error-state.tsx";
 export {
   applyHandledErrorToForm,
   FORM_SERVER_ERROR,
-} from "../../../behavior/errors/logic/apply-handled-error-to-form";
+} from "../../../behavior/errors/logic/apply-handled-error-to-form.ts";
 export type { AppErrorCode } from "@langwatch/handled-error/app-codes";
 export type { ErrorExplanation, ErrorPresentation } from "@langwatch/handled-error/presentation";
 export {
@@ -28,7 +28,7 @@ export type { HandledErrorShape } from "@langwatch/handled-error/read-handled-er
 // code-keyed registry; one we cannot resolves to the generic line and a trace
 // id. See the note above `isRecord` in `readHandledError`.
 export { readHandledError } from "@langwatch/handled-error/read-handled-error";
-export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
-export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
-export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast";
-export { showErrorToast } from "../../../behavior/errors/logic/show-error-toast";
+export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
+export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
+export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast.ts";
+export { showErrorToast } from "../../../behavior/errors/logic/show-error-toast.ts";

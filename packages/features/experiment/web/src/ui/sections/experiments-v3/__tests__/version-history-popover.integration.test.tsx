@@ -31,7 +31,7 @@ type StoreSlice = {
   setStaleWorkbench: (stale: boolean) => void;
   workbenchVersion: number | undefined;
 };
-vi.mock("../../../../behavior/experiments-v3/use-evaluations-v3-store", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () => ({
   useEvaluationsV3Store: (selector: (state: StoreSlice) => unknown) =>
     selector({
       experimentId: "exp_1",
@@ -83,7 +83,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { VersionHistoryButton } from "../version-history-button";
+import { VersionHistoryButton } from "../version-history-button.tsx";
 
 /**
  * A history as the seam writes one: two deliberate versions numbered

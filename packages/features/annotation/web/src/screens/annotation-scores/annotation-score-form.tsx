@@ -17,13 +17,13 @@
  */
 
 import type { AnnotationScoreDataType as AnnotationScoreDataTypeName } from "@langwatch/annotation-contract";
-import { AnnotationScoreDataType } from "./annotation-score-data-type";
+import { AnnotationScoreDataType } from "./annotation-score-data-type.ts";
 import { Input, Textarea } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AnnotationScoreEditor } from "../../ui/blocks/annotation-score-editor";
-import { annotationScoresApi } from "./annotation-scores-api";
-import { useAnnotationScoresHost } from "./annotation-scores-host";
+import { AnnotationScoreEditor } from "../../ui/blocks/annotation-score-editor.tsx";
+import { annotationScoresApi } from "./annotation-scores-api.ts";
+import { useAnnotationScoresHost } from "./annotation-scores-host.ts";
 
 type FormData = {
   name: string;

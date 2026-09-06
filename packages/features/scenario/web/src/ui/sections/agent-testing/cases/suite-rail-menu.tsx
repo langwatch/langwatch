@@ -7,10 +7,10 @@
 import { Button } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { MenuActionLabel, type MenuActionName } from "./menu-action-label";
-import { RecentRunsSubmenu } from "./recent-runs-menu";
+import { MenuActionLabel, type MenuActionName } from "./menu-action-label.tsx";
+import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 
 export type SuiteRailMenuProps = {
   suite: TestSuiteEntry;

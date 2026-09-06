@@ -7,8 +7,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port";
-import { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port";
+import type { ScenarioExecutionRunnerPort } from "../ports/scenario-execution-runner.port.ts";
+import { ScenarioExecutionPoolPort } from "../ports/scenario-execution-pool.port.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 

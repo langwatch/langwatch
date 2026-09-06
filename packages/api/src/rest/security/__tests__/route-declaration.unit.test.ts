@@ -4,9 +4,9 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { publicEndpoint, requires } from "../../../access-policy.js";
-import type { RegisteredRoute } from "../route-registry.js";
-import { assertEveryRouteDeclared, undeclaredRoutes } from "../route-declaration.js";
+import { publicEndpoint, requires } from "../../../access-policy.ts";
+import type { RegisteredRoute } from "../route-registry.ts";
+import { assertEveryRouteDeclared, undeclaredRoutes } from "../route-declaration.ts";
 
 function declared(
   method: string,

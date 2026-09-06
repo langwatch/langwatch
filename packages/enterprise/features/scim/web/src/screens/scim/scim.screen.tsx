@@ -30,9 +30,9 @@ import {
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { scimApi } from "../../behavior/scim-api";
-import { useScimHost } from "../../model/scim-host";
-import { CopyInput } from "../../ui/elements/copy-input";
+import { scimApi } from "../../behavior/scim-api.ts";
+import { useScimHost } from "../../model/scim-host.ts";
+import { CopyInput } from "../../ui/elements/copy-input.tsx";
 
 /** The grant the platform page asked for, unchanged. */
 export const SCIM_PAGE_PERMISSION = "organization:manage";

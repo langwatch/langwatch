@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config";
+import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * Where a deployment keeps the bytes it externalizes out of traces, datasets,

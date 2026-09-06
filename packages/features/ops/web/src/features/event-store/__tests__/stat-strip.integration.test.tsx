@@ -11,7 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DashboardData, PhaseMetrics } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StatStrip } from "../ui/sections/stat-strip";
+import { StatStrip } from "../ui/sections/stat-strip.tsx";
 
 // The dead-letters tile reads the process-outbox side through the same query
 // the navigation badge uses; the strip itself is otherwise snapshot-driven.
@@ -20,7 +20,7 @@ const outboxDeadQuery = vi.fn(() => ({
     | Array<{ processName: string; count: number; oldestUpdatedAt: number }>
     | undefined,
 }));
-vi.mock("../../../behavior/ops-api", () => ({
+vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     ops: { listDeadLetterCounts: { useQuery: () => outboxDeadQuery() } },
   },

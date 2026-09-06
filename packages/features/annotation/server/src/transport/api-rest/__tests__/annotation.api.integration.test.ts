@@ -7,7 +7,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createAnnotationsRestApp, type AnnotationRestCredentialPort } from "../annotation.api";
+import { createAnnotationsRestApp, type AnnotationRestCredentialPort } from "../annotation.api.ts";
 
 describe("given the annotations REST family", () => {
   describe("when a project credential resolves", () => {

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { traceDetailsAddress } from "../analytics-overlay-address";
+import { traceDetailsAddress } from "../analytics-overlay-address.ts";
 
 describe("the trace overlay address", () => {
   describe("given a page with a range and a filter on the address", () => {

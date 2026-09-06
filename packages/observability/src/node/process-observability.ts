@@ -4,8 +4,8 @@ import {
   type ObservabilityHandle,
   type SetupObservabilityOptions,
 } from "langwatch/observability/node";
-import { createLogger, type Logger } from "../logger";
-import { UnexportedSpanProcessor } from "./unexported-spans";
+import { createLogger, type Logger } from "../logger.ts";
+import { UnexportedSpanProcessor } from "./unexported-spans.ts";
 
 type SetupOptions = Omit<SetupObservabilityOptions, "debug" | "serviceName">;
 

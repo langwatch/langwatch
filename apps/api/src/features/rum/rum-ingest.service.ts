@@ -11,7 +11,7 @@ import {
   RUM_SERVICE_NAME,
 } from "@langwatch/react-rum/constants";
 
-import { collectorHeaders, collectorTracesUrl } from "../../platform/config/rum-collector.config";
+import { collectorHeaders, collectorTracesUrl } from "../../platform/config/rum-collector.config.ts";
 
 /**
  * One fixed-window counter, keyed on whatever the caller is identified by.

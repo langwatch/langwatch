@@ -5,7 +5,7 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 /** One label above a field. */
 export function FieldLabel({ children }: { children: React.ReactNode }) {

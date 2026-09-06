@@ -23,23 +23,23 @@ import type { ComponentType } from "react";
 export type SecretScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const secretScreens = {
-  secrets: () => import("./secrets.screen"),
+  secrets: () => import("./secrets.screen.tsx"),
 } as const satisfies Record<string, SecretScreenLoader>;
 
 export type SecretScreenName = keyof typeof secretScreens;
 
-export { SECRET_MANAGE_PERMISSION } from "./secrets.screen";
-export { secretApi } from "../../behavior/secret-api";
+export { SECRET_MANAGE_PERMISSION } from "./secrets.screen.tsx";
+export { secretApi } from "../../behavior/secret-api.ts";
 export {
   SECRET_REFUSAL_CODES,
   describeSecretRefusal,
   readSecretRefusalCode,
   type SecretRefusalCopy,
-} from "../../model/secret-refusal-copy";
+} from "../../model/secret-refusal-copy.ts";
 export {
   SecretHostPort,
   SecretHostProvider,
   type SecretFailureNotice,
   type SecretHostScope,
   type SecretSuccessNotice,
-} from "../../model/secret-host";
+} from "../../model/secret-host.ts";

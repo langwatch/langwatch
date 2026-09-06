@@ -14,7 +14,7 @@ import {
   OrganizationSettingsSecretPort,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
-} from "../../ports/organization.port";
+} from "../../ports/organization.port.ts";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 

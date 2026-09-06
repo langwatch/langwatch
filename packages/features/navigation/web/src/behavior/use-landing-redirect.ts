@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { carryLangyConversation } from "@langwatch/langy-contract";
-import { useNavigationHost } from "../model/navigation-host";
-import { readLastVisitedProduct } from "../model/product-memory";
-import { resolveLandingDestination } from "../model/resolve-landing-destination";
-import type { ProductId } from "../model/products";
-import { navigationApi } from "./navigation-api";
-import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug";
-import { useReachableProducts } from "./use-reachable-products";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { readLastVisitedProduct } from "../model/product-memory.ts";
+import { resolveLandingDestination } from "../model/resolve-landing-destination.ts";
+import type { ProductId } from "../model/products.ts";
+import { navigationApi } from "./navigation-api.ts";
+import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug.ts";
+import { useReachableProducts } from "./use-reachable-products.ts";
 
 /** What the server home resolver answered, flattened for the pickers. */
 interface ResolvedHome {

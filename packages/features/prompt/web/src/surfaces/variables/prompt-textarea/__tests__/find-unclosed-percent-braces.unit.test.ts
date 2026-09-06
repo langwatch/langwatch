@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-import { findUnclosedPercentBraces } from "../prompt-textarea.utils";
+import { findUnclosedPercentBraces } from "../prompt-textarea.utils.ts";
 
 describe("findUnclosedPercentBraces()", () => {
   describe("when text contains unclosed {%", () => {

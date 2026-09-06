@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Deferred } from "../deferred";
+import { Deferred } from "../deferred.ts";
 
 describe("Deferred", () => {
   describe("when resolved before calling fn", () => {

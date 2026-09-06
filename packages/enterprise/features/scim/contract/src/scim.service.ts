@@ -7,8 +7,8 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
   ScimUser,
-} from "./scim.contract";
-import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token";
+} from "./scim.contract.ts";
+import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 
 /** The portable provisioning capability used by every SCIM transport. */
 export abstract class ScimService {

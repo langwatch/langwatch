@@ -8,13 +8,13 @@ import {
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
 import {
   AutomationDatasetMapperPort,
   AutomationPersistActionWriterPort,
-} from "../ports/automation-persist-action.port";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
+} from "../ports/automation-persist-action.port.ts";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
 
 /** The project read this path makes: an existence check, and nothing else. */
 type PersistActionProject = { id: string; name: string; slug: string };

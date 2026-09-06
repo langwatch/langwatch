@@ -1,12 +1,12 @@
 import { Alert, Box, Heading, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
-import { usePublicEnv } from "../../../behavior/use-public-env";
-import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix";
-import { useOnboardingHost } from "../../../model/onboarding-host";
-import { Link } from "../../elements/link";
-import { useIntegrationChecks } from "../integration-checks";
-import ObservabilityCard from "../../elements/welcome/observability-card";
+import { usePublicEnv } from "../../../behavior/use-public-env.ts";
+import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
+import { useOnboardingHost } from "../../../model/onboarding-host.ts";
+import { Link } from "../../elements/link.tsx";
+import { useIntegrationChecks } from "../integration-checks.tsx";
+import ObservabilityCard from "../../elements/welcome/observability-card.tsx";
 
 /**
  * THE API KEY IS ASKED FOR BY NAME.

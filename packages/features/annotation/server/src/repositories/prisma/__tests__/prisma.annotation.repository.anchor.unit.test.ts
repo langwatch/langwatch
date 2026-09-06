@@ -2,8 +2,8 @@
  * See specs/traces-v2/anchored-comments.feature.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { AnnotationDatabase } from "../prisma.annotation.repository";
-import { PrismaAnnotationRepository } from "../prisma.annotation.repository";
+import type { AnnotationDatabase } from "../prisma.annotation.repository.ts";
+import { PrismaAnnotationRepository } from "../prisma.annotation.repository.ts";
 
 const NOW = new Date("2026-01-01T00:00:00Z");
 

@@ -3,9 +3,9 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
-import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line";
-import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
+import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line.ts";
+import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows.ts";
 
 /** The names of every declaration in scope, secrets included. */
 function namesOf(definitions: readonly DeclaredParameter[]): Set<string> {

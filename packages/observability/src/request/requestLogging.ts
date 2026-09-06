@@ -1,5 +1,5 @@
-import { REQUEST_CAUSE_FIELD } from "../constants";
-import type { Logger } from "../logger";
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
+import type { Logger } from "../logger.ts";
 
 /**
  * Common request logging data structure.

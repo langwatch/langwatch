@@ -11,7 +11,7 @@
  */
 
 import { useMemo } from "react";
-import { useCodingAgentActivityHost } from "./coding-agent-activity-host";
+import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 
 export type CodingAgentRouter = {
   query: Readonly<Record<string, string | undefined>>;

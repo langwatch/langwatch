@@ -9,13 +9,13 @@ import {
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
-import type { LangyConversationLivenessRecord } from "../langy-conversation.subscriber";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import type { LangyConversationLivenessRecord } from "../langy-conversation.subscriber.ts";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
-} from "../langy-conversation.subscriber";
+} from "../langy-conversation.subscriber.ts";
 
 const OCCURRED_AT = 1_752_600_000_000;
 const PROJECT_ID = "project_1";

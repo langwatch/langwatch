@@ -1,6 +1,6 @@
 import { Box, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SearchInput } from "./search-input";
+import { SearchInput } from "./search-input.tsx";
 
 const meta = {
   title: "Components/Search input",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignMaxToStep, stepPrecision } from "../use-slider-control";
+import { alignMaxToStep, stepPrecision } from "../use-slider-control.ts";
 
 describe("stepPrecision", () => {
   it("returns 0 for integer steps", () => {

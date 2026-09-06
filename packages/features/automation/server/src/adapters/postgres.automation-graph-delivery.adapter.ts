@@ -1,12 +1,12 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port";
-import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
-import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository";
-import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
-import type { TriggerRepository } from "../repositories/trigger.repository";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
+import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 

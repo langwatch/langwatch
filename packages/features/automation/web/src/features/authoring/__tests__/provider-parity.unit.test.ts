@@ -13,8 +13,8 @@ import {
   ACTION_PROVIDERS,
   CLIENT_PROVIDERS,
   NOTIFY_PROVIDERS,
-} from "../ui/sections/client-providers";
-import { SLACK_BLOCK_KIT_TEMPLATES, type SlackBlockKitTemplateOption } from "../../slack-templates";
+} from "../ui/sections/client-providers.ts";
+import { SLACK_BLOCK_KIT_TEMPLATES, type SlackBlockKitTemplateOption } from "../../slack-templates/index.ts";
 
 /**
  * The browser provider registry enforces its client-facing invariants here.

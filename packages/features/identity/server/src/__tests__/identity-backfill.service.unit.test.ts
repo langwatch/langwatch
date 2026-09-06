@@ -10,14 +10,14 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
-} from "../repositories/identity-backfill.repository";
-import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service";
-import { IdentityBackfillService } from "../services/identity-backfill.service";
-import { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
+} from "../repositories/identity-backfill.repository.ts";
+import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
+import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
+import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 
 const identifierIdentity = CryptoIdentifierIdentityAdapter.create();
 

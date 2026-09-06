@@ -9,7 +9,7 @@ import "@testing-library/jest-dom/vitest";
 
 const getEvaluationInputsUseQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     traces: {
       getEvaluationInputs: { useQuery: getEvaluationInputsUseQueryMock },
@@ -17,7 +17,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_test" },
     organization: {},
@@ -26,8 +26,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-import { EvalCard } from "../eval-card";
-import type { EvalEntry } from "../utils";
+import { EvalCard } from "../eval-card.tsx";
+import type { EvalEntry } from "../utils.ts";
 
 function renderCard(eval_: EvalEntry) {
   return render(

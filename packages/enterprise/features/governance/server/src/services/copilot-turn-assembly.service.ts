@@ -17,8 +17,8 @@ import {
   type ToolCallValue,
   type Turn,
   type TurnAccumulator,
-} from "../rules/copilot-transcript.rules";
-import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service";
+} from "../rules/copilot-transcript.rules.ts";
+import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service.ts";
 
 export class CopilotTurnAssemblyService {
   private constructor() {}

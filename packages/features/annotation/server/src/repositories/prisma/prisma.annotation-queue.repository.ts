@@ -2,7 +2,7 @@
  * The `AnnotationQueue` and `AnnotationQueueItem` rows, over Prisma.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AnnotationQueueStore } from "../../transport/api-trpc/annotation.api";
+import type { AnnotationQueueStore } from "../../transport/api-trpc/annotation.api.ts";
 
 /**
  * Every queue item the caller's organization can see: one whose queue belongs

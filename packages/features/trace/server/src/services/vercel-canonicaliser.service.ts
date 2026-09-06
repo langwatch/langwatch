@@ -1,6 +1,6 @@
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
-import { canonicaliseVercelCore } from "../rules/vercel-core.rules";
-import { canonicaliseVercelIO } from "../rules/vercel-io.rules";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { canonicaliseVercelCore } from "../rules/vercel-core.rules.ts";
+import { canonicaliseVercelIO } from "../rules/vercel-io.rules.ts";
 
 export class VercelCanonicaliserService implements CanonicalAttributesPort {
   static create(): VercelCanonicaliserService {

@@ -45,16 +45,16 @@ import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { AGENT_CHAT_TIMEOUT_MS } from "@langwatch/langy-contract";
-import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
-import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service";
+import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service.ts";
+import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service.ts";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter";
+import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
 import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
-import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter";
-import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
-import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules";
-import { ControlRequestService } from "../../services/langy-local-control-request.service";
-import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service";
+import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter.ts";
+import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
+import { reconcileSkipPolicy } from "../../rules/langy-local-skip-policy.rules.ts";
+import { ControlRequestService } from "../../services/langy-local-control-request.service.ts";
+import type { SkipPermissionsDecision } from "../../services/langy-skip-permissions.service.ts";
 
 const logger = createLogger("langwatch:langy:router");
 

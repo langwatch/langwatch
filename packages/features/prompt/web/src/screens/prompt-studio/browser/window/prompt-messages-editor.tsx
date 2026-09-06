@@ -1,6 +1,6 @@
 import { useFieldArray, useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form";
-import { PromptMessagesField } from "../../fields/prompt-messages-field";
+import type { PromptConfigFormValues } from "../../../../surfaces/prompt-form/index.ts";
+import { PromptMessagesField } from "../../fields/prompt-messages-field.tsx";
 
 /**
  * PromptMessagesEditor

@@ -1,4 +1,4 @@
-import { EmailDeliveryPort, type EmailContent } from "../providers/types";
+import { EmailDeliveryPort, type EmailContent } from "../providers/types.ts";
 
 export class TestMailer extends EmailDeliveryPort {
   defaultFrom(): string {

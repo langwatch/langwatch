@@ -14,5 +14,5 @@
  * what answers it.
  */
 
-export { CreateProjectDrawer } from "./create-project-drawer";
-export { EditProjectDrawer } from "./edit-project-drawer";
+export { CreateProjectDrawer } from "./create-project-drawer.tsx";
+export { EditProjectDrawer } from "./edit-project-drawer.tsx";

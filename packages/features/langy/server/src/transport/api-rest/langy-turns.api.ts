@@ -15,12 +15,12 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
-import { LANGY_API_KEY_TURNS_FLAG } from "../../rules/langy-rest-flags.rules";
+import { LANGY_API_KEY_TURNS_FLAG } from "../../rules/langy-rest-flags.rules.ts";
 import {
   resolveLangyRestActor,
   resolveLangyRestCaller,
   type LangyRestCredentialPorts,
-} from "./langy-rest-credentials.api";
+} from "./langy-rest-credentials.api.ts";
 import {
   type LangyTurnBufferWatch,
   LangyTurnSettlementWaiterService,

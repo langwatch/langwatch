@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { otlpAnyValueSchema, otlpKeyValueSchema } from "../any-value";
+import { otlpAnyValueSchema, otlpKeyValueSchema } from "../any-value.ts";
 
 describe("otlpAnyValueSchema", () => {
   describe("given a value in each encoding a sender uses", () => {

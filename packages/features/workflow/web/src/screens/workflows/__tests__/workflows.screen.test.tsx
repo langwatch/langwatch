@@ -6,8 +6,8 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithWorkflowHost } from "../../../testing";
-import WorkflowsScreen from "../workflows.screen";
+import { renderWithWorkflowHost } from "../../../testing.tsx";
+import WorkflowsScreen from "../workflows.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -29,7 +29,7 @@ const calls = vi.hoisted(() => ({
   invalidateAll: vi.fn(),
 }));
 
-vi.mock("../../../model/workflow-api", () => {
+vi.mock("../../../model/workflow-api.ts", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: () => ({
       isPending: false,

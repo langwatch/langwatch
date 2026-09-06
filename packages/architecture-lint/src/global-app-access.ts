@@ -4,8 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "./files";
-import type { ArchitectureViolation } from "./types";
+import { walkFiles } from "./files.ts";
+import type { ArchitectureViolation } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;

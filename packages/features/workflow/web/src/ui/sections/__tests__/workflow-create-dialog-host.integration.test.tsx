@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../model/workflow-api", () => {
+vi.mock("../../../model/workflow-api.ts", () => {
   const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
   return {
     workflowApi: {
@@ -22,7 +22,7 @@ vi.mock("../../../model/workflow-api", () => {
   };
 });
 
-vi.mock("../../../model/workflow-host", () => ({
+vi.mock("../../../model/workflow-host.ts", () => ({
   useWorkflowHost: () => ({
     scope: () => ({ projectId: "project_1", projectSlug: "project-one" }),
     navigate: vi.fn(),
@@ -30,11 +30,11 @@ vi.mock("../../../model/workflow-host", () => ({
   }),
 }));
 
-vi.mock("../../blocks/workflow-emoji-picker", () => ({
+vi.mock("../../blocks/workflow-emoji-picker.tsx", () => ({
   WorkflowEmojiPicker: () => null,
 }));
 
-import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host";
+import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 
 describe("WorkflowCreateDialogHost", () => {
   afterEach(cleanup);

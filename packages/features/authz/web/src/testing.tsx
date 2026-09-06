@@ -17,7 +17,7 @@ import {
   type AuthzHostScope,
   type AuthzPlanReading,
   type AuthzSuccessNotice,
-} from "./model/authz-host";
+} from "./model/authz-host.ts";
 
 export class FakeAuthzHost extends AuthzHostPort {
   readonly successes: AuthzSuccessNotice[] = [];

@@ -26,8 +26,8 @@ import {
   type PrivacyHostScope,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
-} from "../../../model/data-privacy-host";
-import DataPrivacyScreen from "../data-privacy.screen";
+} from "../../../model/data-privacy-host.ts";
+import DataPrivacyScreen from "../data-privacy.screen.tsx";
 
 const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
   const category = { disposition: "capture" as const, audience: {} };
@@ -71,7 +71,7 @@ const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../../behavior/data-privacy-api", () => ({
+vi.mock("../../../behavior/data-privacy-api.ts", () => ({
   dataPrivacyApi: {
     useUtils: () => ({ dataPrivacy: { getSnapshot: { invalidate } } }),
     dataPrivacy: {

@@ -9,7 +9,7 @@ import { LuChevronRight, LuCircleX } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import { type ParsedEvaluationResult, parseEvaluationResult } from "@langwatch/evaluator-contract";
-import { EVALUATION_STATUS_COLORS, getStatusLabel } from "../../../model/evaluation-results";
+import { EVALUATION_STATUS_COLORS, getStatusLabel } from "../../../model/evaluation-results.ts";
 
 export type EvaluationStatus = ParsedEvaluationResult["status"];
 

@@ -14,7 +14,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 // providers. Server-side auto-provisioning means a fresh org never actually
 // serves an empty list; this state is only reachable when the catalog was
 // curated down to no enabled tools (the curated-empty fallback these pin).
-vi.mock("../behavior/personal-workspace-api", () => ({
+vi.mock("../behavior/personal-workspace-api.ts", () => ({
   api: {
     aiTools: {
       list: { useQuery: () => ({ data: [], isLoading: false }) },
@@ -25,8 +25,8 @@ vi.mock("../behavior/personal-workspace-api", () => ({
   },
 }));
 
-import { AiToolsPortal } from "../ui/sections/ai-tools-portal";
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing";
+import { AiToolsPortal } from "../ui/sections/ai-tools-portal.tsx";
+import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing.tsx";
 
 // The portal's permission gate is the only host input the empty-state branches
 // read; flip it per test via this mutable flag.

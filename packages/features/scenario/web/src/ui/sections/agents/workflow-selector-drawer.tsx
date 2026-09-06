@@ -15,17 +15,17 @@ import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
-import { FormServerError } from "../../../behavior/errors";
+import { FormServerError } from "../../../behavior/errors.tsx";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { EmojiPickerModal } from "@langwatch/workflow-web/surfaces/emoji-picker-modal";
 import { getRandomWorkflowIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import { blankTemplate } from "@langwatch/workflow-web/surfaces/workflow-templates";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { trackEvent } from "../../../model/tracking";
+import { trackEvent } from "../../../model/tracking.ts";
 
 export type WorkflowSelectorDrawerProps = {
   open?: boolean;

@@ -21,13 +21,13 @@ import type { ComponentType } from "react";
 export type DatasetScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const datasetScreens = {
-  datasets: () => import("./datasets.screen"),
-  datasetEditor: () => import("./dataset-editor.screen"),
+  datasets: () => import("./datasets.screen.tsx"),
+  datasetEditor: () => import("./dataset-editor.screen.tsx"),
 } as const satisfies Record<string, DatasetScreenLoader>;
 
 export type DatasetScreenName = keyof typeof datasetScreens;
 
-export { datasetApi } from "../../behavior/dataset-api";
+export { datasetApi } from "../../behavior/dataset-api.ts";
 export {
   DatasetHostPort,
   DatasetHostProvider,
@@ -36,4 +36,4 @@ export {
   type DatasetHostProject,
   type DatasetRouteReading,
   type DatasetSuccessNotice,
-} from "../../model/dataset-host";
+} from "../../model/dataset-host.ts";

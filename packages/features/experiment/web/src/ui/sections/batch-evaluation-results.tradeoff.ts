@@ -2,7 +2,7 @@
  * The trade-off chart's conclusion, in words (#5103).
  */
 
-import type { ParetoDominance, TradeoffDimension } from "./batch-evaluation-results.pareto";
+import type { ParetoDominance, TradeoffDimension } from "./batch-evaluation-results.pareto.ts";
 
 export type TradeoffSummary = {
   headline: string;

@@ -1,5 +1,5 @@
-import type { Event } from "../domain/types";
-import type { SubscriberDispatchOptions } from "./subscriber.types";
+import type { Event } from "../domain/types.ts";
+import type { SubscriberDispatchOptions } from "./subscriber.types.ts";
 
 /** The payload a subscriber's job-id and group-key functions receive. */
 export type SubscriberJobPayload = { event: Event; foldState: unknown };

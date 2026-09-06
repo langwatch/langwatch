@@ -5,8 +5,8 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { templateOptionsFor } from "../ui/elements/registry";
-import { SlackBlockKitTemplatePicker } from "../ui/blocks/template-picker";
+import { templateOptionsFor } from "../ui/elements/registry.ts";
+import { SlackBlockKitTemplatePicker } from "../ui/blocks/template-picker.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

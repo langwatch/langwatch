@@ -4,7 +4,7 @@ import {
   type RenderAgentVariablesInput,
   type RenderScenarioMappingsInput,
 } from "@langwatch/agent-web/surfaces/agent-http-editor";
-import { AgentTestPanel } from "./agent-test-panel";
+import { AgentTestPanel } from "./agent-test-panel.tsx";
 import {
   agentInputBindingSchema,
   FIELD_TYPES,
@@ -17,7 +17,7 @@ import {
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
-import { ScenarioInputMappingSection } from "../../elements/suites/scenario-input-mapping-section";
+import { ScenarioInputMappingSection } from "../../elements/suites/scenario-input-mapping-section.tsx";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,9 +30,9 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { explainExecutionStateError } from "@langwatch/workflow-web/surfaces/execution-state-error";
-import { api } from "../../../behavior/scenario-api";
+import { api } from "../../../behavior/scenario-api.ts";
 
 const inputMappingsSchema = z.record(z.string(), agentInputBindingSchema);
 const availableSourceTypeSchema = z.enum([

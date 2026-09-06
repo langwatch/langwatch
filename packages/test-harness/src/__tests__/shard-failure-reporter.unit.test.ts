@@ -5,13 +5,13 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { hardFloorReport, resolveHardFloorMs } from "../unit-shard-hard-floor";
+import { hardFloorReport, resolveHardFloorMs } from "../unit-shard-hard-floor.ts";
 import ShardFailureReporter, {
   recordShardSelection,
   resetShardState,
   shardModuleTally,
   shardSawFailure,
-} from "../shard-failure-reporter";
+} from "../shard-failure-reporter.ts";
 
 /** The event vitest emits for a module, reduced to what the reporter reads. */
 function module(moduleId: string): { moduleId: string } {

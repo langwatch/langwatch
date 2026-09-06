@@ -3,8 +3,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRACE_NAME_MAX_LENGTH } from "@langwatch/trace-contract";
 import { useEffect, useId, useRef, useState } from "react";
 import { LuCheck, LuX } from "react-icons/lu";
-import { useTraceHost } from "../../behavior/trace-host";
-import { useRenameTrace } from "./internal/use-rename-trace";
+import { useTraceHost } from "../../behavior/trace-host.ts";
+import { useRenameTrace } from "./internal/use-rename-trace.ts";
 
 export type EditableTraceNameProps = {
   projectId: string;

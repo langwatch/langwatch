@@ -9,19 +9,19 @@ import {
 } from "@langwatch/api/rest";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 
-import { unavailableIdempotentRunner } from "../../../app/api-idempotency.composition";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
+import { unavailableIdempotentRunner } from "../../../app/api-idempotency.composition.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
 import type {
   ApiPackagedRestAbsenceReport,
   ApiPackagedRestCollaborators,
   ApiPackagedRestFamilyName,
   ApiPackagedRestPorts,
   ApiPackagedRestServices,
-} from "../../app-rest.packaged-families";
+} from "../../app-rest.packaged-families.ts";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestServices,
-} from "../../app-rest.process-features";
+} from "../../app-rest.process-features.ts";
 
 /** The project every project-scoped route in these suites is called for. */
 export const TEST_PROJECT = {

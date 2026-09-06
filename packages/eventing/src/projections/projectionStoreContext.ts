@@ -1,5 +1,5 @@
-import type { TenantId } from "../domain/tenantId";
-import type { RetentionPolicy } from "../runtime.types";
+import type { TenantId } from "../domain/tenantId.ts";
+import type { RetentionPolicy } from "../runtime.types.ts";
 
 /**
  * A closed time range (ms since epoch) bounding a store's backing-table read

@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
  * GitHub Copilot CLI. Namespaces under the ORG, not the product

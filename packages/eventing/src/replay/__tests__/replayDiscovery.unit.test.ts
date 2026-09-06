@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { filterDiscoveredByAggregateIds } from "../replayDiscovery";
-import type { DiscoveredAggregate } from "../replayEventSource";
+import { filterDiscoveredByAggregateIds } from "../replayDiscovery.ts";
+import type { DiscoveredAggregate } from "../replayEventSource.ts";
 
 function agg(tenantId: string, aggregateId: string): DiscoveredAggregate {
   return { tenantId, aggregateType: "scenario", aggregateId };

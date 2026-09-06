@@ -24,11 +24,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LangWatchQLDiagnostic, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
-import { readHandledError } from "../../../model/handled-error";
-import { LangWatchQLResultPane } from "../langwatch-ql-result-pane";
-import type { LangWatchQLAnswer, LangWatchQLRequestState } from "../../../model/lwql-request-state";
+import { readHandledError } from "../../../model/handled-error.ts";
+import { LangWatchQLResultPane } from "../langwatch-ql-result-pane.tsx";
+import type { LangWatchQLAnswer, LangWatchQLRequestState } from "../../../model/lwql-request-state.ts";
 
-import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures";
+import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
 
 const SUBMITTED_SQL = "SELECT trace_id FROM analytics.traces_daily";
 

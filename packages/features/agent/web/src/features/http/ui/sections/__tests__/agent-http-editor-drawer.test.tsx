@@ -11,9 +11,9 @@ import { describe, expect, it } from "vitest";
 import {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,
-} from "../agent-http-editor-drawer";
-import { AgentHttpEditorPresentationPort } from "../agent-http-editor.presentation";
-import type { RenderScenarioMappingsInput } from "../agent-http-editor.presentation";
+} from "../agent-http-editor-drawer.tsx";
+import { AgentHttpEditorPresentationPort } from "../agent-http-editor.presentation.tsx";
+import type { RenderScenarioMappingsInput } from "../agent-http-editor.presentation.tsx";
 
 const agent: AgentWithFields = {
   id: "agent_1",

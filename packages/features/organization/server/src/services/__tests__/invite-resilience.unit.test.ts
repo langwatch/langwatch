@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service";
-import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules";
-import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
+import { InviteService } from "../invite.service.ts";
+import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules.ts";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
 /**
  * D11 — resilient invitations (specs/identity/resilient-invitations.feature).

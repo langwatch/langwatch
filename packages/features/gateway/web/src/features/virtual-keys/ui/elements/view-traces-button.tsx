@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { Bird } from "lucide-react";
-import { Link } from "../../../../ui/elements/gateway-link";
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
 /**
  * Opens the Trace Explorer filtered to the traces one virtual key produced.

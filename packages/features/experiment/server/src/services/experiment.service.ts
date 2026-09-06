@@ -57,18 +57,18 @@ import {
 import {
   ArchivedExperimentWriteError,
   type ExperimentRepository,
-} from "../repositories/experiment.repository";
-import type { ExperimentRunRepository } from "../repositories/experiment-run.repository";
-import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository";
-import type { ExperimentExecutionPort } from "../ports/experiment-execution.port";
-import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
-import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules";
-import { ExperimentSlugService } from "./experiment-slug.service";
-import { ExperimentWorkbenchService } from "./experiment-workbench.service";
+} from "../repositories/experiment.repository.ts";
+import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
+import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
+import type { ExperimentExecutionPort } from "../ports/experiment-execution.port.ts";
+import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
+import { ExperimentSlugService } from "./experiment-slug.service.ts";
+import { ExperimentWorkbenchService } from "./experiment-workbench.service.ts";
 import {
   ExperimentWorkbenchReferencesService,
   type ExperimentWorkbenchReferenceServices,
-} from "./experiment-workbench-references.service";
+} from "./experiment-workbench-references.service.ts";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;

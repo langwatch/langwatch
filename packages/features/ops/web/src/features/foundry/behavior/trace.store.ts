@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { SpanConfig, SpanType, TraceConfig } from "../model/foundry-types";
-import { shortId } from "../model/foundry-types";
+import type { SpanConfig, SpanType, TraceConfig } from "../model/foundry-types.ts";
+import { shortId } from "../model/foundry-types.ts";
 
 function createDefaultSpan(type: SpanType = "span", name?: string): SpanConfig {
   return {

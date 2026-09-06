@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { AggregateType } from "./domain/aggregateType";
-import type { Event, Projection } from "./domain/types";
-import type { PipelineMetadata, RegisteredPipeline } from "./pipeline/types";
-import type { EventSourcedQueueProcessor } from "./queues";
-import type { EventSourcingService } from "./services/eventSourcingService";
+import type { AggregateType } from "./domain/aggregateType.ts";
+import type { Event, Projection } from "./domain/types.ts";
+import type { PipelineMetadata, RegisteredPipeline } from "./pipeline/types.ts";
+import type { EventSourcedQueueProcessor } from "./queues/index.ts";
+import type { EventSourcingService } from "./services/eventSourcingService.ts";
 
 const logger = createLogger("langwatch:event-sourcing:disabled");
 

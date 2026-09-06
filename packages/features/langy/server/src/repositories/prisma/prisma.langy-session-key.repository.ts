@@ -1,9 +1,9 @@
-import type { LangyDatabase } from "./langy-database.mapper";
-import { PrismaLangySessionKeyReapRepository } from "./prisma.langy-session-key-reap.repository";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
+import { PrismaLangySessionKeyReapRepository } from "./prisma.langy-session-key-reap.repository.ts";
 import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
-} from "../langy-session-key.repository";
+} from "../langy-session-key.repository.ts";
 
 export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
   private constructor(

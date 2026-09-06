@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import type { EventSourcedQueueProcessor } from "../../queues";
+import type { Event } from "../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
-import { ProjectionRegistry } from "../projectionRegistry";
+} from "../../services/__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
+import { ProjectionRegistry } from "../projectionRegistry.ts";
 
 function createMockGlobalQueue(): {
   globalQueue: EventSourcedQueueProcessor<Record<string, unknown>>;

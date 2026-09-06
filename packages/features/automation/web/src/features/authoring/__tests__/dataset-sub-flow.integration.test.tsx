@@ -18,7 +18,7 @@ const { refetchMock, datasets } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     dataset: {
       getAll: {
@@ -33,10 +33,10 @@ vi.mock("../../../behavior/automation-api", () => ({
   },
 }));
 
-const { fakeAutomationHost, renderWithAutomationHost } = await import("../../../testing");
+const { fakeAutomationHost, renderWithAutomationHost } = await import("../../../testing.tsx");
 const { isHandingOverToSubFlow, consumeDraftKeptOnSubFlowReturn } =
-  await import("../behavior/sub-flow");
-const { default: client } = await import("../ui/sections/dataset.client");
+  await import("../behavior/sub-flow.ts");
+const { default: client } = await import("../ui/sections/dataset.client.tsx");
 
 const ConfigForm = client.ConfigForm;
 

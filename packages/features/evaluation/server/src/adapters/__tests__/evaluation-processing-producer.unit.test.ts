@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.adapter";
-import { createEvaluationProcessingPipeline } from "../evaluation-processing.adapter";
+import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.adapter.ts";
+import { createEvaluationProcessingPipeline } from "../evaluation-processing.adapter.ts";
 
 /** The producer's definition, as a host receives it. */
 const producer = () =>

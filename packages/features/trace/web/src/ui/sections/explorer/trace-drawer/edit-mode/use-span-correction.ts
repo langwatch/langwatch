@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
+import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import type { TraceEditSpanField } from "@langwatch/trace-contract";
-import { useSpanDetailCanonical } from "../../hooks/use-span-detail";
-import { useAppliedTraceEditPatch } from "../../hooks/use-trace-edit-overlay";
+import { useSpanDetailCanonical } from "../../hooks/use-span-detail.ts";
+import { useAppliedTraceEditPatch } from "../../hooks/use-trace-edit-overlay.ts";
 
 /**
  * Which of the open span's fields a correction changed, plus the span exactly as

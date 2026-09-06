@@ -3,10 +3,10 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createRestService, createService } from "../builder.js";
-import type { RestEndpoint, RestEndpointHandler } from "../definition.js";
-import type { RestService } from "../builder.js";
-import { serializeEndpointResult } from "../response.js";
+import { createRestService, createService } from "../builder.ts";
+import type { RestEndpoint, RestEndpointHandler } from "../definition.ts";
+import type { RestService } from "../builder.ts";
+import { serializeEndpointResult } from "../response.ts";
 
 type AssertFalse<T extends false> = T;
 type IsAssignable<TFrom, TTo> = TFrom extends TTo ? true : false;

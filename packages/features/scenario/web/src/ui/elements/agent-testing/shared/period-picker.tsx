@@ -9,7 +9,7 @@ import type {
   RelativePresetKey,
   PeriodMode,
 } from "@langwatch/analytics-web/surfaces/period-selector";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   describePeriod,
   matchPeriodPreset,

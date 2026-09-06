@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   NurturingProductInterestService,
   type IntegrationMethodValue,
-} from "../nurturing-product-interest.service";
+} from "../nurturing-product-interest.service.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
   settle,
-} from "./support/nurturing-harness";
+} from "./support/nurturing-harness.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),

@@ -6,7 +6,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 
-vi.mock("../../../../behavior/use-field-redaction", () => ({
+vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
@@ -14,7 +14,7 @@ vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-import { ExecutionOutputPanel } from "../execution-output-panel";
+import { ExecutionOutputPanel } from "../execution-output-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

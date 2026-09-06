@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { SubscribersCard as SubscribersCardView } from "../elements/subscribers-card";
-import { joinSubscriberHealth, type SubscriberHealthRow } from "../../model/subscriber-health";
-import { api } from "../../../../behavior/ops-api";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { SubscribersCard as SubscribersCardView } from "../elements/subscribers-card.tsx";
+import { joinSubscriberHealth, type SubscriberHealthRow } from "../../model/subscriber-health.ts";
+import { api } from "../../../../behavior/ops-api.ts";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 function usePauseActions() {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();

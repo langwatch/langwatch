@@ -8,8 +8,8 @@
  */
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PageLayout } from "../src/components/page-layout";
-import { renderWithDesignSystem } from "../src/testing";
+import { PageLayout } from "../src/components/page-layout.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
 

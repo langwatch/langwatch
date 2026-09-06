@@ -1,5 +1,5 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
-import type { MetricDataPointAppendRepository } from "../../repositories/metric-data-point-append.repository";
+import type { MetricDataPointAppendRepository } from "../../repositories/metric-data-point-append.repository.ts";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 
 abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> {

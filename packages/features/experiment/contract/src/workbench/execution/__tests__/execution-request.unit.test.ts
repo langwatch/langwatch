@@ -7,7 +7,7 @@
  * rather than defining inline duplicates.
  */
 import { describe, expect, it } from "vitest";
-import { executionRequestSchema } from "../types";
+import { executionRequestSchema } from "../types.ts";
 
 describe("executionRequestSchema", () => {
   it("accepts evaluators without settings (settings are fetched from DB)", () => {

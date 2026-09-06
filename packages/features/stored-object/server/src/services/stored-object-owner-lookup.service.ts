@@ -2,12 +2,12 @@ import {
   StoredObjectOwnerLookupUnavailableError,
   StoredObjectOwnerResolver,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectOwnerLookupSpan } from "../ports/stored-object-owner-lookup-telemetry.port";
-import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-owner-lookup-telemetry.port";
+import type { StoredObjectOwnerLookupSpan } from "../ports/stored-object-owner-lookup-telemetry.port.ts";
+import { StoredObjectOwnerLookupTelemetryPort } from "../ports/stored-object-owner-lookup-telemetry.port.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerLookupResult,
-} from "../repositories/stored-object-owner.repository";
+} from "../repositories/stored-object-owner.repository.ts";
 
 /**
  * The legacy id-only file URL crosses tenant boundaries solely to identify an

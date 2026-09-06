@@ -15,8 +15,8 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { EvaluatorApp } from "../evaluator.app";
-import { EvaluatorTrpcApi, type EvaluatorTrpcPorts } from "../../transport/api-trpc/evaluator.api";
+import { EvaluatorApp } from "../evaluator.app.ts";
+import { EvaluatorTrpcApi, type EvaluatorTrpcPorts } from "../../transport/api-trpc/evaluator.api.ts";
 
 type TestContext = {
   app: { evaluatorApp: EvaluatorApp };

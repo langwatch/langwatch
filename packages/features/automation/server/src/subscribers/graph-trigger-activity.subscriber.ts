@@ -3,7 +3,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port";
+import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port.ts";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 

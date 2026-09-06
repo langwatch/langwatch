@@ -4,10 +4,10 @@ import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
 import { lazy, Suspense, useEffect, useMemo, useRef, type ComponentProps } from "react";
 import { FaSlack } from "react-icons/fa";
-import { AutomationMarkdown as Markdown } from "../../../../ui/elements/automation-markdown";
+import { AutomationMarkdown as Markdown } from "../../../../ui/elements/automation-markdown.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { monacoBackgroundFor, trapEscapeInsideEditor } from "../../../liquid-editor";
-import { useMonacoTheme } from "../../../liquid-editor";
+import { monacoBackgroundFor, trapEscapeInsideEditor } from "../../../liquid-editor/index.ts";
+import { useMonacoTheme } from "../../../liquid-editor/index.ts";
 import {
   clearLiquidMarkers,
   clearModelVariables,
@@ -19,7 +19,7 @@ import {
   setupLiquidJsonSchema,
   type VariableInfo as MonacoVariableInfo,
   validateLiquidModel,
-} from "../../../liquid-editor";
+} from "../../../liquid-editor/index.ts";
 
 export type VariableInfo = MonacoVariableInfo;
 

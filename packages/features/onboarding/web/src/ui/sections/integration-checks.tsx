@@ -1,8 +1,8 @@
 import { List, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, Circle } from "react-feather";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { Link } from "../elements/link";
-import { api } from "../../behavior/onboarding-api";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { Link } from "../elements/link.tsx";
+import { api } from "../../behavior/onboarding-api.ts";
 
 export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();

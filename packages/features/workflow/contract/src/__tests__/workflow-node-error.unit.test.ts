@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nodeErrorToDomainError } from "../workflow-node-error";
+import { nodeErrorToDomainError } from "../workflow-node-error.ts";
 
 describe("nodeErrorToDomainError", () => {
   it.each([

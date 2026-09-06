@@ -11,7 +11,7 @@ import {
   isComparisonEvaluatorType,
   localPromptConfigSchema,
   targetConfigObjectSchema,
-} from "../../experiment-workbench";
+} from "../../experiment-workbench.ts";
 
 /**
  * Payload and result schemas for every workbench action.

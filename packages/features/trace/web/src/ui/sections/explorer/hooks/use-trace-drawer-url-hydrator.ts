@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer";
-import { parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store";
-import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode";
+import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
+import { parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode.ts";
 
 /**
  * One-way URL → drawer store sync. Lives at the page level so the

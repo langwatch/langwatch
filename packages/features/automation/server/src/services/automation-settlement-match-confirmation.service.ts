@@ -3,11 +3,11 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type {
   AutomationSettlementEvaluationReaderPort,
   AutomationSettlementTraceReaderPort,
-} from "../ports/automation-settlement-read.port";
+} from "../ports/automation-settlement-read.port.ts";
 import {
   AutomationSettlementFilterEvaluatorPort,
   AutomationSettlementMatchConfirmationPort,
-} from "../ports/automation-settlement.port";
+} from "../ports/automation-settlement.port.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
   "events.event_type",

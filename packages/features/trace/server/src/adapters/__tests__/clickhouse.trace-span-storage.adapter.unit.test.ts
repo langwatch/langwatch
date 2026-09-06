@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
-} from "../../ports/clickhouse.port";
-import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port";
-import { ClickHouseTraceSpanStorageAdapter } from "../clickhouse.trace-span-storage.adapter";
+} from "../../ports/clickhouse.port.ts";
+import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
+import { ClickHouseTraceSpanStorageAdapter } from "../clickhouse.trace-span-storage.adapter.ts";
 
 /**
  * Spec: packages/features/trace/specs/span-storage-write.feature

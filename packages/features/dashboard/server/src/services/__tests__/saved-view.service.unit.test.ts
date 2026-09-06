@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
-import { SavedViewService } from "../saved-view.service";
+import { SavedViewService } from "../saved-view.service.ts";
 
 type Call = { method: string } & Record<string, unknown>;
 

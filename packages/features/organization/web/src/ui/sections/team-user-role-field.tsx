@@ -1,12 +1,12 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { type OrganizationUserRole, TeamUserRole } from "../../model/prisma-types";
-import { api } from "../../behavior/organization-api";
+import { type OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+import { api } from "../../behavior/organization-api.ts";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
   type TeamRoleValue,
-} from "../../model/member-role-constraints";
+} from "../../model/member-role-constraints.ts";
 import { Select } from "@langwatch/design-system/select";
 
 export type RoleOption = {

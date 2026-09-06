@@ -9,7 +9,7 @@
  * parse. So the load-bearing test is: every recommended schedule round-trips.
  */
 import { describe, expect, it } from "vitest";
-import { SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog";
+import { SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog.ts";
 import {
   composerCadenceError,
   cronFromPullParts,
@@ -19,7 +19,7 @@ import {
   pullCadenceCronError,
   recommendedPullSchedule,
   summarizePullCadence,
-} from "../model/pull-cadence";
+} from "../model/pull-cadence.ts";
 
 /** Derived from the real defaults so an adapter added with a schedule the
  *  picker cannot speak fails here the day it lands. */

@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const useQuery = vi.fn();
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     webhookEndpoints: {
       deliveries: { useQuery: (...args: unknown[]) => useQuery(...args) },
@@ -20,7 +20,7 @@ vi.mock("../../../behavior/gateway-api", () => ({
   },
 }));
 
-import { WebhookDeliveriesDrawer } from "../ui/sections/webhook-deliveries-drawer";
+import { WebhookDeliveriesDrawer } from "../ui/sections/webhook-deliveries-drawer.tsx";
 
 const endpoint = {
   id: "ep_1",

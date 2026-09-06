@@ -8,12 +8,12 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing";
-import { InviteMemberDrawer } from "../invite-member-drawer";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
+import { InviteMemberDrawer } from "../invite-member-drawer.tsx";
 
 const calls = vi.hoisted(() => ({ createInvites: vi.fn() }));
 
-vi.mock("../../../behavior/organization-api", () => {
+vi.mock("../../../behavior/organization-api.ts", () => {
   const answers: Record<string, unknown> = {
     "plan.getActivePlan": { type: "ENTERPRISE", free: false, planSource: "subscription" },
     "licenseEnforcement.checkLimit": { allowed: true, current: 1, max: 100 },
@@ -51,7 +51,7 @@ vi.mock("../../../behavior/organization-api", () => {
   return { api: root };
 });
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { HAS_EMAIL_PROVIDER_KEY: true } }),
 }));
 

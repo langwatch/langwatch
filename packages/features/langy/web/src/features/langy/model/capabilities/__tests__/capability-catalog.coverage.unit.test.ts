@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 import {
   CAPABILITY_CATALOG,
   CAPABILITY_SURFACES,
-} from "../../../../../model/langy-capability-catalog";
-import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry";
+} from "../../../../../model/langy-capability-catalog.ts";
+import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry.ts";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
   new URL("../../../../../../../../../../sdks/typescript/src/cli/program.ts", import.meta.url),

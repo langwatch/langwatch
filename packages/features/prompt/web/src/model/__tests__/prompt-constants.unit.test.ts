@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { getLatestOpenAIChatFlagship, getModelById } from "@langwatch/model-provider-contract";
-import { DEFAULT_MODEL } from "../prompt-constants";
+import { DEFAULT_MODEL } from "../prompt-constants.ts";
 
 describe("prompt sync fidelity — default prompt model", () => {
   /** @scenario "The default prompt model is a current model the registry still serves" */

@@ -6,7 +6,7 @@ import {
   type DataPrivacyScopeFacts,
   type ResolvedDataPrivacy,
   resolveAudience,
-} from "./data-privacy";
+} from "./data-privacy.ts";
 
 type Candidate = {
   scopeType: DataPrivacyRow["scopeType"];

@@ -19,11 +19,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   BugReportRateLimitedError,
   BugReportIntakeService,
-} from "../../../services/bug-report-intake.service";
-import type { BugReportNotifierPort } from "../../../ports/bug-report-notifier.port";
-import type { BugReportRateLimiterPort } from "../../../ports/bug-report-rate-limiter.port";
-import { PrismaBugReportRepository } from "../../../repositories/prisma/prisma.bug-report.repository";
-import { createBugReportsRestApp } from "../bug-report.api";
+} from "../../../services/bug-report-intake.service.ts";
+import type { BugReportNotifierPort } from "../../../ports/bug-report-notifier.port.ts";
+import type { BugReportRateLimiterPort } from "../../../ports/bug-report-rate-limiter.port.ts";
+import { PrismaBugReportRepository } from "../../../repositories/prisma/prisma.bug-report.repository.ts";
+import { createBugReportsRestApp } from "../bug-report.api.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

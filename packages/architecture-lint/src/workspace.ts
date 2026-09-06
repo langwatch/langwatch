@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { readFeatureCatalogue } from "./feature-catalogue";
+import { readFeatureCatalogue } from "./feature-catalogue.ts";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
@@ -10,7 +10,7 @@ import type {
   FeatureLayoutVersion,
   FeaturePackageRole,
   PackageManifest,
-} from "./types";
+} from "./types.ts";
 
 const FEATURE_ROLES = new Set<FeaturePackageRole>(["contract", "server", "web"]);
 

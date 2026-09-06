@@ -36,18 +36,18 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
-import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port";
-import { ExperimentRunOrchestratorService } from "../../services/experiment-run-orchestrator.service";
-import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules";
-import type { StartPollingRunInput } from "../../services/experiment-polling-run.service";
-import { ExperimentSavedStateExecutionService } from "../../services/experiment-saved-state-execution.service";
+import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port.ts";
+import { ExperimentRunOrchestratorService } from "../../services/experiment-run-orchestrator.service.ts";
+import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules.ts";
+import type { StartPollingRunInput } from "../../services/experiment-polling-run.service.ts";
+import { ExperimentSavedStateExecutionService } from "../../services/experiment-saved-state-execution.service.ts";
 import {
   type ExecutionDataServices,
   ExperimentExecutionDataService,
-} from "../../services/experiment-execution-data.service";
-import { ExperimentRunResultsWriterService } from "../../services/experiment-run-results-writer.service";
-import { ExperimentRunStateMirrorService } from "../../services/experiment-run-state-mirror.service";
-import { mapThrownErrorEvent } from "../../processes/experiment-result-mapping.process";
+} from "../../services/experiment-execution-data.service.ts";
+import { ExperimentRunResultsWriterService } from "../../services/experiment-run-results-writer.service.ts";
+import { ExperimentRunStateMirrorService } from "../../services/experiment-run-state-mirror.service.ts";
+import { mapThrownErrorEvent } from "../../processes/experiment-result-mapping.process.ts";
 import {
   handledErrorEnvelopeSchema,
   listRunsResponseSchema,
@@ -61,8 +61,8 @@ import {
   startRunResponseSchema,
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
-} from "../../rules/experiment-schemas.rules";
-import { workbenchActorFrom } from "../../rules/experiment-workbench-actor.rules";
+} from "../../rules/experiment-schemas.rules.ts";
+import { workbenchActorFrom } from "../../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 

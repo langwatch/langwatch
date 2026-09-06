@@ -12,7 +12,7 @@
 import { ChakraProvider, defaultSystem, HStack } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { RedisStatTile } from "../ui/elements/redis-stat-tile";
+import { RedisStatTile } from "../ui/elements/redis-stat-tile.tsx";
 
 const renderTile = (
   overrides: Partial<React.ComponentProps<typeof RedisStatTile>["data"]> = {},

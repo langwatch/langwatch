@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { langyRelayFrameSchema } from "../langy-relay-frame.rules";
+import { langyRelayFrameSchema } from "../langy-relay-frame.rules.ts";
 
 describe("Langy relay error frames", () => {
   it("preserves explicit herr retryability", () => {

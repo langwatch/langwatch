@@ -18,7 +18,7 @@ import {
   type ExperimentRunProgressFailure,
   type ExperimentRunProgressState,
   type ExperimentRunProgressSummary,
-} from "../ports/experiment-run-progress.port";
+} from "../ports/experiment-run-progress.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-progress");
 

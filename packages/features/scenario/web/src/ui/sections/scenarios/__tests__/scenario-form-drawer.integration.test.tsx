@@ -15,7 +15,7 @@ import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
-vi.mock("../save-and-run-menu", () => ({
+vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: ({
     onSaveWithoutRunning,
     onSaveAndRun,
@@ -45,13 +45,13 @@ vi.mock("../save-and-run-menu", () => ({
     </div>
   ),
 }));
-vi.mock("../scenario-editor-sidebar", () => ({
+vi.mock("../scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
 // The run-model dialog is covered in ScenarioRunModelDialog.integration.test.tsx.
 // Here it auto-confirms once on open so these flow tests exercise the
 // save → run → navigate path without driving the picker UI.
-vi.mock("../scenario-run-model-dialog", () => ({
+vi.mock("../scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
@@ -60,7 +60,7 @@ vi.mock("../scenario-run-model-dialog", () => ({
   },
 }));
 
-import { ScenarioFormDrawer } from "../scenario-form-drawer";
+import { ScenarioFormDrawer } from "../scenario-form-drawer.tsx";
 
 // -- Hoisted mocks --
 
@@ -91,7 +91,7 @@ const mocks = vi.hoisted(() => ({
     | undefined,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       create: {
@@ -182,7 +182,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   clearFlowCallbacks: mocks.mockClearFlowCallbacks,
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: mocks.mockProject,
     organization: { id: "org-123" },
@@ -200,14 +200,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({
     runScenario: mocks.mockRunScenario,
     isRunning: false,
   }),
 }));
 
-vi.mock("../../use-scenario-target", () => ({
+vi.mock("../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),

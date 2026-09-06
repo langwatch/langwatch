@@ -7,13 +7,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { filterReservedMediaRefAttributes, SummaryMediaStrip } from "../trace-summary-accordions";
+import { filterReservedMediaRefAttributes, SummaryMediaStrip } from "../trace-summary-accordions.tsx";
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     storedObjects: {
       headById: {

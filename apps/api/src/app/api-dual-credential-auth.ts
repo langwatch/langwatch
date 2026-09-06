@@ -7,9 +7,9 @@ import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 
-import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
-import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
-import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
+import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
+import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session.ts";
+import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
 
 /**
  * More than one credential kind claimed the request.

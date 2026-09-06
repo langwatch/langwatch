@@ -11,7 +11,7 @@ vi.mock("@langwatch/redis-client", () => ({
   },
 }));
 
-import { MigrationCutoverRedisAuditAdapter } from "../redis.object-storage-migration.adapter";
+import { MigrationCutoverRedisAuditAdapter } from "../redis.object-storage-migration.adapter.ts";
 
 const logger = {
   error: vi.fn(),

@@ -1,12 +1,12 @@
-import { MailRenderPort } from "../ports/mail-render.port";
+import { MailRenderPort } from "../ports/mail-render.port.ts";
 import {
   renderJoinRequestExpiredEmail,
   renderJoinRequestReminderEmail,
-} from "../templates/join-request-emails";
+} from "../templates/join-request-emails.tsx";
 import {
   renderTriggerDigestEmail,
   type TriggerDigestMail,
-} from "../templates/trigger-digest-email";
+} from "../templates/trigger-digest-email.tsx";
 
 /**
  * The one renderer, and the only place react-email is evaluated on a backend

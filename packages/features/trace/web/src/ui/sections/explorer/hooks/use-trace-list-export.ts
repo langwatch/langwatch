@@ -1,6 +1,6 @@
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useExportTraces } from "./use-export-traces";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useExportTraces } from "./use-export-traces.ts";
 
 /**
  * Adapter around `useExportTraces` that pulls filter/time/query state out of the

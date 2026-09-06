@@ -8,7 +8,7 @@ import type {
   RoleType,
   SolutionType,
   UsageStyle,
-} from "../../behavior/types";
+} from "../../behavior/types.ts";
 
 interface OnboardingFormContextValue extends OnboardingFormData {
   setOrganizationName: (value: string) => void;

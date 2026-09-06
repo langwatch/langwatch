@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
-import { DatasetContentPort } from "../../ports/dataset.port";
-import { DatasetRecordRepository } from "../dataset-record.repository";
-import { DatasetRepository } from "../dataset.repository";
-import { DatasetService } from "../../services/dataset.service";
+import { DatasetContentPort } from "../../ports/dataset.port.ts";
+import { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import { DatasetRepository } from "../dataset.repository.ts";
+import { DatasetService } from "../../services/dataset.service.ts";
 
 const dataset = (): Dataset =>
   datasetSchema.parse({

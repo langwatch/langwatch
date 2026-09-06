@@ -7,11 +7,11 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
-import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port";
+import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port.ts";
 import {
   NullUsageLimitEmailAdapter,
   type UsageLimitEmailAdapter,
-} from "../ports/usage-limit-email.port";
+} from "../ports/usage-limit-email.port.ts";
 
 const logger = createLogger("ee:notification-service");
 

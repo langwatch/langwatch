@@ -1,5 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
+import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -19,7 +19,7 @@ import {
 import {
   apiResponseModelProvidersSchema,
   updateModelProviderInputSchema,
-} from "../../rules/model-provider-schemas.rules";
+} from "../../rules/model-provider-schemas.rules.ts";
 
 const logger = createLogger("langwatch:api:model-providers");
 

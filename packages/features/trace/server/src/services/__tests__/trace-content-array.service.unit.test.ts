@@ -1,4 +1,4 @@
-import { TraceContentArrayService } from "../trace-content-array.service";
+import { TraceContentArrayService } from "../trace-content-array.service.ts";
 import { describe, expect, it } from "vitest";
 
 describe("TraceContentArrayService.tryCoerceContentToArray", () => {

@@ -27,15 +27,15 @@
  * for both and so breaks both at once.
  */
 
-import { quietly } from "./observability";
-import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience";
-import type { RetryAttemptNotice } from "./retry";
+import { quietly } from "./observability.ts";
+import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience.ts";
+import type { RetryAttemptNotice } from "./retry.ts";
 import {
   extractQueryPreview,
   extractRawQuery,
   safeQueryMeta,
   type VendorQueryType,
-} from "./statementShape";
+} from "./statementShape.ts";
 
 /**
  * How a statement ended, as the metric counts it. `inband_error` is a

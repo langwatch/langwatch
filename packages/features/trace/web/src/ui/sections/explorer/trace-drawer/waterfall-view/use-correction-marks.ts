@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { expandDeletedSpanIds } from "@langwatch/trace-contract";
-import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
+import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 
 const NO_MARKS = {
   correctedSpanIds: new Set<string>(),

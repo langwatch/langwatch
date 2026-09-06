@@ -1,14 +1,14 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository";
-import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository";
-import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
-import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
-import { VirtualKeyService } from "../services/virtual-key.service";
-import { VirtualKeyCryptoAdapter } from "./virtual-key-crypto.adapter";
-import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.adapter";
+import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
+import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
+import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import { VirtualKeyService } from "../services/virtual-key.service.ts";
+import { VirtualKeyCryptoAdapter } from "./virtual-key-crypto.adapter.ts";
+import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.adapter.ts";
 
 /**
  * The write-path service wired to this deployment's Postgres, with a fixed

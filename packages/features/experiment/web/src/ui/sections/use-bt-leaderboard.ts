@@ -4,13 +4,13 @@
  */
 
 import { useMemo } from "react";
-import { buildPairwiseComparisons } from "./batch-evaluation-results.pairwise";
+import { buildPairwiseComparisons } from "./batch-evaluation-results.pairwise.ts";
 import {
   type BTLeaderboard,
   type BTLeaderboardOptions,
   computeBTLeaderboard,
-} from "../../model/batch-evaluation-results.bt-leaderboard";
-import type { BatchComparisonColumn } from "./batch-evaluation-results.types";
+} from "../../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { BatchComparisonColumn } from "./batch-evaluation-results.types.ts";
 
 /**
  * Fits to keep. A results page shows a handful of comparison columns and a

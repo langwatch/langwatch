@@ -12,12 +12,12 @@ import {
   type GithubBranchRecheckState,
   githubBranchRecheckSchema,
   githubBranchRecheckWake,
-} from "../processes/github-branch-recheck.process";
+} from "../processes/github-branch-recheck.process.ts";
 import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
-} from "../intents/github-branch-recheck.intent";
-import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port";
+} from "../intents/github-branch-recheck.intent.ts";
+import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
 
 export interface GithubMaintenancePipelineDeps {
   /**

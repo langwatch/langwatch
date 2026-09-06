@@ -1,26 +1,26 @@
-export { WorkerApplication } from "./app/worker.application";
+export { WorkerApplication } from "./app/worker.application.ts";
 export {
   WorkerProductionComposition,
   type WorkerInfrastructureCompositionOptions,
   type WorkerProductionCompositionOptions,
   type WorkerTopicCompositionOptions,
-} from "./app/worker-production.composition";
+} from "./app/worker-production.composition.ts";
 export {
   createWorkerPrivateInfrastructureComposition,
   type WorkerPrivateInfrastructurePorts,
-} from "./app/worker-private-infrastructure.composition";
+} from "./app/worker-private-infrastructure.composition.ts";
 export {
   createWorkerDurableComposition,
   type WorkerDurableCompositionOptions,
   type WorkerDurablePersistencePorts,
-} from "./app/worker-durable.composition";
+} from "./app/worker-durable.composition.ts";
 export {
   WorkerInfrastructureAdapter,
   WorkerStoredObjectStorageFactory,
   WorkerStorageFactoryPort,
   type WorkerInfrastructureAdapterOptions,
   type WorkerStorageLease,
-} from "./platform/infrastructure/worker-foundation.adapter";
+} from "./platform/infrastructure/worker-foundation.adapter.ts";
 export {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
@@ -28,55 +28,55 @@ export {
   type WorkerProjectS3Target,
   type WorkerS3Credentials,
   type WorkerStoredObjectStorageConfig,
-} from "./platform/infrastructure/worker-stored-object-storage.adapter";
-export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer";
-export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer";
+} from "./platform/infrastructure/worker-stored-object-storage.adapter.ts";
+export { TopicWorkerFeatureInstaller } from "./features/topic/topic-worker-feature.installer.ts";
+export { TraceWorkerFeatureInstaller } from "./features/trace/trace-worker-feature.installer.ts";
 export {
   BillingReportingWorkerFeatureInstaller,
   type BillingReportingWorkerCapability,
-} from "./features/billing/billing-reporting-worker-feature.installer";
+} from "./features/billing/billing-reporting-worker-feature.installer.ts";
 export {
   CodingAgentWorkerFeatureInstaller,
   type CodingAgentWorkerCapability,
   type CodingAgentWorkerCommands,
-} from "./features/coding-agent/coding-agent-worker-feature.installer";
+} from "./features/coding-agent/coding-agent-worker-feature.installer.ts";
 export {
   EvaluationWorkerFeatureInstaller,
   type EvaluationWorkerCapability,
   type EvaluationWorkerCommands,
-} from "./features/evaluation/evaluation-worker-feature.installer";
+} from "./features/evaluation/evaluation-worker-feature.installer.ts";
 export {
   ExperimentWorkerFeatureInstaller,
   type ExperimentWorkerCapability,
-} from "./features/experiment/experiment-worker-feature.installer";
+} from "./features/experiment/experiment-worker-feature.installer.ts";
 export {
   GatewaySpendWorkerFeatureInstaller,
   type GatewaySpendWorkerCapability,
-} from "./features/gateway/gateway-spend-worker-feature.installer";
+} from "./features/gateway/gateway-spend-worker-feature.installer.ts";
 export {
   GovernanceEventsWorkerFeatureInstaller,
   type GovernanceEventsWorkerCapability,
   type GovernanceEventsWorkerCommands,
-} from "./features/governance/governance-events-worker-feature.installer";
+} from "./features/governance/governance-events-worker-feature.installer.ts";
 export {
   GovernanceIngestionWorkerFeatureInstaller,
   type GovernanceIngestionInstallation,
   type GovernanceIngestionWorkerCapability,
-} from "./features/governance/governance-ingestion-worker-feature.installer";
+} from "./features/governance/governance-ingestion-worker-feature.installer.ts";
 export {
   ScenarioWorkerFeatureInstaller,
   type ScenarioDeferredMetricsJobSpec,
   type ScenarioWorkerCapability,
-} from "./features/scenario/scenario-worker-feature.installer";
+} from "./features/scenario/scenario-worker-feature.installer.ts";
 export {
   SuiteWorkerFeatureInstaller,
   type SuiteWorkerCapability,
   type SuiteWorkerCommands,
-} from "./features/suite/suite-worker-feature.installer";
+} from "./features/suite/suite-worker-feature.installer.ts";
 export {
   type WorkerFeatureCloser,
   type WorkerFeatureInstallerPort,
-} from "./features/worker-feature.installer";
+} from "./features/worker-feature.installer.ts";
 export {
   resolveWorkerConfig,
   workerConfigDefinition,
@@ -85,29 +85,29 @@ export {
   type WorkerOutboundProxyConfig,
   type WorkerShutdownConfig,
   type WorkerStorageConfig,
-} from "./platform/config/worker.config";
+} from "./platform/config/worker.config.ts";
 export {
   WorkerEventingRuntime,
   type WorkerEventingConsumerOptions,
   type WorkerEventingDependencies,
   type WorkerEventingProductionOptions,
-} from "./platform/eventing/worker-eventing.runtime";
+} from "./platform/eventing/worker-eventing.runtime.ts";
 export {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "./platform/lifecycle/worker-runtime.port";
-export { WorkerRuntime } from "./platform/lifecycle/worker.runtime";
+} from "./platform/lifecycle/worker-runtime.port.ts";
+export { WorkerRuntime } from "./platform/lifecycle/worker.runtime.ts";
 export {
   WORKER_SHUTDOWN_SIGNALS,
   WorkerSignalHandlers,
   type WorkerShutdownSignal,
   type WorkerSignalSource,
-} from "./platform/lifecycle/worker.signals";
+} from "./platform/lifecycle/worker.signals.ts";
 export {
   WORKER_HEARTBEAT_STALL_BUDGET_MS,
   WORKER_LIVENESS_PATH,
-} from "./platform/liveness/worker.liveness";
+} from "./platform/liveness/worker.liveness.ts";
 export {
   createWorkerMetricsHandler,
   LIVENESS_THREAD_SOURCE,
@@ -119,7 +119,7 @@ export {
   type WorkerMetricsRequest,
   type WorkerMetricsServerHandle,
   type WorkerMetricsSnapshot,
-} from "./platform/liveness/worker-metrics.server";
+} from "./platform/liveness/worker-metrics.server.ts";
 export {
   bootWorker,
   WorkerProcess,
@@ -127,25 +127,25 @@ export {
   type WorkerBootOptions,
   type WorkerProcessComposition,
   type WorkerProcessFactoryContext,
-} from "./worker.process";
+} from "./worker.process.ts";
 export {
   bootWorkerMain,
   WorkerMain,
   type WorkerMainOptions,
   type WorkerMainProcessPort,
   type WorkerMainSignals,
-} from "./worker.main";
+} from "./worker.main.ts";
 export {
   bootWorkerExecutable,
   WorkerExecutable,
   WorkerExecutableCompositionPort,
   type WorkerExecutableHost,
   type WorkerExecutableOptions,
-} from "./worker.executable";
-export { WorkerStandaloneComposition } from "./app/worker-standalone.composition";
+} from "./worker.executable.ts";
+export { WorkerStandaloneComposition } from "./app/worker-standalone.composition.ts";
 export {
   describeWorkerFailure,
   startStandaloneWorker,
   type WorkerExecutableProcessHost,
   type WorkerStandaloneExecutableOptions,
-} from "./app/worker-standalone.executable";
+} from "./app/worker-standalone.executable.ts";

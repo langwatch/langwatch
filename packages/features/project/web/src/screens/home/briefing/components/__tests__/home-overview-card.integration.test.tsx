@@ -8,9 +8,9 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
   type ProjectHomeProject,
-} from "../../../../../model/project-home-host";
-import type { StatusCell } from "../../types";
-import { HomeOverviewCard } from "../home-overview-card";
+} from "../../../../../model/project-home-host.ts";
+import type { StatusCell } from "../../types.ts";
+import { HomeOverviewCard } from "../home-overview-card.tsx";
 
 class StubProjectHomeHost extends ProjectHomeHostPort {
   project(): ProjectHomeProject | undefined {

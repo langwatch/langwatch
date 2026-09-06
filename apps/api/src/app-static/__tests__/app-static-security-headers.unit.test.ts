@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSecurityHeaders } from "../app-static.security-headers";
+import { buildSecurityHeaders } from "../app-static.security-headers.ts";
 
 describe("buildSecurityHeaders", () => {
   /** @scenario Production HTTP responses include the Permissions-Policy header */

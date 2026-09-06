@@ -7,16 +7,16 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "../../../../model/prisma-types";
+import type { SimulationSuite } from "../../../../model/prisma-types.ts";
 import type { ExternalSetSummary } from "@langwatch/scenario-contract";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-import { NowContext } from "../../../../behavior/use-now";
-import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../suite-sidebar";
-import { ALL_RUNS_ID, toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing";
+import { NowContext } from "../../../../behavior/use-now.ts";
+import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../suite-sidebar.tsx";
+import { ALL_RUNS_ID, toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

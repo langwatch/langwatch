@@ -22,9 +22,9 @@ import {
   ATTR_NAVIGATION_SUPERSEDED,
   ATTR_NAVIGATION_TYPE,
   RUM_INSTRUMENTATION_NAME,
-} from "./constants";
-import { resetNavigationForTesting, startNavigationSpan } from "./navigation";
-import { NavigationContextManager } from "./navigationContextManager";
+} from "./constants.ts";
+import { resetNavigationForTesting, startNavigationSpan } from "./navigation.ts";
+import { NavigationContextManager } from "./navigationContextManager.ts";
 
 const exporter = new InMemorySpanExporter();
 const provider = new BasicTracerProvider({

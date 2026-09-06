@@ -1,22 +1,22 @@
-import type { StoredObjectDeliveryAudience } from "./audiences";
-import type { StoredObjectId, StoredObjectProjectId } from "./ids";
+import type { StoredObjectDeliveryAudience } from "./audiences.ts";
+import type { StoredObjectId, StoredObjectProjectId } from "./ids.ts";
 import type {
   StoredObjectMetadata,
   StoredObjectProvenance,
   StoredObjectStorageUsage,
-} from "./metadata";
-import type { StoredObjectReference } from "./references";
+} from "./metadata.ts";
+import type { StoredObjectReference } from "./references.ts";
 import type {
   StoredObjectsConfirmUploadInput,
   StoredObjectsCreateUploadInput,
   StoredObjectsCreateUploadOutput,
-} from "./uploads";
+} from "./uploads.ts";
 import type {
   StoredObjectsDeleteInput,
   StoredObjectsDeleteOutput,
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
-} from "./stored-object.commands";
+} from "./stored-object.commands.ts";
 
 export type StoredObjectByteStream = AsyncIterable<Uint8Array>;
 export type StoredObjectByteSource = Uint8Array | StoredObjectByteStream;

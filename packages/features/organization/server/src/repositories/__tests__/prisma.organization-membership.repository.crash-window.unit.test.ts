@@ -16,7 +16,7 @@ import {
   type Prisma,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository";
+import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
 
 const memberFindUnique = vi.fn();
 const memberCount = vi.fn();

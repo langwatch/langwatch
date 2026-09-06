@@ -18,7 +18,7 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
 } from "@langwatch/trace-contract";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.repository";
+import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
 const heavyRow = {
   ProjectionId: "p1",

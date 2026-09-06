@@ -1,8 +1,8 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceTokenCounterPort } from "../../ports/trace-token-counter.port";
-import { OtlpSpanTokenEstimationService } from "../span-token-estimation.service";
+import { TraceTokenCounterPort } from "../../ports/trace-token-counter.port.ts";
+import { OtlpSpanTokenEstimationService } from "../span-token-estimation.service.ts";
 
 class CountingTokenizer extends TraceTokenCounterPort {
   readonly calls: { model: string; text: string | undefined }[] = [];

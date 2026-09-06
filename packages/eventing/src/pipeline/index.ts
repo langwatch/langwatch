@@ -3,4 +3,4 @@ export type {
   PipelineMetadata,
   PipelineWithCommandHandlers,
   RegisteredPipeline,
-} from "./types";
+} from "./types.ts";

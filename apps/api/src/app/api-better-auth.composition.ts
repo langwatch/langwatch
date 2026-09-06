@@ -23,8 +23,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserService } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
-import type { ApiMailComposition } from "./api-mail.composition";
+import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
+import type { ApiMailComposition } from "./api-mail.composition.ts";
 
 /**
  * This process's own Better Auth instance — the deployment's ONE identity seam, composed

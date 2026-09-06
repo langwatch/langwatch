@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ModelProviderSkipPermissionsPatternInvalidError } from "@langwatch/model-provider-contract";
-import { ModelProviderCommandService } from "../model-provider-command.service";
+import { ModelProviderCommandService } from "../model-provider-command.service.ts";
 
 function serviceWith(
   options: {

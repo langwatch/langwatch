@@ -1,11 +1,11 @@
 import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "react-feather";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { traceDetailsAddress } from "../../model/analytics-overlay-address";
-import { useFilterParams } from "../../behavior/use-filter-params";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { SummaryMetricValue } from "../elements/summary-metric";
+import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
 export const FeedbacksTable = () => {
   const { filterParams, queryOpts } = useFilterParams();

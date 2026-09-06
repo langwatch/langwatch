@@ -3,8 +3,8 @@ import type { LogProcessingEvent } from "@langwatch/log-contract";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
-} from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter";
+} from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter.ts";
 
 /**
  * Durable log processing, composed from nothing but a tenant-keyed ClickHouse

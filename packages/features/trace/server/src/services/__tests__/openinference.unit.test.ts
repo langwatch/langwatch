@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { OpenInferenceCanonicaliserService } from "../openinference-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { OpenInferenceCanonicaliserService } from "../openinference-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 describe("OpenInferenceCanonicaliserService", () => {
   const extractor = OpenInferenceCanonicaliserService.create();

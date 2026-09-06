@@ -11,9 +11,9 @@ import {
   LangyConversationNotOwnedError,
   LangyTurnNotStoppableError,
 } from "@langwatch/langy-contract";
-import { LangyTurnStopService } from "../langy-turn-stop.service";
-import { LangyFinalPartsService } from "../langy-final-parts.service";
-import type { LangyTurnServiceDependencies } from "../langy-turn-shared.service";
+import { LangyTurnStopService } from "../langy-turn-stop.service.ts";
+import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
+import type { LangyTurnServiceDependencies } from "../langy-turn-shared.service.ts";
 
 function makeStopDeps(
   over: {

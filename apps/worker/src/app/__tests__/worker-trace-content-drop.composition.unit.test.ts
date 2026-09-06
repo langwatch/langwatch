@@ -7,7 +7,7 @@ import {
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceSpanContentDropPort } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition";
+import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-content-drop.feature

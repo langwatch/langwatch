@@ -30,13 +30,13 @@ import type { ComponentType } from "react";
 export type AuthorizeScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const authorizeScreens = {
-  authorize: () => import("./authorize.screen"),
-  mcpAuthorize: () => import("./mcp-authorize.screen"),
+  authorize: () => import("./authorize.screen.tsx"),
+  mcpAuthorize: () => import("./mcp-authorize.screen.tsx"),
 } as const satisfies Record<string, AuthorizeScreenLoader>;
 
 export type AuthorizeScreenName = keyof typeof authorizeScreens;
 
-export { DISALLOWED_REDIRECT_SCHEMES, isAllowedRedirectScheme } from "../../model/redirect-schemes";
+export { DISALLOWED_REDIRECT_SCHEMES, isAllowedRedirectScheme } from "../../model/redirect-schemes.ts";
 export {
   AuthorizeHostPort,
   AuthorizeHostProvider,
@@ -47,11 +47,11 @@ export {
   type AuthorizeSuccessNotice,
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
-} from "../../model/authorize-host";
+} from "../../model/authorize-host.ts";
 
 /**
  * The tRPC Provider both handoff screens run on. It is the API Keys settings
  * screen's binding, deliberately: the two families share one cache rather than
  * standing a second client over the same procedures.
  */
-export { apiKeyApi } from "../../behavior/api-key-api";
+export { apiKeyApi } from "../../behavior/api-key-api.ts";

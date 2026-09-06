@@ -1,8 +1,8 @@
 import { Deferred } from "@langwatch/eventing";
 import type { TopicClusteringCommandsPort } from "@langwatch/topic-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Topic's worker-facing capability after its server graph is composed. */
 export interface TopicWorkerCapability {

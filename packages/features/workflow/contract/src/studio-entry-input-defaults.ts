@@ -1,4 +1,4 @@
-import type { Entry, Field, NodeDataset, StudioWorkflow } from "./studio-workflow";
+import type { Entry, Field, NodeDataset, StudioWorkflow } from "./studio-workflow.ts";
 
 type Inline = NonNullable<NodeDataset["inline"]>;
 

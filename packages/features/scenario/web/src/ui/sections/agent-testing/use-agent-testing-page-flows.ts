@@ -5,12 +5,12 @@
  */
 
 import { useEffect } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOpenNewRunPlan } from "./run/run-plan-dialog-host";
-import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing";
-import { useAgentTestingStore } from "./use-agent-testing-store";
+import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
+import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingStore } from "./use-agent-testing-store.ts";
 
 /** The id of the suite the address names, or nothing for any other selection. */
 export function useSelectedSuiteTestSuiteId(selection: AgentTestingSelection): string | null {

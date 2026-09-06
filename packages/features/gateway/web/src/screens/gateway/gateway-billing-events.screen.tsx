@@ -12,16 +12,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { keepPreviousData } from "../../model/keep-previous-data";
+import { keepPreviousData } from "../../model/keep-previous-data.ts";
 import { ReceiptText, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
-import { Link } from "../../ui/elements/gateway-link";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
+import { Link } from "../../ui/elements/gateway-link.tsx";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { useRollingWindow } from "../../behavior/use-rolling-window";
-import { api, type RouterOutputs } from "../../behavior/gateway-api";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { useRollingWindow } from "../../behavior/use-rolling-window.ts";
+import { api, type RouterOutputs } from "../../behavior/gateway-api.ts";
 
 const PRESETS: Array<{ label: string; days: number }> = [
   { label: "Last 24h", days: 1 },

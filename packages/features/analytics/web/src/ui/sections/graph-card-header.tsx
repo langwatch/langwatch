@@ -3,10 +3,10 @@ import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2 } from "lucide-react";
 import { useMemo } from "react";
-import type { CustomGraphInput } from "./custom-graph";
-import type { FilterField } from "../../model/analytics-filter-definition";
-import { GraphCardMenu, type SizeOption } from "./graph-card-menu";
-import { GraphFilterIndicator } from "../elements/graph-filter-indicator";
+import type { CustomGraphInput } from "./custom-graph.tsx";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { GraphCardMenu, type SizeOption } from "./graph-card-menu.tsx";
+import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
 
 interface GraphCardHeaderProps {
   graphId: string;

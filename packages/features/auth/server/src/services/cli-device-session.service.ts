@@ -10,7 +10,7 @@ import {
 } from "@langwatch/auth-contract";
 import { randomBytes } from "node:crypto";
 
-import type { CliDeviceSessionStorePort } from "../ports/cli-device-session-store.port";
+import type { CliDeviceSessionStorePort } from "../ports/cli-device-session-store.port.ts";
 
 /** Redis key prefix for device-code records. */
 const DEVICE_CODE_PREFIX = "lwcli:device:";

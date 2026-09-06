@@ -6,7 +6,7 @@ import {
   type Disposition,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { ContentDropPolicyService } from "../content-drop-policy.service";
+import { ContentDropPolicyService } from "../content-drop-policy.service.ts";
 
 const service = ContentDropPolicyService.create();
 

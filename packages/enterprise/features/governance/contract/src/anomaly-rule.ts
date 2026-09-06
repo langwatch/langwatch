@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { unsupportedGovernanceValue } from "./governance.errors";
+import { unsupportedGovernanceValue } from "./governance.errors.ts";
 
 export const ANOMALY_RULE_SEVERITIES = ["critical", "warning", "info"] as const;
 export const ANOMALY_RULE_SCOPES = [

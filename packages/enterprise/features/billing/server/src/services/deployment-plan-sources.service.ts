@@ -9,8 +9,8 @@ import type {
   PlanEnricher,
   ResolvePlanInput,
 } from "@langwatch/entitlement-contract";
-import type { BillingSubscriptionRepository } from "../ports/subscription.port";
-import { SaaSPlanProviderService } from "./plan-provider.service";
+import type { BillingSubscriptionRepository } from "../ports/subscription.port.ts";
+import { SaaSPlanProviderService } from "./plan-provider.service.ts";
 
 /** What a deployment's plan sources are decided from. */
 export type DeploymentPlanSourcesOptions = Readonly<{

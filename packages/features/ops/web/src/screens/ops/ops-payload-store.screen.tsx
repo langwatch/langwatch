@@ -1,5 +1,5 @@
-import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout";
-import { BlobStoreContent } from "../../features/blob-store/ui/sections/blob-store-content";
+import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout.tsx";
+import { BlobStoreContent } from "../../features/blob-store/ui/sections/blob-store-content.tsx";
 
 /**
  * The payload store, as a section of the event-sourcing workspace.

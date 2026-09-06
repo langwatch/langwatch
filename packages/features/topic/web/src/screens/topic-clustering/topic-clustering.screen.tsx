@@ -22,9 +22,9 @@ import type {
   TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
 import { useState } from "react";
-import { topicApi } from "../../behavior/topic-api";
+import { topicApi } from "../../behavior/topic-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useTopicHost } from "../../model/topic-host";
+import { useTopicHost } from "../../model/topic-host.ts";
 
 /**
  * The server sends bare strings for codes/reasons/modes; these lookups narrow them back onto

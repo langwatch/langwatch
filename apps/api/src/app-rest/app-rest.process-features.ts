@@ -41,11 +41,11 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import { createScimProtocolRestApp, createScimWebhookRestApp } from "@langwatch/enterprise-api";
 
-import type { ApiScimRestPorts } from "../app/api-scim.composition";
+import type { ApiScimRestPorts } from "../app/api-scim.composition.ts";
 
-import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount";
+import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount.ts";
 
-import { createCronRestApp, type CronRestPorts } from "../features/cron/cron-rest";
+import { createCronRestApp, type CronRestPorts } from "../features/cron/cron-rest.ts";
 
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -65,49 +65,49 @@ import type { DashboardApp } from "@langwatch/dashboard-server";
 import type { AppRestBroadcast } from "@langwatch/api/rest";
 import type { SimulationService } from "@langwatch/scenario-contract";
 
-import type { ApiHandlerManagedSessionPort } from "../app/api-handler-managed-session";
+import type { ApiHandlerManagedSessionPort } from "../app/api-handler-managed-session.ts";
 import {
   mountScenarioRunExportRest,
   type ScenarioRunExportAudit,
-} from "../features/export/scenario-run-export-rest.mount";
+} from "../features/export/scenario-run-export-rest.mount.ts";
 import {
   mountApiTraceExportRest,
   type ApiTraceExportRestOptions,
-} from "../features/export/trace-export-rest.mount";
-import { mountAnalyticsRest } from "../features/analytics/analytics-rest.mount";
+} from "../features/export/trace-export-rest.mount.ts";
+import { mountAnalyticsRest } from "../features/analytics/analytics-rest.mount.ts";
 import {
   type ApiLangWatchQLRestCollaborators,
   mountLangWatchQLRest,
-} from "../features/analytics/langwatch-ql-rest.mount";
-import { mountQueryRest } from "../features/analytics/query-rest.mount";
-import { mountOrganizationRest } from "../features/organization/organization-rest.mount";
-import { mountPromptsRest } from "../features/prompt/prompt-rest.mount";
-import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition";
-import { mountDatasetGenerateRest } from "../features/dataset/dataset-generate-rest.mount";
-import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount";
-import { mountScenarioGenerateRest } from "../features/scenario/scenario-generate-rest.mount";
-import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount";
+} from "../features/analytics/langwatch-ql-rest.mount.ts";
+import { mountQueryRest } from "../features/analytics/query-rest.mount.ts";
+import { mountOrganizationRest } from "../features/organization/organization-rest.mount.ts";
+import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
+import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition.ts";
+import { mountDatasetGenerateRest } from "../features/dataset/dataset-generate-rest.mount.ts";
+import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount.ts";
+import { mountScenarioGenerateRest } from "../features/scenario/scenario-generate-rest.mount.ts";
+import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount.ts";
 import {
   mountExperimentV3Rest,
   type ApiExperimentV3RestCollaborators,
-} from "../features/experiment/experiment-v3-rest.mount";
+} from "../features/experiment/experiment-v3-rest.mount.ts";
 import {
   mountExperimentInitRest,
   type ApiExperimentInitRestCollaborators,
-} from "../features/experiment/experiment-init-rest.mount";
+} from "../features/experiment/experiment-init-rest.mount.ts";
 import {
   mountWorkflowRunRest,
   type ApiWorkflowRunRestCollaborators,
-} from "../features/workflow/workflow-run-rest.mount";
-import { createApiDiscoveryRestApp } from "../features/discovery/api-discovery-rest";
-import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-openapi-rest";
-import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest";
+} from "../features/workflow/workflow-run-rest.mount.ts";
+import { createApiDiscoveryRestApp } from "../features/discovery/api-discovery-rest.ts";
+import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-openapi-rest.ts";
+import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest.ts";
 import {
   createHealthProbeRestApp,
   type HealthProbeRestPorts,
-} from "../features/health/health-probe-rest";
-import type { RumRateLimiter } from "../features/rum/rum-ingest.service";
-import { createRumRestApp } from "../features/rum/rum-rest";
+} from "../features/health/health-probe-rest.ts";
+import type { RumRateLimiter } from "../features/rum/rum-ingest.service.ts";
+import { createRumRestApp } from "../features/rum/rum-rest.ts";
 import {
   createOtlpIngestRestApp,
   createOtlpPathAliasRestApp,
@@ -118,14 +118,14 @@ import {
   mountEvaluationsLegacyRest,
   type ApiEvaluationBatchRestCollaborators,
   type ApiEvaluationRunRestCollaborators,
-} from "../features/evaluation/evaluations-legacy-rest.mount";
+} from "../features/evaluation/evaluations-legacy-rest.mount.ts";
 import {
   mountCollectorRest,
   mountTraceLegacyRest,
   mountTracesRest,
   type ApiTraceLegacyRestCollaborators,
   type ApiTracesRestCollaborators,
-} from "../features/trace/trace-rest.mount";
+} from "../features/trace/trace-rest.mount.ts";
 import {
   createOpsClickHouseExplainRestApp,
   type OpsClickHouseExplainRestPorts,
@@ -135,12 +135,12 @@ import {
   createMcpAuthorizeRestApp,
   type McpAuthorizeRestPorts,
 } from "@langwatch/hosted-mcp-server";
-import { createImageProxyRestApp } from "../features/image-proxy/image-proxy-rest";
+import { createImageProxyRestApp } from "../features/image-proxy/image-proxy-rest.ts";
 import {
   mountApiPackagedRestFamilies,
   type ApiPackagedRestAbsenceReport,
   type ApiPackagedRestCollaborators,
-} from "./app-rest.packaged-families";
+} from "./app-rest.packaged-families.ts";
 
 /**
  * The project credential a handler-managed family resolves through.

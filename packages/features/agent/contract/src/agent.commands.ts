@@ -4,7 +4,7 @@ import {
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
   workflowAgentConfigSchema,
-} from "./config";
+} from "./config/index.ts";
 import { z } from "zod";
 
 const createAgentRequestBaseSchema = z.object({

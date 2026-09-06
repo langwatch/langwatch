@@ -18,9 +18,9 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createAgentCacheRestApp, type AgentCacheStore } from "../agent-cache-rest";
-import { AgentCacheService } from "../agent-cache.service";
-import { MemoryAgentCacheEntryStore } from "../agent-cache.store";
+import { createAgentCacheRestApp, type AgentCacheStore } from "../agent-cache-rest.ts";
+import { AgentCacheService } from "../agent-cache.service.ts";
+import { MemoryAgentCacheEntryStore } from "../agent-cache.store.ts";
 
 const PROJECT_ID = "project_sandbox";
 /** A 32-byte hex key, the shape the share adapter refuses anything else in place of. */

@@ -12,7 +12,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "project-1", slug: "demo" },
   })),
@@ -26,8 +26,8 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 
 import posthog from "posthog-js";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
-import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
-import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout";
+import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
+import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout.tsx";
 
 const SNOOZE_KEY = "langwatch:new-simulations-callout-dismissed:v1:project-1";
 const PREFERENCE_KEY = "langwatch:prefer-legacy-simulations:v1:project-1";

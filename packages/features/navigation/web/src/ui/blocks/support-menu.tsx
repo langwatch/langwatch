@@ -22,10 +22,10 @@ import {
   LuMessageCircle,
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
-import { useNavigationHost } from "../../model/navigation-host";
-import { DiscordOutlineIcon } from "../elements/discord-outline-icon";
-import { NavigationLink } from "../elements/navigation-link";
-import { SideMenuItem } from "./side-menu-link";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { DiscordOutlineIcon } from "../elements/discord-outline-icon.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { SideMenuItem } from "./side-menu-link.tsx";
 
 export type SupportMenuProps = {
   showLabel?: boolean;

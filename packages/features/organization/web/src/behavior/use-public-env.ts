@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from "react";
-import { useOrganizationHost } from "../model/organization-host";
+import { useOrganizationHost } from "../model/organization-host.ts";
 
 export type OrganizationPublicEnvReading = {
   data: { HAS_EMAIL_PROVIDER_KEY: boolean };

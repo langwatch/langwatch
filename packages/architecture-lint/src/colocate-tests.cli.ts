@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-import { planTestColocation } from "./test-colocation";
+import { planTestColocation } from "./test-colocation.ts";
 
 const USAGE = `Usage:
   pnpm refactor:colocate-tests [--root DIR] [--write]

@@ -24,8 +24,8 @@ import {
   type RetentionHostScope,
   type RetentionRouteReading,
   type RetentionSuccessNotice,
-} from "../../../model/data-retention-host";
-import DataRetentionScreen from "../data-retention.screen";
+} from "../../../model/data-retention-host.ts";
+import DataRetentionScreen from "../data-retention.screen.tsx";
 
 const { snapshotRef, invalidate, removeForScope, setForScope, triggerUpdate, killMutation } =
   vi.hoisted(() => ({
@@ -64,7 +64,7 @@ const { snapshotRef, invalidate, removeForScope, setForScope, triggerUpdate, kil
     },
   }));
 
-vi.mock("../../../behavior/data-retention-api", () => ({
+vi.mock("../../../behavior/data-retention-api.ts", () => ({
   dataRetentionApi: {
     useUtils: () => ({ dataRetention: { getRules: { invalidate } } }),
     dataRetention: {

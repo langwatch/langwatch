@@ -17,16 +17,16 @@ import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
-import type { SkipPermissionsDecision } from "../../../services/langy-skip-permissions.service";
+import type { SkipPermissionsDecision } from "../../../services/langy-skip-permissions.service.ts";
 import {
   LangyLocalControlRuntimeAdapter,
   type LocalControlRuntime,
-} from "../../../adapters/langy-local-control-runtime.adapter";
+} from "../../../adapters/langy-local-control-runtime.adapter.ts";
 import {
   conversationKeyBindingsKey,
   sessionKeyBindingKey,
-} from "../../../rules/langy-local-control-keys.rules";
-import { LangyTrpcApi, type LangyTrpcContext } from "../langy.api";
+} from "../../../rules/langy-local-control-keys.rules.ts";
+import { LangyTrpcApi, type LangyTrpcContext } from "../langy.api.ts";
 
 const ns = nanoid(8);
 const projectId = `p-local-${ns}`;

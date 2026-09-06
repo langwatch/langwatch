@@ -5,10 +5,10 @@
  */
 import type { ModelProvider } from "@langwatch/gateway-contract";
 
-import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
+import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
 import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   budgetPeriodFloorMs,
@@ -16,8 +16,8 @@ import {
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
-import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
 import {
   budgetToWire,
   buildProviderSlot,
@@ -31,7 +31,7 @@ import {
   routingModeToWire,
   type GatewayConfigPayload,
   type ProviderExclusionWire,
-} from "../rules/gateway-config-wire.rules";
+} from "../rules/gateway-config-wire.rules.ts";
 
 export class GatewayConfigMaterialiserService {
   private constructor(

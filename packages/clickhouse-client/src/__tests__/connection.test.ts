@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseConfigService } from "../config";
+import { ClickHouseConfigService } from "../config.ts";
 import {
   ClickHouseClientFactory,
   ClickHouseConnectionClosedError,
@@ -7,8 +7,8 @@ import {
   ClickHouseNotConfiguredError,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
-} from "../connection";
-import { ClickHouseShutdownService } from "../shutdown";
+} from "../connection.ts";
+import { ClickHouseShutdownService } from "../shutdown.ts";
 
 interface TestClient extends ClickHouseCloseableClient {
   input: ClickHouseClientCreationInput;

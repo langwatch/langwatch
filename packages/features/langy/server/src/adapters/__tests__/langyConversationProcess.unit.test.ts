@@ -7,14 +7,14 @@ import {
   type ProcessRef,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
 
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
   type LangyConversationProcessState,
-} from "../../ports/langy-conversation-process.port";
-import { langyConversationProcess } from "../../processes/langy-conversation.process";
+} from "../../ports/langy-conversation-process.port.ts";
+import { langyConversationProcess } from "../../processes/langy-conversation.process.ts";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentRespondedEvent,
@@ -35,7 +35,7 @@ import {
   toLangyProcessEnvelope,
   toolCallInitiatedEvent,
   toolCallSucceededEvent,
-} from "./helpers/langyEventFixtures";
+} from "./helpers/langyEventFixtures.ts";
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own

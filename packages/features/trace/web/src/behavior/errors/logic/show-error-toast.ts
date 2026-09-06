@@ -6,7 +6,7 @@ import {
   isHandledByGlobalHandler,
   showErrorToast as reportFailure,
 } from "@langwatch/ui-host/errors";
-import type { TraceFailureAction } from "../../trace-host";
+import type { TraceFailureAction } from "../../trace-host.ts";
 
 export interface ShowErrorToastOptions {
   /**

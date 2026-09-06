@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ViewAutomationDrawer } from "../ui/sections/view-automation-drawer";
+import { ViewAutomationDrawer } from "../ui/sections/view-automation-drawer.tsx";
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -21,7 +21,7 @@ const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockCloseDrawer: vi.fn(),
 }));
 
-vi.mock("../../../behavior/automation-session", () => ({
+vi.mock("../../../behavior/automation-session.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", name: "Proj", slug: "proj" },
     organization: { id: "org-1" },
@@ -29,13 +29,13 @@ vi.mock("../../../behavior/automation-session", () => ({
   }),
 }));
 
-vi.mock("../../../ui/elements/filter-display", () => ({
+vi.mock("../../../ui/elements/filter-display.tsx", () => ({
   FilterDisplay: ({ filters }: { filters: string }) => (
     <div data-testid="filter-display">{filters}</div>
   ),
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     automation: {
       getTriggerById: {

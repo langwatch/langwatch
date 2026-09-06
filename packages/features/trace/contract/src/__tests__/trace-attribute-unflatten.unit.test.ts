@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeUnflatten } from "../trace-attribute-unflatten";
+import { safeUnflatten } from "../trace-attribute-unflatten.ts";
 
 describe("safeUnflatten", () => {
   describe("when given flat dot-notation keys", () => {

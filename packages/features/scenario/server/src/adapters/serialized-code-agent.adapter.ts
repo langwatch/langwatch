@@ -19,8 +19,8 @@ import {
   NLP_FETCH_HEADROOM_MS,
   NlpFetchAdapter,
   type NlpFetchTimeouts,
-} from "./nlp-fetch.adapter";
-import { SerializedAgentPort } from "../ports/serialized-agent.port";
+} from "./nlp-fetch.adapter.ts";
+import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";

@@ -18,7 +18,7 @@ import {
   ModelProviderAnchorRequiredError,
   ModelProviderNotFoundError,
 } from "@langwatch/model-provider-contract";
-import { ModelProviderCommandService } from "../model-provider-command.service";
+import { ModelProviderCommandService } from "../model-provider-command.service.ts";
 
 const EXISTING = {
   id: "provider-1",

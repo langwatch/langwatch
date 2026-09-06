@@ -21,7 +21,7 @@
 import { describe, expect, it } from "vitest";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
-import { makeProvider } from "./model-provider.test-helpers";
+import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a row whose custom entry has a non-string display name", () => {
   describe("when display names are built alongside a valid entry on another row", () => {

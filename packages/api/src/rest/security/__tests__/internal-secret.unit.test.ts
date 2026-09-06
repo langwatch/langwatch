@@ -4,7 +4,7 @@
  * true, accepting credential-less requests to destructive cron jobs.
  */
 import { describe, expect, it } from "vitest";
-import { isInternalSecretValid } from "../internal-secret";
+import { isInternalSecretValid } from "../internal-secret.ts";
 
 const valid = (authorizationHeader: string | undefined, expected: string | undefined) =>
   isInternalSecretValid({ authorizationHeader, expected });

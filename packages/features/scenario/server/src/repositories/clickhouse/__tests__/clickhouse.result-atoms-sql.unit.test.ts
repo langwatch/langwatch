@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { categorizeRunStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { mapStatus } from "../simulation-run.mapper";
+import { mapStatus } from "../simulation-run.mapper.ts";
 import {
   CODE_TARGET_NAME_EXPR,
   DEDUP_WINDOW_SLACK_MS,
@@ -16,7 +16,7 @@ import {
   TARGET_PARAMETERS_EXPR,
   TARGET_REF_EXPR,
   TARGET_STAMP_KEY_EXPR,
-} from "../clickhouse.result-atoms.repository";
+} from "../clickhouse.result-atoms.repository.ts";
 
 const { buildAtomFilters, groupKeyExpr, trendKeyExpr } = ResultAtomsClickHouseRepository;
 

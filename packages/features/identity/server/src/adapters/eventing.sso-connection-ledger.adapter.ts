@@ -23,7 +23,7 @@ import {
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import {
   type AggregateType,
@@ -32,9 +32,9 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
-import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
-import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
+import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
+import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent.ts";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 

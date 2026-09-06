@@ -7,7 +7,7 @@ import {
   promptOutputSchema,
   promptingTechniqueSchema,
   type PromptConfigData,
-} from "./prompt";
+} from "./prompt.ts";
 
 export const promptConfigFieldsSchema = z
   .object({

@@ -20,7 +20,7 @@ import {
   type NotificationFailureNotice,
   type NotificationHostProject,
   type NotificationSuccessNotice,
-} from "./model/notification-host";
+} from "./model/notification-host.ts";
 
 export class FakeNotificationHost extends NotificationHostPort {
   readonly successes: NotificationSuccessNotice[] = [];

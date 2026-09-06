@@ -8,12 +8,12 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../ports/better-auth.port";
+} from "../../ports/better-auth.port.ts";
 
 /**
  * The KSUID resource prefix a role-binding row is minted under.

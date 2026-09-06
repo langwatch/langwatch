@@ -8,15 +8,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockUseQuery } = vi.hoisted(() => ({ mockUseQuery: vi.fn() }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { spansFull: { useQuery: mockUseQuery } } },
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
 }));
 
-import { TurnSteps, turnHasGenieSteps } from "../turn-steps";
+import { TurnSteps, turnHasGenieSteps } from "../turn-steps.tsx";
 
 const SPANS = [
   {

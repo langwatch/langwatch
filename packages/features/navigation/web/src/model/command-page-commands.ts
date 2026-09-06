@@ -1,4 +1,4 @@
-import type { Command } from "./command-bar-types";
+import type { Command } from "./command-bar-types.ts";
 
 // Registry of page-specific commands. Empty since the legacy Traces page —
 // the only page that ever registered any — was removed; the extension point

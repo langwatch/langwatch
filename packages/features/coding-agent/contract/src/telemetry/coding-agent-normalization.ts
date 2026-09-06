@@ -18,14 +18,14 @@
  * evidence that forced it.
  */
 
-import { CODING_AGENT_REGISTRY } from "./index";
+import { CODING_AGENT_REGISTRY } from "./index.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
   CodingAgentMetric,
   CodingAgentSignal,
   TokenType,
-} from "./coding-agent-definition";
+} from "./coding-agent-definition.ts";
 
 /**
  * Which agent produced this record.

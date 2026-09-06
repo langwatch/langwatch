@@ -8,7 +8,7 @@
  */
 
 import { isReplyTextPart } from "@langwatch/trace-contract";
-import { isNonEmptyString, isRecord, safeStringify } from "./canonical-guard.rules";
+import { isNonEmptyString, isRecord, safeStringify } from "./canonical-guard.rules.ts";
 
 /**
  * Gemini content roles are "user" | "model"; chat messages use

@@ -3,12 +3,12 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type {
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,
-} from "../ports/workflow.port";
-import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service";
+} from "../ports/workflow.port.ts";
+import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service.ts";
 import {
   StudioWorkflowEventEnricherService,
   type StudioEventEnricher,
-} from "./studio-workflow-event-enricher.service";
+} from "./studio-workflow-event-enricher.service.ts";
 
 export type StudioEventPreparationInput = {
   event: StudioClientEvent;

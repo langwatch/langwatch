@@ -2,20 +2,20 @@ import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
 import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
 import type { LangyContextTargetDescriptor } from "@langwatch/langy-web/surfaces/langy-context";
-import { useDensityTokens } from "../../hooks/use-density-tokens";
-import { useDensityStore } from "../../../../../behavior/density.store";
-import { useRowPulseStore } from "../../../../../behavior/row-pulse.store";
-import type { TraceStatus } from "../../types/trace";
+import { useDensityTokens } from "../../hooks/use-density-tokens.ts";
+import { useDensityStore } from "../../../../../behavior/density.store.ts";
+import { useRowPulseStore } from "../../../../../behavior/row-pulse.store.ts";
+import type { TraceStatus } from "../../types/trace.ts";
 import {
   SkeletonAddonRow,
   SkeletonCellContent,
   SkeletonSelectCell,
-} from "../skeleton-cell-content";
-import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../status-row";
-import { Tbody, Td, Tr } from "../../../../elements/explorer/trace-table/table-primitives";
-import { type ColumnMeta, cellPropsFor } from "../trace-table-shell";
-import { SELECT_COLUMN_ID } from "./cells/select-cells";
-import { pickCell, type Registry, type RowActions } from "./types";
+} from "../skeleton-cell-content.tsx";
+import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../status-row.tsx";
+import { Tbody, Td, Tr } from "../../../../elements/explorer/trace-table/table-primitives.tsx";
+import { type ColumnMeta, cellPropsFor } from "../trace-table-shell.tsx";
+import { SELECT_COLUMN_ID } from "./cells/select-cells.tsx";
+import { pickCell, type Registry, type RowActions } from "./types.ts";
 
 interface RegistryRowProps<TRow> {
   tanstackRow: Row<TRow>;

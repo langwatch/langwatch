@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PersonalWorkspaceDiagnosticsAdapter } from "../personal-workspace-diagnostics.adapter";
+import { PersonalWorkspaceDiagnosticsAdapter } from "../personal-workspace-diagnostics.adapter.ts";
 
 describe("PersonalWorkspaceDiagnosticsAdapter", () => {
   describe("when the organization service warns", () => {

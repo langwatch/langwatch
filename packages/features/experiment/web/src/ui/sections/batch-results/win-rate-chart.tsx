@@ -31,14 +31,14 @@ import {
   YAxis,
 } from "recharts";
 
-import { disambiguateNames } from "./presentation";
+import { disambiguateNames } from "./presentation.tsx";
 import {
   axisLabelProps,
   buildAxisLabels,
   truncateLabel,
-} from "../../../model/batch-evaluation-results.chart-axis";
+} from "../../../model/batch-evaluation-results.chart-axis.ts";
 
-import type { BatchComparisonColumn } from "../batch-evaluation-results.types";
+import type { BatchComparisonColumn } from "../batch-evaluation-results.types.ts";
 
 /**
  * Fallback only, for a variant whose target this run has no colour for.

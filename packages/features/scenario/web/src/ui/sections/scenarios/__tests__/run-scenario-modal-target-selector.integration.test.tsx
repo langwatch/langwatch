@@ -50,15 +50,15 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../../behavior/prompts/use-all-prompts-for-project", () => ({
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
   useAllPromptsForProject: () => ({ data: mockPrompts }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getAll: {
@@ -68,8 +68,8 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-import { RunScenarioModal } from "../run-scenario-modal";
-import type { TargetValue } from "../../../../model/scenario-target";
+import { RunScenarioModal } from "../run-scenario-modal.tsx";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 
 describe("RunScenarioModal with TargetSelector", () => {
   let onClose: ReturnType<typeof vi.fn<() => void>>;

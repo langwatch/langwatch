@@ -19,11 +19,11 @@
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StubAuthzEpoch } from "../../ports/__tests__/support/authz-epoch.stub";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
-import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository";
-import { AuthzGrantsService } from "../../services/authz-grants.service";
-import { ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness";
+import { StubAuthzEpoch } from "../../ports/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
+import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
+import { AuthzGrantsService } from "../../services/authz-grants.service.ts";
+import { ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";

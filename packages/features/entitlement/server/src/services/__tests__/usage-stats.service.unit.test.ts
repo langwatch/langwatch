@@ -5,9 +5,9 @@
  */
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
-import { UsageCounterPort, type UsageCount } from "../../ports/usage-counter.port";
-import { UsageMembershipPort } from "../../ports/usage-membership.port";
-import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service";
+import { UsageCounterPort, type UsageCount } from "../../ports/usage-counter.port.ts";
+import { UsageMembershipPort } from "../../ports/usage-membership.port.ts";
+import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 
 const UNLIMITED_MESSAGES = 999_999_999;
 

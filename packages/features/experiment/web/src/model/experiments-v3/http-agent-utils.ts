@@ -3,7 +3,7 @@
  */
 
 import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
-import type { HttpConfig, TargetConfig } from "./types";
+import type { HttpConfig, TargetConfig } from "./types.ts";
 
 // ============================================================================
 // Body Template Variable Extraction

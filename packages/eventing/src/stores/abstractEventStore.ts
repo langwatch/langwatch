@@ -1,21 +1,21 @@
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event } from "../domain/types";
-import { ValidationError } from "../services/errorHandling";
-import { EventUtils } from "../utils/event.utils";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event } from "../domain/types.ts";
+import { ValidationError } from "../services/errorHandling.ts";
+import { EventUtils } from "../utils/event.utils.ts";
 import type {
   EventStore as BaseEventStore,
   EventStoreEventReadInput,
   EventStoreReadContext,
-} from "./eventStore.types";
+} from "./eventStore.types.ts";
 import {
   deduplicateEvents,
   eventToRecord,
   recordToEvent,
   validateEventAggregateType,
   validateEventTenant,
-} from "./eventStoreUtils";
-import { rehydrationLowerBoundMs } from "./rehydrationWindow";
-import type { EventRecord, EventRepository } from "./repositories/eventRepository.types";
+} from "./eventStoreUtils.ts";
+import { rehydrationLowerBoundMs } from "./rehydrationWindow.ts";
+import type { EventRecord, EventRepository } from "./repositories/eventRepository.types.ts";
 
 /**
  * Abstract base class for EventStore implementations using the Template Method pattern.

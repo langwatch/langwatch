@@ -10,7 +10,7 @@ import {
   readCliErrorDocument,
 } from "@langwatch/langy-contract";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
-import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels";
+import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
 
 /** The plan allowance a failure ran into, in the customer's own words. */
 export interface LangyToolFailureLimit {

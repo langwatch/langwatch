@@ -1,5 +1,5 @@
-import { licensingApi } from "../../behavior/licensing-api";
-import { useLicensingHost } from "../../model/licensing-host";
+import { licensingApi } from "../../behavior/licensing-api.ts";
+import { useLicensingHost } from "../../model/licensing-host.ts";
 
 interface UseLicenseActionsOptions {
   organizationId: string;

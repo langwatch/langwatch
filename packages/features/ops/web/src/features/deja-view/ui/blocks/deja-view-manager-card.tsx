@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 
 export interface DejaViewProcessManagerOutboxMessage {
   messageKey: string;

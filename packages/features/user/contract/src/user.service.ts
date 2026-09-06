@@ -19,7 +19,7 @@ import type {
   CreatedUser,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
-} from "./user";
+} from "./user.ts";
 
 export abstract class UserService {
   /** Returns every existing profile among the requested user IDs. */

@@ -20,17 +20,17 @@ import type { Project } from "@langwatch/workflow-contract";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { Link } from "@langwatch/ui-host/link";
-import { describeCellFailure } from "../../../model/experiments-v3/cell-failure";
+import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { TableSkeleton } from "../../elements/batch-results/table-skeleton";
+import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import {
   transformBatchEvaluationData,
   type BatchEvaluationData,
-} from "../batch-evaluation-results.types";
+} from "../batch-evaluation-results.types.ts";
 import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
@@ -38,20 +38,20 @@ import {
   FieldsButton,
   GroupRowsButton,
   RowHeightButton,
-} from "../batch-results/batch-evaluation-results-table";
-import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar";
-import { ComparisonCharts } from "../batch-results/comparison-charts";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
-import { downloadCsv } from "../batch-evaluation-results.csv";
-import { isRunFinished } from "../../../model/batch-evaluation-results.run-state";
-import { useComparisonMode } from "../../../behavior/use-comparison-mode";
+} from "../batch-results/batch-evaluation-results-table.tsx";
+import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar.tsx";
+import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { downloadCsv } from "../batch-evaluation-results.csv.ts";
+import { isRunFinished } from "../../../model/batch-evaluation-results.run-state.ts";
+import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
 import {
   RUN_COLORS,
   useMultiRunData,
-} from "../../../behavior/batch-evaluation-results/use-multi-run-data";
-import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences";
-import { useResultsGrouping } from "../use-results-grouping";
-import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard";
+} from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
+import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
+import { useResultsGrouping } from "../use-results-grouping.ts";
+import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 
 type BatchEvaluationResultsProps = {
   project?: Project;

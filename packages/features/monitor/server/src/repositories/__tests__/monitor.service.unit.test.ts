@@ -8,8 +8,8 @@ import {
   type MonitorUpdateInput,
   type Monitor,
 } from "@langwatch/monitor-contract";
-import { MonitorService } from "../../services/monitor.service";
-import { MonitorRepository } from "../monitor.repository";
+import { MonitorService } from "../../services/monitor.service.ts";
+import { MonitorRepository } from "../monitor.repository.ts";
 
 const monitor: Monitor = {
   id: "monitor_1",

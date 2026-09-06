@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service";
+import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
 import type { DerivedTraceEvent, Evaluation } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -10,7 +10,7 @@ import {
   gateSessionCost,
   gateSessionTitle,
   gateTreeCost,
-} from "../trace-view-gates.api";
+} from "../trace-view-gates.api.ts";
 import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 
 /**

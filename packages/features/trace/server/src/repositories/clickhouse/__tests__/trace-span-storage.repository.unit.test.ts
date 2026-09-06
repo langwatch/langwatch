@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
-} from "../../../ports/clickhouse.port";
-import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository";
+} from "../../../ports/clickhouse.port.ts";
+import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
 /**
  * TWIN-DRIFT PINS. The application's `SpanStorageClickHouseRepository` writes the same `stored_spans` rows and does not compile against this file, so the table name, the column set in the table's own order, the insert settings and the retention stamp are pinned as literals here. They

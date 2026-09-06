@@ -16,13 +16,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The resolver answers a friendly name for the chained prompt target and falls
 // back to the raw id when no entity name is known.
-vi.mock("../../../../../behavior/experiments-v3/use-resolve-target-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-resolve-target-name.ts", () => ({
   useResolveTargetName: () => (target: { id: string; promptId?: string }) =>
     target.promptId === "prompt-cat" ? "category_classifier" : target.id,
 }));
 
-import type { DatasetReference, TargetConfig } from "../../../../../model/experiments-v3/types";
-import { TargetVariablesPanel } from "../target-variables-panel";
+import type { DatasetReference, TargetConfig } from "../../../../../model/experiments-v3/types.ts";
+import { TargetVariablesPanel } from "../target-variables-panel.tsx";
 
 const ACTIVE_DATASET_ID = "dataset-1";
 

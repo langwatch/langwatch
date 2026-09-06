@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UserWithBackofficeIncludes } from "@langwatch/ops-contract";
-import { PrismaAdminUserMapper } from "../prisma.admin-user.mapper";
+import { PrismaAdminUserMapper } from "../prisma.admin-user.mapper.ts";
 
 const mapUserToBackofficeRow = PrismaAdminUserMapper.map;
 

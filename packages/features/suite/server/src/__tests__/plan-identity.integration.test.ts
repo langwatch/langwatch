@@ -30,10 +30,10 @@ import {
 } from "@langwatch/suite-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port";
-import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository";
-import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
-import { SuiteService } from "../services/suite.service";
+import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository.ts";
+import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
+import { SuiteService } from "../services/suite.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

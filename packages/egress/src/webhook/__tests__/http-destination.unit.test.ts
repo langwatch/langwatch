@@ -1,11 +1,11 @@
 import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../ssrf/fenced-fetch", () => ({ fetchValidatedDestination: vi.fn() }));
+vi.mock("../../ssrf/fenced-fetch.ts", () => ({ fetchValidatedDestination: vi.fn() }));
 
-import { fetchValidatedDestination } from "../../ssrf/fenced-fetch";
-import type { SsrfValidationResult } from "../../ssrf/url-validator";
-import { sendHttpDestination } from "../http-destination";
+import { fetchValidatedDestination } from "../../ssrf/fenced-fetch.ts";
+import type { SsrfValidationResult } from "../../ssrf/url-validator.ts";
+import { sendHttpDestination } from "../http-destination.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

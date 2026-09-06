@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { IconRadioCardGroup } from "../icon-radio-card-group";
+import { IconRadioCardGroup } from "../icon-radio-card-group.tsx";
 
 const Star = () => <svg data-testid="star-icon" />;
 const Heart = () => <svg data-testid="heart-icon" />;

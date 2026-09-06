@@ -10,7 +10,7 @@ import { useRunViaApiTabs } from "@langwatch/workflow-web/surfaces/run-via-api-t
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 export function RunViaApiDialog({
   open,

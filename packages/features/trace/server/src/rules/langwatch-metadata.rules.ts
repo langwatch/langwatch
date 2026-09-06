@@ -1,7 +1,7 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
-import { isRecord } from "./canonical-guard.rules";
-import { safeStringify } from "./langwatch-structured-value.rules";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { isRecord } from "./canonical-guard.rules.ts";
+import { safeStringify } from "./langwatch-structured-value.rules.ts";
 
 const LANGWATCH_RULE_PREFIX = "langwatch";
 

@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { PersonalWorkspaceDiagnosticsPort } from "../ports/organization.port";
+import { PersonalWorkspaceDiagnosticsPort } from "../ports/organization.port.ts";
 
 /**
  * Where a personal-workspace warning goes. The port takes `(message, context)` and the

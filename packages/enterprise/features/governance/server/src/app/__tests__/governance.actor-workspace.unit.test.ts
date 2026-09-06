@@ -17,8 +17,8 @@ import {
   GovernanceApp,
   type GovernanceActorUser,
   type GovernancePersonalVirtualKeyPorts,
-} from "../governance.app";
-import { TestGovernanceService } from "./support/test-governance-service";
+} from "../governance.app.ts";
+import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 /** A dependency this operation never reaches; calling one is the test's bug. */
 const unreachable = <Method>(): Method =>

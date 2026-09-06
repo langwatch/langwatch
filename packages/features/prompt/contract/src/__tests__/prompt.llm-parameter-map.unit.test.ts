@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LLM_PARAMETER_MAP } from "../prompt.llm-parameter-map";
+import { LLM_PARAMETER_MAP } from "../prompt.llm-parameter-map.ts";
 
 describe("LLM_PARAMETER_MAP", () => {
   it("has no duplicate formField values", () => {

@@ -22,45 +22,45 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { IngestionPullEventingAdapter } from "../../adapters/ingestion-pull.adapter";
-import { PulledUsageEventingAdapter } from "../../adapters/pulled-usage.adapter";
+import { IngestionPullEventingAdapter } from "../../adapters/ingestion-pull.adapter.ts";
+import { PulledUsageEventingAdapter } from "../../adapters/pulled-usage.adapter.ts";
 import {
   GatewayDebitPort,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
-} from "../gateway-debit.port";
-import { GovernanceWebhookPort, type GovernanceWebhookSendBatch } from "../governance-webhook.port";
+} from "../gateway-debit.port.ts";
+import { GovernanceWebhookPort, type GovernanceWebhookSendBatch } from "../governance-webhook.port.ts";
 import {
   IngestionPullMetricsPort,
   IngestionPullOutcomePort,
   IngestionPullRunPort,
   IngestionPullSchedulePort,
-} from "../ingestion-pull.port";
-import { PulledUsageLedgerPort, type PulledUsageLedgerRow } from "../pulled-usage-ledger.port";
+} from "../ingestion-pull.port.ts";
+import { PulledUsageLedgerPort, type PulledUsageLedgerRow } from "../pulled-usage-ledger.port.ts";
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
-} from "../../projections/ingestion-pull-run-status-eventing.projection";
+} from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
 import {
   type GatewayDebitsState,
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
-} from "../../processes/gateway-debit.process";
-import { GovernanceEventDeliveryProcess } from "../../processes/governance-event-delivery.process";
-import { GovernanceEventDeliveryIntent } from "../../intents/governance-event-delivery.intent";
+} from "../../processes/gateway-debit.process.ts";
+import { GovernanceEventDeliveryProcess } from "../../processes/governance-event-delivery.process.ts";
+import { GovernanceEventDeliveryIntent } from "../../intents/governance-event-delivery.intent.ts";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
-} from "../../processes/ingestion-pull.process";
-import { IngestionPullService } from "../../services/ingestion-pull.service";
-import { PulledUsageLedgerIntent } from "../../intents/pulled-usage-ledger.intent";
+} from "../../processes/ingestion-pull.process.ts";
+import { IngestionPullService } from "../../services/ingestion-pull.service.ts";
+import { PulledUsageLedgerIntent } from "../../intents/pulled-usage-ledger.intent.ts";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
-} from "../../adapters/governance-events.adapter";
+} from "../../adapters/governance-events.adapter.ts";
 
 class FixedSchedule extends IngestionPullSchedulePort {
   nextRunAt(input: { cron: string; after: number }): number {

@@ -8,8 +8,8 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
-import { declined } from "../response.js";
+import { createTestService as createService } from "./test-service.ts";
+import { declined } from "../response.ts";
 
 function service() {
   return createService({ name: "toy-raw", logger: false, tracer: false });

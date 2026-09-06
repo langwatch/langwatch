@@ -1,4 +1,4 @@
-import type { GatewayPersistenceTransaction } from "./gateway-change-events.port";
+import type { GatewayPersistenceTransaction } from "./gateway-change-events.port.ts";
 
 /**
  * One durable unit of work: a key write, its change event, and its audit row

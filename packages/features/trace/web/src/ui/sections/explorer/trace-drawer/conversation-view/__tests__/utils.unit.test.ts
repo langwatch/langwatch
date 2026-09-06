@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "../../../types/trace";
-import type { ParsedTurn } from "../types";
-import { buildConversationMarkdownChunks, joinConversationMarkdown } from "../utils";
+import type { TraceListItem } from "../../../types/trace.ts";
+import type { ParsedTurn } from "../types.ts";
+import { buildConversationMarkdownChunks, joinConversationMarkdown } from "../utils.ts";
 
 function makeTurn(opts: { output: string; assistantText: string; userText?: string }): ParsedTurn {
   return {

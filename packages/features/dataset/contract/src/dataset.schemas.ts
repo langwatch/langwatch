@@ -11,8 +11,8 @@
  * visible to the sweep.
  */
 import { z } from "zod";
-import { datasetRecordFormSchema, datasetRecordInputSchema } from "./dataset";
-import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset";
+import { datasetRecordFormSchema, datasetRecordInputSchema } from "./dataset.ts";
+import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset.ts";
 
 /**
  * The half of a dataset write that is the same either way: the tenant key and

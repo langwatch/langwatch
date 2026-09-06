@@ -7,26 +7,26 @@ import { TextSelection } from "@tiptap/pm/state";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
-import { AutoUppercaseOperators } from "./auto-uppercase-operators";
+import { AutoUppercaseOperators } from "./auto-uppercase-operators.ts";
 import {
   applyAcceptToEditor,
   buildDocument,
   PARAGRAPH_OFFSET,
   readEditorContext,
-} from "./editor-document";
-import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight";
-import type { SuggestionState } from "../../../../model/get-suggestion-state";
-import { useLatestRef } from "../../../../behavior/use-latest-ref";
-import { getSuggestionState } from "../../../../model/get-suggestion-state";
-import { handleKey } from "../../../../model/handle-key";
-import { searchBarPlaceholder } from "./placeholder-editor";
+} from "./editor-document.ts";
+import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
+import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
+import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
+import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
+import { handleKey } from "../../../../model/handle-key.ts";
+import { searchBarPlaceholder } from "./placeholder-editor.tsx";
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
-} from "./suggestion-ui";
+} from "./suggestion-ui.ts";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);

@@ -1,13 +1,13 @@
 import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../processes/topic-clustering.process";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../processes/topic-clustering.process.ts";
 import {
   TopicClusteringRepository,
   type TopicClusteringModelRow,
   type TopicClusteringSeedTopicRow,
   type TopicClusteringTopicIndexRow,
-} from "../topic-clustering.repository";
-import type { TopicDatabase } from "./prisma.topic.repository";
+} from "../topic-clustering.repository.ts";
+import type { TopicDatabase } from "./prisma.topic.repository.ts";
 
 /**
  * The Prisma capability consumed by Topic's private persistence adapters.

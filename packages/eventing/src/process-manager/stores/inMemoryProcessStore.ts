@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { ProcessRef } from "../processManager.types";
+import type { ProcessRef } from "../processManager.types.ts";
 import type {
   AppendIntentsResult,
   CommitResult,
@@ -12,7 +12,7 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
-} from "./processStore.types";
+} from "./processStore.types.ts";
 
 interface StoredMessage extends OutboxMessageRecord {
   /** Epoch ms until which the message is exclusively leased; 0 = unleased. */

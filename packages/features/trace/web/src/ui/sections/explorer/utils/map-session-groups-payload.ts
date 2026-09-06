@@ -1,6 +1,6 @@
-import type { ConversationGroup } from "../trace-table/conversation-groups";
-import type { SessionGroupPayloadItem } from "../../../../model/explorer/session-group-payload";
-import type { TraceStatus } from "../types/trace";
+import type { ConversationGroup } from "../trace-table/conversation-groups.ts";
+import type { SessionGroupPayloadItem } from "../../../../model/explorer/session-group-payload.ts";
+import type { TraceStatus } from "../types/trace.ts";
 
 function worstStatusOf(item: SessionGroupPayloadItem): TraceStatus {
   if (item.errorCount > 0) return "error";

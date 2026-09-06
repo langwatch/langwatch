@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import { useScenarioSelection } from "../use-scenario-selection";
+import { useScenarioSelection } from "../use-scenario-selection.ts";
 import { describe, expect, it } from "vitest";
 
 describe("useScenarioSelection()", () => {

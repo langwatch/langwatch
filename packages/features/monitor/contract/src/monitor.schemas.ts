@@ -11,7 +11,7 @@
  * live here.
  */
 import { z } from "zod";
-import { monitorExecutionModeSchema, type MonitorCreateInput } from "./monitor";
+import { monitorExecutionModeSchema, type MonitorCreateInput } from "./monitor.ts";
 
 /** The process's own precondition parser, injected into the two write inputs. */
 export type MonitorApiPreconditionsParser = z.ZodType<

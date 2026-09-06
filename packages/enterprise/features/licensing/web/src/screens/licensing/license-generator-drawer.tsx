@@ -1,7 +1,7 @@
 import { Button, Heading } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { LicenseGeneratorForm, type LicenseGeneratorFormRef } from "./license-generator-form";
+import { LicenseGeneratorForm, type LicenseGeneratorFormRef } from "./license-generator-form.tsx";
 
 interface LicenseGeneratorDrawerProps {
   open: boolean;

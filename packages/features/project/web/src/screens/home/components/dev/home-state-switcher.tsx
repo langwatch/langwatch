@@ -6,7 +6,7 @@ import {
   type HomeDevState,
   setHomeDevState,
   useHomeDevState,
-} from "./home-dev-state";
+} from "./home-dev-state.ts";
 
 /**
  * Development-only preview control for the Langy home's STATES. Sits beside

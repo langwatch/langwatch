@@ -8,15 +8,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { getCapability } from "../../../../../behavior/lens-capabilities";
-import { truncateId } from "../../../../../model/display-formatters";
-import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
-import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload";
-import type { ConversationGroup } from "../conversation-groups";
-import { ConversationSummaryDetail } from "../registry/addons/conversation/conversation-summary";
-import { conversationCells } from "../registry/cells/conversation";
-import { sessionLabelOf } from "../registry/cells/conversation/conversation-cell";
-import type { CellRenderContext } from "../registry/types";
+import { getCapability } from "../../../../../behavior/lens-capabilities.ts";
+import { truncateId } from "../../../../../model/display-formatters.ts";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
+import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
+import type { ConversationGroup } from "../conversation-groups.ts";
+import { ConversationSummaryDetail } from "../registry/addons/conversation/conversation-summary.tsx";
+import { conversationCells } from "../registry/cells/conversation/index.ts";
+import { sessionLabelOf } from "../registry/cells/conversation/conversation-cell.tsx";
+import type { CellRenderContext } from "../registry/types.ts";
 
 const COMPACT_TOKENS = {
   rowPaddingY: "3px",

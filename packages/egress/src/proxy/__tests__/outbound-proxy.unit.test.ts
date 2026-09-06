@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isProxyBypassed, resolveProxyForHost } from "../outbound-proxy";
+import { isProxyBypassed, resolveProxyForHost } from "../outbound-proxy.ts";
 
 describe("resolveProxyForHost", () => {
   describe("given an outbound proxy", () => {

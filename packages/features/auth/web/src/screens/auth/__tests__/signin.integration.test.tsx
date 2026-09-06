@@ -21,8 +21,8 @@ const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() 
   searchParamsRef: { current: new URLSearchParams("") },
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     signIn: mockSignIn,
@@ -38,22 +38,22 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
 // Mocking the module is the only way to see the redirect, in any environment.
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 
-vi.mock("../../../behavior/browser-navigation", () => ({
+vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replace,
   hardNavigate: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -61,7 +61,7 @@ vi.mock("../../../ui/elements/router-link", () => ({
   ),
 }));
 
-import SignIn from "../signin.screen";
+import SignIn from "../signin.screen.tsx";
 
 const renderPage = () => {
   const view = render(

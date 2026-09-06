@@ -6,4 +6,4 @@
  * plan those words describe, so the card travels as one surface rather than as
  * four copies that fall out of step with the catalogue.
  */
-export { ContactSalesBlock } from "./contact-sales-block";
+export { ContactSalesBlock } from "./contact-sales-block.tsx";

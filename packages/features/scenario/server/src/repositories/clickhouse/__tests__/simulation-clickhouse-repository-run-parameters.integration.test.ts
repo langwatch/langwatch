@@ -16,8 +16,8 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port";
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository";
+import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port.ts";
+import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 /** The repository's own hint window, derived the way production derives it. */
 class HintWindowedRead extends SimulationWindowedReadPort {

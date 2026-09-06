@@ -29,8 +29,8 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
-import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service";
-import type { ConnectCredentials } from "../../services/connected-agent-session.service";
+import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service.ts";
+import type { ConnectCredentials } from "../../services/connected-agent-session.service.ts";
 
 /** The frames a process may post; a register goes to its own endpoint. */
 export const postedFramesSchema = z.object({

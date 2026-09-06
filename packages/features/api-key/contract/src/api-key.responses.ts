@@ -9,8 +9,8 @@
  */
 import { z } from "zod";
 
-import { apiKeyBindingSchema } from "./api-key";
-import type { ApiKeyListEntry, ApiKeyListRoleBinding, NamedApiKeyBinding } from "./api-key.list";
+import { apiKeyBindingSchema } from "./api-key.ts";
+import type { ApiKeyListEntry, ApiKeyListRoleBinding, NamedApiKeyBinding } from "./api-key.list.ts";
 
 /** One of the caller's own bindings, with its scope named. */
 export const namedApiKeyBindingSchema: z.ZodType<NamedApiKeyBinding> = apiKeyBindingSchema

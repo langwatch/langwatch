@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMetadataFilterParams } from "../metadata-filter-params";
+import { buildMetadataFilterParams } from "../metadata-filter-params.ts";
 
 describe("buildMetadataFilterParams", () => {
   describe("when key is trace_id", () => {

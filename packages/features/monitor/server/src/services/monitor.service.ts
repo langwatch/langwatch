@@ -26,8 +26,8 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { MonitorRepository } from "../repositories/monitor.repository";
-import { MonitorCatalogService } from "./monitor-catalog.service";
+import type { MonitorRepository } from "../repositories/monitor.repository.ts";
+import { MonitorCatalogService } from "./monitor-catalog.service.ts";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;

@@ -1,34 +1,34 @@
 import {
   AdminEmailPlatformOperatorsRepository,
   type PrismaSsoPlatformOperatorDatabase,
-} from "../repositories/prisma/prisma.sso-platform-operators.repository";
-import type { PlatformOperatorPort } from "../ports/platform-operator.port";
-import { LocalDoorBreakGlassBindingAdapter } from "./local-door-break-glass-binding.adapter";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
-import { SsoConnectionService } from "../services/sso-connection.service";
+} from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
+import type { PlatformOperatorPort } from "../ports/platform-operator.port.ts";
+import { LocalDoorBreakGlassBindingAdapter } from "./local-door-break-glass-binding.adapter.ts";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import type { EventSourcing } from "@langwatch/eventing";
-import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
+import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter.ts";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
 import {
   SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,
-} from "./eventing.sso-connection-ledger.adapter";
+} from "./eventing.sso-connection-ledger.adapter.ts";
 import {
   EventingSsoConnectionTeardownAdapter,
   SsoConnectionDirectoryRevocationPort,
   UnrevokedSsoConnectionDirectory,
-} from "./eventing.sso-connection-teardown.adapter";
+} from "./eventing.sso-connection-teardown.adapter.ts";
 import {
   PrismaSsoConnectionProjectionRepository,
   type PrismaSsoConnectionProjectionDatabase,
-} from "../repositories/prisma/prisma.sso-connection-projection.repository";
+} from "../repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
   type PrismaSsoConnectionReadDatabase,
   type PrismaSsoConnectionStrandingDatabase,
-} from "../repositories/prisma/prisma.sso-connection-reads.repository";
+} from "../repositories/prisma/prisma.sso-connection-reads.repository.ts";
 
 /** Every model the connection ledger reads or writes, and no other. */
 export type SsoConnectionPipelineDatabase = PrismaSsoConnectionProjectionDatabase &

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SECTION_TEXT_CHARS } from "../block-kit-allowlist";
+import { MAX_SECTION_TEXT_CHARS } from "../block-kit-allowlist.ts";
 import {
   ALERT_TRIGGER_DEFAULTS,
   defaultsForSourceKind,
   REPORT_TRIGGER_DEFAULTS,
   TRACE_TRIGGER_DEFAULTS,
-} from "../defaults";
-import { renderTriggerSlack } from "../render-slack";
+} from "../defaults.ts";
+import { renderTriggerSlack } from "../render-slack.ts";
 import {
   buildReportTemplateContext,
   type ReportTemplateContext,
   type ReportTraceRow,
-} from "../template-context";
+} from "../template-context.ts";
 
 const SLACK_DEFAULTS = {
   slackString: REPORT_TRIGGER_DEFAULTS.slackString,

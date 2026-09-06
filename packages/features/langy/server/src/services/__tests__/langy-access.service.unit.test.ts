@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import { LangyAccessService } from "../langy-access.service";
+import { LangyAccessService } from "../langy-access.service.ts";
 
 function featureFlags(enabled: boolean) {
   const service = MemoryFeatureFlagService.create();

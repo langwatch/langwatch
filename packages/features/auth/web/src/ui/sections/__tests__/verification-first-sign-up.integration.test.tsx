@@ -43,7 +43,7 @@ const {
  * a rejected call leaves an `error` on the hook and re-renders, which is what
  * turns an expired link into the state that offers a fresh one.
  */
-vi.mock("../../../behavior/auth-api", async () => {
+vi.mock("../../../behavior/auth-api.ts", async () => {
   const { useCallback, useState } = await import("react");
   const useFakeMutation = (run: (input: never) => Promise<unknown>) => () => {
     const [error, setError] = useState<unknown>(null);
@@ -91,12 +91,12 @@ vi.mock("../../../behavior/auth-api", async () => {
   };
 });
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     signIn: signInMock,
@@ -109,11 +109,11 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../elements/router-link", () => ({
+vi.mock("../../elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -121,7 +121,7 @@ vi.mock("../../elements/router-link", () => ({
   ),
 }));
 
-import { VerificationFirstSignUp } from "../verification-first-sign-up";
+import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
 
 const localPicker: RoutingDecision = {
   outcome: "method_picker",

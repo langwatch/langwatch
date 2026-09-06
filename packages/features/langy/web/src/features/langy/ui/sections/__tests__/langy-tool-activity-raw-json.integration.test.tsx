@@ -13,11 +13,11 @@ import { describe, expect, it, vi } from "vitest";
 const devModeRef = { current: true };
 // Only developer mode is stubbed; the rest of the package is the real thing,
 // because the card under test renders through several of its other exports.
-vi.mock("../../../../../behavior/use-langy-dev-mode", () => ({
+vi.mock("../../../../../behavior/use-langy-dev-mode.ts", () => ({
   useLangyDevMode: () => [devModeRef.current, vi.fn()],
 }));
 
-const { LangyToolActivity } = await import("../langy-tool-activity");
+const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
 
 function skillMessage(): UIMessage {
   return {

@@ -10,19 +10,19 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter";
+import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter.ts";
 import {
   enforceApiKeyIdOnTraceRequest,
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "../../rules/ingest-key-provenance.rules";
+} from "../../rules/ingest-key-provenance.rules.ts";
 import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-} from "../trace-span-preparation.port";
-import { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "../trace-span-spool.port";
+} from "../trace-span-preparation.port.ts";
+import { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "../trace-span-spool.port.ts";
 
 class PiiRedactionFake extends TraceSpanPiiRedactionPort {
   readonly redact = vi.fn(

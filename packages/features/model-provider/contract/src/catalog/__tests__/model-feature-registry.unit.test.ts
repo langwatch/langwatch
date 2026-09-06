@@ -6,7 +6,7 @@ import {
   type FeatureDescriptor,
   featureByKey,
   featuresByRole,
-} from "../model-feature-registry";
+} from "../model-feature-registry.ts";
 
 describe("feature registry", () => {
   /** @scenario featuresByRole returns every declaration for that role */

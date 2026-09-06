@@ -9,8 +9,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { FacetRow } from "../../../../ui/sections/explorer/filter-sidebar/facet-row";
-import type { FacetItem, FacetValueState } from "../types";
+import { FacetRow } from "../../../../ui/sections/explorer/filter-sidebar/facet-row.tsx";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 const ITEM: FacetItem = {
   value: "error",

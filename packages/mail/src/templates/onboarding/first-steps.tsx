@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HighlightedCode, InlineLink, Muted, Paragraph } from "../email-layout";
+import { HighlightedCode, InlineLink, Muted, Paragraph } from "../email-layout.tsx";
 
 /**
  * The first thing to do, in the language of why they came.

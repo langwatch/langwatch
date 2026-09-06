@@ -16,8 +16,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { OrganizationApp } from "../../../app/organization.app";
-import { OnboardingTrpcApi, type OnboardingTrpcPorts } from "../onboarding.api";
+import type { OrganizationApp } from "../../../app/organization.app.ts";
+import { OnboardingTrpcApi, type OnboardingTrpcPorts } from "../onboarding.api.ts";
 
 const SIGN_UP_DATA_SCHEMA = z.object({
   utmCampaign: z.string().optional(),

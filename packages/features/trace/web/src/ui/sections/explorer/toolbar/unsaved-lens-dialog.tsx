@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "../../dialog";
+} from "../../dialog.tsx";
 
 interface UnsavedLensDialogProps {
   open: boolean;

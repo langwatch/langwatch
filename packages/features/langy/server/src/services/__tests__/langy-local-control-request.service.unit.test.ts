@@ -12,7 +12,7 @@ import { CONTROL_REQUEST_TTL_MS } from "@langwatch/langy-contract";
 import {
   ControlRequestService,
   type StoredControlRequest,
-} from "../langy-local-control-request.service";
+} from "../langy-local-control-request.service.ts";
 
 const projectId = "proj_1";
 const userId = "user_1";

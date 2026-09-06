@@ -2,11 +2,11 @@ import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/m
 import type {
   MetricDataPointBulkWrite,
   MetricDataPointWrite,
-} from "../metric-data-point-append.repository";
+} from "../metric-data-point-append.repository.ts";
 import {
   MetricDataPointRepository,
   type SeriesTotalByPointAttribute,
-} from "../metric-data-point.repository";
+} from "../metric-data-point.repository.ts";
 
 export class NullMetricDataPointRepository extends MetricDataPointRepository {
   private constructor() {

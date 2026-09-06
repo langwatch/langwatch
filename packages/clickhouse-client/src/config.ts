@@ -1,4 +1,4 @@
-import { resolvePoolSize, type PoolSizingDecision, type PoolSizingInput } from "./pool";
+import { resolvePoolSize, type PoolSizingDecision, type PoolSizingInput } from "./pool.ts";
 
 export interface ClickHouseSharedConfiguration {
   /** The shared endpoint. Omit it only when this process has no ClickHouse work. */

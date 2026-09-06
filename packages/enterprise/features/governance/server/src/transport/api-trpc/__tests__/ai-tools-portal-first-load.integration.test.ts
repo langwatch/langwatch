@@ -20,11 +20,11 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { TestGovernanceService } from "../../../app/__tests__/support/test-governance-service";
-import { AiToolProviderCatalogPort, AiToolSlugPort } from "../../../ports/ai-tool-catalog.port";
-import { PrismaAiToolCatalogRepository } from "../../../repositories/prisma/prisma.ai-tool-catalog.repository";
-import { DefaultGovernanceAiToolCatalogService } from "../../../services/ai-tool-catalog.service";
-import { AiToolsTrpcApi } from "../ai-tools.api";
+import { TestGovernanceService } from "../../../app/__tests__/support/test-governance-service.ts";
+import { AiToolProviderCatalogPort, AiToolSlugPort } from "../../../ports/ai-tool-catalog.port.ts";
+import { PrismaAiToolCatalogRepository } from "../../../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
+import { DefaultGovernanceAiToolCatalogService } from "../../../services/ai-tool-catalog.service.ts";
+import { AiToolsTrpcApi } from "../ai-tools.api.ts";
 
 /** This suite writes the rows it then reads; no project owns any of them. */
 class AllowTestQueries extends PrismaQueryGuard {

@@ -9,16 +9,16 @@ import { createLogger } from "@langwatch/observability";
 import {
   EvaluationAzureSafetyCredentialsPort,
   EvaluationSettingsRecoveryPort,
-} from "../ports/evaluation.port";
+} from "../ports/evaluation.port.ts";
 import type {
   EvaluationMonitorLookupPort,
   EvaluationTraceEvidencePort,
-} from "../ports/evaluation-execution.port";
-import { EvaluationPreconditionService } from "./evaluation-precondition.service";
+} from "../ports/evaluation-execution.port.ts";
+import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
 import {
   EvaluatorSettingsService,
   type EvaluatorSettingsSource,
-} from "./evaluator-settings.service";
+} from "./evaluator-settings.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

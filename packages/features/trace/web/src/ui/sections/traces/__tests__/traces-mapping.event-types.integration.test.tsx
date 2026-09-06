@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type { MappingState } from "@langwatch/trace-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import { TracesMapping } from "../traces-mapping";
+import { TracesMapping } from "../traces-mapping.tsx";
 
 // Project-wide event types returned for the last 30 days — note that
 // "thumbs_up" is NOT present on the loaded trace below.
@@ -19,13 +19,13 @@ const PROJECT_EVENT_TYPES = [
   { key: "thumbs_down", label: "thumbs_down" },
 ];
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../use-project-span-names", () => ({
+vi.mock("../../use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: [],
     metadataKeys: [],
@@ -35,7 +35,7 @@ vi.mock("../../use-project-span-names", () => ({
   }),
 }));
 
-vi.mock("../../use-project-event-types", () => ({
+vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({
     eventTypes: PROJECT_EVENT_TYPES,
     isLoading: false,
@@ -43,11 +43,11 @@ vi.mock("../../use-project-event-types", () => ({
   }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     annotationScore: {
       getAllActive: { useQuery: () => ({ data: [] }) },

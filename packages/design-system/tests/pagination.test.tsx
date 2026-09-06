@@ -11,8 +11,8 @@
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Pagination, type PaginationProps } from "../src/components/pagination";
-import { renderWithDesignSystem } from "../src/testing";
+import { Pagination, type PaginationProps } from "../src/components/pagination.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const BASE: PaginationProps = {
   page: 1,

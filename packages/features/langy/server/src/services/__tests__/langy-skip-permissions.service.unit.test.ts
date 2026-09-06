@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SkipPermissionsService,
   type SkipPermissionsProviderRow,
-} from "../langy-skip-permissions.service";
+} from "../langy-skip-permissions.service.ts";
 
 const PROJECT_ID = "project-1";
 

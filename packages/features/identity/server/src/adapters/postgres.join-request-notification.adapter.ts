@@ -1,9 +1,9 @@
 import {
   PrismaJoinRequestAudienceRepository,
   type PrismaJoinRequestAudienceDatabase,
-} from "../repositories/prisma/prisma.join-request-audience.repository";
-import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
-import { JoinRequestNotificationService } from "../services/join-request-notification.service";
+} from "../repositories/prisma/prisma.join-request-audience.repository.ts";
+import type { JoinRequestMailPort } from "../ports/join-request-mail.port.ts";
+import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 
 /** Every model a join-request notification reads, and no other. */
 export type JoinRequestNotificationDatabase = PrismaJoinRequestAudienceDatabase;

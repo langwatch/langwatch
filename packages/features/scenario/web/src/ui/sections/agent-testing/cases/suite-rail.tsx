@@ -11,16 +11,16 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
-import { NewSimulationsCallout } from "../../suites/new-simulations-callout";
+import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 import { SuiteArchiveDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
-import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { SuiteRailFooter } from "./suite-rail-footer";
-import { SuiteRailSections } from "./suite-rail-sections";
+import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { SuiteRailFooter } from "./suite-rail-footer.tsx";
+import { SuiteRailSections } from "./suite-rail-sections.tsx";
 import type {
   ExternalSetEntry,
   TestSuiteEntry,
-} from "../../../../model/agent-testing/cases/test-cases";
-import type { SuiteLastRun } from "./use-test-cases-data";
+} from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { SuiteLastRun } from "./use-test-cases-data.ts";
 
 /** How wide the rail is when it is open. */
 export const SUITE_RAIL_WIDTH = 218;

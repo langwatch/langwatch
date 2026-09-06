@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { getFreePlanLimits, PLAN_LIMITS } from "@langwatch/enterprise-billing-contract";
-import { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "../index";
-import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository";
+import { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "../index.ts";
+import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 
 const mockEnv: {

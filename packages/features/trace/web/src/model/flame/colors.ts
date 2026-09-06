@@ -1,4 +1,4 @@
-import { SPAN_TYPE_COLORS } from "../display-formatters";
+import { SPAN_TYPE_COLORS } from "../display-formatters.ts";
 
 const spanColors: Readonly<Record<string, string>> = SPAN_TYPE_COLORS;
 

@@ -1,5 +1,5 @@
 import { bench, describe } from "vitest";
-import { redactSecretsInText } from "../secrets.js";
+import { redactSecretsInText } from "../secrets.ts";
 
 /**
  * Redaction runs on every stored string at ingestion, so its cost is paid per

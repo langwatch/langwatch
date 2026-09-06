@@ -9,7 +9,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
-} from "../variable-mapping-input";
+} from "../variable-mapping-input.tsx";
 
 // Debounce delay used in VariableMappingInput
 const _DEBOUNCE_DELAY = 300;

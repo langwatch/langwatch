@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { modelProviders as modelProvidersRegistry } from "@langwatch/model-provider-contract";
-import { getRequiredCredentialKeys } from "../model/model-provider-helpers";
+import { getRequiredCredentialKeys } from "../model/model-provider-helpers.ts";
 
 /**
  * Credential fields the customer must fill in for this provider, given what

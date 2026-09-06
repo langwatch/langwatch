@@ -9,9 +9,9 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import { SimulationExecutionPort } from "../../ports/simulation-execution.port";
-import { NullSimulationRepository } from "../simulation.repository";
-import { SimulationService } from "../../services/simulation.service";
+import { SimulationExecutionPort } from "../../ports/simulation-execution.port.ts";
+import { NullSimulationRepository } from "../simulation.repository.ts";
+import { SimulationService } from "../../services/simulation.service.ts";
 
 class RecordingExecutionPort extends SimulationExecutionPort {
   queue: SimulationQueueRun | undefined;

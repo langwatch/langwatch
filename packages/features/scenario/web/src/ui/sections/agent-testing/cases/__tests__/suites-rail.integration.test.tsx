@@ -11,13 +11,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "@langwatch/analytics-web/surfaces/period-selector";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { SuiteNameDialog } from "../suite-name-dialog";
-import { SuiteRail } from "../suite-rail";
+import { SuiteNameDialog } from "../suite-name-dialog.tsx";
+import { SuiteRail } from "../suite-rail.tsx";
 import {
   orderSuitesDefaultFirst,
   type TestSuiteEntry,
-} from "../../../../../model/agent-testing/cases/test-cases";
-import type { SuiteLastRun } from "../use-test-cases-data";
+} from "../../../../../model/agent-testing/cases/test-cases.ts";
+import type { SuiteLastRun } from "../use-test-cases-data.ts";
 
 const routerPush = vi.fn();
 
@@ -29,7 +29,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
@@ -45,7 +45,7 @@ vi.mock("@langwatch/ui-host/format-time-ago", () => ({
 const suiteRunDataQuery = vi.fn();
 const suitesGetAllQuery = vi.fn();
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       getSuiteRunData: {

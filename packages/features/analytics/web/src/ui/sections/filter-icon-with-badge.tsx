@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { LuFilter } from "react-icons/lu";
-import { useFilterParams } from "../../behavior/use-filter-params";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
 
 type FilterIconWithBadgeProps = {
   /** Override the count instead of using the filter params */

@@ -4,7 +4,7 @@
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
 import { describe, expect, it } from "vitest";
-import { credentialsHeader, withCredentials } from "../setup-prompt";
+import { credentialsHeader, withCredentials } from "../setup-prompt.ts";
 
 const SKILL = "# Add LangWatch Tracing to Your Code\n\n## Determine Scope";
 

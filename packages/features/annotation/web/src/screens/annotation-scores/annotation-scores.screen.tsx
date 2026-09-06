@@ -20,11 +20,11 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Switch } from "@langwatch/design-system/switch";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "../../ui/elements/annotation-link";
-import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block";
-import { AnnotationScoreDataType } from "./annotation-score-data-type";
-import { annotationScoresApi } from "./annotation-scores-api";
-import { useAnnotationScoresHost } from "./annotation-scores-host";
+import { Link } from "../../ui/elements/annotation-link.tsx";
+import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block.tsx";
+import { AnnotationScoreDataType } from "./annotation-score-data-type.ts";
+import { annotationScoresApi } from "./annotation-scores-api.ts";
+import { useAnnotationScoresHost } from "./annotation-scores-host.ts";
 
 /** The grant the platform page asked for, unchanged. */
 export const ANNOTATION_SCORES_PAGE_PERMISSION = "annotations:view";

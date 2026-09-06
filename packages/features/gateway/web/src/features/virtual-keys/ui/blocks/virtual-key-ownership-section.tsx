@@ -5,7 +5,7 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { ViewTracesButton } from "../elements/view-traces-button";
+import { ViewTracesButton } from "../elements/view-traces-button.tsx";
 
 /**
  * Where a virtual key lives: who can see and manage it, and where its

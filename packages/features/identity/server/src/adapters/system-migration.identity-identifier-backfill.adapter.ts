@@ -1,6 +1,6 @@
-import type { IdentityBackfillService } from "../services/identity-backfill.service";
+import type { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules.ts";
 
 /**
  * D01 — the identifier backfill as the runner sees it (ADR-101 §6): the

@@ -15,8 +15,8 @@ import {
   type TopicClusteringLangevalsKind,
   type TopicClusteringLangevalsResponse,
 } from "@langwatch/topic-server";
-import type { WorkerConfig } from "../platform/config/worker.config";
-import type { WorkerTopicCompositionOptions } from "./worker-production.composition";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import type { WorkerTopicCompositionOptions } from "./worker-production.composition.ts";
 
 /** The series name the App writes for the same measurement, pinned. */
 export const TOPIC_CLUSTERING_PAYLOAD_SIZE_METRIC_NAME = "payload_size_bytes";

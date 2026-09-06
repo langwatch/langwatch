@@ -3,14 +3,14 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository";
-import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service";
-import { NurturingSinkRegistryService } from "../nurturing-sink-registry.service";
+import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository.ts";
+import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service.ts";
+import { NurturingSinkRegistryService } from "../nurturing-sink-registry.service.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
   settle,
-} from "./support/nurturing-harness";
+} from "./support/nurturing-harness.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),

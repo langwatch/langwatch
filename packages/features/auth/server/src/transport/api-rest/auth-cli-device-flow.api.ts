@@ -17,7 +17,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
+import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -26,7 +26,7 @@ import {
   MIN_POLL_INTERVAL_SECONDS,
   type CliClientInfo,
   type CliDeviceSessionService,
-} from "../../services/cli-device-session.service";
+} from "../../services/cli-device-session.service.ts";
 
 const logger = createLogger("langwatch:auth-cli");
 

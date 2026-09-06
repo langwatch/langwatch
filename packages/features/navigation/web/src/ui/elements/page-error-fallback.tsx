@@ -1,7 +1,7 @@
 import { Box, Button, Center, Code, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Check, Copy, Home, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { useNavigationHost } from "../../model/navigation-host";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 
 /**
  * What a page that threw is replaced with.

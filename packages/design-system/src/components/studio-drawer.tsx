@@ -2,8 +2,8 @@
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 
-import { CloseButton } from "./close-button";
-import { StudioIsolatedErrorBoundary } from "./studio-error-boundary";
+import { CloseButton } from "./close-button.tsx";
+import { StudioIsolatedErrorBoundary } from "./studio-error-boundary.tsx";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants.

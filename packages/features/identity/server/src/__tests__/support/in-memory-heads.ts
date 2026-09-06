@@ -6,7 +6,7 @@ import {
   type IdentityHeads,
   reduceIdentity,
 } from "@langwatch/identity-contract";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 
 export const USER = "user_sam";
 export const ACTOR = { type: "user" as const, id: USER };

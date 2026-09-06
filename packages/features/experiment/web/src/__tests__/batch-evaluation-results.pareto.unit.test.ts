@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
-import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard.ts";
+import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto.ts";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../model/batch-evaluation-results.bt-leaderboard";
-import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 
 /**
  * Dominance is the one claim on the trade-off chart a reader acts on directly — "this

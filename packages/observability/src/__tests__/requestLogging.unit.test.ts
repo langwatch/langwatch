@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { REQUEST_CAUSE_FIELD } from "../constants";
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
-} from "../request/requestLogging";
+} from "../request/requestLogging.ts";
 
 describe("requestLogging", () => {
   describe("getStatusCodeFromError", () => {

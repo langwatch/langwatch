@@ -3,8 +3,8 @@
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { AutomationApp } from "../../../app/automation.app";
-import { AutomationTrpcApi, type AutomationTrpcContext } from "../automation.api";
+import type { AutomationApp } from "../../../app/automation.app.ts";
+import { AutomationTrpcApi, type AutomationTrpcContext } from "../automation.api.ts";
 
 function harness(update: (input: Record<string, unknown>) => Promise<unknown>) {
   const trpc = initTRPC.context<AutomationTrpcContext>().create();

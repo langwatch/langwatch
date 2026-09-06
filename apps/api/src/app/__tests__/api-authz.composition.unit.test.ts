@@ -7,8 +7,8 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
 import { Registry } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
-import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "../api-authz.composition";
-import { ApiEventingInfrastructure } from "../../platform/infrastructure/api-eventing.infrastructure";
+import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "../api-authz.composition.ts";
+import { ApiEventingInfrastructure } from "../../platform/infrastructure/api-eventing.infrastructure.ts";
 
 const AUTHZ_GRANT_PIPELINE = "authz_grant";
 

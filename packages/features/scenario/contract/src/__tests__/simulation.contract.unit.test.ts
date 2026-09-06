@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { simulationAllSuitesRunDataSchema, simulationRunDataSchema } from "../index";
+import { simulationAllSuitesRunDataSchema, simulationRunDataSchema } from "../index.ts";
 
 describe("Simulation contract", () => {
   it("accepts a stored run while preserving provider-specific message fields", () => {

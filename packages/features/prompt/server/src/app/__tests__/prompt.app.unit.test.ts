@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/prompt-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PromptApp } from "../prompt.app";
+import { PromptApp } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

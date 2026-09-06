@@ -10,7 +10,7 @@
  * Spec: specs/ai-governance/cli-onboarding/authorize-project-picker.feature
  */
 import { describe, expect, it } from "vitest";
-import { PERSONAL_GROUP_NAME, resolveCliAuthProjects } from "../cli-auth-projects";
+import { PERSONAL_GROUP_NAME, resolveCliAuthProjects } from "../cli-auth-projects.ts";
 
 const JANE = "u-jane";
 

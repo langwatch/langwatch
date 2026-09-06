@@ -1,5 +1,5 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
-import type { AgentType } from "./config";
+import type { AgentType } from "./config/index.ts";
 import { z } from "zod";
 
 /**

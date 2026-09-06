@@ -4,11 +4,11 @@
 
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PromptBrowserStorage } from "../../model/browser-capabilities";
-import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store";
-import { useCreateDraftPrompt } from "../use-create-draft-prompt";
+import type { PromptBrowserStorage } from "../../model/browser-capabilities.ts";
+import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store.ts";
+import { useCreateDraftPrompt } from "../use-create-draft-prompt.ts";
 
-vi.mock("../use-prompt-project", () => ({
+vi.mock("../use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 
@@ -17,7 +17,7 @@ const { mockGetAllForProjectForFrontend, mockGetResolvedDefault } = vi.hoisted((
   mockGetResolvedDefault: vi.fn(),
 }));
 
-vi.mock("../prompt-api", () => ({
+vi.mock("../prompt-api.ts", () => ({
   promptApi: {
     modelProvider: {
       getAllForProjectForFrontend: { useQuery: mockGetAllForProjectForFrontend },
@@ -48,7 +48,7 @@ const capabilities = {
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 };
 
-vi.mock("../../model/prompt-host", () => ({
+vi.mock("../../model/prompt-host.ts", () => ({
   usePromptHost: () => ({ tabCapabilities: () => capabilities }),
 }));
 

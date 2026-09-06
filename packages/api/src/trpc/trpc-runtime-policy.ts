@@ -28,12 +28,12 @@ import type {
   MiddlewareResult,
   ProcedureType,
 } from "@trpc/server/unstable-core-do-not-import";
-import { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.js";
-import { redactAuditArgs } from "./trpc-audit-redaction.js";
-import { isSilencedCall, recordTrpcCall } from "./trpc-call-logging.js";
-import { callerTraceContext } from "./trpc-caller-trace.js";
-import { trpcFailureTraceIds } from "./trpc-failure-trace.js";
-import type { TrpcPolicyContext } from "./trpc-policy-context.js";
+import { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.ts";
+import { redactAuditArgs } from "./trpc-audit-redaction.ts";
+import { isSilencedCall, recordTrpcCall } from "./trpc-call-logging.ts";
+import { callerTraceContext } from "./trpc-caller-trace.ts";
+import { trpcFailureTraceIds } from "./trpc-failure-trace.ts";
+import type { TrpcPolicyContext } from "./trpc-policy-context.ts";
 import type {
   TrpcAuditPort,
   TrpcCauseTranslationPort,
@@ -41,8 +41,8 @@ import type {
   TrpcAuthenticatedMiddlewareContext,
   TrpcIdentityPort,
   TrpcMiddlewareContext,
-} from "./trpc-policy-ports.js";
-import type { TrpcRoot } from "./trpc-root.js";
+} from "./trpc-policy-ports.ts";
+import type { TrpcRoot } from "./trpc-root.ts";
 
 const logger = createLogger("langwatch:trpc");
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import { createTenantId } from "../../domain/tenantId";
-import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
-import type { Event } from "../../domain/types";
-import { deduplicateEvents, eventToRecord, recordToEvent } from "../eventStoreUtils";
-import type { EventRecord } from "../repositories/eventRepository.types";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import type { Event } from "../../domain/types.ts";
+import { deduplicateEvents, eventToRecord, recordToEvent } from "../eventStoreUtils.ts";
+import type { EventRecord } from "../repositories/eventRepository.types.ts";
 
 const tenantId = createTenantId("test-tenant");
 const aggregateId = "test-aggregate";

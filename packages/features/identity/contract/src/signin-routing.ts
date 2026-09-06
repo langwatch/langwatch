@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { identifierDomain, normalizeIdentifierValue } from "./identifier";
+import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
 /**
  * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision

@@ -18,7 +18,7 @@ import {
   type UpdateIngestionTemplateOttlInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import type { IngestionTemplateRepository } from "../ports/ingestion-template.port";
+import type { IngestionTemplateRepository } from "../ports/ingestion-template.port.ts";
 
 export class IngestionTemplateService {
   private constructor(

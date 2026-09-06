@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateLiquid } from "../validate";
+import { validateLiquid } from "../validate.ts";
 
 describe("validateLiquid", () => {
   describe("when the template is well-formed", () => {

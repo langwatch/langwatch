@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiKeyDiagnosticsAdapter } from "../api-key-diagnostics.adapter";
+import { ApiKeyDiagnosticsAdapter } from "../api-key-diagnostics.adapter.ts";
 
 describe("ApiKeyDiagnosticsAdapter", () => {
   describe("when the legacy grant service warns", () => {

@@ -27,7 +27,7 @@ import {
   NotificationService,
   UsageLimitEmailAdapter,
   type UsageLimitEmailData,
-} from "../index";
+} from "../index.ts";
 
 class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {

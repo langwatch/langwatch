@@ -1,8 +1,8 @@
 import { Table } from "@chakra-ui/react";
 import type React from "react";
 
-import { SortableColumnHeader } from "./sortable-column-header";
-import type { SessionsSortColumn, SessionsSortState } from "./session-sort";
+import { SortableColumnHeader } from "./sortable-column-header.tsx";
+import type { SessionsSortColumn, SessionsSortState } from "./session-sort.ts";
 
 /**
  * The columns, in the order a reader scans them: what the session was and when

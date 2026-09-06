@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State, ExecutionScope } from "@langwatch/experiment-contract";
-import { ExperimentCellPlanService } from "../experiment-cell-plan.service";
+import { ExperimentCellPlanService } from "../experiment-cell-plan.service.ts";
 
 const cellPlan = ExperimentCellPlanService.create();
 const generateCells = (

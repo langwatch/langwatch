@@ -6,8 +6,8 @@ import {
   PostgresDatasetMigrationAdapter,
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
-import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-storage.adapter";
-import type { TasksHost } from "./tasks-host.composition";
+import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-storage.adapter.ts";
+import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
  * Translates this process's own destination POLICY (BYOC first, then this deployment's

@@ -11,14 +11,14 @@ import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
-} from "../app/api-auth.composition";
-import type { ApiProductionCompositionOptions } from "../app/api-production.composition";
+} from "../app/api-auth.composition.ts";
+import type { ApiProductionCompositionOptions } from "../app/api-production.composition.ts";
 import {
   startStandaloneApi,
   type ApiExecutableHost,
   type ApiExecutableHostEvent,
-} from "../app/api-standalone.executable";
-import { apiLoggerConfiguration, resolveApiConfig } from "../platform/config/api.config";
+} from "../app/api-standalone.executable.ts";
+import { apiLoggerConfiguration, resolveApiConfig } from "../platform/config/api.config.ts";
 
 /**
  * The executable's boot proof.

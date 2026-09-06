@@ -20,7 +20,7 @@ import { createPlaygroundRestApp } from "@langwatch/model-provider-server";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
-} from "../../app/api-handler-managed-session";
+} from "../../app/api-handler-managed-session.ts";
 
 /** `/api/playground`, bound to one process. */
 export function mountPlaygroundRest(options: {

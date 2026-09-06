@@ -1,10 +1,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "../../../../behavior/trace-api";
-import { useSharedTrace } from "../context/shared-trace-context";
-import { isPreviewTraceId } from "../../../../model/preview-trace-id";
-import type { ConversationTurn } from "../../../../model/explorer/conversation-turn";
-import { useDrawerProjectId } from "./use-drawer-project-id";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
+import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 export interface ConversationContextResult {
   conversationId: string | null;

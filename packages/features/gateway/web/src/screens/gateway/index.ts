@@ -26,21 +26,21 @@ import type { ComponentType } from "react";
 export type GatewayScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const gatewayScreens = {
-  virtualKeys: () => import("./gateway-virtual-keys.screen"),
-  virtualKey: () => import("./gateway-virtual-key.screen"),
-  budgets: () => import("./gateway-budgets.screen"),
-  budget: () => import("./gateway-budget.screen"),
-  routingPolicies: () => import("./gateway-routing-policies.screen"),
-  usage: () => import("./gateway-usage.screen"),
-  cacheRules: () => import("./gateway-cache-rules.screen"),
-  guardrails: () => import("./gateway-guardrails.screen"),
-  billingEvents: () => import("./gateway-billing-events.screen"),
-  webhooks: () => import("./gateway-webhooks.screen"),
+  virtualKeys: () => import("./gateway-virtual-keys.screen.tsx"),
+  virtualKey: () => import("./gateway-virtual-key.screen.tsx"),
+  budgets: () => import("./gateway-budgets.screen.tsx"),
+  budget: () => import("./gateway-budget.screen.tsx"),
+  routingPolicies: () => import("./gateway-routing-policies.screen.tsx"),
+  usage: () => import("./gateway-usage.screen.tsx"),
+  cacheRules: () => import("./gateway-cache-rules.screen.tsx"),
+  guardrails: () => import("./gateway-guardrails.screen.tsx"),
+  billingEvents: () => import("./gateway-billing-events.screen.tsx"),
+  webhooks: () => import("./gateway-webhooks.screen.tsx"),
 } as const satisfies Record<string, GatewayScreenLoader>;
 
 export type GatewayScreenName = keyof typeof gatewayScreens;
 
-export { gatewayApi } from "../../behavior/gateway-api";
+export { gatewayApi } from "../../behavior/gateway-api.ts";
 export {
   GatewayHostPort,
   GatewayHostProvider,
@@ -55,4 +55,4 @@ export {
   type GatewayScope,
   type GatewaySuccessNotice,
   type GatewayTeam,
-} from "../../model/gateway-host";
+} from "../../model/gateway-host.ts";

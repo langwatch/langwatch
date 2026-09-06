@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { VercelCanonicaliserService } from "../vercel-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { VercelCanonicaliserService } from "../vercel-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 describe("VercelCanonicaliserService", () => {
   const extractor = VercelCanonicaliserService.create();

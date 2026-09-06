@@ -10,7 +10,7 @@ import {
   RETENTION_WEEK_DAYS,
   retentionDaysInputSchema,
   retentionDaysSchema,
-} from "../data-retention";
+} from "../data-retention.ts";
 
 describe("retentionDaysSchema", () => {
   describe("given a whole-week value within the allowed range", () => {

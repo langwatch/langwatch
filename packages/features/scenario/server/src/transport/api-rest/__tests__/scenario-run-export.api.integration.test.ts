@@ -11,7 +11,7 @@ import {
   createScenarioRunExportRestApp,
   type ScenarioRunExportPort,
   type ScenarioRunExportRestPorts,
-} from "../scenario-run-export.api";
+} from "../scenario-run-export.api.ts";
 
 type Session = { user: { id: string } };
 

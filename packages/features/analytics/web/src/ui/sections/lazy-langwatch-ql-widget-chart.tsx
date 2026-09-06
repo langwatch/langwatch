@@ -21,14 +21,14 @@
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";
 
-import { lazyBoundary } from "../elements/lazy-boundary";
+import { lazyBoundary } from "../elements/lazy-boundary.tsx";
 
-import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart";
+import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
 
-export type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart";
+export type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
 
 export const LazyLangWatchQLWidgetChart = lazyBoundary<LangWatchQLWidgetChartProps>(
-  () => import("./langwatch-ql-widget-chart"),
+  () => import("./langwatch-ql-widget-chart.tsx"),
   () => (
     <HStack gap={2} color="fg.muted" padding={4}>
       <Spinner size="sm" />

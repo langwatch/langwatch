@@ -7,7 +7,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
 
 describe("given the evaluator catalogue this process compiles in", () => {
   describe("when an unauthenticated caller reads it", () => {

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { CODEX_ALLOWED_FEATURE_KEYS } from "./catalog/codex-restrictions";
-import { codexTokenKeysSchema } from "./codex-account";
-import type { CustomModelEntry } from "./custom-model";
-import type { ModelProviderScope } from "./model-provider";
+import { CODEX_ALLOWED_FEATURE_KEYS } from "./catalog/codex-restrictions.ts";
+import { codexTokenKeysSchema } from "./codex-account.ts";
+import type { CustomModelEntry } from "./custom-model.ts";
+import type { ModelProviderScope } from "./model-provider.ts";
 
 export const parameterConstraintSchema = z
   .object({ min: z.number().optional(), max: z.number().optional() })

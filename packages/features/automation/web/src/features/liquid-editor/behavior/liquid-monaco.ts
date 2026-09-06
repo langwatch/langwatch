@@ -1,7 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages, Position, Uri } from "monaco-editor";
-import { substituteLiquidForJsonValidation } from "../model/liquid-json-substitution";
-import { registerJsonSchema } from "../model/monaco-schemas";
+import { substituteLiquidForJsonValidation } from "../model/liquid-json-substitution.ts";
+import { registerJsonSchema } from "../model/monaco-schemas.ts";
 
 /**
  * Rich variable info the autocomplete uses: path + TypeScript-ish type + optional description.

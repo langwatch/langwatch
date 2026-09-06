@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../../../../model/batch-evaluation-results.bt-leaderboard";
+} from "../../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import type {
   JudgeIndependence,
   VerbosityProfile,
-} from "../../batch-evaluation-results.judge-bias";
-import type { SampleAdequacy } from "../../../../model/batch-evaluation-results.sample-adequacy";
-import { buildTrustChecks, type LeaderboardTrustPanelProps } from "../leaderboard-trust-panel";
-import { DEFAULT_WARN_THRESHOLD } from "../pairwise-leaderboard";
+} from "../../batch-evaluation-results.judge-bias.ts";
+import type { SampleAdequacy } from "../../../../model/batch-evaluation-results.sample-adequacy.ts";
+import { buildTrustChecks, type LeaderboardTrustPanelProps } from "../leaderboard-trust-panel.tsx";
+import { DEFAULT_WARN_THRESHOLD } from "../pairwise-leaderboard.tsx";
 
 const leaderboard = (overrides: Partial<BTLeaderboard> = {}): BTLeaderboard => ({
   entries: [],

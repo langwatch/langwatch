@@ -1,6 +1,6 @@
-import type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "../ports/agent.port";
-import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository";
-import { AgentService } from "../services/agent.service";
+import type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "../ports/agent.port.ts";
+import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";
+import { AgentService } from "../services/agent.service.ts";
 
 export type PrismaAgentAdapterOptions = {
   database: AgentsDatabase;

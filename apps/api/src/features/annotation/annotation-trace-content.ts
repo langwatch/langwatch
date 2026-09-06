@@ -7,7 +7,7 @@
  * every trace surface reads through, so a field the explorer hides is not revealed here.
  */
 import type { Trace } from "@langwatch/trace-contract";
-import { ApiAnnotationTraceContentPort } from "./annotation.composition";
+import { ApiAnnotationTraceContentPort } from "./annotation.composition.ts";
 
 /** The two reads this adapter takes off the process's trace half. */
 export type ApiAnnotationTraceSource = Readonly<{

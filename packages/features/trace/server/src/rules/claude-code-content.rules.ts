@@ -1,5 +1,5 @@
-import { capPayloadString } from "./trace-payload-cap.rules";
-import { isRecord } from "./canonical-guard.rules";
+import { capPayloadString } from "./trace-payload-cap.rules.ts";
+import { isRecord } from "./canonical-guard.rules.ts";
 
 /**
  * Flatten one Anthropic message `content` (string OR array of content blocks)

@@ -7,8 +7,8 @@ import {
   createMcpAuthorizeRestApp,
   MCP_AUTHORIZE_PERMISSION,
   type McpAuthorizeRestPorts,
-} from "../mcp-authorize.api";
-import type { HostedMcpRedis } from "../../../ports/hosted-mcp.port";
+} from "../mcp-authorize.api.ts";
+import type { HostedMcpRedis } from "../../../ports/hosted-mcp.port.ts";
 
 const PROJECT_ID = "project-1";
 const CLIENT_ID = "mcp_client_1";

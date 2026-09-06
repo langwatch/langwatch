@@ -4,8 +4,8 @@
  * units (hours, minutes, seconds) count real time and truncate.
  */
 
-import { Temporal } from "./temporal";
-import { toEpochMs, toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned";
+import { Temporal } from "./temporal.ts";
+import { toEpochMs, toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned.ts";
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60_000;

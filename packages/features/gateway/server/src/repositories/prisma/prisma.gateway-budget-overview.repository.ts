@@ -1,5 +1,5 @@
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repository";
+import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repository.ts";
 
 /** The client slice the budget-detail overview binds to. */
 export type GatewayBudgetOverviewDatabase = Pick<PrismaClient, "gatewayBudget">;

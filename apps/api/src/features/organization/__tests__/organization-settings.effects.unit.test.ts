@@ -1,7 +1,7 @@
 import type { ShareService } from "@langwatch/share-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "../organization-settings.effects";
+import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "../organization-settings.effects.ts";
 
 describe("revokeTraceSharesAfterOrganizationSettingsUpdate", () => {
   it("attempts every committed project before reporting failed revocations", async () => {

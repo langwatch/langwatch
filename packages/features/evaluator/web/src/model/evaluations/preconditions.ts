@@ -15,7 +15,7 @@ import type {
   Span,
 } from "@langwatch/trace-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import type { CheckPreconditionRule, CheckPreconditions } from "./types";
+import type { CheckPreconditionRule, CheckPreconditions } from "./types.ts";
 
 export type { PreconditionTraceData } from "@langwatch/analytics-contract";
 

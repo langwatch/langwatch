@@ -13,7 +13,7 @@ const mockSetNodeParameter = vi.fn();
 const mockSetNode = vi.fn();
 const mockSetEdges = vi.fn();
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       setNodeParameter: mockSetNodeParameter,
@@ -29,8 +29,8 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-import { IfElsePropertiesPanel } from "../workflow-if-else-properties-panel";
-import type { WorkflowVariablesProps, WorkflowCodeEditorProps } from "../workflow-properties.ports";
+import { IfElsePropertiesPanel } from "../workflow-if-else-properties-panel.tsx";
+import type { WorkflowVariablesProps, WorkflowCodeEditorProps } from "../workflow-properties.ports.ts";
 
 const createIfElseNode = (overrides: Partial<Component> = {}): Node<Component> => ({
   id: "gate",

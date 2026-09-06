@@ -4,7 +4,7 @@ import {
   spanTreeNodeSchema,
   spanTreePageSchema,
   spanTreeTransportInputSchema,
-} from "../index";
+} from "../index.ts";
 import { describe, expect, it } from "vitest";
 
 type LiveSpanTreeNodeShape = {

@@ -15,7 +15,7 @@ import {
   WAVE_PULSE_PERIOD_S,
   WAVE_RIPPLE_TRAVEL_S,
   WAVE_SHAKE_DURATION_S,
-} from "../../model/langy-wave-motion";
+} from "../../model/langy-wave-motion.ts";
 
 /**
  * Draws the panel fold from Langy's activity, never pointer movement. Ambient states

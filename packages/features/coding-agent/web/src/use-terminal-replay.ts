@@ -1,15 +1,15 @@
 import { useCallback, useRef, useState } from "react";
 
-import { codingAgentApi } from "./coding-agent-api";
-import { useCodingAgentToaster, useShowErrorToast } from "./coding-agent-feedback";
-import { useCodingAgentRouter } from "./coding-agent-router";
+import { codingAgentApi } from "./coding-agent-api.ts";
+import { useCodingAgentToaster, useShowErrorToast } from "./coding-agent-feedback.ts";
+import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import {
   type ConversationTurn,
   lastTurnOfSession,
   openReplayHere,
   openReplayInExplorer,
   sayNothingWasStored,
-} from "./open-replay";
+} from "./open-replay.ts";
 
 /** The workspace the rows were read from, and where its traces can be seen. */
 interface TerminalReplayInput {

@@ -11,12 +11,12 @@ import type {
   RawRunTargetRow,
   RawTrendRow,
   ResultAtomsReadPort,
-} from "../../ports/result-atoms-read.port";
+} from "../../ports/result-atoms-read.port.ts";
 import type {
   ScenarioPlanRecord,
   ScenarioRepository,
-} from "../../repositories/scenario.repository";
-import { ResultAtomsService, __testing } from "../result-atoms.service";
+} from "../../repositories/scenario.repository.ts";
+import { ResultAtomsService, __testing } from "../result-atoms.service.ts";
 
 const { bucketSecondsFor, rate } = __testing;
 

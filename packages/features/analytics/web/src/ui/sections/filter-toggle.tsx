@@ -11,10 +11,10 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { countFilters, type FilterParam } from "../../model/analytics-filter-params";
-import type { FilterField } from "../../model/analytics-filter-definition";
-import { useFilterToggle } from "../../behavior/use-filter-toggle";
-import { FilterIconWithBadge } from "./filter-icon-with-badge";
+import { countFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import { FilterIconWithBadge } from "./filter-icon-with-badge.tsx";
 
 export function FilterToggle({ defaultShowFilters = false }: { defaultShowFilters?: boolean }) {
   const { showFilters, setShowFilters, filterParams, clearFilters, setNegateFilters } =

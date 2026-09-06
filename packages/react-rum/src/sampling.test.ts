@@ -7,7 +7,7 @@ import { ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
 import { SamplingDecision } from "@opentelemetry/sdk-trace-base";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createBrowserSampler, SessionRatioSampler } from "./sampling";
+import { createBrowserSampler, SessionRatioSampler } from "./sampling.ts";
 
 const SESSION_ID_KEY = "langwatch.rum.session.id";
 const SESSION_LAST_SEEN_KEY = "langwatch.rum.session.lastSeen";

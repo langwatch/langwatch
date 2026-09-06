@@ -6,14 +6,14 @@ import type { Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { WorkflowApp, WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 
-import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
+import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session.ts";
 import {
   apiExecutionProxyBaseUrl,
   composeApiAuthoringModelResolver,
   type ApiAuthoringModelResolver,
-} from "./api-authoring-model.composition";
-import type { ApiWorkflowStudioRestCollaborators } from "../features/workflow/workflow-studio-rest.mount";
-import { readScenarioGenerateTimeoutMs } from "../features/scenario/scenario-generate-rest.mount";
+} from "./api-authoring-model.composition.ts";
+import type { ApiWorkflowStudioRestCollaborators } from "../features/workflow/workflow-studio-rest.mount.ts";
+import { readScenarioGenerateTimeoutMs } from "../features/scenario/scenario-generate-rest.mount.ts";
 
 /** The playground's collaborators, or none. */
 export type ApiPlaygroundRestCollaborators = Readonly<{

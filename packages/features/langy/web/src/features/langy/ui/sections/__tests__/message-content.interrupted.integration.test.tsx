@@ -17,13 +17,13 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p_demo", slug: "demo" },
   }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   trpcClient: {},
   api: {
     useUtils: () => ({}),
@@ -47,8 +47,8 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-import { MessageContent } from "../message-content";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { MessageContent } from "../message-content.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 afterEach(cleanup);
 

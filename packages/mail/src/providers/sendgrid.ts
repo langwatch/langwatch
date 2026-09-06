@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import sgMail from "@sendgrid/mail";
-import { sanitizeHeaders } from "./mime";
+import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
   type EmailProviderPort,
   type MailerConfiguration,
   toArray,
-} from "./types";
+} from "./types.ts";
 
 const logger = createLogger("langwatch:mailer:sendgrid");
 

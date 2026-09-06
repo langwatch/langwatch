@@ -2,9 +2,9 @@ import type { LangyEventCursor } from "@langwatch/langy-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/langy-api";
-import { useLangyStore } from "../../../../behavior/langy.store";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 
 export interface LangyMessagesResult {

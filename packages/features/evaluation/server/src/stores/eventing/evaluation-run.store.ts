@@ -1,6 +1,6 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluationRunProjectionPort } from "../../ports/evaluation-run-projection.port";
+import type { EvaluationRunProjectionPort } from "../../ports/evaluation-run-projection.port.ts";
 
 /** Stores Evaluation's folded runs through the three-method run projection. */
 export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData> {

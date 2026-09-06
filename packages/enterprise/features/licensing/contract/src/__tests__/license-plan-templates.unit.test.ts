@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LIMIT } from "../index";
-import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE, getPlanTemplate, PRO_TEMPLATE } from "../index";
+import { DEFAULT_LIMIT } from "../index.ts";
+import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE, getPlanTemplate, PRO_TEMPLATE } from "../index.ts";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {

@@ -40,7 +40,7 @@ const { mutateMock, chartQueryMock } = vi.hoisted(() => ({
   chartQueryMock: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-analytics-period", () => ({
+vi.mock("../../../behavior/use-analytics-period.ts", () => ({
   useAnalyticsPeriod: () => ({
     period: {
       startDate: new Date("2026-01-01T00:00:00Z"),
@@ -49,7 +49,7 @@ vi.mock("../../../behavior/use-analytics-period", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/analytics-api", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     analytics: {
       savedWorkbenchCharts: {
@@ -70,13 +70,13 @@ vi.mock("../../../behavior/analytics-api", () => ({
 // several megabytes of chart runtime into this suite. Replaced with a marker
 // that echoes the row count, so "the widget drew this answer" is observable
 // without mounting Vega.
-vi.mock("../lazy-langwatch-ql-widget-chart", () => ({
+vi.mock("../lazy-langwatch-ql-widget-chart.tsx", () => ({
   LazyLangWatchQLWidgetChart: ({ rows }: { rows: readonly Record<string, unknown>[] }) => (
     <div data-testid="widget-chart">{JSON.stringify(rows)}</div>
   ),
 }));
 
-import { LangWatchQLDashboardWidget } from "../langwatch-ql-dashboard-widget";
+import { LangWatchQLDashboardWidget } from "../langwatch-ql-dashboard-widget.tsx";
 
 const CHART = {
   id: "chart_1",

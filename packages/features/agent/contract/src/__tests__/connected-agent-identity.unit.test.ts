@@ -10,7 +10,7 @@ import {
   parseConnectedReference,
   sanitizeEnvironment,
   sanitizeHostLabel,
-} from "../connected-agent.identity";
+} from "../connected-agent.identity.ts";
 
 describe("identity", () => {
   describe("when an environment holds characters outside the grammar", () => {

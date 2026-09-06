@@ -1,13 +1,13 @@
 import { Box, Flex, IconButton, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, Copy, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useTraceStore } from "../../behavior/trace.store";
+import { useTraceStore } from "../../behavior/trace.store.ts";
 import {
   SPAN_TYPE_COLORS,
   SPAN_TYPE_ICONS,
   type SpanConfig,
   type SpanType,
-} from "../../model/foundry-types";
+} from "../../model/foundry-types.ts";
 
 function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);

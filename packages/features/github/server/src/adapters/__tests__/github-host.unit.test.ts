@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GithubHostAdapter } from "../github-host.adapter";
+import { GithubHostAdapter } from "../github-host.adapter.ts";
 
 type HostConfig = { host?: string };
 

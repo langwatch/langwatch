@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import type { ArchitectureViolation } from "./types";
+import type { ArchitectureViolation } from "./types.ts";
 
 const FILE_NAME = "boundary-edge-baseline.json";
 const KINDS = ["cross-feature", "private-runtime-export"] as const;

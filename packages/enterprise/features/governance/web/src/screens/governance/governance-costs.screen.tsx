@@ -1,6 +1,6 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 
-import GovernanceLayout from "../../ui/sections/governance-layout";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
 
 /**
  * Placeholder for the Costs view: the page and its nav item ship behind

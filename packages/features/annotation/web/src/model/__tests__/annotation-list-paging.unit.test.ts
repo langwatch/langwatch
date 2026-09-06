@@ -10,7 +10,7 @@ import {
   pageAddress,
   pageSizeAddress,
   readAnnotationListPaging,
-} from "../annotation-list-paging";
+} from "../annotation-list-paging.ts";
 
 describe("given an address with no paging on it", () => {
   describe("when the list asks which page it is", () => {

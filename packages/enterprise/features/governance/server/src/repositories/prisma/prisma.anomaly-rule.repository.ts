@@ -4,7 +4,7 @@ import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../../ports/anomaly-rule.port";
+} from "../../ports/anomaly-rule.port.ts";
 
 export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
   private constructor(private readonly prisma: PrismaClient) {

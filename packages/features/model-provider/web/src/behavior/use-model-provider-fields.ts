@@ -7,7 +7,7 @@ import {
   getDisplayKeysForProvider,
   getRequiredCredentialKeys,
   isSecretCredentialField,
-} from "../model/model-provider-helpers";
+} from "../model/model-provider-helpers.ts";
 
 export type ServerModelProviderKey = keyof typeof serverModelProviders;
 

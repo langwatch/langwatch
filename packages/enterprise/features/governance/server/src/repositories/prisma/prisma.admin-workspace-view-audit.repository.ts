@@ -4,7 +4,7 @@ import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,
   type AdminWorkspaceTarget,
-} from "../../ports/admin-workspace-view-audit.port";
+} from "../../ports/admin-workspace-view-audit.port.ts";
 
 export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
   private constructor(private readonly prisma: PrismaClient) {

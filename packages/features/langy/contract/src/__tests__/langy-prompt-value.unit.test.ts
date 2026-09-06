@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { MAX_LANGY_CONTEXT_LABEL_LENGTH, sanitizeLangyPromptValue } from "../langy-turn-context";
+import { MAX_LANGY_CONTEXT_LABEL_LENGTH, sanitizeLangyPromptValue } from "../langy-turn-context.ts";
 
 const sanitize = (value: string) => sanitizeLangyPromptValue(value, 200);
 

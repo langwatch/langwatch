@@ -1,12 +1,12 @@
 import { type ComponentProps, useCallback, useState } from "react";
-import { usePromptProject } from "../../behavior/use-prompt-project";
-import { isLimitExceeded, isLiteMemberRestriction } from "../../model/trpc-error-signals";
-import { ChangeHandleDialog } from "./dialogs/change-handle-dialog";
-import { type SaveDialogFormValues, SaveVersionDialog } from "./dialogs/save-version-dialog";
-import type { ChangeHandleFormValues } from "../../surfaces/prompt-form";
-import { usePrompts } from "../../behavior/use-prompts";
-import type { PromptConfigContextType } from "../../model/prompt-config-operations";
-import { PromptConfigContext } from "../../model/prompt-config-context";
+import { usePromptProject } from "../../behavior/use-prompt-project.ts";
+import { isLimitExceeded, isLiteMemberRestriction } from "../../model/trpc-error-signals.ts";
+import { ChangeHandleDialog } from "./dialogs/change-handle-dialog.tsx";
+import { type SaveDialogFormValues, SaveVersionDialog } from "./dialogs/save-version-dialog.tsx";
+import type { ChangeHandleFormValues } from "../../surfaces/prompt-form/index.ts";
+import { usePrompts } from "../../behavior/use-prompts.ts";
+import type { PromptConfigContextType } from "../../model/prompt-config-operations.ts";
+import { PromptConfigContext } from "../../model/prompt-config-context.ts";
 
 /**
  * Provider for prompt configuration operations.

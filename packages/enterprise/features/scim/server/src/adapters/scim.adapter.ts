@@ -5,9 +5,9 @@ import type { GovernanceService } from "@langwatch/enterprise-governance-contrac
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementService } from "@langwatch/entitlement-contract";
 import type { UserService } from "@langwatch/user-contract";
-import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
-import { PrismaScimRepository } from "../repositories/prisma/scim.repository";
-import { ScimService } from "../services/scim.service";
+import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
+import { PrismaScimRepository } from "../repositories/prisma/scim.repository.ts";
+import { ScimService } from "../services/scim.service.ts";
 
 export interface PostgresScimAdapterOptions {
   database: object;

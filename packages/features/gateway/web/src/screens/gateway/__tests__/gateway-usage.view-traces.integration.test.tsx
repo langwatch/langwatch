@@ -9,12 +9,12 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -42,7 +42,7 @@ const { keyRow } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     gatewayUsage: {
       summary: {
@@ -72,7 +72,7 @@ vi.mock("../../../behavior/gateway-api", () => ({
   },
 }));
 
-import GatewayUsagePage from "../gateway-usage.screen";
+import GatewayUsagePage from "../gateway-usage.screen.tsx";
 
 /**
  * An organization with one team holding the project a key's traces land in.

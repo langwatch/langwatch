@@ -1,4 +1,4 @@
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 /**
  * The rollout flag the signal-focused home hangs off, and the only lever
  * that switches the composition. Registered with `defaultValue: false`, so

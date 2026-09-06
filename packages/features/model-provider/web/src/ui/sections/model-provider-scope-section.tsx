@@ -5,9 +5,9 @@ import type {
   ScopeSelection,
   UseModelProviderFormActions,
   UseModelProviderFormState,
-} from "../../behavior/use-model-provider-form";
+} from "../../behavior/use-model-provider-form.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { SmallLabel } from "../elements/small-label";
+import { SmallLabel } from "../elements/small-label.tsx";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import { ScopeChipPicker } from "@langwatch/authz-web/surfaces/scope-picker";
 

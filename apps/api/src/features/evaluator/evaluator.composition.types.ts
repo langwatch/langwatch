@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { EvaluatorApp, EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount.ts";
 
 /** The namespace, its `ctx.app` slice, and the ports the monitor copy takes. */
 export type ComposedEvaluatorFeature = Readonly<{

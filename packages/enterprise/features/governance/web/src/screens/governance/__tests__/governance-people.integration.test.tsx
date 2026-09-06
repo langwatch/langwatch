@@ -27,7 +27,7 @@ const departments = {
   ],
 };
 
-vi.mock("../../../behavior/governance-api", () => ({
+vi.mock("../../../behavior/governance-api.ts", () => ({
   api: {
     useUtils: () => ({ departments: { list: { invalidate: vi.fn() } } }),
     departments: {
@@ -39,8 +39,8 @@ vi.mock("../../../behavior/governance-api", () => ({
   },
 }));
 
-const { fakeGovernanceHost, renderWithGovernanceHost } = await import("../../../testing");
-const PeoplePage = (await import("../governance-people.screen")).default;
+const { fakeGovernanceHost, renderWithGovernanceHost } = await import("../../../testing.tsx");
+const PeoplePage = (await import("../governance-people.screen.tsx")).default;
 
 afterEach(cleanup);
 

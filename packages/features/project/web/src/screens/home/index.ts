@@ -7,7 +7,7 @@ import type { ComponentType } from "react";
 export type ProjectHomeScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const projectHomeScreens = {
-  home: () => import("./home.screen"),
+  home: () => import("./home.screen.tsx"),
 } as const satisfies Record<string, ProjectHomeScreenLoader>;
 
 export type ProjectHomeScreenName = keyof typeof projectHomeScreens;
@@ -17,7 +17,7 @@ export {
   type HomeApiMap,
   type RecentItem,
   type RecentItemType,
-} from "../../behavior/home-api";
+} from "../../behavior/home-api.ts";
 export {
   ProjectHomeHostPort,
   ProjectHomeHostProvider,
@@ -28,5 +28,5 @@ export {
   type ProjectHomeOrganization,
   type ProjectHomeProject,
   type ProjectHomeUser,
-} from "../../model/project-home-host";
-export { SIGNAL_FOCUSED_HOME_FLAG } from "./components/use-show-signal-focused-home";
+} from "../../model/project-home-host.ts";
+export { SIGNAL_FOCUSED_HOME_FLAG } from "./components/use-show-signal-focused-home.ts";

@@ -10,12 +10,12 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
-} from "../../../process-manager/stores/processStore.types";
-import type { JsonValue } from "../../../process-manager/json";
-import type { ProcessRef } from "../../../process-manager/processManager.types";
-import { deriveInboxKey } from "../../../process-manager/stores/inboxKey";
+} from "../../../process-manager/stores/processStore.types.ts";
+import type { JsonValue } from "../../../process-manager/json.ts";
+import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
+import { deriveInboxKey } from "../../../process-manager/stores/inboxKey.ts";
 import { generate } from "@langwatch/ksuid";
-import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database";
+import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database.ts";
 import {
   Prisma,
   PrismaClient,

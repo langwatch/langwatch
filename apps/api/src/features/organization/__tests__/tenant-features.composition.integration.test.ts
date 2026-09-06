@@ -21,19 +21,19 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import { composeAutomationFeature } from "../../automation/automation.composition";
-import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition";
-import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition";
-import { composeProjectFeature } from "../../project/project.composition";
-import { composeOrganizationFeature } from "../organization.composition";
+} from "../../../api.application.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import { composeAutomationFeature } from "../../automation/automation.composition.ts";
+import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
+import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
+import { composeProjectFeature } from "../../project/project.composition.ts";
+import { composeOrganizationFeature } from "../organization.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   stubMount,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 

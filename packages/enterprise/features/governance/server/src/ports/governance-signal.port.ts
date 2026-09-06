@@ -1,12 +1,12 @@
 import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,
-} from "./governance-webhook.port";
+} from "./governance-webhook.port.ts";
 import type {
   GatewayBudgetCrossingCandidate,
   GatewayBudgetScope,
   GatewayBudgetWindow,
-} from "./gateway-debit.port";
+} from "./gateway-debit.port.ts";
 
 export type GovernanceVirtualKeyLifecycleSignal = {
   virtualKey: {

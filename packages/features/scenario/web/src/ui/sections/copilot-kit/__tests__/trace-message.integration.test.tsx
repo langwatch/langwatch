@@ -4,15 +4,15 @@
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TraceMessage } from "../trace-message";
+import { TraceMessage } from "../trace-message.tsx";
 
 const useGetByIdQueryMock = vi.fn();
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     traces: {
       getById: {
@@ -28,7 +28,7 @@ vi.mock("@langwatch/trace-web/surfaces/trace-id-peek", () => ({
   TracePreviewHoverCard: ({ children }: { children: ReactNode }) => children,
 }));
 
-vi.mock("../../../../behavior/use-trace-details-drawer", () => ({
+vi.mock("../../../../behavior/use-trace-details-drawer.ts", () => ({
   useTraceDetailsDrawer: () => ({ openTraceDetailsDrawer: vi.fn() }),
 }));
 

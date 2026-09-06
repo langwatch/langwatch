@@ -14,11 +14,11 @@ import {
   MissingAgentService,
   NoApiTrpcFeatures,
   type ApiTrpcFeatureMount,
-} from "../api.application";
-import { ApiRestSecurity } from "../api-rest.security";
-import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
-import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
-import { sameOriginSseInit } from "../app-trpc/__tests__/support/sse-browser-request";
+} from "../api.application.ts";
+import { ApiRestSecurity } from "../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition.ts";
+import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse.ts";
+import { sameOriginSseInit } from "../app-trpc/__tests__/support/sse-browser-request.ts";
 
 const secret: Secret = {
   id: "secret-1",

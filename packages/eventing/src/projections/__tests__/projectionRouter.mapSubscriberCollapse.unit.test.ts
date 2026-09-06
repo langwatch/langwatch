@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return {
     ...actual,
     incrementEsReactorTotal: vi.fn(),
@@ -11,8 +11,8 @@ vi.mock("../../metrics", async (importOriginal) => {
   };
 });
 
-import { incrementEsReactorCollapsedTotal } from "../../metrics";
-import type { Event } from "../../domain/types";
+import { incrementEsReactorCollapsedTotal } from "../../metrics.ts";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockAppendStore,
   createMockMapProjectionDefinition,
@@ -20,9 +20,9 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
-import { ProjectionRouter } from "../projectionRouter";
+} from "../../services/__tests__/testHelpers.ts";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
 /**
  * The map batch path used to dispatch one event at a time, so the per-subscriber

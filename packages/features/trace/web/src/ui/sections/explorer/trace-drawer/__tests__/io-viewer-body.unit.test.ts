@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { looksLikeMarkdown } from "../io-viewer-body";
+import { looksLikeMarkdown } from "../io-viewer-body.tsx";
 
 describe("looksLikeMarkdown", () => {
   describe("given a candidate text input", () => {

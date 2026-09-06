@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { evaluationResultSchema, evaluationSchema, traceSchema } from "./trace-format.schemas";
+import { evaluationResultSchema, evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import type {
   ChatMessage,
   Evaluation,
@@ -8,7 +8,7 @@ import type {
   Span,
   SpanTimestamps,
   Trace,
-} from "./trace-format.schemas";
+} from "./trace-format.schemas.ts";
 
 /**
  * The results the legacy trace read answers with. They are the contract between that read and

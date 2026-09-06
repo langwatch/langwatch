@@ -13,7 +13,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaAnnotationQueueRepository } from "../prisma.annotation-queue.repository";
+import { PrismaAnnotationQueueRepository } from "../prisma.annotation-queue.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

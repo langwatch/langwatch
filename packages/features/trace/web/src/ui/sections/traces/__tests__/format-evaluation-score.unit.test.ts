@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatEvaluationScore } from "../evaluation-status-item";
+import { formatEvaluationScore } from "../evaluation-status-item.tsx";
 
 /**
  * Characterization test for langwatch/langwatch#6397.

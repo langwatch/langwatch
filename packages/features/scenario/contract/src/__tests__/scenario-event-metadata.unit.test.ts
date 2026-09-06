@@ -19,7 +19,7 @@ import {
   scenarioEventSchema,
   scenarioMessageSnapshotSchema,
   scenarioRunStartedSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("extensible scenario metadata", () => {
   describe("scenarioRunStartedSchema", () => {

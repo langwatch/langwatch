@@ -1,10 +1,10 @@
-import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter";
+import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
   FacetQueryContext,
-} from "./trace-facet-registry.clickhouse.adapter";
-import { KEY_DISCOVERY_SETTINGS } from "./trace-facet-query.clickhouse.adapter";
+} from "./trace-facet-registry.clickhouse.adapter.ts";
+import { KEY_DISCOVERY_SETTINGS } from "./trace-facet-query.clickhouse.adapter.ts";
 
 export class ClickHouseSpanAttributeKeysFacetAdapter {
   static create(): ClickHouseSpanAttributeKeysFacetAdapter {

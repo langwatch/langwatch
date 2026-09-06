@@ -24,8 +24,8 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import type { PersonalFeatureGateDialogState } from "../model/personal-feature-gate-state";
-import { annotationApi } from "./annotation-api";
+import type { PersonalFeatureGateDialogState } from "../model/personal-feature-gate-state.ts";
+import { annotationApi } from "./annotation-api.ts";
 
 export type PersonalFeatureGate = {
   /** Whether an action has to ask before it goes ahead. */

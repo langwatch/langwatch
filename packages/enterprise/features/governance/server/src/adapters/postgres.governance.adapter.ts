@@ -1,6 +1,6 @@
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
-import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma.cost-attribution-policy.repository";
-import { PostgresGovernancePolicyService } from "../services/governance-policy.service";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
+import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma.cost-attribution-policy.repository.ts";
+import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 
 export type GovernanceDatabase = {
   aiToolEntry: {

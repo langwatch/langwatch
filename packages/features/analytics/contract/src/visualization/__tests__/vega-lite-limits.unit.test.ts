@@ -14,15 +14,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry";
-import { validateVegaLiteSpec } from "../validate-vega-lite-spec";
+import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
+import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
 import {
   LWQL_VEGA_LIMITS as L,
   type LangWatchQLVegaLimitName,
   LWQL_VEGA_RULES,
-} from "../vega-lite-policy";
-import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema";
-import type { DatasetRowCounts } from "../visualization-types";
+} from "../vega-lite-policy.ts";
+import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema.ts";
+import type { DatasetRowCounts } from "../visualization-types.ts";
 
 const validate = (spec: unknown, rows: DatasetRowCounts = LWQL_FIXTURE_ROW_COUNTS) =>
   validateVegaLiteSpec({

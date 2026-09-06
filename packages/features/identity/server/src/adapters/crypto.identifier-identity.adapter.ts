@@ -3,7 +3,7 @@ import { Instance, Ksuid } from "@langwatch/ksuid";
 import {
   type DeriveIdentifierIdInput,
   IdentifierIdentityPort,
-} from "../ports/identifier-identity.port";
+} from "../ports/identifier-identity.port.ts";
 
 /**
  * Pinned, never read from the ambient environment - the grants ledger's

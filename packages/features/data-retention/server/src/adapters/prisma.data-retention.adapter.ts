@@ -4,18 +4,18 @@ import type { ProjectService } from "@langwatch/project-contract";
 import {
   RedisDataRetentionCacheStore,
   type DataRetentionRedis,
-} from "../stores/data-retention-cache.store";
-import type { DataRetentionDatabasePort } from "../ports/data-retention-database.port";
-import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma.data-retention.repository";
-import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma.pinned-trace.repository";
-import { DataRetentionService } from "../services/data-retention.service";
-import { StorageMeterService } from "../services/storage-meter.service";
-import type { StorageMeterClickHouseClient } from "../ports/storage-meter-clickhouse.port";
-import type { StorageMeterRedis } from "../stores/storage-meter-cache.store";
+} from "../stores/data-retention-cache.store.ts";
+import type { DataRetentionDatabasePort } from "../ports/data-retention-database.port.ts";
+import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma.data-retention.repository.ts";
+import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma.pinned-trace.repository.ts";
+import { DataRetentionService } from "../services/data-retention.service.ts";
+import { StorageMeterService } from "../services/storage-meter.service.ts";
+import type { StorageMeterClickHouseClient } from "../ports/storage-meter-clickhouse.port.ts";
+import type { StorageMeterRedis } from "../stores/storage-meter-cache.store.ts";
 import {
   ClickHouseRetroactiveRetentionAdapter,
   type TenantClickHouseClientResolver,
-} from "./clickhouse.retroactive-retention.adapter";
+} from "./clickhouse.retroactive-retention.adapter.ts";
 
 export class PrismaDataRetentionAdapter {
   static create(options: {

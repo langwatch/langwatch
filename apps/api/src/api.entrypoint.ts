@@ -2,7 +2,7 @@
 import "@langwatch/time/polyfill";
 
 import process from "node:process";
-import { startStandaloneApi } from "./app/api-standalone.executable";
+import { startStandaloneApi } from "./app/api-standalone.executable.ts";
 
 /**
  * The runnable API process — `pnpm --filter @langwatch/platform-api start`.

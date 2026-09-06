@@ -20,7 +20,7 @@ import {
   describeRefusal,
   REGISTERED_REFUSAL_CODES,
   UNKNOWN_FAILURE_DESCRIPTION,
-} from "../connection-verdict-copy";
+} from "../connection-verdict-copy.ts";
 
 /** The sentence and the secret an upstream refusal can arrive carrying. */
 const LEAKED_KEY = "sk-live-0123456789abcdef";

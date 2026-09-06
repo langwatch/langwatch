@@ -6,12 +6,12 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../services/langwatch-ql-postgres-mapping.service";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../services/langwatch-ql-postgres-mapping.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -37,7 +37,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
   statementsLoggedSince,
-} from "./lwql-clickhouse-harness";
+} from "./lwql-clickhouse-harness.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();

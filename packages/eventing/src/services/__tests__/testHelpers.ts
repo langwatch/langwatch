@@ -1,17 +1,17 @@
 import type { Logger } from "@langwatch/observability";
 import { vi } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { EventType } from "../../domain/eventType";
-import type { TenantId } from "../../domain/tenantId";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event, Projection } from "../../domain/types";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { EventType } from "../../domain/eventType.ts";
+import type { TenantId } from "../../domain/tenantId.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event, Projection } from "../../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
-} from "../../projections/foldProjection.types";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
-import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types";
-import type { QueueManager } from "../queues/queueManager";
+} from "../../projections/foldProjection.types.ts";
+import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types.ts";
+import type { QueueManager } from "../queues/queueManager.ts";
 
 export const TEST_EVENT_TYPES = ["test.event.one", "test.event.two"] as const;
 export const TEST_COMMAND_TYPES = ["test.command.run"] as const;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mightContainLangyCardFence, splitLangyCardFences } from "../fence";
+import { mightContainLangyCardFence, splitLangyCardFences } from "../fence.ts";
 
 describe("splitLangyCardFences", () => {
   describe("given plain prose", () => {

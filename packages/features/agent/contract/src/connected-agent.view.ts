@@ -13,9 +13,9 @@
  * what lets a screen filter `type === "connected"` straight into a
  * {@link ConnectedAgentView} with no cast.
  */
-import type { AgentWithFields } from "./agent";
-import type { ConnectedAgentConfig } from "./config/connected";
-import type { ConnectedAgentSelectability } from "./connected-agent.selectable";
+import type { AgentWithFields } from "./agent.ts";
+import type { ConnectedAgentConfig } from "./config/connected.ts";
+import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
 
 /** The SDK that registered an agent, as the card prints it. */
 export interface ConnectedAgentSdk {

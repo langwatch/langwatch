@@ -5,10 +5,10 @@
 import { PostgresSavedViewAdapter, type SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createSavedViewTrpcRouter } from "./dashboard-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createSavedViewTrpcRouter } from "./dashboard-trpc.mount.ts";
 
-import type { ComposedSavedViewFeature } from "./saved-view.composition.types";
+import type { ComposedSavedViewFeature } from "./saved-view.composition.types.ts";
 
 /** Composes the stored filter sets over this process's own graph. */
 export function composeSavedViewFeature(options: {

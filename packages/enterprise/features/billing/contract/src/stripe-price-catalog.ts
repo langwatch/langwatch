@@ -1,4 +1,4 @@
-import stripeCatalogData from "./stripe-catalog.json";
+import stripeCatalogData from "./stripe-catalog.json" with { type: "json" };
 import {
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
@@ -8,7 +8,7 @@ import {
   type StripePriceName,
   type StripePricesFile,
   stripePricesFileSchema,
-} from "./stripe-prices";
+} from "./stripe-prices.ts";
 
 export const parseStripePricesFile = (value: unknown): StripePricesFile => {
   return stripePricesFileSchema.parse(value);

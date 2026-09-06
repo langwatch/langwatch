@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import type { GithubInstallStatePayload } from "@langwatch/github-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubInstallStateAdapter } from "../github-install-state.adapter";
+import { GithubInstallStateAdapter } from "../github-install-state.adapter.ts";
 
 const SIGNING_KEY = "test-secret-not-real";
 const NOW = 1_700_000_000_000;

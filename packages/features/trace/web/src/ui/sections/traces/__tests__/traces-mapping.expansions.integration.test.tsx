@@ -12,13 +12,13 @@ import "@testing-library/jest-dom/vitest";
 import type { MappingState } from "@langwatch/trace-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),
 }));
 
-vi.mock("../../use-project-span-names", () => ({
+vi.mock("../../use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: [],
     metadataKeys: [],
@@ -27,15 +27,15 @@ vi.mock("../../use-project-span-names", () => ({
   }),
 }));
 
-vi.mock("../../use-project-event-types", () => ({
+vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({ eventTypes: [], isLoading: false }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
     traces: {
@@ -46,7 +46,7 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-const { TracesMapping } = await import("../traces-mapping");
+const { TracesMapping } = await import("../traces-mapping.tsx");
 
 const TRACE = {
   trace_id: "trace-1",

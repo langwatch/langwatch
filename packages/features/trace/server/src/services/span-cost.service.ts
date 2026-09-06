@@ -2,7 +2,7 @@ import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { z } from "zod";
-import { TraceModelCostPort } from "../ports/trace-model-cost.port";
+import { TraceModelCostPort } from "../ports/trace-model-cost.port.ts";
 
 const numericValueSchema = z.union([
   z.number().finite(),

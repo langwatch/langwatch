@@ -1,5 +1,5 @@
-import type { DashboardData } from "./ops-dashboard";
-import type { DetailSnapshot, LiveSnapshot } from "./ops-snapshot";
+import type { DashboardData } from "./ops-dashboard.ts";
+import type { DetailSnapshot, LiveSnapshot } from "./ops-snapshot.ts";
 
 export interface OpsSnapshotLease {
   isHeld: boolean;

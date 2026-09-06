@@ -9,8 +9,8 @@ import {
   eventMetricValuesSchema,
   facetValueAggregatesSchema,
   traceListCursorSchema,
-} from "./trace-list.queries";
-import { traceMediaRefSchema } from "./trace-media-ref";
+} from "./trace-list.queries.ts";
+import { traceMediaRefSchema } from "./trace-media-ref.ts";
 
 /** Which half of the sidebar a facet is listed under. */
 const facetGroupSchema = z.enum(["trace", "evaluation", "span", "metadata", "prompt"]);

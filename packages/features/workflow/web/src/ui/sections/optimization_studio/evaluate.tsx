@@ -24,16 +24,16 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../model/workflow-api-client";
-import { useEvaluationExecution } from "./use-evaluation-execution";
-import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
-import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../model/workflow-api-client.ts";
+import { useEvaluationExecution } from "./use-evaluation-execution.ts";
+import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
+import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Entry } from "@langwatch/workflow-contract";
-import { trainTestSplit } from "../../../model/studio-dataset.utils";
-import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";
-import { VersionToBeUsed } from "./version-to-be-used";
+import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
+import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
+import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
 export function Evaluate() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();

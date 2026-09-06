@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InviteService } from "../invite.service";
+import { InviteService } from "../invite.service.ts";
 
 /**
  * D11 — identifier-aware acceptance (specs/identity/resilient-invitations.feature).

@@ -34,7 +34,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveLatestAlias } from "@langwatch/model-provider-contract";
-import { ProviderModelSelector } from "../provider-model-selector";
+import { ProviderModelSelector } from "../provider-model-selector.tsx";
 
 afterEach(() => cleanup());
 

@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Span } from "@langwatch/trace-contract";
 
-import { SpanStorageService } from "../trace-span-storage-read.service";
-import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../trace-visibility-window.service";
+import { SpanStorageService } from "../trace-span-storage-read.service.ts";
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../trace-visibility-window.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

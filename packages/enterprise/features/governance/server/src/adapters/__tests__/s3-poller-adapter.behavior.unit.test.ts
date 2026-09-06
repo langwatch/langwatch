@@ -5,8 +5,8 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { S3PollingPullerAdapter } from "../s3-puller.adapter";
-import { TestObjectStoragePort } from "../../__tests__/support/puller-test-ports";
+import { S3PollingPullerAdapter } from "../s3-puller.adapter.ts";
+import { TestObjectStoragePort } from "../../__tests__/support/puller-test-ports.ts";
 
 const VALID_CONFIG = {
   adapter: "s3_polling" as const,

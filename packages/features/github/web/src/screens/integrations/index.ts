@@ -28,23 +28,23 @@ import type { ComponentType } from "react";
 export type GithubScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const githubScreens = {
-  integrations: () => import("./integrations.screen"),
+  integrations: () => import("./integrations.screen.tsx"),
 } as const satisfies Record<string, GithubScreenLoader>;
 
 export type GithubScreenName = keyof typeof githubScreens;
 
-export { INTEGRATIONS_PAGE_PERMISSION } from "./integrations.screen";
-export { githubApi } from "../../behavior/github-api";
-export type { GithubApiMap } from "../../behavior/github-api";
+export { INTEGRATIONS_PAGE_PERMISSION } from "./integrations.screen.tsx";
+export { githubApi } from "../../behavior/github-api.ts";
+export type { GithubApiMap } from "../../behavior/github-api.ts";
 export {
   GITHUB_ERROR_QUERY_KEY,
   GITHUB_INSTALL_RETURN,
   githubInstallAddress,
-} from "../../model/github-install-address";
+} from "../../model/github-install-address.ts";
 export {
   GithubHostPort,
   GithubHostProvider,
   type GithubFailureNotice,
   type GithubHostScope,
   type GithubRouteReading,
-} from "../../model/github-host";
+} from "../../model/github-host.ts";

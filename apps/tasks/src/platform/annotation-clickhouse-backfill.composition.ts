@@ -4,8 +4,8 @@ import {
   PostgresAnnotationBackfillAdapter,
   TraceAnnotationSyncPort,
 } from "@langwatch/annotation-server";
-import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
-import type { TasksHost } from "./tasks-host.composition";
+import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition.ts";
+import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
  * Dispatches `bulkSyncAnnotations` onto this process's own producer-only registration of the

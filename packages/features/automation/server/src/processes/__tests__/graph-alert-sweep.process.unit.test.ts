@@ -4,8 +4,8 @@ import {
   automationProcessDefinition,
   InertIntentRetention,
   InertScheduledIntents,
-} from "../../ports/__tests__/pipeline-test-harness";
-import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../graph-alert-sweep.process";
+} from "../../ports/__tests__/pipeline-test-harness.ts";
+import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../graph-alert-sweep.process.ts";
 
 describe("graph alert sweep process", () => {
   describe("when the process manager is built", () => {

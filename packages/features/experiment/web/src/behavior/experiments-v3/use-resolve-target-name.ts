@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useTargetNameMap } from "../use-target-name-map";
-import type { TargetConfig } from "../../model/experiments-v3/types";
+import { useTargetNameMap } from "../use-target-name-map.ts";
+import type { TargetConfig } from "../../model/experiments-v3/types.ts";
 
 /**
  * Returns a resolver that maps a target to its human-readable display name (prompt

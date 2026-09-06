@@ -1,4 +1,4 @@
-import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
+import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
 
 /**
  * One in-place migration, written against the tenant it is given and nothing

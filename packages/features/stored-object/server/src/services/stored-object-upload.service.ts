@@ -21,10 +21,10 @@ import {
   type StoredObjectReference,
   type StoredObjectsCreateUploadOutput,
 } from "@langwatch/stored-object-contract";
-import { storedObjectReferenceOf } from "../rules/stored-object-view.rules";
-import type { StoredObjectUploadTokenClaims } from "../ports/stored-object.port";
-import type { StoredObjectRecord } from "../stores/stored-object.store";
-import type { StoredObjectServiceOptions } from "./stored-object.service";
+import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
+import type { StoredObjectUploadTokenClaims } from "../ports/stored-object.port.ts";
+import type { StoredObjectRecord } from "../stores/stored-object.store.ts";
+import type { StoredObjectServiceOptions } from "./stored-object.service.ts";
 
 export class StoredObjectUploadService {
   static create(

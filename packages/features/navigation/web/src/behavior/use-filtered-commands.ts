@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useNavigationHost } from "../model/navigation-host";
-import { planManagementHref } from "../model/plan-management-href";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { planManagementHref } from "../model/plan-management-href.ts";
 import {
   actionCommands,
   filterCommands,
@@ -8,11 +8,11 @@ import {
   navigationCommands,
   supportCommands,
   themeCommands,
-} from "../model/command-catalogue";
-import { MIN_CATEGORY_MATCH_LENGTH, MIN_SEARCH_QUERY_LENGTH } from "../model/command-bar-constants";
-import { getPageCommands } from "../model/command-page-commands";
-import type { Command } from "../model/command-bar-types";
-import { useCommandFeatureFlags } from "./use-command-feature-flags";
+} from "../model/command-catalogue.ts";
+import { MIN_CATEGORY_MATCH_LENGTH, MIN_SEARCH_QUERY_LENGTH } from "../model/command-bar-constants.ts";
+import { getPageCommands } from "../model/command-page-commands.ts";
+import type { Command } from "../model/command-bar-types.ts";
+import { useCommandFeatureFlags } from "./use-command-feature-flags.ts";
 
 export interface FilteredCommands {
   navigation: Command[];

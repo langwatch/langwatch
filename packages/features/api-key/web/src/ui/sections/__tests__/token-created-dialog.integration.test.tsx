@@ -6,9 +6,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiKeyHostProvider } from "../../../model/api-key-host";
-import { FakeApiKeyHost } from "../../../testing";
-import { CODE_ASSISTANTS, TokenCreatedDialog } from "../token-created-dialog";
+import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
+import { FakeApiKeyHost } from "../../../testing.tsx";
+import { CODE_ASSISTANTS, TokenCreatedDialog } from "../token-created-dialog.tsx";
 
 // Shiki is loaded lazily by the shared adapter; the real wasm highlighter is
 // unnecessary for structural assertions.

@@ -11,8 +11,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluatorApp } from "../evaluator.app";
-import { createEvaluatorsRestApp } from "../../transport/api-rest/evaluator.api";
+import type { EvaluatorApp } from "../evaluator.app.ts";
+import { createEvaluatorsRestApp } from "../../transport/api-rest/evaluator.api.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

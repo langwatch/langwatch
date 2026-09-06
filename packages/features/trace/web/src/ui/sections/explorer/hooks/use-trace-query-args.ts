@@ -1,9 +1,9 @@
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { isPreviewTraceId } from "../../../../model/preview-trace-id";
-import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness";
-import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context";
-import { useDrawerProjectId } from "./use-drawer-project-id";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness.ts";
+import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context.tsx";
+import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 /**
  * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,

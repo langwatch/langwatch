@@ -12,7 +12,7 @@
  */
 
 import { Button, Center, Heading, Stack, Text } from "@chakra-ui/react";
-import { useGovernanceHost } from "../../model/governance-host";
+import { useGovernanceHost } from "../../model/governance-host.ts";
 
 export function NotFoundScene() {
   const host = useGovernanceHost();

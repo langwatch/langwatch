@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ClaudeCodeCanonicaliserService } from "../claude-code-canonicaliser.service";
-import { isConversationalQuerySource } from "../../rules/claude-code-call-policy.rules";
-import { ClaudeCodeRequestService } from "../../services/claude-code-request.service";
-import { ClaudeCodeResponseService } from "../../services/claude-code-response.service";
-import { createExtractorContext, createLogExtractorContext } from "./test-helpers";
+import { ClaudeCodeCanonicaliserService } from "../claude-code-canonicaliser.service.ts";
+import { isConversationalQuerySource } from "../../rules/claude-code-call-policy.rules.ts";
+import { ClaudeCodeRequestService } from "../../services/claude-code-request.service.ts";
+import { ClaudeCodeResponseService } from "../../services/claude-code-response.service.ts";
+import { createExtractorContext, createLogExtractorContext } from "./test-helpers.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 

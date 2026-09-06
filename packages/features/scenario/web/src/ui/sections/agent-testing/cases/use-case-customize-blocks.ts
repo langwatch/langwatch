@@ -5,8 +5,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips";
-import type { CaseDraft } from "./use-case-editor";
+import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
+import type { CaseDraft } from "./use-case-editor.ts";
 
 /** Which of the optional blocks are open. */
 type OpenBlocks = {

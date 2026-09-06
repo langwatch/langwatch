@@ -5,8 +5,8 @@
  * this repository for reads and owns every write itself, by emitting commands
  * — see ../eventing/eventing.authz-grant.repository.ts.
  */
-import type { AuthzDatabase } from "../authz-read.repository";
-import type { AuthzGrantRepository } from "../authz-grant.repository";
+import type { AuthzDatabase } from "../authz-read.repository.ts";
+import type { AuthzGrantRepository } from "../authz-grant.repository.ts";
 
 /** The subset of the write port this repository actually implements. */
 export type AuthzGrantsReadRepository = Pick<

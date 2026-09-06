@@ -3,9 +3,9 @@ import type {
   TopicClusteringStatus,
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
-import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository";
-import { TopicService } from "../../services/topic.service";
+import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port.ts";
+import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
+import { TopicService } from "../../services/topic.service.ts";
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 
 const NOW = 1_800_000_000_000;

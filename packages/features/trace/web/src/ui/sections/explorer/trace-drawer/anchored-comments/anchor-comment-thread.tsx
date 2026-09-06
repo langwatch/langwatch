@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { UserAvatar } from "../../../../elements/user-avatar";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
+import { UserAvatar } from "../../../../elements/user-avatar.tsx";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 
 /**
  * What has already been said about one part of the trace, read above the composer that

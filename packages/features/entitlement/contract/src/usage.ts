@@ -9,7 +9,7 @@
  * the concrete shape reached the client through the generic; it did not.
  */
 import { z } from "zod";
-import { planSchema } from "./plan";
+import { planSchema } from "./plan.ts";
 
 /** Where usage stands against the allowance. */
 export const messageLimitStatusSchema = z.enum(["ok", "warning", "exceeded"]);

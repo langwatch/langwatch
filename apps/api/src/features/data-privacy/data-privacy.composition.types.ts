@@ -1,6 +1,6 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createDataPrivacyTrpcRouter } from "./data-privacy-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createDataPrivacyTrpcRouter } from "./data-privacy-trpc.mount.ts";
 
 /** The one namespace, built over the composed rules. */
 export type ComposedDataPrivacyFeature = Readonly<{

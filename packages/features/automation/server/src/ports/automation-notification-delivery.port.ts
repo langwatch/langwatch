@@ -2,7 +2,7 @@ import type { AlertType, SlackPayload } from "@langwatch/automation-contract";
 import type {
   WebhookDeliveryRequest,
   WebhookSendResult,
-} from "../adapters/webhook-delivery.adapter";
+} from "../adapters/webhook-delivery.adapter.ts";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
 /** Outbound provider calls. Automation owns when and what to send; the process

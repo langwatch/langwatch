@@ -13,7 +13,7 @@ import {
   countryCodeToName,
   DEFAULT_COUNTRIES,
   splitByPopularity,
-} from "../../../model/countries";
+} from "../../../model/countries.ts";
 
 export interface PhoneNumberInputProps {
   value?: string;

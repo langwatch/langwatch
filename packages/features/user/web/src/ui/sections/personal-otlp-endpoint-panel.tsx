@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { usePersonalToaster } from "../../behavior/personal-workspace-feedback";
-import { usePersonalDeployment } from "../../behavior/personal-workspace-session";
+import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
+import { usePersonalDeployment } from "../../behavior/personal-workspace-session.ts";
 
 const SECRET_MASK = "•".repeat(36);
 

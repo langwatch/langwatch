@@ -14,7 +14,7 @@ import {
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { ApiRawRequestSurfacePort } from "../../api-http.listener";
+import { ApiRawRequestSurfacePort } from "../../api-http.listener.ts";
 
 /**
  * The hosted Model Context Protocol endpoint, composed for this process.

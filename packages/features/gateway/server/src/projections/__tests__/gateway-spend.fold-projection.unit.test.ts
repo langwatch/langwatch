@@ -15,7 +15,7 @@ import type {
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
 } from "@langwatch/gateway-server";
-import { GatewaySpendFoldProjection, type GatewaySpendState } from "../gateway-spend.projection";
+import { GatewaySpendFoldProjection, type GatewaySpendState } from "../gateway-spend.projection.ts";
 
 const TENANT = "proj_test";
 const REQUEST = "01K1REQUESTULID";

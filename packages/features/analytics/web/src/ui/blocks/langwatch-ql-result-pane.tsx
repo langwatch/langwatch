@@ -8,21 +8,21 @@ import { Badge, Box, Button, HStack, Spinner, Stack, Text, VStack } from "@chakr
 import { type ReactNode, useId, useState } from "react";
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-import { formatNumber } from "../../model/format";
+import { formatNumber } from "../../model/format.ts";
 
 import {
   type LangWatchQLFailure,
   LWQL_TIMEOUT_CODE,
   LWQL_UNPARSEABLE_CODE,
   readLangWatchQLFailure,
-} from "../../model/lwql-failure";
+} from "../../model/lwql-failure.ts";
 import {
   isLangWatchQLResultStale,
   type LangWatchQLRequestState,
-} from "../../model/lwql-request-state";
-import { LangWatchQLDiagnostics } from "../elements/langwatch-ql-diagnostics";
-import { LangWatchQLResultMeta } from "../elements/langwatch-ql-result-meta";
-import { LangWatchQLResultTable } from "./langwatch-ql-result-table";
+} from "../../model/lwql-request-state.ts";
+import { LangWatchQLDiagnostics } from "../elements/langwatch-ql-diagnostics.tsx";
+import { LangWatchQLResultMeta } from "../elements/langwatch-ql-result-meta.tsx";
+import { LangWatchQLResultTable } from "./langwatch-ql-result-table.tsx";
 
 /** The three readings of a result. */
 export type LangWatchQLResultView = "table" | "chart" | "specification";

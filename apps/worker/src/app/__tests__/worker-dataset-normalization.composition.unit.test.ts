@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
 import {
   WorkerDatasetStorageResolver,
   type WorkerDatasetObjectStorage,
-} from "../worker-dataset-normalization.composition";
-import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter";
-import type { WorkerStorageConfig } from "../../platform/config/worker.config";
+} from "../worker-dataset-normalization.composition.ts";
+import { WorkerProjectS3SourcePort } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
+import type { WorkerStorageConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/datasets/dataset-normalization-azure-storage.feature

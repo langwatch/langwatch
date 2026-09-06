@@ -17,7 +17,7 @@ import {
   SubscriptionNotLinkedError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service";
+import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 

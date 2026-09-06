@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GovernanceHttpPort } from "../../ports/governance-http.port";
+import { GovernanceHttpPort } from "../../ports/governance-http.port.ts";
 
 interface FetchCall {
   url: string;
@@ -259,7 +259,7 @@ afterEach(() => {
 
 async function newAdapter() {
   const { CopilotStudioDataversePullerAdapter } =
-    await import("../copilot-studio-dataverse-puller.adapter");
+    await import("../copilot-studio-dataverse-puller.adapter.ts");
   return CopilotStudioDataversePullerAdapter.create(new StubHttp());
 }
 

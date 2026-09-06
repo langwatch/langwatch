@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { normaliseTagKey, startProfiling, tagsFromResourceAttributes } from "../profiling";
+import { normaliseTagKey, startProfiling, tagsFromResourceAttributes } from "../profiling.ts";
 
 describe("given a process deciding whether to profile itself", () => {
   afterEach(() => {

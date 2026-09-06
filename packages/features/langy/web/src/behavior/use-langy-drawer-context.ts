@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { LangyContextChip } from "./langy.store";
+import type { LangyContextChip } from "./langy.store.ts";
 
 /**
  * Derives a page-context chip from the app's URL-routed drawer (task: richer Langy

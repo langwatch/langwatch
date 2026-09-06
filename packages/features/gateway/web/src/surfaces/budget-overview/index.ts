@@ -13,7 +13,7 @@
  * explicit way one feature's presentation reaches another's page.
  */
 
-export { formatBudgetUsd } from "../../model/format-budget-usd";
+export { formatBudgetUsd } from "../../model/format-budget-usd.ts";
 export {
   BudgetOverviewList,
   budgetDescription,
@@ -24,6 +24,6 @@ export {
   windowAdjective,
   windowPhrase,
   type BudgetOverviewItemView,
-} from "./budget-overview-list";
-export { BudgetExceededBanner, type BudgetExceededBannerProps } from "./budget-exceeded-banner";
-export { spentSubline } from "./spent-subline";
+} from "./budget-overview-list.tsx";
+export { BudgetExceededBanner, type BudgetExceededBannerProps } from "./budget-exceeded-banner.tsx";
+export { spentSubline } from "./spent-subline.ts";

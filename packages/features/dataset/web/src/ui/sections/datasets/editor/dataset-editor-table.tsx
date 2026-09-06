@@ -28,7 +28,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
-import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer";
+import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
@@ -38,25 +38,25 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal";
+import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
   createDatasetEditorStore,
   type EditorColumn,
   type EditorRecord,
   rekeyEditorRecords,
-} from "../../../../behavior/use-dataset-editor-store";
-import { useTableKeyboardNavigation } from "../../../../behavior/use-table-keyboard-navigation";
-import { formatRecordCount } from "../../../../model/dataset-editor-copy";
+} from "../../../../behavior/use-dataset-editor-store.ts";
+import { useTableKeyboardNavigation } from "../../../../behavior/use-table-keyboard-navigation.ts";
+import { formatRecordCount } from "../../../../model/dataset-editor-copy.ts";
 import {
   type AutosaveState,
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
-} from "../../../../model/dataset-table-context";
-import { datasetTableCss } from "../../../../model/dataset-table-styles";
-import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body";
-import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync";
+} from "../../../../model/dataset-table-context.tsx";
+import { datasetTableCss } from "../../../../model/dataset-table-styles.ts";
+import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body.tsx";
+import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync.ts";
 
 export type InMemoryDataset = {
   datasetId?: string;

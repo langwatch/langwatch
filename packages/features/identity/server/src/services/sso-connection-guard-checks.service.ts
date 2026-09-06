@@ -26,7 +26,7 @@ import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
-} from "../repositories/sso-connection.repository";
+} from "../repositories/sso-connection.repository.ts";
 
 /**
  * The checks every SSO connection verb runs before it states a fact, and the reads those checks

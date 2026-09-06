@@ -9,13 +9,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AvailableSource } from "@langwatch/prompt-web/surfaces/variables";
-import { EvaluationsV3Table } from "../evaluations-v3-table";
-import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { EvaluationsV3Table } from "../evaluations-v3-table.tsx";
+import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
-} from "../../../../model/experiments-v3/types";
+} from "../../../../model/experiments-v3/types.ts";
 
 let openedDrawerType: string | null = null;
 let openedDrawerParams: Record<string, any> = {};
@@ -56,7 +56,7 @@ vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/experiments-v3/use-target-name", () => {
+vi.mock("../../../../behavior/experiments-v3/use-target-name.ts", () => {
   const useTargetName = (_target: { id: string }) => "wf agent";
   return {
     useTargetName,
@@ -64,7 +64,7 @@ vi.mock("../../../../behavior/experiments-v3/use-target-name", () => {
       targets.map((target) => (target ? useTargetName(target) : "")),
   };
 });
-vi.mock("../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),

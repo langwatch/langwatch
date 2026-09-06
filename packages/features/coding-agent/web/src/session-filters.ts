@@ -1,4 +1,4 @@
-import type { SessionListRow } from "./session-list-row";
+import type { SessionListRow } from "./session-list-row.ts";
 
 export type Period = { startDate: Date; endDate: Date };
 export type PeriodMode = "relative" | "absolute";

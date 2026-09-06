@@ -7,7 +7,7 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
-} from "../trace-edit-overlay.repository";
+} from "../trace-edit-overlay.repository.ts";
 
 /**
  * The id prefix every correction carries. Stated rather than imported: the application's KSUID_RESOURCES is a browser-shared constant map, and one entry reaching a server package would drag the whole map. The value is the wire format of every id already stored.

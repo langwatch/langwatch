@@ -4,7 +4,7 @@ import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 function makeFixture() {
   const acceptTurn = vi.fn(async () => undefined);

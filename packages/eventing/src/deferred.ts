@@ -1,4 +1,4 @@
-import type { QueueSendOptions } from "./queues/queue.types";
+import type { QueueSendOptions } from "./queues/queue.types.ts";
 
 /**
  * A dispatcher function produced by `mapCommands` for a given command payload.

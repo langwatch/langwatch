@@ -14,7 +14,7 @@ import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
-import { RenderCode } from "../code/render-code";
+import { RenderCode } from "../code/render-code.tsx";
 import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { SmallLabel } from "@langwatch/design-system/small-label";
@@ -23,10 +23,10 @@ import { Link } from "@langwatch/ui-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../model/workflow-api-client";
-import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../model/workflow-api-client.ts";
+import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import {
   getEntryInputs,
   parseStudioWorkflow,
@@ -36,10 +36,10 @@ import {
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
-} from "../../../model/studio-dataset.utils";
-import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";
-import { useVersionState } from "./history";
-import { VersionToBeUsed } from "./version-to-be-used";
+} from "../../../model/studio-dataset.utils.ts";
+import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
+import { useVersionState } from "./history.tsx";
+import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
 // Type with dataset property
 interface NodeDataWithDataset {

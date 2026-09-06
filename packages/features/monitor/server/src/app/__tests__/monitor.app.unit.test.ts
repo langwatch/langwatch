@@ -19,7 +19,7 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { Monitor, MonitorService, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi } from "vitest";
-import { MonitorApp, type MonitorPatch } from "../monitor.app";
+import { MonitorApp, type MonitorPatch } from "../monitor.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

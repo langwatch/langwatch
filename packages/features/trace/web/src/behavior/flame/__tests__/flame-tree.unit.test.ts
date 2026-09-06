@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTree, computeSpanContext, formatPercent, generateTicks } from "../tree";
-import type { TraceFlameSpan, Viewport } from "../types";
+import { buildTree, computeSpanContext, formatPercent, generateTicks } from "../tree.ts";
+import type { TraceFlameSpan, Viewport } from "../types.ts";
 
 const span = (
   spanId: string,

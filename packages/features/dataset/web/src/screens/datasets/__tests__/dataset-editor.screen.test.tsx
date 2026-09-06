@@ -15,7 +15,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithDatasetHost } from "../../../testing";
+import { renderWithDatasetHost } from "../../../testing.tsx";
 
 const { datasetQuery } = vi.hoisted(() => ({
   datasetQuery: {
@@ -28,7 +28,7 @@ const { datasetQuery } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/dataset-api", () => ({
+vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
     dataset: { getById: { useQuery: () => datasetQuery.current } },
   },
@@ -36,13 +36,13 @@ vi.mock("../../../behavior/dataset-api", () => ({
 
 // Render only the chrome (headerActions): the grid has its own suites, and
 // mounting it here would drag the whole editor into a test about the gate.
-vi.mock("../../../ui/sections/dataset-editor-table", () => ({
+vi.mock("../../../ui/sections/dataset-editor-table.tsx", () => ({
   DatasetEditorTable: ({ headerActions }: { headerActions?: ReactNode }) => (
     <div data-testid="dataset-editor-table">{headerActions}</div>
   ),
 }));
 
-const { default: DatasetEditorScreen } = await import("../dataset-editor.screen");
+const { default: DatasetEditorScreen } = await import("../dataset-editor.screen.tsx");
 
 const ROUTE = { params: { id: "ds-1" }, query: {} };
 

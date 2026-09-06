@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration";
-import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository";
+import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
+import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository.ts";
 
 /**
  * The boot-seed wiring's contract with composition: one synchronous call

@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
-import { ROUTING_HANDLE_RULE } from "./model-provider";
-import type { ModelRole } from "./catalog/model-feature-registry";
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message";
+import { ROUTING_HANDLE_RULE } from "./model-provider.ts";
+import type { ModelRole } from "./catalog/model-feature-registry.ts";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message.ts";
 
 export const MODEL_NOT_CONFIGURED_CAUSE = "MODEL_NOT_CONFIGURED" as const;
 

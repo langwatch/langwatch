@@ -3,14 +3,14 @@ import {
   formatEvalColumnId,
   isEvalColumnId,
   parseEvalColumnId,
-} from "../../../../../model/lens-eval-column-id";
-import type { TraceEvalResult, TraceListItem } from "../../types/trace";
+} from "../../../../../model/lens-eval-column-id.ts";
+import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
 import {
   buildEvalColumnDef,
   evalColumnLabel,
   evalFieldValue,
   latestEvalForKey,
-} from "../eval-columns";
+} from "../eval-columns.ts";
 
 function evalResult(over: Partial<TraceEvalResult>): TraceEvalResult {
   return {

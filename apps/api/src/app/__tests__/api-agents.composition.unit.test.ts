@@ -7,7 +7,7 @@ import {
 } from "@langwatch/agent-server";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import { describe, expect, it } from "vitest";
-import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "../api-agents.composition";
+import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "../api-agents.composition.ts";
 
 type Row = Record<string, unknown>;
 

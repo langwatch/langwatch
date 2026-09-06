@@ -15,13 +15,13 @@ import {
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
 import type { RoleService } from "@langwatch/role-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules";
-import { InviteService } from "./invite.service";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import { InviteService } from "./invite.service.ts";
 import {
   ROLE_BINDING_KSUID_RESOURCE,
   type InviteServiceDependencies,
-} from "../rules/invite-contracts.rules";
+} from "../rules/invite-contracts.rules.ts";
 
 const logger = createLogger("langwatch:invites");
 

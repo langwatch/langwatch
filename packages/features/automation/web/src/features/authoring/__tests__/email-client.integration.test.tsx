@@ -17,15 +17,15 @@ import {
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFormCtx } from "../../../model/provider-types";
+import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with — the template an author's first
  *  keystroke would persist. Everything else in the module stays real. */
-vi.mock("../ui/sections/template-authoring", async (original) => {
-  const actual = await original<typeof import("../ui/sections/template-authoring")>();
+vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
+  const actual = await original<typeof import("../ui/sections/template-authoring.tsx")>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
@@ -34,7 +34,7 @@ vi.mock("../ui/sections/template-authoring", async (original) => {
 vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     team: {
       getTeamWithMembers: {
@@ -45,7 +45,7 @@ vi.mock("../../../behavior/automation-api", () => ({
 }));
 
 import type { EmailPreview } from "@langwatch/automation-contract";
-import emailClient, { type EmailSlice } from "../ui/sections/email.client";
+import emailClient, { type EmailSlice } from "../ui/sections/email.client.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

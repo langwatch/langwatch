@@ -6,13 +6,13 @@
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
-import { GroupQueueProcessor } from "../groupQueue";
+import { GroupQueueProcessor } from "../groupQueue.ts";
 
 /** Released by hand so the drain can be held open mid-close. */
 let releaseDrain: (() => void) | undefined;
 const requestShutdown = vi.fn();
 
-vi.mock("../dispatcher", () => ({
+vi.mock("../dispatcher.ts", () => ({
   GroupQueueDispatcher: class {
     start(): void {}
     requestShutdown(): void {
@@ -26,7 +26,7 @@ vi.mock("../dispatcher", () => ({
   },
 }));
 
-vi.mock("../metricsCollector", () => ({
+vi.mock("../metricsCollector.ts", () => ({
   GroupQueueMetricsCollector: class {
     start(): void {}
     stop(): void {}

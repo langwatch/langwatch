@@ -10,11 +10,11 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 import {
   type BucketSpend,
   GatewayBudgetClickHouseRepository,
-} from "../clickhouse.gateway-budget.repository";
+} from "../clickhouse.gateway-budget.repository.ts";
 import { PROVIDER_BUCKET_SEPARATOR } from "@langwatch/gateway-contract";
 
 const chUrl = testClickHouseUrl();

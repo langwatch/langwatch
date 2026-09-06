@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCapability, reconcileColumns } from "../lens-capabilities";
+import { getCapability, reconcileColumns } from "../lens-capabilities.ts";
 
 const flat = getCapability("flat");
 

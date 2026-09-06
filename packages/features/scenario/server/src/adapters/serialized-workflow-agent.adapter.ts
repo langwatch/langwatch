@@ -14,8 +14,8 @@ import {
   type FetchInitWithDispatcher,
   NlpFetchAdapter,
   type NlpFetchTimeouts,
-} from "./nlp-fetch.adapter";
-import { SerializedAgentPort } from "../ports/serialized-agent.port";
+} from "./nlp-fetch.adapter.ts";
+import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
 
 /**
  * How long to wait on the NLP service for one turn.

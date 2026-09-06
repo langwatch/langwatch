@@ -12,7 +12,7 @@ import {
   type ListParams,
   type ListResult,
   type ResourceName,
-} from "./admin-client";
+} from "./admin-client.ts";
 
 /**
  * React-Query hooks around the admin REST endpoints. Kept small and local —

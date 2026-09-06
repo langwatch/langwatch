@@ -10,13 +10,13 @@ import type { TraceApp } from "@langwatch/trace-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
-import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential.ts";
 import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
-} from "../../../app/api-trace-ingest.composition";
-import type { ApiTraceReadStackPort } from "../trace-read-stack.port";
+} from "../../../app/api-trace-ingest.composition.ts";
+import type { ApiTraceReadStackPort } from "../trace-read-stack.port.ts";
 
 const PROJECT = {
   id: "project-1",

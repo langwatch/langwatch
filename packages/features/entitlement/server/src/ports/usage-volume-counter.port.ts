@@ -1,4 +1,4 @@
-import type { USAGE_UNKNOWN } from "./usage-counter.port";
+import type { USAGE_UNKNOWN } from "./usage-counter.port.ts";
 
 /** One project's share of an organization's volume this period. */
 export type ProjectUsageCount = { projectId: string; count: number };

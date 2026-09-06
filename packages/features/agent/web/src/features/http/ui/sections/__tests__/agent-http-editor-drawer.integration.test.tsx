@@ -11,8 +11,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,
-} from "../agent-http-editor-drawer";
-import { AgentHttpEditorPresentationPort } from "../agent-http-editor.presentation";
+} from "../agent-http-editor-drawer.tsx";
+import { AgentHttpEditorPresentationPort } from "../agent-http-editor.presentation.tsx";
 
 class TestPresentation extends AgentHttpEditorPresentationPort {
   renderScenarioMappings() {

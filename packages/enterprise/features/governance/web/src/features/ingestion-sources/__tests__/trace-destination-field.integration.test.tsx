@@ -19,8 +19,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { SourceType } from "../model/ingestion-source-catalog";
-import { TraceDestinationField } from "../ui/elements/trace-destination-field";
+import type { SourceType } from "../model/ingestion-source-catalog.ts";
+import { TraceDestinationField } from "../ui/elements/trace-destination-field.tsx";
 
 const ORG_ID = "org_acme";
 const PROJECTS = [

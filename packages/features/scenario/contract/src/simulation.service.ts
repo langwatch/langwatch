@@ -8,7 +8,7 @@ import type {
   SimulationLastResultSummary,
   SimulationRunData,
   SimulationSetData,
-} from "./simulation";
+} from "./simulation.ts";
 import type {
   SimulationCancelRun,
   SimulationDeleteRun,
@@ -19,7 +19,7 @@ import type {
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
-} from "./simulation.commands";
+} from "./simulation.commands.ts";
 
 export type SimulationProjectDateRangeInput = {
   projectId: string;

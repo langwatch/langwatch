@@ -11,8 +11,8 @@ import { useEffect } from "react";
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store";
-import { useAnnotationMutations } from "./use-annotation-form";
+} from "../../../../../behavior/annotation-draft.store.ts";
+import { useAnnotationMutations } from "./use-annotation-form.ts";
 
 interface AnnotationEditorCardProps {
   draft: AnnotationDraft;

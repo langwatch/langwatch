@@ -29,11 +29,11 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { DataRetentionRepository } from "../repositories/data-retention.repository";
-import { PinnedTraceRepository } from "../repositories/pinned-trace.repository";
-import { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository";
-import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store";
-import { StorageMeterService } from "./storage-meter.service";
+import { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
+import { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
+import { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
+import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store.ts";
+import { StorageMeterService } from "./storage-meter.service.ts";
 
 export class DataRetentionService extends DataRetentionServiceContract {
   static create(options: {

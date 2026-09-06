@@ -1,6 +1,6 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { GatewayBudgetChangeDedupeRepository } from "../gateway-budget-change-dedupe.repository";
+import { GatewayBudgetChangeDedupeRepository } from "../gateway-budget-change-dedupe.repository.ts";
 
 const BUDGET_CHANGE_EVENT_KEY_PREFIX = "gateway_budget_change:";
 

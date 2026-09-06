@@ -11,8 +11,8 @@ import { NotFoundError, type SchemaVersion } from "@langwatch/prompt-contract";
 import {
   LlmConfigVersionsRepository,
   type LlmConfigVersionDTO,
-} from "../prompt-version.repository";
-import { PrismaLlmConfigRepository } from "./prisma.prompt.repository";
+} from "../prompt-version.repository.ts";
+import { PrismaLlmConfigRepository } from "./prisma.prompt.repository.ts";
 import { getVersionValidator, parseRuntimeParameters } from "@langwatch/prompt-contract";
 
 /**

@@ -2,16 +2,16 @@
  * LangWatchQL analytics SQL — the PostgreSQL-resident half of the catalog.
  * @see ./langwatch-ql-view-statements.service.ts — the ClickHouse views over them
  */
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
-} from "./langwatch-ql-postgres-mapping.service";
-import type { LangWatchQLNames } from "./langwatch-ql-access-model.service";
+} from "./langwatch-ql-postgres-mapping.service.ts";
+import type { LangWatchQLNames } from "./langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-} from "./langwatch-ql-catalog-shapes.service";
+} from "./langwatch-ql-catalog-shapes.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 

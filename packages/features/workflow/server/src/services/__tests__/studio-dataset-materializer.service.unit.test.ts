@@ -6,8 +6,8 @@ import {
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
-import { StudioDatasetMaterializerService } from "../studio-dataset-materializer.service";
-import { TestDatasetService } from "./dataset.service.fake";
+import { StudioDatasetMaterializerService } from "../studio-dataset-materializer.service.ts";
+import { TestDatasetService } from "./dataset.service.fake.ts";
 
 const PROJECT_ID = "project-123";
 

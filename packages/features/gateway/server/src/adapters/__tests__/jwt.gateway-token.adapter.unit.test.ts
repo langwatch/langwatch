@@ -9,7 +9,7 @@
 import jwt from "jsonwebtoken";
 import { describe, expect, it } from "vitest";
 
-import { GatewayJwtAdapter, type GatewayJwtSubject } from "../jwt.gateway-token.adapter";
+import { GatewayJwtAdapter, type GatewayJwtSubject } from "../jwt.gateway-token.adapter.ts";
 
 const SECRET = "0123456789abcdef0123456789abcdef";
 const TTL_SECONDS = 15 * 60;

@@ -9,13 +9,13 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../adapters/eventing.topic-events.adapter";
+} from "../adapters/eventing.topic-events.adapter.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../adapters/eventing.topic-events.adapter";
+} from "../adapters/eventing.topic-events.adapter.ts";
 
 /**
  * Per-project topic clustering run status (ADR-051 §1/§7): the public read

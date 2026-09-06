@@ -6,8 +6,8 @@ import {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
   lintWorkspace,
-} from "../src";
-import type { ArchitectureViolation } from "../src";
+} from "../src/index.ts";
+import type { ArchitectureViolation } from "../src/index.ts";
 
 let root = "";
 

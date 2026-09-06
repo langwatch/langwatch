@@ -65,7 +65,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer";
+import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 
 const mount = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);

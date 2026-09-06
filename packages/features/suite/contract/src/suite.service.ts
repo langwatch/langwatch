@@ -1,4 +1,4 @@
-import type { CreateSuiteCommand, SuiteIdInput, UpdateSuiteCommand } from "./suite.commands";
+import type { CreateSuiteCommand, SuiteIdInput, UpdateSuiteCommand } from "./suite.commands.ts";
 import type {
   Suite,
   SuiteArchivedNamesInput,
@@ -11,7 +11,7 @@ import type {
   SuiteBatchHistoryInput,
   SuiteRunStateData,
   SuiteRunStateInput,
-} from "./suite";
+} from "./suite.ts";
 
 /** The sole cross-feature capability for suite definitions. */
 export abstract class SuiteService {

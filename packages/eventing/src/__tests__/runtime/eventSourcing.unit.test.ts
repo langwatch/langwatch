@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DisabledPipeline } from "../../disabledPipeline";
-import { createTenantId } from "../../domain/tenantId";
-import { defineAggregate, defineEvents } from "../../domain/definitions";
-import type { Event } from "../../domain/types";
-import { EventSourcing } from "../../eventSourcing";
-import { definePipeline } from "../../pipeline/staticBuilder";
-import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore";
+import { DisabledPipeline } from "../../disabledPipeline.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore.ts";
 import {
   createMockEventStore,
   createMockMapProjectionDefinition,
-} from "../../services/__tests__/testHelpers";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
+} from "../../services/__tests__/testHelpers.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 /**
  * Creates a minimal static pipeline definition for testing.

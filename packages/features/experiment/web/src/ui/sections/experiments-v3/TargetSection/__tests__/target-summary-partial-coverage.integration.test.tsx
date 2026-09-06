@@ -9,9 +9,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TargetAggregate } from "@langwatch/experiment-contract";
-import { TargetSummary } from "../target-summary";
+import { TargetSummary } from "../target-summary.tsx";
 
-vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorNames: () => new Map<string, string>(),
 }));
 

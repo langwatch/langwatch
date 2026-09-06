@@ -11,9 +11,9 @@ import {
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "../../domain/types";
-import { EventSourcedQueueProcessorMemory } from "../../queues/memory";
-import { replayEvents } from "../../replay/replayExecutor";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcedQueueProcessorMemory } from "../../queues/memory.ts";
+import { replayEvents } from "../../replay/replayExecutor.ts";
 import {
   createMockEventStore,
   createMockFoldProjectionDefinition,
@@ -22,10 +22,10 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import type { EventSubscriberDefinition } from "../eventSubscriber.types";
+} from "../../services/__tests__/testHelpers.ts";
+import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
+import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
 
 /**
  * Builds a real in-memory global queue whose process/spanAttributes callbacks dispatch through

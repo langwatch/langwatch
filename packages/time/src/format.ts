@@ -4,7 +4,7 @@
  * reader, so it is a build-time mistake and not a screen reading "MMMM".
  */
 
-import { toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned";
+import { toZonedDateTime, type TimeInput, type ZoneOptions } from "./zoned.ts";
 
 const MONTHS_SHORT = [
   "Jan",

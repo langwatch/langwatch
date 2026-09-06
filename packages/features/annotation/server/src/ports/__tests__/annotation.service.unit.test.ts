@@ -9,12 +9,12 @@ import {
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnnotationRepository } from "../annotation.port";
-import { AnnotationService } from "../../services/annotation.service";
+import { AnnotationRepository } from "../annotation.port.ts";
+import { AnnotationService } from "../../services/annotation.service.ts";
 import {
   createAnnotationTestOrganizations,
   createAnnotationTestProjects,
-} from "./annotation.test-services";
+} from "./annotation.test-services.ts";
 
 const annotation = {
   id: "annotation-1",

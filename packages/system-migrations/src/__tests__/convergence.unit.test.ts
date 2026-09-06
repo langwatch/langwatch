@@ -6,7 +6,7 @@
  * Timers are faked because the loop deliberately waits between passes; every
  * test therefore has to drive the clock rather than wait on it.
  */
-import type { MigrationPassSummary } from "../types";
+import type { MigrationPassSummary } from "../types.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
@@ -35,7 +35,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-import { startSystemMigrations as start } from "../convergence";
+import { startSystemMigrations as start } from "../convergence.ts";
 
 const startSystemMigrations = () => start({ runPass: stubs.runPass });
 

@@ -2,13 +2,13 @@
  * LangWatchQL analytics SQL — the vocabulary the default-deny walk is written in.
  * @see specs/analytics/lwql-api.feature
  */
-import type { SqlAstNode } from "./langwatch-ql-parser.rules";
-import type { ResolvedLangWatchQLPolicy } from "./langwatch-ql-policy.rules";
+import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
+import type { ResolvedLangWatchQLPolicy } from "./langwatch-ql-policy.rules.ts";
 import type {
   LangWatchQLClause,
   LangWatchQLViolation,
   LangWatchQLViolationCode,
-} from "./langwatch-ql-violations.rules";
+} from "./langwatch-ql-violations.rules.ts";
 
 /** A bound parameter the query declares, e.g. `{since:DateTime}`. */
 export interface LangWatchQLParameter {

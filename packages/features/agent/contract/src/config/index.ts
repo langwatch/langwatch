@@ -1,16 +1,16 @@
 import { z } from "zod";
-import { codeAgentConfigSchema } from "./code";
-import { connectedAgentConfigSchema } from "./connected";
-import { httpAgentConfigSchema } from "./http";
-import { signatureAgentConfigSchema } from "./signature";
-import { workflowAgentConfigSchema } from "./workflow";
+import { codeAgentConfigSchema } from "./code.ts";
+import { connectedAgentConfigSchema } from "./connected.ts";
+import { httpAgentConfigSchema } from "./http.ts";
+import { signatureAgentConfigSchema } from "./signature.ts";
+import { workflowAgentConfigSchema } from "./workflow.ts";
 
-export * from "./base";
-export * from "./code";
-export * from "./connected";
-export * from "./http";
-export * from "./signature";
-export * from "./workflow";
+export * from "./base.ts";
+export * from "./code.ts";
+export * from "./connected.ts";
+export * from "./http.ts";
+export * from "./signature.ts";
+export * from "./workflow.ts";
 
 /**
  * The kinds of agent a project can hold: the four studio component types,

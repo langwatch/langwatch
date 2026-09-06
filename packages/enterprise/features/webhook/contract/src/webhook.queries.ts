@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { webhookEnvelopeSchema } from "./webhook";
+import { webhookEnvelopeSchema } from "./webhook.ts";
 
 export const listWebhookEventsQuerySchema = z.object({
   organizationId: z.string().min(1),

@@ -34,7 +34,7 @@ import { nanoid } from "nanoid";
 import type {
   ApiRateLimitRequest,
   ApiRateLimitResult,
-} from "../platform/infrastructure/api-rate-limit.infrastructure";
+} from "../platform/infrastructure/api-rate-limit.infrastructure.ts";
 
 /** Everything the model gateway is composed from. */
 export type ApiModelProviderCompositionOptions = Readonly<{

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { api } from "../../../behavior/ops-api";
+import { api } from "../../../behavior/ops-api.ts";
 
-import { useOpsMutationOutcomes } from "../../../behavior/ops-mutation-outcome";
+import { useOpsMutationOutcomes } from "../../../behavior/ops-mutation-outcome.ts";
 /** What a pending bulk or single act covers — named fully in the confirm. */
 export interface PendingDlqAction {
   kind: "redrive" | "discard";

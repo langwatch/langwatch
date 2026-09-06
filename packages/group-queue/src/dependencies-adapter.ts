@@ -5,8 +5,8 @@ import type {
   GroupQueueDependencies,
   GroupQueueFailureClassifier,
   GroupQueuePolicy,
-} from "./contracts";
-import type { ObjectStore, ProjectStorageDestination } from "./storage";
+} from "./contracts.ts";
+import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
 
 export type GroupQueueRedis = IORedis | Cluster;
 

@@ -6,7 +6,7 @@ import {
   type OrgModelProvider,
   resolveEligible,
   resolveProviderDefaultModel,
-} from "../model/eligible-model-providers";
+} from "../model/eligible-model-providers.ts";
 
 describe("resolveProviderDefaultModel", () => {
   describe("when the provider is a self-hosted custom endpoint", () => {

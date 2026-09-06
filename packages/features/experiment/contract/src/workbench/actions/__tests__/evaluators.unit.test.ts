@@ -2,9 +2,9 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import { COMPARISON_EVALUATOR_TYPE, type EvaluatorConfig } from "../../../experiment-workbench";
-import { addEvaluator, attachEvaluator } from "../transforms";
-import { baseState, refusalCode } from "./workbench-fixtures";
+import { COMPARISON_EVALUATOR_TYPE, type EvaluatorConfig } from "../../../experiment-workbench.ts";
+import { addEvaluator, attachEvaluator } from "../transforms/index.ts";
+import { baseState, refusalCode } from "./workbench-fixtures.ts";
 
 const comparisonConfig = {
   variants: ["target-a", "target-b"],

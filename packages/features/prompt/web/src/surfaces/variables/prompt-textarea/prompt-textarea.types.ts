@@ -1,6 +1,6 @@
 import type { BoxProps } from "@chakra-ui/react";
-import type { AvailableSource } from "../variable-mapping-input";
-import type { Variable } from "../variables-section";
+import type { AvailableSource } from "../variable-mapping-input.tsx";
+import type { Variable } from "../variables-section.tsx";
 
 export type PromptTextAreaOnAddMention = {
   value: string;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalisation } from "../../services/__tests__/canonicalisation/test-helpers";
-import { CopilotCanonicaliserService } from "../copilot-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { canonicalisation } from "../../services/__tests__/canonicalisation/test-helpers.ts";
+import { CopilotCanonicaliserService } from "../copilot-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 describe("CopilotCanonicaliserService", () => {
   describe("when the span carries copilot-specific attributes", () => {

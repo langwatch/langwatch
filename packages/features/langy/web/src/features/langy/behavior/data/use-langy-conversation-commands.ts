@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/langy-api";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
 
 /**
  * Write commands for Langy conversations, through the defined tRPC API.

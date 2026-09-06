@@ -1,5 +1,5 @@
 import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
-import { MetricDataPointAppendRepository } from "./metric-data-point-append.repository";
+import { MetricDataPointAppendRepository } from "./metric-data-point-append.repository.ts";
 
 /** One series' total over a window, with the label set that identifies it. */
 export interface SeriesTotalByPointAttribute {

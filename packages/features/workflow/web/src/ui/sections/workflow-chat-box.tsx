@@ -14,8 +14,8 @@ import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { workflowApi } from "../../model/workflow-api";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { workflowApi } from "../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /**
  * What the public workflow-run endpoint answers with. Run over that

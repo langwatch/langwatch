@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { runActorLabelSchema } from "./run-actor";
-import { runParameterValuesSchema } from "./scenario.parameters";
+import { runActorLabelSchema } from "./run-actor.ts";
+import { runParameterValuesSchema } from "./scenario.parameters.ts";
 
 /**
  * Persisted and wire-visible state of one simulation run. `STALLED` remains readable for

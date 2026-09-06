@@ -1,8 +1,8 @@
 import { AnnotationCard as PackageAnnotationCard } from "@langwatch/annotation-web/surfaces/annotation-card";
-import { UserAvatar } from "../../../../elements/user-avatar";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { UserAvatar } from "../../../../elements/user-avatar.tsx";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 
 interface AnnotationCardProps {
   annotation: AnnotationByTrace;

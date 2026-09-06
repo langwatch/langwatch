@@ -12,16 +12,16 @@ import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
   LangWatchQLExecutorPort,
-} from "../ports/langwatch-ql-executor.port";
+} from "../ports/langwatch-ql-executor.port.ts";
 import {
   isClickHouseObjectUnavailableError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
-} from "../repositories/clickhouse/clickhouse.query-error-translation.mapper";
-import { toError } from "../repositories/clickhouse/clickhouse.to-error.mapper";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../services/langwatch-ql-access-model.service";
-import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service";
+} from "../repositories/clickhouse/clickhouse.query-error-translation.mapper.ts";
+import { toError } from "../repositories/clickhouse/clickhouse.to-error.mapper.ts";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
 
 const executorService = LangWatchQLExecutorService.create();
 

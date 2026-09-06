@@ -12,8 +12,8 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({}),
 }));
 
-import { createProcessObservability } from "../process-observability";
-import { UnexportedSpanProcessor } from "../unexported-spans";
+import { createProcessObservability } from "../process-observability.ts";
+import { UnexportedSpanProcessor } from "../unexported-spans.ts";
 
 /** What the SDK was actually handed, for the one call this test made. */
 function sdkOptions(): {

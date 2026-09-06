@@ -9,7 +9,7 @@ import {
   DatasetRepository,
   type DatasetCreateInput,
   type DatasetUpdateInput,
-} from "../dataset.repository";
+} from "../dataset.repository.ts";
 
 type Database = Pick<PrismaClient, "dataset">;
 

@@ -1,7 +1,7 @@
 import { ScenarioService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import { SuiteRunCommandsPort, SuiteRunIdPort } from "../suite-execution.port";
-import { SuiteExecutionService } from "../../services/suite-execution.service";
+import { SuiteRunCommandsPort, SuiteRunIdPort } from "../suite-execution.port.ts";
+import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 
 class Commands extends SuiteRunCommandsPort {
   readonly startSuiteRun = vi.fn().mockResolvedValue(undefined);

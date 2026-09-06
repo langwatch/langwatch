@@ -1,9 +1,9 @@
-import type { TenantId } from "../domain/tenantId";
-import type { Event } from "../domain/types";
-import type { RetentionPolicy } from "../runtime.types";
-import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
+import type { TenantId } from "../domain/tenantId.ts";
+import type { Event } from "../domain/types.ts";
+import type { RetentionPolicy } from "../runtime.types.ts";
+import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * A stateless projection that transforms individual events into records.

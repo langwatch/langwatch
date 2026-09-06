@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ProjectVisibilityTooWideError } from "@langwatch/api-key-contract";
-import { ApiKeyVisibilityService } from "../api-key-visibility.service";
+import { ApiKeyVisibilityService } from "../api-key-visibility.service.ts";
 
 type Binding = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
 

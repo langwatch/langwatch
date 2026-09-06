@@ -10,16 +10,16 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../ports/scim-repository.port";
-import { ScimGrantsService } from "./scim-grants.service";
-import { ScimCostCenterService, type ScimDepartmentAssignment } from "./scim-cost-center.service";
-import { ScimDeprovisionService } from "./scim-deprovision.service";
-import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service";
+import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
+import { ScimGrantsService } from "./scim-grants.service.ts";
+import { ScimCostCenterService, type ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service.ts";
 import {
   ScimUserProfileService,
   type ScimSessionRevocation,
   type ScimUserProfileReadWrite,
-} from "./scim-user-profile.service";
+} from "./scim-user-profile.service.ts";
 
 /**
  * Everything SCIM asks of `UserService`: the two reads that decide whether a
@@ -30,13 +30,13 @@ import {
 export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
   Pick<UserService, "tryFindByEmail" | "create">;
-import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
+import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
 import {
   isUniqueViolation,
   nameFromScimRequest,
   scimUserOf,
   tryParseUserNameFilter,
-} from "../rules/scim-user.rules";
+} from "../rules/scim-user.rules.ts";
 
 export class ScimProvisioningService {
   private readonly prisma: ScimRepositoryPort;

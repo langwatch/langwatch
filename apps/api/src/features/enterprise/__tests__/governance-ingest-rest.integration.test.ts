@@ -3,16 +3,16 @@
  * mounts and the real trace ingestion it composes.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { ApiGovernanceIngestKeyProvenance } from "../governance-ingest-rest.mount";
+import { ApiGovernanceIngestKeyProvenance } from "../governance-ingest-rest.mount.ts";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
-import { composeApiTraceIngest } from "../../../app/api-trace-ingest.composition";
-import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { composeApiTraceIngest } from "../../../app/api-trace-ingest.composition.ts";
+import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential.ts";
 
 const TRACE_ID = "0123456789abcdef0123456789abcdef";
 const SPAN_ID = "fedcba9876543210";

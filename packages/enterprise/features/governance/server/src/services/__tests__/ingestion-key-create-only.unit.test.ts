@@ -8,9 +8,9 @@ import {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
   type StoredIngestionKey,
-} from "../../ports/ingestion-source-key.port";
-import { TestOrganizationService } from "../../ports/__tests__/support/test-organization-service";
-import { IngestionKeyService } from "../ingestion-source-key.service";
+} from "../../ports/ingestion-source-key.port.ts";
+import { TestOrganizationService } from "../../ports/__tests__/support/test-organization-service.ts";
+import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-checkout-api";

@@ -9,8 +9,8 @@ import {
   ORGANIZATION_BASE,
   ORGANIZATION_BEARER,
   organizationWorld,
-} from "./support/organization-family.world";
-import { errorCodeOf, TEST_USER_ID } from "./support/rest-family.harness";
+} from "./support/organization-family.world.ts";
+import { errorCodeOf, TEST_USER_ID } from "./support/rest-family.harness.ts";
 
 /** The credential's own member, plus whoever a scenario adds beside them. */
 const acting = {

@@ -1,4 +1,4 @@
-import type { LangyModelGroup } from "./langy-model-profile";
+import type { LangyModelGroup } from "./langy-model-profile.ts";
 
 /**
  * Splits the model catalogue into a short front door and the complete list. The

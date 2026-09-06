@@ -16,7 +16,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
 
 // The mapping editor mounts the whole trace host; what the form does with a
 // definition it cannot resolve is decided before any mapping is drawn.
-vi.mock("../../../elements/evaluations/evaluator-traces-mapping", () => ({
+vi.mock("../../../elements/evaluations/evaluator-traces-mapping.tsx", () => ({
   EvaluatorTracesMapping: () => null,
 }));
 
@@ -88,7 +88,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => {
   return { api: stub("") };
 });
 
-import CheckConfigForm from "../check-config-form";
+import CheckConfigForm from "../check-config-form.tsx";
 
 afterEach(() => cleanup());
 

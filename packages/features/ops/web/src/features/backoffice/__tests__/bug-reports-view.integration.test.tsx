@@ -3,8 +3,8 @@
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import BugReportsView from "../ui/sections/bug-reports-view";
-import { renderWithOpsHost } from "../../../testing";
+import BugReportsView from "../ui/sections/bug-reports-view.tsx";
+import { renderWithOpsHost } from "../../../testing.tsx";
 
 const listState = vi.hoisted(() => ({
   current: {
@@ -25,7 +25,7 @@ const routerState = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("../../../behavior/ops-api", () => ({
+vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     bugReports: {
       getAll: { useQuery: () => listState.current },
@@ -37,7 +37,7 @@ vi.mock("../../../behavior/ops-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/ops-router", () => ({
+vi.mock("../../../behavior/ops-router.ts", () => ({
   useOpsRouter: () => ({
     query: routerState.query,
     replace: routerState.replace,

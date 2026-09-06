@@ -3,7 +3,7 @@ import {
   OutboundProxyResolverPort,
   type AwsClientConfig,
   type AwsClientConfigInput,
-} from "./aws-client";
+} from "./aws-client.ts";
 
 /**
  * The AWS transport owner for one executable process.

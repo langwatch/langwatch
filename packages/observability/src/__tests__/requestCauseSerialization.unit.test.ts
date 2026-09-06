@@ -17,9 +17,9 @@
 import { Writable } from "node:stream";
 import pino from "pino";
 import { describe, expect, it } from "vitest";
-import { REQUEST_CAUSE_FIELD } from "../constants";
-import { NODE_LOG_SERIALIZERS } from "../logger";
-import { logHttpRequest } from "../request/requestLogging";
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
+import { NODE_LOG_SERIALIZERS } from "../logger.ts";
+import { logHttpRequest } from "../request/requestLogging.ts";
 
 /**
  * A pino logger wired to the real serializer map, writing where we can read it.

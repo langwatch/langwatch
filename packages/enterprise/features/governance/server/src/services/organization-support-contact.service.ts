@@ -12,7 +12,7 @@
  * a budget refusal tells a person who to go to, and an organization that has
  * configured nobody gets no name rather than a guess.
  */
-import type { OrganizationSupportContactRepository } from "../repositories/organization-support-contact.repository";
+import type { OrganizationSupportContactRepository } from "../repositories/organization-support-contact.repository.ts";
 
 export class OrganizationSupportContactService {
   private constructor(private readonly repository: OrganizationSupportContactRepository) {}

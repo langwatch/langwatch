@@ -26,8 +26,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { browserOnlyPackage } from "../src/browser-packages";
-import { walkFiles } from "../src/files";
+import { browserOnlyPackage } from "../src/browser-packages.ts";
+import { walkFiles } from "../src/files.ts";
 import {
   chainsToSeeds,
   createWorkspaceModuleResolver,
@@ -36,7 +36,7 @@ import {
   valueImports,
   walkValueImportGraph,
   type ValueImportGraph,
-} from "../src/module-graph";
+} from "../src/module-graph.ts";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 

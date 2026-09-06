@@ -3,7 +3,7 @@
  */
 import { scopeTargetKey } from "@langwatch/gateway-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository";
+import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The client slice scope-target expansion reads. */

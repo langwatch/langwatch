@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TriggerNoReplyService, TriggerNoReplyWarningPort } from "../trigger-no-reply.service";
-import { UnsubscribeTokenService } from "../unsubscribe-token.service";
+import { TriggerNoReplyService, TriggerNoReplyWarningPort } from "../trigger-no-reply.service.ts";
+import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 
 /**
  * Spec: packages/features/automation/specs/unsubscribe-token-twin.feature

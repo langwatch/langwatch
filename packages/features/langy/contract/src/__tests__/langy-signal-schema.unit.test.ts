@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { langyConversationUpdateSignalSchema } from "../langy.dtos";
+import { langyConversationUpdateSignalSchema } from "../langy.dtos.ts";
 
 /**
  * The client half of the freshness signal contract. The broadcast payload

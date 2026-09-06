@@ -28,17 +28,17 @@ import {
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "@langwatch/trace-contract";
-import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service";
-import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
-import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules";
-import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules";
+import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
+import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
+import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
+import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import {
   MAX_PROCESSED_SPANS,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
   RESERVED_REASONING_TOKENS,
   TraceSummaryFoldProjection,
-} from "./trace-summary.projection";
+} from "./trace-summary.projection.ts";
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted

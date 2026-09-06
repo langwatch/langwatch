@@ -14,7 +14,7 @@
  */
 import { assert, describe, expect, it } from "vitest";
 
-import { classifyForLangy, LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langy-permission-policy";
+import { classifyForLangy, LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langy-permission-policy.ts";
 
 // The cross-products live at module scope rather than as loops inside the
 // `it`. Nested `describe`s already put a test body four levels deep, so a

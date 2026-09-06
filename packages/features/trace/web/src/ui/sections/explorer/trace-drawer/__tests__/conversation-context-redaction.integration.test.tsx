@@ -8,17 +8,17 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
 // RedactedInline looks up org permissions for the settings link.
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,
@@ -77,7 +77,7 @@ const turnsState = {
 
 // The panel-level translate toggle dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to an identity passthrough.
-vi.mock("../../hooks/use-text-translation", () => ({
+vi.mock("../../hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -86,11 +86,11 @@ vi.mock("../../hooks/use-text-translation", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context", () => ({
+vi.mock("../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: () => turnsState,
 }));
 
-import { ConversationContext } from "../conversation-context";
+import { ConversationContext } from "../conversation-context.tsx";
 
 function renderStrip() {
   return render(

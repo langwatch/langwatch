@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { createEnterpriseTrpcRouters } from "./enterprise-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { createEnterpriseTrpcRouters } from "./enterprise-trpc.mount.ts";
 
 /** The four namespaces, the three `ctx.app` slices, and the SCIM REST door. */
 export type ComposedEnterpriseFeature = Readonly<{

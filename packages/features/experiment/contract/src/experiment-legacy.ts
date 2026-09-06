@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { experimentRunWorkflowVersionSchema } from "./experiment-run";
+import { experimentRunWorkflowVersionSchema } from "./experiment-run.ts";
 
 // ---------------------------------------------------------------------------
 // Experiment schemas (Zod-first). DSPy optimization steps and batch-evaluation
@@ -175,7 +175,7 @@ export type ESBatchEvaluationTarget = z.infer<typeof eSBatchEvaluationTargetSche
 
 export const mapLegacyExperimentTargets = (
   targets: ESBatchEvaluationTarget[],
-): import("./experiment-run").ExperimentRunCommandTarget[] =>
+): import("./experiment-run.ts").ExperimentRunCommandTarget[] =>
   targets.map((target) => ({
     id: target.id,
     name: target.name,

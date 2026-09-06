@@ -24,7 +24,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logged,
 }));
 
-const { identityStack, signUp } = await import("./support/storage-adapter-stack");
+const { identityStack, signUp } = await import("./support/storage-adapter-stack.ts");
 
 const EMAIL = "member@acme.com";
 

@@ -4,8 +4,8 @@
  * rather than trusting one that happens to pass because nothing was ever turned on.
  */
 import { describe, expect, it } from "vitest";
-import type { BetterAuthDeploymentConfiguration } from "../better-auth.api";
-import { betterAuthTransportFor } from "./better-auth-transport.test-helpers";
+import type { BetterAuthDeploymentConfiguration } from "../better-auth.api.ts";
+import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
 
 function pluginIdsFor(overrides: Partial<BetterAuthDeploymentConfiguration>): string[] {
   const auth = betterAuthTransportFor(overrides);

@@ -9,7 +9,7 @@
 
 import { useEffect } from "react";
 
-import { preloadDrawer, type UiDrawerRegistry } from "../model/drawer-registry";
+import { preloadDrawer, type UiDrawerRegistry } from "../model/drawer-registry.ts";
 
 /**
  * Upper bound on the wait for an idle moment. A screen that never goes idle

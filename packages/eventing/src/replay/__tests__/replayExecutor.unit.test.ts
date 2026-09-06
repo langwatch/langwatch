@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types";
-import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import type { ReplayEvent } from "../replayEventSource";
-import { FoldAccumulator, MapAccumulator, replayEvents } from "../replayExecutor";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
+import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type { ReplayEvent } from "../replayEventSource.ts";
+import { FoldAccumulator, MapAccumulator, replayEvents } from "../replayExecutor.ts";
 
 const TEST_SPAN_RECEIVED_EVENT_TYPE = "test.trace.span_received";
 

@@ -28,7 +28,7 @@ const { state, calls } = vi.hoisted(() => ({
   calls: { remove: vi.fn(), invalidate: vi.fn().mockResolvedValue(void 0) },
 }));
 
-vi.mock("../../../behavior/notification-api", () => ({
+vi.mock("../../../behavior/notification-api.ts", () => ({
   notificationApi: {
     useUtils: () => ({
       emailSuppression: { getAll: { invalidate: calls.invalidate } },
@@ -57,8 +57,8 @@ vi.mock("../../../behavior/notification-api", () => ({
   },
 }));
 
-import { FakeNotificationHost, renderWithNotificationHost } from "../../../testing";
-import EmailSuppressionsScreen from "../email-suppressions.screen";
+import { FakeNotificationHost, renderWithNotificationHost } from "../../../testing.tsx";
+import EmailSuppressionsScreen from "../email-suppressions.screen.tsx";
 
 const row = (overrides: Record<string, unknown> = {}) => ({
   id: "sup-1",

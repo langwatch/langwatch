@@ -1,6 +1,6 @@
 import type { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StripeUsageReportingService } from "../index";
+import { StripeUsageReportingService } from "../index.ts";
 
 const createMockStripe = () => ({
   billing: {

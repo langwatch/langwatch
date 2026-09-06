@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { incrementEsFoldRefoldTotal } from "../../metrics";
+import { incrementEsFoldRefoldTotal } from "../../metrics.ts";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return { ...actual, incrementEsFoldRefoldTotal: vi.fn() };
 });
 
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { FoldProjectionDefinition } from "../foldProjection.types";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
+} from "../../services/__tests__/testHelpers.ts";
+import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 /**
  * State whose `apply` mirrors AbstractFoldProjection: it counts events and

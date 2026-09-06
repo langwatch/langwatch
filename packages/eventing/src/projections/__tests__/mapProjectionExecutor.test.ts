@@ -5,9 +5,9 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { MapProjectionExecutor } from "../mapProjectionExecutor";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
+} from "../../services/__tests__/testHelpers.ts";
+import { MapProjectionExecutor } from "../mapProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 describe("MapProjectionExecutor.execute", () => {
   const tenantId = createTestTenantId();

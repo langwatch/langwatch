@@ -1,6 +1,6 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
-import type { SimulationRunMetricsRepository } from "../../repositories/simulation-run-metrics.repository";
-import type { SimulationRunMetricsProjectionRecord } from "../../projections/simulation-run-metrics.projection";
+import type { SimulationRunMetricsRepository } from "../../repositories/simulation-run-metrics.repository.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../../projections/simulation-run-metrics.projection.ts";
 
 /**
  * AppendStore adapter for the simulationRunMetrics map projection.

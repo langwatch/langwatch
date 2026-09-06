@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { registerJsonSchema, type AutomationMonaco } from "../model/monaco-schemas";
+import { registerJsonSchema, type AutomationMonaco } from "../model/monaco-schemas.ts";
 
 describe("registerJsonSchema", () => {
   it("keeps previously registered editor schemas when adding a model", () => {

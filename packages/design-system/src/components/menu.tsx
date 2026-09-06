@@ -3,7 +3,7 @@
 import { AbsoluteCenter, Menu as ChakraMenu, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { Check, ChevronRight } from "lucide-react";
-import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth";
+import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth.ts";
 
 interface MenuContentProps extends ChakraMenu.ContentProps {
   portalled?: boolean;

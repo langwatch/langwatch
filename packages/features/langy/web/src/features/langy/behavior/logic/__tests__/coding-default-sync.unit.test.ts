@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../../../../behavior/langy.store";
-import { syncLangyAfterDefaultModelWrite } from "../coding-default-sync";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { syncLangyAfterDefaultModelWrite } from "../coding-default-sync.ts";
 
 /**
  * The client-side follow-up to any server-side default-model write (a codex connect with defaults, or the

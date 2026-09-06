@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useDrawerProjectId } from "../use-drawer-project-id";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useDrawerProjectId } from "../use-drawer-project-id.ts";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "ambient-project" } }),
 }));
 

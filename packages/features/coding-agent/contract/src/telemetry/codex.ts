@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
  * Codex. Uses whatever `service_name` it was configured with — there is no

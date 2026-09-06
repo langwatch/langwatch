@@ -1,5 +1,5 @@
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware";
+import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
  * Organization-tenancy guard: the org-level mirror of guardProjectId.

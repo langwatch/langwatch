@@ -10,9 +10,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { InvitesTable } from "../../sections/invites-table";
-import { JoinRequestsTable } from "../join-requests-table";
-import type { PendingJoinRequest } from "../../../model/pending-join-request";
+import { InvitesTable } from "../../sections/invites-table.tsx";
+import { JoinRequestsTable } from "../join-requests-table.tsx";
+import type { PendingJoinRequest } from "../../../model/pending-join-request.ts";
 
 const samsRequest: PendingJoinRequest = {
   joinRequestId: "jreq_1",

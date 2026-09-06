@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { agentSchema, agentViewSchema, agentWithFieldsSchema } from "./agent";
-import { agentTypeSchema } from "./config";
+import { agentSchema, agentViewSchema, agentWithFieldsSchema } from "./agent.ts";
+import { agentTypeSchema } from "./config/index.ts";
 
 export const agentPaginationSchema = z.object({
   page: z.number().int().positive(),

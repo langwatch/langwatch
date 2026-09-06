@@ -1,15 +1,15 @@
 import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
-import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository";
+import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import type {
   LangyMessageRepository,
   LangyMessageRow,
-} from "../repositories/langy-message.repository";
+} from "../repositories/langy-message.repository.ts";
 
 export type {
   LangyMessageRepository,
   LangyMessageRow,
   MessageRole,
-} from "../repositories/langy-message.repository";
+} from "../repositories/langy-message.repository.ts";
 
 export interface LangyMessageRecord {
   id: string;

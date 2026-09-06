@@ -1,5 +1,5 @@
-import { FEATURES } from "./feature-map";
-import GENERATED_SKILLS from "./langySkills.generated.json";
+import { FEATURES } from "./feature-map.ts";
+import GENERATED_SKILLS from "./langySkills.generated.json" with { type: "json" };
 
 /**
  * The skills a user can point Langy at — DERIVED, never hand-listed.

@@ -50,13 +50,13 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),
 }));
 
-vi.mock("../../use-project-span-names", () => ({
+vi.mock("../../use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: [],
     metadataKeys: [],
@@ -66,15 +66,15 @@ vi.mock("../../use-project-span-names", () => ({
   }),
 }));
 
-vi.mock("../../use-project-event-types", () => ({
+vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({ eventTypes: [], isLoading: false }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: mocks.annotationsRead,
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
     traces: {
@@ -85,7 +85,7 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-const { TracesMapping } = await import("../traces-mapping");
+const { TracesMapping } = await import("../traces-mapping.tsx");
 
 const REVIEWED_TRACE = {
   trace_id: TRACE_ID,

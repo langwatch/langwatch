@@ -16,7 +16,7 @@ import {
   computeAuditWindow,
   isAuditPeriodPresetKey,
   readAuditPeriod,
-} from "../audit-period";
+} from "../audit-period.ts";
 
 const NOW = new Date("2026-03-04T15:20:00.000Z");
 

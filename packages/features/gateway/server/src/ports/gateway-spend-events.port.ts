@@ -1,5 +1,5 @@
-import type { SpendEventStatus } from "../adapters/gateway-spend-filters.adapter";
-import type { GatewaySpendState } from "../projections/gateway-spend.projection";
+import type { SpendEventStatus } from "../adapters/gateway-spend-filters.adapter.ts";
+import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
 
 export const SPEND_GROUP_BY_KEYS = [
   "virtual_key",

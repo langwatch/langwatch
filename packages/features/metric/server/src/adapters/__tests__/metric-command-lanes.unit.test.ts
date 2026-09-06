@@ -5,8 +5,8 @@ import {
   metricCommandGroupKey,
   metricMapGroupKey,
   resolveMetricCommandShardCount,
-} from "../metric-processing.adapter";
-import { createMetricProcessingPipeline } from "../metric-processing.adapter";
+} from "../metric-processing.adapter.ts";
+import { createMetricProcessingPipeline } from "../metric-processing.adapter.ts";
 
 describe("metric command lanes", () => {
   describe("when the shard count comes from configuration", () => {

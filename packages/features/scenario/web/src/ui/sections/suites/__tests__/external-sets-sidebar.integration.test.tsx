@@ -16,12 +16,12 @@ vi.mock("posthog-js", () => ({
 // The sidebar mounts VoiceAgentsCallout, which reaches for project context
 // and fires tRPC queries this rig does not provide. Same stub the sibling
 // suite-sidebar suites use, for the same reason.
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({ project: { id: "project_1" } })),
 }));
 
-import { SuiteSidebar } from "../suite-sidebar";
-import { toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing";
+import { SuiteSidebar } from "../suite-sidebar.tsx";
+import { toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

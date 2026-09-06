@@ -1,7 +1,7 @@
 import {
   PrismaCodingAgentActivityRepository,
   type PrismaCodingAgentActivityDatabase,
-} from "../repositories/prisma/prisma.coding-agent-activity.repository";
+} from "../repositories/prisma/prisma.coding-agent-activity.repository.ts";
 
 /** The one model the coding-agent activity seam needs from the client. */
 export type CodingAgentActivityDatabase = PrismaCodingAgentActivityDatabase;

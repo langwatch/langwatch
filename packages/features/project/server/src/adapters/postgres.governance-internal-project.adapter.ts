@@ -1,10 +1,10 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProjectCredentialsAdapter } from "./project-credentials.adapter";
-import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository";
+import { ProjectCredentialsAdapter } from "./project-credentials.adapter.ts";
+import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
 import {
   GovernanceInternalProjectService,
   ProjectOldestTeamPort,
-} from "../services/governance-internal-project.service";
+} from "../services/governance-internal-project.service.ts";
 
 /**
  * The two project reads Governance's ingestion pull makes, over Postgres.

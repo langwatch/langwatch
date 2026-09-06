@@ -1,4 +1,4 @@
-import type { GetRecentItemsParams } from "../rules/recent-items.rules";
+import type { GetRecentItemsParams } from "../rules/recent-items.rules.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type AuditLogJsonObject = { [Key in string]?: AuditLogJsonValue };

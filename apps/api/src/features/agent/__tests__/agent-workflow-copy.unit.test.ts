@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiAgentWorkflowCopyAdapter,
   type ApiAgentWorkflowCopier,
-} from "../agent-workflow-copy.adapter";
+} from "../agent-workflow-copy.adapter.ts";
 
 /**
  * The agent half opens before the execution half, so the seam this adapter

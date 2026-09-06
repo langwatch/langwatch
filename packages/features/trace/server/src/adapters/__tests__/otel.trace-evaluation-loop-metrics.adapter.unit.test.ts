@@ -8,7 +8,7 @@ import {
   EVALUATOR_LOOP_BLOCKED_METRIC_NAME,
   EVALUATOR_LOOP_BLOCKED_REASON_LABEL,
   OtelTraceEvaluationLoopMetricsAdapter,
-} from "../otel.trace-evaluation-loop-metrics.adapter";
+} from "../otel.trace-evaluation-loop-metrics.adapter.ts";
 
 describe("OtelTraceEvaluationLoopMetricsAdapter", () => {
   let metrics: RecordingMeterProvider;

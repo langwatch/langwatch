@@ -13,10 +13,10 @@ import {
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository } from "../repositories/api-key.repository";
-import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service";
-import { ApiKeyLifecycleService } from "./api-key-lifecycle.service";
-import type { ApiKeyDependencies } from "./api-key.service";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 export class ApiKeyCliService {
   static create(

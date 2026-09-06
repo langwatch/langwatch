@@ -11,7 +11,7 @@ import {
   seriesInputsOf,
   trendChartOf,
   type ReportGraphInput,
-} from "../rules/report-chart.rules";
+} from "../rules/report-chart.rules.ts";
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;

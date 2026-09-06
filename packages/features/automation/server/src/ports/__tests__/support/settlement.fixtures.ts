@@ -7,22 +7,22 @@ import {
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { SlackProviderAdapter } from "../../../adapters/slack-provider.adapter";
-import { WebhookProviderAdapter } from "../../../adapters/webhook-provider.adapter";
-import { AutomationClockPort } from "../../automation-clock.port";
-import { AutomationEmailCapStorePort } from "../../email-cap.port";
-import { AutomationNotificationDeliveryPort } from "../../automation-notification-delivery.port";
+import { SlackProviderAdapter } from "../../../adapters/slack-provider.adapter.ts";
+import { WebhookProviderAdapter } from "../../../adapters/webhook-provider.adapter.ts";
+import { AutomationClockPort } from "../../automation-clock.port.ts";
+import { AutomationEmailCapStorePort } from "../../email-cap.port.ts";
+import { AutomationNotificationDeliveryPort } from "../../automation-notification-delivery.port.ts";
 import {
   AutomationDatasetMapperPort,
   AutomationPersistActionWriterPort,
-} from "../../automation-persist-action.port";
+} from "../../automation-persist-action.port.ts";
 import {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
-} from "../../automation-settlement.port";
-import { AutomationEmailCapService } from "../../../services/email-cap.service";
-import { AutomationPersistActionService } from "../../../services/persist-action.service";
-import { AutomationSettlementDispatchService } from "../../../services/trigger-settlement-dispatch.service";
+} from "../../automation-settlement.port.ts";
+import { AutomationEmailCapService } from "../../../services/email-cap.service.ts";
+import { AutomationPersistActionService } from "../../../services/persist-action.service.ts";
+import { AutomationSettlementDispatchService } from "../../../services/trigger-settlement-dispatch.service.ts";
 
 function unavailable(): never {
   throw new Error("unused test capability");

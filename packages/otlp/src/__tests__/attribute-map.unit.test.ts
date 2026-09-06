@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeOtlpAttributeMap, otlpScalarValue } from "../attribute-map";
+import { normalizeOtlpAttributeMap, otlpScalarValue } from "../attribute-map.ts";
 
 describe("otlpScalarValue", () => {
   describe("given each scalar encoding", () => {

@@ -7,11 +7,11 @@
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost } from "@langwatch/suite-web/surfaces/run-formatters";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   formatPassRate,
   passRateColor,
-} from "../../../elements/agent-testing/shared/pass-rate-color";
+} from "../../../elements/agent-testing/shared/pass-rate-color.ts";
 
 /** One figure of the strip, with the line that says what it covers. */
 function Stat({

@@ -22,7 +22,7 @@ import {
   type LLMConfig,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { WorkflowStudioDslPort } from "../ports/workflow.port";
+import { WorkflowStudioDslPort } from "../ports/workflow.port.ts";
 
 /**
  * The terminal fallback model, the registry flagship.

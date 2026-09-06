@@ -1,9 +1,9 @@
 import type { z } from "zod";
-import type { evaluatorCopySchema, evaluatorHistoryEntrySchema } from "./evaluator.schemas";
-import type { Evaluator, EvaluatorConfig, EvaluatorField, EvaluatorWithFields } from "./evaluator";
-import type { CodeEvaluatorExecutionInput } from "./code-evaluator";
-import type { SingleEvaluationResult } from "./evaluators.generated";
-import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution";
+import type { evaluatorCopySchema, evaluatorHistoryEntrySchema } from "./evaluator.schemas.ts";
+import type { Evaluator, EvaluatorConfig, EvaluatorField, EvaluatorWithFields } from "./evaluator.ts";
+import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
+import type { SingleEvaluationResult } from "./evaluators.generated.ts";
+import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution.ts";
 
 export type EvaluatorCreateInput = {
   id: string;

@@ -15,8 +15,8 @@ import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { TraceSearchBody, TracesRestPorts } from "../traces.api";
-import { createTracesRestApp } from "../traces.api";
+import type { TraceSearchBody, TracesRestPorts } from "../traces.api.ts";
+import { createTracesRestApp } from "../traces.api.ts";
 
 const mockUpdateTraceMetadata = vi.fn().mockResolvedValue(undefined);
 

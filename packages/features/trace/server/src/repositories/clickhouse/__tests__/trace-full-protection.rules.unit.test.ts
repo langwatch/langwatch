@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,
-} from "../trace-full-protection.mapper";
+} from "../trace-full-protection.mapper.ts";
 
 const trace = (): TraceFullRecord => ({
   trace_id: "trace-1",

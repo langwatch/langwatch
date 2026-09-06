@@ -1,6 +1,6 @@
-import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/metric-processing/constants";
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
-import { bigint, isGap, type MetricRollupSourcePoint } from "./sequence";
+import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/metric-processing/constants.ts";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
+import { bigint, isGap, type MetricRollupSourcePoint } from "./sequence.ts";
 
 /** One point of a bucket, with its index into the whole ordered series. */
 export interface BucketEntry {

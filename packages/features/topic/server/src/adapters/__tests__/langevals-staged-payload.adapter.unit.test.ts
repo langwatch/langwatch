@@ -15,12 +15,12 @@ import {
   LangevalsPayloadStagingPort,
   STAGED_PAYLOAD_HEADER,
   type StagedLangevalsPayload,
-} from "../../ports/langevals-payload-staging.port";
+} from "../../ports/langevals-payload-staging.port.ts";
 import {
   LangevalsStagedPayloadAdapter,
   PayloadTooLargeError,
   type LangevalsStagedPayloadConfig,
-} from "../langevals-staged-payload.adapter";
+} from "../langevals-staged-payload.adapter.ts";
 
 type StagedCall = {
   projectId: string;

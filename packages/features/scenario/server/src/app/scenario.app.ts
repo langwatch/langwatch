@@ -62,8 +62,8 @@ import type { EventEmitter } from "node:events";
 import type {
   RunConfigurationEntry,
   RunConfigurationsService,
-} from "../services/run-configurations.service";
-import type { ResultAtomsService } from "../services/result-atoms.service";
+} from "../services/run-configurations.service.ts";
+import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays

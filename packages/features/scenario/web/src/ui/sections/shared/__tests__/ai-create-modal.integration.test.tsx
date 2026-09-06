@@ -5,8 +5,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioGenerationError } from "../../../../model/scenario-generation";
-import { AICreateModal } from "../ai-create-modal";
+import { ScenarioGenerationError } from "../../../../model/scenario-generation.ts";
+import { AICreateModal } from "../ai-create-modal.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

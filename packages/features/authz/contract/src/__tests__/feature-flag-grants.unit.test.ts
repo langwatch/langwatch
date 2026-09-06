@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builtinRoleGrants } from "../roles";
+import { builtinRoleGrants } from "../roles.ts";
 
 const PERMISSION = "featureFlags:manageExperiments";
 

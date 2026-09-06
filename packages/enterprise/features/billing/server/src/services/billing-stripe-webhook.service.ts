@@ -2,16 +2,16 @@ import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 import { type StripePriceMap } from "@langwatch/enterprise-billing-contract";
-import { BestEffortService } from "./best-effort.service";
-import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service";
-import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port";
-import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port";
-import type { BillingWebhookSubscriptionPort } from "../ports/billing-webhook-subscription.port";
-import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service";
+import { BestEffortService } from "./best-effort.service.ts";
+import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
+import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port.ts";
+import type { BillingWebhookSubscriptionPort } from "../ports/billing-webhook-subscription.port.ts";
+import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import {
   BillingCheckoutCompletionService,
   type InviteApprover,
-} from "./billing-checkout-completion.service";
+} from "./billing-checkout-completion.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
 

@@ -1,5 +1,5 @@
-import type { CodingAgentSessionState } from "../projections/coding-agent-session.projection";
-import { CodingAgentSessionStateProjection } from "../projections/coding-agent-session-state.projection";
+import type { CodingAgentSessionState } from "../projections/coding-agent-session.projection.ts";
+import { CodingAgentSessionStateProjection } from "../projections/coding-agent-session-state.projection.ts";
 
 /**
  * One folded session, initialised the way the fold itself initialises it.

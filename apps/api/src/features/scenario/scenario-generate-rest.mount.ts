@@ -8,11 +8,11 @@ import {
   createScenarioGenerateRestApp,
 } from "@langwatch/scenario-server";
 
-import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition";
+import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
-} from "../../app/api-handler-managed-session";
+} from "../../app/api-handler-managed-session.ts";
 
 /** The environment variable a deployment may narrow the generation cap with. */
 const SCENARIO_GENERATE_TIMEOUT_ENV = "SCENARIO_GENERATE_TIMEOUT_MS";

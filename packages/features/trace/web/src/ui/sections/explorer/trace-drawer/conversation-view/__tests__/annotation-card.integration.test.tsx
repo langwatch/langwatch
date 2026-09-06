@@ -8,9 +8,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
-import { AnnotationCard } from "../annotation-card";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { AnnotationCard } from "../annotation-card.tsx";
 
 const SCORE_NAMES = new Map([
   ["score-1", "Helpfulness"],

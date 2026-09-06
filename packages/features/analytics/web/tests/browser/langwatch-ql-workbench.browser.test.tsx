@@ -31,11 +31,11 @@ import "@testing-library/jest-dom/vitest";
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
-import { SCHEMA_RESPONSE } from "../../src/__tests__/lwql-fixtures";
+import { SCHEMA_RESPONSE } from "../../src/__tests__/lwql-fixtures.ts";
 
 const harness = vi.hoisted(() => ({ mutation: vi.fn() }));
 
-vi.mock("../../src/behavior/analytics-api", () => ({
+vi.mock("../../src/behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => ({
       client: {
@@ -104,12 +104,12 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubMonacoEditor };
 });
 
-vi.mock("../../src/ui/sections/lazy-langwatch-ql-chart-mode", () => ({
+vi.mock("../../src/ui/sections/lazy-langwatch-ql-chart-mode.tsx", () => ({
   LazyLangWatchQLChartMode: () => <div data-testid="stub-chart-mode" />,
 }));
 
-import { LangWatchQLWorkbench } from "../../src/ui/sections/langwatch-ql-workbench-panel";
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing";
+import { LangWatchQLWorkbench } from "../../src/ui/sections/langwatch-ql-workbench-panel.tsx";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing.tsx";
 
 const SQL = "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 

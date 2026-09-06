@@ -5,9 +5,9 @@
  */
 import { PRESENCE_TTL_SECONDS } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import { ConnectedAgentStateAdapter } from "../connected-agent-state.adapter";
-import { ConnectedAgentRegistryAdapter } from "../connected-agent-registry.adapter";
-import type { InstanceMeta } from "../../ports/connected-agent-runtime.port";
+import { ConnectedAgentStateAdapter } from "../connected-agent-state.adapter.ts";
+import { ConnectedAgentRegistryAdapter } from "../connected-agent-registry.adapter.ts";
+import type { InstanceMeta } from "../../ports/connected-agent-runtime.port.ts";
 
 function meta(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
   return {

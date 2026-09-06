@@ -6,7 +6,7 @@ import type {
   BackfillJsonValue,
   GatewayVirtualKeyConfigBackfillRepository,
   VirtualKeyRow,
-} from "../repositories/gateway-virtual-key-config-backfill.repository";
+} from "../repositories/gateway-virtual-key-config-backfill.repository.ts";
 
 const logger = createLogger("langwatch:task:virtual-key-config-backfill");
 

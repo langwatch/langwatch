@@ -21,17 +21,17 @@ import type { ComponentType } from "react";
 export type TopicScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const topicScreens = {
-  topicClustering: () => import("./topic-clustering.screen"),
+  topicClustering: () => import("./topic-clustering.screen.tsx"),
 } as const satisfies Record<string, TopicScreenLoader>;
 
 export type TopicScreenName = keyof typeof topicScreens;
 
-export { TOPIC_CLUSTERING_PAGE_PERMISSION } from "./topic-clustering.screen";
-export { topicApi, type TopicApiMap } from "../../behavior/topic-api";
+export { TOPIC_CLUSTERING_PAGE_PERMISSION } from "./topic-clustering.screen.tsx";
+export { topicApi, type TopicApiMap } from "../../behavior/topic-api.ts";
 export {
   TopicHostPort,
   TopicHostProvider,
   type TopicFailureNotice,
   type TopicHostProject,
   type TopicSuccessNotice,
-} from "../../model/topic-host";
+} from "../../model/topic-host.ts";

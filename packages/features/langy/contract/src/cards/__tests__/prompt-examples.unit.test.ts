@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../derived-safe";
+import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../derived-safe.ts";
 
 /**
  * Found by walking up to the workspace root rather than by counting `../`.

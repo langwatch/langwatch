@@ -5,8 +5,8 @@ import {
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
   workflowAgentConfigSchema,
-} from "./config";
-import { fieldSchema } from "./fields";
+} from "./config/index.ts";
+import { fieldSchema } from "./fields.ts";
 
 export const agentIdSchema = z.string().brand<"AgentId">();
 

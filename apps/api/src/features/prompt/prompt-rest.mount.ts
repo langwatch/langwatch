@@ -11,7 +11,7 @@ import {
   createOrganizationMiddleware,
   createPlatformUrlBuilder,
   uniqueConstraintTargets,
-} from "../../app/api-rest-ports";
+} from "../../app/api-rest-ports.ts";
 
 const logger = createLogger("langwatch:api:prompts:rest");
 

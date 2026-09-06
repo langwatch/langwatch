@@ -10,7 +10,7 @@ import {
   selectPeersOnTrace,
   selectPeerSessions,
   usePresenceStore,
-} from "../presence-store";
+} from "../presence-store.ts";
 
 function session(overrides: Partial<PresenceSession> & { sessionId: string }): PresenceSession {
   return {

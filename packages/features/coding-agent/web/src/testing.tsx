@@ -33,7 +33,7 @@ import {
   type CodingAgentFailure,
   type CodingAgentNotice,
   type CodingAgentRouteReading,
-} from "./coding-agent-activity-host";
+} from "./coding-agent-activity-host.ts";
 
 export type CodingAgentQuery = Readonly<Record<string, string | undefined>>;
 

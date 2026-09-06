@@ -10,10 +10,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, Users } from "react-feather";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/trace-api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/trace-api.ts";
 import { Select } from "@langwatch/design-system/select";
-import { RandomColorAvatar } from "../../blocks/random-color-avatar";
+import { RandomColorAvatar } from "../../blocks/random-color-avatar.tsx";
 
 export const AddParticipants = ({
   annotators,

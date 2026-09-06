@@ -8,7 +8,7 @@ import {
   type ConnectedAgentSelectability,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port";
+import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port.ts";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 

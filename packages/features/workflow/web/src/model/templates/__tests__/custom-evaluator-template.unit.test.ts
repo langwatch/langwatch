@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customEvaluatorTemplate } from "../custom-evaluator.template";
+import { customEvaluatorTemplate } from "../custom-evaluator.template.ts";
 
 const node = (id: string) => {
   const result = customEvaluatorTemplate.nodes.find((candidate) => candidate.id === id);

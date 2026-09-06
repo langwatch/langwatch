@@ -6,9 +6,9 @@
 
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
-import { RecentRunsMenu } from "./recent-runs-menu";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { RecentRunsMenu } from "./recent-runs-menu.tsx";
 
 /** Why the button is off on a scenario that has never run. */
 export const NO_RUN_YET_HINT = "This scenario has not run yet.";

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { ClickHouseCodingAgentProcessingAdapter } from "../clickhouse.coding-agent-processing.adapter";
-import { ModelCatalogCostEstimatorAdapter } from "../model-catalog.cost-estimator.adapter";
-import type { CodingAgentProcessingPipeline } from "../eventing.coding-agent-processing.adapter";
-import { type CodingAgentSessionState } from "../../projections/coding-agent-session.projection";
-import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection";
-import { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port";
-import { CodingAgentPullRequestMappingPort } from "../../ports/coding-agent-pull-request-mapping.port";
+import { ClickHouseCodingAgentProcessingAdapter } from "../clickhouse.coding-agent-processing.adapter.ts";
+import { ModelCatalogCostEstimatorAdapter } from "../model-catalog.cost-estimator.adapter.ts";
+import type { CodingAgentProcessingPipeline } from "../eventing.coding-agent-processing.adapter.ts";
+import { type CodingAgentSessionState } from "../../projections/coding-agent-session.projection.ts";
+import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection.ts";
+import { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port.ts";
+import { CodingAgentPullRequestMappingPort } from "../../ports/coding-agent-pull-request-mapping.port.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.

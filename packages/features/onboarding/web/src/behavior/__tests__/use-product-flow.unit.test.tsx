@@ -5,8 +5,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProductScreenIndex } from "../types";
-import { useProductFlow } from "../use-product-flow";
+import { ProductScreenIndex } from "../types.ts";
+import { useProductFlow } from "../use-product-flow.ts";
 
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string>,

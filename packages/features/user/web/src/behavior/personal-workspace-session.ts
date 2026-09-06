@@ -20,7 +20,7 @@ import {
   type PersonalDeployment,
   type PersonalOrganization,
   type PersonalProject,
-} from "../model/personal-workspace-host";
+} from "../model/personal-workspace-host.ts";
 
 /**
  * The organization role that caps what a member's role bindings can do.

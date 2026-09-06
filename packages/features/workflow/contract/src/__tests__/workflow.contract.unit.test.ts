@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workflowDslSchema } from "../workflow";
+import { workflowDslSchema } from "../workflow.ts";
 
 describe("Workflow contract", () => {
   it("accepts the portable graph envelope and preserves node values", () => {

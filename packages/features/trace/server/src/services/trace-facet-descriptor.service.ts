@@ -17,9 +17,9 @@ import type {
 import type { FacetDefinition, FacetTable, RangeFacetDef } from "@langwatch/trace-server";
 import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules";
-import type { DiscoverParams } from "../rules/trace-list-cache-key.rules";
-import type { TraceTopicNamingService } from "./trace-topic-naming.service";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 
 export class TraceFacetDescriptorService {
   private constructor(

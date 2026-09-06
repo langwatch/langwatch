@@ -3,7 +3,7 @@ import { Database } from "lucide-react";
 
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
-import { BlobTable } from "../blocks/blob-table";
+import { BlobTable } from "../blocks/blob-table.tsx";
 
 export function BlobStoreBody({
   isLoading,

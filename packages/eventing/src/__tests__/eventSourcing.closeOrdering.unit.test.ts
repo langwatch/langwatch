@@ -16,7 +16,7 @@
  * Spec: specs/background/worker-graceful-shutdown.feature
  */
 import { describe, expect, it } from "vitest";
-import { EventSourcing } from "../eventSourcing";
+import { EventSourcing } from "../eventSourcing.ts";
 
 /**
  * Drives the real `close()` against stubbed collaborators, recording the order

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import { createTenantId } from "../../domain/tenantId";
-import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
-import { EventUtils } from "../event.utils";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import { EventUtils } from "../event.utils.ts";
 
 describe("EventUtils - Event ID", () => {
   const tenantId = createTenantId("test-tenant");

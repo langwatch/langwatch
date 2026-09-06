@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { walkFiles } from "../src/files";
+import { walkFiles } from "../src/files.ts";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const PACKAGES_ROOT = join(REPO_ROOT, "packages");

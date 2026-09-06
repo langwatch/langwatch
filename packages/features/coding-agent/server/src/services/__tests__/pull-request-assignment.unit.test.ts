@@ -8,7 +8,7 @@ import {
   CodingAgentPullRequestAssignmentService,
   type AssignablePullRequest,
   type AssignableSession,
-} from "../coding-agent-pull-request-assignment.service";
+} from "../coding-agent-pull-request-assignment.service.ts";
 
 const assignments = CodingAgentPullRequestAssignmentService.create();
 const assignSessionsToPullRequests = assignments.assignSessions.bind(assignments);

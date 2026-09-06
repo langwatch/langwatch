@@ -1,10 +1,10 @@
 import { useCallback } from "react";
-import { useTabId } from "../../studio-internals";
-import { usePrompts } from "../../../../behavior/use-prompts";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../surfaces/prompt-form";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store";
-import { useTabById } from "../../../../behavior/use-tab-by-id";
-import { usePromptTabSummary } from "./use-prompt-tab-summary";
+import { useTabId } from "../../studio-internals.ts";
+import { usePrompts } from "../../../../behavior/use-prompts.ts";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../surfaces/prompt-form/index.ts";
+import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useTabById } from "../../../../behavior/use-tab-by-id.ts";
+import { usePromptTabSummary } from "./use-prompt-tab-summary.ts";
 
 /**
  * Manages tab state and provides close handler with unsaved changes confirmation.

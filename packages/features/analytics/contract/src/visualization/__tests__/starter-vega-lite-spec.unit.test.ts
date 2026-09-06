@@ -13,9 +13,9 @@ import {
   starterEncodingType,
   starterVegaLiteSpec,
   starterVegaLiteSpecText,
-} from "../starter-vega-lite-spec";
-import { validateVegaLiteSpec } from "../validate-vega-lite-spec";
-import type { DatasetRowCounts, LangWatchQLDatasetColumn } from "../visualization-types";
+} from "../starter-vega-lite-spec.ts";
+import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
+import type { DatasetRowCounts, LangWatchQLDatasetColumn } from "../visualization-types.ts";
 
 const DATASET = "query_result";
 const ROWS: DatasetRowCounts = { [DATASET]: 12 };

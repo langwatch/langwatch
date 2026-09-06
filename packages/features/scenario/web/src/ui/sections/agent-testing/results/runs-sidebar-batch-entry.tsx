@@ -8,15 +8,15 @@ import {
   type BatchRun,
   computeBatchRunSummary,
 } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useNow } from "../../../../behavior/use-now";
+import { useNow } from "../../../../behavior/use-now.ts";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   RunsSidebarEntry,
   type SidebarTargetRate,
-} from "../../../elements/agent-testing/results/runs-sidebar-entry";
-import { batchNote } from "../../../../behavior/agent-testing/results/run-plans";
-import { runTitle } from "../../../../behavior/agent-testing/results/run-titles";
-import { isComparison, summaryOfTarget, useBatchTargets } from "./use-batch-targets";
+} from "../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
+import { batchNote } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
+import { isComparison, summaryOfTarget, useBatchTargets } from "./use-batch-targets.ts";
 
 export type RunsSidebarBatchEntryProps = {
   batch: BatchRun;

@@ -1,7 +1,7 @@
-import type { CommandType } from "../domain/commandType";
-import type { Event } from "../domain/types";
-import type { Command, CommandHandler } from "./command";
-import type { CommandSchema } from "./commandSchema";
+import type { CommandType } from "../domain/commandType.ts";
+import type { Event } from "../domain/types.ts";
+import type { Command, CommandHandler } from "./command.ts";
+import type { CommandSchema } from "./commandSchema.ts";
 
 /**
  * Static properties and methods that must be defined on a CommandHandlerClass.

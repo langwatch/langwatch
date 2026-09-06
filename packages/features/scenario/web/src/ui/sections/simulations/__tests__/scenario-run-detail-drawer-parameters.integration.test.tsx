@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   runState: null as ScenarioRunData | null,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       getRunState: {
@@ -38,10 +38,10 @@ vi.mock("../../../../behavior/scenario-api", () => ({
 
 // Child drawers and modals reach for tRPC and the router of their own; the
 // parameters section is composed above them.
-vi.mock("../../scenarios/run-scenario-modal", () => ({
+vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
   RunScenarioModal: () => null,
 }));
-vi.mock("../../scenarios/scenario-form-drawer", () => ({
+vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: () => null,
 }));
 
@@ -49,7 +49,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
   useDrawerParams: () => ({ scenarioRunId: "run_1" }),
 }));
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
@@ -57,37 +57,37 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
-vi.mock("../../../../behavior/use-drawer-run-callbacks", () => ({
+vi.mock("../../../../behavior/use-drawer-run-callbacks.ts", () => ({
   useDrawerRunCallbacks: () => ({
     onRunComplete: vi.fn(),
     onRunFailed: vi.fn(),
   }),
 }));
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
-vi.mock("../../use-scenario-target", () => ({
+vi.mock("../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),
     hasPersistedTarget: false,
   }),
 }));
-vi.mock("../../../../behavior/use-simulation-streaming-state", () => ({
+vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: [],
     handleStreamingEvent: vi.fn(),
     clearCompleted: vi.fn(),
   }),
 }));
-vi.mock("../../../../behavior/use-simulation-update-listener", () => ({
+vi.mock("../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
 vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn(), query: {}, pathname: "/" }),
 }));
 
-import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer";
+import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
 function buildRunState(metadata: Record<string, unknown> | null) {
   return {

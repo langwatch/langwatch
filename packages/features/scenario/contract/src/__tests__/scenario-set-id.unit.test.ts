@@ -18,7 +18,7 @@ import {
   isInternalSetId,
   isOnPlatformSet,
   ON_PLATFORM_SET_SUFFIX,
-} from "../index";
+} from "../index.ts";
 
 describe("internal-set-id utilities", () => {
   describe("isInternalSetId()", () => {

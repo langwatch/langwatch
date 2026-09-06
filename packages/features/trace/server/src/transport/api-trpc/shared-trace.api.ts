@@ -29,14 +29,14 @@ import {
   mapTraceSummaryToHeader,
   redactV2Content,
   type TraceReadMapperPorts,
-} from "./trace-read-mappers.api";
+} from "./trace-read-mappers.api.ts";
 import {
   gateEvaluations,
   gateHeaderCost,
   gateResources,
   gateTreeCost,
   withoutHiddenResourceAttrs,
-} from "./trace-view-gates.api";
+} from "./trace-view-gates.api.ts";
 import type { TraceApp } from "#app/trace.app";
 
 /**

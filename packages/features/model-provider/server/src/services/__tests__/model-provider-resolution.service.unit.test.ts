@@ -20,7 +20,7 @@ import {
   ModelProviderInvalidError,
   ModelRestrictedForFeatureError,
 } from "@langwatch/model-provider-contract";
-import { ModelProviderResolutionService } from "../model-provider-resolution.service";
+import { ModelProviderResolutionService } from "../model-provider-resolution.service.ts";
 
 const PLAYGROUND = "prompt.create_default";
 const LANGY = "langy.chat";

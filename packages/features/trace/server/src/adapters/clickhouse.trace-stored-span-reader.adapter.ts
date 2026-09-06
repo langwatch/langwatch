@@ -1,7 +1,7 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port";
-import { TraceStoredSpanReaderPort } from "../ports/trace-stored-span-reader.port";
-import { TraceSpanStorageClickHouseRepository } from "../repositories/clickhouse/trace-span-storage.repository";
+import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port.ts";
+import { TraceStoredSpanReaderPort } from "../ports/trace-stored-span-reader.port.ts";
+import { TraceSpanStorageClickHouseRepository } from "../repositories/clickhouse/trace-span-storage.repository.ts";
 
 /**
  * The stored-span read half, composed from exactly what the write half needs

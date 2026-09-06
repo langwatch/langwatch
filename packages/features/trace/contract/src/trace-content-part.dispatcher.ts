@@ -1,10 +1,10 @@
 import {
   openAiFilePayloadToBinaryPart,
   mediaTypeToAudioFormat,
-} from "./trace-content-part.file-decoder";
-import { toMediaPart } from "./trace-content-part.provider-source";
-import { tryParseRecord } from "./trace-content-part.record-schema";
-import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types";
+} from "./trace-content-part.file-decoder.ts";
+import { toMediaPart } from "./trace-content-part.provider-source.ts";
+import { tryParseRecord } from "./trace-content-part.record-schema.ts";
+import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types.ts";
 
 export function dispatchContentPart<R>(
   part: unknown,

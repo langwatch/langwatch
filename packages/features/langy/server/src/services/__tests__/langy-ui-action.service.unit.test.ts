@@ -10,11 +10,11 @@ import {
   type UiActionBlockingRedis,
   type UiActionRedis,
   uiActionKeys,
-} from "../langy-ui-action.service";
+} from "../langy-ui-action.service.ts";
 import {
   LangyUiActionCatalogPort,
   type LangyUiActionDefinition,
-} from "../../ports/langy-ui-action-catalog.port";
+} from "../../ports/langy-ui-action-catalog.port.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });
 const runSchema = z.object({});

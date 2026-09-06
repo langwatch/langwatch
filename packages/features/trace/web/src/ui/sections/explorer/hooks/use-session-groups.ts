@@ -1,16 +1,16 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/trace-api";
-import type { ConversationGroup } from "../trace-table/conversation-groups";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import type { ConversationGroup } from "../trace-table/conversation-groups.ts";
 import {
   groupTracesByConversation,
   sortConversationGroups,
-} from "../trace-table/conversation-groups";
-import { useSamplePreview } from "../onboarding";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
-import { mapSessionGroupsPayload } from "../utils/map-session-groups-payload";
+} from "../trace-table/conversation-groups.ts";
+import { useSamplePreview } from "../onboarding/index.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import { mapSessionGroupsPayload } from "../utils/map-session-groups-payload.ts";
 
 export interface SessionGroupsResult {
   groups: ConversationGroup[];

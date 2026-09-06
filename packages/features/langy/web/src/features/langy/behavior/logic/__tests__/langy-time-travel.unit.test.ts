@@ -2,8 +2,8 @@ import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import type { LangyMessageDto } from "@langwatch/langy-contract";
-import { buildTimeTravelView } from "../langy-time-travel";
-import type { LangyDevLogRecord } from "../../stores/langy-dev-log";
+import { buildTimeTravelView } from "../langy-time-travel.ts";
+import type { LangyDevLogRecord } from "../../stores/langy-dev-log.ts";
 
 /**
  * Time travel is a pure view: (tape prefix, durable history) → the conversation as it

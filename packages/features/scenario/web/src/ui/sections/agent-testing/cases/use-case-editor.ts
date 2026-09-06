@@ -11,13 +11,13 @@ import {
 } from "@langwatch/scenario-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import type { Scenario } from "../../../../model/prisma-types";
-import { api } from "../../../../behavior/scenario-api";
+import type { Scenario } from "../../../../model/prisma-types.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import {
   formatParameterLine,
   toParameterDefinitions,
-} from "../../../../model/agent-testing/run/parameter-line";
-import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./use-case-customize-blocks";
+} from "../../../../model/agent-testing/run/parameter-line.ts";
+import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./use-case-customize-blocks.ts";
 
 /** What a person types into the editor. */
 export type CaseDraft = {

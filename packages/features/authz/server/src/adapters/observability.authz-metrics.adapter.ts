@@ -1,6 +1,6 @@
 import { Counter, type Registry } from "prom-client";
-import { type AuthzCounter, AuthzMetricsPort } from "../ports/authz-metrics.port";
-import type { AuthzRevocationReason } from "../ports/authz-revocation-telemetry.port";
+import { type AuthzCounter, AuthzMetricsPort } from "../ports/authz-metrics.port.ts";
+import type { AuthzRevocationReason } from "../ports/authz-revocation-telemetry.port.ts";
 
 /**
  * The two series AuthZ emits, described once.

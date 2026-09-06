@@ -13,9 +13,9 @@ import {
   type LangyHostProject,
   type LangyHostTeam,
   type LangyRouteReading,
-} from "../../../../../../model/langy-host";
+} from "../../../../../../model/langy-host.ts";
 
-vi.mock("../../../../behavior/use-capability-data", () => ({
+vi.mock("../../../../behavior/use-capability-data.ts", () => ({
   useCapabilityData: () => ({
     status: "idle",
     rows: [],
@@ -25,8 +25,8 @@ vi.mock("../../../../behavior/use-capability-data", () => ({
   }),
 }));
 
-import { resolveCapability } from "../../../../../../model/langy-capability-registry";
-import { LangyTraceSampleCard } from "../langy-trace-sample-card";
+import { resolveCapability } from "../../../../../../model/langy-capability-registry.ts";
+import { LangyTraceSampleCard } from "../langy-trace-sample-card.tsx";
 
 const descriptor = resolveCapability("langwatch.trace.search")!;
 

@@ -14,7 +14,7 @@ import type {
   SpanDetailLevel,
   SpanLayout,
   SpanScope,
-} from "../../../model/markdown/types";
+} from "../../../model/markdown/types.ts";
 
 export function MarkdownConfigurePopover({
   config,

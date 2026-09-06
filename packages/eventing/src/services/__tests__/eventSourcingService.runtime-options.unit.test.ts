@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { Event } from "../../domain/types";
-import { EventSourcingService } from "../eventSourcingService";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
-import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import {
   createMockEventStore,
   createMockLogger,
   createMockMapProjectionDefinition,
-} from "./testHelpers";
+} from "./testHelpers.ts";
 
 describe("EventSourcingService runtime warning policy", () => {
   const projectionSubscriber: SubscriberDispatchDefinition<Event> = {

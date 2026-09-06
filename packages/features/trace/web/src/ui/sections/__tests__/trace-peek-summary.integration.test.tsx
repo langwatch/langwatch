@@ -8,8 +8,8 @@ import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { traceApi } from "../../../behavior/trace-api";
-import { TracePeekSummary } from "../trace-peek-summary";
+import { traceApi } from "../../../behavior/trace-api.ts";
+import { TracePeekSummary } from "../trace-peek-summary.tsx";
 
 /**
  * Proves a feature web package's hooks are testable with no tRPC server and no

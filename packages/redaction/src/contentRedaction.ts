@@ -26,12 +26,12 @@ import {
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
   SHAPE_ONLY_SECRET_RULE_IDS,
-} from "./secrets.js";
+} from "./secrets.ts";
 import {
   compilePiiExceptPatterns,
   ESSENTIAL_PII_ENTITIES,
   redactEssentialPiiInText,
-} from "./essentialPii.js";
+} from "./essentialPii.ts";
 
 /**
  * The resolved data-privacy policy, as the native passes read it.

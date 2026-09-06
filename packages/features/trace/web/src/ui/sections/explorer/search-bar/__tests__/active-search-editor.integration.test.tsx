@@ -8,7 +8,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ActiveSearchEditor } from "../active-search-editor";
+import { ActiveSearchEditor } from "../active-search-editor.tsx";
 
 afterEach(cleanup);
 

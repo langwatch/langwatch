@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { AggregateType } from "./domain/aggregateType";
-import type { Event, Projection } from "./domain/types";
+import type { AggregateType } from "./domain/aggregateType.ts";
+import type { Event, Projection } from "./domain/types.ts";
 import type {
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   RegisteredPipeline,
-} from "./pipeline/types";
-import { EventSourcingService } from "./services/eventSourcingService";
+} from "./pipeline/types.ts";
+import { EventSourcingService } from "./services/eventSourcingService.ts";
 
 const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 

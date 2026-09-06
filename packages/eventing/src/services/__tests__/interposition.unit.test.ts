@@ -10,8 +10,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import { EventSourcingService } from "../eventSourcingService";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
   createMockMapProjectionDefinition,
@@ -20,7 +20,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "./testHelpers";
+} from "./testHelpers.ts";
 
 // ---------------------------------------------------------------------------
 // Test projection transform

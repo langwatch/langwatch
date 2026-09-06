@@ -26,8 +26,8 @@
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
-import type { Currency } from "../model/billing-plans";
-import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types";
+import type { Currency } from "../model/billing-plans.ts";
+import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
 /** The organization every billing procedure is scoped to. */
 type OrganizationScope = { organizationId: string };

@@ -1,4 +1,4 @@
-import type { AuthzRevocationReason } from "./authz-revocation-telemetry.port";
+import type { AuthzRevocationReason } from "./authz-revocation-telemetry.port.ts";
 
 /** The one thing AuthZ asks of a metric: that it can be incremented. */
 export type AuthzCounter = { inc(): void };

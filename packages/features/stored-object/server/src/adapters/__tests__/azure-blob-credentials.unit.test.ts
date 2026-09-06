@@ -7,8 +7,8 @@ import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-} from "../azure-blob-credentials.adapter";
-import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter";
+} from "../azure-blob-credentials.adapter.ts";
+import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 
 function sharedKeyConfig(

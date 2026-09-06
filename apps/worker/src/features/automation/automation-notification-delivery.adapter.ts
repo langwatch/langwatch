@@ -20,7 +20,7 @@ import type { MailRenderPort, TriggerDigestEntry } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter";
+import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter.ts";
 
 /** One settled match, as the digest renders it. */
 type SettlementDigestEntry = {

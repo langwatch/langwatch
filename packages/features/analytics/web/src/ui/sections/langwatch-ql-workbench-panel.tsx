@@ -1,17 +1,17 @@
 /** Application composition for the portable LangWatchQL workbench. */
 import { useMemo } from "react";
 
-import { LangWatchQLWorkbench as PackageWorkbench } from "./langwatch-ql-workbench";
+import { LangWatchQLWorkbench as PackageWorkbench } from "./langwatch-ql-workbench.tsx";
 
-import { useAnalyticsPeriod } from "../../behavior/use-analytics-period";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 
-import { useLangWatchQLQuery } from "../../behavior/use-langwatch-ql-query";
-import { useLangWatchQLSchema } from "../../behavior/use-langwatch-ql-schema";
-import { useSavedChartWiring } from "../../behavior/use-saved-chart-wiring";
-import { LazyLangWatchQLChartMode } from "./lazy-langwatch-ql-chart-mode";
-import { SavedChartsToolbar } from "./saved-charts-toolbar";
+import { useLangWatchQLQuery } from "../../behavior/use-langwatch-ql-query.ts";
+import { useLangWatchQLSchema } from "../../behavior/use-langwatch-ql-schema.ts";
+import { useSavedChartWiring } from "../../behavior/use-saved-chart-wiring.ts";
+import { LazyLangWatchQLChartMode } from "./lazy-langwatch-ql-chart-mode.tsx";
+import { SavedChartsToolbar } from "./saved-charts-toolbar.tsx";
 
 export interface LangWatchQLWorkbenchProps {
   readonly projectId: string;

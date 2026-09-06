@@ -3,10 +3,10 @@ import { z } from "zod";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
-} from "../projections/abstractFoldProjection";
-import { AbstractMapProjection, type MapEventHandlers } from "../projections/abstractMapProjection";
-import type { FoldProjectionStore } from "../projections/foldProjection.types";
-import type { AppendStore } from "../projections/mapProjection.types";
+} from "../projections/abstractFoldProjection.ts";
+import { AbstractMapProjection, type MapEventHandlers } from "../projections/abstractMapProjection.ts";
+import type { FoldProjectionStore } from "../projections/foldProjection.types.ts";
+import type { AppendStore } from "../projections/mapProjection.types.ts";
 
 const testEventSchema = z.object({
   id: z.string(),

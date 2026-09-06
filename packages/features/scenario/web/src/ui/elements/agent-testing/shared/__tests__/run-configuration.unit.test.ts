@@ -16,7 +16,7 @@ import {
   scopeKeyOf,
   sortedTargetLabels,
   sortTargets,
-} from "../../../../sections/agent-testing/run/run-configuration";
+} from "../../../../sections/agent-testing/run/run-configuration.ts";
 
 const TARGET_LABELS = new Map([
   ["agent_dev", "dev-agent"],

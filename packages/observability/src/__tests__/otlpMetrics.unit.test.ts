@@ -1,7 +1,7 @@
 import { metrics } from "@opentelemetry/api";
 import { afterEach, describe, expect, it } from "vitest";
-import { resetMetricsForTests } from "../metrics";
-import { startOtlpMetricsExport } from "../node/otlp-metrics";
+import { resetMetricsForTests } from "../metrics/index.ts";
+import { startOtlpMetricsExport } from "../node/otlp-metrics.ts";
 
 const configured = {
   endpoint: "http://collector.invalid:4318",

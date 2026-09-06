@@ -21,6 +21,9 @@ import {
   S3StoredObjectDriverAdapter,
   StoredObjectApp,
   StoredObjectDestinationPolicyAdapter,
+  StoredObjectOwnerInstanceDirectoryPort,
+  StoredObjectOwnerLookupRuntimeAdapter,
+  StoredObjectOwnerLookupTelemetryPort,
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
   StoredObjectStorageRegistryAdapter,
@@ -32,15 +35,17 @@ import {
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
   type StoredObjectStorageDriver,
+  type StoredObjectOwnerClickHouseClient,
+  type StoredObjectOwnerClickHouseInstance,
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
   AzureBlobCredentialsAdapter,
 } from "@langwatch/stored-object-server";
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiStoredObjectsConfigResolution } from "../../platform/config/api.config";
-import { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiStoredObjectsConfigResolution } from "../../platform/config/api.config.ts";
+import { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount.ts";
 
 /** Reports the one capability this feature can be composed without. */
 export abstract class ApiStoredObjectAbsenceReport {
@@ -73,12 +78,18 @@ export type StoredObjectFeatureCollaborators = Readonly<{
    * on a deployment that composed none.
    */
   resolveClickHouseClient: ((projectId: string) => Promise<unknown>) | null;
+  /**
+   * Every ClickHouse endpoint this process is configured for. The legacy id-only
+   * delivery URL carries no project, so resolving its owner is the one read that
+   * genuinely spans them; absent, those URLs resolve to nothing.
+   */
+  clickHouseInstances: (() => readonly ApiStoredObjectOwnerInstance[]) | null;
   /** The object storage this deployment addresses its bytes in. */
   storage: ApiStoredObjectsConfigResolution;
   report?: ApiStoredObjectAbsenceReport;
 }>;
 
-import type { ComposedStoredObjectFeature } from "./stored-object.composition.types";
+import type { ComposedStoredObjectFeature } from "./stored-object.composition.types.ts";
 
 /** Composes the object store over this process's own graph. */
 export function composeStoredObjectFeature(
@@ -235,7 +246,7 @@ function composeStoredObjects(
       // store's, which this process composes no token signer or delivery policy for.
       storedObjects: ApiStoredObjectPortableAbsence.create(),
       files: service,
-      owners: ApiStoredObjectOwnerAbsence.create(logger),
+      owners: composeOwnerResolver(options, logger),
     }),
     bytes: service,
     storage: { runtime: storageRuntime, aws },
@@ -250,6 +261,67 @@ function composeStoredObjects(
       : AbsentPayloadStagingAdapter.create(),
     close: () => aws.close(),
   };
+}
+
+/** One configured endpoint, as this process hands it to the owner lookup. */
+export type ApiStoredObjectOwnerInstance = Readonly<{
+  target: string;
+  client: unknown;
+}>;
+
+/**
+ * The legacy id-only owner lookup, over every endpoint this process opened. Without a
+ * ClickHouse connection the absence stands: an id with no table behind it resolves to
+ * nothing, which is what an old trace's media link then reports.
+ */
+function composeOwnerResolver(
+  options: StoredObjectFeatureCollaborators,
+  logger: Logger,
+): StoredObjectOwnerResolver {
+  const instances = options.clickHouseInstances;
+  if (!instances) return ApiStoredObjectOwnerAbsence.create(logger);
+
+  return StoredObjectOwnerLookupRuntimeAdapter.create({
+    instanceDirectory: ApiStoredObjectOwnerInstanceDirectory.create(instances),
+    telemetry: ApiStoredObjectOwnerLookupTelemetry.create(),
+  }).resolver;
+}
+
+/** The endpoints the lookup fans out across, read at the lookup rather than captured. */
+class ApiStoredObjectOwnerInstanceDirectory extends StoredObjectOwnerInstanceDirectoryPort {
+  static create(
+    instances: () => readonly ApiStoredObjectOwnerInstance[],
+  ): ApiStoredObjectOwnerInstanceDirectory {
+    return new ApiStoredObjectOwnerInstanceDirectory(instances);
+  }
+
+  private constructor(private readonly instances: () => readonly ApiStoredObjectOwnerInstance[]) {
+    super();
+  }
+
+  async listInstances(): Promise<readonly StoredObjectOwnerClickHouseInstance[]> {
+    return this.instances().map((instance) => ({
+      target: instance.target,
+      client: instance.client as StoredObjectOwnerClickHouseClient,
+    }));
+  }
+}
+
+/**
+ * The lookup's own span attributes, which this process does not collect: the REST door
+ * already records the delivery, and a second span per read would double-count it.
+ */
+class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemetryPort {
+  static create(): ApiStoredObjectOwnerLookupTelemetry {
+    return new ApiStoredObjectOwnerLookupTelemetry();
+  }
+
+  withLookupSpan<Result>(
+    _input: { id: string },
+    operation: (span: { setAttribute(name: string, value: string | number | boolean): void }) => Promise<Result>,
+  ): Promise<Result> {
+    return operation({ setAttribute: () => undefined });
+  }
 }
 
 /** The documented single-replica fallback root, when no other is configured. */

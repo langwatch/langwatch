@@ -18,7 +18,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { INHERIT_SENTINEL, ProviderModelSelector } from "../provider-model-selector";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "../provider-model-selector.tsx";
 
 afterEach(() => cleanup());
 

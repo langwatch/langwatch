@@ -10,8 +10,8 @@ import {
   type ClickHouseVendorClient,
   type ClickHouseVendorClientOptions,
   type LimiterStats,
-} from "../index";
-import { VendorClientResiliencePolicy } from "../vendorClient";
+} from "../index.ts";
+import { VendorClientResiliencePolicy } from "../vendorClient.ts";
 
 /**
  * The seam under test is the wrapped vendor client, because that is the one

@@ -22,8 +22,8 @@ import {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
   OtlpUnsupportedEncodingError,
-} from "../errors";
-import { OTLP_MAX_BODY_BYTES, readOtlpBody } from "../body";
+} from "../errors.ts";
+import { OTLP_MAX_BODY_BYTES, readOtlpBody } from "../body.ts";
 
 /**
  * A Request whose body is a stream we control, so a read can be failed at an

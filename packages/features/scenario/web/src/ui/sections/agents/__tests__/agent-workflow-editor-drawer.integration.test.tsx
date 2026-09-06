@@ -8,14 +8,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioInputMappingSectionProps } from "../../../elements/suites/scenario-input-mapping-section";
-import { AgentWorkflowEditorDrawer } from "../agent-workflow-editor-drawer";
+import type { ScenarioInputMappingSectionProps } from "../../../elements/suites/scenario-input-mapping-section.tsx";
+import { AgentWorkflowEditorDrawer } from "../agent-workflow-editor-drawer.tsx";
 
 // ---------------------------------------------------------------------------
 // Dependency mocks — mirror agent-editor-test-panel.integration.test.tsx
 // ---------------------------------------------------------------------------
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
     organization: { id: "test-org" },
@@ -42,7 +42,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // ---------------------------------------------------------------------------
 // ScenarioInputMappingSection mock
 
-vi.mock("../../../elements/suites/scenario-input-mapping-section", () => ({
+vi.mock("../../../elements/suites/scenario-input-mapping-section.tsx", () => ({
   ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
     <div data-testid="scenario-mapping-section">
       {inputs.map((i) => (
@@ -124,7 +124,7 @@ const MOCK_WORKFLOW = {
   },
 };
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {

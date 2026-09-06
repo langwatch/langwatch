@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
+import type { AggregateType } from "../../domain/aggregateType.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createMockQueueManager,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { TIME_LOCAL_AGGREGATE_TYPES } from "../../stores/rehydrationWindow";
-import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry";
-import type { FoldProjectionStore } from "../foldProjection.types";
-import { ProjectionRouter } from "../projectionRouter";
+} from "../../services/__tests__/testHelpers.ts";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "../../stores/rehydrationWindow.ts";
+import { MAX_APPLIED_EVENT_IDS } from "../foldCache/foldCacheEntry.ts";
+import type { FoldProjectionStore } from "../foldProjection.types.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
 
 /** An aggregate whose rows accumulate over its whole life, so no window bounds them. */
 const LONG_LIVED_AGGREGATE_TYPE = "simulation_set" as const satisfies AggregateType;

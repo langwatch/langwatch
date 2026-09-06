@@ -30,7 +30,7 @@ import {
   rolesAtOrBelow,
   roleToPermissionLabel,
   scopeLabel,
-} from "../api-key-permissions";
+} from "../api-key-permissions.ts";
 
 describe("rolesAtOrBelow()", () => {
   describe("when given ADMIN", () => {

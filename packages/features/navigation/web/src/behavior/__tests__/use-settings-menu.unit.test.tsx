@@ -5,8 +5,8 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useSettingsMenu } from "../use-settings-menu";
-import { WithStubNavigationHost } from "../../testing";
+import { useSettingsMenu } from "../use-settings-menu.ts";
+import { WithStubNavigationHost } from "../../testing.tsx";
 
 function wrapperWithPlan(plan: { isEnterprise?: boolean; isLoading?: boolean }) {
   return function Wrapper({ children }: { children: React.ReactNode }) {

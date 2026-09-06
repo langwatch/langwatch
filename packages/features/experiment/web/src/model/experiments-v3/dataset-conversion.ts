@@ -1,4 +1,4 @@
-import type { DatasetColumn } from "./types";
+import type { DatasetColumn } from "./types.ts";
 
 /**
  * Type for dataset record with optional ID.

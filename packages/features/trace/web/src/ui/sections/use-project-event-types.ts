@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { api } from "../../behavior/trace-api";
+import { api } from "../../behavior/trace-api.ts";
 
 /**
  * @param projectId - The project ID to fetch event types for

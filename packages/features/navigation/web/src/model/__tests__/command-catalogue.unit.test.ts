@@ -7,7 +7,7 @@ import {
   supportCommands,
   themeCommands,
   topLevelNavigationCommands,
-} from "../command-catalogue";
+} from "../command-catalogue.ts";
 
 describe("command-registry", () => {
   describe("filterCommands", () => {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ExperimentClickHouseAdapter } from "../../../adapters/experiment-clickhouse.adapter";
-import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment-id-lookup.repository";
+import { ExperimentClickHouseAdapter } from "../../../adapters/experiment-clickhouse.adapter.ts";
+import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment-id-lookup.repository.ts";
 
 describe("ClickHouseExperimentIdLookupRepository", () => {
   const resolveClient = vi.fn();

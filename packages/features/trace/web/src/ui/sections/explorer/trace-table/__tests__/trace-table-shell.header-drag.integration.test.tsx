@@ -18,7 +18,7 @@ import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { TraceTableShell } from "../trace-table-shell";
+import { TraceTableShell } from "../trace-table-shell.tsx";
 
 interface Row {
   name: string;

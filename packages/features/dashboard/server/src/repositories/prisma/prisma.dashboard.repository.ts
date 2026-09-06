@@ -21,7 +21,7 @@ import {
   type DashboardRecord,
   type DashboardSummaryRecord,
   type GraphRecord,
-} from "../../ports/dashboard.port";
+} from "../../ports/dashboard.port.ts";
 
 const BUILDER_CHART_KIND = "builder";
 const WORKBENCH_SQL_CHART_KIND = "workbench_sql";

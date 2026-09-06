@@ -17,7 +17,7 @@
  * Spec: specs/model-providers/codex-account-provider.feature
  */
 
-import { featuresByRole, type ModelRole } from "./model-feature-registry";
+import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 
 /** Langy's own conversation model. */
 export const LANGY_CHAT_FEATURE_KEY = "langy.chat";

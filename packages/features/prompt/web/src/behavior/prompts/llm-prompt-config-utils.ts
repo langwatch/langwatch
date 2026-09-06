@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
@@ -16,8 +16,8 @@ import {
   type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
-} from "../../surfaces/prompt-form";
-import type { SaveVersionParams } from "../../model/prompts/providers/types";
+} from "../../surfaces/prompt-form/index.ts";
+import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,

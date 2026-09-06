@@ -17,9 +17,9 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { PageRequest } from "../model/governance-events-pager";
-import { type SourceEventRowData, SourceEventsTable } from "../ui/sections/source-events-table";
-import { useSourceEventsPager } from "../behavior/use-source-events-pager";
+import type { PageRequest } from "../model/governance-events-pager.ts";
+import { type SourceEventRowData, SourceEventsTable } from "../ui/sections/source-events-table.tsx";
+import { useSourceEventsPager } from "../behavior/use-source-events-pager.ts";
 
 afterEach(cleanup);
 

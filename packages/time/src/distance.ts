@@ -13,8 +13,8 @@ import {
   differenceInMilliseconds,
   differenceInWeeks,
   wallClockSecondsBetween,
-} from "./difference";
-import type { TimeInput, ZoneOptions } from "./zoned";
+} from "./difference.ts";
+import type { TimeInput, ZoneOptions } from "./zoned.ts";
 
 const MINUTES_IN_DAY = 1440;
 const MINUTES_IN_ALMOST_TWO_DAYS = 2520;

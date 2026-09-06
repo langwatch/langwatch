@@ -6,7 +6,7 @@
 import { nanoid } from "nanoid";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import type { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 const suffix = nanoid(8);
 

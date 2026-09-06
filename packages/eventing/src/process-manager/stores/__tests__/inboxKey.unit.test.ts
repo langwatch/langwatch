@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveInboxKey } from "../inboxKey";
+import { deriveInboxKey } from "../inboxKey.ts";
 
 const SHORT = "event_000649zPnIW3V0Ug6yVk9DECNYK3S";
 const LONG = `project_x:langyconv_1:tool-start:${"a".repeat(3000)}`;

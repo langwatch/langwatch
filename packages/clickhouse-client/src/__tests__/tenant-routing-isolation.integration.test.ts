@@ -18,7 +18,7 @@ import {
   PRIVATE_ROUTE_ENV_PREFIX,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
-} from "../index";
+} from "../index.ts";
 
 const TEST_TABLE = "tenant_routing_isolation";
 

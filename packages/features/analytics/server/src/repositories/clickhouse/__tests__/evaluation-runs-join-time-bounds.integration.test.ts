@@ -27,12 +27,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
-} from "../../../__tests__/migrated-clickhouse.harness";
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
 import {
   buildDataForFilterQuery,
   buildTimeseriesQuery,
-} from "../clickhouse.aggregation-builder.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+} from "../clickhouse.aggregation-builder.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 const TENANT_ID = "test-eval-join-bounds-6392";
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;

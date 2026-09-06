@@ -4,51 +4,51 @@ import {
 } from "@langwatch/authz-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port";
-import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port";
-import type { AuthzDatabase } from "../repositories/authz-read.repository";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository";
+import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port.ts";
+import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port.ts";
+import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import type {
   AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
-} from "../ports/authz-grants-command-dispatcher.port";
+} from "../ports/authz-grants-command-dispatcher.port.ts";
 import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
-} from "../migrations/legacy-import.authz-grant.migration";
-import type { AuthzEpochRedis } from "./redis.authz-epoch.adapter";
-import { RedisAuthzEpochAdapter } from "./redis.authz-epoch.adapter";
-import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository";
-import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository";
-import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository";
-import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository";
-import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository";
-import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository";
+} from "../migrations/legacy-import.authz-grant.migration.ts";
+import type { AuthzEpochRedis } from "./redis.authz-epoch.adapter.ts";
+import { RedisAuthzEpochAdapter } from "./redis.authz-epoch.adapter.ts";
+import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
+import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
+import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository.ts";
+import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository.ts";
+import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
+import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import {
   type AuthzProjectionDatabase,
   PrismaAuthzProjectionRepository,
-} from "../repositories/prisma/prisma.authz-projection.repository";
+} from "../repositories/prisma/prisma.authz-projection.repository.ts";
 import {
   type AuthzBindingDatabase,
   PrismaAuthzBindingRepository,
-} from "../repositories/prisma/prisma.authz-binding.repository";
-import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository";
-import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository";
-import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository";
-import { AuthzGrantsService } from "../services/authz-grants.service";
-import { AuthzService, type AuthzServiceOptions } from "../services/authz.service";
+} from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository.ts";
+import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository.ts";
+import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzService, type AuthzServiceOptions } from "../services/authz.service.ts";
 import {
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
   EventingAuthzLedgerAdapter,
-} from "./eventing.authz-ledger.adapter";
-import { EventingAuthzAdapter } from "./eventing.authz.adapter";
+} from "./eventing.authz-ledger.adapter.ts";
+import { EventingAuthzAdapter } from "./eventing.authz.adapter.ts";
 import {
   type AuthzCutoverDatabase,
   PostgresAuthzCutoverAdapter,
-} from "./postgres.authz-cutover.adapter";
-import { ObservabilityAuthzCutoverAdapter } from "./observability.authz-cutover.adapter";
-import { ObservabilityAuthzRevocationAdapter } from "./observability.authz-revocation.adapter";
+} from "./postgres.authz-cutover.adapter.ts";
+import { ObservabilityAuthzCutoverAdapter } from "./observability.authz-cutover.adapter.ts";
+import { ObservabilityAuthzRevocationAdapter } from "./observability.authz-revocation.adapter.ts";
 
 /**
  * The one structural Postgres capability the AuthZ feature needs. A runtime

@@ -33,7 +33,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import type { AnalyticsApp } from "#app/analytics.app";
-import { timeseriesResponseSchema, type AnalyticsTimeseriesRestBody } from "./analytics.api";
+import { timeseriesResponseSchema, type AnalyticsTimeseriesRestBody } from "./analytics.api.ts";
 
 /** The two shapes this door answers a refusal in, as it has always sent them. */
 const legacySentenceErrorSchema = z.object({

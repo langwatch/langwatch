@@ -7,7 +7,7 @@
  * surface declares it answers, and every type here is inferred from it.
  */
 import { z } from "zod";
-import { latencyWindowsSchema } from "./ops-latency";
+import { latencyWindowsSchema } from "./ops-latency.ts";
 
 /** One tenant's parked group, as the drill-down lists it. */
 export const parkedGroupInfoSchema = z.object({

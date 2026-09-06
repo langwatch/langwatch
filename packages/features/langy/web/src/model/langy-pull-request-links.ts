@@ -4,7 +4,7 @@
  * same rule the pull-request card follows. Spec: specs/langy/langy-github-prs.feature.
  */
 
-import { githubPrsFromToolParts } from "./shared/langy/github-pr-card";
+import { githubPrsFromToolParts } from "./shared/langy/github-pr-card.ts";
 import { pullRequestUrlsIn } from "@langwatch/langy-contract";
 
 /** A tool part on a streamed or persisted assistant message. */

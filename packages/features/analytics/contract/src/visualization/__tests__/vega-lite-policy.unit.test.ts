@@ -7,17 +7,17 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry";
-import { lookupBetweenRegisteredDatasets } from "./fixtures/valid";
-import { validateVegaLiteSpec } from "../validate-vega-lite-spec";
-import { ALLOWED_VEGA_EXPRESSION_IDENTIFIERS } from "../vega-lite-expressions";
+import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
+import { lookupBetweenRegisteredDatasets } from "./fixtures/valid/index.ts";
+import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
+import { ALLOWED_VEGA_EXPRESSION_IDENTIFIERS } from "../vega-lite-expressions.ts";
 import {
   ALLOWED_VEGA_LITE_TRANSFORMS,
   applyLangWatchQLVegaPolicy,
   LWQL_VEGA_LIMITS,
-} from "../vega-lite-policy";
-import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema";
-import type { VegaValidationError } from "../visualization-types";
+} from "../vega-lite-policy.ts";
+import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema.ts";
+import type { VegaValidationError } from "../visualization-types.ts";
 
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({

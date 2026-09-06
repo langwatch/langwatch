@@ -10,8 +10,8 @@ import {
   type ApiKeyUser,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository";
-import type { ApiKeyDependencies } from "./api-key.service";
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 

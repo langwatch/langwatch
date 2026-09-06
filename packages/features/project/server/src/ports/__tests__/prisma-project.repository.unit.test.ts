@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository";
+import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository.ts";
 
 const destination = {
   id: "project_destination",

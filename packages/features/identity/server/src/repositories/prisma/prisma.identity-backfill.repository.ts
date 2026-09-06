@@ -3,7 +3,7 @@ import type {
   BackfillAccountRow,
   BackfillUserRow,
   IdentityBackfillRepository,
-} from "../identity-backfill.repository";
+} from "../identity-backfill.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**

@@ -50,12 +50,12 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { composeApiModelProviders } from "../../../app/api-model-provider.composition";
+import { composeApiModelProviders } from "../../../app/api-model-provider.composition.ts";
 import {
   RestAuthWorld,
   type RestAuthProject,
-} from "../../../app-rest/__tests__/support/rest-auth.world";
-import { composeEvaluatorService } from "../evaluator.composition";
+} from "../../../app-rest/__tests__/support/rest-auth.world.ts";
+import { composeEvaluatorService } from "../evaluator.composition.ts";
 
 /** The tenancy middleware fences production reads; a fixture seeds across it. */
 class AllowTestQueries extends PrismaQueryGuard {

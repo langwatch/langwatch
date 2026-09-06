@@ -12,7 +12,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository";
+import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

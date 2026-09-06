@@ -3,11 +3,11 @@ import {
   automationLimitEmailSubject,
   renderAutomationLimitEmail,
   sendAutomationLimitEmail,
-} from "../automation-limit-email";
-import { sendEmail } from "../../email-sender";
-import { TestMailer } from "../../__tests__/mailer.test-double";
+} from "../automation-limit-email.tsx";
+import { sendEmail } from "../../email-sender.ts";
+import { TestMailer } from "../../__tests__/mailer.test-double.ts";
 
-vi.mock("../../email-sender", () => ({
+vi.mock("../../email-sender.ts", () => ({
   sendEmail: vi.fn(),
 }));
 

@@ -10,16 +10,16 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link";
+} from "../../../../../model/langy-trace-explorer-link.ts";
 import {
   buildSurfaceHref,
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
   summaryLines,
-} from "../../../model/capabilities/capability-registry";
-import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document";
-import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card";
+} from "../../../model/capabilities/capability-registry.ts";
+import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document.ts";
+import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 interface ParsedTrace {
   id: string;

@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   organizationMembers: { members: [{ user: { id: "user-1", name: "Ana" } }] },
 }));
 
-vi.mock("../../../behavior/trace-api", () => ({
+vi.mock("../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -71,28 +71,28 @@ vi.mock("../../../behavior/trace-api", () => ({
     },
   },
 }));
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p1", slug: "acme" },
     organization: { id: "org-1" },
   }),
 }));
-vi.mock("../../../behavior/use-drawer", () => ({
+vi.mock("../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mocks.toastCreate },
 }));
-vi.mock("../errors", () => ({
+vi.mock("../errors/index.ts", () => ({
   applyHandledErrorToForm: () => false,
   FormServerError: () => null,
   showErrorToast: vi.fn(),
 }));
-vi.mock("../annotations/add-or-edit-annotation-score", () => ({
+vi.mock("../annotations/add-or-edit-annotation-score.tsx", () => ({
   AddOrEditAnnotationScore: () => null,
 }));
 
-import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer";
+import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
 
 const renderDrawer = () =>
   render(

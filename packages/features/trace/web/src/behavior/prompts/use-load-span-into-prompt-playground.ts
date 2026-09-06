@@ -2,7 +2,7 @@
  * The address of a span opened in the Prompt Studio.
  */
 
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 export const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 export const QUERY_PARAM_ACTION = "action";

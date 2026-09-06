@@ -9,7 +9,7 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyConversationDeepLink } from "../../../../../behavior/use-langy-conversation-deep-link";
+import { useLangyConversationDeepLink } from "../../../../../behavior/use-langy-conversation-deep-link.ts";
 import { carryLangyConversation } from "@langwatch/langy-contract";
 
 const setSearchParams = vi.fn();
@@ -28,17 +28,17 @@ vi.mock("react-router", () => ({
   useSearchParams: () => [searchParams.current, setSearchParams] as const,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: { detail: { useQuery: () => detailResult.current } },
   },
 }));
 
-vi.mock("../../../../../behavior/langy.store", () => ({
+vi.mock("../../../../../behavior/langy.store.ts", () => ({
   useLangyStore: { getState: () => ({ openPanel, selectConversation }) },
 }));
 

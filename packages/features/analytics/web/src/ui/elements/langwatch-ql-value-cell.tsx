@@ -26,7 +26,7 @@ import {
   type LangWatchQLCell,
   lwqlCellCopyText,
   lwqlCellText,
-} from "../../model/lwql-value-format";
+} from "../../model/lwql-value-format.ts";
 
 export interface LangWatchQLValueCellProps {
   cell: LangWatchQLCell;

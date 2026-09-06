@@ -10,9 +10,9 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { createFeatureFlagTrpcRouter } from "./feature-flag-trpc.mount";
+import { createFeatureFlagTrpcRouter } from "./feature-flag-trpc.mount.ts";
 
-import type { ComposedFeatureFlagFeature } from "./feature-flag.composition.types";
+import type { ComposedFeatureFlagFeature } from "./feature-flag.composition.types.ts";
 
 /** Composes the flag store over this process's own connection. */
 export function composeFeatureFlagFeature(options: {

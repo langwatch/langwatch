@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { agentInputBindingSchema, fieldSchema } from "../fields";
-import { baseAgentConfigSchema } from "./base";
+import { agentInputBindingSchema, fieldSchema } from "../fields.ts";
+import { baseAgentConfigSchema } from "./base.ts";
 
 export const codeParameterSchema = z.object({
   identifier: z.literal("code"),

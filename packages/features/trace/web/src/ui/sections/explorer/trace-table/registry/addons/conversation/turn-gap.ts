@@ -1,4 +1,4 @@
-import type { TraceListItem } from "../../../../types/trace";
+import type { TraceListItem } from "../../../../types/trace.ts";
 
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;

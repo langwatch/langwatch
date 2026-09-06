@@ -8,12 +8,12 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Slider } from "@langwatch/design-system/slider";
-import { useSliderControl } from "./use-slider-control";
+import { useSliderControl } from "./use-slider-control.ts";
 import type {
   ParameterConfig,
   SelectParameterConfig,
   SliderParameterConfig,
-} from "./parameter-config";
+} from "./parameter-config.ts";
 
 // ============================================================================
 // Types

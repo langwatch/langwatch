@@ -1,10 +1,10 @@
 import { HStack, Spacer, Text } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import { useFormContext } from "react-hook-form";
-import { DatasetPreview } from "./dataset-preview";
+import { DatasetPreview } from "./dataset-preview.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { VerticalFormControl } from "../../../ui/elements/vertical-form-control";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
+import { VerticalFormControl } from "../../../ui/elements/vertical-form-control.tsx";
+import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 
 /**

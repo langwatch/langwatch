@@ -14,17 +14,17 @@ import {
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api } from "../../behavior/trace-api";
-import { slugify } from "../../model/slugify";
-import { Drawer } from "./drawer";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors/index.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { api } from "../../behavior/trace-api.ts";
+import { slugify } from "../../model/slugify.ts";
+import { Drawer } from "./drawer.tsx";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/design-system/toaster";
-import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score";
-import { FullWidthFormControl } from "../elements/full-width-form-control";
-import { RandomColorAvatar } from "../blocks/random-color-avatar";
+import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score.tsx";
+import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
+import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 
 export const AddAnnotationQueueDrawer = ({
   open = true,

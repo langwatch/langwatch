@@ -8,9 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
-} from "../eventing.join-request-ledger.adapter";
-import type { JoinRequestEvent } from "../../projections/join-request-state.projection";
-import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
+} from "../eventing.join-request-ledger.adapter.ts";
+import type { JoinRequestEvent } from "../../projections/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../../projections/join-request-state.projection.ts";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature

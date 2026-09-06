@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   LangWatchQLConnection,
   LangWatchQLResultLimits,
-} from "../ports/langwatch-ql-executor.port";
+} from "../ports/langwatch-ql-executor.port.ts";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 

@@ -3,7 +3,7 @@ import {
   deliverGovernanceSchema,
   GovernanceEventDeliveryIntent,
   governanceSendBatchSchema,
-} from "../intents/governance-event-delivery.intent";
+} from "../intents/governance-event-delivery.intent.ts";
 import {
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
@@ -12,7 +12,7 @@ import {
   type GovernanceEventsProcessingEvent,
   type GovernanceVkLifecycleData,
   type GovernanceWebhookEnvelope,
-} from "../ports/governance-webhook.port";
+} from "../ports/governance-webhook.port.ts";
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 

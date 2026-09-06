@@ -6,16 +6,16 @@
  * plain node IS the server-import-safety commitment, not an accident of setup.
  */
 import { describe, expect, it, vi } from "vitest";
-import { schemaInvalidEncodingType, unknownSchemaVersion } from "./fixtures/invalid";
-import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry";
-import { barOverQueryResult, lookupBetweenRegisteredDatasets } from "./fixtures/valid";
-import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validate-vega-lite-spec";
-import { VEGA_LITE_SCHEMA_URL } from "../vega-lite-schema";
+import { schemaInvalidEncodingType, unknownSchemaVersion } from "./fixtures/invalid/index.ts";
+import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
+import { barOverQueryResult, lookupBetweenRegisteredDatasets } from "./fixtures/valid/index.ts";
+import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
+import { VEGA_LITE_SCHEMA_URL } from "../vega-lite-schema.ts";
 import type {
   LangWatchQLVegaLiteChartProps,
   VegaLiteValidationResult,
   VegaValidationError,
-} from "../visualization-types";
+} from "../visualization-types.ts";
 
 const validate = (spec: unknown, rows = LWQL_FIXTURE_ROW_COUNTS) =>
   validateVegaLiteSpec({

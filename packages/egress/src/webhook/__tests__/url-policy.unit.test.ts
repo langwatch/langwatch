@@ -1,6 +1,6 @@
 import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { assertWebhookUrlAllowed, inspectWebhookUrl } from "../url-policy";
+import { assertWebhookUrlAllowed, inspectWebhookUrl } from "../url-policy.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

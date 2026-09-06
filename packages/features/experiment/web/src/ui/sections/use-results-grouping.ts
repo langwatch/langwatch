@@ -5,7 +5,7 @@
 
 import { useMemo } from "react";
 
-import type { ComparisonRunData } from "./batch-evaluation-results.types";
+import type { ComparisonRunData } from "./batch-evaluation-results.types.ts";
 
 export type GroupingSource = "dataset-entry" | "target-metadata";
 

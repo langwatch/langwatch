@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { AgentType } from "@langwatch/agent-contract";
 
-import type { SearchResult } from "./command-bar-types";
+import type { SearchResult } from "./command-bar-types.ts";
 
 /**
  * The address the whole product uses for ONE agent.

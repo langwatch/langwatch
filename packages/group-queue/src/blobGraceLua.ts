@@ -1,4 +1,4 @@
-import { BLOB_RELEASE_GRACE_TTL_SECONDS } from "./blobConstants";
+import { BLOB_RELEASE_GRACE_TTL_SECONDS } from "./blobConstants.ts";
 
 /**
  * Lua definition of `gqGraceExpireIfUnleased`, shared verbatim by every script

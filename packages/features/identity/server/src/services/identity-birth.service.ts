@@ -7,20 +7,20 @@ import {
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import { deriveNewbornUserId } from "../rules/identifier-hash.rules";
-import { type IdentityGuardsService } from "./identity-guards.service";
-import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules";
-import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository";
+import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
+import { type IdentityGuardsService } from "./identity-guards.service.ts";
+import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
+import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import {
   IdentityBirthPort,
   IdentityEngineUnavailableError,
   type IdentityNewborn,
-} from "../ports/identity-birth.port";
+} from "../ports/identity-birth.port.ts";
 import { createLogger } from "@langwatch/observability";
-import type { IdentityEvent } from "../projections/identity-state.projection";
-import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port";
-import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository";
-import { identityEventsFor } from "../intents/identity-events.intent";
+import type { IdentityEvent } from "../projections/identity-state.projection.ts";
+import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port.ts";
+import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
+import { identityEventsFor } from "../intents/identity-events.intent.ts";
 
 const logger = createLogger("langwatch:identity:birth");
 

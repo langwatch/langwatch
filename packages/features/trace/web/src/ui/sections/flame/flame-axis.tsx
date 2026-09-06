@@ -1,6 +1,6 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { Viewport } from "../../../behavior/flame/types";
+import type { Viewport } from "../../../behavior/flame/types.ts";
 
 interface FlameAxisProps {
   timeAxisRef: React.RefObject<HTMLDivElement | null>;

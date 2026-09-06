@@ -6,8 +6,8 @@
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port";
-import type { LoadedWorkflow } from "./experiment-execution-data.service";
+import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port.ts";
+import type { LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 export class ExperimentRunSandboxKeyService {
   static create(): ExperimentRunSandboxKeyService {

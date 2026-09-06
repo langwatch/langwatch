@@ -15,7 +15,7 @@ import type {
   TeamUserRole,
   User,
 } from "@langwatch/organization-contract";
-import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service";
+import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
 export type TeamWithProjects = Team & {
   projects: Project[];

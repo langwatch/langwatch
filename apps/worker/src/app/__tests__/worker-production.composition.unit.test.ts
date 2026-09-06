@@ -28,22 +28,22 @@ import { describe, expect, it, vi } from "vitest";
 import {
   saasBillableEventsMeter,
   WorkerProductionComposition,
-} from "../worker-production.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+} from "../worker-production.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   TopicWorkerFeatureInstaller,
   type TopicWorkerCapability,
-} from "../../features/topic/topic-worker-feature.installer";
-import { AbsentJoinRequestMail } from "../../features/identity/join-request-mail.adapter";
-import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer";
-import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+} from "../../features/topic/topic-worker-feature.installer.ts";
+import { AbsentJoinRequestMail } from "../../features/identity/join-request-mail.adapter.ts";
+import { TraceWorkerFeatureInstaller } from "../../features/trace/trace-worker-feature.installer.ts";
+import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
-import { createWorkerProcessRedis } from "./support/worker-redis.double";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
+import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);

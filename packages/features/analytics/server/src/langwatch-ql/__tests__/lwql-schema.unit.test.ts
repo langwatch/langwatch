@@ -6,13 +6,13 @@
 import { describe, expect, it } from "vitest";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
-import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
 
 const lwqlSchema = LangWatchQLSchemaService.create();
-import { validateLangWatchQL } from "./lwql-validate";
-import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture";
+import { validateLangWatchQL } from "./lwql-validate.ts";
+import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 

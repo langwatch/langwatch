@@ -10,7 +10,7 @@ import {
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { type DashboardApp, SavedWorkbenchChartErrorsAdapter } from "@langwatch/dashboard-server";
 
-import { createPlatformUrlBuilder } from "../../app/api-rest-ports";
+import { createPlatformUrlBuilder } from "../../app/api-rest-ports.ts";
 
 /** The three collaborators the analytics half publishes for this family. */
 export type ApiLangWatchQLRestCollaborators = Pick<

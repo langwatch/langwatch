@@ -8,8 +8,8 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing";
-import AuditLogScreen from "../audit-log.screen";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
+import AuditLogScreen from "../audit-log.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -29,7 +29,7 @@ const calls = vi.hoisted(() => ({
   exportFetch: vi.fn(),
 }));
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   organizationApi: {
     useUtils: () => ({
       organization: {

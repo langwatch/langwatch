@@ -2,17 +2,17 @@ import { Button, HStack, Text } from "@chakra-ui/react";
 import { Database, Download, Pencil, Sparkles } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { PersonalFeatureGateDialog } from "../../me/personal-feature-gate-dialog";
-import { usePersonalFeatureGate } from "../../me/use-personal-feature-gate";
-import { SelectionActionBar } from "../../../elements/selection-action-bar";
+import { PersonalFeatureGateDialog } from "../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../me/use-personal-feature-gate.ts";
+import { SelectionActionBar } from "../../../elements/selection-action-bar.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy";
+import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
 import { traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../../../behavior/selection.store";
-import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../../../behavior/selection.store.ts";
+import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog.tsx";
 
 interface BulkActionBarProps {
   /** Total traces matching the active filter (for the "Select all N" hint). */

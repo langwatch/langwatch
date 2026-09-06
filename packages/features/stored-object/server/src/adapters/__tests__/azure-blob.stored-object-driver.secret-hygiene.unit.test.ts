@@ -1,7 +1,7 @@
 /** Proves the real Azure error path applies the contract-owned redaction. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter.ts";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";

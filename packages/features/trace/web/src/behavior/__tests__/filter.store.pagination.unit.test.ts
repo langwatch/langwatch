@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../filter.store";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../filter.store.ts";
 
 /**
  * The trace list is keyset-paged: `pageCursors[n].sortValue` is the sort value of the

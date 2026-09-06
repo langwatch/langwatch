@@ -6,7 +6,7 @@
 import { act, renderHook } from "@testing-library/react";
 import type { RefObject } from "react";
 import { describe, expect, it } from "vitest";
-import { useScrolledFromTop } from "../use-scrolled-from-top";
+import { useScrolledFromTop } from "../use-scrolled-from-top.ts";
 
 function makeScroller() {
   const el = document.createElement("div");

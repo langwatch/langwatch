@@ -13,11 +13,12 @@ const scripts: Record<string, string> = JSON.parse(
 ).scripts;
 
 /**
- * Runs one of apps/api's own scripts for real, with `pnpm` and `tsx` replaced
+ * Runs one of apps/api's own scripts for real, with `pnpm` and `node` replaced
  * by stubs that record what they were asked to do. The stub `pnpm` dispatches
  * `-s run <script>` back through apps/api's package.json, so the chain under
  * test is the shell the developer and the image actually run — not a string
- * this test re-derives.
+ * this test re-derives. The stub `pnpm` reaches the real Node by its absolute
+ * path, since the stub `node` shadows the name on PATH.
  */
 function runScript({ script, failOn }: { script: string; failOn?: string }): {
   calls: string[];
@@ -33,7 +34,7 @@ function runScript({ script, failOn }: { script: string; failOn?: string }): {
       `echo "pnpm $*" >> "${log}"`,
       // `pnpm -s run <name>` re-enters this package's own scripts.
       'if [ "$1" = "-s" ] && [ "$2" = "run" ]; then',
-      `  body=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf-8")).scripts[process.argv[2]])' "${path.join(API_DIR, "package.json")}" "$3")`,
+      `  body=$(${process.execPath} -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf-8")).scripts[process.argv[2]])' "${path.join(API_DIR, "package.json")}" "$3")`,
       '  exec sh -c "$body"',
       "fi",
       failOn ? `case "$*" in *${failOn}*) exit 1 ;; esac` : "",
@@ -41,11 +42,11 @@ function runScript({ script, failOn }: { script: string; failOn?: string }): {
     ].join("\n"),
     { mode: 0o755 },
   );
-  writeFileSync(path.join(stubDir, "tsx"), `#!/bin/sh\necho "tsx $*" >> "${log}"\nexit 0\n`, {
+  writeFileSync(path.join(stubDir, "node"), `#!/bin/sh\necho "node $*" >> "${log}"\nexit 0\n`, {
     mode: 0o755,
   });
   chmodSync(path.join(stubDir, "pnpm"), 0o755);
-  chmodSync(path.join(stubDir, "tsx"), 0o755);
+  chmodSync(path.join(stubDir, "node"), 0o755);
   writeFileSync(log, "");
 
   let status = 0;

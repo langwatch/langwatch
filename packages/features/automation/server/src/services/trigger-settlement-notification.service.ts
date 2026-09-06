@@ -12,27 +12,27 @@ import {
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
 import {
   AutomationTraceRecordUnavailableError,
   type AutomationSettlementTraceReaderPort,
-} from "../ports/automation-settlement-read.port";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
+} from "../ports/automation-settlement-read.port.ts";
+import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 import type {
   AutomationSlackProviderPort,
   AutomationWebhookProviderPort,
-} from "../ports/automation-provider.port";
+} from "../ports/automation-provider.port.ts";
 import type {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
-} from "../ports/automation-settlement.port";
-import type { AutomationEmailCapService } from "./email-cap.service";
+} from "../ports/automation-settlement.port.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import {
   TriggerSettlementEmailService,
   type SettlementNotificationCandidate,
-} from "./trigger-settlement-email.service";
+} from "./trigger-settlement-email.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-notification");
 

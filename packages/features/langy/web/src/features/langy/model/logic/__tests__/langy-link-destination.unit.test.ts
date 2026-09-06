@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { classifyLangyLinkDestination } from "../langy-link-destination";
+import { classifyLangyLinkDestination } from "../langy-link-destination.ts";
 
 const APP_ORIGIN = "https://app.langwatch.ai";
 

@@ -1,4 +1,4 @@
-import { getModelsForProvider } from "./model-catalog";
+import { getModelsForProvider } from "./model-catalog.ts";
 
 export type ProviderOnboardingDefaultPlan = {
   DEFAULT?: string;

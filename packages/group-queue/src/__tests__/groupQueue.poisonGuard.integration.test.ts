@@ -1,10 +1,10 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { GroupQueueProcessor } from "../groupQueue";
-import { DEFAULT_CONFIRMED_DEATH_THRESHOLD, GroupStagingScripts } from "../scripts";
-import { beaconKey, claimKey, confirmedDeaths as sharedConfirmedDeaths, seedDeadOwner as sharedSeedDeadOwner } from "./poisonGuardFixtures";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import { DEFAULT_CONFIRMED_DEATH_THRESHOLD, GroupStagingScripts } from "../scripts.ts";
+import { beaconKey, claimKey, confirmedDeaths as sharedConfirmedDeaths, seedDeadOwner as sharedSeedDeadOwner } from "./poisonGuardFixtures.ts";
 
 type TestPayload = {
   id: string;

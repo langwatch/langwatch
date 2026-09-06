@@ -25,11 +25,11 @@ import {
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
+import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
 import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
-} from "../repositories/authz-binding.repository";
+} from "../repositories/authz-binding.repository.ts";
 
 export class AuthzBindingWriterService {
   static create(options: {

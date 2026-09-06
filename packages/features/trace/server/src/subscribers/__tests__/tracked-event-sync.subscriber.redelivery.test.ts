@@ -21,14 +21,14 @@
  * older than an hour — see the last case.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TrackedEventSync } from "../tracked-event-sync.subscriber";
+import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
 import {
   createContext,
   createFoldState,
   createOtlpSpan,
   createSpanReceivedEvent,
   OCCURRED_AT,
-} from "./subscribers/support/trace-subscriber.fixtures";
+} from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

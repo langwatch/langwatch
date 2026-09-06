@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const orchestratorEvents = vi.hoisted(() => ({ events: [] as unknown[] }));
 
-vi.mock("../../../services/experiment-run-orchestrator.service", () => ({
+vi.mock("../../../services/experiment-run-orchestrator.service.ts", () => ({
   ExperimentRunOrchestratorService: {
     requestAbort: vi.fn(),
     runOrchestrator: vi.fn(async function* () {
@@ -19,7 +19,7 @@ vi.mock("../../../services/experiment-run-orchestrator.service", () => ({
   },
 }));
 
-vi.mock("../../../services/experiment-execution-data.service", () => ({
+vi.mock("../../../services/experiment-execution-data.service.ts", () => ({
   ExperimentExecutionDataService: {
     loadExecutionData: vi.fn(async () => ({
       datasetRows: [{ input: "one" }],
@@ -32,11 +32,11 @@ vi.mock("../../../services/experiment-execution-data.service", () => ({
   },
 }));
 
-vi.mock("../../../services/experiment-run-results-writer.service", () => ({
+vi.mock("../../../services/experiment-run-results-writer.service.ts", () => ({
   ExperimentRunResultsWriterService: { tryWriterFor: () => undefined },
 }));
 
-import { createExperimentV3RestApp } from "../experiment-v3.api";
+import { createExperimentV3RestApp } from "../experiment-v3.api.ts";
 
 const createRun = vi.fn().mockResolvedValue(undefined);
 const addEvent = vi.fn().mockResolvedValue(undefined);

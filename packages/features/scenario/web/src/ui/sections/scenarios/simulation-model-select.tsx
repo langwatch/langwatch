@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 import {
   buildCustomModelDisplayNames,
   LATEST_ALIAS_PROVIDERS,

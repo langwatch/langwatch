@@ -28,7 +28,7 @@ const mockToasterCreate = vi.hoisted(() => vi.fn());
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
-vi.mock("../../scenario-api", () => ({
+vi.mock("../../scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -67,7 +67,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../use-organization-team-project", () => ({
+vi.mock("../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
@@ -86,7 +86,7 @@ const successResult = {
 };
 
 async function renderUseRunSuite(options?: { onViewRun?: (suiteId: string) => void }) {
-  const { useRunSuite } = await import("../use-run-suite");
+  const { useRunSuite } = await import("../use-run-suite.ts");
   return renderHook(() => useRunSuite(options));
 }
 

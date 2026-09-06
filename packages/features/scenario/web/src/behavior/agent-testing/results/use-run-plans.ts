@@ -6,9 +6,9 @@
 
 import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useOrganizationTeamProject } from "../../use-organization-team-project";
-import { api } from "../../scenario-api";
-import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { api } from "../../scenario-api.ts";
+import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans.ts";
 
 export type UseRunPlansResult = {
   plans: RunPlan[];

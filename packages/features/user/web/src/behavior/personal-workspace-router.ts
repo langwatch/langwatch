@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from "react";
-import { usePersonalWorkspaceHost } from "../model/personal-workspace-host";
+import { usePersonalWorkspaceHost } from "../model/personal-workspace-host.ts";
 
 export type PersonalRouter = {
   query: Readonly<Record<string, string | undefined>>;

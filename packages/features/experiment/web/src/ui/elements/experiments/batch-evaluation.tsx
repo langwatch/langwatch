@@ -16,7 +16,7 @@ import numeral from "numeral";
 import { downloadCsv } from "@langwatch/csv/download";
 import { Download } from "react-feather";
 import type { Experiment, JsonObject, Project } from "@langwatch/workflow-contract";
-import type { BatchEvaluation } from "../../../model/prisma-types";
+import type { BatchEvaluation } from "../../../model/prisma-types.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatMoney } from "@langwatch/design-system/format-money";

@@ -8,10 +8,10 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-web/surfaces/suite-pickers";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { TagPill } from "../../../elements/tag-pill";
-import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
-import type { RunScope } from "./run-configuration";
+import { TagPill } from "../../../elements/tag-pill.tsx";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
+import type { RunScope } from "./run-configuration.ts";
 
 /** A test suite the scope can name. */
 export type ScopeTestSuite = { id: string; name: string };

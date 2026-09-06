@@ -1,10 +1,10 @@
-import type { WireVersionedPrompt } from "../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
 import { useCallback } from "react";
 
-import { usePromptHost } from "../model/prompt-host";
-import { usePromptProject } from "./use-prompt-project";
-import { usePromptConfigContext } from "../model/prompt-config-context";
-import { promptApi } from "./prompt-api";
+import { usePromptHost } from "../model/prompt-host.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
+import { usePromptConfigContext } from "../model/prompt-config-context.ts";
+import { promptApi } from "./prompt-api.ts";
 
 type UseRenamePromptHandleOptions = {
   promptId: string;

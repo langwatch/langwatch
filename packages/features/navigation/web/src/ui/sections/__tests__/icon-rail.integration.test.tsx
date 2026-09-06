@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let orgFlags: Record<string, Record<string, boolean>> = {};
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     featureFlag: {
       isEnabledForEachOrganization: {
@@ -31,10 +31,10 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing";
-import { ICON_RAIL_WIDTH } from "../icon-rail";
-import { NavigationShell } from "../navigation-shell";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
+import { ICON_RAIL_WIDTH } from "../icon-rail.tsx";
+import { NavigationShell } from "../navigation-shell.tsx";
 
 const teamA = {
   id: "team_1",

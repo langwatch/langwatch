@@ -2,7 +2,7 @@
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ColumnTypeIcon } from "../src/components/column-type-icon";
+import { ColumnTypeIcon } from "../src/components/column-type-icon.tsx";
 
 describe("ColumnTypeIcon", () => {
   /** @scenario Shared table headers retain their type-specific visual cues */

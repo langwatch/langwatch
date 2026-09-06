@@ -7,7 +7,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 
-import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store";
+import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store.ts";
 
 const node = (id: string, type: string): Node => ({
   id,

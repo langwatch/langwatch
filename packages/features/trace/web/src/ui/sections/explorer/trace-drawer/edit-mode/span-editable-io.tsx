@@ -2,9 +2,9 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanEditBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
-import { EditableIOField } from "./editable-io-field";
-import { capturedInputForEditing } from "../../../../../model/explorer/trace-drawer/edit-mode/span-input-seed";
+} from "../../../../../behavior/trace-edit.store.ts";
+import { EditableIOField } from "./editable-io-field.tsx";
+import { capturedInputForEditing } from "../../../../../model/explorer/trace-drawer/edit-mode/span-input-seed.ts";
 
 /**
  * The span input or output editor, wired to the draft. Sits between the

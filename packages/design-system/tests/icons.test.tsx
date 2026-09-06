@@ -22,8 +22,8 @@ import {
   OpenTelemetryIcon,
   WeaviateIcon,
   WorkatoIcon,
-} from "../src/components/icons";
-import { renderWithDesignSystem } from "../src/testing";
+} from "../src/components/icons/index.ts";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
 

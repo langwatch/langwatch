@@ -8,7 +8,7 @@ import {
   assertCrispChatHidden,
   installCrispBubblePolicy,
   toggleSupportChat,
-} from "../crisp-bubble-policy";
+} from "../crisp-bubble-policy.ts";
 
 const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 

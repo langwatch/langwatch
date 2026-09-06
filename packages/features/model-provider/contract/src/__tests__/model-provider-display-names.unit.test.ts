@@ -3,7 +3,7 @@ import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
   type ModelProviderEditorValue,
-} from "../index";
+} from "../index.ts";
 
 function provider(
   overrides: Partial<ModelProviderEditorValue> & { provider: string },

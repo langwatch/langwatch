@@ -24,21 +24,21 @@ import type { ComponentType } from "react";
 export type BillingScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const billingScreens = {
-  plans: () => import("./plans.screen"),
-  subscription: () => import("./subscription.screen"),
-  usage: () => import("./usage.screen"),
+  plans: () => import("./plans.screen.tsx"),
+  subscription: () => import("./subscription.screen.tsx"),
+  usage: () => import("./usage.screen.tsx"),
 } as const satisfies Record<string, BillingScreenLoader>;
 
 export type BillingScreenName = keyof typeof billingScreens;
 
-export { PLANS_PAGE_PERMISSION } from "./plans.screen";
-export { SUBSCRIPTION_PAGE_PERMISSION } from "./subscription.screen";
-export { USAGE_PAGE_PERMISSION } from "./usage.screen";
-export { billingApi, type BillingApiMap } from "../../behavior/billing-api";
+export { PLANS_PAGE_PERMISSION } from "./plans.screen.tsx";
+export { SUBSCRIPTION_PAGE_PERMISSION } from "./subscription.screen.tsx";
+export { USAGE_PAGE_PERMISSION } from "./usage.screen.tsx";
+export { billingApi, type BillingApiMap } from "../../behavior/billing-api.ts";
 export {
   BillingHostPort,
   BillingHostProvider,
   type BillingFailureNotice,
   type BillingHostOrganization,
   type BillingSuccessNotice,
-} from "../../model/billing-host";
+} from "../../model/billing-host.ts";

@@ -4,10 +4,10 @@ import type { MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createService as createRawService } from "../builder.js";
-import { createTestService as createService } from "./test-service.js";
-import { ChainBuilder } from "../definition.js";
-import type { MountedRoute } from "../types.js";
+import { createService as createRawService } from "../builder.ts";
+import { createTestService as createService } from "./test-service.ts";
+import { ChainBuilder } from "../definition.ts";
+import type { MountedRoute } from "../types.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

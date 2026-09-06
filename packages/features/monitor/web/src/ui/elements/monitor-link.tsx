@@ -17,7 +17,7 @@
 import { chakra } from "@chakra-ui/react";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
-import { useMonitorHost } from "../../model/monitor-host";
+import { useMonitorHost } from "../../model/monitor-host.ts";
 
 const Anchor = chakra("a");
 

@@ -14,10 +14,10 @@ const langyMock = { showLangy: true, attach: vi.fn(), open: vi.fn() };
 // (`langy:create`) rather than `useShowLangy` (`langy:view`). Both read the one
 // fixture flag: which grant gates which affordance is decided in the hooks, and
 // restating it here would only give the fixture a second opinion.
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => langyMock.showLangy,
 }));
-vi.mock("../../../langy/hooks/use-show-langy", () => ({
+vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => langyMock.showLangy,
 }));
 vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => ({
@@ -29,27 +29,27 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => (
     }) => unknown,
   ) => selector({ attachContext: langyMock.attach, openPanel: langyMock.open }),
 }));
-vi.mock("../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: () => true,
   }),
 }));
-vi.mock("../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: { open: false },
   }),
 }));
-vi.mock("../../add-to-annotation-queue-dialog", () => ({
+vi.mock("../../add-to-annotation-queue-dialog.tsx", () => ({
   AddToAnnotationQueueDialog: () => null,
 }));
 
-import { useSelectionStore } from "../../../../../behavior/selection.store";
-import { BulkActionBar } from "../bulk-action-bar";
+import { useSelectionStore } from "../../../../../behavior/selection.store.ts";
+import { BulkActionBar } from "../bulk-action-bar.tsx";
 
 const renderBar = (namesById: Record<string, string | undefined> = {}) =>
   render(

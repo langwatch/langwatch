@@ -1,7 +1,7 @@
 import { Button, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MoreVertical } from "lucide-react";
-import { Menu } from "./menu";
+import { Menu } from "./menu.tsx";
 
 const meta = {
   title: "Components/Menu",

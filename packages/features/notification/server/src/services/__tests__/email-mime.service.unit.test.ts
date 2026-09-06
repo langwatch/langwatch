@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EmailMimeService } from "../email-mime.service";
+import { EmailMimeService } from "../email-mime.service.ts";
 
 const mime = EmailMimeService.create();
 

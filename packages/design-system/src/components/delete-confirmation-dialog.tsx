@@ -1,5 +1,5 @@
 import { Button, Input, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "./dialog";
+import { Dialog } from "./dialog.tsx";
 import { useEffect, useRef, useState } from "react";
 
 /** Shared destructive-action confirmation for app-owned feature composition. */

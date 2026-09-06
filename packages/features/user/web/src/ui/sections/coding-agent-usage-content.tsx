@@ -4,7 +4,7 @@ import numeral from "numeral";
 
 import { formatBudgetUsd } from "@langwatch/gateway-web/surfaces/budget-overview";
 
-import { api } from "../../behavior/personal-workspace-api";
+import { api } from "../../behavior/personal-workspace-api.ts";
 
 /**
  * Personal coding-agent usage figures (ADR-056): cost, tokens, active time

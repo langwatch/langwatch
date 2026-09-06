@@ -2,7 +2,7 @@
  * @see #4991, #4888
  * Unit tests for resolveOffloadedTracesBatch, the BULK read-path resolver. Where resolveOffloadedTraces resolves one trace's spans (detail reads), this resolves a WHOLE result set (export, thread, annotation, sample builders) with a single bounded-concurrency pass over event_log, so a large export never fires an unbounded N×M burst of CH reads. AC6: streamed, peak concurrency bounded by a constant regardless of result-set size, identical refs deduped. AC7: a failed resolution degrades to preview with a warn log, per-ref, without failing the rest of the batch.
  */
-import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service";
+import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -17,16 +17,16 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service";
-import { BlobNotFoundError } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { EVENT_LOG_RESOLVE_CONCURRENCY } from "../trace-offload-resolution-batch.service";
+import { EVENT_LOG_RESOLVE_CONCURRENCY } from "../trace-offload-resolution-batch.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

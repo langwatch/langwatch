@@ -16,7 +16,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlatformUrlBuilder } from "@langwatch/api/rest";
-import { createScenarioRunPlatformUrlBuilder } from "../scenario-run-platform-url";
+import { createScenarioRunPlatformUrlBuilder } from "../scenario-run-platform-url.ts";
 
 function harness() {
   const platformUrl = vi.fn(

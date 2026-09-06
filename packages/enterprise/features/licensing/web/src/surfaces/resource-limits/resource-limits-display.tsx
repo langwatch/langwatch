@@ -1,7 +1,7 @@
 import { SimpleGrid } from "@chakra-ui/react";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { LIMIT_TYPE_DISPLAY_LABELS } from "../../model/limit-type-labels";
-import { ResourceLimitRow } from "./resource-limit-row";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "../../model/limit-type-labels.ts";
+import { ResourceLimitRow } from "./resource-limit-row.tsx";
 
 /** Resource keys that can be displayed in the limits component */
 export type ResourceKey =

@@ -5,16 +5,16 @@
  */
 
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { RunDialogFields } from "./run-dialog-fields";
-import { RunDialogFooter } from "./run-dialog-footer";
-import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field";
+import { RunDialogFields } from "./run-dialog-fields.tsx";
+import { RunDialogFooter } from "./run-dialog-footer.tsx";
+import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field.tsx";
 import { useCallback, useState } from "react";
-import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context";
-import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types";
-import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form";
-import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit";
+import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context.ts";
+import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types.ts";
+import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form.ts";
+import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit.ts";
 
-export type { RunDialogProps, RunDialogSubject, RunStartedInfo } from "./run-dialog-types";
+export type { RunDialogProps, RunDialogSubject, RunStartedInfo } from "./run-dialog-types.ts";
 
 /** What the dialog is called, given what it was opened on. */
 function dialogTitle(subject: RunDialogSubject): string {

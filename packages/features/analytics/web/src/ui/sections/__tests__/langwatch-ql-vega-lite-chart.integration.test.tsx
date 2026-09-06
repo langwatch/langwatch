@@ -19,7 +19,7 @@ import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart";
+import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart.tsx";
 import { LangWatchQLVegaLoadBlockedError } from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDataset,
@@ -38,7 +38,7 @@ import {
   unknownDataset,
   unknownField,
   unknownSchemaVersion,
-} from "../../../__tests__/lwql-fixtures";
+} from "../../../__tests__/lwql-fixtures.ts";
 
 const TOKENS: LangwatchVegaTokens = {
   fontFamily: "Inter",

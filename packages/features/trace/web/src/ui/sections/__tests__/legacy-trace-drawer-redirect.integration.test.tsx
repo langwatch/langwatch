@@ -32,8 +32,8 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack } = await import("../../../behavior/use-drawer");
-const { LegacyTraceDrawerRedirect } = await import("../legacy-trace-drawer-redirect");
+const { clearDrawerStack, getDrawerStack } = await import("../../../behavior/use-drawer.ts");
+const { LegacyTraceDrawerRedirect } = await import("../legacy-trace-drawer-redirect.tsx");
 
 /** The address the redirect last replaced to, or "" if it never navigated. */
 function lastReplacedUrl(): string {

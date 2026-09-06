@@ -3,8 +3,8 @@ import {
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { QuarantineTenantPort, QuarantineTraceActivityPort } from "../quarantine-fill.port";
-import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service";
+import { QuarantineTenantPort, QuarantineTraceActivityPort } from "../quarantine-fill.port.ts";
+import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service.ts";
 
 const ORGANIZATION_ID = "org-qfe-unit";
 

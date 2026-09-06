@@ -7,9 +7,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StructuredOutputDisplay, tryParseJson } from "../structured-output-display";
-import { PromptHostProvider } from "../../../../model/prompt-host";
-import { FakePromptHost } from "../../../../testing";
+import { StructuredOutputDisplay, tryParseJson } from "../structured-output-display.tsx";
+import { PromptHostProvider } from "../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked

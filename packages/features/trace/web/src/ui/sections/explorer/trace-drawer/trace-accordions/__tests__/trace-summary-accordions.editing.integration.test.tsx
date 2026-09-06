@@ -9,24 +9,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import type { TraceHeader } from "@langwatch/trace-contract";
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../../use-field-redaction", () => ({
+vi.mock("../../../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
+vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useAppliedTraceEditPatch: () => null,
 }));
 
 // The trace's comments are read once per surface. This suite is about the
 // correction, so the surface reads none.
-vi.mock("../../../hooks/use-anchored-annotations", () => ({
+vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
   useAnchoredAnnotations: () => ({
     commentsAt: () => [],
     all: [],
@@ -36,19 +36,19 @@ vi.mock("../../../hooks/use-anchored-annotations", () => ({
 
 // The comment action on each row carries its own composer, which reads over
 // tRPC. It has its own tests; this suite is about the correction.
-vi.mock("../../anchored-comments/anchor-comment-button", () => ({
+vi.mock("../../anchored-comments/anchor-comment-button.tsx", () => ({
   AnchorCommentButton: () => null,
 }));
 
-vi.mock("../../../hooks/use-trace-header", () => ({
+vi.mock("../../../hooks/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../hooks/use-trace-events", () => ({
+vi.mock("../../../hooks/use-trace-events.ts", () => ({
   useTraceEvents: () => ({ events: [], isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-evaluations", () => ({
+vi.mock("../../../hooks/use-trace-evaluations.ts", () => ({
   useTraceEvaluations: () => ({
     rich: [],
     pendingCount: 0,
@@ -56,7 +56,7 @@ vi.mock("../../../hooks/use-trace-evaluations", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-resources", () => ({
+vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   useTraceResources: () => ({
     rootSpanId: null,
     resourceAttributes: {},
@@ -67,12 +67,12 @@ vi.mock("../../../hooks/use-trace-resources", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
 import {
   buildTraceEditPatch,
   useTraceEditStore,
-} from "../../../../../../behavior/trace-edit.store";
-import { TraceSummaryAccordions } from "../trace-summary-accordions";
+} from "../../../../../../behavior/trace-edit.store.ts";
+import { TraceSummaryAccordions } from "../trace-summary-accordions.tsx";
 
 const TRACE_ID = "trace-1";
 

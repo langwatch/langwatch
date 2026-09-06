@@ -7,7 +7,7 @@ import type {
   OpsSnapshotAbortSignal,
   OpsSnapshotLease,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository";
+import { OpsSnapshotRepository } from "../repositories/ops-snapshot.repository.ts";
 
 const logger = createLogger("langwatch:ops:snapshot-reader");
 

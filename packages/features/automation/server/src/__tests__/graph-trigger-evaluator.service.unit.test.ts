@@ -11,14 +11,14 @@ import {
   type GraphTriggerEvaluationDeps,
   type TimeseriesResult,
   type ProjectIdentity,
-} from "../services/trigger-evaluator.service";
-import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service";
-import type { GraphAlertDispatchResult } from "../ports/automation-graph.port";
+} from "../services/trigger-evaluator.service.ts";
+import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import type { GraphAlertDispatchResult } from "../ports/automation-graph.port.ts";
 import {
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
-} from "../repositories/graph-trigger-sent.repository";
-import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository";
+} from "../repositories/graph-trigger-sent.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {

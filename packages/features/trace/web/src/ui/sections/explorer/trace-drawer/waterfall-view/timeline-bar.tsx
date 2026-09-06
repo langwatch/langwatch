@@ -1,14 +1,14 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { useSpanHoverStore } from "../../../../../behavior/span-hover.store";
+import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
 import {
   BAR_HEIGHT,
   GROUP_ROW_HEIGHT,
   getSpanBarColor,
   MIN_BAR_PX,
   type SiblingGroup,
-} from "./types";
+} from "./types.ts";
 
 export const TimelineBar = memo(function TimelineBar({
   span,

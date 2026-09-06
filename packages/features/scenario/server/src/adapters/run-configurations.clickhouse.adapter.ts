@@ -3,11 +3,11 @@
  * the process root is meant to reach it: repositories stay private, the
  * caller receives only the canonical service.
  */
-import { RunConfigurationsService } from "../services/run-configurations.service";
-import { RunConfigurationsClickHouseRepository } from "../repositories/clickhouse/clickhouse.run-configurations.repository";
-import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository";
-import { RunConfigurationsReadPort } from "../ports/run-configurations-read.port";
-import type { ResultAtomsClickHouseClient } from "./result-atoms.clickhouse.adapter";
+import { RunConfigurationsService } from "../services/run-configurations.service.ts";
+import { RunConfigurationsClickHouseRepository } from "../repositories/clickhouse/clickhouse.run-configurations.repository.ts";
+import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
+import { RunConfigurationsReadPort } from "../ports/run-configurations-read.port.ts";
+import type { ResultAtomsClickHouseClient } from "./result-atoms.clickhouse.adapter.ts";
 
 /** The run dialog's configuration history, refused by name for the same reason. */
 class UnavailableRunConfigurationsRepository extends RunConfigurationsReadPort {

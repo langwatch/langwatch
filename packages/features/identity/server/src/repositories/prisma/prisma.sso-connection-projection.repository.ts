@@ -8,7 +8,7 @@ import type {
   SsoVerificationMethod,
 } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
-import type { SsoConnectionFoldState } from "../../projections/sso-connection-state.projection";
+import type { SsoConnectionFoldState } from "../../projections/sso-connection-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

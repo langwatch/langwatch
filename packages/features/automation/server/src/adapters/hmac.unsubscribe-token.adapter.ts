@@ -1,8 +1,8 @@
 import {
   UnsubscribeTokenVerifierPort,
   type UnsubscribeTokenPayload,
-} from "../ports/unsubscribe-token.port";
-import { UnsubscribeTokenService } from "../services/unsubscribe-token.service";
+} from "../ports/unsubscribe-token.port.ts";
+import { UnsubscribeTokenService } from "../services/unsubscribe-token.service.ts";
 
 /**
  * The verifier every process composes over the one token format.

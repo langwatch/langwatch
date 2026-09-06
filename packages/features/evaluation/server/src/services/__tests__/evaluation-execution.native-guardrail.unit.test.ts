@@ -6,7 +6,7 @@ import {
   type NativeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service";
+import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service.ts";
 
 /**
  * Only executeNative and augmentResult are exercised by this dispatch path;

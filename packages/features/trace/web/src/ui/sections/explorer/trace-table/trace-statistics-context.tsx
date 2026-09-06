@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useMemo } from "react";
-import type { TraceListItem } from "../types/trace";
+import type { TraceListItem } from "../types/trace.ts";
 
 interface TraceStatistics {
   /**

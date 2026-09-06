@@ -40,7 +40,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     llmModelCost: {
@@ -63,8 +63,8 @@ vi.mock("../../../behavior/model-provider-api", () => ({
   },
 }));
 
-import { LLMModelCostDrawer } from "../llm-model-cost-drawer";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 function renderDrawer(props: { id?: string; prefillModel?: string; prefillRegex?: string } = {}) {
   const host = new FakeModelProviderHost({

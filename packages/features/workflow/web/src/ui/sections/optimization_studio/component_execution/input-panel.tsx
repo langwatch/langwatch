@@ -5,9 +5,9 @@ import {
   type ExecuteData,
   ExecutionInputPanel,
   type InputField,
-} from "../../../elements/executable-panel/execution-input-panel";
-import { getInputsForExecution, useComponentExecution } from "../use-component-execution";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+} from "../../../elements/executable-panel/execution-input-panel.tsx";
+import { getInputsForExecution, useComponentExecution } from "../use-component-execution.ts";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import type { Component } from "@langwatch/workflow-contract";
 
 /**

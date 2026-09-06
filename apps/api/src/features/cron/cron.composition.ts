@@ -7,7 +7,7 @@ import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
 import { AwsNlpLambdaFleetAdapter, NlpLambdaCleanupService } from "@langwatch/workflow-server";
-import type { ApiNlpLambdaFleetConfig } from "../../platform/config/api.config";
+import type { ApiNlpLambdaFleetConfig } from "../../platform/config/api.config.ts";
 
 /**
  * Builds the sweep over the configured account, or nothing where the

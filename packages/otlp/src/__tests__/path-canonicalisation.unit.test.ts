@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { canonicalOtlpPath, readCorrectedPath, stampCorrectedPath } from "../path-canonicalisation";
+import { canonicalOtlpPath, readCorrectedPath, stampCorrectedPath } from "../path-canonicalisation.ts";
 
 describe("canonicalOtlpPath", () => {
   describe("given a base endpoint that already named a signal", () => {

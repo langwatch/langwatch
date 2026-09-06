@@ -7,11 +7,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
+import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -20,7 +20,7 @@ import {
   createTestPrismaClient,
   idService,
   testNamespace,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 describe.skipIf(!DB_URL)(
   "Default Models visibility for role-binding-only members (real Postgres)",

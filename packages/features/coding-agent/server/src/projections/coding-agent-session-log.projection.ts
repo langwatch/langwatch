@@ -12,7 +12,7 @@ import {
 import {
   type CodingAgentSessionData,
   CodingAgentSessionStateProjection,
-} from "./coding-agent-session-state.projection";
+} from "./coding-agent-session-state.projection.ts";
 
 const CLAUDE = {
   EVENT: {

@@ -1,13 +1,13 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { emitSystemPrompt } from "./coding-agent-transcript-state";
-import { isInjectedContextOnly } from "./coding-agent-transcript-context";
+import { emitSystemPrompt } from "./coding-agent-transcript-state.ts";
+import { isInjectedContextOnly } from "./coding-agent-transcript-context.ts";
 import {
   extractedOutputText,
   isSameRecoveredReply,
   parsedChatMessages,
-} from "./coding-agent-transcript-content";
-import type { RenderedToolCall, SpanEntryAccumulator } from "./coding-agent-transcript-state";
-import { modelOf } from "./coding-agent-transcript-value";
+} from "./coding-agent-transcript-content.ts";
+import type { RenderedToolCall, SpanEntryAccumulator } from "./coding-agent-transcript-state.ts";
+import { modelOf } from "./coding-agent-transcript-value.ts";
 
 export const CODEX_RECOVERED_CONTENT_SPAN_NAME = "codex.turn.response";
 

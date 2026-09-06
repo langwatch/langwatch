@@ -8,11 +8,11 @@ import type { TenantId } from "@langwatch/eventing";
 import { redactAttributeNative, redactStringNative } from "@langwatch/redaction/pii";
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import type { PIICheckOptions } from "../ports/pii-analysis.port";
+import type { PIICheckOptions } from "../ports/pii-analysis.port.ts";
 import type {
   OtlpSpanPiiRedactionServiceDependencies,
   PiiRedactionPolicyService,
-} from "./pii-redaction-policy.service";
+} from "./pii-redaction-policy.service.ts";
 
 /**
  * Accumulator used by the record-shaped redaction paths (logs, metrics). Tracks parallel arrays

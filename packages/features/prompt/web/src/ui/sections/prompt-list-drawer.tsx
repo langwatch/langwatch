@@ -23,8 +23,8 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provider-icons";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 
-import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project";
-import { getDisplayHandle } from "../../surfaces/prompt-reference";
+import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
+import { getDisplayHandle } from "../../surfaces/prompt-reference/index.ts";
 
 export type PromptListDrawerProps = {
   open?: boolean;

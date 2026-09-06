@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLI_EPHEMERAL_LABEL,
   toRunPlanSuites,
-} from "../../../../../behavior/agent-testing/results/run-plans";
+} from "../../../../../behavior/agent-testing/results/run-plans.ts";
 
 const RUN_PLAN = { id: "suite_plan", kind: "run_plan", labels: [] };
 const TEST_SUITE = { id: "test_suite_refunds", kind: "test_suite", labels: [] };

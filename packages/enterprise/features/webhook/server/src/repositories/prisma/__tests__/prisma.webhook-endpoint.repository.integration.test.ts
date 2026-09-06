@@ -28,14 +28,14 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { WebhookEndpointValidationError } from "@langwatch/enterprise-webhook-contract";
-import type { WebhookIdPort } from "../../../ports/webhook-id.port";
-import type { WebhookSecretPort } from "../../../ports/webhook-secret.port";
+import type { WebhookIdPort } from "../../../ports/webhook-id.port.ts";
+import type { WebhookSecretPort } from "../../../ports/webhook-secret.port.ts";
 import {
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WebhookEndpointConfiguration,
-} from "../../../services/webhook-endpoint-policy.service";
-import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository";
+} from "../../../services/webhook-endpoint-policy.service.ts";
+import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

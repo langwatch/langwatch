@@ -9,11 +9,11 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../../adapters/eventing.topic-events.adapter";
+} from "../../adapters/eventing.topic-events.adapter.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
-} from "../topic-clustering-run-history.projection";
+} from "../topic-clustering-run-history.projection.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunHistoryData> = {
   tryLoad: async () => null,

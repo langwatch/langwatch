@@ -8,7 +8,7 @@ import {
   resolveFloatingPanelWidth,
   resolveInspectorFrame,
   SIDEBAR_PANEL_WIDTH,
-} from "../langy-panel-layout";
+} from "../langy-panel-layout.ts";
 
 describe("resolveFloatingPanelWidth", () => {
   it("keeps the normal desktop width", () => {

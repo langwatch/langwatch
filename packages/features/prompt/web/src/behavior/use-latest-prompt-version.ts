@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { usePromptProject } from "./use-prompt-project";
-import { promptApi } from "./prompt-api";
+import { usePromptProject } from "./use-prompt-project.ts";
+import { promptApi } from "./prompt-api.ts";
 
 type UseLatestPromptVersionResult = {
   /** The current version number */

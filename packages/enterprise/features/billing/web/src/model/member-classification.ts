@@ -16,7 +16,7 @@
  */
 
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
-import { OrganizationUserRole } from "./prisma-types";
+import { OrganizationUserRole } from "./prisma-types.ts";
 
 /**
  * A permission that grants nothing but a read.

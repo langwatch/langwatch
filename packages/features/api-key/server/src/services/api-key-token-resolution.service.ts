@@ -13,8 +13,8 @@ import {
   LANGY_SESSION_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository";
-import type { ApiKeyDependencies } from "./api-key.service";
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;

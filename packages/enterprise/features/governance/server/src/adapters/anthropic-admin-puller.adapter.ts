@@ -42,8 +42,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { AdminUsageReportAdapter } from "./admin-usage-report.adapter";
+import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,

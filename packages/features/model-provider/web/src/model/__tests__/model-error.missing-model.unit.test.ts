@@ -7,7 +7,7 @@ import {
   extractMissingModelInfo,
   isHandledByMissingModelHandler,
   markAsHandledByMissingModelHandler,
-} from "../model-error";
+} from "../model-error.ts";
 
 /** The serialised envelope a failed call carries, whatever raised it. */
 function buildError(cause: Record<string, unknown> | undefined, code = "BAD_REQUEST"): Error {

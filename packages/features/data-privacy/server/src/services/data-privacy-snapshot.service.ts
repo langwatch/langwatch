@@ -11,8 +11,8 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port";
-import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port";
+import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
+import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port.ts";
 
 /**
  * The two policy reads the snapshot stands on. Named structurally rather than as

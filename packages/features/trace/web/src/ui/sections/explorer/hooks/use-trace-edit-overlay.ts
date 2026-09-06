@@ -1,10 +1,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useSharedTrace } from "../context/shared-trace-context";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../behavior/trace-edit.store";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
  * The correction stored for the open trace, or null when there is none.

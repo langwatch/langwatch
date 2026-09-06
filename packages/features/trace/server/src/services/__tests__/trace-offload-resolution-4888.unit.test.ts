@@ -3,7 +3,7 @@
  * TDD-red tests for opt-in full blob resolution on the trace-detail read path, targeting resolveOffloadedTraces, written BEFORE TraceService's full-flag wiring lands. ACs covered: AC1 full resolution (>64KB attribute byte-identical to event_log, across the four IO fields, UTF-8 boundary char); AC3 eventref resolves + reserved keys stripped; AC4 no-eventref fast path (0 CH calls); AC5 resolution failure degrades to preview, never throws, warns; AC6 partial/mixed resolution in one trace. AC2/AC7 are covered in trace-service-full-flag.unit.test.ts; AC8 is a git-diff review check.
  */
 
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -22,10 +22,10 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,

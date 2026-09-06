@@ -4,29 +4,29 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { Link } from "../../../blocks/link";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer";
-import type { Density } from "../../../../behavior/density.store";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { findStageDef } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import { ARRIVAL_PREVIEW_TRACES, RICH_ARRIVAL_TRACE_ID } from "./data/sample-preview-traces";
+import { Link } from "../../../blocks/link.tsx";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer.ts";
+import type { Density } from "../../../../behavior/density.store.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { findStageDef } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { ARRIVAL_PREVIEW_TRACES, RICH_ARRIVAL_TRACE_ID } from "./data/sample-preview-traces.ts";
 import {
   hasCompletedJourney,
   hasDensityBeenConfirmed,
   markDensityConfirmed,
   markJourneyCompleted,
   useOnboardingStore,
-} from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { BeadStrip } from "../../../elements/explorer/onboarding/bead-strip";
-import { DensitySpotlight } from "./density-spotlight";
-import { HotkeyBindings } from "../../../elements/explorer/onboarding/hotkey-bindings";
-import { IntegrateDrawer } from "./integrate-drawer";
-import { OutroPanel } from "../../../elements/explorer/onboarding/outro-panel";
-import { ReturningUserHub } from "../../../elements/explorer/onboarding/returning-user-hub";
-import { StaticHero } from "../../../blocks/explorer/onboarding/static-hero";
-import { TypewriterHero } from "../../../blocks/explorer/onboarding/typewriter-hero";
+} from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { BeadStrip } from "../../../elements/explorer/onboarding/bead-strip.tsx";
+import { DensitySpotlight } from "./density-spotlight.tsx";
+import { HotkeyBindings } from "../../../elements/explorer/onboarding/hotkey-bindings.tsx";
+import { IntegrateDrawer } from "./integrate-drawer.tsx";
+import { OutroPanel } from "../../../elements/explorer/onboarding/outro-panel.tsx";
+import { ReturningUserHub } from "../../../elements/explorer/onboarding/returning-user-hub.tsx";
+import { StaticHero } from "../../../blocks/explorer/onboarding/static-hero.tsx";
+import { TypewriterHero } from "../../../blocks/explorer/onboarding/typewriter-hero.tsx";
 
 // Was 8s — too punchy.
 const POST_ARRIVAL_AUTO_OPEN_MS = 14000;

@@ -40,13 +40,13 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 
 import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
 import { TopicServerInstallerAdapter } from "@langwatch/topic-server";
-import { WorkerProductionComposition } from "../worker-production.composition";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { WorkerProductionComposition } from "../worker-production.composition.ts";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 class NoProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {

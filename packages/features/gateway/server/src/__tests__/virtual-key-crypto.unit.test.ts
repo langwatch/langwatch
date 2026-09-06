@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { VirtualKeyCryptoAdapter, VirtualKeyCryptoError } from "../index";
+import { VirtualKeyCryptoAdapter, VirtualKeyCryptoError } from "../index.ts";
 
 const crypto = VirtualKeyCryptoAdapter.create({
   pepper: "unit-test-pepper-32-bytes-exactly!",

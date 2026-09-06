@@ -1,7 +1,7 @@
-import type { TraceListItem } from "../types/trace";
-import { NO_TRACE_EVENTS } from "../types/trace";
-import type { ConversationGroup } from "./conversation-groups";
-import type { TraceGroup } from "./registry";
+import type { TraceListItem } from "../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../types/trace.ts";
+import type { ConversationGroup } from "./conversation-groups.ts";
+import type { TraceGroup } from "./registry/index.ts";
 
 /**
  * What a placeholder row's `traceId` starts with. Placeholder ids address no

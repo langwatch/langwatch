@@ -33,7 +33,7 @@ import {
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
-} from "../../rules/evaluator-schemas.rules";
+} from "../../rules/evaluator-schemas.rules.ts";
 
 const apiResponseEvaluatorWithPlatformUrlSchema = apiResponseEvaluatorSchema.extend({
   platformUrl: z.string().url(),

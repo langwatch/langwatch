@@ -1,11 +1,11 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import type { TopicClusteringRunCompletedEventData } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic-events.adapter";
+import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic-events.adapter.ts";
 import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
-} from "../topic-clustering-run-status.projection";
+} from "../topic-clustering-run-status.projection.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunStatusData> = {
   tryLoad: async () => null,

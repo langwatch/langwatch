@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelCostProjectPort } from "../ports/model-provider.port";
-import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository";
-import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service";
-import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service";
+import type { ModelCostProjectPort } from "../ports/model-provider.port.ts";
+import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
+import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
+import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service.ts";
 
 /** The one model the evidence read needs from the client. */
 export type ModelProviderEvidenceDatabase = Pick<PrismaClient, "modelProvider">;

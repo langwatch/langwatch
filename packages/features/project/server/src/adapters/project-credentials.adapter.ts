@@ -1,5 +1,5 @@
 import { customAlphabet, nanoid } from "nanoid";
-import { ProjectCredentialsPort } from "../ports/project.port";
+import { ProjectCredentialsPort } from "../ports/project.port.ts";
 
 /**
  * The identifier and the ingestion credential a project is born with.

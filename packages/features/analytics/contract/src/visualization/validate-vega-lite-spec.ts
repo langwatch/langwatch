@@ -17,21 +17,21 @@
  * `normalized` is the object that was handed in.
  */
 
-import { type ColumnsByDataset, validateFieldReferences } from "./vega-lite-fields";
+import { type ColumnsByDataset, validateFieldReferences } from "./vega-lite-fields.ts";
 import {
   applyLangWatchQLVegaPolicy,
   checkDatasetRowLimits,
   checkSpecEnvelopeLimits,
   lwqlVegaError,
-} from "./vega-lite-policy";
-import { checkSchemaDeclaration, validateAgainstVegaLiteSchema } from "./vega-lite-schema";
-import { isPlainObject, JSON_POINTER_ROOT } from "./vega-lite-structure";
+} from "./vega-lite-policy.ts";
+import { checkSchemaDeclaration, validateAgainstVegaLiteSchema } from "./vega-lite-schema.ts";
+import { isPlainObject, JSON_POINTER_ROOT } from "./vega-lite-structure.ts";
 import type {
   DatasetRowCounts,
   VegaLiteValidationResult,
   VegaValidationError,
   VegaValidationWarning,
-} from "./visualization-types";
+} from "./visualization-types.ts";
 
 export interface ValidateVegaLiteSpecStructureInput {
   /** The already-parsed candidate specification. Never a URL, never text. */

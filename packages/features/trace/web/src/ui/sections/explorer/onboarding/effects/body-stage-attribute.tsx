@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
+import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 /**
  * Tags `<body>` with the current onboarding stage so global CSS rules can react —

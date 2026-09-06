@@ -7,9 +7,9 @@ import { useAnalytics } from "react-contextual-analytics";
 
 const MotionVStack = motion.create(VStack);
 
-import { usePublicEnv } from "../../behavior/use-public-env";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useActiveProject } from "./active-project-context";
+import { useActiveProject } from "./active-project-context.tsx";
 import {
   PROMPT_AGENT_PERFORMANCE,
   PROMPT_EXPERIMENTS,
@@ -18,17 +18,17 @@ import {
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
-} from "../../model/code-prompts";
-import { maskApiKey } from "../../model/shared/api-key-utils";
+} from "../../model/code-prompts.ts";
+import { maskApiKey } from "../../model/shared/api-key-utils.ts";
 import {
   buildMcpJson,
   CLOUD_ENDPOINT,
   findLangwatchEnvLines,
-} from "../../model/shared/build-mcp-config";
-import { copyToClipboard } from "../../behavior/shared/copy-to-clipboard";
-import { InlineCopyButton } from "./shared/inline-copy-button";
-import { JsonHighlight } from "../elements/shared/json-highlight";
-import { TabButton } from "../elements/shared/tab-button";
+} from "../../model/shared/build-mcp-config.ts";
+import { copyToClipboard } from "../../behavior/shared/copy-to-clipboard.ts";
+import { InlineCopyButton } from "./shared/inline-copy-button.tsx";
+import { JsonHighlight } from "../elements/shared/json-highlight.tsx";
+import { TabButton } from "../elements/shared/tab-button.tsx";
 
 type TabKey = "prompt" | "skill" | "mcp";
 

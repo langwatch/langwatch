@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LangyModelGroup } from "../langy-model-profile";
-import { splitLangyModels } from "../langy-model-suggestions";
+import type { LangyModelGroup } from "../langy-model-profile.ts";
+import { splitLangyModels } from "../langy-model-suggestions.ts";
 
 const model = (value: string, group: LangyModelGroup) => ({
   value,

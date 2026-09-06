@@ -1,9 +1,9 @@
 import type {
   WorkerFeatureCloser,
   WorkerFeatureInstallerPort,
-} from "../features/worker-feature.installer";
-import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime";
-import { WorkerRuntime } from "../platform/lifecycle/worker.runtime";
+} from "../features/worker-feature.installer.ts";
+import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime.ts";
+import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
 
 export class WorkerApplication {
   static create(options: {

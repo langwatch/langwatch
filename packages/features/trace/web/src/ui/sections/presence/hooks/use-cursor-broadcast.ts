@@ -3,7 +3,7 @@ import {
   usePresencePreferencesStore,
   useTabSessionId,
 } from "@langwatch/presence-web/surfaces/presence-state";
-import { api } from "../../../../behavior/trace-api";
+import { api } from "../../../../behavior/trace-api.ts";
 
 const SEND_INTERVAL_MS = 66; // ~15 Hz — imperceptible vs 30 Hz, half the traffic
 

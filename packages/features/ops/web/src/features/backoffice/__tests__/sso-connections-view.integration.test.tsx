@@ -7,8 +7,8 @@
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SsoConnectionsView from "../ui/sections/sso-connections-view";
-import { renderWithOpsHost } from "../../../testing";
+import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
+import { renderWithOpsHost } from "../../../testing.tsx";
 
 const listState = vi.hoisted(() => ({
   current: {
@@ -35,7 +35,7 @@ const mutations = vi.hoisted(() => ({
   requestTeardown: vi.fn(),
 }));
 
-vi.mock("../../../behavior/ops-api", () => {
+vi.mock("../../../behavior/ops-api.ts", () => {
   const mutation = (name: keyof typeof mutations) => ({
     useMutation: () => ({ mutate: mutations[name] }),
   });
@@ -60,7 +60,7 @@ vi.mock("../../../behavior/ops-api", () => {
   };
 });
 
-vi.mock("../../../behavior/ops-router", () => ({
+vi.mock("../../../behavior/ops-router.ts", () => ({
   useOpsRouter: () => ({
     query: routerState.query,
     replace: routerState.replace,

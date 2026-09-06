@@ -5,14 +5,14 @@
  */
 
 import { useCallback, useState, useEffect } from "react";
-import type { Scenario } from "../../../../model/prisma-types";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { readScenarioTarget } from "../../use-scenario-target";
-import { RunDialog } from "../run/run-dialog";
-import type { RunDialogSubject } from "../run/run-dialog-types";
-import { useRunStartedHandler } from "./use-case-run-actions";
+import type { Scenario } from "../../../../model/prisma-types.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { readScenarioTarget } from "../../use-scenario-target.ts";
+import { RunDialog } from "../run/run-dialog.tsx";
+import type { RunDialogSubject } from "../run/run-dialog-types.ts";
+import { useRunStartedHandler } from "./use-case-run-actions.ts";
 import { setFlowCallbacks } from "@langwatch/ui-drawer";
-import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer";
+import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 
 export function AgentTestingCaseEditor() {
   const { project } = useOrganizationTeamProject();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arbitrateClaims } from "../credential-claims";
+import { arbitrateClaims } from "../credential-claims.ts";
 
 type TestClaim = { kind: "api-key"; token: string } | { kind: "session"; userId: string };
 

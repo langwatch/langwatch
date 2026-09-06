@@ -13,9 +13,9 @@ import type {
   QueueInfo,
   QueueSummaryInfo,
 } from "@langwatch/ops-contract";
-import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules";
-import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
-import type { OpsMetricsWindowService } from "./ops-metrics-window.service";
+import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
+import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
+import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
 export class OpsDashboardViewService {
   private constructor() {}

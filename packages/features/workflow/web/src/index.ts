@@ -1,71 +1,71 @@
-export * from "./model/optimizers";
-export * from "./ui/elements/workflow-icons";
-export * from "./ui/elements/workflow-card";
-export * from "./ui/elements/workflow-create-dialog";
-export * from "./model/random-workflow-icon";
-export * from "./ui/sections/workflow-autosave";
-export * from "./ui/sections/workflow-base-properties-panel";
-export * from "./ui/sections/workflow-drag-preview";
-export * from "./ui/sections/workflow-node-selection-panel";
-export * from "./ui/sections/workflow-name-popover";
-export * from "./ui/sections/workflow-progress-toast";
-export * from "./ui/sections/workflow-run-until-here-dialog";
-export * from "./ui/sections/workflow-running-status";
-export * from "./ui/elements/workflow-results-panel";
-export * from "./ui/sections/workflow-undo-redo";
-export * from "./ui/sections/properties/workflow-properties.ports";
-export * from "./ui/sections/properties/workflow-end-properties-panel";
-export * from "./ui/sections/properties/workflow-entry-point-properties-panel";
-export * from "./ui/sections/properties/workflow-code-properties-panel";
-export * from "./ui/sections/properties/workflow-http-properties-panel";
-export * from "./ui/sections/properties/workflow-if-else-properties-panel";
-export * from "./ui/sections/properties/workflow-prompting-technique-properties-panel";
-export * from "./ui/sections/properties/workflow-retrieve-properties-panel";
-export * from "./ui/sections/properties/workflow-properties-panel";
-export * from "./behavior/workflow-store";
-export * from "./model/studio-registry";
-export * from "./model/signature-message-edge";
-export * from "./ui/elements/studio-drawer-footer";
-export * from "./model/studio-evaluation-query";
-export * from "./model/workflow-llm-form";
-export * from "./behavior/use-workflow-store";
-export * from "./behavior/use-run-until-here-dialog-store";
-export * from "./behavior/use-smart-set-node";
-export * from "./behavior/use-ask-before-leaving";
-export * from "./behavior/use-workflow-prompt-picker-flow";
-export * from "./behavior/use-workflow-evaluator-picker-flow";
-export * from "./behavior/use-workflow-agent-picker-flow";
-export * from "./model/control-flow";
-export * from "./model/edge-convergence";
-export * from "./model/edge-mapping";
-export * from "./model/unsaved-changes";
-export * from "./model/code-signature";
-export * from "./model/evaluate-api-snippet";
-export * from "./model/agent-node-data";
-export * from "./model/studio-dataset.utils";
-export { PromptSelectionButton } from "./ui/elements/prompt-selection-button";
-export { WorkflowConfigPopover } from "./ui/elements/workflow-config-popover";
-export * from "./model/code-agent-config";
-export * from "./model/llm-signature-node-factory";
-export * from "./model/code/python-providers";
+export * from "./model/optimizers.ts";
+export * from "./ui/elements/workflow-icons.tsx";
+export * from "./ui/elements/workflow-card.tsx";
+export * from "./ui/elements/workflow-create-dialog.tsx";
+export * from "./model/random-workflow-icon.ts";
+export * from "./ui/sections/workflow-autosave.tsx";
+export * from "./ui/sections/workflow-base-properties-panel.tsx";
+export * from "./ui/sections/workflow-drag-preview.tsx";
+export * from "./ui/sections/workflow-node-selection-panel.tsx";
+export * from "./ui/sections/workflow-name-popover.tsx";
+export * from "./ui/sections/workflow-progress-toast.tsx";
+export * from "./ui/sections/workflow-run-until-here-dialog.tsx";
+export * from "./ui/sections/workflow-running-status.tsx";
+export * from "./ui/elements/workflow-results-panel.tsx";
+export * from "./ui/sections/workflow-undo-redo.tsx";
+export * from "./ui/sections/properties/workflow-properties.ports.ts";
+export * from "./ui/sections/properties/workflow-end-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-entry-point-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-code-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-http-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-if-else-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-prompting-technique-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-retrieve-properties-panel.tsx";
+export * from "./ui/sections/properties/workflow-properties-panel.tsx";
+export * from "./behavior/workflow-store.ts";
+export * from "./model/studio-registry.ts";
+export * from "./model/signature-message-edge.ts";
+export * from "./ui/elements/studio-drawer-footer.tsx";
+export * from "./model/studio-evaluation-query.ts";
+export * from "./model/workflow-llm-form.ts";
+export * from "./behavior/use-workflow-store.ts";
+export * from "./behavior/use-run-until-here-dialog-store.ts";
+export * from "./behavior/use-smart-set-node.ts";
+export * from "./behavior/use-ask-before-leaving.ts";
+export * from "./behavior/use-workflow-prompt-picker-flow.ts";
+export * from "./behavior/use-workflow-evaluator-picker-flow.ts";
+export * from "./behavior/use-workflow-agent-picker-flow.ts";
+export * from "./model/control-flow.ts";
+export * from "./model/edge-convergence.ts";
+export * from "./model/edge-mapping.ts";
+export * from "./model/unsaved-changes.ts";
+export * from "./model/code-signature.ts";
+export * from "./model/evaluate-api-snippet.ts";
+export * from "./model/agent-node-data.ts";
+export * from "./model/studio-dataset.utils.ts";
+export { PromptSelectionButton } from "./ui/elements/prompt-selection-button.tsx";
+export { WorkflowConfigPopover } from "./ui/elements/workflow-config-popover.tsx";
+export * from "./model/code-agent-config.ts";
+export * from "./model/llm-signature-node-factory.ts";
+export * from "./model/code/python-providers.ts";
 export {
   WorkflowCodeEditor,
   WorkflowCodeEditorModal,
   vscodeThemeName,
   type WorkflowCodeEditorContractProps,
   type WorkflowCodeEditorModalHost,
-} from "./ui/elements/code/workflow-code-editor";
-export { LiquidConditionEditor } from "./ui/elements/code/liquid-condition-editor";
+} from "./ui/elements/code/workflow-code-editor.tsx";
+export { LiquidConditionEditor } from "./ui/elements/code/liquid-condition-editor.tsx";
 export {
   validateLiquidCondition,
   type LiquidConditionValidation,
-} from "./model/code/liquid-condition";
+} from "./model/code/liquid-condition.ts";
 export type {
   ContractRef,
   PythonContract,
   PythonField,
   PythonProviderHandle,
-} from "./model/code/python-provider.shared";
+} from "./model/code/python-provider.shared.ts";
 export {
   ComponentNode,
   getNodeDisplayName,
@@ -73,26 +73,26 @@ export {
   NodeSectionTitle,
   selectionColor,
   TypeLabel,
-} from "./ui/sections/workflow-nodes";
-export { workflowNodeComponents } from "./ui/sections/workflow-nodes.registry";
-export { WorkflowEdge } from "./ui/sections/workflow-edge";
-export { ComponentExecutionButton } from "./ui/sections/workflow-node-execution";
-export { WorkflowNodeHostProvider } from "./ui/elements/workflow-node.host";
-export { CustomNode } from "./ui/sections/workflow-nodes.custom";
-export { EndNode } from "./ui/sections/workflow-nodes.end";
-export { EntryNode } from "./ui/sections/workflow-nodes.entry";
-export { EvaluatorNode } from "./ui/sections/workflow-nodes.evaluator";
-export { PromptingTechniqueNode } from "./ui/sections/workflow-nodes.prompting-technique";
-export { SignatureNode } from "./ui/sections/workflow-nodes.signature";
-export { AgentNodeDraggable } from "./ui/sections/workflow-agent-node-draggable";
-export { EvaluatorNodeDraggable } from "./ui/sections/workflow-evaluator-node-draggable";
-export { NodeDraggable } from "./ui/sections/workflow-node-draggable";
+} from "./ui/sections/workflow-nodes.tsx";
+export { workflowNodeComponents } from "./ui/sections/workflow-nodes.registry.ts";
+export { WorkflowEdge } from "./ui/sections/workflow-edge.tsx";
+export { ComponentExecutionButton } from "./ui/sections/workflow-node-execution.tsx";
+export { WorkflowNodeHostProvider } from "./ui/elements/workflow-node.host.tsx";
+export { CustomNode } from "./ui/sections/workflow-nodes.custom.tsx";
+export { EndNode } from "./ui/sections/workflow-nodes.end.tsx";
+export { EntryNode } from "./ui/sections/workflow-nodes.entry.tsx";
+export { EvaluatorNode } from "./ui/sections/workflow-nodes.evaluator.tsx";
+export { PromptingTechniqueNode } from "./ui/sections/workflow-nodes.prompting-technique.tsx";
+export { SignatureNode } from "./ui/sections/workflow-nodes.signature.tsx";
+export { AgentNodeDraggable } from "./ui/sections/workflow-agent-node-draggable.tsx";
+export { EvaluatorNodeDraggable } from "./ui/sections/workflow-evaluator-node-draggable.tsx";
+export { NodeDraggable } from "./ui/sections/workflow-node-draggable.tsx";
 export {
   blankTemplate,
   entryNode as blankTemplateEntryNode,
-} from "./model/templates/blank.template";
+} from "./model/templates/blank.template.ts";
 export {
   customEvaluatorTemplate,
   entryNode as customEvaluatorTemplateEntryNode,
-} from "./model/templates/custom-evaluator.template";
-export * from "./model/templates/templates.registry";
+} from "./model/templates/custom-evaluator.template.ts";
+export * from "./model/templates/templates.registry.ts";

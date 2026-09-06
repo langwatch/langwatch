@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { ListItem } from "../model/command-icon-info";
+import type { ListItem } from "../model/command-icon-info.ts";
 
 /**
  * Hook that handles keyboard navigation and shortcuts for the command bar.

@@ -3,16 +3,16 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Parity pins between the three views of the media-part vocabulary: (1) isExtractableMediaPart (sync classifier the extraction walker stops on) agrees with processContentPart (store-side rewriter) for every canonical shape — disagreement means a part is twice-walked or silently skipped; (2) every extractable shape's serialized form trips containsMediaMarkers — a mismatch regresses extraction to passthrough with no failing test; (3) the render-side collector surfaces every shape pre- and post-extraction — unrendered stored bytes are invisible storage cost. The store-side dependency now takes a TraceMediaStorePort, not the platform's StoredObjectsService; this test fakes that port the way trace-content-extraction.service.unit.test.ts does.
  */
-import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service";
-import { TraceContentExtractionService } from "../trace-content-extraction.service";
+import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
+import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
+import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,
-} from "./fixtures/canonical-media-parts.fixtures";
+} from "./fixtures/canonical-media-parts.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

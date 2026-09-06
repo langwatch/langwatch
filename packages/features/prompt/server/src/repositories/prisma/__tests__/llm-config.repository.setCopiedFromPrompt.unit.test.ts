@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
 
 describe("PrismaLlmConfigRepository", () => {
   let prisma: PromptConfigDatabase;

@@ -18,12 +18,12 @@ import { Container, HStack, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { useFilterToggle } from "../../behavior/use-filter-toggle";
-import { MenuLink } from "../elements/analytics-menu-link";
-import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header";
-import { CustomDashboardsSection } from "./custom-dashboards-section";
-import { CustomQueryMenuLink } from "./custom-query-menu-link";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import { MenuLink } from "../elements/analytics-menu-link.tsx";
+import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
+import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";
+import { CustomQueryMenuLink } from "./custom-query-menu-link.tsx";
 
 /** Which rail entry the page being rendered is. */
 export type AnalyticsRailEntry =

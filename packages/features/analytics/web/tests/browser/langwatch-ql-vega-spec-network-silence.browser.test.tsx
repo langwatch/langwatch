@@ -33,7 +33,7 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { ThemedLangWatchQLVegaLiteChart } from "../../src/ui/sections/themed-langwatch-ql-vega-lite-chart";
+import { ThemedLangWatchQLVegaLiteChart } from "../../src/ui/sections/themed-langwatch-ql-vega-lite-chart.tsx";
 import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 import type {
   LangWatchQLDataset,
@@ -45,7 +45,7 @@ import {
   INVALID_VEGA_FIXTURES,
   LWQL_FIXTURE_COLUMNS,
   VALID_VEGA_FIXTURES,
-} from "../../src/__tests__/lwql-fixtures";
+} from "../../src/__tests__/lwql-fixtures.ts";
 
 /**
  * Small datasets on purpose: the row ceilings are maxima, and what is under

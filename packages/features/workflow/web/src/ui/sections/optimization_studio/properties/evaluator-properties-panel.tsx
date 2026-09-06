@@ -9,25 +9,25 @@ import DynamicZodForm from "@langwatch/evaluator-web/surfaces/dynamic-zod-form";
 import { EvaluatorEditorContent } from "@langwatch/evaluator-web/surfaces/evaluator-editor-content";
 import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
 import { useAvailableEvaluators } from "@langwatch/evaluator-web/surfaces/available-evaluators";
-import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
-import { api } from "../../../../model/workflow-api-client";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants";
+import { api } from "../../../../model/workflow-api-client.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../../model/edge-mapping";
-import { BasePropertiesPanel } from "./base-properties-panel";
+} from "../../../../model/edge-mapping.ts";
+import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
 /**
  * Checks whether the evaluator string uses the new DB-backed format (`evaluators/<id>`).

@@ -1,7 +1,7 @@
 /**
  * The billing reconciliation REST family's seam, filled from this process.
  */
-import { ApiRestCapabilityUnavailableError } from "./api-rest-ports";
+import { ApiRestCapabilityUnavailableError } from "./api-rest-ports.ts";
 import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
 import { ForbiddenError } from "@langwatch/api/rest";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -18,7 +18,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MiddlewareHandler } from "hono";
 
-import type { ApiGatewayComposition } from "./api-gateway.composition";
+import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
 
 /**
  * The Enterprise webhook platform, as the replay route reads it.

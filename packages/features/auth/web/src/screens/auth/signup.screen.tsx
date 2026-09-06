@@ -13,20 +13,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { FrontDoorShell } from "../../ui/sections/front-door-shell";
-import { useShowErrorToast } from "../../behavior/auth-feedback";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
-import { VerificationFirstSignUp } from "../../ui/sections/verification-first-sign-up";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { readHandledError } from "../../model/read-handled-error";
-import { signIn, useSession } from "../../behavior/auth-client";
-import { useSearchParams } from "../../behavior/use-route";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
-import { LogoIcon } from "../../ui/elements/logo-icon";
-import { Link } from "../../ui/elements/link";
-import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
-import { authApi as api } from "../../behavior/auth-api";
-import { authFailureMessage, isCredentialRejection } from "../../model/auth-failure-message";
+import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";
+import { useShowErrorToast } from "../../behavior/auth-feedback.ts";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { VerificationFirstSignUp } from "../../ui/sections/verification-first-sign-up.tsx";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { signIn, useSession } from "../../behavior/auth-client.tsx";
+import { useSearchParams } from "../../behavior/use-route.ts";
+import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
+import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
+import { Link } from "../../ui/elements/link.tsx";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env.ts";
+import { authApi as api } from "../../behavior/auth-api.ts";
+import { authFailureMessage, isCredentialRejection } from "../../model/auth-failure-message.ts";
 
 /**
  * Wording for a sign-in failure this screen can't name. The account has

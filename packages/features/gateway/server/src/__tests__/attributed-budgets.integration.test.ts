@@ -15,21 +15,21 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import {
   attributedUserBucketScopeId,
   bucketPeriodFloorMs,
   budgetPeriodFloorMs,
   GatewayWindow,
 } from "@langwatch/gateway-contract";
-import type { BudgetDebitRow } from "../ports/gateway-budget-spend.port";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import type { BudgetDebitRow } from "../ports/gateway-budget-spend.port.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 /**
  * A month cycle phased to the 17th at 09:00 UTC: far enough in the past

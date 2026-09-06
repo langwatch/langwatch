@@ -14,19 +14,19 @@ const { mockResolvedDefault, mockGenerateMutateAsync, mockCommitMutateAsync, moc
     mockPostEvent: vi.fn(),
   }));
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) => selector(storeState),
 }));
-vi.mock("../../../../behavior/workflow-store", () => ({
+vi.mock("../../../../behavior/workflow-store.ts", () => ({
   serializeWorkflow: (workflow: unknown) => workflow,
 }));
-vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../../../model/workflow-api-client", () => ({
+vi.mock("../../../../model/workflow-api-client.ts", () => ({
   api: {
     useUtils: () => ({
       workflow: { getVersions: { invalidate: vi.fn() } },
@@ -51,7 +51,7 @@ vi.mock("../../../../model/workflow-api-client", () => ({
   },
 }));
 
-vi.mock("../use-post-event", () => ({
+vi.mock("../use-post-event.tsx", () => ({
   usePostEvent: () => ({ postEvent: mockPostEvent, isLoading: false }),
 }));
 
@@ -67,7 +67,7 @@ const storeState = {
   }),
 };
 
-vi.mock("../history", () => ({
+vi.mock("../history.tsx", () => ({
   useVersionState: () => ({
     latestVersion: { id: "v-1-auto", autoSaved: true },
     previousVersion: { id: "v-1", version: "1.0" },
@@ -96,7 +96,7 @@ vi.mock("../history", () => ({
   }),
 }));
 
-const { useRunEvalution } = await import("../use-run-evalution");
+const { useRunEvalution } = await import("../use-run-evalution.ts");
 
 describe("given an evaluation run auto-commits unsaved changes", () => {
   afterEach(() => {

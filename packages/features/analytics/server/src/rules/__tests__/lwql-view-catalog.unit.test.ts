@@ -10,18 +10,18 @@ import {
   CONTENT_KEY_CATALOG,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
-import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture";
+import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
 import {
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
   gateForContentCategory,
   isContentAttributeKey,
-} from "../lwql-content-gating.rules";
-import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules";
+} from "../lwql-content-gating.rules.ts";
+import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   LWQL_COLUMN_UNITS,
-} from "../../services/langwatch-ql-catalog-shapes.service";
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 

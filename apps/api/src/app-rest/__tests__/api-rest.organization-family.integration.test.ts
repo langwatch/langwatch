@@ -10,8 +10,8 @@ import {
   ORGANIZATION_BASE,
   ORGANIZATION_BEARER,
   organizationWorld,
-} from "./support/organization-family.world";
-import { errorCodeOf, TEST_ORGANIZATION_ID } from "./support/rest-family.harness";
+} from "./support/organization-family.world.ts";
+import { errorCodeOf, TEST_ORGANIZATION_ID } from "./support/rest-family.harness.ts";
 
 describe("given an organization-scoped credential on an Enterprise plan", () => {
   describe("when the organization is fetched", () => {

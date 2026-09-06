@@ -5,7 +5,7 @@
  */
 import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInMemoryFeatureFlagService } from "../testing";
+import { createInMemoryFeatureFlagService } from "../testing.ts";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";

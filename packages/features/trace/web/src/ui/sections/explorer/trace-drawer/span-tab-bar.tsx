@@ -19,12 +19,12 @@ import {
   usePresenceStore,
 } from "@langwatch/presence-web/surfaces/presence-state";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
-import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { formatDuration } from "../../../../model/display-formatters";
-import { spanTypeColor } from "../utils/span-type-color";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { formatDuration } from "../../../../model/display-formatters.ts";
+import { spanTypeColor } from "../utils/span-type-color.ts";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 
 /**
  * Tab / menu label for a span: generic tool spans (claude_code.tool ...)

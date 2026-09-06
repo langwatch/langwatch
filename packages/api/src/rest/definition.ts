@@ -2,7 +2,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
-import { parseApiSchemaSync, type ApiSchema } from "../schema.js";
+import { parseApiSchemaSync, type ApiSchema } from "../schema.ts";
 
 import type {
   EndpointDef,
@@ -11,8 +11,8 @@ import type {
   HttpMethod,
   RawEndpointDef,
   ServiceContext,
-} from "./types.js";
-import { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
+} from "./types.ts";
+import { VERSION_LATEST, VERSION_PREVIEW } from "./types.ts";
 
 declare const inputDeclared: unique symbol;
 declare const outputDeclared: unique symbol;

@@ -4,7 +4,7 @@ import {
   type DataPrivacySnapshot,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { CATEGORY_LABELS, DISPOSITION_LABELS, PII_LABELS } from "../../model/data-privacy-labels";
+import { CATEGORY_LABELS, DISPOSITION_LABELS, PII_LABELS } from "../../model/data-privacy-labels.ts";
 
 /**
  * What is ACTUALLY applied once the rules above cascade down.

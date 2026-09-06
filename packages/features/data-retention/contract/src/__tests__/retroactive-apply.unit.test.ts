@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyRetentionChange } from "../data-retention";
+import { classifyRetentionChange } from "../data-retention.ts";
 
 describe("classifyRetentionChange", () => {
   it("identifies a shorter finite window as a contraction", () => {

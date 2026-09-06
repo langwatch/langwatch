@@ -36,14 +36,14 @@ import { type Control, Controller, type SubmitHandler, useForm } from "react-hoo
 
 import { Select } from "@langwatch/design-system/select";
 
-import { applyHandledErrorToForm, HandledErrorAlert } from "../../behavior/handled-error-form";
-import { api } from "../../behavior/organization-api";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import { applyHandledErrorToForm, HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
+import { api } from "../../behavior/organization-api.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
   validateProjectName,
-} from "../../model/project-form-validation";
+} from "../../model/project-form-validation.ts";
 
 export interface ProjectFormData {
   name: string;

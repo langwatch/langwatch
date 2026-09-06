@@ -2,7 +2,7 @@ import type { TenantBroadcastPort } from "@langwatch/notification-server";
 import type { Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { TraceTenantBroadcastPort } from "@langwatch/trace-server";
-import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition";
+import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
 
 /**
  * The realtime half of trace ingestion, as the port Trace declares.

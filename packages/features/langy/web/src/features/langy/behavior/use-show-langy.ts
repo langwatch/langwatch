@@ -2,9 +2,9 @@
  * Langy's visibility gate — "does this user have Langy?". Three layers:
  */
 
-import { useFeatureFlag } from "../../../behavior/use-feature-flag";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useRequiredSession } from "../../../behavior/auth-session";
+import { useFeatureFlag } from "../../../behavior/use-feature-flag.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useRequiredSession } from "../../../behavior/auth-session.ts";
 
 /** The flag the server gate reads under the same name. */
 export const LANGY_RELEASE_FLAG = "release_langy_enabled";

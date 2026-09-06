@@ -2,9 +2,9 @@
  * @see specs/experiments-v3/evaluator-naming.feature
  */
 import { describe, expect, it } from "vitest";
-import { addEvaluatorPayloadSchema } from "../schemas";
-import { addEvaluator } from "../transforms";
-import { baseState } from "./workbench-fixtures";
+import { addEvaluatorPayloadSchema } from "../schemas.ts";
+import { addEvaluator } from "../transforms/index.ts";
+import { baseState } from "./workbench-fixtures.ts";
 
 const exactMatch = (name: string) => ({
   name,

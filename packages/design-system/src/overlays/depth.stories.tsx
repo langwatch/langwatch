@@ -1,10 +1,10 @@
 import { Button, Code, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Dialog } from "../components/dialog";
-import { Menu } from "../components/menu";
-import { Popover } from "../components/popover";
-import { Tooltip } from "../components/tooltip";
-import { BASE_OVERLAY_Z_INDEX, useOverlayZIndex, Z_INDEX_DEPTH_INCREMENT } from "./depth";
+import { Dialog } from "../components/dialog.tsx";
+import { Menu } from "../components/menu.tsx";
+import { Popover } from "../components/popover.tsx";
+import { Tooltip } from "../components/tooltip.tsx";
+import { BASE_OVERLAY_Z_INDEX, useOverlayZIndex, Z_INDEX_DEPTH_INCREMENT } from "./depth.ts";
 
 /** Reads the depth it is mounted at, so the nesting is visible rather than inferred. */
 function DepthReadout() {

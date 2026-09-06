@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { reorderColumnsBySourceHeader } from "../column-reorder";
+import { reorderColumnsBySourceHeader } from "../column-reorder.ts";
 
 const cols: DatasetConfirmColumns = [
   { name: "a", type: "string", sourceHeader: "a" },

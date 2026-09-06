@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { echoIdentifier } from "../../rules/langwatch-ql-violations.rules";
+import { echoIdentifier } from "../../rules/langwatch-ql-violations.rules.ts";
 
 /** A high surrogate with no low surrogate after it, or the reverse. */
 const UNPAIRED_SURROGATE =

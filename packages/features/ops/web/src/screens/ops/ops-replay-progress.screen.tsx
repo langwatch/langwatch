@@ -1,6 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { useOpsRouter } from "../../behavior/ops-router";
-import { ReplayProgressContent } from "../../features/event-store/ui/sections/replay-progress-content";
+import { useOpsRouter } from "../../behavior/ops-router.ts";
+import { ReplayProgressContent } from "../../features/event-store/ui/sections/replay-progress-content.tsx";
 
 export default function OpsReplayProgressScreen() {
   const router = useOpsRouter();

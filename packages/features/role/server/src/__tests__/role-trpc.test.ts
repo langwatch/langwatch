@@ -9,7 +9,7 @@ import {
   RoleTrpcApi,
   type RoleBindingTrpcContext,
   type RoleTrpcContext,
-} from "../index";
+} from "../index.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const USER_ID = "user_1";

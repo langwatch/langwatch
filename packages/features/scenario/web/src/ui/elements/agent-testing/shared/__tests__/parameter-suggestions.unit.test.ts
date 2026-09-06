@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   type DeclaredParameter,
   unionParameterDefinitions,
-} from "../../../../../behavior/suites/use-run-suite";
+} from "../../../../../behavior/suites/use-run-suite.ts";
 import {
   acceptParameterField,
   acceptParameterSuggestion,
@@ -21,7 +21,7 @@ import {
   parameterSuggestionState,
   parameterSuggestions,
   valueSuggestions,
-} from "../../../../sections/agent-testing/run/parameter-suggestions";
+} from "../../../../sections/agent-testing/run/parameter-suggestions.ts";
 
 const MODEL: DeclaredParameter = {
   name: "model",

@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ModelCost, ModelCostRate } from "@langwatch/model-provider-contract";
-import { ModelCostPreviewService, type ModelCostRuleReader } from "../model-cost-preview.service";
-import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service";
+import { ModelCostPreviewService, type ModelCostRuleReader } from "../model-cost-preview.service.ts";
+import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service.ts";
 
 const preview = ModelCostPreviewService.create({
   regexSafety: ModelCostRegexSafetyService.create(),

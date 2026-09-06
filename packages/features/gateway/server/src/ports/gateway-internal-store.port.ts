@@ -3,7 +3,7 @@ import type {
   GatewayBudgetBucketBoundary,
 } from "@langwatch/gateway-contract";
 
-import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
+import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port.ts";
 
 /**
  * The row reads the Go data plane's control-plane calls make that no service

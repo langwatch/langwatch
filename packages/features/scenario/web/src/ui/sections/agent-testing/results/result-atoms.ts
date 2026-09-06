@@ -20,7 +20,7 @@ import {
   CODE_TARGET_NAME,
   type RunPlan,
   toExternalPlanSlug,
-} from "../../../../behavior/agent-testing/results/run-plans";
+} from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /** What the filter row asks of the list. */
 export type ResultFilters = {

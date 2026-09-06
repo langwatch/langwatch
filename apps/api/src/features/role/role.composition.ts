@@ -22,10 +22,10 @@ import {
   RoleScopePort,
 } from "@langwatch/role-server";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createTeamTrpcRouter } from "../organization/organization-trpc.mount";
-import { createRoleTrpcRouter, type RoleTrpcPorts } from "./role-trpc.mount";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createTeamTrpcRouter } from "../organization/organization-trpc.mount.ts";
+import { createRoleTrpcRouter, type RoleTrpcPorts } from "./role-trpc.mount.ts";
 
 /**
  * The Enterprise plan gate on assigning a custom role, for a deployment that composes
@@ -53,7 +53,7 @@ export type RoleFeatureCollaborators = Readonly<{
   customRolePlan?: ApiCustomRolePlanGatePort;
 }>;
 
-import type { ComposedRoleFeature } from "./role.composition.types";
+import type { ComposedRoleFeature } from "./role.composition.types.ts";
 
 /** Composes the role and team surfaces over this process's own graph. */
 export function composeRoleFeature(options: {

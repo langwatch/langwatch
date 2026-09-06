@@ -1,6 +1,6 @@
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { MeterBar } from "./meter-bar";
+import { MeterBar } from "./meter-bar.tsx";
 
 const meta = {
   title: "Components/Meter bar",

@@ -45,28 +45,28 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import { mintRunToken } from "../ports/langy-frame-auth.port";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
-import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port";
+import { mintRunToken } from "../ports/langy-frame-auth.port.ts";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
+import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port.ts";
 import {
   LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
-import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service";
+import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRepository,
   LangyConversationRow,
-} from "../repositories/langy-conversation-projection.repository";
+} from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,
   type LangyMessageRow,
   NullLangyMessageRepository,
-} from "../repositories/langy-message.repository";
-import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service";
+} from "../repositories/langy-message.repository.ts";
+import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
-export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository";
+export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository.ts";
 
 /**
 /**

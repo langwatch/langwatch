@@ -21,7 +21,7 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -58,7 +58,7 @@ const { policies, organization } = vi.hoisted(() => ({
   ],
 }));
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -70,7 +70,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", () => ({
   ProviderScopeChips: () => <div data-testid="provider-scope-chips" />,
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       routingPolicy: { list: { invalidate: vi.fn() } },
@@ -124,8 +124,8 @@ vi.mock("../../../behavior/gateway-api", () => ({
   },
 }));
 
-import { RoutingPolicyDrawer } from "../../../features/routing-policies/ui/sections/routing-policy-drawer";
-import { RoutingPoliciesPage } from "../gateway-routing-policies.screen";
+import { RoutingPolicyDrawer } from "../../../features/routing-policies/ui/sections/routing-policy-drawer.tsx";
+import { RoutingPoliciesPage } from "../gateway-routing-policies.screen.tsx";
 
 /** An admin looking at the organization, optionally at an address already carrying a policy. */
 function adminHost(query: Readonly<Record<string, string>> = {}) {

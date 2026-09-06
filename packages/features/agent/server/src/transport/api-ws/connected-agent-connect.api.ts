@@ -19,12 +19,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
-import { instanceChannel, pendingKey } from "../../rules/connected-agent-keys.rules";
+import { instanceChannel, pendingKey } from "../../rules/connected-agent-keys.rules.ts";
 import {
   AgentSessionService,
   type SessionCoreOptions,
   type SessionInfo,
-} from "../../services/connected-agent-session.service";
+} from "../../services/connected-agent-session.service.ts";
 import type { Unsubscribe } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouterPort } from "@langwatch/api";
 

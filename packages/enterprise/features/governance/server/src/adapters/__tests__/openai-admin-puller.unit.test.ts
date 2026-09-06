@@ -11,9 +11,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service";
+import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
+import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 /** The reason a failed run leaves behind is a log line, so the log is captured. */
@@ -29,8 +29,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
-import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
+import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter.ts";
+import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 
 class StubHttp extends GovernanceHttpPort {
   async fetch(

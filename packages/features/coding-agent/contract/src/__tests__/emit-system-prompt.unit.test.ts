@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { createSpanEntryAccumulator, emitSystemPrompt } from "../coding-agent-transcript-state";
+import { createSpanEntryAccumulator, emitSystemPrompt } from "../coding-agent-transcript-state.ts";
 
 /** A model-call span carrying a chat input with a system message. */
 const spanWithSystem = (text: string, startTimeMs = 1_000): SpanDetail =>

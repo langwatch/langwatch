@@ -21,13 +21,13 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p_demo", slug: "demo" },
   }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({}),
     dashboards: {
@@ -50,8 +50,8 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-import { MessageContent } from "../message-content";
-import { isLangyTranscriptMessage } from "../../../../../model/langy-transcript";
+import { MessageContent } from "../message-content.tsx";
+import { isLangyTranscriptMessage } from "../../../../../model/langy-transcript.ts";
 
 afterEach(cleanup);
 

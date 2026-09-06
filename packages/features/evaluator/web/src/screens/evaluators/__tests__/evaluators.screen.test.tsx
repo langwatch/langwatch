@@ -7,8 +7,8 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithEvaluatorHost } from "../../../testing";
-import EvaluatorsScreen from "../evaluators.screen";
+import { renderWithEvaluatorHost } from "../../../testing.tsx";
+import EvaluatorsScreen from "../evaluators.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -30,7 +30,7 @@ const calls = vi.hoisted(() => ({
   invalidateLimit: vi.fn(),
 }));
 
-vi.mock("../../../behavior/evaluator-api", () => {
+vi.mock("../../../behavior/evaluator-api.ts", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: (options?: {
       onSuccess?: (result: unknown, variables: unknown) => void;

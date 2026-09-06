@@ -1,7 +1,7 @@
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 
-import { formatBudgetUsd } from "../../model/format-budget-usd";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
 
 /**
  * Wire shape matches the 402 body that the gateway returns and

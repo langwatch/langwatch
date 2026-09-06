@@ -12,7 +12,7 @@ import {
   evaluationReportedEventSchema,
   evaluationStartedEventSchema,
 } from "@langwatch/evaluation-contract";
-import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection.ts";
 
 function createStubStore(): FoldProjectionStore<EvaluationRunData> {
   return {

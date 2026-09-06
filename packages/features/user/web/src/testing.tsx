@@ -48,8 +48,8 @@ import {
   type PersonalRouteReading,
   type PersonalScope,
   type PersonalSuccessNotice,
-} from "./model/personal-workspace-host";
-import { CodingAgentHostBridge } from "./ui/sections/coding-agent-host-provider";
+} from "./model/personal-workspace-host.ts";
+import { CodingAgentHostBridge } from "./ui/sections/coding-agent-host-provider.tsx";
 
 export type PersonalQuery = Readonly<Record<string, string | undefined>>;
 

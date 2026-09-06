@@ -19,8 +19,8 @@ import {
   MAX_RUN_CONFIGURATIONS,
   type RawRunConfigurationRow,
   type RunConfigurationsReadPort,
-} from "../ports/run-configurations-read.port";
-import type { ScenarioPlanRecord, ScenarioRepository } from "../repositories/scenario.repository";
+} from "../ports/run-configurations-read.port.ts";
+import type { ScenarioPlanRecord, ScenarioRepository } from "../repositories/scenario.repository.ts";
 
 /** How far back a configuration is still offered, in days. */
 const RUN_CONFIGURATION_WINDOW_DAYS = 30;

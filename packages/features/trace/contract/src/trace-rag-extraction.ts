@@ -1,6 +1,6 @@
-import { safeUnflatten } from "./trace-attribute-unflatten";
-import { flattenSpanTree, organizeSpansIntoTree, typedValueToText } from "./trace-collector-common";
-import { extractRAGTextualContext } from "./trace-rag-chunks";
+import { safeUnflatten } from "./trace-attribute-unflatten.ts";
+import { flattenSpanTree, organizeSpansIntoTree, typedValueToText } from "./trace-collector-common.ts";
+import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
 import type {
   ElasticSearchEvaluation,
   ElasticSearchEvent,
@@ -11,7 +11,7 @@ import type {
   RAGChunk,
   Span,
   SpanInputOutput,
-} from "./trace-format.schemas";
+} from "./trace-format.schemas.ts";
 
 export const getRAGChunks = (spans: (ElasticSearchSpan | Span)[]): RAGChunk[] => {
   const sortedSpans = [

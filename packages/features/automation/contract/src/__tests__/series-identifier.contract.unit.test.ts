@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSeriesIdentifier } from "../graph-alert";
+import { deriveSeriesIdentifier } from "../graph-alert.ts";
 
 describe("deriveSeriesIdentifier", () => {
   it("uses a custom key before the metric and retains the aggregation", () => {

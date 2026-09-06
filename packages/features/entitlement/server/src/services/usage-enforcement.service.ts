@@ -1,17 +1,17 @@
 import { createLogger } from "@langwatch/observability";
 import type { PlanInfo, UsageUnit } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, type UsageCount } from "../ports/usage-counter.port";
-import { NoUsageCache, type UsageCachePort } from "../ports/usage-cache.port";
+import { USAGE_UNKNOWN, type UsageCount } from "../ports/usage-counter.port.ts";
+import { NoUsageCache, type UsageCachePort } from "../ports/usage-cache.port.ts";
 import {
   type UsageMeterReading,
   type UsageOrganizationPort,
-} from "../ports/usage-organization.port";
+} from "../ports/usage-organization.port.ts";
 import {
   type ProjectUsageCounts,
   type UsageVolumeCounterPort,
-} from "../ports/usage-volume-counter.port";
-import { UsageMeterPolicyService } from "./usage-meter-policy.service";
-import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service";
+} from "../ports/usage-volume-counter.port.ts";
+import { UsageMeterPolicyService } from "./usage-meter-policy.service.ts";
+import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service.ts";
 
 const logger = createLogger("langwatch:usage");
 

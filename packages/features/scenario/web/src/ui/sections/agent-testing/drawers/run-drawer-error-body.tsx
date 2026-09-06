@@ -5,7 +5,7 @@
 
 import { Box, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { HandledErrorAlert } from "../../../../behavior/errors";
+import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
 
 export function RunDrawerErrorBody({ error }: { error: unknown }) {
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
 
 /**
  * Bridge: subscribe to `filterStore.queryText` and forward changes into

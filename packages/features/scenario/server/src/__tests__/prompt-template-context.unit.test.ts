@@ -12,7 +12,7 @@ import {
   type ScenarioConfig,
 } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
-import { PromptTemplateAdapter } from "../index";
+import { PromptTemplateAdapter } from "../index.ts";
 
 /**
  * A turn as the scenario runner hands it over: `ScenarioState.addMessage`

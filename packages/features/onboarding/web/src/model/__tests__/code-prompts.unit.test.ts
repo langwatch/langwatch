@@ -10,8 +10,8 @@ import {
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
-} from "../code-prompts";
-import { buildMcpJson } from "../shared/build-mcp-config";
+} from "../code-prompts.ts";
+import { buildMcpJson } from "../shared/build-mcp-config.ts";
 
 /**
  * Regression suite for langwatch/langwatch#3104. Gemini CLI's chat-input parser extracts

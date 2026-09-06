@@ -6,12 +6,12 @@ import {
   eventMetricValueLabel,
   getFacetValueState,
 } from "@langwatch/trace-contract";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
+import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import type {
   EventMetricValues,
   FacetItem,
-} from "../../../../behavior/explorer/filter-sidebar/types";
-import { formatCount } from "./utils";
+} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { formatCount } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;
 

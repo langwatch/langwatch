@@ -1,12 +1,12 @@
 /**
  * The IO wrapper both read paths (traces-v2 drawer, legacy TraceService) share for Claude Code content enrichment. Real llm_request spans carry tokens + request_id but no message content, which lives in the trace's OTLP log records. Pins the three things the wrapper owns: the gate (nothing to join never touches the log store), the join, and best-effort degradation.
  */
-import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service";
+import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Span } from "@langwatch/trace-contract";
-import type { LogRecordStorageService } from "../trace-log-record-read.service";
-import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository";
+import type { LogRecordStorageService } from "../trace-log-record-read.service.ts";
+import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";

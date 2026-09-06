@@ -93,7 +93,7 @@ const { queryImpls, hasFirstMessageRef, hasFirstMessageInputs } = vi.hoisted(() 
   };
 });
 
-vi.mock("../behavior/personal-workspace-api", () => {
+vi.mock("../behavior/personal-workspace-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -151,13 +151,13 @@ import {
   EXPLORE_USAGE_AGENT_PROMPT,
   EXPLORE_USAGE_DOCS_PATH,
   EXPLORE_USAGE_LANGY_PROMPT,
-} from "../ui/sections/connect-your-agent-button";
-import { PersonalOverviewScreen } from "../screens/personal-workspace/personal-overview.screen";
+} from "../ui/sections/connect-your-agent-button.tsx";
+import { PersonalOverviewScreen } from "../screens/personal-workspace/personal-overview.screen.tsx";
 import {
   fakePersonalWorkspaceHost,
   renderWithPersonalWorkspaceHost,
   type FakePersonalWorkspaceHost,
-} from "../testing";
+} from "../testing.tsx";
 
 let host: FakePersonalWorkspaceHost;
 

@@ -1,14 +1,14 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../../../behavior/trace-api";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store";
-import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
-import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /** When prompt aggregation is still catching up (containsPrompt=true but
  * the projected IDs haven't landed yet), poll on a slower cadence so the

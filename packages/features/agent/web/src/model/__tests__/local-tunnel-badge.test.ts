@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agentHasDevTunnel } from "../agent-dev-tunnel";
+import { agentHasDevTunnel } from "../agent-dev-tunnel.ts";
 
 describe("agentHasDevTunnel", () => {
   it("recognizes only HTTP agents carrying the CLI marker", () => {

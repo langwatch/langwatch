@@ -34,8 +34,8 @@ import type {
   DashboardIdGenerator,
   DashboardRepository,
   SavedWorkbenchChartPolicy,
-} from "../ports/dashboard.port";
-import { SavedWorkbenchChartService } from "./saved-workbench-chart.service";
+} from "../ports/dashboard.port.ts";
+import { SavedWorkbenchChartService } from "./saved-workbench-chart.service.ts";
 
 const defaultLayout: GraphLayout = {
   gridColumn: 0,

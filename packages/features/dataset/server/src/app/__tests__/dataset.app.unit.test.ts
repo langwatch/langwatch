@@ -16,7 +16,7 @@
  */
 import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
-import { DatasetApp, type DatasetExperimentLookup } from "../dataset.app";
+import { DatasetApp, type DatasetExperimentLookup } from "../dataset.app.ts";
 
 const replacing = {
   id: "dataset_existing",

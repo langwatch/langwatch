@@ -5,13 +5,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { DeclaredParameter } from "../../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter } from "../../../../../behavior/suites/use-run-suite.ts";
 import {
   lineWithoutUndeclared,
   undeclaredNamesOnLine,
   undeclaredNamesOnRows,
   undeclaredParameterMessage,
-} from "../undeclared-parameters";
+} from "../undeclared-parameters.ts";
 
 const declares = (...names: string[]): DeclaredParameter[] =>
   names.map((name) => ({ name, source: "agent" as const }));

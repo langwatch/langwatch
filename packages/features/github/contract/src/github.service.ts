@@ -8,8 +8,8 @@ import type {
   GithubAppConfig,
   GithubPullRequestRef,
   GithubTurnToken,
-} from "./github";
-import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection";
+} from "./github.ts";
+import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection.ts";
 
 /** The cross-feature GitHub capabilities used by Coding Agent and Langy. */
 export abstract class GithubService {

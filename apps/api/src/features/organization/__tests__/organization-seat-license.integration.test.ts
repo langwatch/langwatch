@@ -5,7 +5,7 @@
  * @see specs/licensing/enforcement-members.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { ApiOrganizationSeatLicense } from "../organization.composition";
+import { ApiOrganizationSeatLicense } from "../organization.composition.ts";
 
 const PLAN = {
   type: "GROWTH",

@@ -1,7 +1,7 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port";
-import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port";
-import { TraceDerivationSpanClickHouseRepository } from "../repositories/clickhouse/trace-derivation-span.repository";
+import { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port.ts";
+import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port.ts";
+import { TraceDerivationSpanClickHouseRepository } from "../repositories/clickhouse/trace-derivation-span.repository.ts";
 
 /** Answers the derivation reader from this deployment's own ClickHouse. */
 export class ClickHouseTraceDerivationSpanReaderAdapter extends TraceDerivationSpanReaderPort {

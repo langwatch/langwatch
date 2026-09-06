@@ -7,8 +7,8 @@ import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import {
   PulledUsageLedgerIntent,
   writePulledUsageSchema,
-} from "../intents/pulled-usage-ledger.intent";
-import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port";
+} from "../intents/pulled-usage-ledger.intent.ts";
+import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port.ts";
 
 export const PULLED_USAGE_LEDGER_PROCESS_NAME = "pulledUsageLedger" as const;
 

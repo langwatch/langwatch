@@ -9,14 +9,14 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import type { UpgradeModalSeatsVariant } from "@langwatch/ui-host/upgrade-modal-store";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SeatProrationPreview } from "../seat-proration-preview";
+import { SeatProrationPreview } from "../seat-proration-preview.tsx";
 
 const { previewQuery, showErrorToastMock } = vi.hoisted(() => ({
   previewQuery: vi.fn(),
   showErrorToastMock: vi.fn(),
 }));
 
-vi.mock("../../../behavior/billing-api", () => ({
+vi.mock("../../../behavior/billing-api.ts", () => ({
   billingApi: {
     subscription: { previewProration: { useQuery: () => previewQuery() } },
   },

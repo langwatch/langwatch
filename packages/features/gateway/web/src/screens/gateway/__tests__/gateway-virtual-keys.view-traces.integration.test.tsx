@@ -13,7 +13,7 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,23 +44,23 @@ const { listRows } = vi.hoisted(() => ({
   listRows: { value: [] as VirtualKeyRow[] },
 }));
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 // The drawers the page keeps mounted have their own network surface, none of
 // which the row action touches.
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-create-drawer", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx", () => ({
   VirtualKeyCreateDrawer: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx", () => ({
   VirtualKeyEditDrawer: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx", () => ({
   VirtualKeySecretReveal: () => null,
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: { list: { invalidate: async () => undefined } },
@@ -100,7 +100,7 @@ const host = fakeGatewayHost({
   },
 });
 
-import VirtualKeysPage from "../gateway-virtual-keys.screen";
+import VirtualKeysPage from "../gateway-virtual-keys.screen.tsx";
 
 function keyRow(overrides: Partial<VirtualKeyRow> = {}): VirtualKeyRow {
   return {

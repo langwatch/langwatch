@@ -21,6 +21,6 @@ export {
   type EnterpriseFeature,
   EnterprisePlanRequiredError,
   isEnterpriseTier,
-} from "./plan-gate.errors";
-export { assertEnterprisePlan, assertEnterprisePlanType, requireEnterprisePlan } from "./plan-gate";
-export { createEnterprisePlanGate, type EnterprisePlanGatePorts } from "./plan-gate.rest";
+} from "./plan-gate.errors.ts";
+export { assertEnterprisePlan, assertEnterprisePlanType, requireEnterprisePlan } from "./plan-gate.ts";
+export { createEnterprisePlanGate, type EnterprisePlanGatePorts } from "./plan-gate.rest.ts";

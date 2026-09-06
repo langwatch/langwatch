@@ -21,14 +21,14 @@
  * none of it can throw into the caller's path — is ./statementReporting.ts.
  */
 
-import { runWithRetry } from "./retry";
+import { runWithRetry } from "./retry.ts";
 import {
   StatementReporter,
   type StatementLogSink,
   type StatementMetrics,
   type StatementOperation,
-} from "./statementReporting";
-import { extractQueryType, extractTableName, inbandExceptionOf } from "./statementShape";
+} from "./statementReporting.ts";
+import { extractQueryType, extractTableName, inbandExceptionOf } from "./statementShape.ts";
 
 /**
  * Anything that can run the vendor's two statement methods. Method shorthand

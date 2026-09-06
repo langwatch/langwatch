@@ -18,8 +18,8 @@ import {
 } from "@langwatch/ops-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
-import type { TasksHost } from "./tasks-host.composition";
+import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition.ts";
+import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
  * Main's worker-boot migration loop, as one more `&&` step of the image CMD,

@@ -6,8 +6,8 @@
 
 import { z } from "zod";
 
-import { cliResultDigestSchema } from "./cards/digest";
-import { cliToolResultSchema } from "./cards/tool-result";
+import { cliResultDigestSchema } from "./cards/digest.ts";
+import { cliToolResultSchema } from "./cards/tool-result.ts";
 
 export const langyStreamEntrySchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delta"), text: z.string() }),

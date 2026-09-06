@@ -10,7 +10,7 @@ import {
   extractLiteMemberRestrictionInfo,
   markAsHandledByLicenseHandler,
   markAsHandledByLiteMemberHandler,
-} from "../../model/license-error";
+} from "../../model/license-error.ts";
 
 /**
  * Reports one failed call as a licence refusal. Answers whether it reported it,

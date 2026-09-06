@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { LIMIT_TYPE_LABELS } from "./license-limit-labels";
+import { LIMIT_TYPE_LABELS } from "./license-limit-labels.ts";
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 /**

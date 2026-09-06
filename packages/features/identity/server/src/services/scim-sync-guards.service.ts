@@ -14,7 +14,7 @@ import {
   type ScimSyncFactInput,
   type ScimSyncState,
 } from "@langwatch/identity-contract";
-import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository";
+import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 
 /**
  * The directory-sync guards (D08): what runs BEFORE any sync fact exists. Each verb reads the

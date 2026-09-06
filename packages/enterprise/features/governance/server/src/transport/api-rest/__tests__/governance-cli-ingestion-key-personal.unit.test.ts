@@ -11,7 +11,7 @@ import { PersonalSourceTypeNotAllowedError } from "@langwatch/enterprise-governa
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createGovernanceCliRestApp, type GovernanceCliRestPorts } from "../governance-cli.api";
+import { createGovernanceCliRestApp, type GovernanceCliRestPorts } from "../governance-cli.api.ts";
 
 const CALLER = {
   user_id: "user_1",

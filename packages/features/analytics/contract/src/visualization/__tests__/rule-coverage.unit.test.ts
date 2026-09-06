@@ -15,14 +15,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial";
-import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid";
-import { LWQL_VEGA_RULES } from "../vega-lite-policy";
+import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial/index.ts";
+import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid/index.ts";
+import { LWQL_VEGA_RULES } from "../vega-lite-policy.ts";
 import {
   type LangWatchQLVegaRuleId,
   LWQL_VEGA_RULE_IDS,
   VEGA_VALIDATION_ERROR_CODES,
-} from "../visualization-types";
+} from "../visualization-types.ts";
 
 const TEST_DIR = fileURLToPath(new URL("./", import.meta.url));
 

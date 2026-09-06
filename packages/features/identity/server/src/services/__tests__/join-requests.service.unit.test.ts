@@ -24,7 +24,7 @@ import {
   type JoinRequestNotifier,
   JoinRequestsService,
   type JoinSettingPort,
-} from "../join-requests.service";
+} from "../join-requests.service.ts";
 
 /**
  * Everything AROUND the lifecycle: the reveal discipline at the boundary, the anti-abuse limits,

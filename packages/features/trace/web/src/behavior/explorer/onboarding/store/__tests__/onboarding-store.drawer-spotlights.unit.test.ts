@@ -4,7 +4,7 @@
  * Unit tests for the persisted seenDrawerSpotlights map.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { useOnboardingStore } from "../onboarding-store";
+import { useOnboardingStore } from "../onboarding-store.ts";
 
 const STORAGE_KEY = "langwatch:traces-v2:onboarding:state:v1";
 

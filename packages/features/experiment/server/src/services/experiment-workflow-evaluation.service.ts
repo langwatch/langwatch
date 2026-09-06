@@ -14,16 +14,16 @@ import type {
   StudioWorkflow as WorkflowDSL,
   WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
-import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
+import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port.ts";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
+import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
 import type {
   ExecutionDataServices,
   LoadedExecutionData,
-} from "./experiment-execution-data.service";
-import { ExperimentExecutionDataService } from "./experiment-execution-data.service";
-import { ExperimentPollingRunService } from "./experiment-polling-run.service";
+} from "./experiment-execution-data.service.ts";
+import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
+import { ExperimentPollingRunService } from "./experiment-polling-run.service.ts";
 
 export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 

@@ -3,8 +3,8 @@ import {
   AnnotationBackfillSourcePort,
   TraceAnnotationSyncPort,
   type BackfillableAnnotation,
-} from "../../ports/annotation-backfill.port";
-import { AnnotationBackfillSweep } from "../annotation-clickhouse-backfill.task";
+} from "../../ports/annotation-backfill.port.ts";
+import { AnnotationBackfillSweep } from "../annotation-clickhouse-backfill.task.ts";
 
 class FakeSource extends AnnotationBackfillSourcePort {
   constructor(private readonly byProject: Record<string, BackfillableAnnotation[]>) {

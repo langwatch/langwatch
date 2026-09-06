@@ -3,7 +3,7 @@
  *
  * Unit tests for TraceContentExtractionService.extractInlineMediaFromEvent.
  */
-import { TraceContentExtractionService } from "../trace-content-extraction.service";
+import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
 import { describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
+import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
 
 // ---------------------------------------------------------------------------
 // Test helpers

@@ -11,7 +11,7 @@ import {
   type SsrfValidationResult,
 } from "@langwatch/egress";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The spend-spike anomaly evaluator, composed from this process's own

@@ -24,39 +24,39 @@ import {
   type ExtractMessageTextInput,
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
-import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service";
-import { CodexCanonicaliserService } from "./codex-canonicaliser.service";
-import { CopilotCanonicaliserService } from "./copilot-canonicaliser.service";
-import { FallbackCanonicaliserService } from "./fallback-canonicaliser.service";
-import { GenAICanonicaliserService } from "./gen-ai-canonicaliser.service";
-import { HaystackCanonicaliserService } from "./haystack-canonicaliser.service";
-import { LangWatchCanonicaliserService } from "./langwatch-canonicaliser.service";
-import { LegacyOtelCanonicaliserService } from "./legacy-otel-canonicaliser.service";
-import { LogfireCanonicaliserService } from "./logfire-canonicaliser.service";
-import { MastraCanonicaliserService } from "./mastra-canonicaliser.service";
-import { OpenInferenceCanonicaliserService } from "./openinference-canonicaliser.service";
-import { SpringAICanonicaliserService } from "./spring-ai-canonicaliser.service";
-import { StrandsCanonicaliserService } from "./strands-canonicaliser.service";
-import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service";
-import { VercelCanonicaliserService } from "./vercel-canonicaliser.service";
-import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service";
-import type { ExtractorContext, LogExtractorContext } from "../ports/canonical-attributes.port";
+import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
+import { CodexCanonicaliserService } from "./codex-canonicaliser.service.ts";
+import { CopilotCanonicaliserService } from "./copilot-canonicaliser.service.ts";
+import { FallbackCanonicaliserService } from "./fallback-canonicaliser.service.ts";
+import { GenAICanonicaliserService } from "./gen-ai-canonicaliser.service.ts";
+import { HaystackCanonicaliserService } from "./haystack-canonicaliser.service.ts";
+import { LangWatchCanonicaliserService } from "./langwatch-canonicaliser.service.ts";
+import { LegacyOtelCanonicaliserService } from "./legacy-otel-canonicaliser.service.ts";
+import { LogfireCanonicaliserService } from "./logfire-canonicaliser.service.ts";
+import { MastraCanonicaliserService } from "./mastra-canonicaliser.service.ts";
+import { OpenInferenceCanonicaliserService } from "./openinference-canonicaliser.service.ts";
+import { SpringAICanonicaliserService } from "./spring-ai-canonicaliser.service.ts";
+import { StrandsCanonicaliserService } from "./strands-canonicaliser.service.ts";
+import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service.ts";
+import { VercelCanonicaliserService } from "./vercel-canonicaliser.service.ts";
+import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
+import type { ExtractorContext, LogExtractorContext } from "../ports/canonical-attributes.port.ts";
 import {
   CanonicalAttributesPort,
   CanonicalLogRecordStore,
   CanonicalSpanStore,
-} from "../ports/canonical-attributes.port";
-import { parseJsonStringValues } from "../rules/canonical-json.rules";
+} from "../ports/canonical-attributes.port.ts";
+import { parseJsonStringValues } from "../rules/canonical-json.rules.ts";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
-} from "../rules/canonical-message.rules";
+} from "../rules/canonical-message.rules.ts";
 import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
-} from "../rules/claude-code-call-policy.rules";
-import { ClaudeCodeRequestService } from "./claude-code-request.service";
-import { ClaudeCodeResponseService } from "./claude-code-response.service";
+} from "../rules/claude-code-call-policy.rules.ts";
+import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
+import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 

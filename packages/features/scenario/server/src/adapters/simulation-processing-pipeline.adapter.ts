@@ -7,30 +7,30 @@ import {
   type ProcessManagerApplier,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
-import { SimulationProcessingCommandsAdapter } from "./simulation-processing-commands.adapter";
-import { FinishRunCommand } from "./finish-run.adapter";
-import { ComputeRunMetricsCommand } from "./compute-run-metrics.adapter";
+import { SimulationProcessingCommandsAdapter } from "./simulation-processing-commands.adapter.ts";
+import { FinishRunCommand } from "./finish-run.adapter.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.adapter.ts";
 import {
   SimulationRunMetricsMapProjection,
   type SimulationRunMetricsProjectionRecord,
-} from "../projections/simulation-run-metrics.projection";
+} from "../projections/simulation-run-metrics.projection.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../projections/simulation-run-state.projection";
+} from "../projections/simulation-run-state.projection.ts";
 import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
-} from "../subscribers/snapshot-update-broadcast.subscriber";
+} from "../subscribers/snapshot-update-broadcast.subscriber.ts";
 import {
   createSuiteRunSyncSubscriber,
   type SuiteRunSyncSubscriberDeps,
-} from "../subscribers/suite-run-sync.subscriber";
+} from "../subscribers/suite-run-sync.subscriber.ts";
 import {
   createTraceMetricsSyncSubscriber,
   type TraceMetricsSyncSubscriberDeps,
-} from "../subscribers/trace-metrics-sync.subscriber";
+} from "../subscribers/trace-metrics-sync.subscriber.ts";
 
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;

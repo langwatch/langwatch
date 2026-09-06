@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { EvaluationResults, EvaluationsV3State } from "./experiment-workbench";
+import type { EvaluationResults, EvaluationsV3State } from "./experiment-workbench.ts";
 import {
   datasetReferenceSchema,
   evaluatorConfigSchema,
   targetConfigSchema,
   targetRowMetadataSchema,
-} from "./experiment-workbench";
+} from "./experiment-workbench.ts";
 
 // ============================================================================
 // Zod Schemas (Single Source of Truth)

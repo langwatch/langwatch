@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { EvaluatorDatabase } from "../../evaluator.repository";
-import { PrismaEvaluatorRepository } from "../prisma.evaluator.repository";
+import type { EvaluatorDatabase } from "../../evaluator.repository.ts";
+import { PrismaEvaluatorRepository } from "../prisma.evaluator.repository.ts";
 
 function fakeDatabase(overrides: Partial<EvaluatorDatabase["evaluator"]> = {}): {
   database: EvaluatorDatabase;

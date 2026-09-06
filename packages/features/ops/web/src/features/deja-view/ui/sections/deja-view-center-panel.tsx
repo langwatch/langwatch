@@ -1,8 +1,8 @@
 import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
-import { EventDetail } from "../blocks/deja-view-event-detail";
-import { hashEventTypeColor } from "../../model/deja-view-fragment";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer";
-import type { EventResult } from "../../model/deja-view-types";
+import { EventDetail } from "../blocks/deja-view-event-detail.tsx";
+import { hashEventTypeColor } from "../../model/deja-view-fragment.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import type { EventResult } from "../../model/deja-view-types.ts";
 
 export function DejaViewCenterPanel({
   currentEvent,

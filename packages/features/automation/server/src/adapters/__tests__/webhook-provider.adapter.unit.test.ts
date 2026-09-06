@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
-import { WebhookProviderAdapter } from "../webhook-provider.adapter";
+import { WebhookProviderAdapter } from "../webhook-provider.adapter.ts";
 
 /** Reversible and obviously not real, so a leak in a failure message is loud. */
 const crypto = {

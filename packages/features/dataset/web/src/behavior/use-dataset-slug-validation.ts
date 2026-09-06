@@ -16,8 +16,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SlugValidation } from "../model/dataset-slug-validation";
-import { datasetApi } from "./dataset-api";
+import type { SlugValidation } from "../model/dataset-slug-validation.ts";
+import { datasetApi } from "./dataset-api.ts";
 
 /** How long typing has to settle before the trailing check runs. */
 const SETTLE_MS = 500;

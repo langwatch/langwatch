@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { FEATURES } from "../../../../../model/shared/langy/feature-map";
+import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
 import {
   deriveFollowUps,
   followUpsForResult,
   type SettledToolResult,
   SUGGESTION_LABEL,
-} from "../cli-follow-ups";
+} from "../cli-follow-ups.ts";
 
 const traceSearch = (overrides: Partial<SettledToolResult> = {}): SettledToolResult => ({
   name: "langwatch.trace.search",

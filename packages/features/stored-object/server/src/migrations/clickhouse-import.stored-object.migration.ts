@@ -16,8 +16,8 @@ import {
   StoredObjectLegacyWriterDrainPort,
   StoredObjectProjectSourcePort,
   type LegacyStoredObjectRow,
-} from "../ports/stored-object.port";
-import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
+} from "../ports/stored-object.port.ts";
+import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
 
 export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;

@@ -16,7 +16,7 @@ vi.mock("@clickhouse/client", () => ({
   createClient: clickhouseMocks.createClient,
 }));
 
-import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttl.reconciler";
+import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttl.reconciler.ts";
 
 describe("reconcileTTL()", () => {
   const envBackup = {

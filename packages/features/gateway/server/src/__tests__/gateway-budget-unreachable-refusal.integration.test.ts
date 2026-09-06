@@ -13,10 +13,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 /**

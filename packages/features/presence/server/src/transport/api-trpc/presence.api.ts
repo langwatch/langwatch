@@ -14,8 +14,8 @@ import {
 } from "@langwatch/presence-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { PresenceEmitterPort } from "../../ports/presence.port";
-import { PresenceStreamService } from "../../services/presence-stream.service";
+import type { PresenceEmitterPort } from "../../ports/presence.port.ts";
+import { PresenceStreamService } from "../../services/presence-stream.service.ts";
 
 type PresenceApplication = Readonly<{
   presence: PresenceService;

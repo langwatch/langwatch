@@ -1,21 +1,21 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { PostgresDatasetMigrationAdapter } from "../postgres.dataset-migration.adapter";
-import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter";
+import { PostgresDatasetMigrationAdapter } from "../postgres.dataset-migration.adapter.ts";
+import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter.ts";
 import type {
   DatasetBlobDriver,
   DatasetStorage,
   PresignedUpload,
-} from "../../ports/dataset-storage.port";
+} from "../../ports/dataset-storage.port.ts";
 import {
   DatasetAzureConfigResolver,
   DatasetStorageResolver,
-} from "../../ports/dataset-storage.port";
+} from "../../ports/dataset-storage.port.ts";
 import {
   toJsonlChunks,
   type ChunkOffset,
   type DatasetChunk,
-} from "../../rules/dataset-chunking.rules";
+} from "../../rules/dataset-chunking.rules.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
 type Fingerprint = { count: number; maxUpdatedAt: Date | null };

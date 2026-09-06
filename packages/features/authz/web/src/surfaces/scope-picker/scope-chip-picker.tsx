@@ -12,7 +12,7 @@ import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "l
 import { useEffect, useMemo, useState } from "react";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Select } from "@langwatch/design-system/select";
-import { ProviderScopeChips } from "./provider-scope-chips";
+import { ProviderScopeChips } from "./provider-scope-chips.tsx";
 
 /**
  * Scope kinds the picker can offer. ORGANIZATION/TEAM/PROJECT mirror the

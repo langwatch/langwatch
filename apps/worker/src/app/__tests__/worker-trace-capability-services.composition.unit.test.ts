@@ -7,14 +7,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerTraceCapabilityServices,
   type WorkerTraceCapabilityDatabase,
-} from "../worker-trace-capability-services.composition";
-import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition";
-import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment.composition";
+} from "../worker-trace-capability-services.composition.ts";
+import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
+import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment.composition.ts";
 import {
   createWorkerTraceEvaluationMonitorPort,
   createWorkerTraceModelCostCatalogPort,
   createWorkerTraceNarrowPorts,
-} from "../worker-trace-narrow-ports.composition";
+} from "../worker-trace-narrow-ports.composition.ts";
 import { TraceProductAnalyticsPort, type TraceProductEvent } from "@langwatch/trace-server";
 
 /**

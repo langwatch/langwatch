@@ -32,7 +32,7 @@ import {
 import {
   ApiDatabaseAbsenceReportPort,
   ApiDatabaseInfrastructure,
-} from "../api-database.infrastructure";
+} from "../api-database.infrastructure.ts";
 
 type ConnectionParts = {
   connection: PrismaConnection;

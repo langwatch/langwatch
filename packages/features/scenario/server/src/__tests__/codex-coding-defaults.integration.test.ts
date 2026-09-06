@@ -53,7 +53,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createTestScenarioExecutionPrefetcherService,
   type ScenarioPrefetchFixture,
-} from "./support/scenario-execution-prefetcher.fixture";
+} from "./support/scenario-execution-prefetcher.fixture.ts";
 
 const DEFAULT_ROLE_MODEL = "openai/gpt-5-mini";
 

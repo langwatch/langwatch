@@ -45,8 +45,8 @@ import {
   DEFAULT_SUITE_NAME,
   DEFAULT_SUITE_SLUG,
   pickFreeSuiteSlug,
-} from "../../rules/default-suite.rules";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository";
+} from "../../rules/default-suite.rules.ts";
+import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
 
 type ScenarioWriteInput = ScenarioUpdateInput & { actor: ScenarioActor };
 

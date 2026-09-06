@@ -45,28 +45,28 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { CodeSnippet } from "../../ui/elements/code-snippet";
+import { CodeSnippet } from "../../ui/elements/code-snippet.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFilterParams } from "../../behavior/use-filter-params";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import {
   CustomGraph,
   type CustomGraphInput,
   summaryGraphTypes,
-} from "../../ui/sections/custom-graph";
-import { FilterIconWithBadge } from "../../ui/sections/filter-icon-with-badge";
-import { FilterSidebar } from "../../ui/sections/filter-sidebar";
-import { useFilterToggle } from "../../behavior/use-filter-toggle";
-import { FilterToggle, FilterToggleButton } from "../../ui/sections/filter-toggle";
-import { useAnalyticsPeriod } from "../../behavior/use-analytics-period";
-import { AnalyticsPeriodPicker } from "../../ui/sections/analytics-period-picker";
-import { SeriesFiltersDialog } from "../../ui/sections/series-filters-dialog";
+} from "../../ui/sections/custom-graph.tsx";
+import { FilterIconWithBadge } from "../../ui/sections/filter-icon-with-badge.tsx";
+import { FilterSidebar } from "../../ui/sections/filter-sidebar.tsx";
+import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import { FilterToggle, FilterToggleButton } from "../../ui/sections/filter-toggle.tsx";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { AnalyticsPeriodPicker } from "../../ui/sections/analytics-period-picker.tsx";
+import { SeriesFiltersDialog } from "../../ui/sections/series-filters-dialog.tsx";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
-import { useAnalyticsHost } from "../../model/analytics-host";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import {
   analyticsGroups,
   analyticsMetrics,
@@ -77,18 +77,18 @@ import {
   getMetric,
   metricAggregations,
   pipelineAggregations,
-} from "../../model/analytics-registry";
+} from "../../model/analytics-registry.ts";
 import type {
   AggregationTypes,
   PipelineAggregationTypes,
   PipelineFields,
   SharedFiltersInput,
-} from "../../model/analytics-vocabulary";
-import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params";
-import type { FilterField } from "../../model/analytics-filter-definition";
-import { analyticsApi, type AnalyticsFilterOption } from "../../behavior/analytics-api";
+} from "../../model/analytics-vocabulary.ts";
+import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { analyticsApi, type AnalyticsFilterOption } from "../../behavior/analytics-api.ts";
 import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
-import { camelCaseToTitleCase, uppercaseFirstLetterLowerCaseRest } from "../../model/string-casing";
+import { camelCaseToTitleCase, uppercaseFirstLetterLowerCaseRest } from "../../model/string-casing.ts";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";

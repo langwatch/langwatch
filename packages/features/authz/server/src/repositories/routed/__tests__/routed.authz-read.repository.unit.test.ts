@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzDatabase, AuthzReadRepository } from "../../authz-read.repository";
-import { RoutedAuthzReadRepository } from "../routed.authz-read.repository";
+import type { AuthzDatabase, AuthzReadRepository } from "../../authz-read.repository.ts";
+import { RoutedAuthzReadRepository } from "../routed.authz-read.repository.ts";
 
 const spyRepository = (name: string): AuthzReadRepository =>
   ({

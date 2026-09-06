@@ -5,7 +5,7 @@
  * connection, so a caller constructs one wherever it makes sense (module scope
  * included) and passes the connection it wants probed (ADR-093).
  */
-import type { RedisConnection, RedisLogger } from "./types";
+import type { RedisConnection, RedisLogger } from "./types.ts";
 
 export interface RedisReadinessServiceOptions {
   logger?: RedisLogger | undefined;

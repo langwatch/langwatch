@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useNavigationHost } from "../model/navigation-host";
-import { writeLastVisitedProduct } from "../model/product-memory";
-import { captureSettingsReturnPath } from "../model/resolve-settings-back-target";
-import { productFromPathname } from "../model/products";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { writeLastVisitedProduct } from "../model/product-memory.ts";
+import { captureSettingsReturnPath } from "../model/resolve-settings-back-target.ts";
+import { productFromPathname } from "../model/products.ts";
 
 /**
  * The navigation write points, mounted once in InnerProviders: keep the

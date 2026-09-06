@@ -1,11 +1,11 @@
-import { ScenarioTargetSelector } from "../scenario-target-selector";
-import type { TargetValue } from "../../../model/scenario-target";
+import { ScenarioTargetSelector } from "../scenario-target-selector.tsx";
+import type { TargetValue } from "../../../model/scenario-target.ts";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { useMemo } from "react";
-import { useSession } from "../../../behavior/auth-session";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project";
-import { api } from "../../../behavior/scenario-api";
+import { useSession } from "../../../behavior/auth-session.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 
 export function TargetSelector({
   value,

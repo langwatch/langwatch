@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ClickHouseClientCreationInput } from "../connection";
+import type { ClickHouseClientCreationInput } from "../connection.ts";
 import {
   ClickHouseManagedClientService,
   ClickHouseOverloadErrorFactory,
@@ -7,9 +7,9 @@ import {
   ClickHouseVendorClientFactory,
   type ClickHouseVendorClient,
   type ClickHouseVendorClientOptions,
-} from "../managed-client";
-import { QueueFullError } from "../rateLimit";
-import { VendorClientResiliencePolicy } from "../vendorClient";
+} from "../managed-client.ts";
+import { QueueFullError } from "../rateLimit.ts";
+import { VendorClientResiliencePolicy } from "../vendorClient.ts";
 
 interface TestVendorClient extends ClickHouseVendorClient {
   query: ReturnType<typeof vi.fn>;

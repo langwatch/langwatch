@@ -11,7 +11,7 @@ import type {
   MonitorToggleInput,
   MonitorUpdateInput,
   MonitorWithEvaluator,
-} from "./monitor";
+} from "./monitor.ts";
 
 export abstract class MonitorService {
   abstract getAllForProject(input: { projectId: string }): Promise<MonitorWithEvaluator[]>;

@@ -20,7 +20,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   PersonalVirtualKeyIssuerPort,
   PersonalVirtualKeyRepository,
-} from "../ports/personal-virtual-key.port";
+} from "../ports/personal-virtual-key.port.ts";
 
 const DEFAULT_PERSONAL_KEY_LABEL = "default";
 

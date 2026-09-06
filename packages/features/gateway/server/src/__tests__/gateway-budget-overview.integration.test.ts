@@ -15,18 +15,18 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { BudgetOverviewService } from "../services/gateway-budget-overview.service";
-import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository";
-import type { GatewayService } from "../services/gateway.service";
-import { TestFeatureFlagService } from "./support/test-feature-flag-service";
-import { TestOrganizationService } from "./support/test-organization-service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestFeatureFlagService } from "./support/test-feature-flag-service.ts";
+import { TestOrganizationService } from "./support/test-organization-service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 import {
   BUDGET_ARCHIVED_ID,
   BUDGET_GROUP_ID,
@@ -42,9 +42,9 @@ import {
   teardownBudgetOverviewFixture,
   TENANTS,
   USER_ID,
-} from "./support/budget-overview.fixture";
+} from "./support/budget-overview.fixture.ts";
 
-import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository";
+import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

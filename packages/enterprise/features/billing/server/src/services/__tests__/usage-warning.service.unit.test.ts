@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { UsageWarningService, type UsageWarningServiceOptions } from "../usage-warning.service";
+import { UsageWarningService, type UsageWarningServiceOptions } from "../usage-warning.service.ts";
 
 const ORG = {
   id: "org-1",

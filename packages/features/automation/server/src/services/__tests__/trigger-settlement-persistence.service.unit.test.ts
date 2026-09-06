@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service";
+import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service.ts";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",

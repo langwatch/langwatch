@@ -5,7 +5,7 @@
 
 import { isInternalSetId } from "@langwatch/scenario-contract";
 import { tryExtractSuiteId } from "@langwatch/suite-contract";
-import { toExternalPlanSlug } from "../../../../behavior/agent-testing/results/run-plans";
+import { toExternalPlanSlug } from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /** The plan of one run set: the name a row reads and the address it opens. */
 export type PlanIdentity = { planName: string; planSlug: string };

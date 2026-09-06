@@ -1,3 +1,3 @@
-export { SequenceSkeleton } from "../../blocks/sequence/sequence-skeleton";
-export { SequenceView } from "./sequence-view";
-export { TopologySkeleton } from "../../blocks/sequence/topology-skeleton";
+export { SequenceSkeleton } from "../../blocks/sequence/sequence-skeleton.tsx";
+export { SequenceView } from "./sequence-view.tsx";
+export { TopologySkeleton } from "../../blocks/sequence/topology-skeleton.tsx";

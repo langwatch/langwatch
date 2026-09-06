@@ -6,15 +6,15 @@
 
 import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api, type RouterOutputs } from "../../../../behavior/scenario-api";
-import type { CaseLastResult } from "./cases-table";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api, type RouterOutputs } from "../../../../behavior/scenario-api.ts";
+import type { CaseLastResult } from "./cases-table.tsx";
 import {
   type ExternalSetEntry,
   orderSuitesDefaultFirst,
   type TestCase,
   type TestSuiteEntry,
-} from "../../../../model/agent-testing/cases/test-cases";
+} from "../../../../model/agent-testing/cases/test-cases.ts";
 
 type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
 type TestSuiteRows = RouterOutputs["suites"]["testSuites"]["getAll"];

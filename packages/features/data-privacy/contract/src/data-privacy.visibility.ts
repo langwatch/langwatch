@@ -1,4 +1,4 @@
-import type { Disposition, ResolvedAudience } from "./data-privacy";
+import type { Disposition, ResolvedAudience } from "./data-privacy.ts";
 
 export interface ViewerFacts {
   isAdmin: boolean;

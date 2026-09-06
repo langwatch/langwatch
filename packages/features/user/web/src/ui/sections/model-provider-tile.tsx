@@ -2,10 +2,10 @@ import { Box, Button, Code, HStack, IconButton, Input, Text, VStack } from "@cha
 import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { Link } from "../elements/personal-link";
-import { TileIcon } from "../elements/tile-icon";
-import type { AiToolConfigOf } from "../../model/ai-tool-config";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { Link } from "../elements/personal-link.tsx";
+import { TileIcon } from "../elements/tile-icon.tsx";
+import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 /**
  * Personal-VK label rules (mirrors `PersonalVirtualKeyTrpcApi.issuePersonal`

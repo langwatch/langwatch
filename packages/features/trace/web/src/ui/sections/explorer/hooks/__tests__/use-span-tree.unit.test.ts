@@ -3,8 +3,8 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
-import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness";
-import { useSpanTree } from "../use-span-tree";
+import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness.ts";
+import { useSpanTree } from "../use-span-tree.ts";
 
 type TreeQueryOptions = {
   queryKey: unknown;
@@ -65,7 +65,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ getQueryData, setQueryData }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: deltaInvalidate } },
@@ -90,8 +90,8 @@ vi.mock("../../../../../behavior/trace-api", () => ({
 
 const QUERY_FN_MARKER = () => Promise.resolve([]);
 
-vi.mock("../span-tree-paged-query", async () => {
-  const actual = await vi.importActual<typeof import("../span-tree-paged-query")>(
+vi.mock("../span-tree-paged-query.ts", async () => {
+  const actual = await vi.importActual<typeof import("../span-tree-paged-query.ts")>(
     "../span-tree-paged-query",
   );
   return {
@@ -106,11 +106,11 @@ vi.mock("../span-tree-paged-query", async () => {
   };
 });
 
-vi.mock("../use-trace-query-args", () => ({
+vi.mock("../use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => traceQueryArgs,
 }));
 
-vi.mock("../../../../../behavior/sse-status.store", () => ({
+vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: (selector: (state: { sseConnectionState: string }) => boolean) =>
     selector({ sseConnectionState }),
 }));

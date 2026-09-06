@@ -6,10 +6,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LangyContextTargetLayer } from "../langy-context-target-layer";
-import { useLangyContextArming } from "../../../behavior/use-langy-context-arming";
-import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store";
-import { useLangyStore } from "../../../behavior/langy.store";
+import { LangyContextTargetLayer } from "../langy-context-target-layer.tsx";
+import { useLangyContextArming } from "../../../behavior/use-langy-context-arming.ts";
+import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store.ts";
+import { useLangyStore } from "../../../behavior/langy.store.ts";
 
 function Host() {
   useLangyContextArming();

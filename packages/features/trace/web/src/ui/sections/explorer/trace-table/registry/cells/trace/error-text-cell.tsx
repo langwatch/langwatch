@@ -1,7 +1,7 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
 
 export const ErrorTextCell = {
   id: "error-text",

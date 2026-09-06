@@ -19,7 +19,7 @@
  */
 
 import { useMemo } from "react";
-import { readAnnotationPeriod, type AnnotationPeriodReading } from "../model/annotation-period";
+import { readAnnotationPeriod, type AnnotationPeriodReading } from "../model/annotation-period.ts";
 
 export function useAnnotationPeriod(
   query: Readonly<Record<string, string | undefined>>,

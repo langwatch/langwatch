@@ -24,9 +24,9 @@ import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiKeyHostProvider } from "../../../model/api-key-host";
-import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing";
-import CliAuthScreen from "../cli-auth.screen";
+import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
+import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
+import CliAuthScreen from "../cli-auth.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -36,7 +36,7 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/api-key-api", () => ({
+vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
     useUtils: () => ({ apiKey: { list: { invalidate: vi.fn() } } }),
     apiKey: {

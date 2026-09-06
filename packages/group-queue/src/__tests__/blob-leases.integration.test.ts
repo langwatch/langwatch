@@ -1,13 +1,13 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage";
+import { createTenantId } from "../storage.ts";
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_RELEASE_GRACE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
-} from "../blobConstants";
-import { BlobLeases } from "../blobLeases";
+} from "../blobConstants.ts";
+import { BlobLeases } from "../blobLeases.ts";
 
 const QUEUE_NAME = "{test/leases}";
 const PREFIX = `${QUEUE_NAME}:gq:`;

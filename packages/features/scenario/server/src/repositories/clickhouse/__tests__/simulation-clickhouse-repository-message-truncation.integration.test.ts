@@ -7,8 +7,8 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository";
-import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port";
+import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

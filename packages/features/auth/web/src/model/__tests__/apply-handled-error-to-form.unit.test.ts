@@ -7,7 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { applyHandledErrorToForm } from "../apply-handled-error-to-form";
+import { applyHandledErrorToForm } from "../apply-handled-error-to-form.ts";
 
 type FormStub = {
   control: { _fields: Record<string, unknown> };

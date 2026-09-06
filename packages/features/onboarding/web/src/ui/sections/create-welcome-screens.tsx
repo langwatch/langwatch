@@ -11,14 +11,14 @@ import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import { Link } from "../elements/link";
-import { LEGAL_LINKS } from "../../behavior/legal-links";
-import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group";
-import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group";
-import { BasicInfoConditionalFields } from "./basic-info-conditional-fields";
-import { IntentSelectionScreen } from "./intent-selection-screen";
-import { desireItems, roleItems, usageStyleItems } from "../../behavior/onboarding-data";
-import { useOnboardingFormContext } from "./form-context";
+import { Link } from "../elements/link.tsx";
+import { LEGAL_LINKS } from "../../behavior/legal-links.ts";
+import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group.tsx";
+import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
+import { BasicInfoConditionalFields } from "./basic-info-conditional-fields.tsx";
+import { IntentSelectionScreen } from "./intent-selection-screen.tsx";
+import { desireItems, roleItems, usageStyleItems } from "../../behavior/onboarding-data.ts";
+import { useOnboardingFormContext } from "./form-context.tsx";
 import {
   type DesireType,
   type OnboardingFlowConfig,
@@ -26,7 +26,7 @@ import {
   OnboardingScreenIndex,
   type RoleType,
   type UsageStyle,
-} from "../../behavior/types";
+} from "../../behavior/types.ts";
 
 // Module-scope screen components and their props
 const OrganizationScreen: React.FC = () => {

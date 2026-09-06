@@ -17,12 +17,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { OrgModelProvider } from "../model/eligible-model-providers";
+import type { OrgModelProvider } from "../model/eligible-model-providers.ts";
 import {
   ALL_PROVIDERS,
   type ProviderAccessValue,
   VirtualKeyProviderAccessSection,
-} from "../ui/blocks/virtual-key-provider-access-section";
+} from "../ui/blocks/virtual-key-provider-access-section.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

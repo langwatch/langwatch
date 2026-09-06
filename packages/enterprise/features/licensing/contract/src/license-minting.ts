@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { DEFAULT_LIMIT } from "./license-constants";
-import type { LicensePlanLimits } from "./license";
+import { DEFAULT_LIMIT } from "./license-constants.ts";
+import type { LicensePlanLimits } from "./license.ts";
 
 export interface BuildMintedPlanParams {
   type: string;

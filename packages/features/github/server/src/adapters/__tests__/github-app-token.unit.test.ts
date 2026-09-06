@@ -20,7 +20,7 @@ import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
   type GithubRedisPort,
-} from "../github-app-token.adapter";
+} from "../github-app-token.adapter.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,

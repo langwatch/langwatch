@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { Task } from "@langwatch/task";
-import { checkOpenApiDocument, renderDriftReport } from "./openapi-document.checker";
-import { DEFAULT_SCRATCH_PATH } from "./openapi-document.generator";
+import { checkOpenApiDocument, renderDriftReport } from "./openapi-document.checker.ts";
+import { DEFAULT_SCRATCH_PATH } from "./openapi-document.generator.ts";
 
 /**
  * The runnable OpenAPI drift check — `pnpm --filter @langwatch/platform-api

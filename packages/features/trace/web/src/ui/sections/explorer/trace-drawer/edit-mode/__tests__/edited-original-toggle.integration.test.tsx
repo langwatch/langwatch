@@ -17,23 +17,23 @@ const overlayData = vi.hoisted(() => ({
   } | null,
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
+vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: overlayData.current }),
   useAppliedTraceEditPatch: () => overlayData.current?.patch ?? null,
 }));
 
-vi.mock("../../../hooks/use-trace-header", () => ({
+vi.mock("../../../hooks/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../hooks/use-spans-full", () => ({
+vi.mock("../../../hooks/use-spans-full.ts", () => ({
   useSpansFullCanonical: () => ({ data: undefined }),
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
-import { EditedOriginalToggle } from "../edited-original-toggle";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { EditedOriginalToggle } from "../edited-original-toggle.tsx";
 
 const patch: TraceEditOverlayPatch = {
   version: 1,

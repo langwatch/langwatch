@@ -32,7 +32,7 @@ import {
   STRICT_ONLY_PII_ENTITIES,
 } from "@langwatch/redaction";
 import { describe, expect, it } from "vitest";
-import { ESSENTIAL_PII_ENTITY_LABELS, STRICT_ADDED_PII_ENTITY_LABELS } from "../pii-entity-labels";
+import { ESSENTIAL_PII_ENTITY_LABELS, STRICT_ADDED_PII_ENTITY_LABELS } from "../pii-entity-labels.ts";
 
 const essential = Object.keys(ESSENTIAL_PII_ENTITY_LABELS);
 const strictAdded = Object.keys(STRICT_ADDED_PII_ENTITY_LABELS);

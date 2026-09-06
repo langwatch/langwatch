@@ -8,25 +8,25 @@ import { useMemo, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 
-import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard";
+import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 import {
   computeJudgeIndependence,
   computeVerbosityProfile,
-} from "../batch-evaluation-results.judge-bias";
-import { computeSampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy";
-import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types";
+} from "../batch-evaluation-results.judge-bias.ts";
+import { computeSampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy.ts";
+import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "../batch-evaluation-results.verdict";
-import { useBTLeaderboard } from "../use-bt-leaderboard";
-import { useVariantMetrics } from "../use-variant-metrics";
-import { LeaderboardStep } from "../../elements/batch-results/leaderboard-step";
-import { buildTrustChecks, LeaderboardTrustPanel } from "./leaderboard-trust-panel";
-import { LeaderboardVerdictPanel } from "./leaderboard-verdict-panel";
-import { DEFAULT_WARN_THRESHOLD, PairwiseLeaderboard } from "./pairwise-leaderboard";
-import { ParetoScatterChart } from "./pareto-scatter-chart";
-import { TradeoffSummaryLine } from "./tradeoff-summary-line";
+} from "../batch-evaluation-results.verdict.ts";
+import { useBTLeaderboard } from "../use-bt-leaderboard.ts";
+import { useVariantMetrics } from "../use-variant-metrics.ts";
+import { LeaderboardStep } from "../../elements/batch-results/leaderboard-step.tsx";
+import { buildTrustChecks, LeaderboardTrustPanel } from "./leaderboard-trust-panel.tsx";
+import { LeaderboardVerdictPanel } from "./leaderboard-verdict-panel.tsx";
+import { DEFAULT_WARN_THRESHOLD, PairwiseLeaderboard } from "./pairwise-leaderboard.tsx";
+import { ParetoScatterChart } from "./pareto-scatter-chart.tsx";
+import { TradeoffSummaryLine } from "./tradeoff-summary-line.tsx";
 
 export type ComparisonLeaderboardDrawerProps = {
   /** Which comparison this drawer is for. The only URL-serializable prop. */

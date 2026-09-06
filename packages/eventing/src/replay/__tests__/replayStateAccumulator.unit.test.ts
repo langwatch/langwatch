@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
+import type { ProjectionStoreContext } from "../../projections/projectionStoreContext.ts";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
-} from "../../projections/stateProjection.types";
-import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor";
-import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types";
-import { StateAccumulator } from "../replayExecutor";
+} from "../../projections/stateProjection.types.ts";
+import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor.ts";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
+import { StateAccumulator } from "../replayExecutor.ts";
 
 interface CounterState {
   count: number;

@@ -4,7 +4,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useRollingWindow } from "../use-rolling-window";
+import { useRollingWindow } from "../use-rolling-window.ts";
 
 describe("useRollingWindow", () => {
   beforeEach(() => {

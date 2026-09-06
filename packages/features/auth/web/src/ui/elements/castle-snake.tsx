@@ -1,9 +1,9 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { MONO_FONT } from "../../model/front-door-theme";
-import type { Direction, SnakeGame } from "../../model/castle-snake";
-import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake";
+import { MONO_FONT } from "../../model/front-door-theme.ts";
+import type { Direction, SnakeGame } from "../../model/castle-snake.ts";
+import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake.ts";
 
 /**
  * Double-tap the castle and a snake comes out of it.

@@ -3,12 +3,12 @@ import { Copy, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { api } from "../../../../behavior/ops-api";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
-import { EmptyCell, formatDateTime } from "../elements/backoffice-cells";
-import { BackofficeTable } from "./backoffice-table-shell";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { EmptyCell, formatDateTime } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
-import { useOpsToaster } from "../../../../behavior/ops-feedback";
+import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 const PAGE_SIZE = 25;
 
 const kindLabel: Record<string, string> = {

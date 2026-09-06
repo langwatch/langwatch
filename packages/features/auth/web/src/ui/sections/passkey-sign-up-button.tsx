@@ -1,9 +1,9 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
 import { useState } from "react";
-import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client";
-import { rememberLastUsedMethod } from "../../model/last-used-method";
-import { MethodButton } from "../elements/method-button";
-import { SignInMethodIcon } from "../elements/sign-in-method-icon";
+import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { MethodButton } from "../elements/method-button.tsx";
+import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
 /** The mark, drawn by the same function every method on the rail is drawn by. */
 const PASSKEY: SignInMethod = {

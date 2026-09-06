@@ -22,7 +22,7 @@
  * satisfy it today.
  */
 
-import type { ApiKeyBinding } from "./api-key";
+import type { ApiKeyBinding } from "./api-key.ts";
 
 /**
  * One of the CALLER's own bindings, with the scope named rather than only

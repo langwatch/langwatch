@@ -5,28 +5,28 @@ import {
   type FoldProjectionStore,
   type ProcessManagerApplier,
 } from "@langwatch/eventing";
-import type { SettleSpendCommandData } from "../processes/gateway-spend-commands.process";
-import type { SpendSettlementProcessDeps } from "../intents/gateway-spend-settlement.intent";
+import type { SettleSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
+import type { SpendSettlementProcessDeps } from "../intents/gateway-spend-settlement.intent.ts";
 import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
-} from "../processes/gateway-spend-settlement.process";
-import type { GatewaySpendState } from "../projections/gateway-spend.projection";
-import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port";
-import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store";
+} from "../processes/gateway-spend-settlement.process.ts";
+import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
+import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port.ts";
+import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
-} from "../processes/gateway-spend-commands.process";
+} from "../processes/gateway-spend-commands.process.ts";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
   FailSpendCommand,
   SettleSpendCommand,
-} from "../intents/gateway-spend.intent";
-import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent";
-import { GatewaySpendFoldProjection } from "../projections/gateway-spend.projection";
+} from "../intents/gateway-spend.intent.ts";
+import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent.ts";
+import { GatewaySpendFoldProjection } from "../projections/gateway-spend.projection.ts";
 
 /**
  * A process manager another feature owns, mounted here under the name its durable rows are already keyed by — renaming loses inbox/state/outbox rows. Webhook delivery (ADR-073) and Governance debits live in packages this one may not depend on.

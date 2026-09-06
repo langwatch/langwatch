@@ -33,7 +33,7 @@ import type {
   ViaFieldFor,
 } from "@langwatch/authz-contract";
 import { authzDeclarationOf } from "@langwatch/authz-contract";
-import type { TrpcDeclaredAuthzMiddlewares } from "./trpc-declared-authz.js";
+import type { TrpcDeclaredAuthzMiddlewares } from "./trpc-declared-authz.ts";
 
 type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType ? TWith : Simplify<TType & TWith>;
 

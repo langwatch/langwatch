@@ -1,17 +1,17 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
-import { AutosaveStatus } from "../../ui/elements/experiments-v3/autosave-status";
-import { EditableHeading } from "../../ui/elements/experiments-v3/editable-heading";
-import { EvaluationsV3Table } from "../../ui/sections/experiments-v3/evaluations-v3-table";
-import { HistoryButton } from "../../ui/sections/experiments-v3/history-button";
-import { PromptTemplateFieldsProvider } from "../../ui/sections/experiments-v3/prompt-template-fields-provider";
-import { RunEvaluationButton } from "../../ui/sections/experiments-v3/run-evaluation-button";
-import { SavedDatasetLoaders } from "../../ui/sections/experiments-v3/saved-dataset-loaders";
-import { TableSettingsMenu } from "../../ui/sections/experiments-v3/table-settings-menu";
-import { UndoRedo } from "../../ui/sections/experiments-v3/undo-redo";
-import { VersionHistoryButton } from "../../ui/sections/experiments-v3/version-history-button";
-import { WorkbenchStaleBanner } from "../../ui/elements/experiments-v3/workbench-stale-banner";
+import { AutosaveStatus } from "../../ui/elements/experiments-v3/autosave-status.tsx";
+import { EditableHeading } from "../../ui/elements/experiments-v3/editable-heading.tsx";
+import { EvaluationsV3Table } from "../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
+import { HistoryButton } from "../../ui/sections/experiments-v3/history-button.tsx";
+import { PromptTemplateFieldsProvider } from "../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
+import { RunEvaluationButton } from "../../ui/sections/experiments-v3/run-evaluation-button.tsx";
+import { SavedDatasetLoaders } from "../../ui/sections/experiments-v3/saved-dataset-loaders.tsx";
+import { TableSettingsMenu } from "../../ui/sections/experiments-v3/table-settings-menu.tsx";
+import { UndoRedo } from "../../ui/sections/experiments-v3/undo-redo.tsx";
+import { VersionHistoryButton } from "../../ui/sections/experiments-v3/version-history-button.tsx";
+import { WorkbenchStaleBanner } from "../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
 import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
@@ -19,20 +19,20 @@ import {
 import { narrateWorkbenchAction } from "@langwatch/experiment-contract";
 import { readLiveWorkbench } from "@langwatch/experiment-contract";
 import { scopeFromRunPayload } from "@langwatch/experiment-contract";
-import { startAndIdentifyRun } from "../../model/experiments-v3/execution/run-identification";
+import { startAndIdentifyRun } from "../../model/experiments-v3/execution/run-identification.ts";
 import {
   revealTargetColumn,
   targetColumnLabel,
-} from "../../model/experiments-v3/reveal-target-column";
-import { useAutosaveEvaluationsV3 } from "../../behavior/experiments-v3/use-autosave-evaluations-v3";
-import { useEvaluationsV3Store } from "../../behavior/experiments-v3/use-evaluations-v3-store";
-import { useExecuteEvaluation } from "../../behavior/experiments-v3/use-execute-evaluation";
-import { useLambdaWarmup } from "../../behavior/experiments-v3/use-lambda-warmup";
-import { useOptimizeWithLangy } from "../../behavior/experiments-v3/use-optimize-with-langy";
-import { useReportPageActivityToLangy } from "../../behavior/experiments-v3/use-report-page-activity-to-langy";
-import { useSavedDatasetLoader } from "../../behavior/experiments-v3/use-saved-dataset-loader";
-import { useTargetNames } from "../../behavior/experiments-v3/use-target-name";
-import { useWorkbenchUpdateListener } from "../../behavior/experiments-v3/use-workbench-update-listener";
+} from "../../model/experiments-v3/reveal-target-column.ts";
+import { useAutosaveEvaluationsV3 } from "../../behavior/experiments-v3/use-autosave-evaluations-v3.ts";
+import { useEvaluationsV3Store } from "../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useExecuteEvaluation } from "../../behavior/experiments-v3/use-execute-evaluation.ts";
+import { useLambdaWarmup } from "../../behavior/experiments-v3/use-lambda-warmup.ts";
+import { useOptimizeWithLangy } from "../../behavior/experiments-v3/use-optimize-with-langy.ts";
+import { useReportPageActivityToLangy } from "../../behavior/experiments-v3/use-report-page-activity-to-langy.ts";
+import { useSavedDatasetLoader } from "../../behavior/experiments-v3/use-saved-dataset-loader.ts";
+import { useTargetNames } from "../../behavior/experiments-v3/use-target-name.ts";
+import { useWorkbenchUpdateListener } from "../../behavior/experiments-v3/use-workbench-update-listener.ts";
 import { HandledErrorAlert } from "@langwatch/workflow-web/surfaces/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRouter } from "@langwatch/ui-host/use-router";

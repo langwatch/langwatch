@@ -14,17 +14,17 @@ const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
 }));
 
-vi.mock("../../scenario-roles", async () => {
+vi.mock("../../scenario-roles.tsx", async () => {
   const actual =
-    await vi.importActual<typeof import("../../scenario-roles")>("../../scenario-roles");
+    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("../../../../markdown", () => ({
+vi.mock("../../../../markdown.tsx", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: (permission: string) =>
@@ -32,11 +32,11 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     translate: {
       translate: {
@@ -52,12 +52,12 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store";
-import { useDrawerStore } from "../../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
-import { enterTraceEditMode } from "../../../utils/trace-edit-mode";
-import { ChatTurnRow } from "../chat-turn-row";
+} from "../../../../../../behavior/annotation-queue-session.store.ts";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
+import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";
 const OCCURRED_AT_MS = 1_754_640_000_000;

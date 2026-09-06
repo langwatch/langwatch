@@ -1,7 +1,7 @@
 import { HStack, VStack } from "@chakra-ui/react";
 import type { ReactElement, ReactNode } from "react";
-import type { ChipProps } from "../../../elements/explorer/trace-drawer/chip";
-import { Chip } from "../../../elements/explorer/trace-drawer/chip";
+import type { ChipProps } from "../../../elements/explorer/trace-drawer/chip.tsx";
+import { Chip } from "../../../elements/explorer/trace-drawer/chip.tsx";
 
 export interface ChipDef extends ChipProps {
   /** Stable key for React reconciliation. */

@@ -1,4 +1,4 @@
-import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse.adapter";
+import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse.adapter.ts";
 
 export class ClickHouseSpanNameFacetAdapter {
   static create(): ClickHouseSpanNameFacetAdapter {

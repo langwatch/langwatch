@@ -3,17 +3,17 @@ import {
   type FeatureFlagConfig,
   type FeatureFlagRegistry,
 } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagCachePort } from "../ports/feature-flag-cache.port";
+import type { FeatureFlagCachePort } from "../ports/feature-flag-cache.port.ts";
 import {
   PrismaFeatureFlagExperimentSettingAdapter,
   type FeatureFlagExperimentDatabase,
-} from "./prisma.feature-flag-experiment-setting.adapter";
+} from "./prisma.feature-flag-experiment-setting.adapter.ts";
 import {
   PrismaFeatureFlagRowAdapter,
   type FeatureFlagDatabase,
-} from "./prisma.feature-flag-row.adapter";
-import { FeatureFlagService } from "../services/feature-flag.service";
-import { CachedFeatureFlagRowAdapter } from "./cached.feature-flag-row.adapter";
+} from "./prisma.feature-flag-row.adapter.ts";
+import { FeatureFlagService } from "../services/feature-flag.service.ts";
+import { CachedFeatureFlagRowAdapter } from "./cached.feature-flag-row.adapter.ts";
 
 /**
  * Builds the feature flag graph a process runs on.

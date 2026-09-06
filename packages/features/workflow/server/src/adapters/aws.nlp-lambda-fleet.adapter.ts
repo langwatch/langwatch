@@ -16,7 +16,7 @@ import {
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../ports/nlp-lambda-fleet.port";
+import { NlpLambdaFleetPort, type NlpLambdaFunction } from "../ports/nlp-lambda-fleet.port.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";
 

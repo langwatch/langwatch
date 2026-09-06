@@ -1,11 +1,11 @@
 import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuCheck, LuX } from "react-icons/lu";
 import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/trace-api";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
-import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
+import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 
 /**
  * Plain data describing the scenario run a trace belongs to. Returned by

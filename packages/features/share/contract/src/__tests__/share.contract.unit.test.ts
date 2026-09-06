@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createShareInputSchema, resolveShareInputSchema, shareLinkSchema } from "../index";
+import { createShareInputSchema, resolveShareInputSchema, shareLinkSchema } from "../index.ts";
 
 describe("Share contract", () => {
   it("accepts the existing share-link response shape", () => {

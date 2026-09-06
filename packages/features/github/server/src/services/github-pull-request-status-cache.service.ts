@@ -1,8 +1,8 @@
-import type { GithubRedisPort } from "../ports/github-app-token.port";
+import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
 import type {
   GithubPullRequestRef,
   GithubPullRequestStatus,
-} from "./github-pull-request-status.service";
+} from "./github-pull-request-status.service.ts";
 
 const STATUS_CACHE_TTL_SEC = 60;
 const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];

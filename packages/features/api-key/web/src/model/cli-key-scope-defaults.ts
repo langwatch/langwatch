@@ -37,7 +37,7 @@
  * `ScopeTriadEntry` — the two are the same two fields, and naming the surface
  * from a model module would buy a `ui-screen-closure` finding for nothing.
  */
-import type { ApiKeyScopeSelection } from "./api-key-scope";
+import type { ApiKeyScopeSelection } from "./api-key-scope.ts";
 
 export function defaultCliKeyScopes(args: {
   organizationId: string;

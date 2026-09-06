@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import { GlobalUpgradeModal } from "../global-upgrade-modal";
+import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>
   render(

@@ -79,13 +79,13 @@ import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
-import type { WorkerConfig } from "../platform/config/worker.config";
-import { createWorkerRecordSpanCommand } from "./worker-record-span.composition";
-import { createWorkerTraceAlertTriggerHandler } from "./worker-trace-alert-trigger.composition";
-import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
-import { createWorkerTraceEvaluationTrigger } from "./worker-trace-evaluation-trigger.composition";
-import { createWorkerTraceNarrowPorts } from "./worker-trace-narrow-ports.composition";
-import type { WorkerTrackedEventComposition } from "./worker-tracked-event.composition";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { createWorkerRecordSpanCommand } from "./worker-record-span.composition.ts";
+import { createWorkerTraceAlertTriggerHandler } from "./worker-trace-alert-trigger.composition.ts";
+import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition.ts";
+import { createWorkerTraceEvaluationTrigger } from "./worker-trace-evaluation-trigger.composition.ts";
+import { createWorkerTraceNarrowPorts } from "./worker-trace-narrow-ports.composition.ts";
+import type { WorkerTrackedEventComposition } from "./worker-tracked-event.composition.ts";
 
 /**
  * The trace processing pipeline, composed and MOUNTED in this process out of packages alone. ALL

@@ -34,15 +34,15 @@ import { useEffect, type ReactNode } from "react";
 import {
   useNavigationShellState,
   type NavigationShellReadyState,
-} from "../../behavior/use-navigation-shell-state";
-import { APP_HEADER_HEIGHT } from "../../model/menu-widths";
-import { useNavigationHost } from "../../model/navigation-host";
-import { shellContentMaxWidth } from "../../model/shell-layout";
-import { ICON_RAIL_WIDTH, IconRail } from "./icon-rail";
-import { MobileShell } from "./mobile-shell";
-import { ProductSidebar } from "./product-sidebar";
-import { ShellPageBody } from "./shell-page-body";
-import { ShellTopBar } from "./shell-top-bar";
+} from "../../behavior/use-navigation-shell-state.ts";
+import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { shellContentMaxWidth } from "../../model/shell-layout.ts";
+import { ICON_RAIL_WIDTH, IconRail } from "./icon-rail.tsx";
+import { MobileShell } from "./mobile-shell.tsx";
+import { ProductSidebar } from "./product-sidebar.tsx";
+import { ShellPageBody } from "./shell-page-body.tsx";
+import { ShellTopBar } from "./shell-top-bar.tsx";
 
 export type NavigationShellProps = {
   children: ReactNode;

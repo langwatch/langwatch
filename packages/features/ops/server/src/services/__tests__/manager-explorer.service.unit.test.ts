@@ -1,13 +1,13 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ManagerExplorerService } from "../manager-explorer.service";
-import { NullProcessAuditSink } from "../../ports/process-audit-sink.port";
-import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter";
+import { ManagerExplorerService } from "../manager-explorer.service.ts";
+import { NullProcessAuditSink } from "../../ports/process-audit-sink.port.ts";
+import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter.ts";
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,
-} from "../../ports/eventing-introspection.port";
+} from "../../ports/eventing-introspection.port.ts";
 
 const metadataMock = vi.fn<() => OpsProcessManagerMetadata[]>(() => []);
 

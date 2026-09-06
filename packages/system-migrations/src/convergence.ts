@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { MigrationPassSummary } from "./types";
+import type { MigrationPassSummary } from "./types.ts";
 
 /**
  * One composed pass over the fleet. The composition root binds the runner,

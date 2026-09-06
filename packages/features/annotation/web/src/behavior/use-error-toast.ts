@@ -15,7 +15,7 @@
 
 import { useCallback } from "react";
 
-import { useAnnotationHost } from "../model/annotation-host";
+import { useAnnotationHost } from "../model/annotation-host.ts";
 
 export function useShowErrorToast() {
   const host = useAnnotationHost();

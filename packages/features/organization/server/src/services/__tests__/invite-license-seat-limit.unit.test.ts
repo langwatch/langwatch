@@ -2,8 +2,8 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service";
-import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
+import { InviteService } from "../invite.service.ts";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
 /**
  * A lapsed license keeps binding the seat count it sold (ADR/spec specs/licensing/expired-license-enforcement.feature): once

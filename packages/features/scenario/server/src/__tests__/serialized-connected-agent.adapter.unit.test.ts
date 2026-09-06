@@ -10,7 +10,7 @@ import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,
   type ServedInstance,
-} from "../adapters/serialized-connected-agent.adapter";
+} from "../adapters/serialized-connected-agent.adapter.ts";
 
 const config: ConnectedAgentData = {
   type: "connected",

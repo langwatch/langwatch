@@ -5,8 +5,8 @@
  */
 
 import { ScenarioRunExportDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
-import { RunDialog } from "../run/run-dialog";
-import type { RunPlanResultsColumnState } from "./use-run-plan-results-column";
+import { RunDialog } from "../run/run-dialog.tsx";
+import type { RunPlanResultsColumnState } from "./use-run-plan-results-column.ts";
 
 export function RunPlanResultsDialogs({
   exportRuns,

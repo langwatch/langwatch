@@ -1,5 +1,5 @@
 import type { CanonicalSpanContext } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../../trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../../trace-canonicalisation.service.ts";
 
 export const canonicalisation = TraceCanonicalisationService.create();
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 // throw the codex coding-assistant-surfaces refusal (codexGatewayModel.ts,
 // api/routers/modelProviders.utils.ts and the default-model writer), so a
 // wording change at the source can't silently stop being recognised here.
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../index";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../index.ts";
 import {
   classifyScenarioInfraError,
   decodeScenarioError,
@@ -20,7 +20,7 @@ import {
   ScenarioInfraErrorCode,
   scenarioErrorDetail,
   scenarioErrorTitle,
-} from "../index";
+} from "../index.ts";
 
 /** The internals a user must never read, each with the name it fails under. */
 const INTERNAL_MARKERS = [

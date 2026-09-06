@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createDatasetEditorStore, type EditorColumn } from "../use-dataset-editor-store";
+import { createDatasetEditorStore, type EditorColumn } from "../use-dataset-editor-store.ts";
 
 const columns: EditorColumn[] = [{ id: "input_0", name: "input", type: "string" }];
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "../data-privacy.markers";
+import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "../data-privacy.markers.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

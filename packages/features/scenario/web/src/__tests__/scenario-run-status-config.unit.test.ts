@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getIconAndColor } from "../ui/elements/scenario-run-status-icon";
+import { getIconAndColor } from "../ui/elements/scenario-run-status-icon.tsx";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
   type ScenarioRunStatusConfig,
-} from "../model/scenario-run-status-config";
+} from "../model/scenario-run-status-config.ts";
 
 const allStatuses = Object.values(ScenarioRunStatus);
 

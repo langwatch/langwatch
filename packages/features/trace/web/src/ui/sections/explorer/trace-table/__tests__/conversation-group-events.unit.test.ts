@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "../../types/trace";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { groupTracesByConversation } from "../conversation-groups";
+import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { groupTracesByConversation } from "../conversation-groups.ts";
 
 /**
  * The Conversations lens totals its turns' events on the group row. It reads

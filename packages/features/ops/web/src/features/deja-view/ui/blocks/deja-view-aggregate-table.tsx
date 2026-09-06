@@ -1,7 +1,7 @@
 import { Badge, Card, Table, Text } from "@chakra-ui/react";
 import { ChevronRight } from "lucide-react";
-import { formatTimestamp } from "../../model/deja-view-fragment";
-import type { AggregateResult } from "../../model/deja-view-types";
+import { formatTimestamp } from "../../model/deja-view-fragment.ts";
+import type { AggregateResult } from "../../model/deja-view-types.ts";
 
 export function AggregateTable({
   aggregates,

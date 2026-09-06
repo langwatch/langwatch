@@ -23,7 +23,7 @@ import {
   userRequestsKey,
   waitKey,
   workspaceChannel,
-} from "../langy-local-control-keys.rules";
+} from "../langy-local-control-keys.rules.ts";
 
 describe("given the local control key family", () => {
   describe("when a key is built", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLineDiff, diffStat } from "../trace/terminal-line-diff";
+import { computeLineDiff, diffStat } from "../trace/terminal-line-diff.ts";
 
 describe("computeLineDiff", () => {
   it("marks identical lines as context", () => {

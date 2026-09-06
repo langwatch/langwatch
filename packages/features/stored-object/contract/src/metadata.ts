@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { storedObjectDeliveryAudienceSchema } from "./audiences";
+import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
 import {
   storedObjectGenerationSchema,
   storedObjectIdSchema,
   storedObjectOperationIdSchema,
   storedObjectProjectIdSchema,
-} from "./ids";
-import { hasControlCharacters } from "./validation";
+} from "./ids.ts";
+import { hasControlCharacters } from "./validation.ts";
 
 export const STORED_OBJECT_FILENAME_MAX_BYTES = 255;
 export const STORED_OBJECT_MEDIA_TYPE_MAX_CHARACTERS = 127;

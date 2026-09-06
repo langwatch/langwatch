@@ -11,12 +11,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import {
   type DatasetReference,
   DEFAULT_TEST_DATA_ID,
-} from "../../../../../model/experiments-v3/types";
-import { DatasetTabs } from "../dataset-tabs";
+} from "../../../../../model/experiments-v3/types.ts";
+import { DatasetTabs } from "../dataset-tabs.tsx";
 
 const onSelectExisting = vi.fn();
 const onUploadCSV = vi.fn();

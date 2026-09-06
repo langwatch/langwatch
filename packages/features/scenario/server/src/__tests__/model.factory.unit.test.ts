@@ -5,7 +5,7 @@
 import { generateText, tool } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createJudgeModelFromParams, createModelFromParams } from "../index";
+import { createJudgeModelFromParams, createModelFromParams } from "../index.ts";
 
 const successResponse = {
   id: "chatcmpl-test",

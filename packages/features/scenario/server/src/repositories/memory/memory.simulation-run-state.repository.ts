@@ -1,6 +1,6 @@
 import type { Projection } from "@langwatch/eventing";
 import { BaseMemoryProjectionStore } from "@langwatch/eventing";
-import type { SimulationRunStateRepository } from "../simulation-run-state.repository";
+import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
 
 export class MemorySimulationRunStateRepository<ProjectionType extends Projection = Projection>
   extends BaseMemoryProjectionStore<ProjectionType>

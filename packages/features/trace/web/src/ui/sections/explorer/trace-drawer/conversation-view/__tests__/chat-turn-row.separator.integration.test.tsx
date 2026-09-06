@@ -8,14 +8,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../scenario-roles", async () => {
+vi.mock("../../scenario-roles.tsx", async () => {
   const actual =
-    await vi.importActual<typeof import("../../scenario-roles")>("../../scenario-roles");
+    await vi.importActual<typeof import("../../scenario-roles.tsx")>("../../scenario-roles");
   return { ...actual, useIsScenarioRole: () => false };
 });
 
 vi.mock(
-  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context",
+  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
   () => ({
     useConversationExpand: () => ({
       isExpandable: false,
@@ -27,7 +27,7 @@ vi.mock(
   }),
 );
 
-vi.mock("../../../hooks/use-text-translation", () => ({
+vi.mock("../../../hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -40,26 +40,26 @@ vi.mock("../../../hooks/use-text-translation", () => ({
  * The badge stands in as an empty marker: the tests read the ledger's text, so
  * anything with words of its own would show up in those assertions.
  */
-vi.mock("../turn-annotations", () => ({
+vi.mock("../turn-annotations.tsx", () => ({
   TurnEditTraceAction: () => <div data-testid="turn-edit-trace-action" />,
   TurnSessionCheckbox: () => <div data-testid="turn-session-checkbox" />,
   TurnAnnotationBadges: () => <div data-testid="turn-annotation-badges" />,
 }));
 
-vi.mock("../../../../markdown", () => ({
+vi.mock("../../../../markdown.tsx", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,
   }),
 }));
 
-import type { TraceListItem } from "../../../types/trace";
-import { NO_TRACE_EVENTS } from "../../../types/trace";
-import { ChatTurnRow } from "../chat-turn-row";
+import type { TraceListItem } from "../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 

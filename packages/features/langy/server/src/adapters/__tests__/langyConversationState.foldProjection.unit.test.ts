@@ -9,8 +9,8 @@ import {
   type LangyConversationStateData,
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
-import { LangyConversationStateFoldProjection } from "../../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import { LangyConversationStateFoldProjection } from "../../projections/langy-conversation-state.projection.ts";
 
 const noopStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},

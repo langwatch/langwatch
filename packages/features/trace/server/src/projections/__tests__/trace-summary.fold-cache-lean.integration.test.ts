@@ -15,13 +15,13 @@ import {
 } from "@langwatch/eventing";
 import type { SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   IO_PREVIEW_BYTES,
   TraceProjectionLeanService,
-} from "../../services/trace-projection-lean.service";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+} from "../../services/trace-projection-lean.service.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 const TENANT_ID = createTenantId("tenant-fold-lean");
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";

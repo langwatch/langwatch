@@ -11,8 +11,8 @@
  * @see specs/features/agent-testing/results-atoms.feature
  */
 
-import type { RunParameterValues } from "./scenario.parameters";
-import type { ScenarioRunStatus } from "./scenario-run";
+import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { ScenarioRunStatus } from "./scenario-run.ts";
 
 /** The target key a run carries when it names no platform target. */
 export const UNKNOWN_TARGET_KEY = "unknown";

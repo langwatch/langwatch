@@ -41,7 +41,7 @@ import {
   VisibilityWindowService,
   type TraceClickHouseWriteResolver,
 } from "@langwatch/trace-server";
-import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition";
+import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition.ts";
 
 /**
  * The four trace reads a settled match is confirmed and rendered from.

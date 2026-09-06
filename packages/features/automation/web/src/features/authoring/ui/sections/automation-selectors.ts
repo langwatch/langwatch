@@ -6,8 +6,8 @@ import {
   notifyChannel,
   presetLabels,
   subjectIsSet,
-} from "./draft-model";
-import { useAutomationStore } from "./automation-store";
+} from "./draft-model.ts";
+import { useAutomationStore } from "./automation-store.ts";
 
 /**
  * Selectors. Each subscribes to the minimum slice it needs so a

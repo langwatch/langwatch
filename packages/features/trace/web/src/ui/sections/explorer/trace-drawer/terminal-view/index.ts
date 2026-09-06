@@ -1,1 +1,1 @@
-export { TerminalTab } from "./terminal-tab";
+export { TerminalTab } from "./terminal-tab.tsx";

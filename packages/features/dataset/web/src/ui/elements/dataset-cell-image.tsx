@@ -16,7 +16,7 @@
 import { Box, Image, Portal, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { proxiedDatasetImageUrl } from "../../model/dataset-image-url";
+import { proxiedDatasetImageUrl } from "../../model/dataset-image-url.ts";
 
 /** Kept clear of the viewport edge so the expanded picture is never flush. */
 const VIEWPORT_MARGIN = 32;

@@ -9,7 +9,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () => ({
   useEvaluationsV3Store: (selector?: (state: unknown) => unknown) =>
     selector
       ? selector({
@@ -35,12 +35,12 @@ vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({ data: undefined, isLoading: false }),
 }));
 
-vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-target-name.ts", () => ({
   useTargetName: () => "Support agent",
   useTargetNames: () => [],
 }));
 
-vi.mock("../../../../../behavior/experiments-v3/use-prompt-template-fields", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-prompt-template-fields.ts", () => ({
   usePromptTemplateFields: () => ({ fields: [], isLoading: false }),
 }));
 
@@ -48,8 +48,8 @@ import {
   type AgentTypeEnum,
   agentTypeEnum,
   type TargetConfig,
-} from "../../../../../model/experiments-v3/types";
-import { TargetHeader } from "../target-header";
+} from "../../../../../model/experiments-v3/types.ts";
+import { TargetHeader } from "../target-header.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

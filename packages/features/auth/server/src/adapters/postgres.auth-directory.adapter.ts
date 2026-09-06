@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthDirectoryPort } from "../ports/auth-directory.port";
-import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository";
+import type { AuthDirectoryPort } from "../ports/auth-directory.port.ts";
+import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 
 /** The Postgres seam a process composes the auth transports' row reads from. */
 export class PostgresAuthDirectoryAdapter {

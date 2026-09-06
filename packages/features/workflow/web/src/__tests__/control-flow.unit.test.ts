@@ -11,7 +11,7 @@ import {
   isConnectionAllowed,
   nodeHasGateInput,
   showsTemporaryGate,
-} from "../model/control-flow";
+} from "../model/control-flow.ts";
 
 const node = (
   id: string,

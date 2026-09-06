@@ -1,7 +1,7 @@
 import { langyMessagePartSchema } from "@langwatch/langy-contract";
-import type { LangyDatabase } from "./langy-database.mapper";
-import { LangyMessageRepository } from "../langy-message.repository";
-import type { LangyMessageRow, MessageRole } from "../langy-message.repository";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
+import { LangyMessageRepository } from "../langy-message.repository.ts";
+import type { LangyMessageRow, MessageRole } from "../langy-message.repository.ts";
 
 export class PrismaLangyMessageRepository extends LangyMessageRepository {
   constructor(private readonly prisma: LangyDatabase) {

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import { ClickHouseLogProcessingAdapter } from "../clickhouse.log-processing.adapter";
-import { ClickHouseCanonicalLogRecordAppendRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository";
-import type { LogClickHouseClient } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository";
-import { ClickHouseCanonicalLogRecordRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record.repository";
+import { ClickHouseLogProcessingAdapter } from "../clickhouse.log-processing.adapter.ts";
+import { ClickHouseCanonicalLogRecordAppendRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import type { LogClickHouseClient } from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { ClickHouseCanonicalLogRecordRepository } from "../../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
 
 function client(overrides: Partial<LogClickHouseClient> = {}): LogClickHouseClient {
   return {

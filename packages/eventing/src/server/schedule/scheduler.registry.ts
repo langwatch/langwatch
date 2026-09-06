@@ -1,4 +1,4 @@
-import type { SchedulerHandler } from "./scheduler.types";
+import type { SchedulerHandler } from "./scheduler.types.ts";
 
 /**
  * ADR-044 §4 "Consumer registration": maps `targetType → handler`, the

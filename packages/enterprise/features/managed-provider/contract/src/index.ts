@@ -1,1 +1,1 @@
-export * from "./managed-provider.service";
+export * from "./managed-provider.service.ts";

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { REMEDIATION_CODES, REMEDIATION_DOC_PATHS, remediation } from "../remediation";
+import { REMEDIATION_CODES, REMEDIATION_DOC_PATHS, remediation } from "../remediation.ts";
 
 // packages/handled-error/src/__tests__ → repo root → docs/
 const DOCS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../docs");

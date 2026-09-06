@@ -11,7 +11,7 @@ import type {
   AnalyticsFilterValue as FilterParam,
   FilterField,
 } from "@langwatch/analytics-contract";
-import type { FilterOption } from "../../ports/filter-options.port";
+import type { FilterOption } from "../../ports/filter-options.port.ts";
 
 export type ClickHouseFilterQueryParams = {
   tenantId: string;

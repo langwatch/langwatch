@@ -1,5 +1,5 @@
-import { PromptBrowserTab as PromptBrowserTabView } from "../../studio-internals";
-import { usePromptBrowserTabController } from "./use-prompt-browser-tab-controller";
+import { PromptBrowserTab as PromptBrowserTabView } from "../../studio-internals.ts";
+import { usePromptBrowserTabController } from "./use-prompt-browser-tab-controller.ts";
 
 interface PromptBrowserTabProps {
   dimmed?: boolean;

@@ -1,4 +1,4 @@
-import type { ScenarioTarget } from "../../model/scenario-target";
+import type { ScenarioTarget } from "../../model/scenario-target.ts";
 import { Badge, Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
@@ -10,7 +10,7 @@ import {
   isAgentTarget,
   scenarioAgentsOf,
   type ScenarioAgent,
-} from "../../behavior/scenarios/use-filtered-scenario-targets";
+} from "../../behavior/scenarios/use-filtered-scenario-targets.ts";
 
 export type ScenarioTargetSelection = {
   type: "prompt" | "http" | "code" | "workflow" | "connected";

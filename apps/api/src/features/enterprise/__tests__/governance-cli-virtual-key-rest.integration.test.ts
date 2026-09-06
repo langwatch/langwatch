@@ -16,7 +16,7 @@ import type {
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";

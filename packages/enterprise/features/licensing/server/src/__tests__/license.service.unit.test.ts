@@ -10,14 +10,14 @@ import {
   LicenseUsagePort,
   NodeLicenseCryptographyAdapter,
   type StoredLicense,
-} from "../index";
+} from "../index.ts";
 import {
   EXPIRED_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
-} from "../testing";
+} from "../testing.ts";
 
 /** A freshly minted key, bound to one organization or to none. */
 function mintLicenseKey(options: { organizationId?: string } = {}): string {

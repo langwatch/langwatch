@@ -39,7 +39,7 @@ import {
   type AdminAuditRequest,
 } from "@langwatch/ops-contract";
 
-import type { OpsApp } from "../../app/ops.app";
+import type { OpsApp } from "../../app/ops.app.ts";
 
 /**
  * Who is acting, as this process resolves it.

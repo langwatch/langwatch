@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { WorkerApplication } from "../worker.application";
+import { WorkerApplication } from "../worker.application.ts";
 import type {
   WorkerFeatureCloser,
   WorkerFeatureInstallerPort,
-} from "../../features/worker-feature.installer";
-import { WorkerRuntime } from "../../platform/lifecycle/worker.runtime";
+} from "../../features/worker-feature.installer.ts";
+import { WorkerRuntime } from "../../platform/lifecycle/worker.runtime.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../../platform/lifecycle/worker-runtime.port";
-import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { InMemoryProcessStore, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 

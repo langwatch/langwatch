@@ -1,10 +1,10 @@
-import { SUITE_RUN_EVENT_TYPES } from "./suite-run.constants";
+import { SUITE_RUN_EVENT_TYPES } from "./suite-run.constants.ts";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunProcessingEvent,
   SuiteRunStartedEvent,
-} from "./suite-run.events";
+} from "./suite-run.events.ts";
 
 export function isSuiteRunStartedEvent(
   event: SuiteRunProcessingEvent,

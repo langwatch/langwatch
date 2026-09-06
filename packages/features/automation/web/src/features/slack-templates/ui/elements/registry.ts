@@ -52,7 +52,7 @@ import {
   TraceAlertCompactWireframe,
   TraceAlertOneLinerWireframe,
   TraceCardRichWireframe,
-} from "./wireframes";
+} from "./wireframes.tsx";
 
 export type SlackBlockKitTemplateId =
   | "trace_alert_compact"

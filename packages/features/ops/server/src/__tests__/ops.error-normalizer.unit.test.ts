@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeErrorMessage } from "../index";
+import { normalizeErrorMessage } from "../index.ts";
 
 describe("normalizeErrorMessage", () => {
   it("keeps an error cluster stable across volatile identifiers", () => {

@@ -13,14 +13,14 @@ const turns = [
   { traceId: "trace-2", timestamp: 2, input: null, output: null },
 ];
 
-vi.mock("../../../hooks/use-conversation-turns", () => ({
+vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: { items: turns },
     isLoading: false,
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations", () => ({
+vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -30,26 +30,26 @@ vi.mock("../../../hooks/use-conversation-annotations", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events", () => ({
+vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
+vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
 }));
 
-vi.mock("../annotated-turn-row", () => ({
+vi.mock("../annotated-turn-row.tsx", () => ({
   AnnotatedTurnRow: ({ parsed }: { parsed: { turn: { traceId: string } } }) => (
     <div data-testid="annotated-turn-row">{parsed.turn.traceId}</div>
   ),
 }));
 
-import type { TraceListItem } from "../../../types/trace";
-import { ConversationView } from "../conversation-view";
+import type { TraceListItem } from "../../../types/trace.ts";
+import { ConversationView } from "../conversation-view.tsx";
 
 function renderView({
   conversationId = "thread-1" as string | null,

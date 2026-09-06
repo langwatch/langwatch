@@ -17,14 +17,14 @@ import {
 import type { Logger } from "@langwatch/observability";
 import type { TraceAppDependencies } from "@langwatch/trace-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   createLlmModelCostTrpcRouter,
   createModelProviderTrpcRouter,
   type ModelProviderTrpcChecks,
-} from "./model-provider-trpc.mount";
-import { createTranslateTrpcRouter } from "./translate-trpc.mount";
+} from "./model-provider-trpc.mount.ts";
+import { createTranslateTrpcRouter } from "./translate-trpc.mount.ts";
 
 /**
  * The model-provider capabilities that reach OUTSIDE this process: the vendor
@@ -81,7 +81,7 @@ export type ModelProviderPeers = Readonly<{
   spans?: TraceAppDependencies["traces"]["spans"];
 }>;
 
-import type { ComposedModelProviderFeature } from "./model-provider.composition.types";
+import type { ComposedModelProviderFeature } from "./model-provider.composition.types.ts";
 
 /** Composes the provider surfaces over this process's own graph. */
 export function composeModelProviderFeature(options: {

@@ -8,7 +8,7 @@
  * uniqueness itself is the database's, declared on the model.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { ScimDirectoryIdentityService } from "../scim-directory-identity.service";
+import { ScimDirectoryIdentityService } from "../scim-directory-identity.service.ts";
 
 const OKTA = "conn_okta_primary";
 const ENTRA = "conn_entra_contractors";

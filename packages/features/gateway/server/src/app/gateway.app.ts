@@ -18,15 +18,15 @@ import type { z } from "zod";
 import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,
-} from "../adapters/gateway-virtual-key-dto.adapter";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
+} from "../adapters/gateway-virtual-key-dto.adapter.ts";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
 import type {
   GatewayVirtualKeyScope,
   VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port";
-import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service";
-import type { GatewayUsageService } from "../services/gateway-usage.service";
+} from "../ports/gateway-virtual-key.port.ts";
+import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import type { GatewayUsageService } from "../services/gateway-usage.service.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped API key or legacy project key, and what any of those IS belongs to the process's authentication, not this feature — the doors hand one straight to the checks below and never read it.

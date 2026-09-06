@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { readStoredSkipList } from "@langwatch/model-provider-contract";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -22,7 +22,7 @@ import {
   createTestPrismaClient,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 describe.skipIf(!DB_URL)(
   "Feature: the provider row holds the models allowed to skip Langy permission checks",

@@ -31,14 +31,14 @@ import {
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 
-import { ApiOrganizationMissingCredentialsError } from "../../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
+import { ApiOrganizationMissingCredentialsError } from "../../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
 import {
   mountRestFamily,
   TEST_ORGANIZATION_ID,
   TEST_USER_ID,
   type MountedRestFamily,
-} from "./rest-family.harness";
+} from "./rest-family.harness.ts";
 
 /** The credential every request in these suites carries unless it drops it. */
 export const ORGANIZATION_BEARER = { authorization: "Bearer org-key" };

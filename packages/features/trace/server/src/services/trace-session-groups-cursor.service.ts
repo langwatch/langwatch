@@ -9,7 +9,7 @@ import type {
   SessionGroupCursor,
   SessionGroupRow,
   SessionGroupSortColumn,
-} from "../repositories/session-groups.repository";
+} from "../repositories/session-groups.repository.ts";
 
 /**
  * Every sort dimension a cursor may name, keyed by the union so the compiler refuses a list that

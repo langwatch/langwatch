@@ -12,8 +12,8 @@ import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Info } from "lucide-react";
 
-import { DeleteConfirmationDialog } from "../../../ui/blocks/delete-confirmation-dialog";
-import { CopyButton } from "../../../ui/elements/copy-button";
+import { DeleteConfirmationDialog } from "../../../ui/blocks/delete-confirmation-dialog.tsx";
+import { CopyButton } from "../../../ui/elements/copy-button.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -25,11 +25,11 @@ import {
 } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { usePromptHost } from "../../../model/prompt-host";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog";
-import { usePromptTags } from "../../../behavior/use-prompt-tags";
-import { promptApi } from "../../../behavior/prompt-api";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
+import { usePromptTags } from "../../../behavior/use-prompt-tags.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;

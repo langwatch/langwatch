@@ -6,11 +6,11 @@
  * Returns state and callbacks only, never JSX, so both the workflow and the
  * experiment buttons can reuse it.
  */
-import type { PrismLanguage } from "../../../model/prism-language";
+import type { PrismLanguage } from "../../../model/prism-language.ts";
 import { useMemo, useState } from "react";
 
-import type { ApiSnippetTab } from "../generate-api-snippet-dialog";
-import type { RunSnippetDataSource, RunSnippetLang } from "../../../model/run-via-api/run-snippets";
+import type { ApiSnippetTab } from "../generate-api-snippet-dialog.tsx";
+import type { RunSnippetDataSource, RunSnippetLang } from "../../../model/run-via-api/run-snippets.ts";
 
 interface LangTabSpec {
   value: RunSnippetLang;

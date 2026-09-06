@@ -11,8 +11,8 @@ import {
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
   scopeHierarchyOf,
-} from "../scope-filter-address";
-import type { AvailableScopes } from "../scope-filter";
+} from "../scope-filter-address.ts";
+import type { AvailableScopes } from "../scope-filter.tsx";
 
 const available: AvailableScopes = {
   organization: { id: "org_1", name: "Acme" },

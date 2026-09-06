@@ -4,7 +4,7 @@
  * @see specs/auth/password-reset.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { betterAuthTransportFor } from "./better-auth-transport.test-helpers";
+import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
 
 describe("the deployment's password reset", () => {
   describe("when a reset completes", () => {

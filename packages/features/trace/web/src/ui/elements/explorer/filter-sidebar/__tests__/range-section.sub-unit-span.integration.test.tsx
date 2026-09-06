@@ -9,8 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clampRangeToBounds,
   RangeSection,
-} from "../../../../sections/explorer/filter-sidebar/range-section";
-import { stepForSpan } from "../range-controls";
+} from "../../../../sections/explorer/filter-sidebar/range-section.tsx";
+import { stepForSpan } from "../range-controls.tsx";
 
 describe("RangeSection", () => {
   afterEach(cleanup);

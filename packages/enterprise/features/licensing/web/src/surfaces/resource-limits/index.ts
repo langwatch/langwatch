@@ -6,11 +6,11 @@
  * drawing and the two mappings that feed it are one surface rather than a
  * component each side copies.
  */
-export { ResourceLimitRow } from "./resource-limit-row";
+export { ResourceLimitRow } from "./resource-limit-row.tsx";
 export {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
-} from "./resource-limits-display";
-export { LIMIT_TYPE_DISPLAY_LABELS } from "../../model/limit-type-labels";
+} from "./resource-limits-display.tsx";
+export { LIMIT_TYPE_DISPLAY_LABELS } from "../../model/limit-type-labels.ts";

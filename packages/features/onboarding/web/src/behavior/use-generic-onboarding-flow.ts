@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { OnboardingFlowDirection } from "./types";
+import { OnboardingFlowDirection } from "./types.ts";
 
 export function useGenericOnboardingFlow<
   TScreenIndex extends number,

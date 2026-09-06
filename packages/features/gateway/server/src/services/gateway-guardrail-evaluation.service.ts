@@ -7,7 +7,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { EnabledGuardrailMonitor, MonitorService } from "@langwatch/monitor-contract";
 import type { GatewayGuardrailDirection } from "@langwatch/gateway-contract";
-import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository";
+import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");

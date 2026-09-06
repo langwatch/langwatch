@@ -5,7 +5,7 @@ import {
   createIngestionTemplateInputSchema,
   ingestionTemplateSchema,
   ingestionTemplateSourceTypeSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("ingestion template contract", () => {
   it("uses Zod 4 schemas for the portable template shape", () => {

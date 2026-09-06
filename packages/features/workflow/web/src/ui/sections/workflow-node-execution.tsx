@@ -7,9 +7,9 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
-import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
-import { useWorkflowNodeHost } from "../elements/workflow-node.host";
+import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store.ts";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 
 export function ComponentExecutionButton({
   node,

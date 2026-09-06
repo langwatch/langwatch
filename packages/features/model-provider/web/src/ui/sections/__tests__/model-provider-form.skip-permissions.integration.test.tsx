@@ -24,11 +24,11 @@ const {
   mockCloseDrawer: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: (...args: unknown[]) => mockUseModelProvidersSettings(...args),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const shared = {
     modelProvider: {
       listAllForOrganizationForFrontend: {
@@ -64,7 +64,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: mockCloseDrawer, openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", name: "Web App", slug: "web-app" },
     team: { id: "team-1", name: "Platform" },
@@ -83,7 +83,7 @@ vi.mock("../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-model-provider-api-key-validation", () => ({
+vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
   useModelProviderApiKeyValidation: () => ({
     validate: vi.fn().mockResolvedValue(true),
     validateWithCustomUrl: vi.fn().mockResolvedValue(true),
@@ -103,9 +103,9 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 import { modelProviders } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
-import { keyedRow, makePrimeQueries } from "./model-provider-drawer-harness";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { keyedRow, makePrimeQueries } from "./model-provider-drawer-harness.tsx";
 
 const primeQueries = makePrimeQueries({
   providersSettingsMock: mockUseModelProvidersSettings,

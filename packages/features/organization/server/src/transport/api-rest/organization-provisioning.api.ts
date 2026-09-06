@@ -20,7 +20,7 @@ import {
   CREATE_ORGANIZATION,
   GET_ORGANIZATION,
   LIST_ORGANIZATIONS,
-} from "../../rules/organization-provisioning-openapi.rules";
+} from "../../rules/organization-provisioning-openapi.rules.ts";
 
 /** One organization as the instance-admin surface reports it. */
 export interface OrganizationProvisioningSummary {

@@ -1,4 +1,4 @@
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 import {
   absorbZeroBuckets,
   type BucketMap,
@@ -8,9 +8,9 @@ import {
   MAX_DENSE_BUCKET_SPAN,
   mergeMap,
   subtractMaps,
-} from "./exponential-bucket";
-import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row";
-import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence";
+} from "./exponential-bucket.ts";
+import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row.ts";
+import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence.ts";
 
 /** A point re-expressed at the bucket's common scale and zero threshold. */
 interface NormalizedPoint {

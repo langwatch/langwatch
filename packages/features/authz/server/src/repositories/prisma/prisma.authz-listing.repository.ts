@@ -27,8 +27,8 @@ import type {
   AuthzTeamMemberBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
-import { AuthzListingRepository } from "../authz-listing.repository";
-import type { AuthzDatabase } from "../authz-read.repository";
+import { AuthzListingRepository } from "../authz-listing.repository.ts";
+import type { AuthzDatabase } from "../authz-read.repository.ts";
 
 const USER_CREATED_ROLE_KIND = "custom" as const;
 

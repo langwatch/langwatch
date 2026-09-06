@@ -2,11 +2,11 @@ import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
-} from "../api.main";
+} from "../api.main.ts";
 import {
   ApiProductionComposition,
   type ApiProductionCompositionOptions,
-} from "./api-production.composition";
+} from "./api-production.composition.ts";
 
 /*
  * There is no unavailable-adapter list any more, and its removal is the point

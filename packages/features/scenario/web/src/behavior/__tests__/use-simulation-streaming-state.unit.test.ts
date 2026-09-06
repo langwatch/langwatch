@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createStreamingStore, type StreamingMessage } from "../use-simulation-streaming-state";
+import { createStreamingStore, type StreamingMessage } from "../use-simulation-streaming-state.ts";
 
 type Store = ReturnType<typeof createStreamingStore>;
 

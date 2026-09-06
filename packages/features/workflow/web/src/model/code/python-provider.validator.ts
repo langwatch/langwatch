@@ -11,7 +11,7 @@ import {
   MIXED_INDENT,
   OUTPUT_TYPE_MISMATCH,
   parseSimpleDictEntries,
-} from "./python-provider.shared";
+} from "./python-provider.shared.ts";
 
 /**
  * Lightweight client-side validator — flags mismatched brackets, unterminated

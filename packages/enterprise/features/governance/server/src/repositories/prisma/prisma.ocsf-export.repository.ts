@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GovernanceOcsfExportRepository } from "../../ports/ocsf-export.port";
+import { GovernanceOcsfExportRepository } from "../../ports/ocsf-export.port.ts";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 

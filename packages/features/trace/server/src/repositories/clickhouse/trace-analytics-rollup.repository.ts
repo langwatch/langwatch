@@ -1,8 +1,8 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
-import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection";
-import type { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
+import type { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 

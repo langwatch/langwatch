@@ -1,8 +1,8 @@
 import {
   PrismaMonitorRepository,
   type MonitorDatabase,
-} from "../repositories/prisma/prisma.monitor.repository";
-import { MonitorCatalogService } from "../services/monitor-catalog.service";
+} from "../repositories/prisma/prisma.monitor.repository.ts";
+import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 
 /** The one model the monitor listing needs from the client. */
 export type MonitorCatalogDatabase = MonitorDatabase;

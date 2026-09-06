@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagCachePort, FeatureFlagRow } from "../ports/feature-flag-cache.port";
-import type { FeatureFlagRepository } from "../repositories/feature-flag.repository";
-import { FeatureFlagRowStore } from "../stores/feature-flag-row.store";
+import type { FeatureFlagCachePort, FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
 
 /**
  * Per-process window in front of the shared cache. The trace-processing

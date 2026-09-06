@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type AuthzBindingDatabase,
   PrismaAuthzBindingRepository,
-} from "../prisma.authz-binding.repository";
+} from "../prisma.authz-binding.repository.ts";
 
 function setup() {
   const delegate = () => ({

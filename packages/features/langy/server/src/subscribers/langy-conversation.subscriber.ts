@@ -12,7 +12,7 @@ import {
   type LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import { LangyTurnErrors, LangyWorkerStoppedError } from "@langwatch/langy-contract";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");

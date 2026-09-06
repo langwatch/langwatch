@@ -3,10 +3,10 @@ import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
-import { ApiHttpListener } from "../api-http.listener";
-import { ApiRestSecurity } from "../api-rest.security";
-import { ApiSecretRestFeature } from "../api-secret-rest.feature";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
+import { ApiHttpListener } from "../api-http.listener.ts";
+import { ApiRestSecurity } from "../api-rest.security.ts";
+import { ApiSecretRestFeature } from "../api-secret-rest.feature.ts";
 
 const secret: Secret = {
   id: "secret-1",

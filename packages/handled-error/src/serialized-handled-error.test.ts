@@ -4,7 +4,7 @@ import {
   serializedReasonSchema,
   type SerializedHandledError,
   type SerializedReason,
-} from "./index";
+} from "./index.ts";
 
 describe("serialized handled-error schemas", () => {
   it("normalizes a legacy kind-only payload and its reason defaults", () => {

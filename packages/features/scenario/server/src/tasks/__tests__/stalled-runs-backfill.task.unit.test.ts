@@ -8,7 +8,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { SimulationStalledRun } from "@langwatch/scenario-server";
-import { backfillStalledRuns, StalledRunsBackfillTask } from "../stalled-runs-backfill.task";
+import { backfillStalledRuns, StalledRunsBackfillTask } from "../stalled-runs-backfill.task.ts";
 
 function makeRun(overrides: Partial<SimulationStalledRun> = {}): SimulationStalledRun {
   return {

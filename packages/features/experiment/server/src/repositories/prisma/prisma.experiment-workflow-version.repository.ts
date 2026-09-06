@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ExperimentRunWorkflowVersion } from "@langwatch/experiment-contract";
-import { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port";
+import { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port.ts";
 
 /** Only what this repository touches. */
 export type ExperimentWorkflowVersionDatabase = Pick<PrismaClient, "workflowVersion">;

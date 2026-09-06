@@ -5,7 +5,7 @@ import {
   resetParamCounter,
   translateAllFilters,
   translateFilter,
-} from "../clickhouse.filter-translator.mapper";
+} from "../clickhouse.filter-translator.mapper.ts";
 
 describe("filter-translator", () => {
   beforeEach(() => {

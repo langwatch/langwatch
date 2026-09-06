@@ -1,7 +1,7 @@
 import { Flex, Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace";
-import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
-import type { AddonDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
+import type { AddonDef } from "../../types.ts";
 
 export const ErrorDetailAddon: AddonDef<TraceListItem> = {
   id: "error-detail",

@@ -35,10 +35,10 @@ import {
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
-} from "../services/trace-io-accumulation.service";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service";
-import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
-import { anchorStorageTime } from "../rules/trace-storage-anchor.rules";
+} from "../services/trace-io-accumulation.service.ts";
+import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
+import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
+import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 
 export type { TraceSummaryData };
 

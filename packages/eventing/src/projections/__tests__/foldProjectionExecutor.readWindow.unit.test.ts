@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { incrementEsFoldReadWindowFallbackTotal } from "../../metrics";
+import { incrementEsFoldReadWindowFallbackTotal } from "../../metrics.ts";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return { ...actual, incrementEsFoldReadWindowFallbackTotal: vi.fn() };
 });
 
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import type { FoldProjectionDefinition } from "../foldProjection.types";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
+} from "../../services/__tests__/testHelpers.ts";
+import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 interface CounterState {
   count: number;

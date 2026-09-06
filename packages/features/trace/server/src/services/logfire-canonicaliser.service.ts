@@ -7,9 +7,9 @@ import {
   extractOutputMessages,
   inferSpanTypeIfAbsent,
   recordValueType,
-} from "../rules/canonical-extraction.rules";
-import { safeJsonParse } from "../rules/canonical-guard.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+} from "../rules/canonical-extraction.rules.ts";
+import { safeJsonParse } from "../rules/canonical-guard.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export class LogfireCanonicaliserService implements CanonicalAttributesPort {
   static create(): LogfireCanonicaliserService {

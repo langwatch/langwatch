@@ -1,8 +1,8 @@
 import { Accordion, Separator, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { useActiveProject } from "../active-project-context";
-import { CodePreview } from "./code-preview";
+import { useActiveProject } from "../active-project-context.tsx";
+import { CodePreview } from "./code-preview.tsx";
 
 export function LangflowSetup(): React.ReactElement {
   const { project } = useActiveProject();

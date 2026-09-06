@@ -14,8 +14,8 @@ import {
   REST_AUTH_PROJECT,
   RestAuthWorld,
   type RestAuthKey,
-} from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+} from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /** The other tenant, seeded so a cross-organization key has somewhere real to come from. */
 const OTHER_PROJECT = {

@@ -1,10 +1,10 @@
-import { OrganizationUserRole } from "../../../../model/prisma-types";
+import { OrganizationUserRole } from "../../../../model/prisma-types.ts";
 
-import { useFeatureFlag } from "../../use-feature-flag";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { usePublicEnv } from "../../use-public-env";
-import { useRequiredSession } from "../../../../behavior/auth-session";
-import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag";
+import { useFeatureFlag } from "../../use-feature-flag.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../use-public-env.ts";
+import { useRequiredSession } from "../../../../behavior/auth-session.ts";
+import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag.ts";
 
 /**
  * Langy's visibility gate — "does this user have Langy?". Three layers:

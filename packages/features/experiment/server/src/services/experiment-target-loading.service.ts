@@ -14,7 +14,7 @@ import {
   ExperimentExecutionDataService,
   type ExecutionDataServices,
   type LoadedWorkflow,
-} from "./experiment-execution-data.service";
+} from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:target-loading");
 

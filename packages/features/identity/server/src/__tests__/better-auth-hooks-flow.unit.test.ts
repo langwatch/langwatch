@@ -8,18 +8,18 @@ import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it } from "vitest";
-import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter";
-import { IdentityGuardsService } from "../services/identity-guards.service";
-import { newIdentityCommandId } from "../rules/identity-command-id.rules";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
-import { IdentityService } from "../services/identity.service";
+import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import { IdentityService } from "../services/identity.service.ts";
 import {
   InMemoryIdentityEventStore,
   inMemoryIdentityLedger,
-} from "./support/in-memory-event-store";
-import { InMemoryHeads, T0 } from "./support/in-memory-heads";
-import { InMemoryReservations } from "./support/in-memory-reservations";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
+} from "./support/in-memory-event-store.ts";
+import { InMemoryHeads, T0 } from "./support/in-memory-heads.ts";
+import { InMemoryReservations } from "./support/in-memory-reservations.ts";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 

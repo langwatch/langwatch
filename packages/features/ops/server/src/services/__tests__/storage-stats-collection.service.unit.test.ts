@@ -5,11 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { StorageStatsMetricsPort } from "../../ports/storage-stats-metrics.port";
+import { StorageStatsMetricsPort } from "../../ports/storage-stats-metrics.port.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
-} from "../storage-stats-collection.service";
+} from "../storage-stats-collection.service.ts";
 
 type TableSeries = { instance: string; table: string; rows: number; bytes: number; parts: number };
 type DiskSeries = { instance: string; disk: string };

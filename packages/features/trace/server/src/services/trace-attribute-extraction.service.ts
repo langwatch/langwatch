@@ -6,7 +6,7 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { parseJsonStringArray, stringAttr } from "../rules/trace-summary-attributes.rules";
+import { parseJsonStringArray, stringAttr } from "../rules/trace-summary-attributes.rules.ts";
 
 const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
 

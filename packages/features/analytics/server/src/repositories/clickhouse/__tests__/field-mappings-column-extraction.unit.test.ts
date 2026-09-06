@@ -5,7 +5,7 @@ import {
   extractReferencedTraceColumns,
   narrowSpanAttributesColumns,
   spanAttributesNarrowProjection,
-} from "../clickhouse.field-mappings.mapper";
+} from "../clickhouse.field-mappings.mapper.ts";
 
 describe("extractReferencedSpanColumns", () => {
   describe("when expression references a single column", () => {

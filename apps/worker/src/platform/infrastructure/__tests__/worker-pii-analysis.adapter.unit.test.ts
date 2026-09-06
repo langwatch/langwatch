@@ -1,8 +1,8 @@
 import { PiiAnalysisMetricsPort, type PiiAnalysisOutcome } from "@langwatch/data-privacy-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { WorkerTracePrivacyConfig } from "../../config/worker.config";
-import { WorkerPiiAnalysisAdapter } from "../worker-pii-analysis.adapter";
+import type { WorkerTracePrivacyConfig } from "../../config/worker.config.ts";
+import { WorkerPiiAnalysisAdapter } from "../worker-pii-analysis.adapter.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

@@ -19,46 +19,46 @@ import {
   type LangyAnswerSegment,
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
-} from "../../../../model/langy-answer-segments";
-import { codeAccessCallId } from "../../../../model/langy-code-access-tool";
+} from "../../../../model/langy-answer-segments.ts";
+import { codeAccessCallId } from "../../../../model/langy-code-access-tool.ts";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
-} from "../../../../model/langy-feedback-directive";
+} from "../../../../model/langy-feedback-directive.ts";
 import {
   type LangyQuestionCardData,
   langyAnsweredOptionIds,
   toolCallIdOfQuestionBlock,
-} from "../../../../model/langy-local-waits";
-import { langyPlan } from "../../../../model/langy-plan";
+} from "../../../../model/langy-local-waits.ts";
+import { langyPlan } from "../../../../model/langy-plan.ts";
 import {
   linkPullRequestReferences,
   pullRequestLinksFromToolParts,
-} from "../../../../model/langy-pull-request-links";
-import { questionToolCardParts } from "../../../../model/langy-question-tool";
+} from "../../../../model/langy-pull-request-links.ts";
+import { questionToolCardParts } from "../../../../model/langy-question-tool.ts";
 import {
   foldReasoningTitles,
   stripReasoningTitles,
-} from "../../../../model/langy-reasoning-titles";
-import { stripToolNarration } from "../../../../model/langy-tool-narration";
-import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript";
+} from "../../../../model/langy-reasoning-titles.ts";
+import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
+import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript.ts";
 import { isInternalHref, Markdown } from "@langwatch/workflow-web/surfaces/markdown";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card";
-import { useSpaLinkClick } from "../../behavior/logic/spa-link";
-import { useLangyStore } from "../../../../behavior/langy.store";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card";
-import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view";
-import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card";
-import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards";
-import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card";
-import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card";
-import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary";
-import { LangyFeedback } from "./langy-feedback";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark";
-import { LangyPlanCard } from "./langy-plan-card";
-import { hasLangyActivity, LangyActivityParts } from "./langy-tool-activity";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";
+import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
+import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
+import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
+import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
+import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
+import { LangyFeedback } from "./langy-feedback.tsx";
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark.tsx";
+import { LangyPlanCard } from "./langy-plan-card.tsx";
+import { hasLangyActivity, LangyActivityParts } from "./langy-tool-activity.tsx";
 
 export interface LangyProposal {
   langyProposal: true;

@@ -1,4 +1,4 @@
-import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection";
+import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection.ts";
 
 export type LangyAnalyticsEventRecord = {
   tenantId: string;

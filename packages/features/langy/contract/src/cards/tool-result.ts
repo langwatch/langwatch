@@ -21,8 +21,8 @@ import {
   traceCardSchema,
   tracesCardSchema,
   SCHEMA_BY_CARD_KIND,
-} from "./schemas.js";
-import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.js";
+} from "./schemas.ts";
+import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.ts";
 
 /**
  * The card's own verdict on whether the thing it describes actually happened.

@@ -10,7 +10,7 @@ import {
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
-} from "../../rules/ingest-key-provenance.rules";
+} from "../../rules/ingest-key-provenance.rules.ts";
 
 const PROVENANCE = {
   apiKeyId: "key_abc",

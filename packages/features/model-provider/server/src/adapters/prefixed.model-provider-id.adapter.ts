@@ -1,4 +1,4 @@
-import { ModelProviderIdService } from "../ports/model-provider.port";
+import { ModelProviderIdService } from "../ports/model-provider.port.ts";
 
 /**
  * The three id prefixes Model Provider's rows are read back by.

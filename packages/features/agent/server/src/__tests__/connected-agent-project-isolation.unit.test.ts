@@ -11,9 +11,9 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { StoredCall } from "@langwatch/agent-contract";
-import type { AgentRepository } from "../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
+import type { AgentRepository } from "../repositories/agent.repository.ts";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   callAckKey,
@@ -21,10 +21,10 @@ import {
   httpSessionKey,
   pendingKey,
   resultKey,
-} from "../rules/connected-agent-keys.rules";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
-import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service";
+} from "../rules/connected-agent-keys.rules.ts";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service.ts";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 
 const victimProjectId = "project_victim";
 const attackerProjectId = "project_attacker";

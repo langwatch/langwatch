@@ -8,13 +8,13 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import {
   AgentAdapterFactoryPort,
   type AgentAdapterBuildInput,
-} from "../ports/agent-adapter-factory.port";
-import type { NlpFetchTimeouts } from "./nlp-fetch.adapter";
-import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter";
-import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter";
-import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.adapter";
-import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
-import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adapter";
+} from "../ports/agent-adapter-factory.port.ts";
+import type { NlpFetchTimeouts } from "./nlp-fetch.adapter.ts";
+import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter.ts";
+import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter.ts";
+import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.adapter.ts";
+import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter.ts";
+import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adapter.ts";
 
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not

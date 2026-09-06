@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { Logger } from "@langwatch/observability";
 
-import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors";
-import { MAX_BLOB_BYTES } from "./blobConstants";
+import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors.ts";
+import { MAX_BLOB_BYTES } from "./blobConstants.ts";
 import {
   type CompressionCodec,
   compress,
@@ -12,10 +12,10 @@ import {
   decodePayload,
   decompress,
   encodePayload,
-} from "./bodyCodec";
-import { gqPayloadTooLargeTotal } from "./metrics";
-import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
-import type { TenantId } from "./storage";
+} from "./bodyCodec.ts";
+import { gqPayloadTooLargeTotal } from "./metrics.ts";
+import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
+import type { TenantId } from "./storage.ts";
 
 /**
  * Decompression with the over-limit error converted to a park signal. bodyCodec

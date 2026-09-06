@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { AlertType, TriggerAction, TriggerKind, TriggerTemplate } from "./trigger";
-import type { NotificationCadence } from "./cadences";
+import type { AlertType, TriggerAction, TriggerKind, TriggerTemplate } from "./trigger.ts";
+import type { NotificationCadence } from "./cadences.ts";
 export type TriggerSummary = {
   id: string;
   projectId: string;

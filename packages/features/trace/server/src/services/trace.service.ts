@@ -42,14 +42,14 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
-import type { TraceQueryFieldValuesPort } from "../ports/query-field-values.port";
-import type { TraceQueryClassificationPort } from "../ports/trace-query-classification.port";
-import type { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port";
-import type { TraceRecordPort } from "../ports/trace-record.port";
-import type { TraceEventDerivationPort } from "../ports/trace-event-derivation.port";
-import type { TraceFullRecordPort } from "../ports/trace-full-record.port";
-import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port";
-import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service";
+import type { TraceQueryFieldValuesPort } from "../ports/query-field-values.port.ts";
+import type { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
+import type { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port.ts";
+import type { TraceRecordPort } from "../ports/trace-record.port.ts";
+import type { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
+import type { TraceFullRecordPort } from "../ports/trace-full-record.port.ts";
+import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port.ts";
+import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
 
 type TraceComposition = {
   repository: TraceRepository;

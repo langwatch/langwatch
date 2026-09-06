@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { IntentSpec, WakeHandler } from "../../pipeline/processManagerDefinition";
+import type { IntentSpec, WakeHandler } from "../../pipeline/processManagerDefinition.ts";
 
 export const PROCESS_RETENTION_SWEEP_PROCESS_NAME = "processRetentionSweep" as const;
 

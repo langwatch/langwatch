@@ -15,8 +15,8 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { z } from "zod";
-import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync";
-import { identityActorSchema } from "./vocabulary";
+import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync.ts";
+import { identityActorSchema } from "./vocabulary.ts";
 
 export const ISSUE_SCIM_TOKEN_COMMAND_TYPE = "lw.identity.issue_scim_token" as const;
 export const RECORD_SCIM_USER_PUSH_COMMAND_TYPE = "lw.identity.record_scim_user_push" as const;

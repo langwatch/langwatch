@@ -13,14 +13,14 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table";
-import { ComparisonWinnerCell } from "../comparison-winner-cell";
+import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table.tsx";
+import { ComparisonWinnerCell } from "../comparison-winner-cell.tsx";
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
-} from "../../batch-evaluation-results.types";
-import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
-import { WinRateChart } from "../win-rate-chart";
+} from "../../batch-evaluation-results.types.ts";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts renders its bars through internal layout, so under jsdom there is
 // nothing in the DOM to assert on. Surfacing the `data` prop, the exact input

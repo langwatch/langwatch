@@ -23,8 +23,8 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { DEFAULT_SUITE_NAME } from "../../../rules/default-suite.rules";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../../scenario.repository";
+import { DEFAULT_SUITE_NAME } from "../../../rules/default-suite.rules.ts";
+import { ScenarioRepository, type ScenarioPlanRecord } from "../../scenario.repository.ts";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
   static create(): MemoryScenarioRepository {

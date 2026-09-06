@@ -2,8 +2,8 @@
  * Set membership over trace_summaries, moved out of the application process's findExistingTraceIds unchanged. No dedup: several unmerged versions of a row all prove the same thing, and the answer is set membership, not a value. TenantId is first since no other id here is unique across tenants.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { TraceClickHouseResolver } from "../../ports/clickhouse.port";
-import { TraceExistencePort } from "../../ports/trace-existence.port";
+import type { TraceClickHouseResolver } from "../../ports/clickhouse.port.ts";
+import { TraceExistencePort } from "../../ports/trace-existence.port.ts";
 
 export class ClickHouseTraceExistenceRepository extends TraceExistencePort {
   static create(options: {

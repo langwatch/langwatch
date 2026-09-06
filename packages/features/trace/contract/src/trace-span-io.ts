@@ -1,4 +1,4 @@
-import type { Span, SpanInputOutput } from "./trace-format.schemas";
+import type { Span, SpanInputOutput } from "./trace-format.schemas.ts";
 
 /**
  * The text one system-instruction entry contributes: the entry itself when it

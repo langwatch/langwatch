@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isEmailPasswordEnabled } from "../better-auth.api";
+import { isEmailPasswordEnabled } from "../better-auth.api.ts";
 
 describe("given a SaaS deployment that names an identity provider", () => {
   describe("when the email/password routes are considered", () => {

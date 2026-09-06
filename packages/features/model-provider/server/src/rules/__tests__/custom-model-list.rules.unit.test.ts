@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { toCanonicalCustomModelList } from "../custom-model-list.rules";
+import { toCanonicalCustomModelList } from "../custom-model-list.rules.ts";
 
 describe("toCanonicalCustomModelList", () => {
   describe("given the string shape the field started as", () => {

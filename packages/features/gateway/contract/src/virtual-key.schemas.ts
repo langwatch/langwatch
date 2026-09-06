@@ -15,7 +15,7 @@
  * still lets the surrounding shape live here.
  */
 import { z } from "zod";
-import { virtualKeyConfigSchema } from "./virtual-key-config";
+import { virtualKeyConfigSchema } from "./virtual-key-config.ts";
 
 /** How a key picks a provider when its primary is unavailable. */
 export const virtualKeyApiRoutingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);

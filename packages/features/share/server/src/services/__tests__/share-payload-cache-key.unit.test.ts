@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ShareService } from "../share.service";
+import { ShareService } from "../share.service.ts";
 
 const buildSharedTraceCacheKey = ShareService.buildPayloadCacheKey;
 

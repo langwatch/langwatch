@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { JoinRequestAudiencePort } from "../../ports/join-request-audience.port";
-import { JoinRequestMailPort } from "../../ports/join-request-mail.port";
-import { JoinRequestNotificationService } from "../join-request-notification.service";
+import { JoinRequestAudiencePort } from "../../ports/join-request-audience.port.ts";
+import { JoinRequestMailPort } from "../../ports/join-request-mail.port.ts";
+import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature

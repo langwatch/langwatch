@@ -12,8 +12,8 @@ import {
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port";
-import type { PresenceRepository } from "../repositories/presence.repository";
+import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port.ts";
+import type { PresenceRepository } from "../repositories/presence.repository.ts";
 
 export const PRESENCE_TTL_SECONDS = 30;
 

@@ -6,7 +6,7 @@ import {
   type GeneratedScenario,
   generateScenarioWithAI,
   ScenarioGenerationError,
-} from "../model/scenario-generation";
+} from "../model/scenario-generation.ts";
 
 describe("generateScenarioWithAI()", () => {
   const mockScenario: GeneratedScenario = {

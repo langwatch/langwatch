@@ -3,9 +3,9 @@
  * @see packages/features/agent/specs/package-boundary.feature
  */
 import { describe, expect, it } from "vitest";
-import { agentApiCreateInputSchema } from "../agent.schemas";
-import { createAgentRequestSchema } from "../agent.commands";
-import { agentTypeSchema } from "../config";
+import { agentApiCreateInputSchema } from "../agent.schemas.ts";
+import { createAgentRequestSchema } from "../agent.commands.ts";
+import { agentTypeSchema } from "../config/index.ts";
 
 // RPC parses agentApiCreateInputSchema, built from createAgentCommandSchema;
 // legacy REST parses createAgentRequestSchema. Both assemble the same per-type

@@ -48,9 +48,9 @@ import {
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { annotationApi } from "../../behavior/annotation-api";
-import { readHandledError } from "../../model/handled-error";
-import { ReviewerAvatar } from "../elements/reviewer-avatar";
+import { annotationApi } from "../../behavior/annotation-api.ts";
+import { readHandledError } from "../../model/handled-error.ts";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
 /** What the server said about individual fields, if it named any. */
 function fieldProblems(error: unknown): Record<string, string> {

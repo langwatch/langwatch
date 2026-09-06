@@ -35,7 +35,7 @@
  * derives from (see below).
  */
 
-import type { PublicAppConfig } from "./public-app-config";
+import type { PublicAppConfig } from "./public-app-config.ts";
 
 const PRODUCTION_DOCS_URL = "https://docs.langwatch.ai";
 const LOCAL_DOCS_URL = "http://localhost:3000";

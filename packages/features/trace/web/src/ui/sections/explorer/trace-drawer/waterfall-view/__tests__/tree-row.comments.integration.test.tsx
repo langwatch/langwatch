@@ -8,7 +8,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: (permission: string) =>
@@ -24,24 +24,24 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../../behavior/auth-session", () => ({
+vi.mock("../../../../../../behavior/auth-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: {},
   }),
 }));
 
-vi.mock("../../../../me/personal-feature-gate-dialog", () => ({
+vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -62,9 +62,9 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { useSpanHoverStore } from "../../../../../../behavior/span-hover.store";
-import { TreeRow } from "../tree-row";
-import type { WaterfallTreeNode } from "../types";
+import { useSpanHoverStore } from "../../../../../../behavior/span-hover.store.ts";
+import { TreeRow } from "../tree-row.tsx";
+import type { WaterfallTreeNode } from "../types.ts";
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";

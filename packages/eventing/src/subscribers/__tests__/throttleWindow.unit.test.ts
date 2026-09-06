@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriberJobPayload } from "../throttleWindow";
-import { throttledPerWindow } from "../throttleWindow";
+import type { SubscriberJobPayload } from "../throttleWindow.ts";
+import { throttledPerWindow } from "../throttleWindow.ts";
 
 const makeJobId = (payload: SubscriberJobPayload) => `job:${payload.event.tenantId}`;
 

@@ -14,7 +14,7 @@ import {
 import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderService } from "../../services/model-provider.service";
+import { ModelProviderService } from "../../services/model-provider.service.ts";
 import {
   ModelCostRepository,
   ModelDefaultRepository,
@@ -26,7 +26,7 @@ import {
   ModelProviderRepository,
   ModelTranslationPort,
   type ModelDefaultConfigSaveInput,
-} from "../model-provider.port";
+} from "../model-provider.port.ts";
 
 const now = new Date();
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {

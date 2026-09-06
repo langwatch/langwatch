@@ -14,8 +14,8 @@ import {
 import {
   statusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
-} from "../rules/system-migration-support.rules";
-import { systemMigrationLookup } from "./system-migration-lookup.service";
+} from "../rules/system-migration-support.rules.ts";
+import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
 
 export class SystemMigrationRunService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRunService {

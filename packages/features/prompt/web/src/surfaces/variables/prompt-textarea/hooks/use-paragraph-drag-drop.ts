@@ -1,5 +1,5 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
-import { BORDERLESS_LINE_HEIGHT, setTextareaValueUndoable } from "../prompt-textarea.utils";
+import { BORDERLESS_LINE_HEIGHT, setTextareaValueUndoable } from "../prompt-textarea.utils.ts";
 
 type UseParagraphDragDropProps = {
   localValue: string;

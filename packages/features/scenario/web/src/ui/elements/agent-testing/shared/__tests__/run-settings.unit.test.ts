@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { readRunSettings } from "../../../../sections/agent-testing/results/run-settings";
+import { readRunSettings } from "../../../../sections/agent-testing/results/run-settings.ts";
 
 /** One finished run of a batch, carrying the reserved namespace given. */
 function run(langwatch: Record<string, unknown>): ScenarioRunData {

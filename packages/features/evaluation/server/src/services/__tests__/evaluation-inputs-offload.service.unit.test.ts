@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationInputStoragePort } from "../../ports/evaluation.port";
-import { EvaluationInputsOffloadService } from "../evaluation-inputs-offload.service";
+import { EvaluationInputStoragePort } from "../../ports/evaluation.port.ts";
+import { EvaluationInputsOffloadService } from "../evaluation-inputs-offload.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
   STORED_OBJECT_MARKER_KEY,
-} from "../evaluation-inputs-offload.service";
+} from "../evaluation-inputs-offload.service.ts";
 
 class MemoryStorage extends EvaluationInputStoragePort {
   readonly stored = new Map<string, Uint8Array>();

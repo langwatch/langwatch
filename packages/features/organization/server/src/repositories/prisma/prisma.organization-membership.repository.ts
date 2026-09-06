@@ -19,8 +19,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository";
-import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
+import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
 
 /** The two shared read helpers this repository leans on. Stateless; the client rides each call. */
 const personalTeamScope = PrismaPersonalTeamScopeRepository.create();
@@ -29,8 +29,8 @@ import {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "../../rules/member-role-constraints.rules";
-import { isCustomRole } from "../../rules/custom-role-naming.rules";
+} from "../../rules/member-role-constraints.rules.ts";
+import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import { CustomRoleNotAssignableError } from "@langwatch/organization-contract";
 import {
   CannotDemoteLastAdminError,
@@ -57,7 +57,7 @@ import type {
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
-} from "../organization-membership.repository";
+} from "../organization-membership.repository.ts";
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody

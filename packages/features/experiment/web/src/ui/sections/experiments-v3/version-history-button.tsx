@@ -6,9 +6,9 @@ import { History } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Popover } from "@langwatch/design-system/popover";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { VersionList } from "./version-history-list";
+import { VersionList } from "./version-history-list.tsx";
 
 type VersionHistoryButtonProps = {
   disabled?: boolean;

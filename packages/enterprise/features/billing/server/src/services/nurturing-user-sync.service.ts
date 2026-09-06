@@ -1,4 +1,4 @@
-import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**

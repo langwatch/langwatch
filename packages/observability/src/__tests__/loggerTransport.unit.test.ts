@@ -15,7 +15,7 @@ const pinoMock = vi.hoisted(() => {
 
 vi.mock("pino", () => ({ default: pinoMock.pino }));
 
-import { createLoggerFactory } from "../logger";
+import { createLoggerFactory } from "../logger.ts";
 
 describe("configured Node logger transports", () => {
   beforeEach(() => {

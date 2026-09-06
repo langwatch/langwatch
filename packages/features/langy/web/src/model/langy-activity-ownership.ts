@@ -1,4 +1,4 @@
-import type { LangyProgressSample } from "./values/langy-turn";
+import type { LangyProgressSample } from "./values/langy-turn.ts";
 
 /**
  * One piece of work gets one visible progress owner.

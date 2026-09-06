@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GatewayBudgetScopeReachService } from "../services/gateway-budget-scope-reach.service";
+import { GatewayBudgetScopeReachService } from "../services/gateway-budget-scope-reach.service.ts";
 
 const candidate = (over: Record<string, unknown> = {}) => ({
   organizationId: "organization-1",

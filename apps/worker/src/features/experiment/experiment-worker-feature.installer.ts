@@ -1,7 +1,7 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { ExperimentRunProcessingPipeline } from "@langwatch/experiment-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Experiment's worker-facing capability after its server graph is composed. */
 export interface ExperimentWorkerCapability {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { timeColumnSizing } from "../../../../../behavior/time-format.store";
-import { getTraceColumnDef } from "../columns";
+import { timeColumnSizing } from "../../../../../behavior/time-format.store.ts";
+import { getTraceColumnDef } from "../columns.ts";
 
 describe("getTraceColumnDef", () => {
   describe("given the Time column", () => {

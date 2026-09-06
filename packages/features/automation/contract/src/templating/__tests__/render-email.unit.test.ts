@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { TEST_FIRE_EMAIL_SUBJECT_PREFIX, TEST_FIRE_NOTICE } from "../banner";
-import { EMAIL_SUBJECT_MAX_LENGTH, renderTriggerEmail } from "../render-email";
-import { makeContext, makeMatch } from "./fixtures";
+import { TEST_FIRE_EMAIL_SUBJECT_PREFIX, TEST_FIRE_NOTICE } from "../banner.ts";
+import { EMAIL_SUBJECT_MAX_LENGTH, renderTriggerEmail } from "../render-email.ts";
+import { makeContext, makeMatch } from "./fixtures.ts";
 
 describe("renderTriggerEmail", () => {
   describe("when no custom templates are provided", () => {

@@ -7,8 +7,8 @@ import {
 import type {
   CreateIngestionSourceRecord,
   UpdateIngestionSourceRecord,
-} from "../../ports/ingestion-source.port";
-import { IngestionSourceRepository } from "../../ports/ingestion-source.port";
+} from "../../ports/ingestion-source.port.ts";
+import { IngestionSourceRepository } from "../../ports/ingestion-source.port.ts";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)

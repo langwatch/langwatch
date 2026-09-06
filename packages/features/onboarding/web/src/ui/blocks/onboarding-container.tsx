@@ -2,12 +2,12 @@ import { Box, Center, Container, IconButton, Text, VStack } from "@chakra-ui/rea
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAnalytics } from "react-contextual-analytics";
-import { FullLogo } from "../elements/icons/full-logo";
-import { Link } from "../elements/link";
+import { FullLogo } from "../elements/icons/full-logo.tsx";
+import { Link } from "../elements/link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOnboardingHost } from "../../model/onboarding-host";
-import { OnboardingMeshBackground } from "../elements/onboarding-mesh-background";
-import SpookyScarySkeleton from "../elements/spooky-scary-skeleton";
+import { useOnboardingHost } from "../../model/onboarding-host.ts";
+import { OnboardingMeshBackground } from "../elements/onboarding-mesh-background.tsx";
+import SpookyScarySkeleton from "../elements/spooky-scary-skeleton.tsx";
 
 const MotionBox = motion.create(Box);
 const MotionCenter = motion.create(Center);

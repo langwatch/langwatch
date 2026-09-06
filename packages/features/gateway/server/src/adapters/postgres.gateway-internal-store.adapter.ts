@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayInternalStorePort } from "../ports/gateway-internal-store.port";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port";
+import { GatewayInternalStorePort } from "../ports/gateway-internal-store.port.ts";
+import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
+import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port.ts";
 
 const logger = createLogger("langwatch:gateway:internal-store");
 

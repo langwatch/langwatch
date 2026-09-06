@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryReservations } from "./support/in-memory-reservations";
+import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 
 /**
  * `releaseAddressLocks` (prisma.identity-projection.repository.ts) calls exactly this: a user's

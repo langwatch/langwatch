@@ -1,4 +1,4 @@
-import type { TargetConfig } from "./types";
+import type { TargetConfig } from "./types.ts";
 
 /**
  * A prompt's output field as it arrives from the API / prompt editor.

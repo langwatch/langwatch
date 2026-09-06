@@ -6,7 +6,7 @@ import {
   secretValueSchema,
   storedSecretNameSchema,
   type Secret,
-} from "./secret";
+} from "./secret.ts";
 
 export const secretPublicSchema = z
   .object({

@@ -3,8 +3,8 @@
  * `/me` reads its org off the ambient scope `OrganizationSelect` writes.
  */
 
-import { navigationApi } from "./navigation-api";
-import type { NavigationHostPort } from "../model/navigation-host";
+import { navigationApi } from "./navigation-api.ts";
+import type { NavigationHostPort } from "../model/navigation-host.ts";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
 const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;

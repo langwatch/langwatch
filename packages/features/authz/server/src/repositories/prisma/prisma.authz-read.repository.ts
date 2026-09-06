@@ -19,8 +19,8 @@ import type {
   OrganizationMembership,
   OrganizationRole,
   ShareLinkRow,
-} from "../authz-read.repository";
-import { AuthzReadRepository, type AuthzDatabase } from "../authz-read.repository";
+} from "../authz-read.repository.ts";
+import { AuthzReadRepository, type AuthzDatabase } from "../authz-read.repository.ts";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 

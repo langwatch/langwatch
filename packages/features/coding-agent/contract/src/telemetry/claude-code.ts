@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
  * Claude Code (CLI). Namespaces its event and metric names under

@@ -1,8 +1,8 @@
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { RoleService as RoleServiceContract } from "@langwatch/role-contract";
-import { RolePermissionPort, RoleScopePort } from "../ports/role.port";
-import { PrismaRoleRepository } from "../repositories/prisma/prisma.role.repository";
-import { RoleService, type RoleServiceDependencies } from "../services/role.service";
+import { RolePermissionPort, RoleScopePort } from "../ports/role.port.ts";
+import { PrismaRoleRepository } from "../repositories/prisma/prisma.role.repository.ts";
+import { RoleService, type RoleServiceDependencies } from "../services/role.service.ts";
 
 export interface PostgresRoleAdapterOptions {
   database: object;

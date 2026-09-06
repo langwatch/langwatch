@@ -20,7 +20,7 @@ import type {
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../simulation-run-state.projection";
+} from "../simulation-run-state.projection.ts";
 
 // Create a dummy store -- only init/apply are tested, not persistence
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {

@@ -7,10 +7,10 @@
 import type { LangyEventCursor } from "@langwatch/langy-contract";
 import { useEffect } from "react";
 
-import { api } from "../../../../behavior/langy-api";
+import { api } from "../../../../behavior/langy-api.ts";
 
-import type { LangyRecordWait } from "../../../../model/langy-local-waits";
-import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store";
+import type { LangyRecordWait } from "../../../../model/langy-local-waits.ts";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 
 export interface LangyLocalRecordResult {
   waits: LangyRecordWait[];

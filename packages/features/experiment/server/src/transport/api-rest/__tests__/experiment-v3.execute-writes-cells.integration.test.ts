@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const orchestratorEvents = vi.hoisted(() => ({ events: [] as unknown[] }));
 
-vi.mock("../../../services/experiment-run-orchestrator.service", () => ({
+vi.mock("../../../services/experiment-run-orchestrator.service.ts", () => ({
   ExperimentRunOrchestratorService: {
     requestAbort: vi.fn(),
     runOrchestrator: vi.fn(async function* () {
@@ -18,7 +18,7 @@ vi.mock("../../../services/experiment-run-orchestrator.service", () => ({
   },
 }));
 
-vi.mock("../../../services/experiment-execution-data.service", () => ({
+vi.mock("../../../services/experiment-execution-data.service.ts", () => ({
   ExperimentExecutionDataService: {
     loadExecutionData: vi.fn(async () => ({
       datasetRows: [{ input: "one" }],
@@ -34,7 +34,7 @@ vi.mock("../../../services/experiment-execution-data.service", () => ({
 // The run-state store is Redis in production and is not what this file is
 // about. Its writes are stubbed so the route's own decisions are all that
 // reaches an assertion.
-vi.mock("../../../services/experiment-run-state-mirror.service", () => ({
+vi.mock("../../../services/experiment-run-state-mirror.service.ts", () => ({
   ExperimentRunStateMirrorService: {
     create: () => ({
       record: vi.fn(async () => undefined),
@@ -43,7 +43,7 @@ vi.mock("../../../services/experiment-run-state-mirror.service", () => ({
   },
 }));
 
-import { createExperimentV3RestApp } from "../experiment-v3.api";
+import { createExperimentV3RestApp } from "../experiment-v3.api.ts";
 
 const getWorkbenchState = vi.fn();
 const recordWorkbenchRunResults = vi.fn();

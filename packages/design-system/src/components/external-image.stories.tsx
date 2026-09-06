@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ExternalImage } from "./external-image";
+import { ExternalImage } from "./external-image.tsx";
 
 const SAMPLE =
   "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNDAiIGhlaWdodD0iMTQwIj48cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE0MCIgZmlsbD0iI2VkODkyNiIvPjx0ZXh0IHg9IjEyMCIgeT0iNzYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE4IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BdHRhY2htZW50PC90ZXh0Pjwvc3ZnPg==";

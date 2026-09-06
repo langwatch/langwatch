@@ -1,6 +1,6 @@
 import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
-import { LangyPromptRegistryService, type LangyPromptPort } from "./langy-prompt-registry.service";
-import { LANGY_OVERRIDE } from "./langy-turn-shared.service";
+import { LangyPromptRegistryService, type LangyPromptPort } from "./langy-prompt-registry.service.ts";
+import { LANGY_OVERRIDE } from "./langy-turn-shared.service.ts";
 
 export type LangyTurnOverride = {
   text: string;

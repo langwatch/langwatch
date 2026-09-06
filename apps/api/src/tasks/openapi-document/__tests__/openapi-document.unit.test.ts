@@ -12,7 +12,7 @@ import {
   checkOpenApiDocument,
   FROZEN_DOCUMENT_PATH,
   UNSERVED_AT_BASELINE,
-} from "../openapi-document.checker";
+} from "../openapi-document.checker.ts";
 import {
   atCanonicalPaths,
   generateOpenApiDocument,
@@ -20,7 +20,7 @@ import {
   type AccessPolicyExtension,
   type GeneratedOpenApiDocument,
   type OpenApiDocument,
-} from "../openapi-document.generator";
+} from "../openapi-document.generator.ts";
 
 /**
  * One path per REST family the process mounts, spelled the way the document spells it.

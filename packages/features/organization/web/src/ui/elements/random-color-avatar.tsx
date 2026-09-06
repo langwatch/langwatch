@@ -8,7 +8,7 @@
 
 import type { AvatarRootProps } from "@langwatch/design-system/avatar";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
-import { UserAvatar } from "./user-avatar";
+import { UserAvatar } from "./user-avatar.tsx";
 
 /**
  * Person avatar with a deterministic name-hashed background behind the initials

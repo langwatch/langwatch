@@ -25,11 +25,11 @@ import {
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
 } from "@langwatch/coding-agent-contract";
-import { EventingContributeLogFactsAdapter } from "../eventing.contribute-log-facts.adapter";
-import { EventingContributeMetricFactsAdapter } from "../eventing.contribute-metric-facts.adapter";
-import { EventingContributeSpanFactsAdapter } from "../eventing.contribute-span-facts.adapter";
-import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter";
-import type { CodingAgentSessionContextMemoPort } from "../../ports/coding-agent-session-context.port";
+import { EventingContributeLogFactsAdapter } from "../eventing.contribute-log-facts.adapter.ts";
+import { EventingContributeMetricFactsAdapter } from "../eventing.contribute-metric-facts.adapter.ts";
+import { EventingContributeSpanFactsAdapter } from "../eventing.contribute-span-facts.adapter.ts";
+import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter.ts";
+import type { CodingAgentSessionContextMemoPort } from "../../ports/coding-agent-session-context.port.ts";
 
 const TENANT = "tenant-1";
 const SESSION = "8f2c9a1e-session";

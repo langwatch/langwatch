@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AggregateType, EventUtils } from "../../";
-import { createTenantId } from "../../domain/tenantId";
-import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
-import { EventStoreMemory } from "../eventStoreMemory";
+import { type AggregateType, EventUtils } from "../..//index.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import { EventStoreMemory } from "../eventStoreMemory.ts";
 
 describe("EventStoreMemory - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");

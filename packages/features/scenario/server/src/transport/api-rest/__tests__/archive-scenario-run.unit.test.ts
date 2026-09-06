@@ -18,7 +18,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
-import { archiveScenarioRun } from "../scenario-event.api";
+import { archiveScenarioRun } from "../scenario-event.api.ts";
 
 describe("archiveScenarioRun()", () => {
   let mockTryGetScenarioRunData: Mock;

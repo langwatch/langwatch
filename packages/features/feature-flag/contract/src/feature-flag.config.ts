@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { FeatureFlagKey } from "./feature-flag";
-import { FEATURE_FLAGS } from "./feature-flag";
-import { resolveFeatureFlagEnvOverride } from "./feature-flag-environment";
+import type { FeatureFlagKey } from "./feature-flag.ts";
+import { FEATURE_FLAGS } from "./feature-flag.ts";
+import { resolveFeatureFlagEnvOverride } from "./feature-flag-environment.ts";
 
 const optionalEnvironmentValueSchema = z.string().optional();
 

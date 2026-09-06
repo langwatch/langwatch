@@ -12,25 +12,25 @@ const mocks = vi.hoisted(() => ({
   closeDrawer: vi.fn(),
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({
     openDrawer: mocks.openDrawer,
     closeDrawer: mocks.closeDrawer,
   }),
 }));
 
-vi.mock("../../../../use-deja-view-link", () => ({
+vi.mock("../../../../use-deja-view-link.ts", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
 
-vi.mock("../../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     isGated: false,
     requestEnable: async () => true,
@@ -53,7 +53,7 @@ vi.mock("@langwatch/presence-web", () => ({
   selectPeersMatching: () => () => [],
 }));
 
-vi.mock("../../../hooks/use-trace-resources", () => ({
+vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   useTraceResources: () => ({
     resourceAttributes: {},
     scopeName: null,
@@ -63,7 +63,7 @@ vi.mock("../../../hooks/use-trace-resources", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-context", () => ({
+vi.mock("../../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     turns: [],
     position: null,
@@ -74,11 +74,11 @@ vi.mock("../../../hooks/use-conversation-context", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-refresh", () => ({
+vi.mock("../../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({
     canGoBack: false,
     goBack: vi.fn(),
@@ -88,39 +88,39 @@ vi.mock("../../../hooks/use-trace-drawer-navigation", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-span-tree", () => ({
+vi.mock("../../../hooks/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [], isLoading: false }),
 }));
 
-vi.mock("../../trace-header-chips", () => ({
+vi.mock("../../trace-header-chips.tsx", () => ({
   useTraceHeaderChipDefs: () => [],
 }));
 
-vi.mock("../../../add-to-annotation-queue-dialog", () => ({
+vi.mock("../../../add-to-annotation-queue-dialog.tsx", () => ({
   AddToAnnotationQueueDialog: () => null,
 }));
 
-vi.mock("../share-trace-dialog", () => ({ ShareTraceDialog: () => null }));
+vi.mock("../share-trace-dialog.tsx", () => ({ ShareTraceDialog: () => null }));
 
 // `EditableTraceName` moved into `@langwatch/trace-web`, where it runs a real
 // tRPC mutation and would need a transport Provider this test has no reason to
 // mount. Partially mock the barrel so everything else it exports — notably
 // `usePinnedAttributesStore`, which this test drives — stays real.
-vi.mock("../../../../editable-trace-name", () => ({
+vi.mock("../../../../editable-trace-name.tsx", () => ({
   EditableTraceName: ({ value }: { value: string }) => <span>{value}</span>,
 }));
 
-vi.mock("../trace-overflow-menu", () => ({ TraceOverflowMenu: () => null }));
+vi.mock("../trace-overflow-menu.tsx", () => ({ TraceOverflowMenu: () => null }));
 
-vi.mock("../../edit-mode/edited-original-toggle", () => ({
+vi.mock("../../edit-mode/edited-original-toggle.tsx", () => ({
   EditedOriginalToggle: () => null,
 }));
 
-vi.mock("../../raw-json-dialog", () => ({ RawJsonDialog: () => null }));
+vi.mock("../../raw-json-dialog.tsx", () => ({ RawJsonDialog: () => null }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { usePinnedAttributesStore } from "../../../../../../behavior/pinned-attributes.store";
-import { DrawerHeader } from "../drawer-header";
+import { usePinnedAttributesStore } from "../../../../../../behavior/pinned-attributes.store.ts";
+import { DrawerHeader } from "../drawer-header.tsx";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {
   return {

@@ -4,7 +4,7 @@ import {
   CUSTOM_PRESET_VALUE,
   INDEFINITE_PRESET_VALUE,
   LEGACY_PRESET_VALUE,
-} from "../retention-constants";
+} from "../retention-constants.ts";
 
 const labels = (items: { label: string }[]) => items.map((i) => i.label);
 const values = (items: { value: string }[]) => items.map((i) => i.value);

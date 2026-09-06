@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import { useOptionalLangyHost } from "../model/langy-host";
+import { useOptionalLangyHost } from "../model/langy-host.ts";
 
 export type LangySessionReading = {
   data: {

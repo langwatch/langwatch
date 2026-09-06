@@ -1,4 +1,4 @@
-import type { EmailContent, EmailDeliveryPort } from "./providers/types";
+import type { EmailContent, EmailDeliveryPort } from "./providers/types.ts";
 
 export const computeDefaultFrom = (mailer: EmailDeliveryPort): string => mailer.defaultFrom();
 

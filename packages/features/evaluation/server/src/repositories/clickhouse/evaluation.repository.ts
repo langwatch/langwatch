@@ -11,10 +11,10 @@ import type {
 import type {
   EvaluationClickHouseResolver,
   EvaluationRetentionFloorPort,
-} from "../../ports/evaluation.port";
-import { EvaluationRunRepository } from "../evaluation.repository";
-import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository";
-import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository";
+} from "../../ports/evaluation.port.ts";
+import { EvaluationRunRepository } from "../evaluation.repository.ts";
+import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
+import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
 
 /** Composes the read and write adapters for the evaluation_runs table. */
 export class ClickHouseEvaluationRepository extends EvaluationRunRepository {

@@ -5,28 +5,28 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TargetValue } from "../../../../model/scenario-target";
-import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import {
   unionParameterDefinitions,
   type DeclaredParameter,
-} from "../../../../behavior/suites/use-run-suite";
+} from "../../../../behavior/suites/use-run-suite.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { api } from "../../../../behavior/scenario-api";
-import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips";
-import type { PromptEntry } from "./prompt-picker";
+import { api } from "../../../../behavior/scenario-api.ts";
+import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
+import type { PromptEntry } from "./prompt-picker.tsx";
 import { declaredDefaults } from "@langwatch/suite-contract";
-import { useSession } from "../../../../behavior/auth-session";
-import { applyConfigurationTo } from "./apply-configuration";
-import { type CompareRow, compareRowParameters, type ParameterDefaults } from "./compare-rows";
+import { useSession } from "../../../../behavior/auth-session.ts";
+import { applyConfigurationTo } from "./apply-configuration.ts";
+import { type CompareRow, compareRowParameters, type ParameterDefaults } from "./compare-rows.ts";
 import {
   formatParameterLine,
   formatStoredParameterLine,
   toLineRunParameters,
-} from "../../../../model/agent-testing/run/parameter-line";
+} from "../../../../model/agent-testing/run/parameter-line.ts";
 import {
   canCollapseRows,
   lineFromRows,
@@ -36,23 +36,23 @@ import {
   storableSecretRowNames,
   toRowsRunParameters,
   toStorableRowParameters,
-} from "../../../../model/agent-testing/run/parameter-rows";
-import type { ParameterFieldError } from "./parameter-suggestions";
-import { type ScopeScenario, scenariosInScope } from "./run-scope-section";
-import type { RunDialogAgent } from "./run-target-picker";
-import { normaliseRunScope, type RunScope } from "./run-configuration";
-import type { RunDialogMode, RunDialogSubject, RunTarget } from "./run-dialog-types";
+} from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { ParameterFieldError } from "./parameter-suggestions.ts";
+import { type ScopeScenario, scenariosInScope } from "./run-scope-section.tsx";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
+import { normaliseRunScope, type RunScope } from "./run-configuration.ts";
+import type { RunDialogMode, RunDialogSubject, RunTarget } from "./run-dialog-types.ts";
 import {
   lineWithoutUndeclared,
   undeclaredNamesOnLine,
   undeclaredNamesOnRows,
   undeclaredParameterMessage,
-} from "./undeclared-parameters";
-import { useCompareRows } from "./use-compare-rows";
-import { useRunConfigurationHistory } from "./use-run-configuration-history";
-import { useRunHistorySeed } from "./use-run-history-seed";
-import { buildTargetLabels, scopeLabelOf, useRunName } from "./use-run-name";
-import { type RunPlanFields, useRunPlanFields } from "./use-run-plan-fields";
+} from "./undeclared-parameters.ts";
+import { useCompareRows } from "./use-compare-rows.ts";
+import { useRunConfigurationHistory } from "./use-run-configuration-history.ts";
+import { useRunHistorySeed } from "./use-run-history-seed.ts";
+import { buildTargetLabels, scopeLabelOf, useRunName } from "./use-run-name.ts";
+import { type RunPlanFields, useRunPlanFields } from "./use-run-plan-fields.ts";
 
 /** One key per subject the dialog can be open on, "closed" when it is not. */
 function subjectKeyOf(subject: RunDialogSubject | null): string {

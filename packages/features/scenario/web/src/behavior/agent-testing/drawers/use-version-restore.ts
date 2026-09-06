@@ -7,8 +7,8 @@
 import { useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "../../use-organization-team-project";
-import { api } from "../../scenario-api";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { api } from "../../scenario-api.ts";
 
 export type VersionRestore = ReturnType<typeof useVersionRestore>;
 

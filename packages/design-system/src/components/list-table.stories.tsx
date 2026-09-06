@@ -1,6 +1,6 @@
 import { Box, Skeleton, Table, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ListTable } from "./list-table";
+import { ListTable } from "./list-table.tsx";
 
 const ROWS = [
   { name: "Checkout greeting", model: "gpt-5-mini", version: 12 },

@@ -4,8 +4,8 @@ import {
   ESSENTIAL_PII_ENTITIES,
   PRESIDIO_STRICT_ENTITIES,
   STRICT_ONLY_PII_ENTITIES,
-} from "../piiEntities.js";
-import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "../markers.js";
+} from "../piiEntities.ts";
+import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "../markers.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

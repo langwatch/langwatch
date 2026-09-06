@@ -7,8 +7,8 @@ import {
   type UpdateGatewayCacheRuleInput,
 } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
-import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository";
-import { GatewayCacheRuleService } from "../../services/gateway-cache-rule.service";
+import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
+import { GatewayCacheRuleService } from "../../services/gateway-cache-rule.service.ts";
 
 const existingRule: GatewayCacheRuleResource = {
   id: "rule_01",

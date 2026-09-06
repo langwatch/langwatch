@@ -11,12 +11,12 @@ import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   tryCreateWorkerAutomationDelivery,
   tryCreateWorkerAutomationGraphComposition,
-} from "../worker-automation-graph.composition";
-import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition";
+} from "../worker-automation-graph.composition.ts";
+import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition.ts";
 
 /**
  * Spec: packages/features/automation/specs/graph-alert-worker-composition.feature

@@ -2,12 +2,12 @@
 
 import { Heading } from "@chakra-ui/react";
 import type React from "react";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useInviteActions } from "../../behavior/use-invite-actions";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { usePublicEnv } from "../../behavior/use-public-env";
-import { api } from "../../behavior/organization-api";
-import { AddMembersForm } from "./add-members-form";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useInviteActions } from "../../behavior/use-invite-actions.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { api } from "../../behavior/organization-api.ts";
+import { AddMembersForm } from "./add-members-form.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 /**

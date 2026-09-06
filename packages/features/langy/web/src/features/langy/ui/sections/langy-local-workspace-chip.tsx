@@ -7,10 +7,10 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { FolderCode } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { describeError } from "../../../../behavior/errors";
-import { api } from "../../../../behavior/langy-api";
+import { describeError } from "../../../../behavior/errors.tsx";
+import { api } from "../../../../behavior/langy-api.ts";
 
-import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 
 export interface LangyLocalWorkspaceChipProps {
   projectId: string;

@@ -8,7 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { SyntheticTraceBadge } from "../synthetic-trace-badge";
+import { SyntheticTraceBadge } from "../synthetic-trace-badge.tsx";
 
 afterEach(() => {
   cleanup();

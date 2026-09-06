@@ -1,7 +1,7 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { SuiteRunProcessingPipeline } from "@langwatch/suite-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
  * The two suite-run senders the Scenario pipeline's suite sync dispatches to.

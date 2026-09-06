@@ -4,8 +4,8 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
-import type { UiScopeHostPort } from "./use-organization-team-project";
-import type { UiSlotsPort } from "./slots";
+import type { UiScopeHostPort } from "./use-organization-team-project.ts";
+import type { UiSlotsPort } from "./slots.tsx";
 import { createContext, useContext } from "react";
 
 /** The composition never filled this port, and something asked it to work. */

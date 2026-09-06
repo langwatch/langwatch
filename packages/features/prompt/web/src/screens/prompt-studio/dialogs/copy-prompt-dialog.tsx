@@ -12,10 +12,10 @@
  */
 
 import { useState } from "react";
-import { promptApi } from "../../../behavior/prompt-api";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { usePromptHost } from "../../../model/prompt-host";
-import { PromptReplicateDialog } from "../../../ui/blocks/prompt-replicate-dialog";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { PromptReplicateDialog } from "../../../ui/blocks/prompt-replicate-dialog.tsx";
 
 export const CopyPromptDialog = ({
   open,

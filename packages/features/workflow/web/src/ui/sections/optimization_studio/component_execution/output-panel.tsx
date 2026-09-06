@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
-import { ExecutionOutputPanel } from "../../executable-panel/execution-output-panel";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { ExecutionOutputPanel } from "../../executable-panel/execution-output-panel.tsx";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import type { Component } from "@langwatch/workflow-contract";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {

@@ -22,7 +22,7 @@ const { mockUsageData } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     limits: {
       getUsage: {
@@ -39,7 +39,7 @@ vi.mock("../../../behavior/organization-api", () => ({
   },
 }));
 
-import { MemberSeatUsage } from "../../sections/member-seat-usage";
+import { MemberSeatUsage } from "../../sections/member-seat-usage.tsx";
 
 const planWith = ({ maxMembers, maxMembersLite }: { maxMembers: number; maxMembersLite: number }) =>
   ({ maxMembers, maxMembersLite }) as any;

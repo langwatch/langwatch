@@ -3,8 +3,8 @@ import {
   AutomationEmailCapService,
   type ConsumeDailyEmailCapInput,
   type ConsumeHourlyEmailCapInput,
-} from "../../services/email-cap.service";
-import type { AutomationEmailCapStorePort } from "../email-cap.port";
+} from "../../services/email-cap.service.ts";
+import type { AutomationEmailCapStorePort } from "../email-cap.port.ts";
 
 // The package accepts the infrastructure connection explicitly. This holder
 // keeps the test's Redis-vs-memory choice local without a process-global App.

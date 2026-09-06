@@ -2,8 +2,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import {
   ClickHouseRetroactiveRetentionRepository,
   type RetentionClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.retroactive-retention.repository";
-import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository";
+} from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
+import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
 
 export type TenantClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 

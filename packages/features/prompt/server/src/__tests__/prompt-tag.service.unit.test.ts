@@ -5,8 +5,8 @@ import {
   PromptTagProtectedError,
   PromptTagValidationError,
 } from "@langwatch/prompt-contract";
-import { PromptTagService } from "../services/prompt-tag.service";
-import { PROTECTED_TAGS, type PromptTagRepository } from "../repositories/prompt-tag.repository";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { PROTECTED_TAGS, type PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
 
 /**
  * A stored tag as the catalogue itself hands one back, read off the repository

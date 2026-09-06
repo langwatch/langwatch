@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GatewayElevenLabsCredentialRepository,
   type GatewayElevenLabsProviderRow,
-} from "../gateway-elevenlabs-credential.repository";
+} from "../gateway-elevenlabs-credential.repository.ts";
 
 /** The client slice the ElevenLabs credential reads bind to. */
 export type GatewayElevenLabsCredentialDatabase = Pick<PrismaClient, "modelProvider">;

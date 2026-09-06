@@ -3,7 +3,7 @@ import { createTenantId } from "@langwatch/eventing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { createEvaluationProcessingPipeline } from "@langwatch/evaluation-server/internal";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent";
+import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
 import type { EvaluationAnalyticsData } from "@langwatch/evaluation-server/internal";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
@@ -16,7 +16,7 @@ import type {
   EvaluationProcessingEvent,
   EvaluationRunData,
 } from "@langwatch/evaluation-contract";
-import { createEvaluationStartedEvent } from "./eventing/fixtures/evaluation-events.fixtures";
+import { createEvaluationStartedEvent } from "./eventing/fixtures/evaluation-events.fixtures.ts";
 
 const tenantId = createTenantId("project-wiring");
 

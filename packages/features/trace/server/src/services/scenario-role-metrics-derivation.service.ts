@@ -1,7 +1,7 @@
-import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port";
-import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules";
-import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules";
-import { SpanCostService } from "./span-cost.service";
+import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port.ts";
+import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
+import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules.ts";
+import { SpanCostService } from "./span-cost.service.ts";
 
 /**
  * Window after which a memo entry is dropped purely as a memory backstop — correctness comes from

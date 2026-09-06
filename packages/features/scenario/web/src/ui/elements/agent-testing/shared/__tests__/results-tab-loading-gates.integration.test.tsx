@@ -8,8 +8,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab";
-import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge";
+import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab.tsx";
+import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge.tsx";
 
 const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string | string[] | undefined>,
@@ -24,7 +24,7 @@ const mockBatchHistory = vi.hoisted(() => vi.fn());
 const mockResultsOverview = vi.hoisted(() => vi.fn());
 const mockResultAtoms = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -84,11 +84,11 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),

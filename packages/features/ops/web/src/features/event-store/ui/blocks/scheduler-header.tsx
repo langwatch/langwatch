@@ -1,6 +1,6 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import type { SchedulerHeaderCounts } from "../../model/scheduler-presentation";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import type { SchedulerHeaderCounts } from "../../model/scheduler-presentation.ts";
 
 /**
  * What needs attention, and whether the calendar loop itself is the problem.

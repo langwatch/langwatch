@@ -8,8 +8,8 @@ import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cssRulesForElement } from "./emotion-test-css";
-import { Dialog } from "../dialog";
+import { cssRulesForElement } from "./emotion-test-css.ts";
+import { Dialog } from "../dialog.tsx";
 
 /** The misuse warning is a development affordance, so the shell says so here. */
 const capabilities: UiCapabilities = {

@@ -5,7 +5,7 @@ import {
   displayValue,
   serializeOptionalScalarValue,
   serializeScalarValue,
-} from "../src/json-value-text";
+} from "../src/json-value-text.ts";
 
 describe("JSON value text", () => {
   it("renders values without text as an empty controlled input", () => {

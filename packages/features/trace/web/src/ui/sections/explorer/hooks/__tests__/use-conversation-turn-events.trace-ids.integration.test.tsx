@@ -9,21 +9,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../../elements/explorer/context/trace-viewer-context", () => ({
+vi.mock("../../../../elements/explorer/context/trace-viewer-context.tsx", () => ({
   useIsReadOnlyTrace: () => false,
 }));
 
-import type { TraceListItem } from "../../types/trace";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { useConversationTurnEvents } from "../use-conversation-turn-events";
+import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { useConversationTurnEvents } from "../use-conversation-turn-events.ts";
 
 function turn(traceId: string, timestamp: number): TraceListItem {
   return {

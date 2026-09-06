@@ -19,8 +19,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createWorkerMetricsHandler, type WorkerMetricsPorts } from "../worker-metrics.server";
-import { WORKER_LIVENESS_PATH } from "../worker.liveness";
+import { createWorkerMetricsHandler, type WorkerMetricsPorts } from "../worker-metrics.server.ts";
+import { WORKER_LIVENESS_PATH } from "../worker.liveness.ts";
 
 // Derive the fakes' types from the handler itself, so this test cannot drift
 // from the @types/node signature the real listener is checked against.

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TriggerAction } from "@langwatch/automation-contract";
-import { INITIAL_DRAFT } from "../ui/sections/draft-model";
-import { MAX_TEST_HISTORY, useAutomationStore } from "../ui/sections/automation-store";
+import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
+import { MAX_TEST_HISTORY, useAutomationStore } from "../ui/sections/automation-store.ts";
 
 describe("automationStore", () => {
   describe("given a fresh store", () => {

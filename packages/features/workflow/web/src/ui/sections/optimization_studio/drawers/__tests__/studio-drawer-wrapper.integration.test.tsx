@@ -15,7 +15,7 @@ const mockDeleteNode = vi.fn();
 const mockDeselectAllNodes = vi.fn();
 const mockSetPropertiesExpanded = vi.fn();
 
-vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
@@ -26,15 +26,15 @@ vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => 
       deleteNode: mockDeleteNode,
     }),
 }));
-vi.mock("../../../../elements/workflow-icons", async (importOriginal) => ({
+vi.mock("../../../../elements/workflow-icons.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentIcon: () => <div data-testid="component-icon" />,
 }));
-vi.mock("../../../workflow-node-execution", async (importOriginal) => ({
+vi.mock("../../../workflow-node-execution.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentExecutionButton: () => <div data-testid="exec-button" />,
 }));
-vi.mock("../../../workflow-nodes", async (importOriginal) => ({
+vi.mock("../../../workflow-nodes.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
 }));
@@ -47,15 +47,15 @@ vi.mock("usehooks-ts", () => ({
   useWindowSize: () => ({ width: 1200, height: 800 }),
 }));
 
-vi.mock("../../component_execution/input-panel", () => ({
+vi.mock("../../component_execution/input-panel.tsx", () => ({
   InputPanel: () => <div data-testid="input-panel" />,
 }));
 
-vi.mock("../../component_execution/output-panel", () => ({
+vi.mock("../../component_execution/output-panel.tsx", () => ({
   OutputPanel: () => <div data-testid="output-panel" />,
 }));
 
-const { StudioDrawerWrapper } = await import("../studio-drawer-wrapper");
+const { StudioDrawerWrapper } = await import("../studio-drawer-wrapper.tsx");
 
 function makeNode(type: string): Node<Component> {
   return {

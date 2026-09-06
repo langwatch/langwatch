@@ -12,7 +12,7 @@ import type {
   WorkflowLlmParameterResolution,
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,
-} from "../ports/workflow.port";
+} from "../ports/workflow.port.ts";
 
 const workflowLlmConfigSchema = llmConfigSchema.passthrough().nullish();
 

@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../../domain/types";
-import type { EventSourcedQueueProcessor } from "../../../queues";
+import type { Event } from "../../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
 import {
   createTestAggregateType,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../__tests__/testHelpers";
-import type { JobRegistryEntry } from "../queueManager";
-import { QueueManager } from "../queueManager";
+} from "../../__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../queueManager.ts";
+import { QueueManager } from "../queueManager.ts";
 
 function createMockSharedQueue(): EventSourcedQueueProcessor<any> {
   return {

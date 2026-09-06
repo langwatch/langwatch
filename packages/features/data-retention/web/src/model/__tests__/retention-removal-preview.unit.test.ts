@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { RetentionScopeGroup } from "../retention-grouping";
-import { retentionRemovalPreviewQuery } from "../retention-removal-preview";
+import type { RetentionScopeGroup } from "../retention-grouping.ts";
+import { retentionRemovalPreviewQuery } from "../retention-removal-preview.ts";
 
 const group: RetentionScopeGroup = {
   scopeType: "ORGANIZATION",

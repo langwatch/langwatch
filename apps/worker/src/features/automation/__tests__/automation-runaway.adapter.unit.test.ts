@@ -1,7 +1,7 @@
 import { NoopAutomationRunawayMetrics } from "@langwatch/automation-server";
 import { EmailDeliveryPort } from "@langwatch/notification-server";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerAutomationRunawayAdapter } from "../automation-runaway.adapter";
+import { WorkerAutomationRunawayAdapter } from "../automation-runaway.adapter.ts";
 
 class NoopMailer extends EmailDeliveryPort {
   defaultFrom(): string {

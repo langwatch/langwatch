@@ -24,22 +24,22 @@ import type { ComponentType } from "react";
 export type GovernanceScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const governanceScreens = {
-  overview: () => import("./governance-overview.screen"),
-  inventory: () => import("./governance-inventory.screen"),
-  ingestionSource: () => import("./governance-ingestion-source.screen"),
-  anomalyRules: () => import("./governance-anomaly-rules.screen"),
-  people: () => import("./governance-people.screen"),
-  costs: () => import("./governance-costs.screen"),
-  billed: () => import("./governance-billed.screen"),
-  teams: () => import("./governance-teams.screen"),
-  team: () => import("./governance-team.screen"),
-  users: () => import("./governance-users.screen"),
-  user: () => import("./governance-user.screen"),
+  overview: () => import("./governance-overview.screen.tsx"),
+  inventory: () => import("./governance-inventory.screen.tsx"),
+  ingestionSource: () => import("./governance-ingestion-source.screen.tsx"),
+  anomalyRules: () => import("./governance-anomaly-rules.screen.tsx"),
+  people: () => import("./governance-people.screen.tsx"),
+  costs: () => import("./governance-costs.screen.tsx"),
+  billed: () => import("./governance-billed.screen.tsx"),
+  teams: () => import("./governance-teams.screen.tsx"),
+  team: () => import("./governance-team.screen.tsx"),
+  users: () => import("./governance-users.screen.tsx"),
+  user: () => import("./governance-user.screen.tsx"),
 } as const satisfies Record<string, GovernanceScreenLoader>;
 
 export type GovernanceScreenName = keyof typeof governanceScreens;
 
-export { governanceApi } from "../../behavior/governance-api";
+export { governanceApi } from "../../behavior/governance-api.ts";
 export {
   GovernanceHostPort,
   GovernanceHostProvider,
@@ -52,4 +52,4 @@ export {
   type GovernanceScope,
   type GovernanceSuccessNotice,
   type GovernanceTeam,
-} from "../../model/governance-host";
+} from "../../model/governance-host.ts";

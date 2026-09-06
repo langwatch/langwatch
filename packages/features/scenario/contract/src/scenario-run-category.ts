@@ -1,4 +1,4 @@
-import { ScenarioRunStatus } from "./scenario-run";
+import { ScenarioRunStatus } from "./scenario-run.ts";
 
 /**
  * The outcome bucket a run falls into, independent of which specific status

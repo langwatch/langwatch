@@ -4,7 +4,7 @@
 
 import { Button, HStack, Input } from "@chakra-ui/react";
 import { useRef, useState } from "react";
-import { TagPill, type TagPillTone } from "./tag-pill";
+import { TagPill, type TagPillTone } from "./tag-pill.tsx";
 
 type TagListProps = {
   labels: string[];

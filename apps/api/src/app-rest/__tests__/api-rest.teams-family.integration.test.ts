@@ -22,14 +22,14 @@ import { TeamIdentityAdapter } from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition";
-import { ApiRestSecurity } from "../../api-rest.security";
+import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition.ts";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
 import {
   errorCodeOf,
   mountRestFamily,
   TEST_ORGANIZATION_ID,
   type MountedRestFamily,
-} from "./support/rest-family.harness";
+} from "./support/rest-family.harness.ts";
 
 const OTHER_ORGANIZATION_ID = "organization-2";
 

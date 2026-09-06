@@ -10,7 +10,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LangyGitHubProgressCard } from "../../../../../ui/elements/github/langy-github-progress-card";
+import { LangyGitHubProgressCard } from "../../../../../ui/elements/github/langy-github-progress-card.tsx";
 
 function renderCard({
   events,

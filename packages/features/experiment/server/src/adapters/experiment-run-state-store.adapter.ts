@@ -5,10 +5,10 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import type {
   ExperimentClickHousePort,
   ExperimentEventingClickHouseClient,
-} from "../ports/experiment-clickhouse.port";
-import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
-import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store";
-import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection";
+} from "../ports/experiment-clickhouse.port.ts";
+import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository.ts";
+import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store.ts";
+import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection.ts";
 
 export class ExperimentRunStateStoreAdapter {
   /**

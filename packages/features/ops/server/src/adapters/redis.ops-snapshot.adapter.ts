@@ -1,7 +1,7 @@
 import { OpsSnapshotService } from "@langwatch/ops-contract";
-import { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port";
-import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository";
-import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service";
+import { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port.ts";
+import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
+import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 
 export interface RedisOpsSnapshotAdapterOptions {
   redis: OpsSnapshotRedisPort;

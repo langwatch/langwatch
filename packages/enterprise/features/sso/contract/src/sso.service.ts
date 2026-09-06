@@ -1,4 +1,4 @@
-import type { SsoConfiguration } from "./sso.contract";
+import type { SsoConfiguration } from "./sso.contract.ts";
 
 /** Portable SSO capability exposed to Enterprise composition roots. */
 export abstract class SsoService {

@@ -2,8 +2,8 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import { addTarget, removeTarget, setTargetPrompt, updateTargetModel } from "../transforms";
-import { baseState, refusalCode } from "./workbench-fixtures";
+import { addTarget, removeTarget, setTargetPrompt, updateTargetModel } from "../transforms/index.ts";
+import { baseState, refusalCode } from "./workbench-fixtures.ts";
 
 describe("addTarget", () => {
   it("infers dataset mappings and evaluator mappings for the new target", () => {

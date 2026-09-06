@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pMapLimited } from "../pMapLimited";
+import { pMapLimited } from "../pMapLimited.ts";
 
 /**
  * Deferred promise handle — lets a test hold an in-flight invocation open

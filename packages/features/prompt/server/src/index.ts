@@ -1,5 +1,5 @@
 export type { PromptService } from "@langwatch/prompt-contract";
-export { PostgresPromptAdapter } from "./adapters/postgres.prompt.adapter";
+export { PostgresPromptAdapter } from "./adapters/postgres.prompt.adapter.ts";
 export {
   PromptApp,
   PromptHasNoCopiesError,
@@ -11,14 +11,14 @@ export {
   PromptTagTakenError,
   type PromptAppDependencies,
   type PromptCaller,
-} from "./app/prompt.app";
-export { PromptTagTrpcApi } from "./transport/api-trpc/prompt-tag.api";
-export { PromptTrpcApi } from "./transport/api-trpc/prompt.api";
+} from "./app/prompt.app.ts";
+export { PromptTagTrpcApi } from "./transport/api-trpc/prompt-tag.api.ts";
+export { PromptTrpcApi } from "./transport/api-trpc/prompt.api.ts";
 export type {
   PromptTrpcContext,
   PromptTrpcPorts,
   PromptTrpcProcedures,
-} from "./rules/prompt-trpc-context.rules";
+} from "./rules/prompt-trpc-context.rules.ts";
 export {
   apiResponsePromptWithVersionDataSchema,
   createPromptInputSchema,
@@ -30,4 +30,4 @@ export {
   type PromptOrganizationVariables,
   type PromptRestPorts,
   type PromptRestService,
-} from "./transport/api-rest/prompt.api";
+} from "./transport/api-rest/prompt.api.ts";

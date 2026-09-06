@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordAuditLogCommandSchema } from "../index";
+import { recordAuditLogCommandSchema } from "../index.ts";
 
 describe("recordAuditLogCommandSchema", () => {
   it("round-trips portable audit data", () => {

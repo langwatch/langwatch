@@ -14,8 +14,8 @@ import {
 } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Fragment, type ReactNode, useState } from "react";
-import { EventDetailRow } from "./source-event-detail-panels";
-import type { SourceEventsPager } from "../../behavior/use-source-events-pager";
+import { EventDetailRow } from "./source-event-detail-panels.tsx";
+import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
 
 /**
  * The events section of the ingestion-source detail page: a cursor-walked

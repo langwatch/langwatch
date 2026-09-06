@@ -1,9 +1,9 @@
 import { motion } from "motion/react";
 import type React from "react";
 import { useEffect } from "react";
-import { useTraceListRefresh } from "../hooks/use-trace-list-refresh";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store";
-import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg";
+import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
+import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg.tsx";
 
 const FADE_MASK =
   "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%)";

@@ -8,7 +8,7 @@
  * @see specs/rbac/authz-grants.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTOR, harness, ORG_ID } from "../support/eventing.authz-ledger-fork.harness";
+import { ACTOR, harness, ORG_ID } from "../support/eventing.authz-ledger-fork.harness.ts";
 
 beforeEach(() => {
   vi.clearAllMocks();

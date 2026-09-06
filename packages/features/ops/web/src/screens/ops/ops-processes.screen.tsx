@@ -1,5 +1,5 @@
-import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout";
-import { ProcessesContent } from "../../features/event-store/ui/sections/processes-content";
+import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout.tsx";
+import { ProcessesContent } from "../../features/event-store/ui/sections/processes-content.tsx";
 
 export default function OpsProcessesScreen() {
   return (

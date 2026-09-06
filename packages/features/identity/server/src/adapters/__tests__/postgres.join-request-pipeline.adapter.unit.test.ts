@@ -1,12 +1,12 @@
-import { JoinRequestMailPort } from "../../ports/join-request-mail.port";
+import { JoinRequestMailPort } from "../../ports/join-request-mail.port.ts";
 import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import {
   PostgresJoinRequestPipelineAdapter,
   type JoinRequestPipelineDatabase,
-} from "../postgres.join-request-pipeline.adapter";
-import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
-import type { JoinRequestPipeline } from "../join-request-pipeline-definition.adapter";
+} from "../postgres.join-request-pipeline.adapter.ts";
+import type { JoinRequestFoldState } from "../../projections/join-request-state.projection.ts";
+import type { JoinRequestPipeline } from "../join-request-pipeline-definition.adapter.ts";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature

@@ -1,6 +1,6 @@
-import type { LicenseData } from "./license";
-import { resolvePlanDefaults } from "./license-plan-defaults";
-import type { PlanInfo } from "./license-plan";
+import type { LicenseData } from "./license.ts";
+import { resolvePlanDefaults } from "./license-plan-defaults.ts";
+import type { PlanInfo } from "./license-plan.ts";
 
 export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
   const resolved = resolvePlanDefaults(licenseData.plan);

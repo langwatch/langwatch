@@ -5,9 +5,9 @@
  */
 
 import { Box, HStack, Spinner, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { PassRateText } from "../shared/pass-rate-text";
-import { passRateColor } from "../shared/pass-rate-color";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { PassRateText } from "../shared/pass-rate-text.tsx";
+import { passRateColor } from "../shared/pass-rate-color.ts";
 
 /** How one target of a comparison did, and the colour it reads in. */
 export type SidebarTargetRate = {

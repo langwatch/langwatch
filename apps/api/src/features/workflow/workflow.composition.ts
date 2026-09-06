@@ -36,13 +36,13 @@ import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
 
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { composeApiAuthoringModelResolver } from "../../app/api-authoring-model.composition";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
+import { composeApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   createWorkflowOptimizationTrpcRouter,
   createWorkflowTrpcRouter,
-} from "./workflow-trpc.mount";
+} from "./workflow-trpc.mount.ts";
 
 /** Where one copy lives, for the "org / team / project" path shown beside it. */
 const workflowCopyPathSelect = {
@@ -151,7 +151,7 @@ export type WorkflowPeers = Readonly<{
   modelProviders: ModelProviderService;
 }>;
 
-import type { ComposedWorkflowFeature } from "./workflow.composition.types";
+import type { ComposedWorkflowFeature } from "./workflow.composition.types.ts";
 
 /**
  * Composes the studio's commit-message writer over this process's model gateway.

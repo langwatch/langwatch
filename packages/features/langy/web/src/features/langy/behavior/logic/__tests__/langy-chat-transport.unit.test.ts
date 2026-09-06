@@ -9,7 +9,7 @@ import {
   createLangyChatTransport,
   type LangyChatTransportDeps,
   type LangyTurnRequestContext,
-} from "../langy-chat-transport";
+} from "../langy-chat-transport.ts";
 
 /**
  * What a tRPC subscription hands back.
@@ -26,7 +26,7 @@ const subscription = vi.fn<(path: string, input: unknown, opts: unknown) => Unsu
 // receiving the dotted path so the assertions still name the procedure. (The
 // v10-era detached-`this` hazard died with the dotted-path client — every
 // proxy access mints a bound call.)
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   trpcClient: {
     langy: {
       createConversation: {

@@ -1,4 +1,4 @@
-import { TraceProjectionLeanService } from "../services/trace-projection-lean.service";
+import { TraceProjectionLeanService } from "../services/trace-projection-lean.service.ts";
 import type { Event, ReplayEvent } from "@langwatch/eventing";
 import type { ReplayEventLean } from "@langwatch/eventing/server";
 

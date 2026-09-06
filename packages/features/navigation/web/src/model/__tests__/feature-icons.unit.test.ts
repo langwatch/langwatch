@@ -2,7 +2,7 @@
  * @see specs/features/suites/rename-suites-to-runs.feature - Feature icon label scenarios
  */
 import { describe, expect, it } from "vitest";
-import { featureIcons, recentItemTypeToFeature } from "../feature-icons";
+import { featureIcons, recentItemTypeToFeature } from "../feature-icons.ts";
 
 describe("featureIcons", () => {
   describe("when the suites feature icon configuration is read", () => {

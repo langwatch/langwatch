@@ -27,7 +27,7 @@ import {
   type LangWatchQLSnapshot,
   type LangWatchQLTimeWindowValues,
   lwqlRequestReducer,
-} from "./lwql-request-state";
+} from "./lwql-request-state.ts";
 
 /** What the request looks like on the wire. */
 export interface LangWatchQLExecuteRequest {

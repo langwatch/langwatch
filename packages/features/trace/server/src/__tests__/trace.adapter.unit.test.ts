@@ -3,16 +3,16 @@ import {
   TracePayloadReaderPort,
   TraceFullIoPort,
   TraceSummaryReaderPort,
-} from "../index";
+} from "../index.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
-import type { TraceClickHouseClient, TraceClickHouseResolver } from "../ports/clickhouse.port";
-import { ClickHouseTraceAdapter } from "../index";
-import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository";
+import type { TraceClickHouseClient, TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
+import { ClickHouseTraceAdapter } from "../index.ts";
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { describe, expect, it } from "vitest";
-import { TestModelProviderService } from "../ports/__tests__/support/model-provider.service.fake";
-import { TestTraceQueryClassification } from "../ports/__tests__/support/query-classification.fake";
-import { traceReadPorts } from "../ports/__tests__/support/trace-read-ports.fake";
+import { TestModelProviderService } from "../ports/__tests__/support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "../ports/__tests__/support/query-classification.fake.ts";
+import { traceReadPorts } from "../ports/__tests__/support/trace-read-ports.fake.ts";
 
 class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
   async list() {

@@ -10,7 +10,7 @@ import { LuCode, LuEye } from "react-icons/lu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { FormatSelect } from "../format-select";
+import { FormatSelect } from "../format-select.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

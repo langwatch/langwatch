@@ -3,7 +3,7 @@
  */
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
+import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
 import { metadataFromRow, type ResourceMetadata, toWireEnum } from "@langwatch/gateway-contract";
 
 /**

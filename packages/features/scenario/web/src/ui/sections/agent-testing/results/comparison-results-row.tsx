@@ -6,13 +6,13 @@
 
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Square } from "lucide-react";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run";
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design";
-import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label";
-import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline";
-import { type BatchTarget, runsOfTarget } from "./use-batch-targets";
+import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
+import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
+import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
+import { type BatchTarget, runsOfTarget } from "./use-batch-targets.ts";
 
 /** What a cell reads when the run never went against that target. */
 export const NOT_IN_RUN_LABEL = "not in run";

@@ -1,7 +1,7 @@
 import {
   type LangyConversationListQueryResult,
   useLangyConversationListQuery,
-} from "./use-langy-conversation-list-query";
+} from "./use-langy-conversation-list-query.ts";
 
 /** The panel's recents list — see {@link useLangyConversationListQuery}. */
 export type LangyConversationListResult = LangyConversationListQueryResult;

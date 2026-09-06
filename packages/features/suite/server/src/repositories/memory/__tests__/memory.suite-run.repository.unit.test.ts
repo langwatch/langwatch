@@ -1,7 +1,7 @@
 import { createTenantId, type Projection } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { MemorySuiteRunRepository } from "../memory.suite-run.repository";
+import { MemorySuiteRunRepository } from "../memory.suite-run.repository.ts";
 
 const state: SuiteRunStateData = {
   SuiteRunId: "run_1",

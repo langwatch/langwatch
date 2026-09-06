@@ -10,8 +10,8 @@ import type {
   PlanProviderUser,
   UsageStats,
 } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN, UsageCounterPort } from "../ports/usage-counter.port";
-import type { UsageMembershipPort } from "../ports/usage-membership.port";
+import { USAGE_UNKNOWN, UsageCounterPort } from "../ports/usage-counter.port.ts";
+import type { UsageMembershipPort } from "../ports/usage-membership.port.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than

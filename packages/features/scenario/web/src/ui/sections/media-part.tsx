@@ -4,11 +4,11 @@
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder";
-import { resolveMediaPart } from "../../model/media-part-source";
-import { resolveRawPcmFormat, wrapRawPcmToWav } from "../../model/pcm-to-wav";
-import type { MediaPartData } from "../../model/media-parts";
-import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback";
+import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
+import { resolveMediaPart } from "../../model/media-part-source.ts";
+import { resolveRawPcmFormat, wrapRawPcmToWav } from "../../model/pcm-to-wav.ts";
+import type { MediaPartData } from "../../model/media-parts.ts";
+import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback.ts";
 
 type LoadStatus = "loading" | "ok" | "probing" | "missing" | "error";
 

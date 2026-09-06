@@ -5,7 +5,7 @@ import { ModelProviderLegacyMigrationService } from "#services/model-provider-le
 import type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
-} from "../rules/model-provider-migration.rules";
+} from "../rules/model-provider-migration.rules.ts";
 
 const logger = createLogger("langwatch:task:model-provider-migrate-credentials");
 

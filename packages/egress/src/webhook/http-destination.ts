@@ -1,6 +1,6 @@
 import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
-import { fetchValidatedDestination, type EgressTlsPolicy } from "../ssrf/fenced-fetch";
-import type { SsrfUrlValidator } from "../ssrf/url-validator";
+import { fetchValidatedDestination, type EgressTlsPolicy } from "../ssrf/fenced-fetch.ts";
+import type { SsrfUrlValidator } from "../ssrf/url-validator.ts";
 
 /**
  * The one fenced outbound HTTP utility every customer-endpoint dispatch shares.

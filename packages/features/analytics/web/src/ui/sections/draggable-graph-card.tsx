@@ -2,12 +2,12 @@ import { Box, Card } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { CustomGraph, type CustomGraphInput } from "./custom-graph";
-import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget";
-import { WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds";
-import type { FilterField } from "../../model/analytics-filter-definition";
-import { GraphCardHeader } from "./graph-card-header";
-import type { SizeOption } from "./graph-card-menu";
+import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
+import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx";
+import { WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { GraphCardHeader } from "./graph-card-header.tsx";
+import type { SizeOption } from "./graph-card-menu.tsx";
 
 interface GraphData {
   id: string;
@@ -147,5 +147,5 @@ function GraphCardChartArea({ graph, projectId }: { graph: GraphData; projectId:
 }
 
 // Re-export from GraphCardMenu for backwards compatibility
-export { getCurrentSize, sizeOptions } from "./graph-card-menu";
+export { getCurrentSize, sizeOptions } from "./graph-card-menu.tsx";
 export type { GraphData, SizeOption };

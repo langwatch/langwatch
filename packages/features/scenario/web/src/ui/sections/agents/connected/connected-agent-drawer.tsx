@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "@langwatch/time";
-import { AgentTestPanel } from "../agent-test-panel";
+import { AgentTestPanel } from "../agent-test-panel.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   type AvailableSource,
@@ -30,8 +30,8 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
 import { presenceLabel, scopeOf, sdkLabel } from "@langwatch/agent-web/surfaces/connected-agents";
 

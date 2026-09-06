@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatSeriesGroupName, formatSingleSeriesName } from "../series-group-name";
+import { formatSeriesGroupName, formatSingleSeriesName } from "../series-group-name.ts";
 
 const groupName = (overrides: Partial<Parameters<typeof formatSeriesGroupName>[0]> = {}) =>
   formatSeriesGroupName({

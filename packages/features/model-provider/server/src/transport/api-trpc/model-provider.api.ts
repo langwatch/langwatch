@@ -3,7 +3,7 @@
  */
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
+import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules.ts";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,

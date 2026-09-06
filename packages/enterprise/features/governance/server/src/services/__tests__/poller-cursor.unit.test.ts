@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { IngestionSourceService } from "../ingestion-source.service";
+import { IngestionSourceService } from "../ingestion-source.service.ts";
 
 describe("IngestionSourceService.hasPollerCursor", () => {
   describe("given a source that has never pulled", () => {

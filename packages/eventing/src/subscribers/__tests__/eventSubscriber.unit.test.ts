@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockEventStore,
   createTestAggregateType,
@@ -7,9 +7,9 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import type { EventSubscriberDefinition } from "../eventSubscriber.types";
+} from "../../services/__tests__/testHelpers.ts";
+import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
 
 describe("event subscribers", () => {
   const aggregateType = createTestAggregateType();

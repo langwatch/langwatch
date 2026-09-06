@@ -3,11 +3,11 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationService } from "../langy-conversation.service";
-import { LangyCredentialService } from "../langy-credential.service";
-import type { LangyMessageService } from "../langy-message.service";
-import type { LangyTurnService } from "../langy-turn.service";
-import { LangyService } from "../langy.service";
+import type { LangyConversationService } from "../langy-conversation.service.ts";
+import { LangyCredentialService } from "../langy-credential.service.ts";
+import type { LangyMessageService } from "../langy-message.service.ts";
+import type { LangyTurnService } from "../langy-turn.service.ts";
+import { LangyService } from "../langy.service.ts";
 
 /** Only the one collaborator the egress verbs reach. */
 function credentialService(stored: string[] | null) {

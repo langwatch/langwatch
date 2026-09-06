@@ -12,8 +12,8 @@ import {
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { BarChart2 } from "lucide-react";
 import { useState } from "react";
-import { calculateGridPositions, type GridLayout } from "../../model/grid-positions";
-import { DraggableGraphCard, type GraphData, type SizeOption } from "./draggable-graph-card";
+import { calculateGridPositions, type GridLayout } from "../../model/grid-positions.ts";
+import { DraggableGraphCard, type GraphData, type SizeOption } from "./draggable-graph-card.tsx";
 
 interface ReportGridProps {
   graphs: GraphData[];

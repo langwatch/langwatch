@@ -12,7 +12,7 @@ import {
   type ScimSyncFact,
   type ScimSyncState,
   scimSyncIdFor,
-} from "../scim-sync";
+} from "../scim-sync.ts";
 
 const CONNECTION = "conn_okta_primary";
 const ORGANIZATION = "org_acme";

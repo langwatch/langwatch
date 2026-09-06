@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 
-import { organizationTeamMemberRoleSchema, organizationTeamSchema } from "./team";
+import { organizationTeamMemberRoleSchema, organizationTeamSchema } from "./team.ts";
 
 export const organizationTeamRestSchema = organizationTeamSchema.omit({
   isPersonal: true,

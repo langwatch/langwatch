@@ -4,10 +4,10 @@
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service";
-import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service";
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository";
-import { ApiKeyCliService } from "../api-key-cli.service";
+import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
+import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
+import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
+import { ApiKeyCliService } from "../api-key-cli.service.ts";
 
 const OLD_KEY = {
   id: "apikey-old",

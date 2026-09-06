@@ -9,7 +9,7 @@ import {
   bucketForSubject,
   hashFeatureFlagSubject,
   isWithinRolloutPercentage,
-} from "../feature-flag-bucketing";
+} from "../feature-flag-bucketing.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
 const OTHER_FLAG = "release_ui_home_signal_focused_enabled";

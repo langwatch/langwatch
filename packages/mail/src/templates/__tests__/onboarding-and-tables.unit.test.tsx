@@ -3,14 +3,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
-import { DataTable } from "../email-layout";
-import { inviteEmailTemplate } from "../invite-email";
-import { joinRequestApprovedTemplate } from "../join-request-emails";
-import { AGENT_PROMPT, FIRST_STEPS_LINKS, SKILLS_INSTALL_COMMAND } from "../onboarding/first-steps";
-import { tokenize } from "../onboarding/highlight";
-import { renderMailTemplate, type MailTemplate } from "../registry";
-import { signUpVerificationEmailTemplate } from "../sign-up-verification-email";
-import { triggerDigestEmailTemplate } from "../trigger-digest-email";
+import { DataTable } from "../email-layout.tsx";
+import { inviteEmailTemplate } from "../invite-email.tsx";
+import { joinRequestApprovedTemplate } from "../join-request-emails.tsx";
+import { AGENT_PROMPT, FIRST_STEPS_LINKS, SKILLS_INSTALL_COMMAND } from "../onboarding/first-steps.tsx";
+import { tokenize } from "../onboarding/highlight.ts";
+import { renderMailTemplate, type MailTemplate } from "../registry.ts";
+import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";
+import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
 
 const html = async (template: MailTemplate, props: unknown): Promise<string> =>
   (await renderMailTemplate(template, props)).html;

@@ -3,7 +3,7 @@ import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
   SEARCH_GRAMMAR,
-} from "../../../model/get-suggestion-state";
+} from "../../../model/get-suggestion-state.ts";
 
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {

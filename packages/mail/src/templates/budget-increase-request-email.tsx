@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
 import {
   DataTable,
   DetailTable,
@@ -10,8 +10,8 @@ import {
   PrimaryButton,
   TintPanel,
   TintText,
-} from "./email-layout";
-import { defineTemplate, renderMailTemplate } from "./registry";
+} from "./email-layout.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const budgetIncreaseRequestEmailProps = z.object({
   requesterEmail: z.email(),

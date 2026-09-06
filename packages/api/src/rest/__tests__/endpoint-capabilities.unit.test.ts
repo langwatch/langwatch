@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { RateLimiter, ResponseCache } from "../../ports.js";
+import type { RateLimiter, ResponseCache } from "../../ports.ts";
 
 // ---------------------------------------------------------------------------
 // The observability seam, mocked so cache/limiter failure logging is observable.
@@ -30,7 +30,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createService: createRawService } = await import("../builder.js");
+const { createService: createRawService } = await import("../builder.ts");
 const createService: typeof createRawService = ((config: Parameters<typeof createRawService>[0]) =>
   createRawService(config).withoutPermission("framework test endpoint")) as typeof createRawService;
 

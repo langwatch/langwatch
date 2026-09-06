@@ -9,8 +9,8 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   type AgentTestingRoutingState,
   buildAgentTestingPush,
-} from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { RESULT_GROUPINGS, type ResultFilters, type ResultGrouping } from "./result-atoms";
+} from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { RESULT_GROUPINGS, type ResultFilters, type ResultGrouping } from "./result-atoms.ts";
 
 /** The grouping the tab opens on. */
 export const DEFAULT_RESULT_GROUPING: ResultGrouping = "plan";

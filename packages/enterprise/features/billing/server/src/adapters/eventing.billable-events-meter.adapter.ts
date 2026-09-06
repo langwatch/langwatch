@@ -12,8 +12,8 @@ import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type {
   BillableEventsMeterPort,
   BillableEventRecord,
-} from "../ports/billable-events-meter.port";
-import type { BillingTenantOrganizationService } from "../services/tenant-organization.service";
+} from "../ports/billable-events-meter.port.ts";
+import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 
 /**
  * The experiment-run event types this meter counts, as literals.

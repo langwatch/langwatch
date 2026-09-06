@@ -3,13 +3,13 @@ import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { useOnboardingFormContext } from "./form-context";
+import { useOnboardingFormContext } from "./form-context.tsx";
 import {
   accentChipBg,
   accentChipBorder,
   selectedSurfaceBg,
   selectedSurfaceBorder,
-} from "../../model/shared/accent-surface";
+} from "../../model/shared/accent-surface.ts";
 
 interface IntentOption {
   value: OrganizationIntent;

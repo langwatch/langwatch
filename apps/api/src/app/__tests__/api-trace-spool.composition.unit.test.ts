@@ -20,7 +20,7 @@ import { SPOOL_REF_V2 } from "@langwatch/trace-server";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeApiTraceSpool } from "../api-trace-spool.composition";
+import { composeApiTraceSpool } from "../api-trace-spool.composition.ts";
 
 const PROJECT_ID = "project-001";
 

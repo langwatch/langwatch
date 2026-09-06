@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { LangWatchCanonicaliserService } from "../langwatch-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { LangWatchCanonicaliserService } from "../langwatch-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 describe("LangWatchCanonicaliserService", () => {
   const extractor = LangWatchCanonicaliserService.create();

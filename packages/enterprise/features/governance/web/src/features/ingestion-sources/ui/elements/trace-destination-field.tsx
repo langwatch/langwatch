@@ -32,7 +32,7 @@
  */
 
 import { Badge, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { routesConversations, type SourceType } from "../../model/ingestion-source-catalog";
+import { routesConversations, type SourceType } from "../../model/ingestion-source-catalog.ts";
 
 /**
  * Says the stored destination is gone, in the one wording that distinguishes

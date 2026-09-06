@@ -4,7 +4,7 @@
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { WorkflowEvaluationAdapter } from "../workflow-evaluation.adapter";
+import { WorkflowEvaluationAdapter } from "../workflow-evaluation.adapter.ts";
 
 describe("WorkflowEvaluationAdapter.run", () => {
   describe("given the workflow fails with an error carrying a stack trace", () => {

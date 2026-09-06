@@ -28,19 +28,19 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter";
-import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition";
-import { ApiAuditPort } from "../../../api-request.policy";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure";
-import { composeUserFeature } from "../../user/user.composition";
-import { composeOrganizationFeature } from "../organization.composition";
+} from "../../../api.application.ts";
+import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter.ts";
+import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
+import { ApiAuditPort } from "../../../api-request.policy.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { composeUserFeature } from "../../user/user.composition.ts";
+import { composeOrganizationFeature } from "../organization.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = {
   id: "user-1",

@@ -108,7 +108,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
     Links_Attributes: [],
   });
 
-  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository").TraceLegacyReadClickHouseRepository;
+  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository.ts").TraceLegacyReadClickHouseRepository;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -116,7 +116,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
     mockPrismaFindUnique.mockResolvedValue({});
 
     // Dynamic import to get fresh module after mocks are set
-    const mod = await import("../trace-legacy-read.repository");
+    const mod = await import("../trace-legacy-read.repository.ts");
     TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
   });
 
@@ -1199,7 +1199,7 @@ describe("isClickHouseMemoryLimitError", () => {
   }
 
   it("recognizes the resilient client's translated query_memory_exceeded", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
 
     const translated = new TranslatedClickHouseError("query_memory_exceeded", [
       new Error("some driver detail without the fragment"),
@@ -1209,7 +1209,7 @@ describe("isClickHouseMemoryLimitError", () => {
   });
 
   it("recognizes a handled error wrapping a raw MEMORY_LIMIT_EXCEEDED in reasons", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
 
     const wrapped = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
@@ -1219,7 +1219,7 @@ describe("isClickHouseMemoryLimitError", () => {
   });
 
   it("does not match an unrelated handled error", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
 
     const unrelated = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("connection refused"),

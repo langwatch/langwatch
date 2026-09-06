@@ -1,5 +1,5 @@
 import type { Alert } from "@chakra-ui/react";
-import { SlugAlert } from "./slug-alert";
+import { SlugAlert } from "./slug-alert.tsx";
 
 /** Warns that changing a Dataset slug invalidates external references. */
 export function SlugChangeWarningAlert(props: Alert.RootProps) {

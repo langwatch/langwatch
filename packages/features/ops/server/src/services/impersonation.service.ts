@@ -7,7 +7,7 @@ import {
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
 import type { AdminAuditRequest } from "@langwatch/ops-contract";
-import type { AdminAccess } from "./admin-access.service";
+import type { AdminAccess } from "./admin-access.service.ts";
 
 const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
 

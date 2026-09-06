@@ -50,7 +50,7 @@ import {
   EvaluationCostRecorderPort,
   EvaluationExecutionReceiptPort,
   type ExecuteEvaluationCommandDeps,
-} from "../../evaluation.port";
+} from "../../evaluation.port.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions";
+import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions.ts";
 
 describe("event catalogue", () => {
   /** @scenario "The application composes an explicit event catalogue" */

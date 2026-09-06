@@ -1,5 +1,5 @@
 import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
-import { ScimSyncGuardsService } from "../../services/scim-sync-guards.service";
+import { ScimSyncGuardsService } from "../../services/scim-sync-guards.service.ts";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
@@ -8,8 +8,8 @@ import {
   RecordScimGroupMappingCommand,
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
-} from "../../intents/scim-sync.intent";
-import { ScimSyncPipelineDefinitionAdapter } from "../scim-sync-pipeline-definition.adapter";
+} from "../../intents/scim-sync.intent.ts";
+import { ScimSyncPipelineDefinitionAdapter } from "../scim-sync-pipeline-definition.adapter.ts";
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";

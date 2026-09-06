@@ -4,14 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { GroupQueueProducer } from "../capabilities";
-import { defineGroupQueue } from "../definition";
+import { GroupQueueProducer } from "../capabilities.ts";
+import { defineGroupQueue } from "../definition.ts";
 import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   readEnvelopeDescriptor,
   readJobRoutingMeta,
-} from "../jobEnvelope";
+} from "../jobEnvelope.ts";
 
 describe("Group Queue framework contract", () => {
   /** @scenario "A queue definition fixes its transport contract" */

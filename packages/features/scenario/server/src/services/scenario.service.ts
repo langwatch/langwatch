@@ -45,11 +45,11 @@ import {
 import { resolveRunParameters } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import type { ScenarioRepository } from "../repositories/scenario.repository";
-import type { ScenarioClockPort } from "../ports/scenario-clock.port";
-import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
-import { ScenarioRunSecretsService } from "./scenario-run-secrets.service";
+import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
+import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
+import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port.ts";
+import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
 const logger = createLogger("langwatch:scenarios");
 

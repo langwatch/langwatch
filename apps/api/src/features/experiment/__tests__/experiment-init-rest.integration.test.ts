@@ -7,9 +7,9 @@ import { ExperimentFindOrCreateService } from "@langwatch/experiment-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountExperimentInitRest } from "../experiment-init-rest.mount";
-import { mountEvaluationsLegacyRest } from "../../evaluation/evaluations-legacy-rest.mount";
-import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential";
+import { mountExperimentInitRest } from "../experiment-init-rest.mount.ts";
+import { mountEvaluationsLegacyRest } from "../../evaluation/evaluations-legacy-rest.mount.ts";
+import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
 
 const initInit = (body: unknown) => ({
   method: "POST",

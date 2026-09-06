@@ -3,7 +3,7 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it } from "vitest";
-import { LambdaWebAdapterStreamService } from "../lambda-web-adapter-stream.service";
+import { LambdaWebAdapterStreamService } from "../lambda-web-adapter-stream.service.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();

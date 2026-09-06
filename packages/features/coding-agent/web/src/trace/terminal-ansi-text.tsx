@@ -1,7 +1,7 @@
 import { chakra } from "@chakra-ui/react";
 import { Fragment, memo, useMemo } from "react";
-import { type AnsiSegment, type AnsiStyle, parseAnsi } from "./terminal-ansi-parser";
-import { ansiColorToken, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
+import { type AnsiSegment, type AnsiStyle, parseAnsi } from "./terminal-ansi-parser.ts";
+import { ansiColorToken, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 /**
  * Render a raw string that may contain ANSI escape codes as selectable,

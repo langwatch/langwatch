@@ -11,17 +11,17 @@ import {
   NotificationService as NotificationRecordService,
   type Notification,
 } from "@langwatch/notification-contract";
-import { NotificationService } from "./billing-usage-notice.service";
-import { UsageWarningService } from "./usage-warning.service";
-import type { BillingErrorReporter } from "../ports/error-reporter.port";
+import { NotificationService } from "./billing-usage-notice.service.ts";
+import { UsageWarningService } from "./usage-warning.service.ts";
+import type { BillingErrorReporter } from "../ports/error-reporter.port.ts";
 import {
   MIN_DAYS_BETWEEN_ALERTS,
   planLimitCooldown,
   planLimitInFlight,
   resourceLimitCooldown,
   type BillingCooldownCache,
-} from "./billing-alert-cooldown.service";
-import { NullNotificationRecordService } from "./null-notification-record.service";
+} from "./billing-alert-cooldown.service.ts";
+import { NullNotificationRecordService } from "./null-notification-record.service.ts";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 

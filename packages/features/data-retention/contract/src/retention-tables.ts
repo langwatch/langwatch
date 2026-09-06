@@ -1,4 +1,4 @@
-import type { RetentionCategory } from "./data-retention";
+import type { RetentionCategory } from "./data-retention.ts";
 
 export const RETENTION_TABLE_CATEGORY_MAP = {
   event_log: "traces",

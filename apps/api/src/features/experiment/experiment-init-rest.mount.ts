@@ -37,7 +37,7 @@ import {
   type ExperimentInitRestCredential,
 } from "@langwatch/experiment-server";
 
-import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential";
+import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";
 
 /** The project credential this door reads. */
 export type ApiExperimentInitCredentialPort = (input: {

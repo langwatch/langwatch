@@ -13,7 +13,7 @@ import {
   InvalidRuntimeConfigError,
   portSchema,
   RuntimeConfig,
-} from "../src";
+} from "../src/index.ts";
 
 const serviceSchema = z.object({
   PORT: portSchema.default(5_560),

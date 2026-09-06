@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { annotationViewCopy, viewReadsMemberQueues, type AnnotationView } from "../annotation-view";
+import { annotationViewCopy, viewReadsMemberQueues, type AnnotationView } from "../annotation-view.ts";
 
 const VIEWS: AnnotationView[] = ["inbox", "mine", "all", "queue"];
 

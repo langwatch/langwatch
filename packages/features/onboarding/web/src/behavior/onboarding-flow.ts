@@ -1,5 +1,5 @@
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { type OnboardingFlowConfig, OnboardingScreenIndex } from "./types";
+import { type OnboardingFlowConfig, OnboardingScreenIndex } from "./types.ts";
 
 function buildConfig(
   variant: OnboardingFlowConfig["variant"],

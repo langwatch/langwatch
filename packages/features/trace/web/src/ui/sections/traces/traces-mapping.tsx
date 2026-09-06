@@ -3,10 +3,10 @@ import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "@langwatch/trace-contract";
-import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useProjectEventTypes } from "../use-project-event-types";
-import { useProjectSpanNames } from "../use-project-span-names";
+import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useProjectEventTypes } from "../use-project-event-types.ts";
+import { useProjectSpanNames } from "../use-project-span-names.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
@@ -18,7 +18,7 @@ import {
   TRACE_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/trace-contract";
-import { api } from "../../../behavior/trace-api";
+import { api } from "../../../behavior/trace-api.ts";
 import { Switch } from "@langwatch/design-system/switch";
 
 /** Trace field options for the threads sub-field selector, excluding thread sources themselves. */

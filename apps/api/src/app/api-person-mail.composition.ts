@@ -13,8 +13,8 @@ import {
   sendJoinRequestReminderEmail,
   sendSignUpVerificationEmail,
 } from "@langwatch/mail";
-import type { ApiMailComposition } from "./api-mail.composition";
-import { ApiPersonMailPort } from "./api-person-mail.port";
+import type { ApiMailComposition } from "./api-mail.composition.ts";
+import { ApiPersonMailPort } from "./api-person-mail.port.ts";
 
 export class ApiComposedPersonMail extends ApiPersonMailPort {
   static create(mail: ApiMailComposition): ApiComposedPersonMail {

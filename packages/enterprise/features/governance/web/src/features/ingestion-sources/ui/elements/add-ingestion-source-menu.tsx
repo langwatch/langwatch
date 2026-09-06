@@ -13,7 +13,7 @@ import {
   SOURCE_GROUP_META,
   type SourceGroup,
   type SourceType,
-} from "../../model/ingestion-source-catalog";
+} from "../../model/ingestion-source-catalog.ts";
 
 /**
  * The Add source entry point: a menu of every supported ingestion-source

@@ -7,17 +7,17 @@ import userEvent from "@testing-library/user-event";
 import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Variable, VariablesSection } from "../../../../../surfaces/variables";
-import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form";
+import { type Variable, VariablesSection } from "../../../../../surfaces/variables/index.ts";
+import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form/index.ts";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type PromptTabsCapabilities,
   type TabData,
-} from "../../../studio-internals";
-import { PromptTabbedSection } from "../prompt-tabbed-section";
-import { PromptHostProvider } from "../../../../../model/prompt-host";
-import { FakePromptHost } from "../../../../../testing";
+} from "../../../studio-internals.ts";
+import { PromptTabbedSection } from "../prompt-tabbed-section.tsx";
+import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked the
@@ -61,7 +61,7 @@ const capabilities: PromptTabsCapabilities = {
 const TEST_PROJECT_ID = "test-project";
 
 // Mock useOrganizationTeamProject
-vi.mock("../../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: { id: TEST_PROJECT_ID },
     projectId: TEST_PROJECT_ID,
@@ -403,8 +403,8 @@ describe("PromptTabbedSection Store Integration", () => {
 const { tabIdRef } = vi.hoisted(() => ({
   tabIdRef: { current: "test-tab-id" },
 }));
-vi.mock("../../../studio-internals", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../studio-internals")>()),
+vi.mock("../../../studio-internals.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../studio-internals.ts")>()),
   useTabId: () => tabIdRef.current,
 }));
 

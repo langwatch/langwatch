@@ -8,8 +8,8 @@
  * own value.
  */
 import { z } from "zod";
-import { runParameterValuesSchema } from "./scenario.parameters";
-import { scenarioVersionSummarySchema, scenarioVersionDetailSchema } from "./scenario.version";
+import { runParameterValuesSchema } from "./scenario.parameters.ts";
+import { scenarioVersionSummarySchema, scenarioVersionDetailSchema } from "./scenario.version.ts";
 
 /** One saved version, with the human name resolved for the author it stores as an id. */
 export const scenarioVersionSummaryWithAuthorSchema = scenarioVersionSummarySchema

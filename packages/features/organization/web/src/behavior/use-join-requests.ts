@@ -1,8 +1,8 @@
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
-import { api } from "./organization-api";
-import type { PendingJoinRequest } from "../model/pending-join-request";
-import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback";
+import { api } from "./organization-api.ts";
+import type { PendingJoinRequest } from "../model/pending-join-request.ts";
+import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 
 /**
  * The members area's join-requests state (D12): what is waiting, the two

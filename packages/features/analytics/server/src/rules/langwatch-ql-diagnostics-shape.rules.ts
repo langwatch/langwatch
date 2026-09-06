@@ -3,13 +3,13 @@
  *
  * The rules themselves are the `langwatch-ql-*-diagnostics` services.
  */
-import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service";
-import type { LangWatchQLResultLimits } from "../ports/langwatch-ql-executor.port";
-import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
+import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
+import type { LangWatchQLResultLimits } from "../ports/langwatch-ql-executor.port.ts";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import type {
   AcceptedLangWatchQL,
   LangWatchQLQueryBlock,
-} from "./langwatch-ql-validation-shape.rules";
+} from "./langwatch-ql-validation-shape.rules.ts";
 
 /**
  * Every note this API can attach to a result. A code is here because a caller would *do

@@ -1,9 +1,9 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons";
+import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons.tsx";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
-import { Link } from "../../../../ui/elements/gateway-link";
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
 import {
   buildScopeHierarchy,
@@ -11,7 +11,7 @@ import {
   type OrgModelProvider,
   resolveEligible,
   type VirtualKeyScopeEntry,
-} from "../../model/eligible-model-providers";
+} from "../../model/eligible-model-providers.ts";
 
 type ScopeNames = {
   organizationName?: string;

@@ -2,8 +2,8 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import { addColumn, addRows, setCellValue, TransformError } from "../transforms";
-import { baseState, refusalCode, savedDataset } from "./workbench-fixtures";
+import { addColumn, addRows, setCellValue, TransformError } from "../transforms/index.ts";
+import { baseState, refusalCode, savedDataset } from "./workbench-fixtures.ts";
 
 describe("setCellValue", () => {
   it("writes the cell", () => {

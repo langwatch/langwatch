@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AuthzMigrationDatabase,
   PrismaAuthzMigrationRepository,
-} from "../prisma.authz-migration.repository";
+} from "../prisma.authz-migration.repository.ts";
 
 type Row = Record<string, any>;
 

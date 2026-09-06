@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnterpriseCatalogue } from "../src";
+import { EnterpriseCatalogue } from "../src/index.ts";
 
 describe("EnterpriseCatalogue", () => {
   /** @scenario "Discover every installed Enterprise feature contract" */

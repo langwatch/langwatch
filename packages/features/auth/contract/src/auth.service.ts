@@ -1,4 +1,4 @@
-import type { BrowserSession, VerifiedBrowserSession } from "./browser-session";
+import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
 
 /** The one browser-session lifecycle capability owned by Auth. */
 export abstract class AuthService {

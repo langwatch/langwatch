@@ -1,5 +1,5 @@
 import type { ZodTypeAny } from "zod";
-import type { AlertType, TriggerAction } from "./trigger";
+import type { AlertType, TriggerAction } from "./trigger.ts";
 
 export type Category = "notify" | "action";
 

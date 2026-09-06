@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisReadinessService } from "./readiness";
-import type { RedisConnection } from "./types";
+import { RedisReadinessService } from "./readiness.ts";
+import type { RedisConnection } from "./types.ts";
 
 function connectionThat(ping: () => Promise<unknown>): RedisConnection {
   return { ping } as unknown as RedisConnection;

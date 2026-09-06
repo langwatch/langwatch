@@ -3,13 +3,13 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useOnboardingStore } from "../../../../../../behavior/explorer/onboarding/store/onboarding-store";
+import { useOnboardingStore } from "../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 let isTourDismissed = false;
 let isTourPreferenceResolved = true;
 const mockPersistDismissal = vi.fn();
 
-vi.mock("../use-trace-explorer-tour-preference", () => ({
+vi.mock("../use-trace-explorer-tour-preference.ts", () => ({
   useTraceExplorerTourPreference: () => ({
     dismiss: mockPersistDismissal,
     isDismissed: isTourDismissed,
@@ -17,7 +17,7 @@ vi.mock("../use-trace-explorer-tour-preference", () => ({
   }),
 }));
 
-import { useFirstTraceSpotlightTrigger } from "../use-first-trace-spotlight-trigger";
+import { useFirstTraceSpotlightTrigger } from "../use-first-trace-spotlight-trigger.ts";
 
 describe("useFirstTraceSpotlightTrigger", () => {
   beforeEach(() => {

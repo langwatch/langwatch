@@ -17,14 +17,14 @@ const mocks = vi.hoisted(() => {
   return { thread, turns: thread };
 });
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turns", () => ({
+vi.mock("../../../../../sections/explorer/hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: { items: mocks.turns },
     isLoading: false,
   }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations", () => ({
+vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -34,15 +34,15 @@ vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations", (
   }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../../../../sections/explorer/hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turn-events", () => ({
+vi.mock("../../../../../sections/explorer/hooks/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
+vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
 }));
 
@@ -52,7 +52,7 @@ vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
  * the turn under review.
  */
 vi.mock(
-  "../../../../../sections/explorer/trace-drawer/conversation-view/annotated-turn-row",
+  "../../../../../sections/explorer/trace-drawer/conversation-view/annotated-turn-row.tsx",
   () => ({
     AnnotatedTurnRow: ({
       parsed,
@@ -77,9 +77,9 @@ vi.mock(
   }),
 );
 
-import type { TraceListItem } from "../../../../../sections/explorer/types/trace";
-import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view";
-import { FOCUS_SCROLL_REST_MS } from "../focused-turn";
+import type { TraceListItem } from "../../../../../sections/explorer/types/trace.ts";
+import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view.tsx";
+import { FOCUS_SCROLL_REST_MS } from "../focused-turn.tsx";
 
 function renderView({
   focusTraceId,

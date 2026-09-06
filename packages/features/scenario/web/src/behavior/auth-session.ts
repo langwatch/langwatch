@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from "react";
-import { type ScenarioHostUser, useOptionalScenarioHost } from "../model/scenario-host";
+import { type ScenarioHostUser, useOptionalScenarioHost } from "../model/scenario-host.ts";
 
 export type ScenarioSessionReading = {
   data: { user: ScenarioHostUser } | null;

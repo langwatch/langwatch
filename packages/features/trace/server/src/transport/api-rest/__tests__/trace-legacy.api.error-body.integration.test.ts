@@ -11,8 +11,8 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { TraceLegacyRestPorts, TraceLegacySearchFields } from "../trace-legacy.api";
-import { createTraceLegacyRestApp } from "../trace-legacy.api";
+import type { TraceLegacyRestPorts, TraceLegacySearchFields } from "../trace-legacy.api.ts";
+import { createTraceLegacyRestApp } from "../trace-legacy.api.ts";
 
 const project = { id: "project-123" };
 

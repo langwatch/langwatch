@@ -1,6 +1,6 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuExternalLink, LuLightbulb } from "react-icons/lu";
-import { exactModelMatchRegex } from "../../../../../model/model-cost-regex";
+import { exactModelMatchRegex } from "../../../../../model/model-cost-regex.ts";
 
 /**
  * Deep link to the model costs settings page (project context comes from

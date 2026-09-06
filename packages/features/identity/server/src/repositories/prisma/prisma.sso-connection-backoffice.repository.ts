@@ -3,8 +3,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
-} from "../sso-connection-backoffice.repository";
-import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository";
+} from "../sso-connection-backoffice.repository.ts";
+import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The two models the operator back office reads, and no others. */
 export type PrismaSsoConnectionBackofficeDatabase = Pick<

@@ -1,5 +1,5 @@
-import type { Task } from "./task";
-import { TaskNotFoundError } from "./task.errors";
+import type { Task } from "./task.ts";
+import { TaskNotFoundError } from "./task.errors.ts";
 
 /**
  * The one list a process's tasks live in: `apps/tasks/src/tasks.catalogue.ts`

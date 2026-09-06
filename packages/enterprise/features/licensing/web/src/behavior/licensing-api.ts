@@ -24,7 +24,7 @@
 
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
-import type { PlanType } from "../model/plan-form-defaults";
+import type { PlanType } from "../model/plan-form-defaults.ts";
 
 /** The organization every license procedure is scoped to. */
 type OrganizationScope = { organizationId: string };

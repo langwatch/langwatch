@@ -5,7 +5,7 @@ import {
   initialLangyDerivedCardPreview,
   reconcileLangyDerivedCardPreviews,
   type LangyDerivedCardPreview,
-} from "../preview";
+} from "../preview.ts";
 
 /** Feed a sequence of cumulative buffers, as the stream would. */
 function feedAll(chunks: string[]): LangyDerivedCardPreview {

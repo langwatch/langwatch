@@ -5,7 +5,7 @@ import {
   type OpsProcessManagerMetadata,
   type OpsKillSwitchDescriptor,
   type OpsProjectionMetadata,
-} from "../ports/eventing-introspection.port";
+} from "../ports/eventing-introspection.port.ts";
 
 type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
 

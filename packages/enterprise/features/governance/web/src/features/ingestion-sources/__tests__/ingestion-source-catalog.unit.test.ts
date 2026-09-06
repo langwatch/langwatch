@@ -13,7 +13,7 @@ import {
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
-} from "../model/ingestion-source-catalog";
+} from "../model/ingestion-source-catalog.ts";
 
 /** What the menu should offer: everything the catalog still sells. */
 const offerable = SOURCE_TYPE_OPTIONS.filter((o) => !o.deprecated);

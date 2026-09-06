@@ -9,15 +9,15 @@
 
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { licensingApi } from "../../behavior/licensing-api";
-import { LicenseDetailsCard } from "../../ui/elements/license-details-card";
-import { LicenseLoadError } from "../../ui/elements/license-load-error";
-import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton";
-import { OverSeatsCallout } from "../../ui/elements/over-seats-callout";
-import { licenseMetersSeats, normalizeKeyForActivation } from "../../model/license-status";
-import { LicenseGeneratorDrawer } from "./license-generator-drawer";
-import { NoLicenseCard } from "./no-license-card";
-import { useLicenseActions } from "./use-license-actions";
+import { licensingApi } from "../../behavior/licensing-api.ts";
+import { LicenseDetailsCard } from "../../ui/elements/license-details-card.tsx";
+import { LicenseLoadError } from "../../ui/elements/license-load-error.tsx";
+import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton.tsx";
+import { OverSeatsCallout } from "../../ui/elements/over-seats-callout.tsx";
+import { licenseMetersSeats, normalizeKeyForActivation } from "../../model/license-status.ts";
+import { LicenseGeneratorDrawer } from "./license-generator-drawer.tsx";
+import { NoLicenseCard } from "./no-license-card.tsx";
+import { useLicenseActions } from "./use-license-actions.ts";
 
 interface LicenseStatusPanelProps {
   organizationId: string;

@@ -2,7 +2,7 @@ import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createHash } from "crypto";
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 
 /**
  * KSUID resource prefixes for the two identifiers this module mints — the

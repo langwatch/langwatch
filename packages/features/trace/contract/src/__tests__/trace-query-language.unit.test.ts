@@ -10,8 +10,8 @@ import {
   setRangeInQuery,
   swapOperatorAtLocation,
   toggleFacetInQuery,
-} from "../trace-query-mutations";
-import { ParseError, parse, serialize, stripAtSigils } from "../trace-query-parser";
+} from "../trace-query-mutations.ts";
+import { ParseError, parse, serialize, stripAtSigils } from "../trace-query-parser.ts";
 import {
   analyzeOrGroups,
   buildFacetStateLookup,
@@ -20,7 +20,7 @@ import {
   type OrGroup,
   type OrGroupAnalysis,
   validateAst,
-} from "../trace-query-analysis";
+} from "../trace-query-analysis.ts";
 
 function locationOf(query: string, fragment: string): { start: number; end: number } {
   const start = query.indexOf(fragment);

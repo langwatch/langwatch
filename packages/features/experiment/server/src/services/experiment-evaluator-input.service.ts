@@ -13,7 +13,7 @@ import {
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 export class ExperimentEvaluatorInputService {
   static create({

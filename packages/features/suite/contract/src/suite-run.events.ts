@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./suite-run.constants";
+import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./suite-run.constants.ts";
 
 const suiteRunEventSchema = z.object({
   id: z.string(),
@@ -86,4 +86,4 @@ export {
   isSuiteRunItemCompletedEvent,
   isSuiteRunItemStartedEvent,
   isSuiteRunStartedEvent,
-} from "./suite-run.event-guards";
+} from "./suite-run.event-guards.ts";

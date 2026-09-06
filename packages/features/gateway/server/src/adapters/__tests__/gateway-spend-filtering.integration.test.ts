@@ -15,12 +15,12 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
+import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { GatewaySpendScopeAdapter } from "../postgres.gateway-spend-scope.adapter";
+} from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewaySpendScopeAdapter } from "../postgres.gateway-spend-scope.adapter.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

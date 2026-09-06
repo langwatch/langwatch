@@ -1,5 +1,5 @@
 import { MessageCircle } from "lucide-react";
-import { AnnotationHoverChip } from "./annotation-hover-chip";
+import { AnnotationHoverChip } from "./annotation-hover-chip.tsx";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 
 export function AnnotationCommentsChip({

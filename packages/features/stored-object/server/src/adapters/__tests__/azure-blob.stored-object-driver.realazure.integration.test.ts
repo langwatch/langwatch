@@ -5,9 +5,9 @@
 import crypto from "node:crypto";
 import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter.ts";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter.ts";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;

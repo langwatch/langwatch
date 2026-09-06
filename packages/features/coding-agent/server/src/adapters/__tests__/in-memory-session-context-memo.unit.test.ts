@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
-import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter";
+import { InMemorySessionContextMemoAdapter } from "../in-memory.session-context-memo.adapter.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 

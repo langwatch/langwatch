@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, TagsInput, Text, VStack } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { useState } from "react";
-import { api } from "../../../../behavior/ops-api";
+import { api } from "../../../../behavior/ops-api.ts";
 
 export function TenantSelector({
   tenantIds,

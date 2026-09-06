@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../index";
+import { TraceCanonicalisationService } from "../index.ts";
 
 describe("TraceCanonicalisationService", () => {
   const service = TraceCanonicalisationService.create();

@@ -4,7 +4,7 @@ import {
   reportSourceIsAutoLayout,
   SLACK_BLOCK_KIT_TEMPLATES,
   templateOptionsFor,
-} from "../ui/elements/registry";
+} from "../ui/elements/registry.ts";
 
 const GATED_BLOCKS = ["alert", "card", "data_visualization", "data_table"];
 

@@ -1,18 +1,18 @@
-import type { GoErrorCode, NodeErrorCode } from "./codes.generated";
+import type { GoErrorCode, NodeErrorCode } from "./codes.generated.ts";
 import type {
   HandledErrorFault,
   SerializedHandledError,
   SerializedReason,
-} from "./serialized-handled-error";
+} from "./serialized-handled-error.ts";
 
-import type { AppErrorCode } from "./app-codes";
+import type { AppErrorCode } from "./app-codes.ts";
 import {
   type HandledErrorShape,
   handledShapeFromSerialized,
   readAuthoredMessageOfUnhandled,
   readHandledError,
   safeProse,
-} from "./read-handled-error";
+} from "./read-handled-error.ts";
 
 /**
  * The customer-facing copy for every handled-error code, keyed by code.

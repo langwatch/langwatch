@@ -1,6 +1,6 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { describe, expect, it } from "vitest";
-import { EvaluatorNativeService } from "../evaluator-native.service";
+import { EvaluatorNativeService } from "../evaluator-native.service.ts";
 
 const native = EvaluatorNativeService.create();
 

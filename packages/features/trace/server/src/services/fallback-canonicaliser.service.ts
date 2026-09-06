@@ -1,8 +1,8 @@
 /** Last-resort span-type inference and shared error consolidation. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { extractErrorInfo, inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+import { extractErrorInfo, inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export class FallbackCanonicaliserService implements CanonicalAttributesPort {
   static create(): FallbackCanonicaliserService {

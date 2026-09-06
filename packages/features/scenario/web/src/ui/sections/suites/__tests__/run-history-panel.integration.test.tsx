@@ -46,7 +46,7 @@ const mockRunDataQuery = vi.hoisted(() => vi.fn());
 const mockScenariosQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -62,7 +62,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -85,7 +85,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-import { RunHistoryPanel } from "../run-history-panel";
+import { RunHistoryPanel } from "../run-history-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

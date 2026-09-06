@@ -25,8 +25,8 @@ import {
   ScenarioSecretParameterConflictError,
   ScenarioSecretParameterInTextError,
   ScenarioSecretParameterMissingError,
-} from "./scenario-run-parameter.error";
-import { renderScenarioContent } from "./scenario-content-template";
+} from "./scenario-run-parameter.error.ts";
+import { renderScenarioContent } from "./scenario-content-template.ts";
 import {
   findUnknownParameterKeys,
   mergeRunParameters,
@@ -35,8 +35,8 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
   withoutParameterNames,
-} from "./scenario.parameters";
-import type { ScenarioRunConfig } from "./scenario";
+} from "./scenario.parameters.ts";
+import type { ScenarioRunConfig } from "./scenario.ts";
 
 /**
  * What one scenario in the run resolved.

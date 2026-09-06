@@ -9,12 +9,12 @@
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { TrpcRootDefinition } from "../trpc-root.js";
+import { TrpcRootDefinition } from "../trpc-root.ts";
 import {
   createTrpcProcedure,
   createTrpcService,
   type TrpcPolicyDecorator,
-} from "../trpc-service-builder.js";
+} from "../trpc-service-builder.ts";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2

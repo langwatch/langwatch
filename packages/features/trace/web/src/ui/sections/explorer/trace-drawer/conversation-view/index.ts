@@ -1,1 +1,1 @@
-export { ConversationView } from "./conversation-view";
+export { ConversationView } from "./conversation-view.tsx";

@@ -10,11 +10,11 @@ import type {
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
-import { SimulationRunStateStoreAdapter } from "../simulation-eventing.adapter";
+import { SimulationRunStateStoreAdapter } from "../simulation-eventing.adapter.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../../projections/simulation-run-state.projection";
+} from "../../projections/simulation-run-state.projection.ts";
 
 const TENANT_ID = createTenantId("project-acme");
 const RUN_ID = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";

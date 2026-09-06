@@ -7,7 +7,7 @@ import {
   ReportChartService,
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
-} from "../report-chart.service";
+} from "../report-chart.service.ts";
 
 const COUNT_SERIES = {
   metric: "metadata.trace_id",

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { lintStrictContractBuildConfigs, type ClassifiedPackage } from "../src";
+import { lintStrictContractBuildConfigs, type ClassifiedPackage } from "../src/index.ts";
 
 let root = "";
 

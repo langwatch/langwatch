@@ -1,8 +1,8 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionEventRecord } from "../projections/coding-agent-session-events.projection";
-import type { CodingAgentTraceSessionRecord } from "../projections/coding-agent-trace-sessions.projection";
-import type { SessionMetricSeriesRecord } from "../projections/session-metric-series.projection";
+import type { CodingAgentSessionEventRecord } from "../projections/coding-agent-session-events.projection.ts";
+import type { CodingAgentTraceSessionRecord } from "../projections/coding-agent-trace-sessions.projection.ts";
+import type { SessionMetricSeriesRecord } from "../projections/session-metric-series.projection.ts";
 
 /**
  * Appends records through Coding Agent's named projection-persistence adapter.

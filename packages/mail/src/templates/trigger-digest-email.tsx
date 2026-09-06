@@ -7,8 +7,8 @@ import {
   Paragraph,
   ActionRow,
   type DataRow,
-} from "./email-layout";
-import { defineTemplate, renderMailTemplate } from "./registry";
+} from "./email-layout.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
  * How many matches one digest lists.

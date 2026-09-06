@@ -4,8 +4,8 @@ import {
   type EmailContent,
   EmailGatewayPort,
   type MailerConfiguration,
-} from "../ports/email-delivery.port";
-import { EmailMimeService } from "../services/email-mime.service";
+} from "../ports/email-delivery.port.ts";
+import { EmailMimeService } from "../services/email-mime.service.ts";
 
 const logger = createLogger("langwatch:mailer:sendgrid");
 

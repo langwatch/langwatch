@@ -2,7 +2,7 @@
  * The two reads the operator back office makes of the support inbox.
  */
 import type { BugReport } from "@langwatch/ops-contract";
-import type { BugReportRepositoryPort } from "../ports/bug-report.port";
+import type { BugReportRepositoryPort } from "../ports/bug-report.port.ts";
 
 /** One page of the inbox, with the count the pager renders. */
 export type BugReportListing = Readonly<{

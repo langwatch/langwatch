@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
 
 describe("budgetPeriodFloorMs on an anchored budget", () => {

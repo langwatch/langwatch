@@ -10,18 +10,18 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config.ts";
 import { Square } from "lucide-react";
-import { formatCost, formatLatency } from "./formatters";
+import { formatCost, formatLatency } from "./formatters.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
-import { formatRunStatusLabel } from "./format-run-status-label";
-import { buildDisplayTitle } from "./run-history-transforms";
-import { isCancellableStatus } from "./run-status";
+import { formatRunStatusLabel } from "./format-run-status-label.ts";
+import { buildDisplayTitle } from "./run-history-transforms.ts";
+import { isCancellableStatus } from "./run-status.ts";
 
 /**
  * Wraps one rendered scenario row. `children` is the single row element, not

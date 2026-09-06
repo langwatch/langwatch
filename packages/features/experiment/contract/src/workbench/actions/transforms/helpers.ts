@@ -3,8 +3,8 @@ import type {
   EvaluatorConfig,
   InlineDataset,
   TargetConfig,
-} from "../../../experiment-workbench";
-import { TransformError, type WorkbenchState } from "./types";
+} from "../../../experiment-workbench.ts";
+import { TransformError, type WorkbenchState } from "./types.ts";
 
 export const requireTarget = ({
   state,

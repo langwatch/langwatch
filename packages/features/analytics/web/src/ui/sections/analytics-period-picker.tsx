@@ -17,7 +17,7 @@ import {
   type AnalyticsPeriod,
   type AnalyticsPeriodMode,
   type AnalyticsPresetKey,
-} from "../../model/analytics-period";
+} from "../../model/analytics-period.ts";
 
 /** Where the range list opens, relative to the trigger. */
 export type AnalyticsPeriodPickerPlacement = NonNullable<

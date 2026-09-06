@@ -12,8 +12,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventSourcing } from "../../eventSourcing";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const TEST_PIPELINE_NAME = "gateway_spend_processing";
 

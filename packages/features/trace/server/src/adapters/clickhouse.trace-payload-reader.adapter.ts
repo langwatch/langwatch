@@ -2,9 +2,9 @@ import {
   TraceClickHousePort,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
-} from "../ports/clickhouse.port";
-import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port";
-import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository";
+} from "../ports/clickhouse.port.ts";
+import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port.ts";
+import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository.ts";
 
 /**
  * The aggregate every offloaded trace field is stored under.

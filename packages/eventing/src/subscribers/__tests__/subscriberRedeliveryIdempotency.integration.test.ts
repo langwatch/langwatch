@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AggregateType, EventUtils } from "../../";
-import { createTenantId } from "../../domain/tenantId";
-import { ProjectionRouter } from "../../projections/projectionRouter";
-import { TEST_CONSTANTS, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
-import { QueueManager } from "../../services/queues/queueManager";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import type { Event } from "../../domain/types";
+import { type AggregateType, EventUtils } from "../..//index.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { ProjectionRouter } from "../../projections/projectionRouter.ts";
+import { TEST_CONSTANTS, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import { QueueManager } from "../../services/queues/queueManager.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+import type { Event } from "../../domain/types.ts";
 
 /**
  * Delivery is at-least-once, so a handler that completed and then lost its

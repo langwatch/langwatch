@@ -10,8 +10,8 @@ import type {
   ResourceGrantUsageSeed,
   RoleHeadRow,
   ShareLinkFactRow,
-} from "../authz-migration.repository";
-import { AuthzMigrationRepository } from "../authz-migration.repository";
+} from "../authz-migration.repository.ts";
+import { AuthzMigrationRepository } from "../authz-migration.repository.ts";
 
 type DatabaseRow = Record<string, any>;
 

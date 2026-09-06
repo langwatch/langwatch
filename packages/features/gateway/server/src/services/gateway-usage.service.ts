@@ -5,8 +5,8 @@
  */
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.

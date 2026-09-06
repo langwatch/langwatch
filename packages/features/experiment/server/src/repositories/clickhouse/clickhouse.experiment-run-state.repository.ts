@@ -12,16 +12,16 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
+import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port.ts";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
-} from "../../projections/experiment-run-state.projection";
+} from "../../projections/experiment-run-state.projection.ts";
 import {
   makeExperimentRunKey,
   parseExperimentRunKey,
-} from "../../processes/experiment-run-key.process";
-import type { ExperimentRunStateRepository } from "../experiment-run-state.repository";
+} from "../../processes/experiment-run-key.process.ts";
+import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
 
 const TABLE_NAME = "experiment_runs" as const;
 

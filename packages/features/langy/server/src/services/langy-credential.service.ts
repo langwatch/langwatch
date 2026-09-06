@@ -10,7 +10,7 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-import { LangyCredentialRepository } from "../repositories/langy-credential.repository";
+import { LangyCredentialRepository } from "../repositories/langy-credential.repository.ts";
 
 const virtualKeyConfigSchema = z
   .object({ modelsAllowed: z.array(z.string()).nullable().default(null) })

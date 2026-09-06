@@ -3,7 +3,7 @@ import {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,
   type TieredFreeToSeatEventMigrationDatabase,
-} from "../tiered-free-to-seat-event.task";
+} from "../tiered-free-to-seat-event.task.ts";
 
 function databaseWith(
   orgs: { id: string; name: string; slug: string; pricingModel: string }[],

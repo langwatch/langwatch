@@ -1,8 +1,8 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { MetricProcessingPipeline } from "@langwatch/metric-server";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** Metric's worker-facing capability after its server graph is composed. */
 export interface MetricWorkerCapability {

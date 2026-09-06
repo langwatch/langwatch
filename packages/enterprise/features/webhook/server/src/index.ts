@@ -24,14 +24,14 @@ export {
   type WebhookEndpointRuntime,
   type WebhookEndpointServiceOptions,
   type WebhookEndpointStatusSnapshot,
-} from "./adapters/webhook-endpoint.webhook-endpoint.adapter";
-export { WebhookIdPort } from "./ports/webhook-id.port";
-export { WebhookSecretPort } from "./ports/webhook-secret.port";
+} from "./adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+export { WebhookIdPort } from "./ports/webhook-id.port.ts";
+export { WebhookSecretPort } from "./ports/webhook-secret.port.ts";
 // Webhook event reads are composed through the adapter and held as the port.
 // The ClickHouse repository, its client shape and its cursor codec are private
 // to the feature: nothing outside it names them any more.
-export { WebhookEventsAdapter } from "./adapters/clickhouse.webhook-events.adapter";
-export { WebhookEventsRepositoryPort } from "./ports/webhook-events.port";
+export { WebhookEventsAdapter } from "./adapters/clickhouse.webhook-events.adapter.ts";
+export { WebhookEventsRepositoryPort } from "./ports/webhook-events.port.ts";
 export {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,
@@ -42,13 +42,13 @@ export {
   WEBHOOK_IN_FLIGHT_BOUNDS,
   WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
   type WebhookEndpointConfigurationInput,
-} from "./services/webhook-endpoint-policy.service";
+} from "./services/webhook-endpoint-policy.service.ts";
 export {
   WebhookDestinationService,
   type ParsedSqsQueueUrl,
   type WebhookDestinationConfig,
   type WebhookUrlProblemCode,
-} from "./services/webhook-destination.service";
+} from "./services/webhook-destination.service.ts";
 export {
   deliverSchema,
   flushEndpointSchema,
@@ -77,29 +77,29 @@ export {
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
   type WebhookDispatchResult,
-} from "./services/webhook-delivery.service";
+} from "./services/webhook-delivery.service.ts";
 export {
   WebhookBatchPlannerService,
   WEBHOOK_FLUSH_RECHECK_MS,
   type PendingEnvelope,
-} from "./services/webhook-batch-planner.service";
+} from "./services/webhook-batch-planner.service.ts";
 export {
   WebhookEnvelopeService,
   type WebhookSpendEventRow,
   type WebhookSpendEventStatus,
-} from "./services/webhook-envelope.service";
-export { WebhookAccessService } from "./services/webhook-access.service";
+} from "./services/webhook-envelope.service.ts";
+export { WebhookAccessService } from "./services/webhook-access.service.ts";
 export {
   WebhookEventsService,
   type LegacyWebhookEventsServiceOptions,
   type WebhookProjectReader,
   type WebhookEventsServiceOptions,
-} from "./services/webhook-events.service";
+} from "./services/webhook-events.service.ts";
 export {
   WebhookHealthService,
   type WebhookEndpointHealthSource,
   type WebhookHealthDeps,
-} from "./services/webhook-health.service";
+} from "./services/webhook-health.service.ts";
 
 /**
  * The feature's application: the one object both of its doors call. The process composes it
@@ -110,7 +110,7 @@ export {
   WebhookApp,
   type WebhookAppDependencies,
   type WebhookTestDispatch,
-} from "./app/webhook.app";
+} from "./app/webhook.app.ts";
 
 /**
  * The app-process tRPC transport this feature owns. The process supplies its
@@ -120,12 +120,12 @@ export {
 export {
   WebhookEndpointTrpcApi,
   type WebhookEndpointTrpcContext,
-} from "./transport/api-trpc/webhook-endpoint.api";
+} from "./transport/api-trpc/webhook-endpoint.api.ts";
 
 /**
  * The organization-key REST family this feature owns, `/api/webhooks/v1`.
  */
-export { createWebhookRestApp } from "./transport/api-rest/webhook.api";
+export { createWebhookRestApp } from "./transport/api-rest/webhook.api.ts";
 
 // --------------------------------------------------------------------------- An endpoint's
 // LAST HOP Everything above the destination interface is one machinery no matter where an
@@ -136,26 +136,26 @@ export {
   WebhookDestinationPort,
   type WebhookDispatchRequest,
   type WebhookDispatchVerdict,
-} from "./ports/webhook-destination.port";
+} from "./ports/webhook-destination.port.ts";
 export {
   WebhookDestinationAdapter,
   type WebhookDestinationDeps,
-} from "./adapters/webhook-destination.adapter";
-export { HttpWebhookDestinationAdapter } from "./adapters/http.webhook-destination.adapter";
+} from "./adapters/webhook-destination.adapter.ts";
+export { HttpWebhookDestinationAdapter } from "./adapters/http.webhook-destination.adapter.ts";
 export {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationAdapter,
   type AwsClientConfigPort,
   type SqsDestinationConfig,
-} from "./adapters/sqs.webhook-destination.adapter";
+} from "./adapters/sqs.webhook-destination.adapter.ts";
 export {
   inspectSqsQueueUrl,
   parseSqsQueueUrl,
   sqsHostFor,
   type SqsQueueUrlInspection,
   type SqsQueueUrlProblem,
-} from "./rules/sqs-queue-url.rules";
+} from "./rules/sqs-queue-url.rules.ts";
 export {
   PrismaWebhookRetentionRepository,
   WEBHOOK_DELIVERY_RETENTION_MS,
-} from "./repositories/prisma/prisma.webhook-retention.repository";
+} from "./repositories/prisma/prisma.webhook-retention.repository.ts";

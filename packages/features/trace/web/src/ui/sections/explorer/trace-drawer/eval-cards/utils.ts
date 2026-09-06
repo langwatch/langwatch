@@ -1,8 +1,8 @@
 import {
   EVALUATION_STATUS_COLORS,
   EVALUATION_STATUS_TONES,
-} from "../../../../../model/evaluation-results";
-import type { EvalSummary } from "../../types/trace";
+} from "../../../../../model/evaluation-results.ts";
+import type { EvalSummary } from "../../types/trace.ts";
 
 /**
  * Per-status tag rendering for the Evals accordion cards.

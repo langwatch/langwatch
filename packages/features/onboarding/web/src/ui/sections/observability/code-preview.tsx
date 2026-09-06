@@ -12,8 +12,8 @@ import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard";
-import { InlineCopyButton } from "../shared/inline-copy-button";
+import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
+import { InlineCopyButton } from "../shared/inline-copy-button.tsx";
 
 /**
  * An explicit `copyText` must bypass the CodeBlock copy path entirely: that

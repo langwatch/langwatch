@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
  * Claude Cowork — the Claude desktop runtime working in a VM. Its telemetry

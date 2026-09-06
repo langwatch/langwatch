@@ -20,7 +20,7 @@
  * are implementation details of `RedisConfigService.resolve`, and the behaviour
  * they carry is covered through it.
  */
-export { RedisConfigService } from "./config";
+export { RedisConfigService } from "./config.ts";
 export type {
   RedisClusterConfig,
   RedisClusterEndpoint,
@@ -29,10 +29,10 @@ export type {
   RedisStandaloneConfig,
   RedisTlsSetting,
   RedisUnconfigured,
-} from "./config";
-export { RedisConnectionService } from "./connection";
-export type { RedisConnectionServiceOptions } from "./connection";
-export { RedisReadinessService } from "./readiness";
-export type { RedisPingOptions, RedisReadinessServiceOptions } from "./readiness";
-export { RedisShutdownService } from "./shutdown";
-export type { RedisConnection, RedisLogger } from "./types";
+} from "./config.ts";
+export { RedisConnectionService } from "./connection.ts";
+export type { RedisConnectionServiceOptions } from "./connection.ts";
+export { RedisReadinessService } from "./readiness.ts";
+export type { RedisPingOptions, RedisReadinessServiceOptions } from "./readiness.ts";
+export { RedisShutdownService } from "./shutdown.ts";
+export type { RedisConnection, RedisLogger } from "./types.ts";

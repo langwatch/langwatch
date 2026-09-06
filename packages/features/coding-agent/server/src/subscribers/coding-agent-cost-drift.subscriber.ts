@@ -6,12 +6,12 @@ import {
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port";
+import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port";
-import { CodingAgentSessionStateProjection } from "../projections/coding-agent-session-state.projection";
-import { CodingAgentSessionSpanProjection } from "../projections/coding-agent-session-span.projection";
-import { CodingAgentSessionLogProjection } from "../projections/coding-agent-session-log.projection";
+import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port.ts";
+import { CodingAgentSessionStateProjection } from "../projections/coding-agent-session-state.projection.ts";
+import { CodingAgentSessionSpanProjection } from "../projections/coding-agent-session-span.projection.ts";
+import { CodingAgentSessionLogProjection } from "../projections/coding-agent-session-log.projection.ts";
 
 function labels(agent: string, facts: Record<string, unknown>) {
   const model = facts.model ?? facts["gen_ai.request.model"] ?? facts["gen_ai.response.model"];

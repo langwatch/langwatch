@@ -1,3 +1,3 @@
-export * from "./annotation.anchor";
-export * from "./annotation.record";
-export * from "./annotation.score";
+export * from "./annotation.anchor.ts";
+export * from "./annotation.record.ts";
+export * from "./annotation.score.ts";

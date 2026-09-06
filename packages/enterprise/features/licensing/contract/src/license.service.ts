@@ -1,11 +1,11 @@
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import type { GenerateLicenseInput, GenerateLicenseOutput } from "./license.commands";
+import type { GenerateLicenseInput, GenerateLicenseOutput } from "./license.commands.ts";
 import type {
   LicenseStatus,
   PlatformLicenseAccess,
   RemoveLicenseResult,
   StoreLicenseResult,
-} from "./license";
+} from "./license.ts";
 
 /** The provider-neutral source port Licensing implements for Entitlements. */
 export type { EntitlementSource, ResolvePlanInput } from "@langwatch/entitlement-contract";

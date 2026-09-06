@@ -5,7 +5,7 @@ import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import {
   createTraceMetricsSyncSubscriber,
   type TraceMetricsSyncSubscriberDeps,
-} from "../trace-metrics-sync.subscriber";
+} from "../trace-metrics-sync.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clonePayload } from "../payload-clone.rules";
+import { clonePayload } from "../payload-clone.rules.ts";
 
 describe("clonePayload", () => {
   describe("given a payload the structured clone algorithm also handles", () => {

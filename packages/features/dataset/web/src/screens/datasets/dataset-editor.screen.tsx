@@ -14,10 +14,10 @@
 import { Alert, Box, Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetHost } from "../../model/dataset-host";
-import { retryDatasetNormalize } from "../../behavior/direct-upload";
-import { DatasetEditorTable } from "../../ui/sections/dataset-editor-table";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { retryDatasetNormalize } from "../../behavior/direct-upload.ts";
+import { DatasetEditorTable } from "../../ui/sections/dataset-editor-table.tsx";
 
 /**
  * The grant that offers the workbench hand-off.

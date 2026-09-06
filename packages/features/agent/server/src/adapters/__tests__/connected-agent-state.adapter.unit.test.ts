@@ -5,7 +5,7 @@
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
-import { ConnectedAgentStateAdapter } from "../connected-agent-state.adapter";
+import { ConnectedAgentStateAdapter } from "../connected-agent-state.adapter.ts";
 
 type MessageListener = (channel: string, message: string) => void;
 

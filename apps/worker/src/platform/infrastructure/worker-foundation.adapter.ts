@@ -13,7 +13,7 @@ import {
 } from "@langwatch/redis-client";
 import { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter";
+import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter.ts";
 
 /** Named construction port for the storage implementation owned by a host. */
 export type WorkerStorageLease = {

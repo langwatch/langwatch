@@ -14,7 +14,7 @@ import {
   WorkflowNotFoundError,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { EvaluatorRepository } from "../repositories/evaluator.repository";
+import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 
 export class EvaluatorExecutionService {
   static create(options: {

@@ -19,7 +19,7 @@ import type { PromptService } from "@langwatch/prompt-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import { agentDrawerPath } from "../agent/agent-platform-url";
+import { agentDrawerPath } from "../agent/agent-platform-url.ts";
 
 /**
  * The eight directories, each absent where this process composed none of it.

@@ -1,6 +1,6 @@
 import type { Preview } from "@storybook/react-vite";
 import "./fonts.css";
-import { DesignSystemProvider } from "../src/provider";
+import { DesignSystemProvider } from "../src/provider/index.tsx";
 
 /**
  * Every story mounts the package's own provider and system, so a story shows

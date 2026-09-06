@@ -1,5 +1,5 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { mapChRowToNormalized, serializeAttributes } from "../stored-span-row.mapper";
+import { mapChRowToNormalized, serializeAttributes } from "../stored-span-row.mapper.ts";
 
 /**
  * A normalized span put through the real ClickHouse row round trip.

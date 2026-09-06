@@ -9,7 +9,7 @@ import {
   applyMappingChangeToEdges,
   buildAvailableSources,
   buildInputMappingsFromEdges,
-} from "../edge-mapping";
+} from "../edge-mapping.ts";
 
 function createNode(id: string, type: string, data: Partial<Component> = {}): Node<Component> {
   return {

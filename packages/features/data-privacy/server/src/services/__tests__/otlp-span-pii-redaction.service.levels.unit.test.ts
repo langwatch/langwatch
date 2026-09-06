@@ -1,12 +1,12 @@
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { PIICheckOptions } from "../../ports/pii-analysis.port";
+import type { PIICheckOptions } from "../../ports/pii-analysis.port.ts";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service";
-import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service";
-import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture";
+import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
+import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service.ts";
+import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture.ts";
 
 /**
  * The rollout switches this suite reads, held in memory. The packaged flag

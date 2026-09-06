@@ -3,7 +3,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { githubPrsFromToolParts, LANGY_OPEN_PR_TOOL, parseGithubPrCard } from "../github-pr-card";
+import { githubPrsFromToolParts, LANGY_OPEN_PR_TOOL, parseGithubPrCard } from "../github-pr-card.ts";
 
 const RICH = {
   owner: "acme",

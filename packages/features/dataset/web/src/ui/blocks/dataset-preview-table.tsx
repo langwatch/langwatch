@@ -27,10 +27,10 @@ import {
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
-} from "../../model/dataset-table-context";
-import { datasetTableCss } from "../../model/dataset-table-styles";
-import { JSON_LIKE_TYPES } from "../elements/editable-cell";
-import { TableCell } from "../elements/table-cell";
+} from "../../model/dataset-table-context.tsx";
+import { datasetTableCss } from "../../model/dataset-table-styles.ts";
+import { JSON_LIKE_TYPES } from "../elements/editable-cell.tsx";
+import { TableCell } from "../elements/table-cell.tsx";
 
 export type DatasetPreviewRow = { id?: string; isSelected?: boolean } & Record<string, unknown>;
 

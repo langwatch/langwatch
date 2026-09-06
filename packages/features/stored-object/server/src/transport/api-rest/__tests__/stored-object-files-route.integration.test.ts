@@ -16,7 +16,7 @@ import {
   createFilesRestApp,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "../stored-object.api";
+} from "../stored-object.api.ts";
 
 const OWNER_PROJECT = "project-owner";
 const OBJECT_ID = "stored-object-1";

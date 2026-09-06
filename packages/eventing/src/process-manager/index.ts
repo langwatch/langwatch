@@ -1,4 +1,4 @@
-export { ensureJsonSafe, JsonSafetyError, type JsonValue } from "./json";
+export { ensureJsonSafe, JsonSafetyError, type JsonValue } from "./json.ts";
 export {
   type DispatchableMessage,
   type DispatchReport,
@@ -7,7 +7,7 @@ export {
   type OutboxDispatcherServiceOptions,
   ProcessOutboxWorker,
   type ProcessOutboxWorkerOptions,
-} from "./outbox";
+} from "./outbox/index.ts";
 export type {
   Evolution,
   ProcessDefinition,
@@ -16,17 +16,17 @@ export type {
   ProcessIntent,
   ProcessRef,
   ProcessSignalEnvelope,
-} from "./processManager.types";
+} from "./processManager.types.ts";
 export {
   DEFAULT_SIGNAL_REVISION_RETRIES,
   type HandleResult,
   ProcessManagerService,
   type ProcessManagerServiceOptions,
   type SignalHandleResult,
-} from "./processManagerService";
-export { type GeneratedProcessArtifacts, ProcessRuntime } from "./processRuntime";
-export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
-export { deriveInboxKey } from "./stores/inboxKey";
+} from "./processManagerService.ts";
+export { type GeneratedProcessArtifacts, ProcessRuntime } from "./processRuntime.ts";
+export { InMemoryProcessStore } from "./stores/inMemoryProcessStore.ts";
+export { deriveInboxKey } from "./stores/inboxKey.ts";
 export type {
   AppendIntentsResult,
   CommitResult,
@@ -40,9 +40,9 @@ export type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
-} from "./stores/processStore.types";
+} from "./stores/processStore.types.ts";
 export {
   ProcessWakeWorker,
   type ProcessWakeWorkerOptions,
   type WakeHandlerPort,
-} from "./wake/processWakeWorker";
+} from "./wake/processWakeWorker.ts";

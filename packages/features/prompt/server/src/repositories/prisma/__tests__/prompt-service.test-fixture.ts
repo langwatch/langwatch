@@ -5,12 +5,12 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { vi } from "vitest";
-import { PrismaPromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository";
-import { PrismaPromptTagRepository } from "../prisma.prompt-tag.repository";
-import { PrismaLlmConfigRepository } from "../prisma.prompt.repository";
-import { PromptService } from "../../../services/prompt.service";
-import { PromptTagService } from "../../../services/prompt-tag.service";
-import { PromptVersionService } from "../../../services/prompt-version.service";
+import { PrismaPromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository.ts";
+import { PrismaPromptTagRepository } from "../prisma.prompt-tag.repository.ts";
+import { PrismaLlmConfigRepository } from "../prisma.prompt.repository.ts";
+import { PromptService } from "../../../services/prompt.service.ts";
+import { PromptTagService } from "../../../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../../../services/prompt-version.service.ts";
 
 /**
  * Creates a typed client that unit tests can safely spy on without opening a

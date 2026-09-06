@@ -18,7 +18,7 @@ import userEvent from "@testing-library/user-event";
 import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLChartMode, type LangWatchQLChartResult } from "../langwatch-ql-chart-mode";
+import { LangWatchQLChartMode, type LangWatchQLChartResult } from "../langwatch-ql-chart-mode.tsx";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 import {
   langwatchVegaConfig,

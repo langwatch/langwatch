@@ -1,5 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { formatLimitOrUnlimited } from "../../model/license-status";
+import { formatLimitOrUnlimited } from "../../model/license-status.ts";
 
 export interface ResourceLimitRowProps {
   label: string;

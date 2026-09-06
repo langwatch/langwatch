@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceActivityOperationsService } from "./governance-activity-operations.service";
-import type { GovernanceIngestionOperationsService } from "./governance-ingestion-operations.service";
-import type { GovernanceLifecycleOperationsService } from "./governance-lifecycle-operations.service";
-import type { GovernanceRulesOperationsService } from "./governance-rules-operations.service";
+import type { GovernanceActivityOperationsService } from "./governance-activity-operations.service.ts";
+import type { GovernanceIngestionOperationsService } from "./governance-ingestion-operations.service.ts";
+import type { GovernanceLifecycleOperationsService } from "./governance-lifecycle-operations.service.ts";
+import type { GovernanceRulesOperationsService } from "./governance-rules-operations.service.ts";
 
 /**
  * The one process-owned Governance capability passed to composition callers.

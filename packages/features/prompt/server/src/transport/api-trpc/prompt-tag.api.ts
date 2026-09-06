@@ -10,7 +10,7 @@ import { z } from "zod";
 import type {
   PromptTrpcContext,
   PromptTrpcProcedures,
-} from "../../rules/prompt-trpc-context.rules";
+} from "../../rules/prompt-trpc-context.rules.ts";
 
 /**
  * A tag definition is one organization row and its assignments cascade to every project in

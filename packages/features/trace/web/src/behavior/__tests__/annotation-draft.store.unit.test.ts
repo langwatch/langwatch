@@ -8,7 +8,7 @@ import {
   isSameAnnotationTarget,
   isTurnRailDraft,
   useAnnotationDraftStore,
-} from "../annotation-draft.store";
+} from "../annotation-draft.store.ts";
 
 const store = () => useAnnotationDraftStore.getState();
 

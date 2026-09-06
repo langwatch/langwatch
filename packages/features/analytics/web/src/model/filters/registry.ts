@@ -1,4 +1,4 @@
-import type { FilterDefinition, FilterField } from "./types";
+import type { FilterDefinition, FilterField } from "./types.ts";
 
 /**
  * UI metadata for every filter field: display name, URL key, and key/subkey

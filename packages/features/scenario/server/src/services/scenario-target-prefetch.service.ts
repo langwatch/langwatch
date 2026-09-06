@@ -14,9 +14,9 @@ import type {
   WorkflowAgentData,
 } from "@langwatch/scenario-contract";
 import { AuthConfigSchema } from "@langwatch/scenario-contract";
-import type { ModelParamsFailureReason } from "./scenario-model-parameters.service";
-import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service";
-import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service";
+import type { ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
+import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
+import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service.ts";
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
 type HydrationFailure = {

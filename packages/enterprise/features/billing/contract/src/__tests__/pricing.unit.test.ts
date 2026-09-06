@@ -4,7 +4,7 @@ import {
   formatPrice,
   getAnnualDiscountPercent,
   getGrowthSeatPriceCents,
-} from "../index";
+} from "../index.ts";
 
 const prices = BillingPriceCatalogue.create("test").prices;
 

@@ -13,8 +13,8 @@
  * deleted / skip reason reported), not the shape of any message.
  */
 import { describe, expect, it, vi } from "vitest";
-import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent";
-import { fakeRunnerDeps } from "./topic-clustering-runner.fixture";
+import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent.ts";
+import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 
 /** A full page of clusterable traces, well over the batch minimum of 10. */
 function usableTraceRows(count: number) {

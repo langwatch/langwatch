@@ -16,9 +16,9 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { createPresenceTrpcRouter } from "./presence-trpc.mount";
+import { createPresenceTrpcRouter } from "./presence-trpc.mount.ts";
 
-import type { ComposedPresenceFeature } from "./presence.composition.types";
+import type { ComposedPresenceFeature } from "./presence.composition.types.ts";
 
 /** Composes presence and the fabric it publishes on. */
 export function composePresenceFeature(options: {

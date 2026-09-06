@@ -1,11 +1,11 @@
 import {
   WebhookEventsRepositoryPort,
   type WebhookEventsPage,
-} from "../../ports/webhook-events.port";
+} from "../../ports/webhook-events.port.ts";
 import type {
   WebhookSpendEventRow,
   WebhookSpendEventStatus,
-} from "../../services/webhook-envelope.service";
+} from "../../services/webhook-envelope.service.ts";
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 
 const SPEND_TABLE = "gateway_spend";

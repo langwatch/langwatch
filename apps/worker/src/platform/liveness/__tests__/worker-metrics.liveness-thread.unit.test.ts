@@ -10,11 +10,11 @@
 import http from "node:http";
 import { Worker } from "node:worker_threads";
 import { afterEach, describe, expect, it } from "vitest";
-import { LIVENESS_THREAD_SOURCE } from "../worker-metrics.server";
+import { LIVENESS_THREAD_SOURCE } from "../worker-metrics.server.ts";
 import {
   WORKER_HEARTBEAT_STALL_BUDGET_MS as STALL_BUDGET_MS,
   WORKER_LIVENESS_PATH,
-} from "../worker.liveness";
+} from "../worker.liveness.ts";
 
 /**
  * The probe path as the Helm chart writes it — `charts/langwatch/templates/

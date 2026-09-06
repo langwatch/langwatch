@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process.ts";
 import {
   ModelCatalogGatewaySpendRatingAdapter,
   NO_RATE_RULE_CODE,
   UNPRICED_QUANTITIES_CODE,
-} from "../model-catalog.gateway-spend-rating.adapter";
+} from "../model-catalog.gateway-spend-rating.adapter.ts";
 
 const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 // The rating service is the only place that can see a request burn something

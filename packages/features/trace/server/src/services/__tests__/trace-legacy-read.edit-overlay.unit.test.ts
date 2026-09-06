@@ -27,9 +27,9 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { TraceService } from "../trace-legacy-read.service";
-import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository";
-import type { TraceEditOverlayService } from "../trace-edit-overlay.service";
+import { TraceService } from "../trace-legacy-read.service.ts";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 
 const PROJECT_ID = "project_test";
 

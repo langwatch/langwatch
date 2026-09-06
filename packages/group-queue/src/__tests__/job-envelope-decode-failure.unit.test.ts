@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MAX_BLOB_BYTES } from "../blobConstants";
+import { MAX_BLOB_BYTES } from "../blobConstants.ts";
 import {
   DecodeFailureError,
   decodeJobEnvelope,
   encodeJobEnvelope,
   PayloadTooLargeError,
   readEnvelopeDescriptor,
-} from "../jobEnvelope";
-import { createTenantId } from "../storage";
-import { TieredBlobStore } from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
+} from "../jobEnvelope.ts";
+import { createTenantId } from "../storage.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 /**
  * #5538. The drop path used to throw plain `Error`s, so every decode failure

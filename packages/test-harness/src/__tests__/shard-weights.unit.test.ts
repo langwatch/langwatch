@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import DurationManifestReporter, { mergeDurations } from "../duration-manifest-reporter";
-import { createWeigher, loadDurationManifest } from "../shard-weights";
+import DurationManifestReporter, { mergeDurations } from "../duration-manifest-reporter.ts";
+import { createWeigher, loadDurationManifest } from "../shard-weights.ts";
 
 /** A vitest TestModule, as much of one as the reporter actually reads. */
 const fakeModule = (moduleId: string, duration: number) =>

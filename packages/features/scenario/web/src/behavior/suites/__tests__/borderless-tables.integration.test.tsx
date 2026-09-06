@@ -10,7 +10,7 @@ import { GroupRow, RunRow } from "@langwatch/suite-web/surfaces/run-cards";
 import { type RunGroup, type RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
 
-vi.mock("../use-prefetch-run-state", () => ({
+vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
 

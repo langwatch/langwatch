@@ -9,7 +9,7 @@ import {
   SIMULATOR_MODEL_FEATURE_KEY,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
-import { SuiteRunModelsService } from "../suite-run-models.service";
+import { SuiteRunModelsService } from "../suite-run-models.service.ts";
 
 const projectId = "project-1";
 

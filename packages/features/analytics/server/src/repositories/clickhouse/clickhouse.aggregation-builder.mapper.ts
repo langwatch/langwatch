@@ -3,8 +3,8 @@
  */
 
 import type { FilterField } from "@langwatch/analytics-contract";
-import { MAX_PROCESSED_SPANS } from "../../rules/trace-signal.rules";
-import { snakeCase } from "../../rules/string-casing.rules";
+import { MAX_PROCESSED_SPANS } from "../../rules/trace-signal.rules.ts";
+import { snakeCase } from "../../rules/string-casing.rules.ts";
 import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import {
   buildJoinClause,
@@ -17,15 +17,15 @@ import {
   TRACE_ANALYTICS_COLUMNS,
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
-} from "./clickhouse.field-mappings.mapper";
-import { translateAllFilters } from "./clickhouse.filter-translator.mapper";
+} from "./clickhouse.field-mappings.mapper.ts";
+import { translateAllFilters } from "./clickhouse.filter-translator.mapper.ts";
 import {
   buildMetricAlias,
   type MetricTranslation,
   nonBilledCostExpression,
   translateMetric,
   translatePipelineAggregation,
-} from "./clickhouse.metric-translator.mapper";
+} from "./clickhouse.metric-translator.mapper.ts";
 
 /**
  * Resolve which columns a joined table needs based on the SQL expressions that

@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "../ui/sections/batch-evaluation-results.verdict";
-import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
+} from "../ui/sections/batch-evaluation-results.verdict.ts";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy.ts";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../model/batch-evaluation-results.bt-leaderboard";
-import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,

@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   SignUpAccountDirectory,
   SignUpVerificationTokenStore,
-} from "../../services/signup-verification.service";
+} from "../../services/signup-verification.service.ts";
 
 /**
  * Sign-up's address-confirmation tokens, over the `VerificationToken` table.

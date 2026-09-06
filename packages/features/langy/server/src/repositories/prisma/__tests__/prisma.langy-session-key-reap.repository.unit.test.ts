@@ -12,12 +12,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyDatabase } from "../langy-database.mapper";
+import type { LangyDatabase } from "../langy-database.mapper.ts";
 import {
   PrismaLangySessionKeyReapRepository,
   type PrismaLangySessionKeyReapDatabase,
-} from "../prisma.langy-session-key-reap.repository";
-import { PrismaLangySessionKeyRepository } from "../prisma.langy-session-key.repository";
+} from "../prisma.langy-session-key-reap.repository.ts";
+import { PrismaLangySessionKeyRepository } from "../prisma.langy-session-key.repository.ts";
 
 type SweepUpdate = {
   where: { name: string; revokedAt: Date | null; expiresAt: { not: null; lte: Date } };

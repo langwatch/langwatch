@@ -4,24 +4,24 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition";
-import { composeApiPackagedRest } from "../api-packaged-rest.composition";
-import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
-import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
-import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
-import { refusingDatasetFeature } from "../../features/dataset/dataset.composition";
-import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
-import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
-import { refusingRoleFeature } from "../../features/role/role.composition";
-import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
-import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
-import { refusingPresenceFeature } from "../../features/presence/presence.composition";
-import { refusingOrganizationFeature } from "../../features/organization/organization.composition";
-import { refusingAutomationFeature } from "../../features/automation/automation.composition";
-import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition";
-import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
-import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
-import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
+import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition.ts";
+import { composeApiPackagedRest } from "../api-packaged-rest.composition.ts";
+import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition.ts";
+import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition.ts";
+import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
+import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
+import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition.ts";
+import { refusingMonitorFeature } from "../../features/monitor/monitor.composition.ts";
+import { refusingRoleFeature } from "../../features/role/role.composition.ts";
+import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
+import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
+import { refusingPresenceFeature } from "../../features/presence/presence.composition.ts";
+import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
+import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
+import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
+import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
+import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
+import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition.ts";
 
 const project = {
   id: "project-1",

@@ -4,13 +4,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { useAllPromptsForProject } from "../use-all-prompts-for-project";
+import { useAllPromptsForProject } from "../use-all-prompts-for-project.ts";
 
 const { useQueryMock } = vi.hoisted(() => ({
   useQueryMock: vi.fn(() => ({ data: [] })),
 }));
 
-vi.mock("../../scenario-api", () => ({
+vi.mock("../../scenario-api.ts", () => ({
   api: {
     prompts: {
       getAllPromptsForProject: { useQuery: useQueryMock },
@@ -18,7 +18,7 @@ vi.mock("../../scenario-api", () => ({
   },
 }));
 
-vi.mock("../../use-organization-team-project", () => ({
+vi.mock("../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ projectId: "project-1" }),
 }));
 

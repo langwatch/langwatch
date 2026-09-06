@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   EvaluationPreconditionService,
   PRECONDITION_FIELDS,
-} from "../evaluation-precondition.service";
+} from "../evaluation-precondition.service.ts";
 
 const service = EvaluationPreconditionService.create();
 

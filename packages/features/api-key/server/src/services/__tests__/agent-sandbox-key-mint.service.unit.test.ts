@@ -7,8 +7,8 @@
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AgentSandboxKeySharePort } from "../../ports/agent-sandbox-key-share.port";
-import { AgentSandboxKeyMintService } from "../agent-sandbox-key-mint.service";
+import { AgentSandboxKeySharePort } from "../../ports/agent-sandbox-key-share.port.ts";
+import { AgentSandboxKeyMintService } from "../agent-sandbox-key-mint.service.ts";
 
 const create = vi.fn();
 

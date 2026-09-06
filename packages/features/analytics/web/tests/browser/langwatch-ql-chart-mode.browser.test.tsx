@@ -41,8 +41,8 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode";
-import type { LangWatchQLDatasetColumn } from "../../src/ui/sections/chart";
+import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode.tsx";
+import type { LangWatchQLDatasetColumn } from "../../src/ui/sections/chart.ts";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },

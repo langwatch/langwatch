@@ -10,7 +10,7 @@ import {
   type SlackActionParams,
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { SlackProviderAdapter, type AutomationSecretCrypto } from "../slack-provider.adapter";
+import { SlackProviderAdapter, type AutomationSecretCrypto } from "../slack-provider.adapter.ts";
 
 /**
  * A stand-in cipher. It hex-encodes rather than wrapping, so a test asserting

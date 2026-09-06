@@ -1,5 +1,5 @@
 import type { IdentityCommand } from "@langwatch/identity-contract";
-import type { IdentityEvent } from "../projections/identity-state.projection";
+import type { IdentityEvent } from "../projections/identity-state.projection.ts";
 
 /**
  * The two ledger legs the born-finalized entrance sequences its own Deliberately not

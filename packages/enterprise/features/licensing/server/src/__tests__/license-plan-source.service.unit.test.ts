@@ -1,15 +1,15 @@
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
-import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter";
-import { LicensingEntitlementSourceAdapter } from "../adapters/licensing.entitlement-source.adapter";
-import { OrganizationLicensePort } from "../ports/organization-license.port";
+import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
+import { LicensingEntitlementSourceAdapter } from "../adapters/licensing.entitlement-source.adapter.ts";
+import { OrganizationLicensePort } from "../ports/organization-license.port.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_PUBLIC_KEY,
-} from "../testing";
-import { LicensePlanSourceService } from "../services/license-plan-source.service";
+} from "../testing.ts";
+import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
 
 /**
  * Spec: packages/enterprise/features/licensing/specs/licensing.feature

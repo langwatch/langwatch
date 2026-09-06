@@ -2,16 +2,16 @@ import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect } from "react";
 import { UiSlot } from "@langwatch/ui-host/slots";
-import { fieldMetadataFor } from "../../model/model-provider-field-metadata";
+import { fieldMetadataFor } from "../../model/model-provider-field-metadata.ts";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
-} from "../../behavior/use-model-provider-form";
-import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys";
+} from "../../behavior/use-model-provider-form.ts";
+import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { api } from "../../behavior/model-provider-api";
-import { isSecretCredentialField } from "../../model/model-provider-helpers";
-import { SmallLabel } from "../elements/small-label";
+import { api } from "../../behavior/model-provider-api.ts";
+import { isSecretCredentialField } from "../../model/model-provider-helpers.ts";
+import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * Renders credential input fields based on the provider's schema, or whatever the

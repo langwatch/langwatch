@@ -24,7 +24,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "../cleanup-test-rows";
+import { cleanupTestRows } from "../cleanup-test-rows.ts";
 
 /**
  * The tenancy guard names a project/organization on every query. This suite

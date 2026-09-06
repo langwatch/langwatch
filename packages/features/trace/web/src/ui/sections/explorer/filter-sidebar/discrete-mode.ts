@@ -1,5 +1,5 @@
-import type { NumericMode } from "../../../../behavior/numeric-mode.store";
-import type { RangeSectionData } from "../../../../behavior/explorer/filter-sidebar/types";
+import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
+import type { RangeSectionData } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 
 /**
  * Pure resolution of numeric-facet presentation mode. Two small helpers factored out of

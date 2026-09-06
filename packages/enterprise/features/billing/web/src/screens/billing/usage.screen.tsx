@@ -33,15 +33,15 @@ import {
   ResourceLimitsDisplay,
 } from "@langwatch/enterprise-licensing-web/surfaces/resource-limits";
 import { ArrowRight } from "lucide-react";
-import { billingApi } from "../../behavior/billing-api";
-import { useBillingHost } from "../../model/billing-host";
+import { billingApi } from "../../behavior/billing-api.ts";
+import { useBillingHost } from "../../model/billing-host.ts";
 import {
   getPlanActionLabel,
   planManagementUrl,
   shouldShowPlanLimits,
-} from "../../model/plan-management-url";
-import { PricingModel } from "../../model/prisma-types";
-import { Link } from "../../ui/elements/link";
+} from "../../model/plan-management-url.ts";
+import { PricingModel } from "../../model/prisma-types.ts";
+import { Link } from "../../ui/elements/link.tsx";
 
 function ResourceLimitsCard({
   planLabel,

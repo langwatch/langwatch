@@ -5,11 +5,11 @@
 
 import { useCallback, useRef } from "react";
 import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
-import { useScenarioTabFollow } from "../use-scenario-tab-follow";
-import { useSimulationUpdateListener } from "../use-simulation-update-listener";
-import { api } from "../scenario-api";
+import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
+import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
+import { api } from "../scenario-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { toAgentTestingRunPath } from "./results/run-plans";
+import { toAgentTestingRunPath } from "./results/run-plans.ts";
 
 /**
  * Takes a run handed off by another tab. The address the handoff carries names

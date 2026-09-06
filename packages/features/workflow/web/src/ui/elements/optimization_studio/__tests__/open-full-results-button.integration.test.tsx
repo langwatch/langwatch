@@ -12,7 +12,7 @@ import {
   type BatchRunSummary,
   BatchSummaryFooter,
 } from "@langwatch/experiment-web/surfaces/batch-results";
-import { OpenFullResultsButton } from "../open-full-results-button";
+import { OpenFullResultsButton } from "../open-full-results-button.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

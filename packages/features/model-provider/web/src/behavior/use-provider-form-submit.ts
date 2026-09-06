@@ -7,20 +7,20 @@ import {
 } from "@langwatch/model-provider-contract";
 import { describeError } from "@langwatch/ui-host/errors";
 
-import { useModelProviderToaster, useShowErrorToast } from "./model-provider-feedback";
+import { useModelProviderToaster, useShowErrorToast } from "./model-provider-feedback.ts";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import { api } from "./model-provider-api";
+import { api } from "./model-provider-api.ts";
 import {
   filterMaskedApiKeys,
   hasUserEnteredNewApiKey,
   hasUserModifiedAnyCredential,
   hasUserModifiedNonApiKeyFields,
-} from "../model/model-provider-helpers";
+} from "../model/model-provider-helpers.ts";
 import {
   broadcastModelProvidersUpdated,
   invalidateModelProviderQueries,
-} from "./model-provider-sync";
-import type { ExtraHeader } from "./use-extra-headers";
+} from "./model-provider-sync.ts";
+import type { ExtraHeader } from "./use-extra-headers.ts";
 
 /** Snapshot of all form state needed at submission time. */
 export type FormSnapshot = {

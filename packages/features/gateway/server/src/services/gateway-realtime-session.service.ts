@@ -13,11 +13,11 @@ import type {
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
-} from "../repositories/gateway-realtime-session.repository";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process";
-import type { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port";
-import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port";
-import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port";
+} from "../repositories/gateway-realtime-session.repository.ts";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process.ts";
+import type { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port.ts";
+import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port.ts";
+import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port.ts";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 

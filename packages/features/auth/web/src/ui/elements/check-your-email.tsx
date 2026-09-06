@@ -1,5 +1,5 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
-import { AuthCard } from "./auth-card";
+import { AuthCard } from "./auth-card.tsx";
 
 /**
  * The one state both doors end at when an address has to be confirmed: the

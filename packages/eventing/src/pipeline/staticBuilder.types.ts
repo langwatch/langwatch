@@ -1,21 +1,21 @@
-import type { CommandHandlerClass } from "../commands/commandHandlerClass";
-import type { AggregateDefinition } from "../domain/definitions";
-import type { Event, Projection } from "../domain/types";
+import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
+import type { AggregateDefinition } from "../domain/definitions.ts";
+import type { Event, Projection } from "../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
-} from "../projections/foldProjection.types";
+} from "../projections/foldProjection.types.ts";
 import type {
   MapProjectionDefinition,
   MapProjectionOptions,
-} from "../projections/mapProjection.types";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type { DeduplicationStrategy } from "../queues/queue.types";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
-import type { ProcessManagerDefinition } from "./processManagerDefinition";
-import type { PipelineMetadata } from "./types";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
+} from "../projections/mapProjection.types.ts";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { DeduplicationStrategy } from "../queues/queue.types.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
+import type { PipelineMetadata } from "./types.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * Queue serialization and append-coalescing options (ADR-066 pillar 2), shared
@@ -149,7 +149,7 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
+    handlerInstance?: import("../commands/command.ts").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }>;
 

@@ -6,7 +6,7 @@ import {
   traceListItemSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("trace view contract", () => {
   it("keeps trace header defaults used by cached and older responses", () => {

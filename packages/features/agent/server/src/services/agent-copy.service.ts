@@ -9,8 +9,8 @@ import {
   copyAgentCommandSchema,
   linkedWorkflowId,
 } from "@langwatch/agent-contract";
-import type { AgentsWorkflowPort } from "../ports/agent.port";
-import type { AgentRepository } from "../repositories/agent.repository";
+import type { AgentsWorkflowPort } from "../ports/agent.port.ts";
+import type { AgentRepository } from "../repositories/agent.repository.ts";
 
 type AgentCopyServiceOptions = {
   repository: AgentRepository;

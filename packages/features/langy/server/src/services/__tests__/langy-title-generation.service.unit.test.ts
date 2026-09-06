@@ -10,8 +10,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import type { LangyTrustedMessageReader } from "../langy-message.service";
-import { LangyTitleGeneratorService } from "../langy-title-generator.service";
+import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
+import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 
 const generateText = vi.fn();
 vi.mock("ai", () => ({ generateText: (args: unknown) => generateText(args) }));

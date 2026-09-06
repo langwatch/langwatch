@@ -17,8 +17,8 @@ import {
   type IdentityFactInput,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { InMemoryIdentityEventStore } from "./support/in-memory-event-store";
-import { ACTOR, USER } from "./support/in-memory-heads";
+import { InMemoryIdentityEventStore } from "./support/in-memory-event-store.ts";
+import { ACTOR, USER } from "./support/in-memory-heads.ts";
 
 const attached = (identifierId: string): IdentityFactInput => ({
   type: IDENTIFIER_ATTACHED_EVENT_TYPE,

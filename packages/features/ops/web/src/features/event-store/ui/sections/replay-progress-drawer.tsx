@@ -11,14 +11,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { parseActiveProjections } from "../../model/replay-presentation";
-import { formatDuration } from "../../../../model/ops-formatters";
-import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "../elements/phase-timeline";
+import { parseActiveProjections } from "../../model/replay-presentation.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "../elements/phase-timeline.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { useReplayStatus } from "../../behavior/use-replay-status";
-import { api } from "../../../../behavior/ops-api";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 
 export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();

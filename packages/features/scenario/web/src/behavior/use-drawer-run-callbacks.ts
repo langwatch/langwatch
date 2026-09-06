@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOrganizationTeamProject } from "./use-organization-team-project";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * Returns callbacks that navigate to the simulations page (runs list) when a scenario

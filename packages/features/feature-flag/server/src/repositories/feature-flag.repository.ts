@@ -1,5 +1,5 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagRow } from "../ports/feature-flag-cache.port";
+import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
 
 export abstract class FeatureFlagRepository {
   /** `null` when no operator row exists for the key. */

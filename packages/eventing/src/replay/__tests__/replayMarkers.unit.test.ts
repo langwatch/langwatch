@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DONE_MARKER_TTL_SECONDS, doneMarkerKey } from "../replayConstants";
+import { DONE_MARKER_TTL_SECONDS, doneMarkerKey } from "../replayConstants.ts";
 import {
   aggregateKey,
   cleanupAll,
@@ -12,7 +12,7 @@ import {
   markPendingBatch,
   removeInFlightMarkers,
   unmarkBatch,
-} from "../replayMarkers";
+} from "../replayMarkers.ts";
 
 /**
  * Create a minimal Redis mock with pipeline support.

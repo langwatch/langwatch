@@ -20,7 +20,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
-import { type BillingInterval, type Currency, formatPrice } from "../../model/billing-plans";
+import { type BillingInterval, type Currency, formatPrice } from "../../model/billing-plans.ts";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -28,7 +28,7 @@ import {
   type PendingInviteWithMemberType,
   type PlannedUser,
   type SubscriptionUser,
-} from "../../model/subscription-types";
+} from "../../model/subscription-types.ts";
 
 export function UserManagementDrawer({
   open,

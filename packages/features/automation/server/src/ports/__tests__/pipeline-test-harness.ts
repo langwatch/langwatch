@@ -7,10 +7,10 @@ import type {
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
-} from "../../adapters/eventing.automation.adapter";
-import { AutomationIntentRetentionPort } from "../automation-intent-retention.port";
-import { AutomationScheduledIntentPort } from "../automation-scheduled-intent.port";
-import { AutomationSettlementExecutorPort } from "../automation-settlement.port";
+} from "../../adapters/eventing.automation.adapter.ts";
+import { AutomationIntentRetentionPort } from "../automation-intent-retention.port.ts";
+import { AutomationScheduledIntentPort } from "../automation-scheduled-intent.port.ts";
+import { AutomationSettlementExecutorPort } from "../automation-settlement.port.ts";
 
 class InertSettlementExecutor extends AutomationSettlementExecutorPort {
   async notifyDigest(): Promise<void> {}

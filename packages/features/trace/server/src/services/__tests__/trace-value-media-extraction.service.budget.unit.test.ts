@@ -3,7 +3,7 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * The generic value media walker's BUDGET and MARKER GATE. A fake media store records every storeFromBytes call and returns deterministic ids; the walker, visitor dispatch, and per-part rewriting are production code.
  */
-import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service";
+import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import { containsMediaMarkers } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,8 +16,8 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
-import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service";
+import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
+import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service.ts";
 
 interface StoredCall {
   mediaType: string;

@@ -3,9 +3,9 @@
  */
 
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { EvaluatorConfig, TargetConfig } from "./types";
-import { isGoldenFieldSatisfied } from "./types";
-import { extractVariablesFromBodyTemplate } from "./http-agent-utils";
+import type { EvaluatorConfig, TargetConfig } from "./types.ts";
+import { isGoldenFieldSatisfied } from "./types.ts";
+import { extractVariablesFromBodyTemplate } from "./http-agent-utils.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 
 // ============================================================================

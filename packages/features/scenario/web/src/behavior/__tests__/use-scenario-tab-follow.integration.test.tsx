@@ -6,10 +6,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ScenarioHostPort, ScenarioHostProvider } from "../../model/scenario-host";
+import { ScenarioHostPort, ScenarioHostProvider } from "../../model/scenario-host.ts";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
-import { useScenarioTabFollow } from "../use-scenario-tab-follow";
+import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
 
 /** Mirrors runs-filter-url-sync.integration.test.tsx's TestScenarioHost. */
 function TestScenarioHost({ children }: { children: ReactNode }) {

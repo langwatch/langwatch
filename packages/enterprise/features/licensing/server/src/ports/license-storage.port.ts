@@ -1,4 +1,4 @@
-import { OrganizationLicensePort } from "./organization-license.port";
+import { OrganizationLicensePort } from "./organization-license.port.ts";
 
 export type StoredLicense = {
   licenseKey: string;

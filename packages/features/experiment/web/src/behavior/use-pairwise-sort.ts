@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { BTLeaderboardEntry } from "../model/batch-evaluation-results.bt-leaderboard";
+import type { BTLeaderboardEntry } from "../model/batch-evaluation-results.bt-leaderboard.ts";
 
 export type SortKey = "rank" | "score" | "winRate" | "matchups";
 export type SortDir = "asc" | "desc";

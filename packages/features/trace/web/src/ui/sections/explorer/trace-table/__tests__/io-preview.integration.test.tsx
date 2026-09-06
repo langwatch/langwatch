@@ -7,17 +7,17 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
-import { IOPreview } from "../io-preview";
+import { IOPreview } from "../io-preview.tsx";
 
 // Compact vs comfortable is gated by the density store; force compact so
 // the row path under test is the one in the screenshot.
-vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: { density: string }) => unknown) =>
     selector({ density: "compact" }),
 }));
 
-vi.mock("../../hooks/use-density-tokens", () => ({
+vi.mock("../../hooks/use-density-tokens.ts", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),
 }));
 

@@ -2,8 +2,8 @@ import { Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { UiSlot } from "@langwatch/ui-host/slots";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import { LimitContent } from "./limit-content";
-import { LiteMemberRestrictionContent } from "./lite-member-restriction-content";
+import { LimitContent } from "./limit-content.tsx";
+import { LiteMemberRestrictionContent } from "./lite-member-restriction-content.tsx";
 
 /**
  * Store-driven mount for the upgrade/limit dialog. One dialog, three things a

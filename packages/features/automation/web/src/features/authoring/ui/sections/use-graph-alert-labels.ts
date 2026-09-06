@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { resolveSeriesLabel } from "../../../../model/graph-series";
-import { api } from "../../../../behavior/automation-api";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import { api } from "../../../../behavior/automation-api.ts";
 
 /**
  * Resolves the human-facing names a graph alert renders with — the graph's

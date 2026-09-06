@@ -1,4 +1,4 @@
-import { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
+import { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 
 export class SystemCodingAgentClockAdapter extends CodingAgentClockPort {
   static create(): SystemCodingAgentClockAdapter {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repository";
+import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repository.ts";
 
 /**
  * Unit tests for PrismaUsageMembershipRepository.

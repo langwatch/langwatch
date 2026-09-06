@@ -36,7 +36,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { LLMModelDisplay } from "../llm-model-display";
+import { LLMModelDisplay } from "../llm-model-display.tsx";
 
 afterEach(() => cleanup());
 

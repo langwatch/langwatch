@@ -2,9 +2,9 @@ import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { RateLimitedError } from "../errors.js";
-import type { RateLimiter, ResponseCache } from "../ports.js";
-import { ENDPOINT_INPUT, type HttpMethod } from "./types.js";
+import { RateLimitedError } from "../errors.ts";
+import type { RateLimiter, ResponseCache } from "../ports.ts";
+import { ENDPOINT_INPUT, type HttpMethod } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // Port-backed capabilities (ADR 003)

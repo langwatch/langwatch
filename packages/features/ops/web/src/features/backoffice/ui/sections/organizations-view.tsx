@@ -20,13 +20,13 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
 
-import { Currency, PricingModel } from "../../model/backoffice-enums";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
-import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells";
-import { BackofficeTable } from "./backoffice-table-shell";
+import { Currency, PricingModel } from "../../model/backoffice-enums.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 /**
  * Read-facing Organization shape — intentionally does NOT include
  * s3Endpoint / s3AccessKeyId /

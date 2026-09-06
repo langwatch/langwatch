@@ -1,6 +1,6 @@
 import { KILL_SWITCH_CACHE_TTL_MS, featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
 import { z } from "zod";
-import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "../ports/feature-flag-cache.port";
+import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "../ports/feature-flag-cache.port.ts";
 
 const CACHE_PREFIX = "feature_flag_store:v2:";
 const cacheSlotSchema = z.object({

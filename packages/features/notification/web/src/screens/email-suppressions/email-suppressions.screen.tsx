@@ -26,8 +26,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MailX, Trash2 } from "lucide-react";
-import { notificationApi } from "../../behavior/notification-api";
-import { useNotificationHost } from "../../model/notification-host";
+import { notificationApi } from "../../behavior/notification-api.ts";
+import { useNotificationHost } from "../../model/notification-host.ts";
 
 /** The grant the platform page asked for, unchanged. */
 export const EMAIL_SUPPRESSIONS_PAGE_PERMISSION = "triggers:view";

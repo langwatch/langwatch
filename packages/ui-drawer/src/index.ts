@@ -15,12 +15,12 @@ export {
   readFlatQuery,
   useDrawerRouter,
   type DrawerRouter,
-} from "./behavior/drawer-router";
+} from "./behavior/drawer-router.ts";
 export {
   createDrawerPreloader,
   makeUsePreload,
   type DrawerPreloader,
-} from "./behavior/drawer-preloader";
+} from "./behavior/drawer-preloader.ts";
 export {
   clearDrawerOpenRewrite,
   clearDrawerStack,
@@ -41,7 +41,7 @@ export {
   useUpdateDrawerParams,
   type DrawerOpenRewrite,
   type DrawerType,
-} from "./behavior/use-drawer";
+} from "./behavior/use-drawer.ts";
 export {
   lazyDrawer,
   preloadDrawer,
@@ -52,10 +52,10 @@ export {
   type FlowCallbacksRegistryOf,
   type UiDrawerComponent,
   type UiDrawerRegistry,
-} from "./model/drawer-registry";
-export { URL_QS_PARSE_OPTIONS } from "./model/qs-parse-options";
+} from "./model/drawer-registry.ts";
+export { URL_QS_PARSE_OPTIONS } from "./model/qs-parse-options.ts";
 export {
   CurrentDrawer,
   type CurrentDrawerProps,
   type CurrentDrawerRestriction,
-} from "./ui/sections/current-drawer";
+} from "./ui/sections/current-drawer.tsx";

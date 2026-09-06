@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { configureLogger, createLogger, resetLoggerCache } from "../logger";
+import { configureLogger, createLogger, resetLoggerCache } from "../logger.ts";
 
 /** Everything createLogger wrote while `run` executed, parsed. */
 function emitted(run: () => void): Record<string, unknown>[] {

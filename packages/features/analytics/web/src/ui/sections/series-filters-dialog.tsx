@@ -18,9 +18,9 @@ import { useEffect, useState } from "react";
 
 import { Dialog } from "@langwatch/design-system/dialog";
 
-import type { FilterField } from "../../model/analytics-filter-definition";
-import type { FilterParam } from "../../model/analytics-filter-params";
-import { FieldsFilters } from "./fields-filters";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import type { FilterParam } from "../../model/analytics-filter-params.ts";
+import { FieldsFilters } from "./fields-filters.tsx";
 
 const emptyFilters = {} as Record<FilterField, FilterParam>;
 

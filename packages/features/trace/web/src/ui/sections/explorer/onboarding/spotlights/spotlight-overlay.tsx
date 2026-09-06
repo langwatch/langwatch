@@ -5,13 +5,13 @@ import { Box, Button, Flex, HStack, Portal, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTraceExplorerTourPreference } from "../hooks/use-trace-explorer-tour-preference";
-import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
+import { useTraceExplorerTourPreference } from "../hooks/use-trace-explorer-tour-preference.ts";
+import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import type {
   Spotlight,
   SpotlightContext,
-} from "../../../../../model/explorer/onboarding/spotlights/spotlights";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights";
+} from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 
 // ---------------------------------------------------------------------------
 // URL fragment helpers (scoped to sp= prefix so we don't clobber the

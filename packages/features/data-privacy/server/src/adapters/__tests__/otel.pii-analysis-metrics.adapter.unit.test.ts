@@ -7,7 +7,7 @@ import {
   PII_ANALYSIS_EVALUATOR_TYPE,
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
-} from "../otel.pii-analysis-metrics.adapter";
+} from "../otel.pii-analysis-metrics.adapter.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

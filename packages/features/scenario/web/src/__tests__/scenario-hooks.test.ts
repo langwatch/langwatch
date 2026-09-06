@@ -1,8 +1,8 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useNewScenarioFlow } from "../behavior/use-new-scenario-flow";
-import { useScenarioLabelFilter } from "../behavior/use-scenario-label-filter";
-import { useScenarioSelection } from "../behavior/use-scenario-selection";
+import { useNewScenarioFlow } from "../behavior/use-new-scenario-flow.ts";
+import { useScenarioLabelFilter } from "../behavior/use-scenario-label-filter.ts";
+import { useScenarioSelection } from "../behavior/use-scenario-selection.ts";
 
 describe("Scenario web hooks", () => {
   it("collects sorted labels and toggles only the labels filter", () => {

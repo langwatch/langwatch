@@ -7,8 +7,8 @@ import { useMemo } from "react";
 import {
   computeVariantMetrics,
   type VariantMetrics,
-} from "./batch-evaluation-results.variant-metrics";
-import type { BatchResultRow } from "./batch-evaluation-results.types";
+} from "./batch-evaluation-results.variant-metrics.ts";
+import type { BatchResultRow } from "./batch-evaluation-results.types.ts";
 
 /** Bounded, because a content key has nothing to collect it. */
 const MAX_CACHED_METRICS = 16;

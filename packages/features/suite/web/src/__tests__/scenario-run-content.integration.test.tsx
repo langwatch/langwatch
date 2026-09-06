@@ -10,10 +10,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunContent } from "../scenario-run-content";
-import { makeScenarioRunData } from "./test-helpers";
+import { ScenarioRunContent } from "../scenario-run-content.tsx";
+import { makeScenarioRunData } from "./test-helpers.ts";
 
-vi.mock("../scenario-grid-card", () => ({
+vi.mock("../scenario-grid-card.tsx", () => ({
   ScenarioGridCard: ({
     scenarioRun,
     onClick,
@@ -27,7 +27,7 @@ vi.mock("../scenario-grid-card", () => ({
   ),
 }));
 
-vi.mock("../scenario-target-row", () => ({
+vi.mock("../scenario-target-row.tsx", () => ({
   ScenarioTargetRow: ({
     scenarioRun,
     onClick,

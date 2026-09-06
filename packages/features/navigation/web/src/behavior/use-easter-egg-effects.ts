@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import type { EasterEgg } from "../model/command-easter-eggs";
+import type { EasterEgg } from "../model/command-easter-eggs.ts";
 
 export function useEasterEggEffects() {
   const triggerEffect = useCallback((egg: EasterEgg) => {

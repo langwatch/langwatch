@@ -3,7 +3,7 @@ import {
   monitorMappingsInputSchema,
   monitorReplicationInputSchema,
   monitorSchema,
-} from "../monitor";
+} from "../monitor.ts";
 
 describe("Monitor contract", () => {
   it("normalises legacy empty mappings", () => {

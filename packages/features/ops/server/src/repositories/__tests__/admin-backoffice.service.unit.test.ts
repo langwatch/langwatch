@@ -2,9 +2,9 @@ import { AuthService } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
 import { UserService, type UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AdminBackofficeRepository } from "../admin-backoffice.repository";
-import { AdminBackofficeService } from "../../services/admin-backoffice.service";
-import { AdminAuditSink } from "../../services/impersonation.service";
+import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
+import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
+import { AdminAuditSink } from "../../services/impersonation.service.ts";
 
 const user: UserProfile = {
   id: "user-1",

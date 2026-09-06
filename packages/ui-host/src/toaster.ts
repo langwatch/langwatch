@@ -2,7 +2,7 @@
  * The toast singleton every browser feature calls, routed to one port.
  */
 
-import type { UiFailureNotice, UiSuccessNotice } from "./capabilities";
+import type { UiFailureNotice, UiSuccessNotice } from "./capabilities.ts";
 
 /**
  * Whatever answers a report — the application's feedback capability, or a

@@ -1,18 +1,18 @@
 import {
   GatewayBudgetRepository,
   type GatewayBudgetCheckReadInput,
-} from "../repositories/gateway-budget.repository";
-import { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository";
-import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository";
-import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service";
-import { GatewayGuardrailService } from "../services/gateway-guardrail.service";
-import { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/gateway-budget.repository.ts";
+import { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository.ts";
+import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { MonitorService } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
-import { GatewayAuditPort } from "../ports/gateway-audit.port";
+import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 
 class FakeBudgetRepository extends GatewayBudgetRepository {
   input: GatewayBudgetCheckReadInput | null = null;

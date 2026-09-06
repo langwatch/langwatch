@@ -1,11 +1,11 @@
 import { HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ShareVisibility } from "@langwatch/share-contract";
-import type { ShareLinkView } from "./share-link-status";
+import type { ShareLinkView } from "./share-link-status.ts";
 import type { IconType } from "react-icons";
 import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
-import { describeShareLink, isShareLinkSpent } from "./share-link-status";
-import { shareUrlForToken } from "./share-url";
+import { describeShareLink, isShareLinkSpent } from "./share-link-status.ts";
+import { shareUrlForToken } from "./share-url.ts";
 
 /** Terse labels for the link list — the icon already carries the meaning, and
  *  the full phrasing lives in the "Who can access" select. */

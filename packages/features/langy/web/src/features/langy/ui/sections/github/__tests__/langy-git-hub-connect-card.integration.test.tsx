@@ -12,7 +12,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-import { LangyGitHubConnectCard } from "../langy-git-hub-connect-card";
+import { LangyGitHubConnectCard } from "../langy-git-hub-connect-card.tsx";
 
 function renderCard() {
   return render(

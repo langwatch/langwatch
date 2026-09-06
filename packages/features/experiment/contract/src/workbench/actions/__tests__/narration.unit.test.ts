@@ -3,12 +3,12 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { WORKBENCH_ACTION_KINDS } from "../manifest";
+import { WORKBENCH_ACTION_KINDS } from "../manifest.ts";
 import {
   narrateWorkbenchAction,
   narrateWorkbenchRun,
   WORKBENCH_ACTION_NARRATION,
-} from "../narration";
+} from "../narration.ts";
 
 describe("workbench action narration", () => {
   describe("given the manifest of actions the page accepts", () => {

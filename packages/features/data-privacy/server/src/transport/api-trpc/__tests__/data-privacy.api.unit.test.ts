@@ -20,7 +20,7 @@ import {
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { DataPrivacyTrpcApi, type DataPrivacyTrpcPorts } from "../data-privacy.api";
+import { DataPrivacyTrpcApi, type DataPrivacyTrpcPorts } from "../data-privacy.api.ts";
 
 type TestContext = { session: { user: { id: string } } | null };
 

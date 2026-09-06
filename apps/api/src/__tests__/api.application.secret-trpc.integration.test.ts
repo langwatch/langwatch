@@ -1,7 +1,7 @@
 import { SecretNotFoundError, SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
 
 const secret: Secret = {
   id: "secret-1",

@@ -4,8 +4,8 @@ import {
   type Currency,
   formatPrice,
   getGrowthSeatPriceCents,
-} from "../model/billing-plans";
-import { countFullMembers } from "../model/subscription-types";
+} from "../model/billing-plans.ts";
+import { countFullMembers } from "../model/subscription-types.ts";
 
 interface HasMemberType {
   memberType: MemberType;

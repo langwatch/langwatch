@@ -1,4 +1,4 @@
-import { PRODUCTS, type ProductId } from "./products";
+import { PRODUCTS, type ProductId } from "./products.ts";
 
 /**
  * The last product visited, one value per organization, on this device

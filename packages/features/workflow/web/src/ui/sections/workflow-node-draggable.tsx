@@ -5,15 +5,15 @@ import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { LuGripVertical } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { updateCodeClassName } from "../../behavior/workflow-store";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
+import { updateCodeClassName } from "../../behavior/workflow-store.ts";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import {
   findLowestAvailableName,
   nameToId,
   type NodeWithOptionalPosition,
 } from "@langwatch/workflow-contract";
-import { useWorkflowNodeHost } from "../elements/workflow-node.host";
+import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 
 export type WorkflowNodeDragItem = {
   node: Node<Component> & { type: ComponentType };

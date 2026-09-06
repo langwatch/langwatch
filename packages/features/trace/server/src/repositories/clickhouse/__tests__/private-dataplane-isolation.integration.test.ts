@@ -28,7 +28,7 @@ import {
 } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SpanStorageClickHouseRepository } from "../span-storage.repository";
+import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
 const PRIVATE_ORGANIZATION = privateRouteOrgId("isolation-private");
 const SHARED_ORGANIZATION = privateRouteOrgId("isolation-shared");

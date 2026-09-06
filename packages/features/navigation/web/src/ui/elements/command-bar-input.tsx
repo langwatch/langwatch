@@ -1,6 +1,6 @@
 import { Box, HStack, Input, Spinner } from "@chakra-ui/react";
 import { Search } from "lucide-react";
-import { MIN_SEARCH_QUERY_LENGTH } from "../../model/command-bar-constants";
+import { MIN_SEARCH_QUERY_LENGTH } from "../../model/command-bar-constants.ts";
 
 interface CommandBarInputProps {
   inputRef: React.RefObject<HTMLInputElement | null>;

@@ -24,7 +24,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RoleService } from "@langwatch/role-contract";
-import type { ApiOrganizationInvitePort } from "../features/organization/organization.composition";
+import type { ApiOrganizationInvitePort } from "../features/organization/organization.composition.ts";
 
 /**
  * The seat census, over the SAME reading the usage panel shows.

@@ -1,23 +1,23 @@
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port";
+import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port.ts";
 import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
-} from "../ports/trace-analytics-projection.port";
-import { TraceAnalyticsRollupPort } from "../ports/trace-analytics-rollup.port";
+} from "../ports/trace-analytics-projection.port.ts";
+import { TraceAnalyticsRollupPort } from "../ports/trace-analytics-rollup.port.ts";
 import {
   TraceSummaryProjectionPort,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
-} from "../ports/trace-summary-projection.port";
-import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection";
-import type { TraceAnalyticsRepository } from "../repositories/trace-metrics-analytics.repository";
-import type { TraceAnalyticsRollupRepository } from "../repositories/trace-analytics-rollup.repository";
-import type { TraceSummaryRepository } from "../repositories/trace-summary.repository";
-import { TraceAnalyticsClickHouseRepository } from "../repositories/clickhouse/trace-metrics-analytics.repository";
-import { TraceAnalyticsRollupClickHouseRepository } from "../repositories/clickhouse/trace-analytics-rollup.repository";
-import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository";
+} from "../ports/trace-summary-projection.port.ts";
+import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection.ts";
+import type { TraceAnalyticsRepository } from "../repositories/trace-metrics-analytics.repository.ts";
+import type { TraceAnalyticsRollupRepository } from "../repositories/trace-analytics-rollup.repository.ts";
+import type { TraceSummaryRepository } from "../repositories/trace-summary.repository.ts";
+import { TraceAnalyticsClickHouseRepository } from "../repositories/clickhouse/trace-metrics-analytics.repository.ts";
+import { TraceAnalyticsRollupClickHouseRepository } from "../repositories/clickhouse/trace-analytics-rollup.repository.ts";
+import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository.ts";
 
 /**
  * The three projection-storage bridges, composed from nothing but a tenant-keyed

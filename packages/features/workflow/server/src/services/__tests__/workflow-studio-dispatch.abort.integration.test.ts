@@ -7,8 +7,8 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { WorkflowStudioStreamPort } from "../../ports/workflow.port";
-import { WorkflowStudioDispatchService } from "../workflow-studio-dispatch.service";
+import { WorkflowStudioStreamPort } from "../../ports/workflow.port.ts";
+import { WorkflowStudioDispatchService } from "../workflow-studio-dispatch.service.ts";
 
 const blockedCell = {
   type: "execute_component",

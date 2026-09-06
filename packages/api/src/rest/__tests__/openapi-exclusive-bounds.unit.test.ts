@@ -4,7 +4,7 @@
  * @see specs/api-reference/exclusive-bounds-3-1.feature
  */
 import { describe, expect, it } from "vitest";
-import { normalizeExclusiveBounds } from "../openapi-exclusive-bounds";
+import { normalizeExclusiveBounds } from "../openapi-exclusive-bounds.ts";
 
 describe("normalizeExclusiveBounds", () => {
   describe("given a lower bound written the 3.0 way", () => {

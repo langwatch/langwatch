@@ -8,7 +8,7 @@ import {
   ModelProviderEgressPort,
   type ModelProviderEgressRequest,
   type ModelProviderEgressResponse,
-} from "../ports/model-provider.port";
+} from "../ports/model-provider.port.ts";
 
 /** The address policy a deployment fences its outbound probes with. */
 export type ModelProviderEgressPolicy = Readonly<{

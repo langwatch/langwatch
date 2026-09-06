@@ -2,7 +2,7 @@ import { create } from "zustand";
 import {
   INITIAL_STAGE,
   type StageId,
-} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
+} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 
 /**
  * Consolidated onboarding state. Combines the stage state-machine, the per-project

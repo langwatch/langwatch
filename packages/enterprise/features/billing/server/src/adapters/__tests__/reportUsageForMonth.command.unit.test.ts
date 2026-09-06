@@ -125,7 +125,7 @@ function usageBilledOrg({
 
 async function createHandler() {
   const { EventingReportUsageForMonthAdapter } =
-    await import("../eventing.report-usage-for-month.adapter");
+    await import("../eventing.report-usage-for-month.adapter.ts");
 
   return new EventingReportUsageForMonthAdapter({
     organizations: mockOrganizations as any,
@@ -536,7 +536,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("static properties", () => {
     it("exposes schema, getAggregateId, and getSpanAttributes", async () => {
       const { EventingReportUsageForMonthAdapter: ReportUsageForMonthCommand } =
-        await import("../eventing.report-usage-for-month.adapter");
+        await import("../eventing.report-usage-for-month.adapter.ts");
 
       expect(ReportUsageForMonthCommand.schema.type).toBe(
         "lw.billing_report.report_usage_for_month",

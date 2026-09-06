@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapZodIssuesToLogContext } from "../zod-issues";
+import { mapZodIssuesToLogContext } from "../zod-issues.ts";
 
 describe("mapZodIssuesToLogContext", () => {
   it("joins nested path segments with dots", () => {

@@ -15,7 +15,7 @@ import {
   type UiRouteReadingValues,
   type UiSessionPort,
   type UiSuccessNotice,
-} from "./capabilities";
+} from "./capabilities.ts";
 
 /** What a feature host double answers, loosely enough for every family's port. */
 export type UiTestHost = {

@@ -1,5 +1,5 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
-import { buildDefaultFormValues, type PromptConfigFormValues } from "../../surfaces/prompt-form";
+import { buildDefaultFormValues, type PromptConfigFormValues } from "../../surfaces/prompt-form/index.ts";
 
 type ConfigData = PromptConfigFormValues["version"]["configData"];
 

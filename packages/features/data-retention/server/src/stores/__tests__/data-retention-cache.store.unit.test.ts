@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   RedisDataRetentionCacheStore,
   type DataRetentionRedis,
-} from "../data-retention-cache.store";
+} from "../data-retention-cache.store.ts";
 
 const retention = {
   traces: 49,

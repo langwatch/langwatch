@@ -28,7 +28,7 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
+import { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,

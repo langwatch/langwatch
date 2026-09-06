@@ -4,8 +4,8 @@ import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TraceMediaReferencePort,
-} from "../ports/trace-media-reference.port";
-import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port";
+} from "../ports/trace-media-reference.port.ts";
+import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port.ts";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {

@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import specification from "../openapi-document.json";
+import specification from "../openapi-document.json" with { type: "json" };
 
 const RUN = "/api/v1/query";
 const SCHEMA = "/api/v1/query/schema";

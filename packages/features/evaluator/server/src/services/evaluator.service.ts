@@ -29,11 +29,11 @@ import {
   type NativeEvaluatorExecutionInput,
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "../ports/evaluator.port";
-import type { EvaluatorRepository } from "../repositories/evaluator.repository";
-import { EvaluatorCodeService } from "./evaluator-code.service";
-import { EvaluatorNativeService } from "./evaluator-native.service";
-import { EvaluatorExecutionService } from "./evaluator-execution.service";
+import type { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "../ports/evaluator.port.ts";
+import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
+import { EvaluatorCodeService } from "./evaluator-code.service.ts";
+import { EvaluatorNativeService } from "./evaluator-native.service.ts";
+import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
 
 export type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;

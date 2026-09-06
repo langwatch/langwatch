@@ -11,8 +11,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyRepository } from "../../repositories/api-key.repository";
-import { AgentSandboxKeyReapService } from "../agent-sandbox-key-reap.service";
+import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts";
+import { AgentSandboxKeyReapService } from "../agent-sandbox-key-reap.service.ts";
 
 function repositoryDouble(count = 0) {
   const revokeExpiredByName = vi.fn(async (_input: { name: string; now: Date }) => count);

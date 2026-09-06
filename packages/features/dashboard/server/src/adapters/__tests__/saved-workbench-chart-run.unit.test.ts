@@ -5,7 +5,7 @@ import {
   PostgresDashboardAdapter,
 } from "@langwatch/dashboard-server";
 import { LangWatchQLService, recordingExecutor } from "@langwatch/analytics-server/testing";
-import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter";
+import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter.ts";
 
 const PROJECT = { id: "project_1", lwqlKey: "restricted-project-key" };
 const WEEK = {

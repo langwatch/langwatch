@@ -1,7 +1,7 @@
 import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
-import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port";
-import { TraceQueryEvaluationAdapter } from "../adapters/trace-query-evaluation.adapter";
+import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
+import { TraceQueryEvaluationAdapter } from "../adapters/trace-query-evaluation.adapter.ts";
 
 export class TraceQueryClassificationAdapter extends TraceQueryClassificationPort {
   private constructor() {

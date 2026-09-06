@@ -1,5 +1,5 @@
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
-import { ClickHouseSpanStatusFacetAdapter } from "../trace-facet-span-status.clickhouse.adapter";
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseSpanStatusFacetAdapter } from "../trace-facet-span-status.clickhouse.adapter.ts";
 import { describe, expect, it } from "vitest";
 
 describe("ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET", () => {

@@ -23,12 +23,12 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { Composer } from "../composer";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { Composer } from "../composer.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 function renderComposer({
   variant,

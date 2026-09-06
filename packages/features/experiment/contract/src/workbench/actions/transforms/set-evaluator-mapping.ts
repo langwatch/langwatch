@@ -1,6 +1,6 @@
-import { type SetEvaluatorMappingPayload, setEvaluatorMappingPayloadSchema } from "../schemas";
-import { requireDataset, requireEvaluator, requireTarget } from "./helpers";
-import type { Transform } from "./types";
+import { type SetEvaluatorMappingPayload, setEvaluatorMappingPayloadSchema } from "../schemas.ts";
+import { requireDataset, requireEvaluator, requireTarget } from "./helpers.ts";
+import type { Transform } from "./types.ts";
 
 /**
  * Point one evaluator input field at a source, for one dataset and one target.

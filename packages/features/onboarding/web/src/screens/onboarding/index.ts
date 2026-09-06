@@ -36,16 +36,16 @@ import type { ComponentType } from "react";
 export type OnboardingScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const onboardingScreens = {
-  onboarding: () => import("./onboarding.screen"),
-  welcome: () => import("./welcome.screen"),
-  product: () => import("./product.screen"),
-  project: () => import("./project.screen"),
-  setup: () => import("./setup.screen"),
+  onboarding: () => import("./onboarding.screen.tsx"),
+  welcome: () => import("./welcome.screen.tsx"),
+  product: () => import("./product.screen.tsx"),
+  project: () => import("./project.screen.tsx"),
+  setup: () => import("./setup.screen.tsx"),
 } as const satisfies Record<string, OnboardingScreenLoader>;
 
 export type OnboardingScreenName = keyof typeof onboardingScreens;
 
-export { onboardingApi } from "../../behavior/onboarding-api";
+export { onboardingApi } from "../../behavior/onboarding-api.ts";
 export {
   OnboardingHostPort,
   OnboardingHostProvider,
@@ -59,4 +59,4 @@ export {
   type OnboardingSessionStatus,
   type OnboardingSuccessNotice,
   type OnboardingTeam,
-} from "../../model/onboarding-host";
+} from "../../model/onboarding-host.ts";

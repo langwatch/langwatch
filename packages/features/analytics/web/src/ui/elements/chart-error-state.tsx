@@ -1,7 +1,7 @@
 import { Box, Button, HStack, VStack } from "@chakra-ui/react";
 import { RefreshCw } from "react-feather";
 
-import { HandledErrorAlert } from "./handled-error-alert";
+import { HandledErrorAlert } from "./handled-error-alert.tsx";
 
 /**
  * Full-area error state for analytics charts.

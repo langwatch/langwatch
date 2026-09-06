@@ -1,5 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { AutomationSettlementObservabilityPort } from "../ports/automation-settlement.port";
+import { AutomationSettlementObservabilityPort } from "../ports/automation-settlement.port.ts";
 
 export const AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME = "automation_overflow_flush_total";
 

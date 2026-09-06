@@ -9,13 +9,13 @@ import {
   PAID_RETENTION_PRESET_DAYS,
 } from "@langwatch/data-retention-contract";
 import { TRPCError } from "@trpc/server";
-import type { DataRetentionAdministratorPort } from "../ports/data-retention-administrator.port";
+import type { DataRetentionAdministratorPort } from "../ports/data-retention-administrator.port.ts";
 import type {
   DataRetentionDirectoryPort,
   RetentionScopeTarget,
-} from "../ports/data-retention-directory.port";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port";
-import type { DataRetentionPlan, DataRetentionPlanPort } from "../ports/data-retention-plan.port";
+} from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
+import type { DataRetentionPlan, DataRetentionPlanPort } from "../ports/data-retention-plan.port.ts";
 
 /** The caller a gate is decided for. */
 export type RetentionActor = Readonly<{ userId: string | null; email: string | null }>;

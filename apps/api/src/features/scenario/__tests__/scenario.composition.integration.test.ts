@@ -27,21 +27,21 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
-import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
-import { ApiRestSecurity } from "../../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import { ApiScenarioAbsenceReport, composeScenarioFeature } from "../scenario.composition";
-import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.composition";
-import { composeLangyFeature } from "../../langy/langy.composition";
+} from "../../../api.application.ts";
+import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
+import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request.ts";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import { ApiScenarioAbsenceReport, composeScenarioFeature } from "../scenario.composition.ts";
+import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.composition.ts";
+import { composeLangyFeature } from "../../langy/langy.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = {
   id: "user-1",

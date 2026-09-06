@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeNextWake, hasFleetTrouble } from "../model/process-presentation";
+import { describeNextWake, hasFleetTrouble } from "../model/process-presentation.ts";
 
 const NOW = 1_755_100_000_000;
 

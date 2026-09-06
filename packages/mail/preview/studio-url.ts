@@ -1,5 +1,5 @@
-import type { Density } from "./gallery-view";
-import type { PreviewScheme, WIDTHS } from "./studio-shared";
+import type { Density } from "./gallery-view.tsx";
+import type { PreviewScheme, WIDTHS } from "./studio-shared.ts";
 
 export type View = "inspect" | "gallery";
 

@@ -8,12 +8,12 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { resolvePersonDeploymentFacts } from "../../features/auth/auth.composition";
-import { resolveApiConfig } from "../../platform/config/api.config";
+import { resolvePersonDeploymentFacts } from "../../features/auth/auth.composition.ts";
+import { resolveApiConfig } from "../../platform/config/api.config.ts";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
-} from "../app-rest.process-features";
+} from "../app-rest.process-features.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InProcessBreakGlassLimiterAdapter } from "../in-process-break-glass-limiter.adapter";
+import { InProcessBreakGlassLimiterAdapter } from "../in-process-break-glass-limiter.adapter.ts";
 
 describe("the break-glass budget", () => {
   describe("when the parameter is used inside one window", () => {

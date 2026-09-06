@@ -10,7 +10,7 @@ import type React from "react";
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import type { InstallMatrix } from "./codegen/registry";
+import type { InstallMatrix } from "./codegen/registry.tsx";
 
 interface InstallPreviewProps {
   install?: InstallMatrix;

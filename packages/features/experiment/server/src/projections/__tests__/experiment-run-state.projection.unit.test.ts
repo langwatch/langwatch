@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../../rules/experiment-run-event-types.rules";
+} from "../../rules/experiment-run-event-types.rules.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -12,11 +12,11 @@ import type {
   ExperimentRunStartedEvent,
   TargetResultEvent,
   TraceMetricsComputedEvent,
-} from "../../processes/experiment-run-events.process";
+} from "../../processes/experiment-run-events.process.ts";
 import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
-} from "../experiment-run-state.projection";
+} from "../experiment-run-state.projection.ts";
 
 // Create a dummy store — only init/apply are tested, not persistence
 const noopStore: FoldProjectionStore<ExperimentRunStateData> = {

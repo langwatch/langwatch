@@ -1,4 +1,4 @@
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service";
+import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 
 export type WebhookEventsPage = {
   rows: WebhookSpendEventRow[];

@@ -17,15 +17,15 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { renderWithDatasetHost } from "../../../testing";
+import { renderWithDatasetHost } from "../../../testing.tsx";
 
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 const retryDatasetNormalize = vi.fn();
-vi.mock("../../../behavior/direct-upload", async (orig) => {
-  const actual = await orig<typeof import("../../../behavior/direct-upload")>();
+vi.mock("../../../behavior/direct-upload.ts", async (orig) => {
+  const actual = await orig<typeof import("../../../behavior/direct-upload.ts")>();
   return {
     ...actual,
     requestDirectUpload: (...a: unknown[]) => requestDirectUpload(...a),
@@ -37,8 +37,8 @@ vi.mock("../../../behavior/direct-upload", async (orig) => {
 });
 
 const parseHeaderColumns = vi.fn();
-vi.mock("../../../model/parse-header-columns", async (orig) => {
-  const actual = await orig<typeof import("../../../model/parse-header-columns")>();
+vi.mock("../../../model/parse-header-columns.ts", async (orig) => {
+  const actual = await orig<typeof import("../../../model/parse-header-columns.ts")>();
   return {
     ...actual,
     parseHeaderColumns: (...a: unknown[]) => parseHeaderColumns(...a),
@@ -51,14 +51,14 @@ const getByIdQuery = vi.fn(() => ({
   isFetched: true,
   refetch: vi.fn(),
 }));
-vi.mock("../../../behavior/dataset-api", () => ({
+vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
     dataset: { getById: { useQuery: () => getByIdQuery() } },
     useUtils: () => ({}),
   },
 }));
 
-import { BulkUploadDrawer } from "../bulk-upload-drawer";
+import { BulkUploadDrawer } from "../bulk-upload-drawer.tsx";
 
 // Faithful to what `parseHeaderColumns` actually returns: each column carries
 // its immutable `sourceHeader` (the canonical header it was parsed from), which

@@ -6,7 +6,7 @@ import {
   literalKindOf,
   parseSimpleDictEntries,
   scanImports,
-} from "../python-provider.shared";
+} from "../python-provider.shared.ts";
 
 describe("Workflow Python provider helpers", () => {
   it("classifies declared fields and literal values", () => {

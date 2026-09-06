@@ -5,14 +5,14 @@ import {
   TraceSpoolLegacyObjectPort,
   TraceSpoolStoragePort,
   type TraceSpoolObjectStore,
-} from "../../ports/trace-spool-storage.port";
-import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules";
+} from "../../ports/trace-spool-storage.port.ts";
+import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules.ts";
 import {
   MAX_SPOOL_BYTES,
   SpoolDestinationUnsupportedError,
   TraceSpoolService,
-} from "../trace-spool.service";
-import { StreamTooLargeError } from "../trace-stream-buffer.service";
+} from "../trace-spool.service.ts";
+import { StreamTooLargeError } from "../trace-stream-buffer.service.ts";
 
 /**
  * The object path, the reference marker and the read cap are a wire format between two

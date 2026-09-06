@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SelectionActionBar } from "./selection-action-bar";
+import { SelectionActionBar } from "./selection-action-bar.tsx";
 
 const meta = {
   title: "Patterns/Selection action bar",

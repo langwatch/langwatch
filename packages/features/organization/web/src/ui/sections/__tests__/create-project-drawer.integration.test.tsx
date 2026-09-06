@@ -49,7 +49,7 @@ const invalidator = (name: string) => ({
   },
 });
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
       organization: { getAll: invalidator("organization.getAll") },
@@ -79,8 +79,8 @@ vi.mock("react-contextual-analytics", () => ({
   useAnalytics: () => ({ emit: mockEmit }),
 }));
 
-import { CreateProjectDrawer } from "../create-project-drawer";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing";
+import { CreateProjectDrawer } from "../create-project-drawer.tsx";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
 
 const typeName = async (name: string) => {
   const user = userEvent.setup();

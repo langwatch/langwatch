@@ -1,9 +1,9 @@
-export { ClickHouseMetricProcessingAdapter } from "./adapters/clickhouse.metric-processing.adapter";
-export { MetricRuntimeAdapter } from "./adapters/runtime.metric.adapter";
+export { ClickHouseMetricProcessingAdapter } from "./adapters/clickhouse.metric-processing.adapter.ts";
+export { MetricRuntimeAdapter } from "./adapters/runtime.metric.adapter.ts";
 export {
   type MetricProcessingPipeline,
   resolveMetricCommandShardCount,
-} from "./adapters/metric-processing.adapter";
+} from "./adapters/metric-processing.adapter.ts";
 
 /**
  * The OTLP METRIC signal's collection: one export request in, metric
@@ -14,4 +14,4 @@ export {
   MetricRequestCollectionService,
   type MetricRequestCollectionDeps,
   type MetricRequestCollectionResult,
-} from "./services/metric-request-collection.service";
+} from "./services/metric-request-collection.service.ts";

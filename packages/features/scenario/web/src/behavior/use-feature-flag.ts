@@ -4,7 +4,7 @@
 
 import { type FeatureFlagTargetId, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
-import { api } from "./scenario-api";
+import { api } from "./scenario-api.ts";
 
 /** Five minutes: the service caches operator rows for five seconds anyway. */
 export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;

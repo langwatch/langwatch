@@ -1,18 +1,18 @@
-import { type PythonField } from "../../../../model/code/python-provider.shared";
+import { type PythonField } from "../../../../model/code/python-provider.shared.ts";
 import {
   WorkflowCodeEditor,
   WorkflowCodeEditorModal,
   type WorkflowCodeEditorContractProps,
   type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostPort,
-} from "../../../elements/code/workflow-code-editor";
+} from "../../../elements/code/workflow-code-editor.tsx";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useMemo } from "react";
 
-import { SecretsIndicator } from "../../secrets/secrets-indicator";
+import { SecretsIndicator } from "../../secrets/secrets-indicator.tsx";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../../model/workflow-api-client";
+import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../../model/workflow-api-client.ts";
 
 type EditorProps = WorkflowCodeEditorContractProps & {
   code: string;

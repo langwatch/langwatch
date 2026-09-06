@@ -17,8 +17,8 @@
  * it is safe.
  */
 import { describe, expect, it, vi } from "vitest";
-import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber";
-import { createContext, createTraceEvent } from "./subscribers/support/trace-subscriber.fixtures";
+import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber.ts";
+import { createContext, createTraceEvent } from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

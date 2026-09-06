@@ -1,9 +1,9 @@
-import { StoredObjectOwnerInstanceDirectoryPort } from "../../ports/stored-object-owner-instance-directory.port";
+import { StoredObjectOwnerInstanceDirectoryPort } from "../../ports/stored-object-owner-instance-directory.port.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerHit,
   type StoredObjectOwnerLookupResult,
-} from "../stored-object-owner.repository";
+} from "../stored-object-owner.repository.ts";
 
 type StoredObjectOwnerRow = Readonly<{
   project_id: string;

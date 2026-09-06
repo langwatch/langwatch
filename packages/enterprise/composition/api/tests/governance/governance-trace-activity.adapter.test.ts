@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import { AppGovernanceTraceActivityAdapter } from "../../src/governance/governance-trace-activity.clickhouse.repository";
+import { AppGovernanceTraceActivityAdapter } from "../../src/governance/governance-trace-activity.clickhouse.repository.ts";
 
 function makeClient(rows: unknown[]) {
   return {

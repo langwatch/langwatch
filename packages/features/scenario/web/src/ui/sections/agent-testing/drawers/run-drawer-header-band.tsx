@@ -8,22 +8,22 @@ import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Button, Heading, HStack, VStack, Icon } from "@chakra-ui/react";
 import { Square, Edit2 } from "lucide-react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config";
-import { hasNoResults } from "../../../../model/scenario-run-status.utils";
-import { CopyIdChip } from "../../../elements/copy-id-chip";
-import { RunCriteriaChip } from "../../../elements/run-criteria-chip";
-import { ScenarioRunActions } from "../../../elements/scenario-run-actions";
-import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
+import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
+import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
+import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
+import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
+import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
-import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip";
-import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys";
+import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip.tsx";
+import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
 import type {
   RunDetail,
   RunDrawerState,
   RunScenarioState,
   useRunDrawerStop,
-} from "./use-run-drawer-state";
+} from "./use-run-drawer-state.ts";
 
 export type RunDrawerHeaderBandProps = Pick<RunDrawerState, "detail" | "scenarioVersion"> & {
   stop: ReturnType<typeof useRunDrawerStop>;

@@ -16,7 +16,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ProviderScopeChips } from "../provider-scope-chips";
+import { ProviderScopeChips } from "../provider-scope-chips.tsx";
 
 afterEach(() => cleanup());
 

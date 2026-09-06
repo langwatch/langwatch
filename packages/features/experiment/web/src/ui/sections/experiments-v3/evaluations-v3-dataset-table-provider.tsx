@@ -10,7 +10,7 @@ import {
   DatasetTableProvider,
 } from "@langwatch/dataset-web/surfaces/dataset-table";
 import { renderDatasetImage } from "@langwatch/dataset-web/surfaces/render-dataset-image";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 export function EvaluationsV3DatasetTableProvider({ children }: PropsWithChildren) {
   const value: DatasetTableContextValue = useEvaluationsV3Store((state) => ({

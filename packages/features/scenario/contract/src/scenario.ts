@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { scenarioParameterDefinitionsSchema } from "./scenario.parameters";
+import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;

@@ -7,12 +7,12 @@ import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port";
-import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.repository";
+import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseUrl = testClickHouseUrl();
 const integration = describe.skipIf(clickHouseUrl === null);

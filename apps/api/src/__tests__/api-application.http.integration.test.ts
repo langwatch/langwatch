@@ -1,7 +1,7 @@
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
-import { ApiHttpListener } from "../api-http.listener";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
+import { ApiHttpListener } from "../api-http.listener.ts";
 
 const secret: Secret = {
   id: "secret-1",

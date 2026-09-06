@@ -5,9 +5,9 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { Counter, register } from "prom-client";
-import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules";
-import type { IdentityWriteGateStatePort } from "../ports/identity-write-gate-state.port";
+import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service.ts";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules.ts";
+import type { IdentityWriteGateStatePort } from "../ports/identity-write-gate-state.port.ts";
 
 const logger = createLogger("langwatch:identity:write-gate");
 

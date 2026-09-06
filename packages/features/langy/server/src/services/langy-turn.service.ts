@@ -1,19 +1,19 @@
-import { LangyFinalPartsService } from "./langy-final-parts.service";
-import { LangyTurnStartService } from "./langy-turn-start.service";
-import { LangyTurnStopService } from "./langy-turn-stop.service";
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import { LangyTurnStartService } from "./langy-turn-start.service.ts";
+import { LangyTurnStopService } from "./langy-turn-stop.service.ts";
 import {
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "./langy-turn-shared.service";
-import { LangyTurnWarmService } from "./langy-turn-warm.service";
+} from "./langy-turn-shared.service.ts";
+import { LangyTurnWarmService } from "./langy-turn-warm.service.ts";
 
 export type {
   LangyChatMessageInput,
   LangyTurnServiceDeps,
   LangyTurnTechnicalPorts,
   StartConversationTurnInput,
-} from "./langy-turn-shared.service";
-export { LANGY_USER_MESSAGE_LABEL, LangyTurnSharedService } from "./langy-turn-shared.service";
+} from "./langy-turn-shared.service.ts";
+export { LANGY_USER_MESSAGE_LABEL, LangyTurnSharedService } from "./langy-turn-shared.service.ts";
 
 /** The one public Langy turn facade; all workflow collaborators remain private. */
 export class LangyTurnService {

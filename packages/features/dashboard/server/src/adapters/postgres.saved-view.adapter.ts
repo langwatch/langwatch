@@ -1,10 +1,10 @@
-import type { SavedViewsPort } from "../transport/api-trpc/saved-view.api";
-import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
+import type { SavedViewsPort } from "../transport/api-trpc/saved-view.api.ts";
+import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port.ts";
 import {
   PrismaSavedViewRepository,
   type SavedViewDatabase,
-} from "../repositories/prisma/prisma.saved-view.repository";
-import { SavedViewService } from "../services/saved-view.service";
+} from "../repositories/prisma/prisma.saved-view.repository.ts";
+import { SavedViewService } from "../services/saved-view.service.ts";
 
 /**
  * The saved-view lifecycle over Postgres, in the shape the transport asks for. The service

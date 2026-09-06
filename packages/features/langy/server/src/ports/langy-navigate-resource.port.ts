@@ -13,7 +13,7 @@
  * read at is that feature's own — the same one its REST door hands out as
  * `platformUrl` — never something Langy composes.
  */
-import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules";
+import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 
 export abstract class LangyNavigateResourcePort {
   /**

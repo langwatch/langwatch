@@ -10,20 +10,20 @@ import type {
   LangyMessageProjectionRecord,
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
-import { LangyEffectPortsAdapter } from "./langy-effect.adapter";
-import { LangyConversationPipelineAdapter } from "./eventing.langy-conversation.adapter";
-import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection";
-import type { LangyTitleGenerator } from "../ports/langy-effect.port";
-import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
-import type { LangySessionKeyService } from "../services/langy-session-key.service";
-import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
-import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
+import { LangyEffectPortsAdapter } from "./langy-effect.adapter.ts";
+import { LangyConversationPipelineAdapter } from "./eventing.langy-conversation.adapter.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection.ts";
+import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
+import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
+import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
   type LangyBroadcastPort,
-} from "../subscribers/langy-conversation.subscriber";
+} from "../subscribers/langy-conversation.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
 export interface LangyConversationRuntimeCommands {

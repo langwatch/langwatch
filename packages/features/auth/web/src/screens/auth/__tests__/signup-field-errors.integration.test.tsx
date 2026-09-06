@@ -29,27 +29,27 @@ const { sessionRef, publicEnvRef, searchParamsRef, mutateMock } = vi.hoisted(() 
   mutateMock: vi.fn(() => Promise.resolve({})),
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return { ...actual, signIn: vi.fn(), useSession: () => sessionRef.current };
 });
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
 
-vi.mock("../../../behavior/auth-api", () => ({
+vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
     user: {
       register: {
@@ -63,7 +63,7 @@ vi.mock("../../../behavior/auth-api", () => ({
   },
 }));
 
-import SignUp from "../signup.screen";
+import SignUp from "../signup.screen.tsx";
 
 const renderPage = () =>
   render(

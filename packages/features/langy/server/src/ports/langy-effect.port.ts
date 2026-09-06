@@ -1,7 +1,7 @@
 import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./langy-conversation-process.port";
+} from "./langy-conversation-process.port.ts";
 
 /** Worker dispatch budget used by both the worker adapter and process lease. */
 export const LANGY_AGENT_DISPATCH_TIMEOUT_MS = 60_000;

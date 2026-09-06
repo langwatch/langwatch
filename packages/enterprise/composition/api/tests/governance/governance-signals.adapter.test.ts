@@ -11,7 +11,7 @@ import {
   AppGovernanceSignalsService,
   GovernanceSignalDeliveryPort,
   GovernanceSignalStoragePort,
-} from "../../src/governance/governance-signals.adapter";
+} from "../../src/governance/governance-signals.adapter.ts";
 
 class RecordingStorage extends GovernanceSignalStoragePort {
   readonly crossings: GovernanceResolvedBudgetCrossing[];

@@ -13,12 +13,12 @@ import type { GovernanceService } from "@langwatch/enterprise-governance-contrac
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
-import { AppAdminWorkspaceViewAuditAdapter } from "./admin-workspace-view-audit.adapter";
-import { AppCliTokenRevocationAdapter } from "./cli-token-revocation.adapter";
-import { AppIngestionKeyAdapter } from "./ingestion-key.adapter";
-import { AppGovernanceOttlGateway } from "./ottl-gateway.client";
-import { AppPersonalUsageReader } from "./personal-usage.adapter";
-import type { AppPersonalUsageReadAdapter } from "./personal-usage.clickhouse.repository";
+import { AppAdminWorkspaceViewAuditAdapter } from "./admin-workspace-view-audit.adapter.ts";
+import { AppCliTokenRevocationAdapter } from "./cli-token-revocation.adapter.ts";
+import { AppIngestionKeyAdapter } from "./ingestion-key.adapter.ts";
+import { AppGovernanceOttlGateway } from "./ottl-gateway.client.ts";
+import { AppPersonalUsageReader } from "./personal-usage.adapter.ts";
+import type { AppPersonalUsageReadAdapter } from "./personal-usage.clickhouse.repository.ts";
 import {
   AppAiToolProviderCatalogPort,
   AppAiToolSlugPort,
@@ -27,10 +27,10 @@ import {
   type GovernanceModelProviderCatalogPort,
   type GovernanceOrganizationContactPort,
   type GovernanceVirtualKeyPort,
-} from "./governance-products.adapter";
-import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository";
-import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository";
-import { AppQuarantineFillEvaluatorAdapter } from "./quarantine-fill-evaluator.adapter";
+} from "./governance-products.adapter.ts";
+import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository.ts";
+import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository.ts";
+import { AppQuarantineFillEvaluatorAdapter } from "./quarantine-fill-evaluator.adapter.ts";
 type GovernanceRuntimeOptions = {
   setupActivity?: AppGovernanceTraceActivityAdapter;
   ocsfEvents?: AppGovernanceOcsfEventsAdapter;

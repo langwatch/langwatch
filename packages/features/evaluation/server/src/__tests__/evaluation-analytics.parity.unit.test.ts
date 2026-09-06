@@ -11,8 +11,8 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "@langwatch/evaluation-contract";
-import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection";
-import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
+import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection.ts";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection.ts";
 
 /**
  * ADR-034 Phase 6: the slim fold reuses `EvaluationRunFoldProjection`'s

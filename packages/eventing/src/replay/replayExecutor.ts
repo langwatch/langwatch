@@ -1,18 +1,18 @@
-import type { RetentionPolicy, RetentionPolicyResolver } from "../runtime.types";
-import type { TenantId } from "../domain/tenantId";
-import type { Event } from "../domain/types";
-import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../runtime.types.ts";
+import type { TenantId } from "../domain/tenantId.ts";
+import type { Event } from "../domain/types.ts";
+import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
 import type {
   BulkAppendContext,
   MapProjectionDefinition,
-} from "../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
+} from "../projections/mapProjection.types.ts";
+import type { ProjectionStoreContext } from "../projections/projectionStoreContext.ts";
 import type {
   StateProjectionDefinition,
   StoredProjection,
-} from "../projections/stateProjection.types";
-import { applyStateEvent } from "../projections/stateProjectionExecutor";
-import type { ReplayEvent } from "./replayEventSource";
+} from "../projections/stateProjection.types.ts";
+import { applyStateEvent } from "../projections/stateProjectionExecutor.ts";
+import type { ReplayEvent } from "./replayEventSource.ts";
 
 /** Default number of projection entries per ClickHouse INSERT batch. */
 const DEFAULT_WRITE_BATCH_SIZE = 5000;

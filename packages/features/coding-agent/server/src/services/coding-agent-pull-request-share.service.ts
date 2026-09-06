@@ -1,9 +1,9 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
-import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-event.repository";
+import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-event.repository.ts";
 import type {
   AssignablePullRequest,
   CodingAgentPullRequestAssignmentService,
-} from "./coding-agent-pull-request-assignment.service";
+} from "./coding-agent-pull-request-assignment.service.ts";
 
 export interface PullRequestAttribution {
   /**

@@ -6,7 +6,7 @@ import {
   extractSystemText,
   parseContentBlocks,
   withBlockKeys,
-} from "../parsing";
+} from "../parsing.ts";
 
 describe("coerceToChatMessages", () => {
   describe("given an explicit chat_messages typed-value envelope", () => {

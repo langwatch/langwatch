@@ -5,13 +5,13 @@ const stubs = vi.hoisted(() => ({
   runMigrations: vi.fn(async () => undefined),
 }));
 
-vi.mock("../goose.migration-runner", () => ({ runMigrations: stubs.runMigrations }));
-vi.mock("../ttl.reconciler", () => ({ reconcileTTL: stubs.reconcileTTL }));
+vi.mock("../goose.migration-runner.ts", () => ({ runMigrations: stubs.runMigrations }));
+vi.mock("../ttl.reconciler.ts", () => ({ reconcileTTL: stubs.reconcileTTL }));
 
 import {
   ClickHouseMigrateTask,
   resolveClickHouseMigrationTaskConfig,
-} from "../clickhouse-migrate.task";
+} from "../clickhouse-migrate.task.ts";
 
 describe("clickhouse-migrate task", () => {
   beforeEach(() => {

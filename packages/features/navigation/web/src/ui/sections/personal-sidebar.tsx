@@ -28,11 +28,11 @@ import {
   SquareTerminal,
 } from "lucide-react";
 import { useMemo } from "react";
-import { navigationApi } from "../../behavior/navigation-api";
-import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-state";
-import { useNavigationHost } from "../../model/navigation-host";
-import { isPathUnder } from "../../model/products";
-import { SideMenuLink } from "../blocks/side-menu-link";
+import { navigationApi } from "../../behavior/navigation-api.ts";
+import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-state.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { isPathUnder } from "../../model/products.ts";
+import { SideMenuLink } from "../blocks/side-menu-link.tsx";
 
 /**
  * The advanced features a reader turned on in their personal workspace.

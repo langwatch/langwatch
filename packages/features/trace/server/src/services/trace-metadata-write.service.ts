@@ -1,8 +1,8 @@
 import { z } from "zod";
-import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port";
+import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port.ts";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
-import { TraceCollectorSpanService } from "./trace-collector-span.service";
+import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
 
 /**
  * Post-hoc trace metadata updates, applied by recording a synthetic `langwatch.metadata_update`

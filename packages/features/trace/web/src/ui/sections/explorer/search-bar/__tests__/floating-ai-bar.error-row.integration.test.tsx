@@ -15,7 +15,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 // The composer inside the bar dispatches through tRPC; these tests pin
 // the ERROR SURFACE (store -> row), so the dispatcher is stubbed out.
-vi.mock("../../ai/use-ai-trace-action", () => ({
+vi.mock("../../ai/use-ai-trace-action.ts", () => ({
   useAiTraceAction: () => ({
     submit: vi.fn(),
     isPending: false,
@@ -24,10 +24,10 @@ vi.mock("../../ai/use-ai-trace-action", () => ({
   }),
 }));
 
-import { explainAnyError } from "../../../errors";
+import { explainAnyError } from "../../../errors/index.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { FloatingAiBar } from "../floating-ai-bar";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { FloatingAiBar } from "../floating-ai-bar.tsx";
 
 /** A handled failure in the shape tRPC delivers it. */
 function handledCause(code: string, meta: Record<string, unknown> = {}) {

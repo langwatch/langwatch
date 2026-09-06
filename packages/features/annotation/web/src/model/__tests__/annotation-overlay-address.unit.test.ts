@@ -19,7 +19,7 @@ import {
   queueItemHref,
   readQueueEditor,
   traceDetailsAddress,
-} from "../annotation-overlay-address";
+} from "../annotation-overlay-address.ts";
 
 describe("given a row that opens the trace explorer's drawer", () => {
   describe("when the row knows when its trace started", () => {

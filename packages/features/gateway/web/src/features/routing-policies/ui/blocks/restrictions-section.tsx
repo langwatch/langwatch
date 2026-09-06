@@ -11,7 +11,7 @@ import {
   RESTRICTION_DIMENSIONS,
   type RestrictionDimension,
   type RoutingPolicyFormValues,
-} from "../../model/routing-policy-form";
+} from "../../model/routing-policy-form.ts";
 
 const DIMENSION_COPY: Record<
   RestrictionDimension,

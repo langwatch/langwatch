@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isWithinRolloutPercentage } from "./feature-flag-bucketing";
+import { isWithinRolloutPercentage } from "./feature-flag-bucketing.ts";
 
 /**
  * Targeting-rule contract for postgres-backed feature flags.

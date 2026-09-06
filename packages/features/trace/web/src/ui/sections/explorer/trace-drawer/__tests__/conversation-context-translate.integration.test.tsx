@@ -9,16 +9,16 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,
@@ -29,7 +29,7 @@ const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: strin
   translation: `EN::${textToTranslate}`,
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     translate: {
       translate: {
@@ -61,7 +61,7 @@ const turnsState = {
   isLoading: false,
 };
 
-vi.mock("../../hooks/use-conversation-context", () => ({
+vi.mock("../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     ...turnsState,
     turns: [turnsState.previous, current()],
@@ -85,7 +85,7 @@ function current() {
   };
 }
 
-import { ConversationContext } from "../conversation-context";
+import { ConversationContext } from "../conversation-context.tsx";
 
 function renderStrip() {
   return render(

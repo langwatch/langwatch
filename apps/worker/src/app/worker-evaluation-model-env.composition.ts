@@ -12,7 +12,7 @@ import {
   prepareLitellmParams,
   resolveMaxTokensCeiling,
 } from "@langwatch/model-provider-server";
-import type { WorkerModelProviders } from "./worker-model-provider.composition";
+import type { WorkerModelProviders } from "./worker-model-provider.composition.ts";
 
 /**
  * The evaluator environment, over the composed gateway. Takes the whole

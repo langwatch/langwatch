@@ -3,23 +3,23 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
-import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
-import { LangWatchQLCatalogShapesService } from "../services/langwatch-ql-catalog-shapes.service";
-import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port";
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLCatalogShapesService } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
 import {
   KEY_MAP_COLUMNS,
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
-} from "../services/langwatch-ql-access-model.service";
-import { postgresLiteral } from "../rules/langwatch-ql-sql-literal.rules";
-import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service";
+} from "../services/langwatch-ql-access-model.service.ts";
+import { postgresLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 
-import { SHIPPED_LWQL_DEDUP } from "../services/langwatch-ql-view-statements.service";
-import { LangWatchQLPostgresViewsService } from "../services/langwatch-ql-postgres-views.service";
-import { LangWatchQLViewStatementsService } from "../services/langwatch-ql-view-statements.service";
+import { SHIPPED_LWQL_DEDUP } from "../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLPostgresViewsService } from "../services/langwatch-ql-postgres-views.service.ts";
+import { LangWatchQLViewStatementsService } from "../services/langwatch-ql-view-statements.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();

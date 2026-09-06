@@ -20,17 +20,17 @@ import {
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
-import type { ScimRepositoryPort } from "../ports/scim-repository.port";
+import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
 import type {
   ScimSyncLifecyclePort,
   ScimUserPushOperation,
-} from "../ports/scim-sync-lifecycle.port";
-import { ScimDirectoryService } from "./scim-directory.service";
-import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
-import { ScimGrantsService } from "./scim-grants.service";
-import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service";
-import type { ScimDepartmentAssignment } from "./scim-cost-center.service";
-import type { ScimSessionRevocation } from "./scim-user-profile.service";
+} from "../ports/scim-sync-lifecycle.port.ts";
+import { ScimDirectoryService } from "./scim-directory.service.ts";
+import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
+import { ScimGrantsService } from "./scim-grants.service.ts";
+import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
+import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import type { ScimSessionRevocation } from "./scim-user-profile.service.ts";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.

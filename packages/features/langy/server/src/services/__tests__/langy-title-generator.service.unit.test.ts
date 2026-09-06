@@ -15,9 +15,9 @@ vi.mock("ai", () => ({ generateText: vi.fn() }));
 
 import { generateText } from "ai";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { LangyTitleModelPort } from "../../ports/langy-title-model.port";
-import { LangyTitleGeneratorService } from "../langy-title-generator.service";
-import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service";
+import { LangyTitleModelPort } from "../../ports/langy-title-model.port.ts";
+import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
+import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 
 const mockGenerateText = vi.mocked(generateText);
 

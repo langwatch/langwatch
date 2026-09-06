@@ -34,7 +34,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createCollectorRestApp } = await import("../collector.api");
+const { createCollectorRestApp } = await import("../collector.api.ts");
 
 const project = { id: "project-123", teamId: "team-1", organizationId: "org-1" };
 

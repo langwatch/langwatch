@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTraceTimestamp } from "../derive-trace-timestamp";
+import { deriveTraceTimestamp } from "../derive-trace-timestamp.ts";
 
 describe("deriveTraceTimestamp", () => {
   it("uses the span timing baseline when present", () => {

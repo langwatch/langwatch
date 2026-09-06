@@ -1,4 +1,4 @@
-import type { AlertType } from "../trigger";
+import type { AlertType } from "../trigger.ts";
 
 /**
  * The single variable contract every trigger-notification template renders

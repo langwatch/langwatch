@@ -1,17 +1,17 @@
 import { Alert, Box, Button, Center, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "../../ui/blocks/link";
-import { HandledErrorState } from "../../ui/sections/errors";
-import { TraceDrawerContent } from "../../ui/sections/explorer/trace-drawer/trace-drawer-content";
+import { Link } from "../../ui/blocks/link.tsx";
+import { HandledErrorState } from "../../ui/sections/errors/index.ts";
+import { TraceDrawerContent } from "../../ui/sections/explorer/trace-drawer/trace-drawer-content.tsx";
 import {
   SharedTraceProvider,
   useSharedTrace,
-} from "../../ui/sections/explorer/context/shared-trace-context";
-import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context";
-import { useDrawerStore } from "../../behavior/drawer.store";
+} from "../../ui/sections/explorer/context/shared-trace-context.tsx";
+import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context.tsx";
+import { useDrawerStore } from "../../behavior/drawer.store.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "../../behavior/trace-api";
+import { api } from "../../behavior/trace-api.ts";
 
 /** There is no drawer to close on a share page. */
 const noop = () => undefined;

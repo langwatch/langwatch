@@ -1,12 +1,12 @@
 import { Badge, Collapsible, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
-import { useAttributeValues } from "../hooks/use-attribute-values";
-import { AttributeValueRow } from "./attribute-value-row";
-import { NoneAttributeRow } from "../../../blocks/explorer/filter-sidebar/none-attribute-row";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
-import type { FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types";
-import { formatCount } from "./utils";
+import { useAttributeValues } from "../hooks/use-attribute-values.ts";
+import { AttributeValueRow } from "./attribute-value-row.tsx";
+import { NoneAttributeRow } from "../../../blocks/explorer/filter-sidebar/none-attribute-row.tsx";
+import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
+import type { FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { formatCount } from "./utils.ts";
 
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,

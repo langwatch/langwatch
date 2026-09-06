@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import { walkFiles } from "./files.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;

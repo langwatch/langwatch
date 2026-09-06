@@ -5,9 +5,9 @@ import type {
   ProcessEventEnvelope,
   ProcessRef,
   ProcessSignalEnvelope,
-} from "../processManager.types";
-import { ProcessManagerService } from "../processManagerService";
-import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
+} from "../processManager.types.ts";
+import { ProcessManagerService } from "../processManagerService.ts";
+import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 
 const T0 = Date.UTC(2026, 7, 22, 12, 0, 0);
 const ref: ProcessRef = {

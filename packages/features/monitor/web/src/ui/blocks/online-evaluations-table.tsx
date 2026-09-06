@@ -30,8 +30,8 @@ import {
   LuTrash,
 } from "react-icons/lu";
 
-import { MonitorLink } from "../elements/monitor-link";
-import { PerformancePreview } from "../elements/online-evaluation-performance-preview";
+import { MonitorLink } from "../elements/monitor-link.tsx";
+import { PerformancePreview } from "../elements/online-evaluation-performance-preview.tsx";
 
 export type OnlineEvaluationRow = {
   id: string;

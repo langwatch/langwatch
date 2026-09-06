@@ -2,7 +2,7 @@ import type {
   StoredObjectMetadata,
   StoredObjectReference,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectRecord } from "../stores/stored-object.store";
+import type { StoredObjectRecord } from "../stores/stored-object.store.ts";
 
 /** The stored object as a caller reads it: facts only, every timestamp already a string. */
 export function storedObjectMetadataOf(value: StoredObjectRecord): StoredObjectMetadata {

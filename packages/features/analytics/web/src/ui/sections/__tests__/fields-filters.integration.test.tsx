@@ -28,7 +28,7 @@ vi.mock("@tanstack/react-virtual", () => ({
 // The value picker's own read, stood in for at the transport boundary: what
 // this file is about is the picker, not the procedure behind it.
 const mockUseQuery = vi.fn();
-vi.mock("../../../behavior/analytics-api", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     analytics: {
       dataForFilter: {
@@ -38,7 +38,7 @@ vi.mock("../../../behavior/analytics-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/use-filter-params", () => ({
+vi.mock("../../../behavior/use-filter-params.ts", () => ({
   useFilterParams: () => ({
     filterParams: {},
     queryOpts: { enabled: true },
@@ -47,9 +47,9 @@ vi.mock("../../../behavior/use-filter-params", () => ({
   }),
 }));
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing";
-import type { FilterField } from "../../../model/analytics-filter-definition";
-import { FieldsFilters } from "../fields-filters";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
+import type { FilterField } from "../../../model/analytics-filter-definition.ts";
+import { FieldsFilters } from "../fields-filters.tsx";
 
 const mockFilterOptions = [
   { field: "label-1", label: "Production", count: 100 },

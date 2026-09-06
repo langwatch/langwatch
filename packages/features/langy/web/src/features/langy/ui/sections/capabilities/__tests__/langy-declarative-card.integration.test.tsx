@@ -8,9 +8,9 @@ import type { CliResultDigest } from "@langwatch/langy-contract";
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry";
-import { LangyDeclarativeCard } from "../langy-declarative-card";
-import type { CapabilityData } from "../../../../behavior/use-capability-data";
+import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
+import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
+import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
@@ -18,7 +18,7 @@ import {
   type LangyHostProject,
   type LangyHostTeam,
   type LangyRouteReading,
-} from "../../../../../../model/langy-host";
+} from "../../../../../../model/langy-host.ts";
 
 /**
  * A minimal host: the deep-link chip and the row links both resolve through
@@ -76,7 +76,7 @@ const idleData: CapabilityData = {
   isHydrating: false,
 };
 const useCapabilityDataMock = vi.fn((): CapabilityData => idleData);
-vi.mock("../../../../behavior/use-capability-data", () => ({
+vi.mock("../../../../behavior/use-capability-data.ts", () => ({
   useCapabilityData: () => useCapabilityDataMock(),
 }));
 

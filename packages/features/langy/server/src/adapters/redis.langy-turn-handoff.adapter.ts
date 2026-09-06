@@ -3,7 +3,7 @@ import {
   type LangyTurnHandoff,
   LangyTurnHandoffPort,
   langyTurnHandoffSchema,
-} from "../ports/langy-turn-handoff.port";
+} from "../ports/langy-turn-handoff.port.ts";
 
 export interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;

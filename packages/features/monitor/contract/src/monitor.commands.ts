@@ -3,9 +3,9 @@ import type {
   MonitorNameAvailabilityInput,
   MonitorReplicationInput,
   MonitorToggleInput,
-} from "./monitor";
+} from "./monitor.ts";
 
-export type { MonitorCreateInput, MonitorUpdateInput } from "./monitor";
+export type { MonitorCreateInput, MonitorUpdateInput } from "./monitor.ts";
 export type MonitorToggleCommand = MonitorToggleInput;
 export type MonitorDeleteCommand = MonitorIdInput;
 export type MonitorGetCommand = MonitorIdInput;

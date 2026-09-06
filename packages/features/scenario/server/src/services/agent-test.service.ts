@@ -24,18 +24,18 @@ import {
 import type { SecretService } from "@langwatch/secret-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port";
-import type { AgentTestConnectedDispatchPort } from "../ports/agent-test-connected-dispatch.port";
-import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port";
+import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port.ts";
+import type { AgentTestConnectedDispatchPort } from "../ports/agent-test-connected-dispatch.port.ts";
+import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port.ts";
 import {
   AgentTestPrefetchService,
   type AdapterRead,
   type ProjectRead,
-} from "./agent-test-prefetch.service";
-import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service";
-import { ScenarioModelParametersService } from "./scenario-model-parameters.service";
-import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service";
-import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service";
+} from "./agent-test-prefetch.service.ts";
+import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
+import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
+import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
+import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
 /** What one turn answered. */
 export type AgentTestTurnResult = {

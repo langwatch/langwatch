@@ -6,8 +6,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import type { Cost, PrismaClient, Project } from "@langwatch/prisma-client/generated";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createCostTrpcRouter, createLimitsTrpcRouter } from "./entitlement-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createCostTrpcRouter, createLimitsTrpcRouter } from "./entitlement-trpc.mount.ts";
 
 /**
  * The usage reading and the approaching-limit mail, over the deployment's billing store.
@@ -57,7 +57,7 @@ export type ApiProjectSpendRollup = Readonly<{
   >;
 }>;
 
-import type { ComposedSpendFeature } from "./spend.composition.types";
+import type { ComposedSpendFeature } from "./spend.composition.types.ts";
 
 /** Composes the spend rollup and the allowance reading over this process. */
 export function composeSpendFeature(options: {

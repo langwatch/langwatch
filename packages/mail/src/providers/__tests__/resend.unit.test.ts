@@ -18,8 +18,8 @@ vi.mock("undici", () => ({
 }));
 
 import { parseOutboundProxyConfig } from "@langwatch/egress";
-import { ResendEmailProvider } from "../resend";
-import { EmailProviderConfigurationError } from "../types";
+import { ResendEmailProvider } from "../resend.ts";
+import { EmailProviderConfigurationError } from "../types.ts";
 
 const PROXY_ENV_KEYS = [
   "HTTPS_PROXY",

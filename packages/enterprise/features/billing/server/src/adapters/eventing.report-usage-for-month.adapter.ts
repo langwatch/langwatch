@@ -6,14 +6,14 @@ import {
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
 } from "@langwatch/enterprise-billing-contract";
-import type { BillingErrorReporter } from "../ports/error-reporter.port";
+import type { BillingErrorReporter } from "../ports/error-reporter.port.ts";
 import type {
   BillingReportOrganizationLookup,
   BillingReportOrganizationPort,
-} from "../ports/billing-report-organization.port";
-import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port";
-import type { BillableEventsQueryService } from "../services/billable-events-query.service";
-import type { UsageReportingService } from "../services/usage-reporting.service";
+} from "../ports/billing-report-organization.port.ts";
+import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port.ts";
+import type { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
+import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
 

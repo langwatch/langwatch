@@ -3,7 +3,7 @@ import { Task } from "@langwatch/task";
 import type {
   ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,
-} from "../repositories/process-manager-purge.repository";
+} from "../repositories/process-manager-purge.repository.ts";
 
 const logger = createLogger("langwatch:task:process-manager-purge");
 

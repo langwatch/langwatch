@@ -16,7 +16,7 @@ import { describe, expect, it, vi, type Mock } from "vitest";
 import {
   ApiUserAvatarStorageAdapter,
   type ApiUserAvatarObjectWriter,
-} from "../user-avatar-storage.adapter";
+} from "../user-avatar-storage.adapter.ts";
 
 type AvatarObjectWrite = ApiUserAvatarObjectWriter["storeFromBytes"];
 

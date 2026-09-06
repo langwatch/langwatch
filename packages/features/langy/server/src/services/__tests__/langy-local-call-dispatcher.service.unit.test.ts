@@ -11,9 +11,9 @@ import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import {
   LocalCallDispatcherService,
   type WorkspaceNudge,
-} from "../langy-local-call-dispatcher.service";
-import { workspaceChannel } from "../../rules/langy-local-control-keys.rules";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
+} from "../langy-local-call-dispatcher.service.ts";
+import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";

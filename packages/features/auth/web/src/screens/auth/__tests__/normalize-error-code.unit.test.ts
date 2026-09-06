@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { isStableAuthError, normalizeErrorCode, STABLE_AUTH_ERRORS } from "../sign-in-error.screen";
+import { isStableAuthError, normalizeErrorCode, STABLE_AUTH_ERRORS } from "../sign-in-error.screen.tsx";
 
 describe("normalizeErrorCode", () => {
   describe("when given null or undefined", () => {

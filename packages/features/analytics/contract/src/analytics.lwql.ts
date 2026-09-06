@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window";
+import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";
 
 /** One column in a LangWatchQL result. */
 export const langWatchQLColumnSchema = z

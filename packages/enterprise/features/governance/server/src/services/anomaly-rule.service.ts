@@ -12,7 +12,7 @@ import {
   validateDestinationConfig,
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../ports/anomaly-rule.port";
+import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../ports/anomaly-rule.port.ts";
 
 export class AnomalyRuleService {
   private constructor(

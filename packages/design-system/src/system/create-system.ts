@@ -1,5 +1,5 @@
 import { createSystem, defaultConfig, mergeConfigs } from "@chakra-ui/react";
-import { designSystemConfig } from "./config";
+import { designSystemConfig } from "./config.ts";
 
 export type DesignSystemExtension = Parameters<typeof mergeConfigs>[number];
 

@@ -13,11 +13,11 @@ import {
 import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   LangWatchQLTimeWindowService,
-} from "../../services/langwatch-ql-time-window.service";
+} from "../../services/langwatch-ql-time-window.service.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
-import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 
 const GRANULARITY: LangWatchQLParameter[] = [
   { name: "period_granularity_seconds", type: "UInt32" },

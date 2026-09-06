@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { FallbackCanonicaliserService } from "../fallback-canonicaliser.service";
-import { createExtractorContext } from "./test-helpers";
+import { FallbackCanonicaliserService } from "../fallback-canonicaliser.service.ts";
+import { createExtractorContext } from "./test-helpers.ts";
 
 describe("FallbackCanonicaliserService", () => {
   const extractor = FallbackCanonicaliserService.create();

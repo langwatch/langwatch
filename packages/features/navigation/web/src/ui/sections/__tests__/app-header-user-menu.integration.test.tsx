@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 let governanceByOrg: Record<string, boolean> = {};
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     featureFlag: {
       isEnabledForEachOrganization: {
@@ -27,8 +27,8 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing";
-import { AppHeaderUserMenu } from "../app-header-user-menu";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
+import { AppHeaderUserMenu } from "../app-header-user-menu.tsx";
 
 const rememberScopeMock = vi.fn();
 const navigateMock = vi.fn();

@@ -41,7 +41,7 @@ import {
   LIST_PROJECTS,
   REGENERATE_PROJECT_API_KEY,
   UPDATE_PROJECT,
-} from "../../rules/project-openapi.rules";
+} from "../../rules/project-openapi.rules.ts";
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),

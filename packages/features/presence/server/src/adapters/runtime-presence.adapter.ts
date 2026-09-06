@@ -1,10 +1,10 @@
 import type { PresenceService as PresenceServiceContract } from "@langwatch/presence-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port";
-import { MemoryPresenceRepository } from "../repositories/memory/memory.presence.repository";
-import { RedisPresenceRepository } from "../repositories/redis/redis.presence.repository";
-import { PresenceService } from "../services/presence.service";
+import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port.ts";
+import { MemoryPresenceRepository } from "../repositories/memory/memory.presence.repository.ts";
+import { RedisPresenceRepository } from "../repositories/redis/redis.presence.repository.ts";
+import { PresenceService } from "../services/presence.service.ts";
 
 export interface RuntimePresenceAdapterOptions {
   redis: RedisConnection | null;

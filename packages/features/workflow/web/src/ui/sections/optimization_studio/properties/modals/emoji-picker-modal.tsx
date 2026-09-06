@@ -1,6 +1,6 @@
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";
 import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
-import { WorkflowConfigPopover } from "../../../../elements/workflow-config-popover";
+import { WorkflowConfigPopover } from "../../../../elements/workflow-config-popover.tsx";
 import dynamic from "@langwatch/ui-host/compat/next-dynamic";
 
 // Use string literals matching the enum values, not the runtime enums — a

@@ -4,7 +4,7 @@
  * @see specs/experiments-v3/experiment-slug-deduplication.feature
  */
 import { describe, expect, it } from "vitest";
-import { ExperimentSlugService, type ExperimentSlugRepository } from "../experiment-slug.service";
+import { ExperimentSlugService, type ExperimentSlugRepository } from "../experiment-slug.service.ts";
 
 const repositoryOf = (slugs: string[]): ExperimentSlugRepository => ({
   findSlugsByPrefix: async (input) =>

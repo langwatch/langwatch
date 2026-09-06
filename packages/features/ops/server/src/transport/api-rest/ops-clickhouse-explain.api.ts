@@ -12,9 +12,9 @@ import {
   type ServiceContext,
 } from "@langwatch/api/rest";
 
-import type { OpsExplainService } from "../../services/ops-clickhouse-explain.service";
-import { explainBodySchema } from "../../adapters/ops-clickhouse-explain.adapter";
-import { OpsClickhouseExplainAdapter } from "../../adapters/ops-clickhouse-explain.adapter";
+import type { OpsExplainService } from "../../services/ops-clickhouse-explain.service.ts";
+import { explainBodySchema } from "../../adapters/ops-clickhouse-explain.adapter.ts";
+import { OpsClickhouseExplainAdapter } from "../../adapters/ops-clickhouse-explain.adapter.ts";
 const { buildExplainQuery, redactQueryForAudit } = OpsClickhouseExplainAdapter;
 
 /** What the family needs from the process it is mounted in. */

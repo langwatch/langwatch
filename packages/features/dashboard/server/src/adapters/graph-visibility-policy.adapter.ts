@@ -1,5 +1,5 @@
-import { DashboardGraphVisibilityPolicyPort } from "../ports/dashboard.port";
-import type { WorkbenchAccessPort } from "../ports/workbench-access.port";
+import { DashboardGraphVisibilityPolicyPort } from "../ports/dashboard.port.ts";
+import type { WorkbenchAccessPort } from "../ports/workbench-access.port.ts";
 
 /** Preserves the project-level LangWatchQL gate when Dashboard counts visible cards. */
 export class WorkbenchAwareGraphVisibilityAdapter extends DashboardGraphVisibilityPolicyPort {

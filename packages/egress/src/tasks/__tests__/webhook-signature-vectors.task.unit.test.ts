@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { serializeVectors, VECTORS_RELATIVE_PATH } from "../../webhook/signature-vectors";
-import { WebhookSignatureVectorsTask } from "../webhook-signature-vectors.task";
+import { serializeVectors, VECTORS_RELATIVE_PATH } from "../../webhook/signature-vectors.ts";
+import { WebhookSignatureVectorsTask } from "../webhook-signature-vectors.task.ts";
 
 describe("WebhookSignatureVectorsTask", () => {
   describe("given the task is run", () => {

@@ -1,7 +1,7 @@
-import type { FieldMapping } from "../../../experiment-workbench";
-import { type RemoveTargetPayload, removeTargetPayloadSchema } from "../schemas";
-import { requireTarget } from "./helpers";
-import type { Transform } from "./types";
+import type { FieldMapping } from "../../../experiment-workbench.ts";
+import { type RemoveTargetPayload, removeTargetPayloadSchema } from "../schemas.ts";
+import { requireTarget } from "./helpers.ts";
+import type { Transform } from "./types.ts";
 
 /**
  * A removed target must also leave every comparison that names it as a variant.

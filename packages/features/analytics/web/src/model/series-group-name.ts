@@ -1,4 +1,4 @@
-import { uppercaseFirstLetter } from "./string-casing";
+import { uppercaseFirstLetter } from "./string-casing.ts";
 
 /**
  * Display naming for the group-by bucket of a chart series.

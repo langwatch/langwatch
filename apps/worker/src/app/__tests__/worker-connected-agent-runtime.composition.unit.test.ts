@@ -1,7 +1,7 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installWorkerConnectedAgentRuntime } from "../worker-connected-agent-runtime.composition";
+import { installWorkerConnectedAgentRuntime } from "../worker-connected-agent-runtime.composition.ts";
 
 const { install, close } = vi.hoisted(() => ({
   install: vi.fn(),

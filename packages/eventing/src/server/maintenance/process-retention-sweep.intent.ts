@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
+import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic.ts";
 import {
   CONSUMED_INBOX_RETENTION_MS,
   DEAD_OUTBOX_RETENTION_MS,
@@ -10,8 +10,8 @@ import {
   RETENTION_SWEEP_DEADLINE_MS,
   RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
-} from "./process-retention-sweep.process";
-import type { ProcessRetentionMetricsPort, RetentionFamily } from "./retention-metrics.port";
+} from "./process-retention-sweep.process.ts";
+import type { ProcessRetentionMetricsPort, RetentionFamily } from "./retention-metrics.port.ts";
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 

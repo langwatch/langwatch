@@ -39,7 +39,7 @@
  *   is left as-is rather than throwing.
  */
 import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../rules/trace-payload-cap.rules";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../rules/trace-payload-cap.rules.ts";
 
 type AttributeList = OtlpSpan["attributes"];
 

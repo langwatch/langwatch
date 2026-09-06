@@ -8,7 +8,7 @@ import {
   type RefreshGithubPullRequestSnapshotInput,
   type UpsertGithubBranchCheckInput,
   type UpsertGithubPullRequestInput,
-} from "../github-pull-requests.repository";
+} from "../github-pull-requests.repository.ts";
 
 type PullRequestRecord = {
   organizationId: string;

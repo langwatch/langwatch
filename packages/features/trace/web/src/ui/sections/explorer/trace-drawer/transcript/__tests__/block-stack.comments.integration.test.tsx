@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   comments: [] as unknown[],
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: (permission: string) =>
@@ -24,8 +24,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-anchored-annotations", async () => {
-  const actual = await vi.importActual<typeof import("../../../hooks/use-anchored-annotations")>(
+vi.mock("../../../hooks/use-anchored-annotations.ts", async () => {
+  const actual = await vi.importActual<typeof import("../../../hooks/use-anchored-annotations.ts")>(
     "../../../hooks/use-anchored-annotations",
   );
   return {
@@ -38,24 +38,24 @@ vi.mock("../../../hooks/use-anchored-annotations", async () => {
   };
 });
 
-vi.mock("../../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: null,
   }),
 }));
 
-vi.mock("../../../../me/personal-feature-gate-dialog", () => ({
+vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../../use-annotation-invalidation", () => ({
+vi.mock("../../../../use-annotation-invalidation.ts", () => ({
   useAnnotationInvalidation: () => vi.fn(),
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     annotation: {
       getByTraceId: { useQuery: () => ({ data: [] }) },
@@ -88,10 +88,10 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { BlockStack } from "../block-stack";
-import { MessageCommentScope } from "../message-comments";
-import { withBlockKeys } from "../parsing";
-import type { ContentBlock } from "../types";
+import { BlockStack } from "../block-stack.tsx";
+import { MessageCommentScope } from "../message-comments.tsx";
+import { withBlockKeys } from "../parsing.ts";
+import type { ContentBlock } from "../types.ts";
 
 const TRACE_ID = "trace-1";
 const BLOCKS: ContentBlock[] = [

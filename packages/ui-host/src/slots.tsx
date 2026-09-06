@@ -5,8 +5,8 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
-import { useOptionalUiCapabilities } from "./capabilities";
-import type { UpgradeModalSeatsVariant } from "./upgrade-modal-store";
+import { useOptionalUiCapabilities } from "./capabilities.ts";
+import type { UpgradeModalSeatsVariant } from "./upgrade-modal-store.ts";
 
 /**
  * What a screen hands the block it asked for — the CORE side of the contract,

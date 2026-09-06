@@ -4,18 +4,18 @@
  */
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
-import { useCapabilityData } from "../../../behavior/use-capability-data";
+import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
-} from "../../../model/capabilities/capability-registry";
-import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document";
+} from "../../../model/capabilities/capability-registry.ts";
+import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,
   LangyCapabilityCard,
-} from "./langy-capability-card";
+} from "./langy-capability-card.tsx";
 
 function parseDataset(output: unknown): {
   count: number | null;

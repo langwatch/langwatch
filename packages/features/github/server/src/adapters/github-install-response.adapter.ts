@@ -1,4 +1,4 @@
-import { GithubInstallResponsePort } from "../ports/github-install-response.port";
+import { GithubInstallResponsePort } from "../ports/github-install-response.port.ts";
 
 export class GithubInstallResponseAdapter extends GithubInstallResponsePort {
   static create(): GithubInstallResponseAdapter {

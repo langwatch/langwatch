@@ -16,7 +16,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
-import { useOrganizationHost } from "../../model/organization-host";
+import { useOrganizationHost } from "../../model/organization-host.ts";
 
 type LinkProps = {
   href: string | undefined;

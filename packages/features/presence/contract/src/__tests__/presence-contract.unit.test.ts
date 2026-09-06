@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { presenceCursorEventSchema, presenceEventSchema, presenceLocationSchema } from "../index";
+import { presenceCursorEventSchema, presenceEventSchema, presenceLocationSchema } from "../index.ts";
 
 describe("presence contract", () => {
   const session = {

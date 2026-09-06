@@ -11,7 +11,7 @@ import {
   createUserAvatarRestApp,
   type UserAvatarObjectReader,
   type UserAvatarStoredObjectRead,
-} from "../user-avatar.api";
+} from "../user-avatar.api.ts";
 
 describe("given the avatar route", () => {
   describe("when the object is a user avatar", () => {

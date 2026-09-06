@@ -1,5 +1,5 @@
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
-import { StoredObjectProjectDestinationResolverPort } from "./stored-object-storage-runtime.adapter";
+import { StoredObjectProjectDestinationResolverPort } from "./stored-object-storage-runtime.adapter.ts";
 
 export type StoredObjectStorageSelection = Readonly<{
   backend: "azure" | "s3" | "file";

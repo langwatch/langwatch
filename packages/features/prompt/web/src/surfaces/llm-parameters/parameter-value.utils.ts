@@ -5,8 +5,8 @@
  * handling the snake_case/camelCase conversion.
  */
 
-import { toFormKey } from "./parameter-config";
-import type { LLMConfigValues } from "./llm-config-values.types";
+import { toFormKey } from "./parameter-config.ts";
+import type { LLMConfigValues } from "./llm-config-values.types.ts";
 
 // ============================================================================
 // Parameter Value Access

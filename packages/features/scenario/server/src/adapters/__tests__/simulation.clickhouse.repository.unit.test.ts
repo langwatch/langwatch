@@ -1,15 +1,15 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import type { SimulationReadClient } from "../simulation.clickhouse.adapter";
+import type { SimulationReadClient } from "../simulation.clickhouse.adapter.ts";
 import {
   RUN_ID_CAP,
   SimulationClickHouseRepository,
-} from "../../repositories/clickhouse/simulation-clickhouse.repository";
+} from "../../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import {
   type SimulationWindowFragment,
   SimulationWindowedReadPort,
   type SimulationWindowedReadInput,
-} from "../../ports/simulation-windowed-read.port";
+} from "../../ports/simulation-windowed-read.port.ts";
 
 type QueryCall = {
   query: string;

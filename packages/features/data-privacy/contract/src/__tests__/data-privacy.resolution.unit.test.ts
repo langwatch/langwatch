@@ -3,7 +3,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   resolveDataPrivacy,
   type DataPrivacyScopeFacts,
-} from "../index";
+} from "../index.ts";
 
 const facts: DataPrivacyScopeFacts = {
   organizationId: "org-1",

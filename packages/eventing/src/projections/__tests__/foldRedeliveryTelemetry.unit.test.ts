@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../metrics", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../metrics")>();
+vi.mock("../../metrics.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../metrics.ts")>();
   return {
     ...actual,
     observeEsFoldBlindReapplyEvents: vi.fn(),
@@ -14,16 +14,16 @@ vi.mock("../../metrics", async (importOriginal) => {
   };
 });
 
-import { observeEsFoldBlindReapplyEvents } from "../../metrics";
-import type { Event } from "../../domain/types";
+import { observeEsFoldBlindReapplyEvents } from "../../metrics.ts";
+import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "../../services/__tests__/testHelpers";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
+} from "../../services/__tests__/testHelpers.ts";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 
 /**
  * Blast radius of a blind re-apply.

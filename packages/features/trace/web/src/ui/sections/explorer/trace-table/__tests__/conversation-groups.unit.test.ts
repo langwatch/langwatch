@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { LENS_CAPABILITIES } from "../../../../../behavior/lens-capabilities";
-import type { TraceListItem } from "../../types/trace";
-import { type ConversationGroup, sortConversationGroups } from "../conversation-groups";
+import { LENS_CAPABILITIES } from "../../../../../behavior/lens-capabilities.ts";
+import type { TraceListItem } from "../../types/trace.ts";
+import { type ConversationGroup, sortConversationGroups } from "../conversation-groups.ts";
 
 /**
  * Regression coverage for the conversation lens sort.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AbstractFoldProjection, type FoldEventHandlers } from "../abstractFoldProjection";
-import type { FoldProjectionStore } from "../foldProjection.types";
+import { AbstractFoldProjection, type FoldEventHandlers } from "../abstractFoldProjection.ts";
+import type { FoldProjectionStore } from "../foldProjection.types.ts";
 
 // --- Test Zod schemas (mimic real event schemas) ---
 

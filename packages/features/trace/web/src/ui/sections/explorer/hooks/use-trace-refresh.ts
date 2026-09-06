@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { api } from "../../../../behavior/trace-api";
+import { api } from "../../../../behavior/trace-api.ts";
 
 /**
  * Refresh-button handler for the drawer header. Invalidates everything that backs the

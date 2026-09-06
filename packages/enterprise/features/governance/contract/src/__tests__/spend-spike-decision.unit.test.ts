@@ -9,7 +9,7 @@ import {
   DEFAULT_SPEND_SPIKE_CONFIG,
   evaluateSpendSpike,
   type SpendSpikeThresholdConfig,
-} from "../anomaly-rule";
+} from "../anomaly-rule.ts";
 
 const FIXED_WINDOW_START = new Date("2026-04-29T10:00:00Z");
 const FIXED_WINDOW_END = new Date("2026-04-29T11:00:00Z");

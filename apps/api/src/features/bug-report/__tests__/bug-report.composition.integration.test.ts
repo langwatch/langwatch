@@ -8,15 +8,15 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiAuditPort } from "../../../api-request.policy";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
+} from "../../../api.application.ts";
+import { ApiAuditPort } from "../../../api-request.policy.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
-import { composeBugReportFeature } from "../bug-report.composition";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { composeBugReportFeature } from "../bug-report.composition.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 

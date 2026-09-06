@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { EvaluationInputStoragePort } from "../ports/evaluation.port";
+import type { EvaluationInputStoragePort } from "../ports/evaluation.port.ts";
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 

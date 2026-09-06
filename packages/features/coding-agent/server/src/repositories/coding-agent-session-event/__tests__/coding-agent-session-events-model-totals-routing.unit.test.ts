@@ -4,8 +4,8 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port";
-import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.repository";
+import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port.ts";
+import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.repository.ts";
 
 const FROM_MS = Date.parse("2026-07-01T00:00:00.000Z");
 

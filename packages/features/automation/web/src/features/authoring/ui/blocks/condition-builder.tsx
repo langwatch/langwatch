@@ -21,7 +21,7 @@ import {
   queryToConditions,
   serializeConditions,
   valueTypeOfField,
-} from "../../model/condition-query";
+} from "../../model/condition-query.ts";
 
 const OPERATOR_LABEL: Record<ConditionOperator, string> = {
   is: "is",

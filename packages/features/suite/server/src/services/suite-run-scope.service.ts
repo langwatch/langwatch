@@ -19,9 +19,9 @@ import {
   ScenarioTestSuiteNotFoundError,
 } from "@langwatch/scenario-contract";
 import { SuiteNotFoundError } from "@langwatch/suite-contract";
-import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service";
-import { isAgentTarget } from "../rules/suite-target.rules";
-import type { SuiteServiceOptions } from "./suite.service";
+import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
+import { isAgentTarget } from "../rules/suite-target.rules.ts";
+import type { SuiteServiceOptions } from "./suite.service.ts";
 
 export class SuiteRunScopeService {
   static create(options: SuiteServiceOptions): SuiteRunScopeService {

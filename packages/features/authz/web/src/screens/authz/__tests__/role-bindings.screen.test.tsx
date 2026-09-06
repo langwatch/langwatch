@@ -13,7 +13,7 @@
 
 import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing";
+import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing.tsx";
 
 const { api, state } = vi.hoisted(() => {
   const state = {
@@ -36,9 +36,9 @@ const { api, state } = vi.hoisted(() => {
   return { api, state };
 });
 
-vi.mock("../../../behavior/authz-api", () => ({ authzApi: api }));
+vi.mock("../../../behavior/authz-api.ts", () => ({ authzApi: api }));
 
-const { default: RoleBindingsScreen } = await import("../role-bindings.screen");
+const { default: RoleBindingsScreen } = await import("../role-bindings.screen.tsx");
 
 function binding(overrides: Record<string, unknown>) {
   return {

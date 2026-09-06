@@ -1,8 +1,8 @@
 import type { Field } from "@langwatch/workflow-contract";
-import type { TargetConfig } from "../../../experiment-workbench";
-import { type SetTargetPromptPayload, setTargetPromptPayloadSchema } from "../schemas";
-import { requireTarget } from "./helpers";
-import type { Transform } from "./types";
+import type { TargetConfig } from "../../../experiment-workbench.ts";
+import { type SetTargetPromptPayload, setTargetPromptPayloadSchema } from "../schemas.ts";
+import { requireTarget } from "./helpers.ts";
+import type { Transform } from "./types.ts";
 
 /**
  * Write the target's draft prompt.

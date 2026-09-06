@@ -1,9 +1,9 @@
 /** Maps OpenInference span kind, context, and token usage to canonical keys. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { ALLOWED_SPAN_TYPES } from "../rules/canonical-extraction.rules";
-import { asNumber } from "../rules/canonical-guard.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+import { ALLOWED_SPAN_TYPES } from "../rules/canonical-extraction.rules.ts";
+import { asNumber } from "../rules/canonical-guard.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export class OpenInferenceCanonicaliserService implements CanonicalAttributesPort {
   static create(): OpenInferenceCanonicaliserService {

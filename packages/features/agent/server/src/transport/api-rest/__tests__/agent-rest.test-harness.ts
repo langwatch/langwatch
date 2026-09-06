@@ -12,12 +12,12 @@ import type { Agent, AgentConfig, AgentType } from "@langwatch/agent-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 
-import { AgentApp } from "../../../app/agent.app";
-import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../../ports/agent.port";
-import type { AgentRepository, PersistAgentInput } from "../../../repositories/agent.repository";
-import { AgentService } from "../../../services/agent.service";
-import { createAgentLegacyRestApp } from "../agent-legacy.api";
-import { createAgentV1RestApp } from "../agent-v1.api";
+import { AgentApp } from "../../../app/agent.app.ts";
+import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../../ports/agent.port.ts";
+import type { AgentRepository, PersistAgentInput } from "../../../repositories/agent.repository.ts";
+import { AgentService } from "../../../services/agent.service.ts";
+import { createAgentLegacyRestApp } from "../agent-legacy.api.ts";
+import { createAgentV1RestApp } from "../agent-v1.api.ts";
 
 export const PROJECT_ID = "project_agents";
 const PROJECT_SLUG = "agents-project";

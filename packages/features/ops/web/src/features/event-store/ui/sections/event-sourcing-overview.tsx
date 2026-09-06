@@ -1,11 +1,11 @@
 import { Box, Button, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, Skull } from "lucide-react";
-import { ProcessRecentActions } from "./process-recent-actions-panel";
-import { hasFleetTrouble } from "../../model/process-presentation";
-import { ProcessFleetStrip } from "../blocks/process-fleet-strip";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { Link } from "../../../../ui/elements/ops-link";
-import { api } from "../../../../behavior/ops-api";
+import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
+import { hasFleetTrouble } from "../../model/process-presentation.ts";
+import { ProcessFleetStrip } from "../blocks/process-fleet-strip.tsx";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { Link } from "../../../../ui/elements/ops-link.tsx";
+import { api } from "../../../../behavior/ops-api.ts";
 
 /**
  * Where an operator lands, built to answer one question: is anything wrong,

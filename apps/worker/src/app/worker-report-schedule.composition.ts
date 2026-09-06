@@ -37,7 +37,7 @@ import {
   TraceQueryClickHouseAdapter,
 } from "@langwatch/trace-server";
 import type { ReportTraceRow } from "@langwatch/automation-contract";
-import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition";
+import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition.ts";
 import type { AutomationProjectIdentityPort } from "@langwatch/automation-server";
 
 /**

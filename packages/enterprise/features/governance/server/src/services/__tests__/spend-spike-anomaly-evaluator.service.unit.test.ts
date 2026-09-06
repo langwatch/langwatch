@@ -4,14 +4,14 @@ import type {
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyAlertHttpPort } from "../../ports/anomaly-alert-http.port";
+import { AnomalyAlertHttpPort } from "../../ports/anomaly-alert-http.port.ts";
 import {
   AnomalySpendReaderPort,
   type AnomalySpendSourceFilter,
   SpendSpikeAnomalyRepository,
-} from "../../ports/spend-spike-anomaly.port";
-import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service";
-import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service";
+} from "../../ports/spend-spike-anomaly.port.ts";
+import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
+import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
 
 const NOW = new Date("2026-08-24T12:00:00.000Z");
 

@@ -2,7 +2,7 @@ import { Box, Button, Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useGovernanceHost } from "../../model/governance-host";
+import { useGovernanceHost } from "../../model/governance-host.ts";
 interface Props {
   children: ReactNode;
   featureName: string;

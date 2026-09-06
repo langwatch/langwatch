@@ -6,10 +6,10 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
   versionSchema,
-} from "./prompt.field-schemas";
-import { nodeDatasetSchema } from "./prompt.field-schemas";
-import { SchemaVersion } from "./prompt.enums";
-import { sortKeysDeep } from "./prompt.sort-keys";
+} from "./prompt.field-schemas.ts";
+import { nodeDatasetSchema } from "./prompt.field-schemas.ts";
+import { SchemaVersion } from "./prompt.enums.ts";
+import { sortKeysDeep } from "./prompt.sort-keys.ts";
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 

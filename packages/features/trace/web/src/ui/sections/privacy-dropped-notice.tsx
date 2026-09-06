@@ -1,6 +1,6 @@
 import { Alert, Button } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import NextLink from "../elements/next-link";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import NextLink from "../elements/next-link.tsx";
 
 /**
  * Banner shown when a trace is missing content because a `drop` privacy policy stripped

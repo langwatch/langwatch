@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { DataPrivacyConfig, DataPrivacyRow, DataPrivacyScopeFacts } from "../data-privacy";
-import { resolveDataPrivacy } from "../data-privacy.resolution";
+import type { DataPrivacyConfig, DataPrivacyRow, DataPrivacyScopeFacts } from "../data-privacy.ts";
+import { resolveDataPrivacy } from "../data-privacy.resolution.ts";
 
 const teamProject: DataPrivacyScopeFacts = {
   organizationId: "acme",

@@ -6,11 +6,11 @@ import {
   toWireEnum,
   usdDisplayString,
 } from "@langwatch/gateway-contract";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
 import type {
   AttributedUserBudgetTemplate,
   GatewayBudgetRepository,
-} from "../repositories/gateway-budget.repository";
+} from "../repositories/gateway-budget.repository.ts";
 
 /**
  * Attributed-user budget allowances for one end user, with spend. Two stores answer this:

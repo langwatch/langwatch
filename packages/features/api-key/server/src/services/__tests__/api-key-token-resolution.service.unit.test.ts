@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ApiKeyNotFoundError, LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
-import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service";
+import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
 
 const CURRENT_TOKEN = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 const LEGACY_TOKEN = "sk-lw-legacy-project-key";

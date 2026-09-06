@@ -2,7 +2,7 @@ import IORedis, { type Redis } from "ioredis";
 import { register } from "prom-client";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GroupQueueProcessor } from "../groupQueue";
+import { GroupQueueProcessor } from "../groupQueue.ts";
 
 type TestPayload = {
   id: string;

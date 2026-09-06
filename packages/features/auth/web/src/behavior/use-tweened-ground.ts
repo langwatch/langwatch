@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { GroundShift } from "../model/ground-palette";
+import type { GroundShift } from "../model/ground-palette.ts";
 import {
   easeInOutCubic,
   GROUND_TWEEN_MS,
   groundShiftsMatch,
   mixGroundShift,
-} from "../model/ground-palette";
+} from "../model/ground-palette.ts";
 
 /**
  * The ground, on its way to a new turn.

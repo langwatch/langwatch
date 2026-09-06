@@ -1,19 +1,19 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter";
-import { IdentityLedgerWriterAdapter } from "./identity-ledger.adapter";
-import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter";
-import { IdentityIdentifierBackfillMigrationAdapter } from "./system-migration.identity-identifier-backfill.adapter";
-import { IdentitySecretHealMigrationAdapter } from "./system-migration.identity-secret-heal.adapter";
-import type { IdentityEventingPort } from "../ports/identity-eventing.port";
-import { PrismaIdentityBackfillRepository } from "../repositories/prisma/prisma.identity-backfill.repository";
-import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository";
-import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository";
-import { PrismaIdentityUsersRepository } from "../repositories/prisma/prisma.identity-users.repository";
-import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service";
-import { IdentityBackfillService } from "../services/identity-backfill.service";
-import { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
-import { IdentityService } from "../services/identity.service";
+import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter.ts";
+import { IdentityLedgerWriterAdapter } from "./identity-ledger.adapter.ts";
+import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter.ts";
+import { IdentityIdentifierBackfillMigrationAdapter } from "./system-migration.identity-identifier-backfill.adapter.ts";
+import { IdentitySecretHealMigrationAdapter } from "./system-migration.identity-secret-heal.adapter.ts";
+import type { IdentityEventingPort } from "../ports/identity-eventing.port.ts";
+import { PrismaIdentityBackfillRepository } from "../repositories/prisma/prisma.identity-backfill.repository.ts";
+import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
+import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository.ts";
+import { PrismaIdentityUsersRepository } from "../repositories/prisma/prisma.identity-users.repository.ts";
+import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
+import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
+import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
+import { IdentityService } from "../services/identity.service.ts";
 
 export type PostgresIdentityUserMigrationsOptions = {
   /** The composition root's own typed client, handed down with no cast. */

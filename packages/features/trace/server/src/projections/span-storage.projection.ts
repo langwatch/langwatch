@@ -2,12 +2,12 @@ import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port";
-import { SpanCostService } from "../services/span-cost.service";
+import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
+import { SpanCostService } from "../services/span-cost.service.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-} from "../rules/trace-span-storage-group.rules";
+} from "../rules/trace-span-storage-group.rules.ts";
 
 const spanEvents = [spanReceivedEventSchema] as const;
 

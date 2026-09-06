@@ -12,7 +12,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Avatar } from "../src/components/avatar";
+import { Avatar } from "../src/components/avatar.tsx";
 
 afterEach(cleanup);
 

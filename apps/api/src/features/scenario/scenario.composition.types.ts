@@ -6,10 +6,10 @@ import type {
   ScenarioTabRegistry,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount";
-import type { createSuiteTrpcRouter } from "../suite/suite-trpc.mount";
-import type { createScenarioTrpcRouter } from "./scenario-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount.ts";
+import type { createSuiteTrpcRouter } from "../suite/suite-trpc.mount.ts";
+import type { createScenarioTrpcRouter } from "./scenario-trpc.mount.ts";
 
 /** The three routers, the two `ctx.app` slices, and the services the doors take. */
 export type ComposedScenarioFeature = Readonly<{

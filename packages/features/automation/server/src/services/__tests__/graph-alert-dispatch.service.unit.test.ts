@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
-import { GraphAlertDispatchService } from "../graph-alert-dispatch.service";
+import { GraphAlertDispatchService } from "../graph-alert-dispatch.service.ts";
 
 /** A real alert context, built the way the evaluator builds one. */
 const CONTEXT = buildGraphAlertTemplateContext({

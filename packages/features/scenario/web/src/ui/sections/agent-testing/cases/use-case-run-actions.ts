@@ -6,11 +6,11 @@
 
 import { useCallback, useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readScenarioTarget } from "../../use-scenario-target";
-import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
-import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run";
+import { readScenarioTarget } from "../../use-scenario-target.ts";
+import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog.tsx";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run.ts";
 
 /**
  * The run dialog subject of a whole suite, with the scenarios it holds.

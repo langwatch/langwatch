@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { governanceEventEnvelopeSchema } from "./governance";
+import { governanceEventEnvelopeSchema } from "./governance.ts";
 
 export const PULLED_USAGE_PIPELINE_NAME = "pulled_usage_processing" as const;
 export const PULLED_USAGE_AGGREGATE_TYPE = "pulled_usage" as const;

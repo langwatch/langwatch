@@ -1,13 +1,13 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
-import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations";
-import { useTextTranslation } from "../hooks/use-text-translation";
-import { IOViewerBody } from "./io-viewer-body";
-import { AnnotationExpectedOutputs } from "./annotation-expected-outputs";
-import { IOViewerToolbar } from "./io-viewer-toolbar";
-import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight";
+import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
+import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
+import { useTextTranslation } from "../hooks/use-text-translation.ts";
+import { IOViewerBody } from "./io-viewer-body.tsx";
+import { AnnotationExpectedOutputs } from "./annotation-expected-outputs.tsx";
+import { IOViewerToolbar } from "./io-viewer-toolbar.tsx";
+import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
@@ -20,12 +20,12 @@ import {
   parseContentBlocks,
   tryParseJSON,
   VIRTUALIZE_AT,
-} from "./transcript";
-import { MessageCommentScope } from "./transcript/message-comments";
-import { TraceMediaPart } from "../../traces/trace-media-part";
+} from "./transcript/index.ts";
+import { MessageCommentScope } from "./transcript/message-comments.tsx";
+import { TraceMediaPart } from "../../traces/trace-media-part.tsx";
 import { TerminalOutput } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports";
-import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
+import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state.ts";
 
 /**
  * How much of a captured value this viewer renders before offering an

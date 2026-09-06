@@ -5,8 +5,8 @@
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { deserializeMappingStateToUI } from "../deserialize-mapping-state-to-ui";
-import { serializeMappingsToMappingState } from "../serialize-mappings-to-mapping-state";
+import { deserializeMappingStateToUI } from "../deserialize-mapping-state-to-ui.ts";
+import { serializeMappingsToMappingState } from "../serialize-mappings-to-mapping-state.ts";
 
 describe("the evaluator mapping round trip", () => {
   describe("given a trace-level evaluator mapping a field to a thread source", () => {

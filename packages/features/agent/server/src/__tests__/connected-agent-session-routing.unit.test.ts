@@ -6,12 +6,12 @@
 import type { AgentService } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 import type { StoredCall, StoredResult } from "@langwatch/agent-contract";
-import type { AgentRepository } from "../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
-import { callKey, resultKey } from "../rules/connected-agent-keys.rules";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
-import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service";
+import type { AgentRepository } from "../repositories/agent.repository.ts";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
+import { callKey, resultKey } from "../rules/connected-agent-keys.rules.ts";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service.ts";
 
 const projectId = "proj_1";
 const instanceId = "inst_stranger";

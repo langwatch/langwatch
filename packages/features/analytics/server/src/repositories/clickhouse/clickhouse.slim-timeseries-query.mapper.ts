@@ -22,13 +22,13 @@
  *     `dedupedTraceSummaries` helper.
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
-import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
-} from "./clickhouse.analytics-route-table.mapper";
+} from "./clickhouse.analytics-route-table.mapper.ts";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
@@ -39,7 +39,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
-} from "./clickhouse.timeseries-query-shared.mapper";
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";

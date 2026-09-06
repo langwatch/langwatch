@@ -6,31 +6,31 @@ import type { Cluster, Redis } from "ioredis";
 import {
   EventingTopicClusteringCommandsAdapter,
   EventingTopicClusteringOutcomeCommandsAdapter,
-} from "./eventing.topic-clustering-commands.adapter";
-import { EventingTopicClusteringScheduleAdapter } from "./eventing.topic-clustering-schedule.adapter";
+} from "./eventing.topic-clustering-commands.adapter.ts";
+import { EventingTopicClusteringScheduleAdapter } from "./eventing.topic-clustering-schedule.adapter.ts";
 import {
   createTopicClusteringProcessingPipeline,
   type TopicClusteringProcessingPipelineDeps,
-} from "./eventing.topic-clustering.adapter";
-import { PostgresTopicAdapter, type TopicClusteringPersistence } from "./postgres.topic.adapter";
-import { RedisTopicClusteringBootstrapAdapter } from "./redis.topic-clustering-bootstrap.adapter";
+} from "./eventing.topic-clustering.adapter.ts";
+import { PostgresTopicAdapter, type TopicClusteringPersistence } from "./postgres.topic.adapter.ts";
+import { RedisTopicClusteringBootstrapAdapter } from "./redis.topic-clustering-bootstrap.adapter.ts";
 import {
   classifyClusteringError,
   type TopicClusteringMetricsPort,
   type TopicClusteringRunPort,
-} from "../intents/topic-clustering.intent";
+} from "../intents/topic-clustering.intent.ts";
 import {
   TopicClusteringRunner,
   type TopicClusteringRunnerDeps,
-} from "../intents/topic-clustering-runner.intent";
-import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration";
-import type { TopicClusteringClickHouseResolver } from "../ports/topic-clustering-clickhouse.port";
+} from "../intents/topic-clustering-runner.intent.ts";
+import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
+import type { TopicClusteringClickHouseResolver } from "../ports/topic-clustering-clickhouse.port.ts";
 import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevalsPort,
-} from "../ports/topic-clustering-langevals.port";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
-import type { TopicClusteringDatabase } from "../repositories/prisma/prisma.topic-clustering.repository";
+} from "../ports/topic-clustering-langevals.port.ts";
+import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
+import type { TopicClusteringDatabase } from "../repositories/prisma/prisma.topic-clustering.repository.ts";
 
 /** Technical dependencies supplied by API/worker composition for Topic execution. */
 export interface TopicClusteringExecutionDependencies {

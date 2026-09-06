@@ -31,7 +31,7 @@ import {
   type LangWatchQLSchemaColumnModel,
   type LangWatchQLSchemaDatasetModel,
   type LangWatchQLSchemaModel,
-} from "../../model/lwql-schema-model";
+} from "../../model/lwql-schema-model.ts";
 
 export interface LangWatchQLSchemaBrowserProps {
   model: LangWatchQLSchemaModel;

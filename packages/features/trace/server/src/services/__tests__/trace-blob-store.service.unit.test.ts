@@ -6,15 +6,15 @@ import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
-import { StreamTooLargeError } from "../trace-stream-buffer.service";
+import { StreamTooLargeError } from "../trace-stream-buffer.service.ts";
 import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,
   type S3ClientResolver,
   SpoolDestinationUnsupportedError,
   type SpoolStorage,
-} from "../trace-blob-store.service";
-import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules";
+} from "../trace-blob-store.service.ts";
+import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules.ts";
 
 /**
  * In-memory stand-in for the stored-objects StorageRegistry, keyed by URI.

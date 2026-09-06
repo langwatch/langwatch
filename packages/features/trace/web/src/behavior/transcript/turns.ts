@@ -1,5 +1,5 @@
-import { getReasoning, parseContentBlocks } from "./parsing";
-import type { ChatMessage, ContentBlock, ConversationTurn } from "../../model/transcript/types";
+import { getReasoning, parseContentBlocks } from "./parsing.ts";
+import type { ChatMessage, ContentBlock, ConversationTurn } from "../../model/transcript/types.ts";
 
 /**
  * Group raw chat messages into logical turns. Each message stays as its own turn (two

@@ -8,7 +8,7 @@ import {
   WebhookDestinationPort,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
-} from "../ports/webhook-destination.port";
+} from "../ports/webhook-destination.port.ts";
 
 /** How much of the receiver's response the delivery log keeps. */
 const RESPONSE_SNIPPET_CHARS = 1000;

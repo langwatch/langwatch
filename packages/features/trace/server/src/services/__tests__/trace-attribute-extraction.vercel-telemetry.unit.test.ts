@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
-import { TraceAttributeExtractionService } from "../trace-attribute-extraction.service";
+import { TraceAttributeExtractionService } from "../trace-attribute-extraction.service.ts";
 
 function makeService() {
   return TraceAttributeExtractionService.create();

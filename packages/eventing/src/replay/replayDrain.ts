@@ -1,6 +1,6 @@
 import type IORedis from "ioredis";
-import type { DiscoveredAggregate } from "./replayEventSource";
-import type { ProjectionKind } from "./types";
+import type { DiscoveredAggregate } from "./replayEventSource.ts";
+import type { ProjectionKind } from "./types.ts";
 
 /**
  * The GroupQueue's global key prefix. All event-sourcing jobs share one queue

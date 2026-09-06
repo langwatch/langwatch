@@ -5,13 +5,13 @@ import {
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
 import { createLogger } from "@langwatch/observability";
-import { buildRawMimeMessage } from "./mime";
+import { buildRawMimeMessage } from "./mime.ts";
 import {
   type EmailContent,
   type EmailProviderPort,
   type MailerConfiguration,
   toArray,
-} from "./types";
+} from "./types.ts";
 
 const logger = createLogger("langwatch:mailer:ses");
 

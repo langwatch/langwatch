@@ -20,7 +20,7 @@ import {
   type RegenerateBackupCodesCommandData,
   remainingBackupCodes,
 } from "@langwatch/identity-contract";
-import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository";
+import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 
 /**
  * The two-step verification guards (D06): what runs BEFORE any fact exists.

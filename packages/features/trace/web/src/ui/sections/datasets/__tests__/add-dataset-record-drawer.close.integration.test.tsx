@@ -40,20 +40,20 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "my-project" },
   }),
 }));
 
-vi.mock("../../../../behavior/use-local-storage-selected-dataset-id", () => ({
+vi.mock("../../../../behavior/use-local-storage-selected-dataset-id.ts", () => ({
   useLocalStorageSelectedDataSetId: () => ({
     selectedDataSetId: "dataset-1",
     setSelectedDataSetId: () => Promise.resolve(),
   }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       dataset: { getAll: { invalidate: vi.fn() } },
@@ -85,11 +85,11 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../dataset-selector", () => ({
+vi.mock("../dataset-selector.tsx", () => ({
   DatasetSelector: () => <div data-testid="dataset-selector" />,
 }));
 
-vi.mock("../dataset-mapping-preview", () => ({
+vi.mock("../dataset-mapping-preview.tsx", () => ({
   DatasetMappingPreview: ({
     onRowDataChange,
   }: {
@@ -106,9 +106,9 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store";
-import { clearDrawerStack, useDrawer } from "../../../../behavior/use-drawer";
-import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer";
+import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store.ts";
+import { clearDrawerStack, useDrawer } from "../../../../behavior/use-drawer.ts";
+import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
 function OpenFromTrace() {

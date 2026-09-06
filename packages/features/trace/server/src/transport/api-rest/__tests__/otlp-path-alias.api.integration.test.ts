@@ -27,8 +27,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createOtlpIngestRestApp } = await import("../otlp-ingest.api");
-const { createOtlpPathAliasRestApp } = await import("../otlp-path-alias.api");
+const { createOtlpIngestRestApp } = await import("../otlp-ingest.api.ts");
+const { createOtlpPathAliasRestApp } = await import("../otlp-path-alias.api.ts");
 
 const project = { id: "project-123", teamId: "team-1", organizationId: "org-1" };
 

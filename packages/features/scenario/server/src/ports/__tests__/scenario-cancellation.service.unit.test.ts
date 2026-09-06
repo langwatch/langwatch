@@ -12,11 +12,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { ScenarioRepository } from "../../repositories/scenario.repository";
-import { ScenarioService } from "../../services/scenario.service";
-import { ScenarioClockPort } from "../scenario-clock.port";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port";
-import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port";
+import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
+import { ScenarioClockPort } from "../scenario-clock.port.ts";
+import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
+import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
 
 class CancellationTestSecretCipher extends ScenarioSecretCipherPort {
   encrypt(value: string): string {

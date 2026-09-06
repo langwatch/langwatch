@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { useCodingAgentActivityHost } from "./coding-agent-activity-host";
+import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 
 /** The subset of the application toaster's create options these tables use. */
 export type CodingAgentToast = {

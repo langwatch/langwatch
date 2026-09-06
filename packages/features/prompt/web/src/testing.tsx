@@ -19,7 +19,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
-import type { PromptBrowserStorage, PromptTabsCapabilities } from "./model/browser-capabilities";
+import type { PromptBrowserStorage, PromptTabsCapabilities } from "./model/browser-capabilities.ts";
 import {
   PromptHostPort,
   PromptHostProvider,
@@ -30,7 +30,7 @@ import {
   type PromptPlatformDrawer,
   type PromptRouteReading,
   type PromptSuccessNotice,
-} from "./model/prompt-host";
+} from "./model/prompt-host.ts";
 
 /** One recorded `openPlatformDrawer` call. */
 export type RecordedDrawerOpen = {

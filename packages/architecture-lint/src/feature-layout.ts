@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files";
+import { walkFiles } from "./files.ts";
 import {
   CONTRACT_ARTIFACT,
   PROCESS_MANAGER_SERVICE_PATTERN,
@@ -15,8 +15,8 @@ import {
   valueImports,
   walkValueImportGraph,
   type WorkspaceModuleResolver,
-} from "./module-graph";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+} from "./module-graph.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const RULES_IMPLEMENTATION_PATH =
   /(?:^|\/)(?:services|ports|adapters|repositories|stores|projections|subscribers|processes|intents|transport)(?:\/|$)/;

@@ -15,9 +15,9 @@ import {
   OpsTrpcApi,
   type OpsTrpcContext,
   type OpsTrpcPorts,
-} from "../../transport/api-trpc/ops.api";
-import { OpsApp, type OpsCapability } from "../ops.app";
-import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port";
+} from "../../transport/api-trpc/ops.api.ts";
+import { OpsApp, type OpsCapability } from "../ops.app.ts";
+import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port.ts";
 
 /**
  * Every mock is typed from the port itself. The port's own comment explains

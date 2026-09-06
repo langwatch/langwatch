@@ -16,20 +16,20 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MiddlewareHandler } from "hono";
 
-import { FixedGatewaySettlementPolicyAdapter } from "../../../adapters/fixed-gateway-settlement.adapter";
-import { GatewayEndUserCapsAdapter } from "../../../adapters/gateway-end-user-caps.adapter";
-import { GatewaySpendScopeAdapter } from "../../../adapters/postgres.gateway-spend-scope.adapter";
-import { GatewayBudgetClickHouseRepository } from "../../../repositories/clickhouse/clickhouse.gateway-budget.repository";
-import { GatewaySpendEventsRepository } from "../../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
+import { FixedGatewaySettlementPolicyAdapter } from "../../../adapters/fixed-gateway-settlement.adapter.ts";
+import { GatewayEndUserCapsAdapter } from "../../../adapters/gateway-end-user-caps.adapter.ts";
+import { GatewaySpendScopeAdapter } from "../../../adapters/postgres.gateway-spend-scope.adapter.ts";
+import { GatewayBudgetClickHouseRepository } from "../../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewaySpendEventsRepository } from "../../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { GatewaySpendEventsService } from "../../../services/gateway-spend-events.service";
-import { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "../gateway-spend.api";
-import { testRestSecurity } from "./support/rest-security.support";
+} from "../../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewaySpendEventsService } from "../../../services/gateway-spend-events.service.ts";
+import { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "../gateway-spend.api.ts";
+import { testRestSecurity } from "./support/rest-security.support.ts";
 
-import type { SpendEventRow } from "../../../ports/gateway-spend-events.port";
+import type { SpendEventRow } from "../../../ports/gateway-spend-events.port.ts";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

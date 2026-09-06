@@ -23,7 +23,7 @@ import {
   conversationKeyBindingsKey,
   sessionKeyBindingKey,
   userRequestsKey,
-} from "../rules/langy-local-control-keys.rules";
+} from "../rules/langy-local-control-keys.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:requests");
 

@@ -2,7 +2,7 @@ import { presenceSessionSchema, type PresenceSession } from "@langwatch/presence
 import type { RedisConnection } from "@langwatch/redis-client";
 import type Redis from "ioredis";
 import type { Cluster } from "ioredis";
-import { PresenceRepository } from "../presence.repository";
+import { PresenceRepository } from "../presence.repository.ts";
 
 const KEY_PREFIX = "presence:v1";
 

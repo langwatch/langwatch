@@ -1,6 +1,6 @@
-export * from "../../behavior/langy-context-chips";
-export * from "../../behavior/use-langy-context-target";
-export * from "../../ui/sections/langy-context-target";
+export * from "../../behavior/langy-context-chips.ts";
+export * from "../../behavior/use-langy-context-target.ts";
+export * from "../../ui/sections/langy-context-target.tsx";
 export {
   absorbContextTarget,
   LANGY_CONTEXT_DRAG_MIME,
@@ -10,4 +10,4 @@ export {
   readDraggedTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
-} from "../../behavior/langy-context-target.store";
+} from "../../behavior/langy-context-target.store.ts";

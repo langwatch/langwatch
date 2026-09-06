@@ -7,15 +7,15 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../eventing.topic-events.adapter";
+import type { TopicClusteringProcessingEvent } from "../eventing.topic-events.adapter.ts";
 import type {
   TopicClusteringDispatchDeps,
   TopicClusteringOutcomeCommands,
-} from "../../intents/topic-clustering.intent";
+} from "../../intents/topic-clustering.intent.ts";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
-} from "../../processes/topic-clustering.process";
+} from "../../processes/topic-clustering.process.ts";
 
 const PROJECT_ID = "project-1";
 const REF = {

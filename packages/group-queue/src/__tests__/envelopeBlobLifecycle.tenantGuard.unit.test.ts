@@ -1,9 +1,9 @@
 import type { Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
 
-import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle";
-import type { EnvelopeHeader } from "../jobEnvelope";
-import type { BlobRef } from "../tieredBlobStore";
+import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle.ts";
+import type { EnvelopeHeader } from "../jobEnvelope.ts";
+import type { BlobRef } from "../tieredBlobStore.ts";
 
 /**
  * The decode tenant guard refuses BEFORE any store is touched, so it is

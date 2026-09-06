@@ -18,7 +18,7 @@
  */
 
 import type { ComponentType } from "react";
-import type { CustomGraphScreenMode } from "./custom-graph.screen";
+import type { CustomGraphScreenMode } from "./custom-graph.screen.tsx";
 
 /** A screen that needs nothing from the route beyond its host. */
 type PlainScreenLoader = () => Promise<{ default: ComponentType }>;
@@ -65,20 +65,20 @@ type CustomGraphScreenLoader = () => Promise<{
  * blocker to look at is publishing the renderer as a SURFACE.
  */
 export const analyticsScreens = {
-  overview: () => import("./analytics-overview.screen"),
-  users: () => import("./analytics-users.screen"),
-  topics: () => import("./analytics-topics.screen"),
-  metrics: () => import("./analytics-metrics.screen"),
-  evaluations: () => import("./analytics-evaluations.screen"),
-  reports: () => import("./analytics-reports.screen"),
-  query: () => import("./analytics-query.screen"),
-  customGraph: () => import("./custom-graph.screen"),
+  overview: () => import("./analytics-overview.screen.tsx"),
+  users: () => import("./analytics-users.screen.tsx"),
+  topics: () => import("./analytics-topics.screen.tsx"),
+  metrics: () => import("./analytics-metrics.screen.tsx"),
+  evaluations: () => import("./analytics-evaluations.screen.tsx"),
+  reports: () => import("./analytics-reports.screen.tsx"),
+  query: () => import("./analytics-query.screen.tsx"),
+  customGraph: () => import("./custom-graph.screen.tsx"),
 } as const satisfies Record<string, PlainScreenLoader | CustomGraphScreenLoader>;
 
 export type AnalyticsScreenName = keyof typeof analyticsScreens;
 
 export type { CustomGraphScreenMode };
-export { analyticsApi } from "../../behavior/analytics-api";
+export { analyticsApi } from "../../behavior/analytics-api.ts";
 export {
   AnalyticsHostPort,
   AnalyticsHostProvider,
@@ -87,4 +87,4 @@ export {
   type AnalyticsHostProject,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
-} from "../../model/analytics-host";
+} from "../../model/analytics-host.ts";

@@ -19,12 +19,12 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug";
-import { useReachableProducts } from "../../behavior/use-reachable-products";
-import { useNavigationHost } from "../../model/navigation-host";
-import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products";
-import { LogoIcon } from "../elements/logo-icon";
-import { NavigationLink } from "../elements/navigation-link";
+import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products.ts";
+import { LogoIcon } from "../elements/logo-icon.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
 
 export const ICON_RAIL_WIDTH = "64px";
 

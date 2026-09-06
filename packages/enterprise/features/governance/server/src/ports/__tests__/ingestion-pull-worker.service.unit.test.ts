@@ -10,7 +10,7 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { GovernanceEncryptionPort } from "../governance-encryption.port";
+import { GovernanceEncryptionPort } from "../governance-encryption.port.ts";
 import {
   GovernanceOcsfEventSinkPort,
   GovernanceTraceIngestionPort,
@@ -20,18 +20,18 @@ import {
   IngestionPullSourcePort,
   PulledUsageDispatcherPort,
   PulledUsageEntitlementPort,
-} from "../ingestion-pull-worker.port";
-import { IngestionCredentialsService } from "../../services/ingestion-credentials.service";
+} from "../ingestion-pull-worker.port.ts";
+import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
-} from "../../services/ingestion-pull-worker.service";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
-import { PullerRegistryService } from "../../services/puller-registry.service";
-import { PulledUsageRatePort } from "../pulled-usage-rate.port";
-import { TestProjectService } from "./support/test-project-service";
+} from "../../services/ingestion-pull-worker.service.ts";
+import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../../services/puller-registry.service.ts";
+import { PulledUsageRatePort } from "../pulled-usage-rate.port.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 function ingestionSource(
   overrides: Partial<GovernanceIngestionSource> = {},

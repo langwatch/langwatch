@@ -2,9 +2,9 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
-import { ToolMarkdown } from "../elements/tool-markdown";
-import { TileIcon } from "../elements/tile-icon";
-import type { AiToolConfigOf } from "../../model/ai-tool-config";
+import { ToolMarkdown } from "../elements/tool-markdown.tsx";
+import { TileIcon } from "../elements/tile-icon.tsx";
+import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 interface Props {
   displayName: string;

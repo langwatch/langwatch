@@ -1,11 +1,11 @@
 import { Text } from "@chakra-ui/react";
 import type { ReactElement } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TraceListItem } from "../../../../types/trace";
-import { formatCost } from "../../../../../../../model/display-formatters";
-import { CostBreakdownTooltipContent } from "../../../../shared/cost-breakdown-tooltip";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { formatCost } from "../../../../../../../model/display-formatters.ts";
+import { CostBreakdownTooltipContent } from "../../../../shared/cost-breakdown-tooltip.tsx";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
 
 // `totalCost` is the grand list-price cost; `nonBilledCost` is the bundled
 // (theoretical) portion a tool on a flat plan never pays per token. Show the

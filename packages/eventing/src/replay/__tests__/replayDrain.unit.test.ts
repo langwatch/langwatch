@@ -1,7 +1,7 @@
 import type IORedis from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { waitForActiveJobs } from "../replayDrain";
+import { waitForActiveJobs } from "../replayDrain.ts";
 
 describe("replay drain", () => {
   afterEach(() => {

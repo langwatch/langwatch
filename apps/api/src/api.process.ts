@@ -15,15 +15,15 @@ import {
   type ApiHttpOptions,
   type ApiSubscriptionMount,
   type ApiTrpcFeaturesPort,
-} from "./api.application";
-import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener";
+} from "./api.application.ts";
+import { ApiHttpListener, type ApiHttpListenerOptions } from "./api-http.listener.ts";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
   ApiReadinessPort,
   ObservabilityApiRequestFailureCaptureAdapter,
-} from "./api-process.lifecycle";
-import { ApiRequestPolicy } from "./api-request.policy";
+} from "./api-process.lifecycle.ts";
+import { ApiRequestPolicy } from "./api-request.policy.ts";
 import { GracefulShutdown, type ShutdownLogger } from "@langwatch/runtime-composition";
 import type { Hono } from "hono";
 import { trace } from "@opentelemetry/api";

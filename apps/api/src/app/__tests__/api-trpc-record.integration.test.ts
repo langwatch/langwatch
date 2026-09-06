@@ -5,21 +5,21 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import { ApiAuditPort } from "../../api-request.policy";
-import { ApiRestSecurity } from "../../api-rest.security";
-import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
-import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
-import { ApiTrpcCollaboratorsAbsence } from "../../app-trpc/app-trpc.collaborators";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application.ts";
+import { ApiAuditPort } from "../../api-request.policy.ts";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse.ts";
+import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
+import { ApiTrpcCollaboratorsAbsence } from "../../app-trpc/app-trpc.collaborators.ts";
+import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   stubMount,
-} from "./api-trpc-record.test-doubles";
+} from "./api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";

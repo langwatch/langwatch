@@ -57,9 +57,9 @@ import { createLogger } from "@langwatch/observability";
 import { Buffer } from "node:buffer";
 import { z } from "zod";
 
-import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../services/pull-destination.service";
-import { TERMINAL_MESSAGE_STATUSES } from "../services/genie-trace-mapper.service";
+import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../services/pull-destination.service.ts";
+import { TERMINAL_MESSAGE_STATUSES } from "../services/genie-trace-mapper.service.ts";
 import {
   DatabricksWarehouseCostService,
   GENIE_CLIENT_APPLICATION,
@@ -67,7 +67,7 @@ import {
   WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
   type WarehousePricedStatement,
   warehouseCostRowSchema,
-} from "../services/puller-databricks-warehouse-cost.service";
+} from "../services/puller-databricks-warehouse-cost.service.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 import type {
   GovernancePuller as PullerAdapter,

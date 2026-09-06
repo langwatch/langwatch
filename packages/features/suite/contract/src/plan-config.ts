@@ -19,9 +19,9 @@
  */
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import { type SuiteScope, suiteScopeSchema } from "./suite.scope";
-import { targetIdentityKey, targetSortKey } from "./target-key";
-import type { SuiteTarget } from "./suite";
+import { type SuiteScope, suiteScopeSchema } from "./suite.scope.ts";
+import { targetIdentityKey, targetSortKey } from "./target-key.ts";
+import type { SuiteTarget } from "./suite.ts";
 
 /** Everything a run plan holds beside its name. */
 export type PlanConfig = {

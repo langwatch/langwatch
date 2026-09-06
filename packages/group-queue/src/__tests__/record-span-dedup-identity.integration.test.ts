@@ -1,7 +1,7 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GroupStagingScripts } from "../scripts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 /**
  * The `recordSpan` command's GroupQueue staging dedup identity: at most one staged `:data`

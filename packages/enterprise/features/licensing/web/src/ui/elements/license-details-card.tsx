@@ -6,7 +6,7 @@ import {
   hasLicenseMetadata,
   isCorruptedLicense,
   isLicenseExpired,
-} from "../../model/license-status";
+} from "../../model/license-status.ts";
 
 interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;

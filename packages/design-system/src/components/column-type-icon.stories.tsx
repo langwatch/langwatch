@@ -1,6 +1,6 @@
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ColumnTypeIcon } from "./column-type-icon";
+import { ColumnTypeIcon } from "./column-type-icon.tsx";
 
 const TYPES = [
   "string",

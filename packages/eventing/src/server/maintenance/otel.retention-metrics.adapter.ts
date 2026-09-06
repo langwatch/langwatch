@@ -1,5 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { ProcessRetentionMetricsPort, type RetentionFamily } from "./retention-metrics.port";
+import { ProcessRetentionMetricsPort, type RetentionFamily } from "./retention-metrics.port.ts";
 
 /**
  * The two series names, pinned because two processes write them.

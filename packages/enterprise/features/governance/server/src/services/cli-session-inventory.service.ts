@@ -8,8 +8,8 @@ import {
   cliUserInputSchema,
   revokeCliSessionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import type { CliTokenStorePort } from "../ports/cli-token-store.port";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
+import type { CliTokenStorePort } from "../ports/cli-token-store.port.ts";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 
 export class DefaultGovernanceCliSessionInventoryService {
   private constructor(

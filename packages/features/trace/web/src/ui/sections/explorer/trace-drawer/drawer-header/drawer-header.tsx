@@ -19,28 +19,28 @@ import {
   LuShare2,
   LuX,
 } from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
-import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
+import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors";
+import { showErrorToast } from "../../../errors/index.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TracePresenceAvatars } from "@langwatch/presence-web/surfaces/presence-indicators";
-import { useDejaViewLink } from "../../../use-deja-view-link";
-import { useDrawer } from "../../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
+import { useDejaViewLink } from "../../../use-deja-view-link.ts";
+import { useDrawer } from "../../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { useConversationContext } from "../../hooks/use-conversation-context";
-import { usePinnedAttributes } from "../../hooks/use-pinned-attributes";
-import { useSpanTree } from "../../hooks/use-span-tree";
-import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation";
-import { useTraceRefresh } from "../../hooks/use-trace-refresh";
-import { useTraceResources } from "../../hooks/use-trace-resources";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { useFocusSectionStore } from "../../../../../behavior/focus-section.store";
+import { useConversationContext } from "../../hooks/use-conversation-context.ts";
+import { usePinnedAttributes } from "../../hooks/use-pinned-attributes.ts";
+import { useSpanTree } from "../../hooks/use-span-tree.ts";
+import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
+import { useTraceRefresh } from "../../hooks/use-trace-refresh.ts";
+import { useTraceResources } from "../../hooks/use-trace-resources.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import {
   formatAbsoluteTime,
   formatCost,
@@ -48,33 +48,33 @@ import {
   formatRelativeTimeAgo,
   formatTokens,
   STATUS_COLORS,
-} from "../../../../../model/display-formatters";
-import { isTerminalOrigin } from "../../../../../model/terminal-origin";
-import { EditableTraceName } from "../../../editable-trace-name";
-import { rankedErrorSpans } from "../../../../../model/explorer/error-spans";
-import { guardTraceEditExit } from "../../utils/trace-edit-mode";
-import { AddToAnnotationQueueDialog } from "../../add-to-annotation-queue-dialog";
-import { CostBreakdownTooltipContent } from "../../shared/cost-breakdown-tooltip";
-import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip";
-import { ModelsTooltip } from "../../trace-table/registry/cells/trace/model-cell";
-import { Chip } from "../../../../elements/explorer/trace-drawer/chip";
-import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar";
-import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content";
-import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle";
-import { ModeSwitch } from "../mode-switch";
-import { RawJsonDialog } from "../raw-json-dialog";
-import { useTraceHeaderChipDefs } from "../trace-header-chips";
-import { MetricPill } from "./metric-pill";
-import { type CategorizedPin, type PinCategory, renderPinPills } from "./pin-strip";
-import { ShareTraceDialog } from "./share-trace-dialog";
-import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge";
-import { TraceOverflowMenu } from "./trace-overflow-menu";
-import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header";
+} from "../../../../../model/display-formatters.ts";
+import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
+import { EditableTraceName } from "../../../editable-trace-name.tsx";
+import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
+import { guardTraceEditExit } from "../../utils/trace-edit-mode.ts";
+import { AddToAnnotationQueueDialog } from "../../add-to-annotation-queue-dialog.tsx";
+import { CostBreakdownTooltipContent } from "../../shared/cost-breakdown-tooltip.tsx";
+import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
+import { ModelsTooltip } from "../../trace-table/registry/cells/trace/model-cell.tsx";
+import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
+import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
+import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle.tsx";
+import { ModeSwitch } from "../mode-switch.tsx";
+import { RawJsonDialog } from "../raw-json-dialog.tsx";
+import { useTraceHeaderChipDefs } from "../trace-header-chips.tsx";
+import { MetricPill } from "./metric-pill.tsx";
+import { type CategorizedPin, type PinCategory, renderPinPills } from "./pin-strip.tsx";
+import { ShareTraceDialog } from "./share-trace-dialog.tsx";
+import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
+import { TraceOverflowMenu } from "./trace-overflow-menu.tsx";
+import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
 import {
   formatPinValue,
   readNumberAttribute,
   resolveAttributeValue,
-} from "../../../../../model/explorer/trace-drawer/drawer-header/utils";
+} from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;

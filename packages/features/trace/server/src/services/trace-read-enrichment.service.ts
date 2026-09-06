@@ -12,9 +12,9 @@ import {
   ClaudeCodeLogEnrichmentService,
   CODING_AGENT_ORIGIN,
   type TraceLogRecordReader,
-} from "./claude-code-log-enrichment.service";
-import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
-import type { TraceEditOverlayService } from "./trace-edit-overlay.service";
+} from "./claude-code-log-enrichment.service.ts";
+import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service.ts";
+import type { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 
 export class TraceReadEnrichmentService {
   private readonly logger = createLogger("langwatch:traces:read-enrichment");

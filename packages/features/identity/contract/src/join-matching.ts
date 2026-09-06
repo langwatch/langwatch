@@ -1,4 +1,4 @@
-import { identifierDomain, normalizeIdentifierValue } from "./identifier";
+import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
 /**
  * Which organizations will take an address (ADR-117, D12). One question, and

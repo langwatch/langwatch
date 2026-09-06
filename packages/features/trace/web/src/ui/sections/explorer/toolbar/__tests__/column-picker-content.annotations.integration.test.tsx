@@ -10,7 +10,7 @@ const harness = vi.hoisted(() => ({
   permissions: { annotationsView: true },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
     hasPermission: (permission: string) =>
@@ -18,11 +18,11 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-evaluator-options", () => ({
+vi.mock("../../hooks/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       columnOrder: ["time", "trace"],
@@ -32,12 +32,12 @@ vi.mock("../../../../../behavior/view.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/time-format.store", () => ({
+vi.mock("../../../../../behavior/time-format.store.ts", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));
 
-import { ColumnPickerContent } from "../column-picker-content";
+import { ColumnPickerContent } from "../column-picker-content.tsx";
 
 afterEach(cleanup);
 

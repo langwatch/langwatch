@@ -6,7 +6,7 @@ import {
   type GithubInstallationRow,
   type GithubRepositoryRef,
   type UpsertGithubInstallationInput,
-} from "../github-installations.repository";
+} from "../github-installations.repository.ts";
 
 function parseRepositories(value: Prisma.JsonValue | null): GithubRepositoryRef[] | null {
   if (!Array.isArray(value)) {

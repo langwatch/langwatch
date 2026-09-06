@@ -6,7 +6,7 @@ import {
 } from "@langwatch/trace-server";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composition";
+import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/trace-tenant-broadcast-worker-composition.feature

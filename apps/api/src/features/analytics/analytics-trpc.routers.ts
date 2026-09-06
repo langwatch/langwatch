@@ -11,12 +11,12 @@ import type { sharedFiltersInputSchema, timeseriesInputSchema } from "@langwatch
 import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { GraphTrpcPorts, SavedWorkbenchChartTrpcPorts } from "@langwatch/dashboard-server";
 import type { z } from "zod";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import {
   createGraphTrpcRouter,
   createSavedWorkbenchChartTrpcRouter,
-} from "../dashboard/dashboard-trpc.mount";
-import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount";
+} from "../dashboard/dashboard-trpc.mount.ts";
+import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount.ts";
 
 /** The filter fields this deployment offers, as the enum publishes them. */
 export type ApiFilterField = (typeof filterFieldsEnum)["options"][number];

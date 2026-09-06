@@ -2,10 +2,10 @@ import type { AuthService as AuthCapability } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { AuthClockPort } from "../ports/auth-clock.port";
-import { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port";
-import { AuthSessionRepository } from "../repositories/auth-session.repository";
-import { AuthService } from "../services/auth.service";
+import { AuthClockPort } from "../ports/auth-clock.port.ts";
+import { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port.ts";
+import { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
+import { AuthService } from "../services/auth.service.ts";
 
 type PrismaAuthDatabase = {
   session: {

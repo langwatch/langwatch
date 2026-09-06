@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   EmailSuppressionNameRepository,
   type UnsubscribeNames,
-} from "../email-suppression-name.repository";
+} from "../email-suppression-name.repository.ts";
 export class PrismaEmailSuppressionNameRepository extends EmailSuppressionNameRepository {
   private constructor(private readonly database: PrismaClient) {
     super();

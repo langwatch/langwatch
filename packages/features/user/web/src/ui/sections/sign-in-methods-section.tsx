@@ -22,15 +22,15 @@
 import { Box, Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { KeyRound, X } from "lucide-react";
 import { useState } from "react";
-import { api } from "../../behavior/personal-workspace-api";
-import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import {
   canChangePassword,
   isCredentialAccount,
   isRemovableMethod,
   providerDisplayName,
-} from "../../model/sign-in-methods";
-import { ChangePasswordDialog } from "./change-password-dialog";
+} from "../../model/sign-in-methods.ts";
+import { ChangePasswordDialog } from "./change-password-dialog.tsx";
 
 export function SignInMethodsSection() {
   const host = usePersonalWorkspaceHost();

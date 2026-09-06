@@ -1,8 +1,8 @@
 import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthzCompatibilityLedgerPort } from "../authz-compatibility-ledger.port";
-import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
+import type { AuthzCompatibilityLedgerPort } from "../authz-compatibility-ledger.port.ts";
+import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 
 const actor = { type: "user" as const, id: "admin-1" };
 const scope = {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationIdSchema } from "./organization";
+import { organizationIdSchema } from "./organization.ts";
 
 export const organizationTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
 export type OrganizationTeamRole = z.infer<typeof organizationTeamRoleSchema>;

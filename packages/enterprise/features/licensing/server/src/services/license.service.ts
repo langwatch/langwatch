@@ -11,12 +11,12 @@ import {
   type RemoveLicenseResult,
   type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port";
-import type { LicenseLoggerPort } from "../ports/license-logger.port";
-import type { LicenseRetentionPort } from "../ports/license-retention.port";
-import type { LicenseUsagePort } from "../ports/license-usage.port";
-import type { LicenseStoragePort } from "../ports/license-storage.port";
-import { LicensePlanSourceService } from "./license-plan-source.service";
+import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
+import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
+import type { LicenseUsagePort } from "../ports/license-usage.port.ts";
+import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
+import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicenseRetentionConfiguration = {
   categories: readonly string[];

@@ -16,18 +16,18 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { GatewayJwtAdapter } from "../../../adapters/jwt.gateway-token.adapter";
-import { TestProjectService } from "../../../__tests__/support/test-project-service";
-import { VirtualKeyService } from "../../../services/virtual-key.service";
+import { GatewayJwtAdapter } from "../../../adapters/jwt.gateway-token.adapter.ts";
+import { TestProjectService } from "../../../__tests__/support/test-project-service.ts";
+import { VirtualKeyService } from "../../../services/virtual-key.service.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
   createGatewayInternalRestApp,
   type GatewayInternalRestPorts,
-} from "../gateway-internal.api";
-import { testRestSecurity } from "./support/rest-security.support";
+} from "../gateway-internal.api.ts";
+import { testRestSecurity } from "./support/rest-security.support.ts";
 
-import { PostgresVirtualKeyAdapter } from "../../../testing";
+import { PostgresVirtualKeyAdapter } from "../../../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 class AllowTestQueries extends PrismaQueryGuard {

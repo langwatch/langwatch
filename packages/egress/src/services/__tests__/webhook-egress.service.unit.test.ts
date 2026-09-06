@@ -1,16 +1,16 @@
 import { DispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../webhook/http-destination", () => ({ sendHttpDestination: vi.fn() }));
+vi.mock("../../webhook/http-destination.ts", () => ({ sendHttpDestination: vi.fn() }));
 
-import { InMemoryWebhookDispatchRateLimiterAdapter } from "../../adapters/in-memory.webhook-dispatch-rate-limiter.adapter";
+import { InMemoryWebhookDispatchRateLimiterAdapter } from "../../adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
 import {
   WebhookDispatchRateLimiterPort,
   type WebhookDispatchRateLimitResult,
-} from "../../ports/webhook-dispatch-rate-limiter.port";
-import { sendHttpDestination } from "../../webhook/http-destination";
-import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature";
-import { WebhookEgressService } from "../webhook-egress.service";
+} from "../../ports/webhook-dispatch-rate-limiter.port.ts";
+import { sendHttpDestination } from "../../webhook/http-destination.ts";
+import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature.ts";
+import { WebhookEgressService } from "../webhook-egress.service.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

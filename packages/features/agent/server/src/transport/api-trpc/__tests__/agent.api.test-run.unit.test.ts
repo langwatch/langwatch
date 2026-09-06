@@ -6,7 +6,7 @@ import type { AgentTestRunResult } from "@langwatch/agent-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentApp } from "#app/agent.app";
-import { AgentTrpcApi, type AgentTrpcContext } from "../agent.api";
+import { AgentTrpcApi, type AgentTrpcContext } from "../agent.api.ts";
 
 const runResult: AgentTestRunResult = {
   scenarioRunId: "scenariorun_1",

@@ -14,8 +14,8 @@ import {
   traceChipDisplayName,
   traceContextChip,
   workflowContextChip,
-} from "../langy-context-chips";
-import { type LangyContextChip, selectAddableChips, selectVisibleChips } from "../langy.store";
+} from "../langy-context-chips.ts";
+import { type LangyContextChip, selectAddableChips, selectVisibleChips } from "../langy.store.ts";
 
 /** The chip Langy derives for itself from the open drawer / the route. */
 const autoDerivedTrace: LangyContextChip = traceContextChip("abc123def456");

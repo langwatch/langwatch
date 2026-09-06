@@ -8,7 +8,7 @@ import {
   type AppendGatewayChangeEventInput,
   type GatewayChangeEventKind,
   type GatewayPersistenceTransaction,
-} from "../../ports/gateway-change-events.port";
+} from "../../ports/gateway-change-events.port.ts";
 
 /** The client slice the revision feed needs. */
 export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;

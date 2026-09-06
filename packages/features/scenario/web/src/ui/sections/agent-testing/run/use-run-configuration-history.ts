@@ -5,13 +5,13 @@
  */
 
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import {
   configurationsForScope,
   type RunConfigurationEntry,
   type RunScope,
-} from "./run-configuration";
+} from "./run-configuration.ts";
 
 /** The configurations of one scope, and whether the read has answered yet. */
 export type RunConfigurationHistory = {

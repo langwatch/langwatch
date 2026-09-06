@@ -15,7 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
-import type { ScenarioListItem } from "../../model/scenario-list.types";
+import type { ScenarioListItem } from "../../model/scenario-list.types.ts";
 
 export type ScenarioTableProps = {
   scenarios: ScenarioListItem[];

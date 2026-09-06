@@ -1,6 +1,6 @@
 import { useLocalStorage } from "usehooks-ts";
-import type { TargetValue } from "../../model/scenario-target";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import type { TargetValue } from "../../model/scenario-target.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 interface PersistedTarget {
   type: "prompt" | "http" | "code" | "workflow" | "connected";

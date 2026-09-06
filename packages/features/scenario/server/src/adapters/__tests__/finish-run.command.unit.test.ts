@@ -13,8 +13,8 @@ import type {
   SimulationTextMessageEndEvent,
 } from "@langwatch/scenario-contract";
 import type { SimulationEventResults as SimulationResults } from "@langwatch/scenario-contract";
-import type { FinishRunDeps } from "../finish-run.adapter";
-import { FinishRunCommand } from "../finish-run.adapter";
+import type { FinishRunDeps } from "../finish-run.adapter.ts";
+import { FinishRunCommand } from "../finish-run.adapter.ts";
 
 function makeDeps(overrides: Partial<FinishRunDeps> = {}) {
   const loadPriorEvents = vi.fn().mockResolvedValue([]);

@@ -1,7 +1,7 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "./tooltip.tsx";
 
 export function OverflownTextWithTooltip({
   children,

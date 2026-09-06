@@ -19,17 +19,17 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surf
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import type { ModelTier } from "../../model/model-tier-presets";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import type { ModelTier } from "../../model/model-tier-presets.ts";
 
-import { ModelNameMappingSection } from "../blocks/model-name-mapping-section";
-import { ModelTiersSection } from "./model-tiers-section";
-import type { ProviderCredentialOption } from "../../model/provider-credential-option";
-import { ProviderCredentialPicker } from "../elements/provider-credential-picker";
-import { RestrictionsSection } from "../blocks/restrictions-section";
-import type { RoutingPolicyFormValues } from "../../model/routing-policy-form";
-import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form";
-import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations";
+import { ModelNameMappingSection } from "../blocks/model-name-mapping-section.tsx";
+import { ModelTiersSection } from "./model-tiers-section.tsx";
+import type { ProviderCredentialOption } from "../../model/provider-credential-option.ts";
+import { ProviderCredentialPicker } from "../elements/provider-credential-picker.tsx";
+import { RestrictionsSection } from "../blocks/restrictions-section.tsx";
+import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
+import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
+import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 
 /**
  * URL-routed shell for the routing-policy editor (see

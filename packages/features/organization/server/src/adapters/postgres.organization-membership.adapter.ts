@@ -5,9 +5,9 @@ import type {
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
-} from "../ports/organization-membership.port";
-import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository";
-import { OrganizationMembershipService } from "../services/organization-membership.service";
+} from "../ports/organization-membership.port.ts";
+import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 
 export interface PostgresOrganizationMembershipAdapterOptions {
   database: PrismaClient;

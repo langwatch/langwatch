@@ -18,9 +18,9 @@ import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url";
-import { ApiConnectCredentialAdapter } from "../features/agent/agent-connect-credential.adapter";
-import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
+import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url.ts";
+import { ApiConnectCredentialAdapter } from "../features/agent/agent-connect-credential.adapter.ts";
+import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
 
 /** Reports the composition decisions a missing collaborator would otherwise hide. */
 export abstract class ApiConnectedAgentsAbsenceReportPort {

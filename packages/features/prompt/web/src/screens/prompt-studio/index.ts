@@ -32,12 +32,12 @@ import type { ComponentType } from "react";
 export type PromptScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const promptScreens = {
-  promptStudio: () => import("./prompt-studio.screen"),
+  promptStudio: () => import("./prompt-studio.screen.tsx"),
 } as const satisfies Record<string, PromptScreenLoader>;
 
 export type PromptScreenName = keyof typeof promptScreens;
 
-export { promptApi } from "../../behavior/prompt-api";
+export { promptApi } from "../../behavior/prompt-api.ts";
 export {
   PromptHostPort,
   PromptHostProvider,
@@ -48,4 +48,4 @@ export {
   type PromptPlatformDrawer,
   type PromptRouteReading,
   type PromptSuccessNotice,
-} from "../../model/prompt-host";
+} from "../../model/prompt-host.ts";

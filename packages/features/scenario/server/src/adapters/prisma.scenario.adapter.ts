@@ -1,10 +1,10 @@
 import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import type { ScenarioClockPort } from "../ports/scenario-clock.port";
-import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
-import { ScenarioService } from "../services/scenario.service";
-import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository";
+import type { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
+import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port.ts";
+import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import { ScenarioService } from "../services/scenario.service.ts";
+import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
 
 /** Process-composition adapter for the Scenario service's private Prisma port. */
 export class PrismaScenarioAdapter {

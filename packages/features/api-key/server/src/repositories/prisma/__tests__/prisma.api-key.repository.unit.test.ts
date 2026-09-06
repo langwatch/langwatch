@@ -11,7 +11,7 @@
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository";
+import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository.ts";
 
 function repositoryWithSpy() {
   const findMany = vi.fn(async () => []);

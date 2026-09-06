@@ -22,9 +22,9 @@ import {
   outputsSchema,
   responseFormatSchema,
   runtimeParametersSchema,
-} from "./prompt.field-schemas";
-import { promptingTechniqueSchema, promptScopeSchema } from "./prompt";
-import type { PromptTagAssignment, VersionedPrompt } from "./prompt";
+} from "./prompt.field-schemas.ts";
+import { promptingTechniqueSchema, promptScopeSchema } from "./prompt.ts";
+import type { PromptTagAssignment, VersionedPrompt } from "./prompt.ts";
 
 /** One project, named by the surface that is reading it. */
 export const promptProjectTrpcInputSchema = z.object({ projectId: z.string() });

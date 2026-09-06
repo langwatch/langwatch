@@ -26,13 +26,13 @@ import type {
   ResourceGrantRow,
   RoleHeadRow,
   ShareLinkFactRow,
-} from "../repositories/authz-migration.repository";
-import { EventingAuthzGrantAdapter } from "../adapters/eventing.authz-grant.adapter";
+} from "../repositories/authz-migration.repository.ts";
+import { EventingAuthzGrantAdapter } from "../adapters/eventing.authz-grant.adapter.ts";
 import {
   AuthzGrantMapper,
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,
-} from "../repositories/prisma/prisma.authz-grant.mapper";
+} from "../repositories/prisma/prisma.authz-grant.mapper.ts";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
 

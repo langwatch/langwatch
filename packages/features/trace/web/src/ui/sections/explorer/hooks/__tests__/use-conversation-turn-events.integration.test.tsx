@@ -12,23 +12,23 @@ const harness = vi.hoisted(() => ({
   isReadOnly: { value: false },
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
-vi.mock("../../../../elements/explorer/context/trace-viewer-context", () => ({
+vi.mock("../../../../elements/explorer/context/trace-viewer-context.tsx", () => ({
   useIsReadOnlyTrace: () => harness.isReadOnly.value,
 }));
 
-import type { TraceListItem } from "../../types/trace";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { useConversationTurnEvents } from "../use-conversation-turn-events";
+import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { useConversationTurnEvents } from "../use-conversation-turn-events.ts";
 
 /** A turn with no events of its own, so only what the hook merges in shows up. */
 function turn(traceId: string, timestamp: number): TraceListItem {

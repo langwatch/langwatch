@@ -1,4 +1,4 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter";
+import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter.ts";
 import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
 import {
   type CategoricalRead,
@@ -11,7 +11,7 @@ import {
   type FieldHandler,
   type TranslationContext,
 } from "@langwatch/trace-contract";
-import { TraceQueryValuesAdapter } from "./trace-query-values.clickhouse.adapter";
+import { TraceQueryValuesAdapter } from "./trace-query-values.clickhouse.adapter.ts";
 
 // ---------------------------------------------------------------------------
 // ClickHouse compilation (unchanged output — the byte-identical invariant)

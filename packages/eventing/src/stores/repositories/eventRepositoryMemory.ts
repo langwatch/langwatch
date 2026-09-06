@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import { EventNotFoundError } from "../../services/errorHandling";
-import { compareOrdinal } from "../../utils/compareOrdinal";
-import type { EventRecord, EventRepository } from "./eventRepository.types";
+import { EventNotFoundError } from "../../services/errorHandling.ts";
+import { compareOrdinal } from "../../utils/compareOrdinal.ts";
+import type { EventRecord, EventRepository } from "./eventRepository.types.ts";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 

@@ -11,7 +11,7 @@ import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { RunRow, ScenarioGridCard } from "@langwatch/suite-web/surfaces/run-cards";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
 
-vi.mock("../use-prefetch-run-state", () => ({
+vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
 

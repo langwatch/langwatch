@@ -8,14 +8,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ExecutionControls, MiniRunButton } from "../execution-controls";
+import { ExecutionControls, MiniRunButton } from "../execution-controls.tsx";
 
 // Mock the useExecuteEvaluation hook
 const mockExecute = vi.fn();
 const mockAbort = vi.fn();
 const mockReset = vi.fn();
 
-vi.mock("../../../../behavior/experiments-v3/use-execute-evaluation", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-execute-evaluation.ts", () => ({
   useExecuteEvaluation: () => ({
     status: mockStatus,
     runId: mockRunId,

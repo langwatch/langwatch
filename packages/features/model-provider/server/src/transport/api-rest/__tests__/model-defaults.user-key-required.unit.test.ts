@@ -12,7 +12,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createModelDefaultsRestApp } from "../model-defaults.api";
+import { createModelDefaultsRestApp } from "../model-defaults.api.ts";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

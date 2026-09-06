@@ -2,8 +2,8 @@ import { Badge, Box, Collapsible, HStack, Spacer, Text, VStack } from "@chakra-u
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useSideMenuDensity } from "../elements/side-menu-density";
-import { SideMenuLink } from "./side-menu-link";
+import { useSideMenuDensity } from "../elements/side-menu-density.tsx";
+import { SideMenuLink } from "./side-menu-link.tsx";
 
 export type CollapsibleMenuChild = {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PrismaDriverAdapterService } from "./driver-adapter";
+import { PrismaDriverAdapterService } from "./driver-adapter.ts";
 
 describe("PrismaDriverAdapterService", () => {
   const service = PrismaDriverAdapterService.create();

@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../analytics-api", () => ({
+vi.mock("../analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => mocks.utils,
     analytics: {
@@ -46,7 +46,7 @@ vi.mock("../analytics-api", () => ({
   },
 }));
 
-import { useSavedWorkbenchCharts } from "../use-saved-workbench-charts";
+import { useSavedWorkbenchCharts } from "../use-saved-workbench-charts.ts";
 
 const PROJECT_ID = "proj-1";
 

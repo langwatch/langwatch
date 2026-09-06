@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceOcsfEventsReaderPort,
   GovernanceOcsfExportRepository,
-} from "../ocsf-export.port";
-import { DefaultGovernanceOcsfExportService } from "../../services/ocsf-export.service";
+} from "../ocsf-export.port.ts";
+import { DefaultGovernanceOcsfExportService } from "../../services/ocsf-export.service.ts";
 
 class FixedTenantRepository extends GovernanceOcsfExportRepository {
   constructor(private readonly tenantId: string | null) {

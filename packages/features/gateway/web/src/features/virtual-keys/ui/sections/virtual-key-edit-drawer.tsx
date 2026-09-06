@@ -14,54 +14,54 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import { api } from "../../../../behavior/gateway-api";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { api } from "../../../../behavior/gateway-api.ts";
 import {
   buildScopeHierarchy,
   type OrgModelProvider,
   resolveEligible,
   type VirtualKeyScopeEntry,
-} from "../../model/eligible-model-providers";
-import { resolveTracesHrefForKey } from "../../model/traces-href-for-key";
+} from "../../model/eligible-model-providers.ts";
+import { resolveTracesHrefForKey } from "../../model/traces-href-for-key.ts";
 import {
   TAGS_CSV_MAX_LENGTH,
   VK_TAGS_FIELD_DESCRIPTION,
   parseTagsCsv,
   tagsBeyondLimitsNotice,
-} from "../../model/virtual-key-tags-field";
-import { humanizeGatewayError } from "../../../../model/gateway-error-copy";
+} from "../../model/virtual-key-tags-field.ts";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
   VirtualKeyBudgetSection,
   type VirtualKeyBudgetValue,
   type VirtualKeyBudgetWindow,
-} from "./virtual-key-budget-section";
+} from "./virtual-key-budget-section.tsx";
 import {
   NEVER_EXPIRES,
   VirtualKeyExpirationSection,
   type VirtualKeyExpirationValue,
-} from "../elements/virtual-key-expiration-section";
-import { VirtualKeyOwnershipReadOnly } from "../blocks/virtual-key-ownership-section";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback";
+} from "../elements/virtual-key-expiration-section.tsx";
+import { VirtualKeyOwnershipReadOnly } from "../blocks/virtual-key-ownership-section.tsx";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import {
   ALL_PROVIDERS,
   type ProviderAccessValue,
   providerAccessInvalidReason,
   providerAccessToConfig,
   VirtualKeyProviderAccessSection,
-} from "../blocks/virtual-key-provider-access-section";
+} from "../blocks/virtual-key-provider-access-section.tsx";
 import {
   routingValueFromKey,
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
-} from "../elements/virtual-key-routing-section";
+} from "../elements/virtual-key-routing-section.tsx";
 import {
   expirationStateFromStored,
   expiryFieldErrorFrom,
   expiryIncompleteReason,
   resolveExpiresAt,
-} from "../../model/virtual-key-expiration";
+} from "../../model/virtual-key-expiration.ts";
 
 export type VirtualKeyDetail = {
   id: string;

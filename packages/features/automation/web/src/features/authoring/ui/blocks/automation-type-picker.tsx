@@ -1,9 +1,9 @@
 import { HStack } from "@chakra-ui/react";
 import { Calendar, TrendingUp, Zap } from "lucide-react";
 import type { ReactNode } from "react";
-import type { FacetAccordionProps } from "../elements/facet-section";
-import { FacetSection } from "../elements/facet-section";
-import { SourceCard } from "../elements/source-card";
+import type { FacetAccordionProps } from "../elements/facet-section.tsx";
+import { FacetSection } from "../elements/facet-section.tsx";
+import { SourceCard } from "../elements/source-card.tsx";
 
 export type AutomationSource = "trace" | "customGraph" | "report";
 

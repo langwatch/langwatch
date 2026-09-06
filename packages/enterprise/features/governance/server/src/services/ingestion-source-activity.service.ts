@@ -12,7 +12,7 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
-import type { ActivityMonitorRepository } from "../ports/ingestion-source-activity.port";
+import type { ActivityMonitorRepository } from "../ports/ingestion-source-activity.port.ts";
 
 export class ActivityMonitorService {
   private constructor(private readonly repository: ActivityMonitorRepository) {}

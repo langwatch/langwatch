@@ -1,8 +1,8 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase, LangyDatabaseTransaction } from "./langy-database.mapper";
+import type { LangyDatabase, LangyDatabaseTransaction } from "./langy-database.mapper.ts";
 
-import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository";
-import type { LangyTurnAdmissionClaim } from "../langy-turn-admission.repository";
+import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository.ts";
+import type { LangyTurnAdmissionClaim } from "../langy-turn-admission.repository.ts";
 
 const PREPARING = "preparing";
 const COMMITTED = "committed";

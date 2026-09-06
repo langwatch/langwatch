@@ -12,8 +12,8 @@
  * ES write would have to deliberately update the test.
  */
 import { describe, expect, it } from "vitest";
-import { storeResults } from "../topic-clustering-runner.intent";
-import { fakeRunnerDeps } from "./topic-clustering-runner.fixture";
+import { storeResults } from "../topic-clustering-runner.intent.ts";
+import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 
 const sampleClusteringResult = {
   topics: [

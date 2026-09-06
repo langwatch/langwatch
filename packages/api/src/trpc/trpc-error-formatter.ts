@@ -11,7 +11,7 @@
  */
 import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { TrpcFailureTraceIds } from "./trpc-failure-trace.js";
+import type { TrpcFailureTraceIds } from "./trpc-failure-trace.ts";
 
 const MAX_CAUSE_DEPTH = 3;
 

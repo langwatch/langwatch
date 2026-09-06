@@ -14,14 +14,14 @@ import { Upload, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Select } from "@langwatch/design-system/select";
-import { licensingApi } from "../../behavior/licensing-api";
-import { useLicensingHost } from "../../model/licensing-host";
+import { licensingApi } from "../../behavior/licensing-api.ts";
+import { useLicensingHost } from "../../model/licensing-host.ts";
 import { ENTERPRISE_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
 // A package that self-references through its own `exports` resolves at runtime
 // and not under `moduleResolution: "bundler"`, so the names this file already
 // shared with the package entry are reached by relative path.
-import { formatFileSize } from "../../model/license-status";
-import { getPlanDefaults, type PlanType } from "../../model/plan-form-defaults";
+import { formatFileSize } from "../../model/license-status.ts";
+import { getPlanDefaults, type PlanType } from "../../model/plan-form-defaults.ts";
 
 const planTypeCollection = createListCollection({
   items: [

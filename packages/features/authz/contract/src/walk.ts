@@ -7,9 +7,9 @@
  * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
  * migration stage that removes them.
  */
-import { bindingGrants, legacyTeamFallbackGrants, matchResourceGrant } from "./matchers";
-import { builtinRoleGrants, builtinRolePermissions } from "./roles";
-import type { ScopeChainLink } from "./scope";
+import { bindingGrants, legacyTeamFallbackGrants, matchResourceGrant } from "./matchers.ts";
+import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
+import type { ScopeChainLink } from "./scope.ts";
 import type {
   AuthzDecision,
   AuthzPrincipalRef,
@@ -17,7 +17,7 @@ import type {
   CollectedBinding,
   CollectedGrants,
   ResourceGrant,
-} from "./authz";
+} from "./authz.ts";
 
 /**
  * What every step of the walk reads. `chain` and `chainBindings` are derived

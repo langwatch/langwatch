@@ -9,14 +9,14 @@
  * on a close button it has no room for.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TabIdProvider } from "../../../studio-internals";
+import { TabIdProvider } from "../../../studio-internals.ts";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PromptBrowserTab } from "../prompt-browser-tab-view";
-import { usePromptBrowserTabController } from "../use-prompt-browser-tab-controller";
+import { PromptBrowserTab } from "../prompt-browser-tab-view.tsx";
+import { usePromptBrowserTabController } from "../use-prompt-browser-tab-controller.ts";
 
-vi.mock("../use-prompt-browser-tab-controller", () => ({
+vi.mock("../use-prompt-browser-tab-controller.ts", () => ({
   usePromptBrowserTabController: vi.fn(),
 }));
 

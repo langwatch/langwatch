@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceProjectionCompileService } from "../trace-projection-compile.service";
+import { TraceProjectionCompileService } from "../trace-projection-compile.service.ts";
 import { describe, expect, it } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
 

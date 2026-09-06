@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
-import { IdentityEmailService } from "../services/identity-email.service";
-import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
-import { PrismaIdentityHeadsRepository } from "../repositories/prisma/prisma.identity-heads.repository";
-import { PrismaIdentityLatchRepository } from "../repositories/prisma/prisma.identity-latch.repository";
+import { IdentityEmailService } from "../services/identity-email.service.ts";
+import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
+import { PrismaIdentityHeadsRepository } from "../repositories/prisma/prisma.identity-heads.repository.ts";
+import { PrismaIdentityLatchRepository } from "../repositories/prisma/prisma.identity-latch.repository.ts";
 
 const logger = createLogger("langwatch:identity:latch");
 

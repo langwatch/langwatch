@@ -35,7 +35,7 @@ import {
   type TrpcPolicyContext,
   type TrpcRoot,
 } from "@langwatch/api/trpc";
-import { declaredCheckFrom } from "./app-trpc.declared-check";
+import { declaredCheckFrom } from "./app-trpc.declared-check.ts";
 
 /**
  * What the process fills for the chain to exist.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { TEST_COMMAND_TYPES } from "../../services/__tests__/testHelpers";
-import { defineCommandSchema } from "../commandSchema";
+import { TEST_COMMAND_TYPES } from "../../services/__tests__/testHelpers.ts";
+import { defineCommandSchema } from "../commandSchema.ts";
 
 describe("defineCommandSchema", () => {
   describe("when creating a schema with all parameters", () => {

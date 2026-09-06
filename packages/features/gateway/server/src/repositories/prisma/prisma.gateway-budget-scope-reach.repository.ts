@@ -1,4 +1,4 @@
-import type { GatewayKeyReachCandidate } from "../gateway-budget.repository";
+import type { GatewayKeyReachCandidate } from "../gateway-budget.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The client slice the reach walk reads. */

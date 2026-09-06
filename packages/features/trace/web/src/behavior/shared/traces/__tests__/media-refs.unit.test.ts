@@ -11,7 +11,7 @@ import {
   mergeMediaRefs,
   parseMediaRefs,
   serializeMediaRefList,
-} from "../media-refs";
+} from "../media-refs.ts";
 
 /** The fold's two steps in one call: walk a span payload, then serialize it. */
 const serializeMediaRefs = (value: unknown) => serializeMediaRefList(collectMediaRefs(value));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CONTACT_SALES_URL, FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN } from "../index";
-import { licenseValidationError } from "../index";
+import { CONTACT_SALES_URL, FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN } from "../index.ts";
+import { licenseValidationError } from "../index.ts";
 
 /**
  * The prose-keyed `LICENSE_ERROR_MESSAGES` / `getUserFriendlyLicenseError`

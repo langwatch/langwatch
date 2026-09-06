@@ -11,7 +11,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useLangyMessages } from "../../../behavior/data/use-langy-messages";
+import { useLangyMessages } from "../../../behavior/data/use-langy-messages.ts";
 
 const previousConversation = {
   messages: [{ id: "msg_1", role: "assistant", parts: [] }],
@@ -24,14 +24,14 @@ const previousConversation = {
   lastModel: "openai/gpt-5-mini",
 };
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
 }));
 
 // The panel's own query seam. `keepPreviousData` is what the real hook asks
 // for, so the stub does what react-query does: hand back the last payload
 // whatever the key now is.
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       messages: {
@@ -49,7 +49,7 @@ vi.mock("../../../../../behavior/langy-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/langy.store", () => ({
+vi.mock("../../../../../behavior/langy.store.ts", () => ({
   useLangyStore: { getState: () => ({ confirmConversation: vi.fn() }) },
 }));
 

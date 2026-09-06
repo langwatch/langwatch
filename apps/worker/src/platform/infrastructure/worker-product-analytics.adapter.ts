@@ -1,7 +1,7 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { TraceProductAnalyticsPort, type TraceProductEvent } from "@langwatch/trace-server";
 import { PostHog } from "posthog-node";
-import type { WorkerProductAnalyticsConfig } from "../config/worker.config";
+import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
 
 /**
  * The product-analytics sink for this process, as a vendor transport.

@@ -8,7 +8,7 @@ import {
   type TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository";
+import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
 
 const projectionSchema = z.object({
   LastRequestedAt: z.number().nullable(),

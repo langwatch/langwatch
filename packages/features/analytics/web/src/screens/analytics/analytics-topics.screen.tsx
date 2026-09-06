@@ -1,9 +1,9 @@
 import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import { CustomGraph, type CustomGraphInput } from "../../ui/sections/custom-graph";
-import { FilterSidebar } from "../../ui/sections/filter-sidebar";
-import AnalyticsLayout from "../../ui/sections/analytics-layout";
-import { TopicsSelector } from "../../ui/sections/topics-selector";
+import { CustomGraph, type CustomGraphInput } from "../../ui/sections/custom-graph.tsx";
+import { FilterSidebar } from "../../ui/sections/filter-sidebar.tsx";
+import AnalyticsLayout from "../../ui/sections/analytics-layout.tsx";
+import { TopicsSelector } from "../../ui/sections/topics-selector.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

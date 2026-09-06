@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { LogExtractorContext } from "../ports/canonical-attributes.port";
-import { asNumber, asString, CODEX_EVENT_NAME_PREFIX } from "../rules/codex-canonical-value.rules";
+import type { LogExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { asNumber, asString, CODEX_EVENT_NAME_PREFIX } from "../rules/codex-canonical-value.rules.ts";
 
 export class CodexLogCanonicaliserService {
   private constructor() {}

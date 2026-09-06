@@ -5,7 +5,7 @@ import {
   parseModelProviderWireValue,
   resolveModelProviderWireValue,
   type ModelProviderWireTarget,
-} from "../model-provider-wire-format";
+} from "../model-provider-wire-format.ts";
 
 const openaiShared: ModelProviderWireTarget = {
   id: "mp_openai_shared",

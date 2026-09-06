@@ -8,9 +8,9 @@ import { useMemo } from "react";
 import {
   type DeclaredParameter,
   unionParameterDefinitions,
-} from "../../../../behavior/suites/use-run-suite";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
+} from "../../../../behavior/suites/use-run-suite.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 
 export function useAgentDeclaredParameters(): DeclaredParameter[] {
   const { project } = useOrganizationTeamProject();

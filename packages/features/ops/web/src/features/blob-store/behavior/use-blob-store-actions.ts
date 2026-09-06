@@ -1,6 +1,6 @@
-import { api } from "../../../behavior/ops-api";
+import { api } from "../../../behavior/ops-api.ts";
 
-import { useOpsToaster, useShowErrorToast } from "../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../behavior/ops-feedback.ts";
 interface CleanupVariables {
   // Optional to match the tRPC input, where `dryRun` carries a Zod default and
   // so is not required at the call site. The caller keys off `dryRun === false`,

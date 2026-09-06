@@ -28,8 +28,8 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
-import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query";
-import { formatLangyConversationDate } from "../../../../model/langy-conversation-date";
+import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query.ts";
+import { formatLangyConversationDate } from "../../../../model/langy-conversation-date.ts";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */
 const UNTITLED = "Untitled chat";

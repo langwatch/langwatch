@@ -4,7 +4,7 @@
  * Unit tests for the audio members of `chatRichContentSchema` (#5304).
  * Feature: specs/trace-processing/audio-player-in-traces.feature
  */
-import { chatRichContentSchema } from "../index";
+import { chatRichContentSchema } from "../index.ts";
 import { describe, expect, it } from "vitest";
 
 describe("chatRichContentSchema", () => {

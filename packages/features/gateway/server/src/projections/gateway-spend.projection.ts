@@ -1,10 +1,10 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import type { SpendUsage } from "../processes/gateway-spend-commands.process";
+import type { SpendUsage } from "../processes/gateway-spend-commands.process.ts";
 import {
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-} from "../processes/gateway-spend-commands.process";
+} from "../processes/gateway-spend-commands.process.ts";
 import {
   type GatewaySpendAdmittedEvent,
   type GatewaySpendConfirmedEvent,
@@ -14,7 +14,7 @@ import {
   gatewaySpendConfirmedEventSchema,
   gatewaySpendFailedEventSchema,
   gatewaySpendSettledEventSchema,
-} from "../intents/gateway-spend.intent";
+} from "../intents/gateway-spend.intent.ts";
 
 const gatewaySpendEvents = [
   gatewaySpendAdmittedEventSchema,

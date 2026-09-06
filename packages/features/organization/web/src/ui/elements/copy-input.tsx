@@ -14,7 +14,7 @@ import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
 import { Copy as FiCopy, Eye as FiEye, EyeOff as FiEyeOff } from "lucide-react";
 import { useState } from "react";
-import { useOrganizationHost } from "../../model/organization-host";
+import { useOrganizationHost } from "../../model/organization-host.ts";
 
 export function CopyInput(
   props: {

@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Event, ProjectionStoreContext } from "@langwatch/eventing";
-import type { BillableEventRecord } from "../../ports/billable-events-meter.port";
+import type { BillableEventRecord } from "../../ports/billable-events-meter.port.ts";
 import {
   BILLABLE_EVENTS_METER_PROJECTION_NAME,
   EventingBillableEventsMeterAdapter,
-} from "../eventing.billable-events-meter.adapter";
+} from "../eventing.billable-events-meter.adapter.ts";
 import {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
   RedisBillingTenantOrganizationCacheAdapter,
-} from "../redis.tenant-organization-cache.adapter";
-import { ClickHouseBillableEventsMeterAdapter } from "../clickhouse.billable-events-meter.adapter";
-import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter";
-import { BillingTenantOrganizationService } from "../../services/tenant-organization.service";
+} from "../redis.tenant-organization-cache.adapter.ts";
+import { ClickHouseBillableEventsMeterAdapter } from "../clickhouse.billable-events-meter.adapter.ts";
+import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter.ts";
+import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
 /**
  * The event types the App's own twin subscribes to, restated rather than

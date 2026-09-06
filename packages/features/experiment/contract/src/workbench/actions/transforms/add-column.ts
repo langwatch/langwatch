@@ -1,7 +1,7 @@
-import type { DatasetColumn } from "../../../experiment-workbench";
-import { type AddColumnPayload, addColumnPayloadSchema } from "../schemas";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
-import { type Transform, TransformError } from "./types";
+import type { DatasetColumn } from "../../../experiment-workbench.ts";
+import { type AddColumnPayload, addColumnPayloadSchema } from "../schemas.ts";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import { type Transform, TransformError } from "./types.ts";
 
 /**
  * Add a column to an inline dataset.

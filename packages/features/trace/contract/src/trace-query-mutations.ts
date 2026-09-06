@@ -10,9 +10,9 @@
  */
 
 import type { LiqeQuery } from "liqe";
-import { filterAST, walkAST } from "./trace-query-ast";
-import type { FacetState } from "./trace-query-metadata";
-import { isEmptyAST, parse, serialize } from "./trace-query-parser";
+import { filterAST, walkAST } from "./trace-query-ast.ts";
+import type { FacetState } from "./trace-query-metadata.ts";
+import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 /**
  * Toggle a facet value through three states: neutral → include → exclude → neutral.

@@ -5,15 +5,15 @@
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import type { CompareRow } from "./compare-rows";
-import { formatStoredParameterLine } from "../../../../model/agent-testing/run/parameter-line";
+import type { CompareRow } from "./compare-rows.ts";
+import { formatStoredParameterLine } from "../../../../model/agent-testing/run/parameter-line.ts";
 import {
   type ParameterRow,
   rowsFromLine,
-} from "../../../../model/agent-testing/run/parameter-rows";
-import type { RunConfigurationEntry } from "./run-configuration";
-import type { RunDialogFields } from "./use-run-dialog-form";
-import type { RunPlanFields } from "./use-run-plan-fields";
+} from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { RunConfigurationEntry } from "./run-configuration.ts";
+import type { RunDialogFields } from "./use-run-dialog-form.ts";
+import type { RunPlanFields } from "./use-run-plan-fields.ts";
 
 /**
  * Whether a stored configuration is a comparison: several targets, every one

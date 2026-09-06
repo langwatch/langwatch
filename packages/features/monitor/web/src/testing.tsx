@@ -28,7 +28,7 @@ import {
   type MonitorRouteReading,
   type MonitorScope,
   type MonitorSuccessNotice,
-} from "./model/monitor-host";
+} from "./model/monitor-host.ts";
 
 const DEFAULT_TARGETS: MonitorCopyTarget[] = [
   { id: "proj-1", name: "Acme / Engineering / Web App", canCreate: true },

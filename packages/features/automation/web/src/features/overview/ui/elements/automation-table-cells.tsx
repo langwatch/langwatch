@@ -4,8 +4,8 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
-import { resolveSeriesLabel } from "../../../../model/graph-series";
-import type { TriggerActionParams } from "../../model/trigger-action-params";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
 import { HelpCircle, Plus } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 const OPERATOR_LABELS: Record<string, string> = {

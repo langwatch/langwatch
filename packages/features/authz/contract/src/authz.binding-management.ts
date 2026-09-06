@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { grantsLedgerActorSchema } from "./authz-grant.events";
-import { organizationRoleSchema, roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz";
+import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
+import { organizationRoleSchema, roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz.ts";
 
 const nullableTextSchema = z.string().nullable();
 

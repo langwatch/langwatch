@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
 
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "./tooltip.tsx";
 
 export function GenerateApiSnippetButton({
   hasHandle,

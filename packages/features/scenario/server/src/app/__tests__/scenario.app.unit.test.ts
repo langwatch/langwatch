@@ -13,9 +13,9 @@ import type {
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import type { RunConfigurationsService } from "../../services/run-configurations.service";
-import type { ResultAtomsService } from "../../services/result-atoms.service";
-import { ScenarioApp, type QueueSimulationRunInput } from "../scenario.app";
+import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
+import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
+import { ScenarioApp, type QueueSimulationRunInput } from "../scenario.app.ts";
 
 function harness() {
   const commands: SimulationQueueRun[] = [];

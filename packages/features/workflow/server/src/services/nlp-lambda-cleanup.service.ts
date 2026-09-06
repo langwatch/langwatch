@@ -4,7 +4,7 @@
  * year with it; one whose activity cannot be READ is left alone.
  */
 import type { Logger } from "@langwatch/observability";
-import { NlpLambdaFleetPort } from "../ports/nlp-lambda-fleet.port";
+import { NlpLambdaFleetPort } from "../ports/nlp-lambda-fleet.port.ts";
 
 /** The name every studio engine function and its log group carries. */
 export const NLP_LAMBDA_NAME_PREFIX = "langwatch_nlp-";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveTraceDepartmentId, UNASSIGNED_DEPARTMENT } from "../index";
+import { resolveTraceDepartmentId, UNASSIGNED_DEPARTMENT } from "../index.ts";
 
 describe("resolveTraceDepartmentId", () => {
   describe("given a trace with a principal user", () => {

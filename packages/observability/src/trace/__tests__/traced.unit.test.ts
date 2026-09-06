@@ -15,7 +15,7 @@ import {
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { traced } from "../traced";
+import { traced } from "../traced.ts";
 
 class ExampleService {
   getterReads = 0;

@@ -11,8 +11,8 @@
  * JSON Schema, verbatim). Compiled ahead of time because Ajv's runtime
  * compiler needs `unsafe-eval`, and the chart runtime must work without it.
  */
-import ajvRuntimeEqualModule from "ajv/dist/runtime/equal";
-import ajvRuntimeUcs2LengthModule from "ajv/dist/runtime/ucs2length";
+import ajvRuntimeEqualModule from "ajv/dist/runtime/equal.js";
+import ajvRuntimeUcs2LengthModule from "ajv/dist/runtime/ucs2length.js";
 const ajvRuntimeEqual = ajvRuntimeEqualModule.default ?? ajvRuntimeEqualModule;
 const ajvRuntimeUcs2Length = ajvRuntimeUcs2LengthModule.default ?? ajvRuntimeUcs2LengthModule;
 

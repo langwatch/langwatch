@@ -25,10 +25,10 @@ import {
   FIRST_TRACE_REDIRECT_DELAY_MS,
   resolveFirstTracePolling,
   resolveFirstTraceTransition,
-} from "../model/first-trace-policy";
-import { useApiKeyHost } from "../model/api-key-host";
-import { findPersonalProject } from "../model/personal-project";
-import { apiKeyApi } from "./api-key-api";
+} from "../model/first-trace-policy.ts";
+import { useApiKeyHost } from "../model/api-key-host.ts";
+import { findPersonalProject } from "../model/personal-project.ts";
+import { apiKeyApi } from "./api-key-api.ts";
 
 /**
  * "waiting" is the confirmed never-synced poll, "redirecting" the brief

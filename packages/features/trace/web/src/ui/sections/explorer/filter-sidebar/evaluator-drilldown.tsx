@@ -8,14 +8,14 @@ import {
   EVALUATOR_VERDICT_FIELD,
   readEvaluatorGroupFromAst,
 } from "@langwatch/trace-contract";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
+import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import {
   commitRange,
   RangeEndpointInput,
   stepForSpan,
-} from "../../../elements/explorer/filter-sidebar/range-controls";
-import type { FacetItem } from "../../../../behavior/explorer/filter-sidebar/types";
-import { formatCount } from "./utils";
+} from "../../../elements/explorer/filter-sidebar/range-controls.tsx";
+import type { FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { formatCount } from "./utils.ts";
 
 interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */

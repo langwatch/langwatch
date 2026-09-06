@@ -10,7 +10,7 @@
 
 import { type AnchorHTMLAttributes, forwardRef, type MouseEvent, type ReactNode } from "react";
 
-import { useOptionalWorkflowHost } from "../../../model/workflow-host";
+import { useOptionalWorkflowHost } from "../../../model/workflow-host.ts";
 
 interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   href: string | { pathname: string; query?: Record<string, any> };

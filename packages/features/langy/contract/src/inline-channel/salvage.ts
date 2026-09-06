@@ -3,7 +3,7 @@
  * fence damage (truncation, unclosed brackets) aggressively, but never
  * guesses CONTENT — the result still must pass the schema STRICTLY.
  */
-import { langyModelEmittedCardSchema, type LangyModelEmittedCard } from "../cards/derived-safe.js";
+import { langyModelEmittedCardSchema, type LangyModelEmittedCard } from "../cards/derived-safe.ts";
 
 export type LangySalvageResult = { ok: true; value: unknown } | { ok: false };
 

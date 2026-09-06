@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
-import type { ScenarioPrefetchFixture } from "./scenario-execution-prefetcher.fixture";
+import type { ScenarioPrefetchFixture } from "./scenario-execution-prefetcher.fixture.ts";
 
 const defaultModelParams: LiteLLMParams = {
   api_key: "sk-test",

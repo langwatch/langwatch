@@ -1,13 +1,13 @@
 import { Box, chakra, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuSparkles, LuWrench } from "react-icons/lu";
-import { tryPrettyJson } from "../../../behavior/transcript/parsing";
-import { skillInvocationFromToolUse } from "../../../model/transcript/skill-invocation";
-import type { ChatMessage } from "../../../model/transcript/types";
-import { toolResultBodyToString } from "../../../model/transcript/tool-result-body";
-import { ToolArgRow, ToolPairSection } from "../../elements/transcript/tool-pair-sections";
-import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports";
-import { isRecord } from "../../../model/transcript/record";
+import { tryPrettyJson } from "../../../behavior/transcript/parsing.ts";
+import { skillInvocationFromToolUse } from "../../../model/transcript/skill-invocation.ts";
+import type { ChatMessage } from "../../../model/transcript/types.ts";
+import { toolResultBodyToString } from "../../../model/transcript/tool-result-body.ts";
+import { ToolArgRow, ToolPairSection } from "../../elements/transcript/tool-pair-sections.tsx";
+import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports.tsx";
+import { isRecord } from "../../../model/transcript/record.ts";
 
 function hasAnsi(text: string): boolean {
   return text.includes(`${String.fromCharCode(27)}[`);

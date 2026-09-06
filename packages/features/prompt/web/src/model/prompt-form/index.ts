@@ -4,28 +4,28 @@ export {
   hasNonEmptySystemMessage,
   refinedFormSchemaWithModelLimits,
   type PromptConfigFormValues,
-} from "./prompt-form.schemas";
+} from "./prompt-form.schemas.ts";
 export {
   versionMetadataSchema,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
   type VersionMetadata,
-} from "./version-metadata.schemas";
-export { buildDefaultFormValues, DEFAULT_FORM_VALUES } from "./default-form-values";
-export { areFormValuesEqual } from "./are-form-values-equal";
-export { getSaveBlockerMessage } from "./save-blocker-message";
-export { isNodeDataEqual } from "./node-data-comparison";
+} from "./version-metadata.schemas.ts";
+export { buildDefaultFormValues, DEFAULT_FORM_VALUES } from "./default-form-values.ts";
+export { areFormValuesEqual } from "./are-form-values-equal.ts";
+export { getSaveBlockerMessage } from "./save-blocker-message.ts";
+export { isNodeDataEqual } from "./node-data-comparison.ts";
 export {
   changeHandleFormSchema,
   createChangeHandleFormSchema,
   type ChangeHandleFormValues,
-} from "./change-handle-form.schemas";
+} from "./change-handle-form.schemas.ts";
 export {
   inputsAndOutputsToDemostrationColumns,
   withDerivedDemonstrationColumns,
-} from "./demonstration-columns";
+} from "./demonstration-columns.ts";
 export {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "./versioned-prompt-form-values";
-export { computeInitialFormValuesForPrompt } from "./initial-form-values";
+} from "./versioned-prompt-form-values.ts";
+export { computeInitialFormValuesForPrompt } from "./initial-form-values.ts";

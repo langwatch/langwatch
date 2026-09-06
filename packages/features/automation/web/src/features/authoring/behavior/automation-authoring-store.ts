@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { ProviderClients } from "../../../model/provider-registry";
-import { type AutomationDraft, type DraftAction } from "../model/draft-reducer";
+import type { ProviderClients } from "../../../model/provider-registry.ts";
+import { type AutomationDraft, type DraftAction } from "../model/draft-reducer.ts";
 
 export const MAX_AUTOMATION_TEST_HISTORY = 5;
 

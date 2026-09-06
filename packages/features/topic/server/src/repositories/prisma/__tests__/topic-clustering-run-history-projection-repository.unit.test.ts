@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../prisma.topic-clustering-run-history-projection.repository";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../prisma.topic-clustering-run-history-projection.repository.ts";
 
 const validRun = {
   runId: "20260720T093000",

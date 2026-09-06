@@ -2,9 +2,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files";
+import { walkFiles } from "./files.ts";
 import { isLowerKebabFilename } from "@langwatch/lint-core/grammar/feature-layout-policy.mjs";
-import { discoverClassifiedPackages } from "./workspace";
+import { discoverClassifiedPackages } from "./workspace.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const CANONICAL_ARTIFACTS = new Set([

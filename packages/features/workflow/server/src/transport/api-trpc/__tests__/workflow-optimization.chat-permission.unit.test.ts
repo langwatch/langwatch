@@ -11,7 +11,7 @@ import type { WorkflowApp } from "#app/workflow.app";
 import {
   WorkflowOptimizationTrpcApi,
   type WorkflowOptimizationTrpcContext,
-} from "../workflow-optimization.api";
+} from "../workflow-optimization.api.ts";
 
 /**
  * The host's real policy resolves the scope and refuses; this one records what

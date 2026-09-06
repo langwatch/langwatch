@@ -2,7 +2,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { SaasBrowserService } from "@langwatch/enterprise-saas-contract";
-import { ExtraFooterComponents, SaasBrowserAnalytics } from "../index";
+import { ExtraFooterComponents, SaasBrowserAnalytics } from "../index.ts";
 
 class TestRuntime extends SaasBrowserService {
   updateLastLogin = vi.fn();

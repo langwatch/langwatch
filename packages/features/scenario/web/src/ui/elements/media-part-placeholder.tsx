@@ -1,6 +1,6 @@
 import { Badge, HStack, Icon, Skeleton, Text } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
-import type { MediaCategory } from "../../model/media-part-source";
+import type { MediaCategory } from "../../model/media-part-source.ts";
 
 const TEST_ID = {
   missing: "media-part-missing",

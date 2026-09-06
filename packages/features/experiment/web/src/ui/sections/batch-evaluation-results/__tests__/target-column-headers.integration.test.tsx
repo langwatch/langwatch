@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
-import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
 
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),

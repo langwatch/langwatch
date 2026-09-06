@@ -3,7 +3,7 @@ import {
   buildGraphAlertTemplateContext,
   buildReportTemplateContext,
   buildTemplateContext,
-} from "../template-context";
+} from "../template-context.ts";
 
 const baseArgs = {
   trigger: {

@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Unsubscribe } from "@langwatch/agent-contract";
 import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "@langwatch/langy-contract";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
 import {
   type CliFrame,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -18,7 +18,7 @@ import {
 import type {
   ControlSession,
   LocalControlSessionCoreService,
-} from "../../services/langy-local-session.service";
+} from "../../services/langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
 

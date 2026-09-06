@@ -8,7 +8,7 @@ import {
   FG_MUTED,
   GROUP_HEADER_BG,
   QUIET_BUTTON_SHADOW,
-} from "../../../../model/agent-testing/shared/design";
+} from "../../../../model/agent-testing/shared/design.ts";
 
 export type TestSuiteHeaderRowProps = {
   name: string;

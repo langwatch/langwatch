@@ -17,7 +17,7 @@ const mockMarkDrawerSpotlightSeen = vi.fn((id: string) => {
   mockSeenDrawerSpotlights = { ...mockSeenDrawerSpotlights, [id]: true };
 });
 
-vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       spotlightsActive: mockPageTourActive,
@@ -26,7 +26,7 @@ vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store",
     }),
 }));
 
-vi.mock("../../hooks/use-trace-explorer-tour-preference", () => ({
+vi.mock("../../hooks/use-trace-explorer-tour-preference.ts", () => ({
   useTraceExplorerTourPreference: () => ({
     dismiss: mockPersistDismissal,
     isDismissed: isMockTourDismissed,
@@ -42,7 +42,7 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 });
 vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
-import { DrawerSpotlights } from "../drawer-spotlights";
+import { DrawerSpotlights } from "../drawer-spotlights.tsx";
 
 function addAnchor(anchor: string): HTMLElement {
   const el = document.createElement("div");

@@ -1,13 +1,13 @@
 import type { z } from "zod";
-import type { Event } from "../domain/types";
+import type { Event } from "../domain/types.ts";
 import {
   type DotSnakeToPascal,
   type EventTypeOf,
   eventTypeToHandlerName,
   type StripPrefix,
   type UnionToIntersection,
-} from "./eventTypeTransforms";
-import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjection.types";
+} from "./eventTypeTransforms.ts";
+import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjection.types.ts";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction

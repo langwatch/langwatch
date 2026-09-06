@@ -20,14 +20,14 @@ import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuardsService } from "./identity-guards.service";
-import type { IdentityLedger } from "../rules/identity-ledger.rules";
+import type { IdentityGuardsService } from "./identity-guards.service.ts";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,
   IdentityLinkProposalWrites,
   IdentityVerificationWrites,
-} from "../rules/identity-writes.rules";
+} from "../rules/identity-writes.rules.ts";
 
 /**
  * The identity write surface (ADR-101 §2, ADR-115 §3): six verbs, each

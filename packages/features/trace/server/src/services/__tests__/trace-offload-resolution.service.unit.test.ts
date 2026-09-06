@@ -2,7 +2,7 @@
  * @see ADR-022
  * Unit tests for resolveOffloadedTraces — per-trace span-level eventref resolution and TraceIO recompute (the read-resolution half). Each test covers one assertion.
  */
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -18,10 +18,10 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service";
-import { BlobNotFoundError } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,

@@ -1,4 +1,4 @@
-import type { UsageLimitEmailData } from "../services/billing-usage-notice.service";
+import type { UsageLimitEmailData } from "../services/billing-usage-notice.service.ts";
 
 export abstract class UsageLimitEmailAdapter {
   abstract send(input: {

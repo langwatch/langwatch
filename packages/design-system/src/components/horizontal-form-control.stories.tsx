@@ -1,6 +1,6 @@
 import { Box, Input, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HorizontalFormControl } from "./horizontal-form-control";
+import { HorizontalFormControl } from "./horizontal-form-control.tsx";
 
 const meta = {
   title: "Components/Horizontal form control",

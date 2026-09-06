@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import { useConversationAnnotations } from "../use-conversation-annotations";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useConversationAnnotations } from "../use-conversation-annotations.ts";
 
 const annotations = vi.hoisted(() => ({
   rows: [] as unknown[],
   askedFor: [] as unknown[],
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: () => true,
@@ -18,7 +18,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
 
 // Stands in for the retention the real hook asks for: whatever it last read is
 // handed back while the next set of turns is still in flight.
-vi.mock("../../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: (params: unknown) => {
     annotations.askedFor.push(params);
     return {

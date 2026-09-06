@@ -2,7 +2,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
-} from "../repositories/trace-edit-overlay.repository";
+} from "../repositories/trace-edit-overlay.repository.ts";
 import {
   emptyTraceEditOverlayPatch,
   encodeSpanIOFromEditedText,

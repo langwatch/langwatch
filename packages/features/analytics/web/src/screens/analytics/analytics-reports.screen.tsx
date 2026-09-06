@@ -1,15 +1,15 @@
 import { Alert, Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { FilterSidebar } from "../../ui/sections/filter-sidebar";
-import { useFilterToggle } from "../../behavior/use-filter-toggle";
-import AnalyticsLayout from "../../ui/sections/analytics-layout";
-import { useWidgetGranularity } from "../../behavior/use-widget-granularity";
-import { analyticsApi } from "../../behavior/analytics-api";
-import { calculateGridPositions, type GridLayout } from "../../model/grid-positions";
-import { type SizeOption, sizeOptions } from "../../ui/sections/graph-card-menu";
-import { ReportGrid } from "../../ui/sections/report-grid";
-import { Link } from "../../ui/elements/analytics-link";
-import { useAnalyticsHost } from "../../model/analytics-host";
+import { FilterSidebar } from "../../ui/sections/filter-sidebar.tsx";
+import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import AnalyticsLayout from "../../ui/sections/analytics-layout.tsx";
+import { useWidgetGranularity } from "../../behavior/use-widget-granularity.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { calculateGridPositions, type GridLayout } from "../../model/grid-positions.ts";
+import { type SizeOption, sizeOptions } from "../../ui/sections/graph-card-menu.tsx";
+import { ReportGrid } from "../../ui/sections/report-grid.tsx";
+import { Link } from "../../ui/elements/analytics-link.tsx";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 function ReportsContent() {
   const host = useAnalyticsHost();

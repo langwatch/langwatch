@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   annotationsForTrace: vi.fn(() => ({ data: [], isLoading: false })),
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: (permission: string) =>
@@ -22,7 +22,7 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     annotation: {
       getByTraceId: { useQuery: mocks.annotationsForTrace },
@@ -33,7 +33,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
 // Stands in for the correction popover, cloning the trigger it was handed the
 // way Popover.Trigger's asChild does, so the test sees the element Zag would
 // anchor on and hand focus back to.
-vi.mock("../annotation-popover", async () => {
+vi.mock("../annotation-popover.tsx", async () => {
   const { cloneElement } = await import("react");
   return {
     AnnotationPopover: (props: {
@@ -60,7 +60,7 @@ vi.mock("../annotation-popover", async () => {
   };
 });
 
-const { TurnAnnotationBadges } = await import("../turn-annotations");
+const { TurnAnnotationBadges } = await import("../turn-annotations.tsx");
 
 const ANNOTATIONS = [
   {

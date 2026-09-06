@@ -14,8 +14,8 @@ import {
 import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
 import { useState } from "react";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
-import { billingApi } from "../../behavior/billing-api";
-import { Link } from "../../ui/elements/link";
+import { billingApi } from "../../behavior/billing-api.ts";
+import { Link } from "../../ui/elements/link.tsx";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
@@ -26,11 +26,11 @@ import {
   FREE_PLAN_FEATURES,
   getGrowthPlanFeatures,
   getGrowthSeatPriceCents,
-} from "../../model/billing-plans";
+} from "../../model/billing-plans.ts";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
-} from "../../model/plan-current-resolver";
+} from "../../model/plan-current-resolver.ts";
 
 /** The public list of every event type that counts toward the usage lines below. */
 const BILLABLE_EVENTS_DOCS_URL = "https://docs.langwatch.ai/pricing/billable-events";

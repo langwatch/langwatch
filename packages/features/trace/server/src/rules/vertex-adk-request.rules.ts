@@ -1,9 +1,9 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
-import { recordValueType } from "./canonical-extraction.rules";
-import { convertGeminiContent, systemInstructionText } from "./gemini-content.rules";
-import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules";
-import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { recordValueType } from "./canonical-extraction.rules.ts";
+import { convertGeminiContent, systemInstructionText } from "./gemini-content.rules.ts";
+import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules.ts";
+import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
 export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;

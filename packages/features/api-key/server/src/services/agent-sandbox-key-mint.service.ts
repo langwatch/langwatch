@@ -4,8 +4,8 @@
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port";
-import type { ApiKeyRepository } from "../repositories/api-key.repository";
+import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 

@@ -3,7 +3,7 @@ import {
   ModelProviderScopeForbiddenError,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
+import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 
 /**
  * Shared write check for the model-provider's provider and default commands.

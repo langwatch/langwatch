@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TenantId } from "../../domain/tenantId";
-import type { Projection } from "../../domain/types";
-import type { ProjectionStore } from "../../stores/projectionStore.types";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
-import { RepositoryFoldStore } from "../repositoryFoldStore";
+import type { TenantId } from "../../domain/tenantId.ts";
+import type { Projection } from "../../domain/types.ts";
+import type { ProjectionStore } from "../../stores/projectionStore.types.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
+import { RepositoryFoldStore } from "../repositoryFoldStore.ts";
 
 interface TestData {
   total: number;

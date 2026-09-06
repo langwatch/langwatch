@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { ClickHouseSuiteRunProcessingAdapter } from "../clickhouse.suite-run-processing.adapter";
-import type { SuiteRunProcessingPipeline } from "../suite-run-processing.adapter";
+import { ClickHouseSuiteRunProcessingAdapter } from "../clickhouse.suite-run-processing.adapter.ts";
+import type { SuiteRunProcessingPipeline } from "../suite-run-processing.adapter.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.

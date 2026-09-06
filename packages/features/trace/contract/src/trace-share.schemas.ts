@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { evaluationSchema } from "./trace-format.schemas";
+import { evaluationSchema } from "./trace-format.schemas.ts";
 
 /**
  * How many spans' full detail one share payload may carry. The share page
@@ -15,8 +15,8 @@ import {
   spanLangwatchSignalsSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
-} from "./trace-view.contract";
-import { spanTreeNodeSchema } from "./trace";
+} from "./trace-view.contract.ts";
+import { spanTreeNodeSchema } from "./trace.ts";
 
 /**
  * The share-safe output contract for `sharedTrace.get` — the ONLY payload an

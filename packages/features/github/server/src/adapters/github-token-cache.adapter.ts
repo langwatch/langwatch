@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 
-import type { GithubRedisPort } from "../ports/github-app-token.port";
-import type { GithubHostPort } from "../ports/github-host.port";
-import { GithubTokenCachePort } from "../ports/github-token-cache.port";
+import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
+import { GithubTokenCachePort } from "../ports/github-token-cache.port.ts";
 
 const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;

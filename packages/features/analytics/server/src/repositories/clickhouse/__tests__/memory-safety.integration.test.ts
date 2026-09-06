@@ -25,9 +25,9 @@ import {
   releaseMigratedCaches,
   seedSpans,
   startMigratedClickHouse,
-} from "../../../__tests__/migrated-clickhouse.harness";
-import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 const TENANT_ID = "memory-safety-test";
 const WIDE_TENANT_ID = "memory-safety-wide-test";

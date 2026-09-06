@@ -20,21 +20,21 @@ import {
 } from "@chakra-ui/react";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { CreateGroupDialog } from "../../ui/sections/create-group-dialog";
+import { CreateGroupDialog } from "../../ui/sections/create-group-dialog.tsx";
 import {
   roleBadgeColor,
   SourceBadge,
   scopeTypeLabel,
-} from "../../ui/sections/group-binding-input-row";
-import { GroupDetailDialog } from "../../ui/sections/group-detail-dialog";
+} from "../../ui/sections/group-binding-input-row.tsx";
+import { GroupDetailDialog } from "../../ui/sections/group-detail-dialog.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { UiSlot } from "@langwatch/ui-host/slots";
-import { useActivePlan } from "../../behavior/use-active-plan";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import type { RouterOutputs } from "../../behavior/organization-api";
-import { api } from "../../behavior/organization-api";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+import { useActivePlan } from "../../behavior/use-active-plan.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import type { RouterOutputs } from "../../behavior/organization-api.ts";
+import { api } from "../../behavior/organization-api.ts";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 

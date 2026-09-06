@@ -1,9 +1,9 @@
 import { formatQueryParams } from "@clickhouse/client/dist/common";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
-import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository";
-import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository";
-import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper";
+import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
+import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository.ts";
+import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
 import { point } from "@langwatch/metric-server/testing";
 

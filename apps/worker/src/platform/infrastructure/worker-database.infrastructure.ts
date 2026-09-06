@@ -6,7 +6,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { WorkerDatabaseConfig } from "../config/worker.config";
+import type { WorkerDatabaseConfig } from "../config/worker.config.ts";
 
 export type WorkerDatabaseInfrastructureOptions = {
   resources: ResourceScope;

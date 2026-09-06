@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { PersonalUsageReaderPort } from "../personal-usage.port";
-import { DefaultGovernancePersonalUsageService } from "../../services/personal-usage.service";
+import { PersonalUsageReaderPort } from "../personal-usage.port.ts";
+import { DefaultGovernancePersonalUsageService } from "../../services/personal-usage.service.ts";
 
 class StubPersonalUsageReader extends PersonalUsageReaderPort {
   findSummary = vi.fn(async () => ({

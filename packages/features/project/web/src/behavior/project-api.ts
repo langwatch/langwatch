@@ -20,7 +20,7 @@
  */
 
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
-import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host";
+import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
 
 export type ProjectApiMap = {
   organization: {

@@ -18,12 +18,12 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
-import { formatFileSize, parseTabularFileToRows } from "../../model/parse-tabular-file";
+import { formatFileSize, parseTabularFileToRows } from "../../model/parse-tabular-file.ts";
 import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
   dropzoneSurfaceProps,
-} from "../elements/dataset-dropzone-styles";
+} from "../elements/dataset-dropzone-styles.tsx";
 
 /** Visually hidden but kept in the tab order, so the picker stays operable. */
 const SR_ONLY_INPUT: React.CSSProperties = {

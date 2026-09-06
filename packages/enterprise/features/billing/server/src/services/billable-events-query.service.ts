@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { BillableEventsRepository } from "../ports/billable-events.port";
+import type { BillableEventsRepository } from "../ports/billable-events.port.ts";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 

@@ -1,8 +1,8 @@
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceModelCostCatalogPort } from "../../ports/trace-model-cost-catalog.port";
-import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service";
+import { TraceModelCostCatalogPort } from "../../ports/trace-model-cost-catalog.port.ts";
+import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service.ts";
 
 /**
  * Spec: packages/features/trace/specs/record-time-cost-enrichment.feature

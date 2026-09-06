@@ -11,9 +11,9 @@
 import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository";
-import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service";
-import { ApiKeyLifecycleService } from "../api-key-lifecycle.service";
+import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
+import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
+import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 
 const ORG_ID = "org_1";
 const USER_ID = "user_1";

@@ -77,9 +77,9 @@ const subscription = vi.fn((_input: unknown, _options: unknown) => ({
   unsubscribe: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const { createTrpcUtils, idleQuery, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
 
   const trpcUtils = createTrpcUtils();
 
@@ -159,14 +159,14 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangySidecar } from "../langy-panel.tsx";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 

@@ -14,7 +14,7 @@ import {
   TraceSpoolService,
 } from "@langwatch/trace-server";
 
-import { ApiTraceSpoolStorageAdapter } from "../platform/infrastructure/api-trace-spool.adapter";
+import { ApiTraceSpoolStorageAdapter } from "../platform/infrastructure/api-trace-spool.adapter.ts";
 
 export type ApiTraceSpoolOptions = Readonly<{
   /** The byte storage the object store composed, or none. */

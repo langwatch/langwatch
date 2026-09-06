@@ -1,4 +1,4 @@
-import type { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port";
+import type { ExperimentWorkflowVersionPort } from "../../ports/experiment-workflow-version.port.ts";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -14,13 +14,13 @@ import {
   experimentRunTargetSchema,
   experimentRunWithItemsSchema,
 } from "@langwatch/experiment-contract";
-import { ExperimentRunRepository } from "../experiment-run.repository";
+import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import {
   buildDedupedRunItemsWhere,
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
-} from "./clickhouse.experiment-run.mapper";
+} from "./clickhouse.experiment-run.mapper.ts";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {

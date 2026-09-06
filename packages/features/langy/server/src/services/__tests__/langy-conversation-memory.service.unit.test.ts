@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
-import { LangyConversationMemoryService } from "../langy-conversation-memory.service";
+import { LangyConversationMemoryService } from "../langy-conversation-memory.service.ts";
 
 type Digest = {
   resource: string;

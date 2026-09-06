@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { DatasetRecordContentRepository } from "../dataset-record-content.repository";
+import { DatasetRecordContentRepository } from "../dataset-record-content.repository.ts";
 
 /**
  * Unit tests for {@link DatasetRecordRepository} read ordering. Boundary mock:

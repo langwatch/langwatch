@@ -7,14 +7,14 @@ import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/l
 import { Check, FolderCode, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { LangyCopyButton } from "../../elements/langy-copy-button";
-import { describeError } from "../../../behavior/errors";
+import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
+import { describeError } from "../../../behavior/errors.tsx";
 import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
-import { api } from "../../../behavior/langy-api";
+import { api } from "../../../behavior/langy-api.ts";
 
-import { readLocalFolderPick, writeLocalFolderPick } from "../../../model/langy-code-access-pick";
-import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store";
-import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card";
+import { readLocalFolderPick, writeLocalFolderPick } from "../../../model/langy-code-access-pick.ts";
+import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store.ts";
+import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card.tsx";
 
 /** The option ids the selection carries, so the message reads the same words. */
 export const LANGY_CODE_ACCESS_OPTIONS = {

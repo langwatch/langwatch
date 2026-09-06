@@ -7,7 +7,7 @@
 import { featureFlagRulesSchema } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
 
-import { summarizeTargeting, targetingLabel } from "../targeting-summary";
+import { summarizeTargeting, targetingLabel } from "../targeting-summary.ts";
 
 const note = (rules: unknown) =>
   targetingLabel(summarizeTargeting(featureFlagRulesSchema.parse(rules)));

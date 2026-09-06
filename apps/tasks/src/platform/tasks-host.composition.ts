@@ -15,11 +15,11 @@ import {
   type RedisConnection,
 } from "@langwatch/redis-client";
 import { TaskHostPort, TaskInfrastructureUnavailableError } from "@langwatch/task";
-import type { TasksConfig } from "./config/tasks.config";
+import type { TasksConfig } from "./config/tasks.config.ts";
 import {
   createTasksObjectStorage,
   type TasksObjectStorage,
-} from "./infrastructure/tasks-stored-object-storage.adapter";
+} from "./infrastructure/tasks-stored-object-storage.adapter.ts";
 
 const logger = createLogger("langwatch:tasks:host");
 

@@ -33,7 +33,7 @@
  */
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { actionOf, permissionsForResource, resourceOf } from "./permission-catalogue";
+import { actionOf, permissionsForResource, resourceOf } from "./permission-catalogue.ts";
 
 /** The actions that cannot stand without `view`. */
 const VIEW_DEPENDENT = ["create", "update", "delete"] as const;

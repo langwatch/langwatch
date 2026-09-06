@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   GovernanceWebhookPort,
   type GovernanceWebhookEnvelope,
-} from "../ports/governance-webhook.port";
+} from "../ports/governance-webhook.port.ts";
 
 export const governanceWebhookEnvelopeSchema = z.object({
   id: z.string(),

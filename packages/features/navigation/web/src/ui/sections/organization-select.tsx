@@ -16,10 +16,10 @@
 import { Button, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization";
-import { useNavigationHost, type NavigationOrganization } from "../../model/navigation-host";
-import type { ProductId } from "../../model/products";
-import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination";
+import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
+import { useNavigationHost, type NavigationOrganization } from "../../model/navigation-host.ts";
+import type { ProductId } from "../../model/products.ts";
+import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination.ts";
 
 function firstProjectSlug(organization: NavigationOrganization): string | null {
   for (const team of organization.teams ?? []) {

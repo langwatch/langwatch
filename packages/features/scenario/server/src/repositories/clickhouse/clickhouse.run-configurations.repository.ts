@@ -8,7 +8,7 @@ import {
   MAX_RUN_CONFIGURATIONS,
   RunConfigurationsReadPort,
   type RawRunConfigurationRow,
-} from "../../ports/run-configurations-read.port";
+} from "../../ports/run-configurations-read.port.ts";
 import {
   ATOM_SORT_KEY,
   LANGWATCH_METADATA,
@@ -16,7 +16,7 @@ import {
   TARGET_PARAMETERS_EXPR,
   ResultAtomsClickHouseRepository,
   type ResultAtomsClickHouseClientResolver,
-} from "./clickhouse.result-atoms.repository";
+} from "./clickhouse.result-atoms.repository.ts";
 
 /** The target's type: `http`, `prompt`, `code` or `workflow`. */
 export const TARGET_TYPE_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetType')`;

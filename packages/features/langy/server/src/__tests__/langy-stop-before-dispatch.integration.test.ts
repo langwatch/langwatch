@@ -12,16 +12,16 @@
  */
 import type { Redis } from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { LangyTurnServiceDeps } from "../services/langy-turn.service";
-import { LangyTurnService } from "../services/langy-turn.service";
+import type { LangyTurnServiceDeps } from "../services/langy-turn.service.ts";
+import { LangyTurnService } from "../services/langy-turn.service.ts";
 import IORedis from "ioredis";
 import {
   type LangyHandoffRedis,
   LangyTurnHandoffAdapter,
-} from "../adapters/redis.langy-turn-handoff.adapter";
-import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port";
-import { LangyEffectPortsAdapter } from "../adapters/langy-effect.adapter";
-import { testRedisUrl } from "./support/test-redis-url";
+} from "../adapters/redis.langy-turn-handoff.adapter.ts";
+import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port.ts";
+import { LangyEffectPortsAdapter } from "../adapters/langy-effect.adapter.ts";
+import { testRedisUrl } from "./support/test-redis-url.ts";
 
 /** Native Redis, the way every other datastore suite in this repo asks for one. */
 const REDIS_URL = testRedisUrl();

@@ -2,7 +2,7 @@ import {
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleDatabase,
   type IngestionPullLifecycleSource,
-} from "../../ports/ingestion-pull-lifecycle.port";
+} from "../../ports/ingestion-pull-lifecycle.port.ts";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 const INGESTION_PULL_PROCESS_NAME = "ingestionPull";

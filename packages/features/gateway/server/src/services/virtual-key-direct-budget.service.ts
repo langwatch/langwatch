@@ -5,8 +5,8 @@
  */
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository";
+import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { type TenantId, TenantIdSchema } from "../domain/tenantId";
-import type { Projection } from "../domain/types";
+import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
+import type { Projection } from "../domain/types.ts";
 
 /**
  * Zod schema for projection store read context.

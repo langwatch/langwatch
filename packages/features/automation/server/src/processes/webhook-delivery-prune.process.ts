@@ -1,5 +1,5 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
-import { webhookDeliveryPruneIntentSchema } from "../intents/webhook-delivery-prune.intent";
+import { webhookDeliveryPruneIntentSchema } from "../intents/webhook-delivery-prune.intent.ts";
 
 export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME = "webhookDeliveryPrune" as const;
 /** ADR-040 §6: the delivery log is bounded at 30 days; one prune a day keeps

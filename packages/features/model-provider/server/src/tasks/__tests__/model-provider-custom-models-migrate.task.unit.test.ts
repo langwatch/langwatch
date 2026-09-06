@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ModelProviderCustomModelsMigrateTask } from "../model-provider-custom-models-migrate.task";
-import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules";
+import { ModelProviderCustomModelsMigrateTask } from "../model-provider-custom-models-migrate.task.ts";
+import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 
 function emptyDatabase(): ModelProviderMigrationDatabase {
   return {

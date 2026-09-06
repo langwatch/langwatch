@@ -1,8 +1,8 @@
-import type { AggregateType } from "../domain/aggregateType";
-import type { TenantId } from "../domain/tenantId";
-import type { Event, EventMetadataBase } from "../domain/types";
-import type { DeduplicationStrategy } from "../queues/queue.types";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { TenantId } from "../domain/tenantId.ts";
+import type { Event, EventMetadataBase } from "../domain/types.ts";
+import type { DeduplicationStrategy } from "../queues/queue.types.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * A staged queue payload (ADR-069): a plain versioned job DTO a `stage` hook

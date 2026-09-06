@@ -3,8 +3,8 @@ import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { AnalyticsApp, LangWatchQLService } from "@langwatch/analytics-server";
 import type { DashboardApp } from "@langwatch/dashboard-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { analyticsRouters } from "./analytics-trpc.routers";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { analyticsRouters } from "./analytics-trpc.routers.ts";
 
 /** The two namespaces, the two `ctx.app` slices, and what the REST doors take. */
 export type ComposedAnalyticsFeature = Readonly<{

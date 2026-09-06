@@ -1,12 +1,12 @@
 import process from "node:process";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
-import { WorkerSignalHandlers, type WorkerSignalSource } from "./platform/lifecycle/worker.signals";
+import { WorkerSignalHandlers, type WorkerSignalSource } from "./platform/lifecycle/worker.signals.ts";
 import {
   bootWorker,
   type WorkerProcess,
   type WorkerProcessComposition,
   type WorkerProcessFactoryContext,
-} from "./worker.process";
+} from "./worker.process.ts";
 
 export abstract class WorkerExecutableCompositionPort {
   abstract compose(

@@ -7,14 +7,14 @@
  * The patch is applied as given. What a viewer may read is decided before it
  * reaches here, by `redactPatchForViewer`.
  */
-import type { Span, Trace } from "./trace-format.schemas";
+import type { Span, Trace } from "./trace-format.schemas.ts";
 import {
   patchHasAnyEdit,
   TRACE_EDIT_SPAN_FIELDS,
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
   type TraceEditSpanPatch,
-} from "./trace-edit-overlay.contract";
+} from "./trace-edit-overlay.contract.ts";
 
 function buildChildrenIndex(
   links: ReadonlyArray<{ id: string; parentId?: string | null }>,

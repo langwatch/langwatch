@@ -13,7 +13,7 @@ import {
   type ScimRoleBindingRecord,
   type ScimTokenRecord,
   type ScimTokenIdentity,
-} from "../../ports/scim-repository.port";
+} from "../../ports/scim-repository.port.ts";
 
 type ScimIdentityDatabase = {
   ssoConnection: {

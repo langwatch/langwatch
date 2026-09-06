@@ -1,6 +1,6 @@
 import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { api } from "../../../../behavior/ops-api";
+import { api } from "../../../../behavior/ops-api.ts";
 
 /**
  * Anomalous-tenants panel. Lists tenants whose enqueue rate has spiked

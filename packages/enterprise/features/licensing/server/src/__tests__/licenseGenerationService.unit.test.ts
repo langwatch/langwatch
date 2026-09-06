@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "@langwatch/enterprise-licensing-contract";
-import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../index";
+import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../index.ts";
 import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing";
+import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
 
 const baseParams = {
   organizationName: "Acme Corp",

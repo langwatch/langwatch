@@ -13,8 +13,8 @@ vi.mock("react-contextual-analytics", () => ({
 }));
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { OnboardingFormProvider } from "../form-context";
-import { IntentSelectionScreen } from "../intent-selection-screen";
+import { OnboardingFormProvider } from "../form-context.tsx";
+import { IntentSelectionScreen } from "../intent-selection-screen.tsx";
 
 const noop = () => void 0;
 

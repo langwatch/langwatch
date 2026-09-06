@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import type { PromptingTechnique } from "@langwatch/workflow-contract";
-import type { WorkflowBasePropertiesPanelProps } from "./workflow-properties.ports";
+import type { WorkflowBasePropertiesPanelProps } from "./workflow-properties.ports.ts";
 
 export function PromptingTechniquePropertiesPanel({
   node,

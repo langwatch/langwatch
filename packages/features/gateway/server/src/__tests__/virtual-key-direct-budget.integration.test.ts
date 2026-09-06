@@ -12,13 +12,13 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
-import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service";
-import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
+import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import {
   ALL_KEY_IDS,
   BUDGET_BOTH_MANAGED_ID,
@@ -37,7 +37,7 @@ import {
   VK_NEIGHBOUR_UNUSED_ID,
   VK_NEIGHBOUR_USED_ID,
   VK_STANDALONE_ID,
-} from "./support/virtual-key-direct-budget.fixture";
+} from "./support/virtual-key-direct-budget.fixture.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

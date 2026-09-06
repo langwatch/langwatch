@@ -3,8 +3,8 @@ import type React from "react";
 
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 
-import { EmptySection, Section } from "./detail-section";
-import { type DetailPayload, MISSING_VALUE } from "./pull-request-detail";
+import { EmptySection, Section } from "./detail-section.tsx";
+import { type DetailPayload, MISSING_VALUE } from "./pull-request-detail.ts";
 
 type ModelUsage = DetailPayload["modelBreakdown"][number];
 

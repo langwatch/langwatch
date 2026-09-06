@@ -1,5 +1,5 @@
-import { promptApi } from "./prompt-api";
-import { usePromptProject } from "./use-prompt-project";
+import { promptApi } from "./prompt-api.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
 
 export interface UseModelLimitsParams {
   model: string | undefined;

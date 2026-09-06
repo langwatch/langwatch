@@ -8,9 +8,9 @@ import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redi
 import Redis from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
-import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture";
-import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture";
-import type { CodingAgentSessionState } from "../coding-agent-session.projection";
+import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { CodingAgentSessionState } from "../coding-agent-session.projection.ts";
 
 const QUEUE_NAME = "{test/prmap-throttle}";
 const TENANT_ID = "project-throttle";

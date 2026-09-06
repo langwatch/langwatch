@@ -1,9 +1,9 @@
 import { Button, Icon } from "@chakra-ui/react";
 import { Zap } from "lucide-react";
-import { useDrawer } from "../../../../behavior/use-drawer";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { getCurrentFilterText } from "../../../../behavior/filter.store";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { getCurrentFilterText } from "../../../../behavior/filter.store.ts";
 
 /**
  * Filtered traces → automation entry point (ADR-043).

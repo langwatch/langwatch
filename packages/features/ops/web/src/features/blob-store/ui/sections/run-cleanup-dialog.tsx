@@ -1,6 +1,6 @@
 import { Input } from "@chakra-ui/react";
 
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 
 /** Typed in full before the destructive sweep unlocks. */
 const REQUIRED_WORD = "RECLAIM";

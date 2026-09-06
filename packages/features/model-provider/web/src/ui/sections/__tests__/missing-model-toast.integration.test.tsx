@@ -14,7 +14,7 @@ import {
   showAiCallFailedToast,
   showMissingModelToast,
   showProviderDisabledToast,
-} from "../missing-model-toast";
+} from "../missing-model-toast.ts";
 
 beforeEach(() => {
   toaster.remove();

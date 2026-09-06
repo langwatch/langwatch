@@ -17,7 +17,7 @@ import {
   type LangwatchVegaTokens,
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
-} from "../langwatch-vega-config";
+} from "../langwatch-vega-config.ts";
 
 const LIGHT_TOKENS: LangwatchVegaTokens = {
   fontFamily: "Inter, sans-serif",

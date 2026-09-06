@@ -6,7 +6,7 @@ import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   CustomEvaluationSync,
   type CustomEvaluationSyncSubscriberDeps,
-} from "../custom-evaluation-sync.subscriber";
+} from "../custom-evaluation-sync.subscriber.ts";
 
 function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
   return {

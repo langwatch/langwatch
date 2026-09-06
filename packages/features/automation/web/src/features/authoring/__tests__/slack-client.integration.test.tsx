@@ -14,7 +14,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFormCtx } from "../../../model/provider-types";
+import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 vi.mock("@langwatch/design-system/color-mode", () => ({
@@ -28,14 +28,14 @@ const listedChannels: { current: { id: string; name: string }[] | undefined } = 
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
 
-vi.mock("../../../behavior/automation-feedback", () => ({
+vi.mock("../../../behavior/automation-feedback.ts", () => ({
   useDescribeError:
     () =>
     ({ fallbackTitle }: { fallbackTitle?: string }) =>
       fallbackTitle ?? "Something went wrong",
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     automation: {
       getTriggers: {
@@ -55,8 +55,8 @@ vi.mock("../../../behavior/automation-api", () => ({
 }));
 
 import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "@langwatch/automation-contract";
-import slackClient, { type SlackSlice } from "../ui/sections/slack.client";
-import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../../slack-templates";
+import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
+import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../../slack-templates/index.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

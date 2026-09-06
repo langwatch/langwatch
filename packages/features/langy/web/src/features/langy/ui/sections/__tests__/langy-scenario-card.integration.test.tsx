@@ -11,8 +11,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { resolveCapability } from "../../../model/capabilities/capability-registry";
-import { LangyScenarioCard } from "../capabilities/langy-scenario-card";
+import { resolveCapability } from "../../../model/capabilities/capability-registry.ts";
+import { LangyScenarioCard } from "../capabilities/langy-scenario-card.tsx";
 
 /** The payload `langwatch scenario get --format json` hands the panel. */
 const scenarioPayload = {

@@ -4,7 +4,7 @@
  * @see specs/experiments-v3/execution-inputs.feature
  */
 import { describe, expect, it } from "vitest";
-import { ExperimentExecutionDataService } from "../experiment-execution-data.service";
+import { ExperimentExecutionDataService } from "../experiment-execution-data.service.ts";
 
 describe("applyParametersToRows", () => {
   describe("given rows and a parameter for a new field", () => {

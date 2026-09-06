@@ -4,7 +4,7 @@ import {
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
-import { promptApi } from "./prompt-api";
+import { promptApi } from "./prompt-api.ts";
 
 export type { ModelMetadataForFrontend };
 

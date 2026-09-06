@@ -1,5 +1,5 @@
-import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout";
-import { EventSourcingOverview } from "../../features/event-store/ui/sections/event-sourcing-overview";
+import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout.tsx";
+import { EventSourcingOverview } from "../../features/event-store/ui/sections/event-sourcing-overview.tsx";
 
 export default function OpsEventSourcingScreen() {
   return (

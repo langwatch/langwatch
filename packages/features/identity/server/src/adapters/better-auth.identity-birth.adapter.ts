@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
+import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
 /**
  * Born finalized: the entrance a flagged sign-up takes (ADR-116 §3).

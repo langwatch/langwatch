@@ -1,9 +1,9 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../domain/tenantId";
-import type { FoldProjectionStore } from "../foldProjection.types";
-import type { ProjectionStoreContext } from "../projectionStoreContext";
-import { RedisCachedFoldStore } from "../redisCachedFoldStore";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { FoldProjectionStore } from "../foldProjection.types.ts";
+import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
+import { RedisCachedFoldStore } from "../redisCachedFoldStore.ts";
 
 // Capture the wrapper's own logger so the TTL-floor clamp can be asserted to
 // warn (once), while leaving every other observability export intact.

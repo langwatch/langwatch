@@ -9,12 +9,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { scenarioAgentsOf } from "../../../../../behavior/scenarios/use-filtered-scenario-targets";
-import { OfflineTargetsNotice } from "../offline-targets-notice";
-import type { RunDialogAgent } from "../run-target-picker";
-import { TargetSection } from "../target-section";
+import { scenarioAgentsOf } from "../../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import { OfflineTargetsNotice } from "../offline-targets-notice.tsx";
+import type { RunDialogAgent } from "../run-target-picker.tsx";
+import { TargetSection } from "../target-section.tsx";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "project" },
     organization: { id: "org_1" },

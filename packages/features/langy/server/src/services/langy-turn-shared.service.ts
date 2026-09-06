@@ -5,8 +5,8 @@ import {
   type LangyMessagePart,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
-import type { LangyPromptPort } from "./langy-prompt-registry.service";
-import { LangyFinalPartsService } from "./langy-final-parts.service";
+import type { LangyPromptPort } from "./langy-prompt-registry.service.ts";
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import {
   LangyGithubPermitPort,
   LangyHarnessPort,
@@ -17,14 +17,14 @@ import {
   LangyUiActionSurfacePort,
   type LangyWorkerProbeInput,
   LangyWorkerPort,
-} from "../ports/langy-turn-runtime.port";
-import type { LangyTurnAccessPort } from "../ports/langy-turn-access.port";
-import type { LangyTurnHandoffPort } from "../ports/langy-turn-handoff.port";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
-import { LangyConversationService } from "./langy-conversation.service";
-import { LangyCredentialService } from "./langy-credential.service";
-import { LangyMessageRepository } from "../repositories/langy-message.repository";
-import { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository";
+} from "../ports/langy-turn-runtime.port.ts";
+import type { LangyTurnAccessPort } from "../ports/langy-turn-access.port.ts";
+import type { LangyTurnHandoffPort } from "../ports/langy-turn-handoff.port.ts";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
+import { LangyConversationService } from "./langy-conversation.service.ts";
+import { LangyCredentialService } from "./langy-credential.service.ts";
+import { LangyMessageRepository } from "../repositories/langy-message.repository.ts";
+import { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository.ts";
 
 export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 

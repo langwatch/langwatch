@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { useFocusSectionStore } from "../../../../../behavior/focus-section.store";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 
 /**
  * Wires an accordion stack to the cross-component focus pipeline:

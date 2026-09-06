@@ -1,12 +1,12 @@
 import { SecretService } from "@langwatch/secret-contract";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
   ApiRequestFailureCapturePort,
-} from "../api-process.lifecycle";
+} from "../api-process.lifecycle.ts";
 
 describe("ApiProcessLifecycleRoutes", () => {
   it("preserves the empty 204 liveness response for GET and HEAD", async () => {

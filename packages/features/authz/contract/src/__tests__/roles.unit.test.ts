@@ -9,7 +9,7 @@
  * webhook and spend permissions is what stands in for "org-scoped" here.
  */
 import { describe, expect, it } from "vitest";
-import { builtinRoleGrants, builtinRolePermissions } from "../roles";
+import { builtinRoleGrants, builtinRolePermissions } from "../roles.ts";
 
 describe("builtinRoleGrants", () => {
   describe("given a user with an organization admin role", () => {

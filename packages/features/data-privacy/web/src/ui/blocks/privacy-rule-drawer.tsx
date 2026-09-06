@@ -40,13 +40,13 @@ import {
   type PiiChoice,
   type RuleFormState,
   type SecretsChoice,
-} from "../../model/data-privacy-rule-config";
+} from "../../model/data-privacy-rule-config.ts";
 import {
   ESSENTIAL_PII_ENTITY_LABELS,
   ESSENTIAL_PII_SUMMARY,
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
-} from "../../model/pii-entity-labels";
+} from "../../model/pii-entity-labels.ts";
 import {
   CATEGORY_LABELS,
   DISPOSITION_LABELS,
@@ -54,14 +54,14 @@ import {
   inheritedHint,
   PII_VALUE_LABELS,
   SCOPE_ICON,
-} from "../../model/data-privacy-labels";
+} from "../../model/data-privacy-labels.ts";
 import {
   attributePatternError,
   customSecretPatternError,
   secretPatternError,
-} from "../../model/data-privacy-patterns";
-import { AudiencePicker } from "../elements/audience-picker";
-import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group";
+} from "../../model/data-privacy-patterns.ts";
+import { AudiencePicker } from "../elements/audience-picker.tsx";
+import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 
 /**
  * Writing one privacy rule, at one or more scopes.

@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { analyticsApi } from "./analytics-api";
+import { analyticsApi } from "./analytics-api.ts";
 
 export interface UseLangWatchQLWidgetRunInput {
   readonly chartId: string;

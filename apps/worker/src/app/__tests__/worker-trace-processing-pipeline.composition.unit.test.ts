@@ -9,7 +9,7 @@ import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
   createWorkerTraceProcessingPipeline,
   type WorkerTraceProcessingPipelineOptions,
-} from "../worker-trace-processing-pipeline.composition";
+} from "../worker-trace-processing-pipeline.composition.ts";
 
 /**
  * THE DEFINITION, driven through the function the installer registers.

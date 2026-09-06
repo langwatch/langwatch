@@ -4,8 +4,8 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { groupMessagesIntoTurns } from "../turns";
-import type { ChatMessage } from "../../../model/transcript/types";
+import { groupMessagesIntoTurns } from "../turns.ts";
+import type { ChatMessage } from "../../../model/transcript/types.ts";
 
 const kindsOf = (messages: ChatMessage[]) =>
   groupMessagesIntoTurns(messages).map((turn) => turn.kind);

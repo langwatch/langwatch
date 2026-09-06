@@ -1,7 +1,7 @@
 import { Box, Button, Card, Container, HStack, Spacer } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { LogOut } from "react-feather";
-import { signOut } from "../../behavior/auth-client";
+import { signOut } from "../../behavior/auth-client.tsx";
 
 export const SetupLayout = ({
   children,

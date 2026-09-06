@@ -21,22 +21,22 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../../behavior/prompts/use-all-prompts-for-project", () => ({
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
   useAllPromptsForProject: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: { getAll: { useQuery: () => ({ data: mockAgents }) } },
   },
 }));
 
-import { TargetSelector } from "../target-selector";
-import type { TargetValue } from "../../../../model/scenario-target";
+import { TargetSelector } from "../target-selector.tsx";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 
 describe("<TargetSelector/>", () => {
   afterEach(cleanup);

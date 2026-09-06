@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { MAX_SECRETS_PER_PROJECT } from "./secret";
+import { MAX_SECRETS_PER_PROJECT } from "./secret.ts";
 
 export class SecretNotFoundError extends HandledError {
   declare readonly code: "secret_not_found";

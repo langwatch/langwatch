@@ -27,8 +27,8 @@ import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { AuthzDatabase } from "../../authz-read.repository";
-import { EventingAuthzReadRepository } from "../eventing.authz-read.repository";
+import type { AuthzDatabase } from "../../authz-read.repository.ts";
+import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
 
 const ns = `authz-rolekey-${randomUUID().slice(0, 8)}`;
 const organizationId = `${ns}-org`;

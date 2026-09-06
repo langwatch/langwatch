@@ -18,7 +18,7 @@
  * `@langwatch/enterprise-billing-contract` makes about its Prisma enum copies.
  */
 
-import type { RetentionCategory, RetentionScopeType, ResolvedRetention } from "./data-retention";
+import type { RetentionCategory, RetentionScopeType, ResolvedRetention } from "./data-retention.ts";
 
 /** One scope a retention rule can be bound to, named for a reader. */
 export type RetentionScopeRef = {

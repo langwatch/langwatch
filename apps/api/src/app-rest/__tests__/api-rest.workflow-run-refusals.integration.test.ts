@@ -8,9 +8,9 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import { WorkflowNotFoundError, WorkflowNotPublishedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
-import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
+import { REST_AUTH_PROJECT, RestAuthWorld } from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 const PROJECT_KEY = "sk-lw-alpha-workflow-run";
 const WORKFLOW_ID = "workflow-1";

@@ -5,7 +5,7 @@
 import type { TrpcApiMount } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 
-import type { AppTrpcDeclaredCheck, AppTrpcPolicyKit } from "../../app-trpc/app-trpc.policy-kit";
+import type { AppTrpcDeclaredCheck, AppTrpcPolicyKit } from "../../app-trpc/app-trpc.policy-kit.ts";
 
 export function opsPolicyKit(
   middlewares: TrpcApiMount<never, never, never>["middlewares"],

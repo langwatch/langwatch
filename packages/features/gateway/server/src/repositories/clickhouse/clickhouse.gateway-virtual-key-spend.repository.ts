@@ -3,14 +3,14 @@
  */
 import { createLogger } from "@langwatch/observability";
 
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
+import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
 import {
   type GatewaySpendWindow,
   type GatewayTraceRow,
   type GatewayUsageBucket,
   type GatewayVirtualKeySpend,
   GatewayVirtualKeySpendPort,
-} from "../../ports/gateway-virtual-key-spend.port";
+} from "../../ports/gateway-virtual-key-spend.port.ts";
 import { usdDisplayString } from "@langwatch/gateway-contract";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";

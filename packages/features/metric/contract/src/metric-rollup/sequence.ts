@@ -1,5 +1,5 @@
-import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/metric-processing/constants";
-import type { CanonicalMetricDataPoint } from "../schemas/metric-processing/metric-data-point";
+import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/metric-processing/constants.ts";
+import type { CanonicalMetricDataPoint } from "../schemas/metric-processing/metric-data-point.ts";
 
 function compareOrdinal(left: string, right: string): number {
   if (left === right) return 0;

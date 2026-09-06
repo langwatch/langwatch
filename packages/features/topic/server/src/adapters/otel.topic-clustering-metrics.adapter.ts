@@ -4,7 +4,7 @@ import {
   type CounterHandle,
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
-import type { TopicClusteringMetricsPort } from "../intents/topic-clustering.intent";
+import type { TopicClusteringMetricsPort } from "../intents/topic-clustering.intent.ts";
 
 /**
  * The two series names, pinned because two processes write them.

@@ -1,6 +1,6 @@
 import { Button, Input, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Popover } from "./popover";
+import { Popover } from "./popover.tsx";
 
 const meta = {
   title: "Components/Popover",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRetryAfterMessage } from "../retry-after-message.rules";
+import { buildRetryAfterMessage } from "../retry-after-message.rules.ts";
 
 describe("buildRetryAfterMessage", () => {
   describe("given a reset point several seconds in the future", () => {

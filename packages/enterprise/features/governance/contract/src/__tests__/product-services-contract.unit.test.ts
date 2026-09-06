@@ -6,7 +6,7 @@ import {
   issuedPersonalVirtualKeySchema,
   routingPolicySchema,
   toRoutingPolicyScopeType,
-} from "../index";
+} from "../index.ts";
 
 describe("Governance product contracts", () => {
   it("keeps routing policies transport-safe", () => {

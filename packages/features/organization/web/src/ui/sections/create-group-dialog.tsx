@@ -11,18 +11,18 @@ import {
 } from "@chakra-ui/react";
 import { Search, X } from "lucide-react";
 import { useState } from "react";
-import { RandomColorAvatar } from "../elements/random-color-avatar";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import { api } from "../../behavior/organization-api";
+import { api } from "../../behavior/organization-api.ts";
 import {
   BindingInputRow,
   type PendingBinding,
   roleBadgeColor,
   scopeTypeLabel,
-} from "./group-binding-input-row";
-import { useShowErrorToast } from "../../behavior/organization-feedback";
+} from "./group-binding-input-row.tsx";
+import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 export function CreateGroupDialog({
   organizationId,

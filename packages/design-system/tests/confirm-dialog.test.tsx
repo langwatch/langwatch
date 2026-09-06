@@ -8,8 +8,8 @@
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfirmDialog } from "../src/components/confirm-dialog";
-import { renderWithDesignSystem } from "../src/testing";
+import { ConfirmDialog } from "../src/components/confirm-dialog.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const defaultProps = {
   open: true,

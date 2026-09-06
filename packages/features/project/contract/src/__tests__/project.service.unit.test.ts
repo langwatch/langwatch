@@ -4,7 +4,7 @@ import {
   internalProjectQuerySchema,
   internalProjectSchema,
   projectPresenceInputSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("project contract", () => {
   it("accepts the portable internal-project boundary", () => {

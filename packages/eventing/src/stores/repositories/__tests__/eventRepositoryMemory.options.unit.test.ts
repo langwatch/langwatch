@@ -5,7 +5,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ warn }),
 }));
 
-import { EventRepositoryMemory } from "../eventRepositoryMemory";
+import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
 const duplicate = {
   TenantId: "tenant",

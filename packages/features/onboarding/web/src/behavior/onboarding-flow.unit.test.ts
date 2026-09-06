@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { OnboardingScreenIndex } from "./types";
-import { getOnboardingFlowConfig } from "./onboarding-flow";
+import { OnboardingScreenIndex } from "./types.ts";
+import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
 
 /**
  * ADR-038 I3/I7: the flow config IS the fork. Governance track is exactly

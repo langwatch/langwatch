@@ -8,7 +8,7 @@ import type {
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode, useEffect, useState } from "react";
-import type { AgentBrowserPort } from "../../../../model/agent-browser.port";
+import type { AgentBrowserPort } from "../../../../model/agent-browser.port.ts";
 
 /**
  * An agent the way this page holds one: off a query, so its instants are the

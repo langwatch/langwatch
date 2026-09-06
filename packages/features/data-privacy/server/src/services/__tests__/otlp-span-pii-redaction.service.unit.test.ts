@@ -9,8 +9,8 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { PiiAnalysisPort } from "../../ports/pii-analysis.port";
-import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service";
+import { PiiAnalysisPort } from "../../ports/pii-analysis.port.ts";
+import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

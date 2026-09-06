@@ -1,8 +1,8 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiKeyDiagnosticsPort } from "../../ports/api-key-diagnostics.port";
-import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service";
+import { ApiKeyDiagnosticsPort } from "../../ports/api-key-diagnostics.port.ts";
+import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
 
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
 const CUTOVER_AT = new Date("2024-06-01T00:00:00.000Z");

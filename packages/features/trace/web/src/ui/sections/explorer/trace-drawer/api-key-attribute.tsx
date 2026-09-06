@@ -1,10 +1,10 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import { Key } from "lucide-react";
-import { Link } from "../../../blocks/link";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { apiKeySettingsHref } from "../../../../model/api-key-anchor";
-import { api } from "../../../../behavior/trace-api";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
+import { Link } from "../../../blocks/link.tsx";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { apiKeySettingsHref } from "../../../../model/api-key-anchor.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 /**
  * Resource attribute the ingestion receiver stamps on every authenticated

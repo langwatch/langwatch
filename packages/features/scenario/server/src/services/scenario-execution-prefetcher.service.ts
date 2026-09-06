@@ -15,21 +15,21 @@ import type { SuiteService } from "@langwatch/suite-contract";
 import type { TraceService } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service";
-import { ScenarioModelParametersService } from "./scenario-model-parameters.service";
+import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
+import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
-} from "./scenario-prefetch-completion.service";
-import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service";
-import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
-import { ScenarioRunSecretsService } from "./scenario-run-secrets.service";
-import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service";
+} from "./scenario-prefetch-completion.service.ts";
+import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
+import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
+import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
+import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
 export type {
   ModelParamsFailureReason,
   ModelParamsResult,
-} from "./scenario-model-parameters.service";
+} from "./scenario-model-parameters.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 

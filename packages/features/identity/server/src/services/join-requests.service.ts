@@ -21,15 +21,15 @@ import {
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../repositories/join-request.repository";
-import type { JoinRequestService } from "./join-request.service";
+} from "../repositories/join-request.repository.ts";
+import type { JoinRequestService } from "./join-request.service.ts";
 import {
   approveJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
-} from "../rules/join-request-id.rules";
+} from "../rules/join-request-id.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process";
+import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process.ts";
 
 const logger = createLogger("langwatch:identity:join-requests");
 

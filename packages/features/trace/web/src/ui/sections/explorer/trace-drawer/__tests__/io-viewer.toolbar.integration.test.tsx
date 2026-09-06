@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   translate: vi.fn(async () => ({ translation: "translated!" })),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: (permission: string) =>
@@ -23,30 +23,30 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/auth-session", () => ({
+vi.mock("../../../../../behavior/auth-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: {},
   }),
 }));
 
-vi.mock("../../../me/personal-feature-gate-dialog", () => ({
+vi.mock("../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../../../behavior/prompts/use-load-span-into-prompt-playground", () => ({
+vi.mock("../../../../../behavior/prompts/use-load-span-into-prompt-playground.ts", () => ({
   useGoToSpanInPlaygroundTabUrlBuilder: () => ({
     buildUrl: () => new URL("https://app.test/prompts?span=span-7"),
   }),
 }));
 
-vi.mock("../../../use-field-redaction", () => ({
+vi.mock("../../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({
     isRedacted: undefined,
     isLoading: false,
@@ -54,7 +54,7 @@ vi.mock("../../../use-field-redaction", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useQueries: () => [{ data: mocks.storedComments, isLoading: false, isError: false }],
     useUtils: () => ({
@@ -79,7 +79,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { IOViewer } from "../io-viewer";
+import { IOViewer } from "../io-viewer.tsx";
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";

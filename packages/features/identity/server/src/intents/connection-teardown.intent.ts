@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type {
   completeTeardownIntentSchema,
   ConnectionTeardownPort,
-} from "../processes/connection-teardown.process";
+} from "../processes/connection-teardown.process.ts";
 
 const logger = createLogger("langwatch:identity:connection-teardown");
 

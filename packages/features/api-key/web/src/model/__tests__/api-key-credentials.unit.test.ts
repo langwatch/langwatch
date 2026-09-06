@@ -22,8 +22,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildMcpJson, formatEnvLines, maskApiKey, maskSecret } from "../api-key-snippets";
-import { apiKeyRowAnchorId, apiKeySettingsHref } from "../api-key-anchor";
+import { buildMcpJson, formatEnvLines, maskApiKey, maskSecret } from "../api-key-snippets.ts";
+import { apiKeyRowAnchorId, apiKeySettingsHref } from "../api-key-anchor.ts";
 
 const TOKEN = "sk-lw-averyrealsecrettokenvalue";
 

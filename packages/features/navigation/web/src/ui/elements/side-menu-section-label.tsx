@@ -1,5 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import { useSideMenuDensity } from "./side-menu-density";
+import { useSideMenuDensity } from "./side-menu-density.tsx";
 
 /**
  * The heading above a group of sidebar menu items ("OBSERVE",

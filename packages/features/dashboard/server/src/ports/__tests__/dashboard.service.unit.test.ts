@@ -20,8 +20,8 @@ import {
   type DashboardRecord,
   type DashboardSummaryRecord,
   type SavedWorkbenchChartRecord,
-} from "../dashboard.port";
-import { DashboardService } from "../../services/dashboard.service";
+} from "../dashboard.port.ts";
+import { DashboardService } from "../../services/dashboard.service.ts";
 
 const dashboard: DashboardRecord = {
   id: "dashboard_1",

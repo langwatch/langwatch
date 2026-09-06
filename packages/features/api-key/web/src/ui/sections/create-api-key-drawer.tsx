@@ -40,27 +40,27 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker";
+import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
 import { useEffect, useMemo, useState } from "react";
-import { apiKeyApi } from "../../behavior/api-key-api";
+import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   earliestCustomExpiration,
   EXPIRATION_OPTIONS,
   resolveExpiresAt,
-} from "../../model/api-key-form";
-import { useApiKeyHost } from "../../model/api-key-host";
+} from "../../model/api-key-form.ts";
+import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   deriveBindingRole,
   getUserPermissionsAtScope,
   type PermissionMode,
-} from "../../model/api-key-permissions";
+} from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
   type PermissionSelection,
-} from "../blocks/permission-category-list";
+} from "../blocks/permission-category-list.tsx";
 
 type MyBindings = {
   data: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;

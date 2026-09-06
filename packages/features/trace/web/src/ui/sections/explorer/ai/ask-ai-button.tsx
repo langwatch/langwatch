@@ -13,9 +13,9 @@ import {
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import NextLink from "../../../elements/next-link";
-import { aiBrandPalette, aiBrandPaletteHot } from "../../../../model/explorer/ai/ai-brand-palette";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import NextLink from "../../../elements/next-link.tsx";
+import { aiBrandPalette, aiBrandPaletteHot } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 
 // Slow, breathing halo that cycles through the palette so the Ask AI
 // affordance reads as alive without becoming a flashing distraction. Each

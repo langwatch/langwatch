@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
-import { useTraceFacets } from "../../hooks/use-trace-facets";
-import type { NumericMode } from "../../../../../behavior/numeric-mode.store";
-import { useDensityStore } from "../../../../../behavior/density.store";
+import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
+import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
+import { useDensityStore } from "../../../../../behavior/density.store.ts";
 import {
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
@@ -16,20 +16,20 @@ import {
   RANGE_DEFAULTS,
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
-} from "../../../../../behavior/facet-constants";
-import { applyLensOrder, useFacetLensStore } from "../../../../../behavior/facet-lens.store";
+} from "../../../../../behavior/facet-constants.ts";
+import { applyLensOrder, useFacetLensStore } from "../../../../../behavior/facet-lens.store.ts";
 import {
   selectVisibilityFor,
   useFacetVisibilityStore,
-} from "../../../../../behavior/facet-visibility.store";
-import { useFilterStore } from "../../../../../behavior/filter.store";
+} from "../../../../../behavior/facet-visibility.store.ts";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import {
   selectNumericModesFor,
   useNumericModeStore,
-} from "../../../../../behavior/numeric-mode.store";
-import { hashColor } from "../../../../../model/display-formatters";
-import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode";
-import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups";
+} from "../../../../../behavior/numeric-mode.store.ts";
+import { hashColor } from "../../../../../model/display-formatters.ts";
+import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
+import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
 import type {
   AttributeKey,
   AttributesSectionData,
@@ -38,8 +38,8 @@ import type {
   FacetValueState,
   RangeSectionData,
   Section,
-} from "../../../../../behavior/explorer/filter-sidebar/types";
-import { facetLabel, sortBySectionOrder } from "../utils";
+} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
 export function useFilterSidebarData() {
   const ast = useFilterStore((s) => s.ast);

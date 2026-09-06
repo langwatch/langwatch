@@ -14,15 +14,15 @@ import {
 } from "@langwatch/suite-server/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { QueueRunCommand } from "../../../adapters/simulation-processing-commands.adapter";
+import { QueueRunCommand } from "../../../adapters/simulation-processing-commands.adapter.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
-} from "../../../projections/simulation-run-state.projection";
-import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository";
-import { RunConfigurationsService } from "../../../services/run-configurations.service";
-import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository";
-import { SimulationRunStateRepositoryClickHouse } from "../clickhouse.simulation-run-state.repository";
+} from "../../../projections/simulation-run-state.projection.ts";
+import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository.ts";
+import { RunConfigurationsService } from "../../../services/run-configurations.service.ts";
+import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository.ts";
+import { SimulationRunStateRepositoryClickHouse } from "../clickhouse.simulation-run-state.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

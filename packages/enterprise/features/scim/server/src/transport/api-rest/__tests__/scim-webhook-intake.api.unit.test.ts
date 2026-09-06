@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createScimWebhookRestApp } from "../scim-webhook-intake.api";
+import { createScimWebhookRestApp } from "../scim-webhook-intake.api.ts";
 
 const SECRET = "deployment-shared-secret";
 const NOW = new Date("2026-09-04T10:00:00.000Z");

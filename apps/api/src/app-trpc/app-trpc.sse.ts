@@ -7,12 +7,12 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
 import { TRPCError } from "@trpc/server";
-import { isCrossSiteRequest } from "../api-rest.cross-site";
+import { isCrossSiteRequest } from "../api-rest.cross-site.ts";
 import {
   LiveStreamCrossSiteBlockedError,
   LiveStreamNotFoundError,
   LiveStreamUnsupportedProcedureError,
-} from "./app-trpc.sse.errors";
+} from "./app-trpc.sse.errors.ts";
 
 /** How often the channel writes a comment so an idle proxy keeps it open. */
 export const SSE_KEEPALIVE_INTERVAL_MS = 25_000;

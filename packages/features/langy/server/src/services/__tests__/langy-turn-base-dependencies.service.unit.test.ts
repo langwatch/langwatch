@@ -4,12 +4,12 @@
  * payload, unset when no harness resolver is composed.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { LangyWorkerProbeInput } from "../../ports/langy-turn-runtime.port";
+import type { LangyWorkerProbeInput } from "../../ports/langy-turn-runtime.port.ts";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
   const probe = vi.fn<(input: LangyWorkerProbeInput) => Promise<boolean>>(async () => false);

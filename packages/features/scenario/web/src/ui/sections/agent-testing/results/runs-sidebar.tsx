@@ -6,13 +6,13 @@
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker";
-import type { PeriodControls } from "./period-controls";
-import { RunsSidebarBatchEntry } from "./runs-sidebar-batch-entry";
-import { RunsSidebarEntry } from "../../../elements/agent-testing/results/runs-sidebar-entry";
-import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches";
-import { NewSimulationsCallout } from "../../suites/new-simulations-callout";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import type { PeriodControls } from "./period-controls.ts";
+import { RunsSidebarBatchEntry } from "./runs-sidebar-batch-entry.tsx";
+import { RunsSidebarEntry } from "../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
+import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 
 export const RUNS_SIDEBAR_WIDTH = 230;
 

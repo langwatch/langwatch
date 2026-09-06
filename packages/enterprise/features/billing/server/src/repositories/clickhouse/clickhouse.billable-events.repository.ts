@@ -18,7 +18,7 @@ import type { DataFormat } from "@clickhouse/client";
 import {
   BillableEventsRepository,
   type BillableEventsWindow,
-} from "../../ports/billable-events.port";
+} from "../../ports/billable-events.port.ts";
 
 /**
  * The one read shape these queries issue, rather than a vendor client.

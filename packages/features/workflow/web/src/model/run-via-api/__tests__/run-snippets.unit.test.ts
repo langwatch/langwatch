@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type BuildRunSnippetInput, buildRunSnippet, type RunSnippetLang } from "../run-snippets";
+import { type BuildRunSnippetInput, buildRunSnippet, type RunSnippetLang } from "../run-snippets.ts";
 
 const baseInput: Omit<BuildRunSnippetInput, "dataSource" | "lang"> = {
   kind: "experiment",

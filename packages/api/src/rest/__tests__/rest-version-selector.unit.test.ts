@@ -1,6 +1,6 @@
-import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.js";
-import { restVersionSelectorMiddleware, RestVersionSelector } from "../rest-version-selector.js";
-import { API_VERSION_HEADER } from "../types.js";
+import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.ts";
+import { restVersionSelectorMiddleware, RestVersionSelector } from "../rest-version-selector.ts";
+import { API_VERSION_HEADER } from "../types.ts";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 

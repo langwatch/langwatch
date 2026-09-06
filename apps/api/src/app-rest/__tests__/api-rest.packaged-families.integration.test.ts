@@ -21,11 +21,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type ApiPackagedRestCollaborators,
   type ApiPackagedRestFamilyName,
-} from "../app-rest.packaged-families";
-import { createApiProcessRestFeatures } from "../app-rest.process-features";
-import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth";
-import { unavailableIdempotentRunner } from "../../app/api-idempotency.composition";
-import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter";
+} from "../app-rest.packaged-families.ts";
+import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth.ts";
+import { unavailableIdempotentRunner } from "../../app/api-idempotency.composition.ts";
+import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 

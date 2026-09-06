@@ -19,9 +19,9 @@ export {
   updateInputFields,
   updateOutputFields,
   type WorkflowStore,
-} from "./workflow-store";
+} from "./workflow-store.ts";
 
-import { store, type WorkflowStore } from "./workflow-store";
+import { store, type WorkflowStore } from "./workflow-store.ts";
 
 export const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {

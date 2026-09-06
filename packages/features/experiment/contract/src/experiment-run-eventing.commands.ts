@@ -1,6 +1,6 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { experimentRunEventingTargetSchema } from "./experiment-run-eventing.events";
+import { experimentRunEventingTargetSchema } from "./experiment-run-eventing.events.ts";
 
 export const startExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),

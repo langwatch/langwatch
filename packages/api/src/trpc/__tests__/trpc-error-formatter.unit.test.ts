@@ -21,7 +21,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { HandledError } from "@langwatch/handled-error";
 import type { TRPCDefaultErrorShape } from "@trpc/server";
-import { createTrpcErrorFormatter } from "../trpc-error-formatter.js";
+import { createTrpcErrorFormatter } from "../trpc-error-formatter.ts";
 
 const formatter = createTrpcErrorFormatter({
   causePayload: { payloadFor: () => null },

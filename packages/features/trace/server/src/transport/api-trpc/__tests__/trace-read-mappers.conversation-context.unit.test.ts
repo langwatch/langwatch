@@ -4,7 +4,7 @@ import {
   toConversationContextTurn as toConversationContextTurnWithPorts,
   type TraceContentPrivacyPort,
   type V2Protections,
-} from "../trace-read-mappers.api";
+} from "../trace-read-mappers.api.ts";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,

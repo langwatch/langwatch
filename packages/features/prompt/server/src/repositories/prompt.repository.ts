@@ -12,7 +12,7 @@ import type {
   CreateLlmConfigVersionParams,
   LlmConfigVersionsRepository,
   PromptVersionRow,
-} from "./prompt-version.repository";
+} from "./prompt-version.repository.ts";
 
 /** A stored prompt config row. */
 export type PromptConfigRow = {

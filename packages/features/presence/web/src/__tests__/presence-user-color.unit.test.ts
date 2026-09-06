@@ -5,7 +5,7 @@ import {
   presenceSessionColor,
   presenceUserColor,
   presenceUserDisplayName,
-} from "../presence-user-color";
+} from "../presence-user-color.ts";
 
 function user(overrides: Partial<PresenceUser> = {}): PresenceUser {
   return { id: "u1", name: "Alice", image: null, ...overrides };

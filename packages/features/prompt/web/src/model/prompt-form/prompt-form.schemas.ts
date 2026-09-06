@@ -6,8 +6,8 @@ import {
   runtimeParametersSchema,
   scopeSchema,
 } from "@langwatch/prompt-contract";
-import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../token-limits";
-import { versionMetadataSchema } from "./version-metadata.schemas";
+import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../token-limits.ts";
+import { versionMetadataSchema } from "./version-metadata.schemas.ts";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 

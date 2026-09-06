@@ -3,7 +3,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { shouldHideBreakMarker } from "../io-preview";
+import { shouldHideBreakMarker } from "../io-preview.tsx";
 
 describe("shouldHideBreakMarker", () => {
   // The clamp shows 2 lines, so a 40px clamped box is two 20px lines: the

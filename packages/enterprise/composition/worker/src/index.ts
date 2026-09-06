@@ -49,10 +49,10 @@ export {
   WorkerGovernanceIngestionPullHost,
   currentRegistryRateVersion,
   type WorkerGovernanceIngestionPullHostOptions,
-} from "./governance/governance-ingestion-pull.host";
+} from "./governance/governance-ingestion-pull.host.ts";
 
 export {
   startSpendSpikeAnomalyWorker,
   type SpendSpikeAnomalyWorkerDependencies,
   type SpendSpikeAnomalyWorkerHandle,
-} from "./governance/spend-spike-anomaly.worker";
+} from "./governance/spend-spike-anomaly.worker.ts";

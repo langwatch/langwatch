@@ -19,7 +19,7 @@ import {
   WebhookBatchPlannerService,
   WEBHOOK_FLUSH_RECHECK_MS,
   type PendingEnvelope,
-} from "../webhook-batch-planner.service";
+} from "../webhook-batch-planner.service.ts";
 
 const NOW = 1_000_000;
 

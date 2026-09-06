@@ -11,14 +11,14 @@ import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
-} from "../../services/langwatch-ql-catalog-shapes.service";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service";
-import { LangWatchQLViewStatementsService } from "../../services/langwatch-ql-view-statements.service";
-import { validateLangWatchQL } from "./lwql-validate";
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
+import { LangWatchQLViewStatementsService } from "../../services/langwatch-ql-view-statements.service.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -43,7 +43,7 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
-} from "./lwql-clickhouse-harness";
+} from "./lwql-clickhouse-harness.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();

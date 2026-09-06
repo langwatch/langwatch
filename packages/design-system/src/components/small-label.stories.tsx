@@ -1,6 +1,6 @@
 import { Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SmallLabel } from "./small-label";
+import { SmallLabel } from "./small-label.tsx";
 
 const meta = {
   title: "Primitives/Small label",

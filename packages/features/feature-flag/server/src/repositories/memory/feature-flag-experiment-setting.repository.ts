@@ -2,7 +2,7 @@ import {
   FeatureFlagExperimentRepository,
   type ExperimentSetting,
   type ExperimentSubject,
-} from "../feature-flag-experiment-setting.repository";
+} from "../feature-flag-experiment-setting.repository.ts";
 
 function keyOf({
   flagKey,

@@ -5,20 +5,20 @@
  */
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import type { Command, CommandHandler } from "../../commands/command";
-import { defineCommandSchema } from "../../commands/commandSchema";
-import { defineAggregate, defineEvents } from "../../domain/definitions";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import { EventSourcing } from "../../eventSourcing";
-import { definePipeline } from "../../pipeline/staticBuilder";
+import type { Command, CommandHandler } from "../../commands/command.ts";
+import { defineCommandSchema } from "../../commands/commandSchema.ts";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
-} from "../../queues/queue.types";
-import { EventUtils } from "../../utils/event.utils";
-import { EventStoreProducerOnly } from "../eventStoreProducerOnly";
-import type { EventStoreReadContext } from "../eventStore.types";
+} from "../../queues/queue.types.ts";
+import { EventUtils } from "../../utils/event.utils.ts";
+import { EventStoreProducerOnly } from "../eventStoreProducerOnly.ts";
+import type { EventStoreReadContext } from "../eventStore.types.ts";
 
 const readContext: EventStoreReadContext = { tenantId: createTenantId("organization-1") };
 

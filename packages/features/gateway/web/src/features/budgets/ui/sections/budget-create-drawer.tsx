@@ -15,13 +15,13 @@ import { useMemo, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { describeError } from "../../../../model/describe-error";
-import { readHandledError } from "../../../../model/handled-error";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import { api } from "../../../../behavior/gateway-api";
+import { describeError } from "../../../../model/describe-error.ts";
+import { readHandledError } from "../../../../model/handled-error.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { api } from "../../../../behavior/gateway-api.ts";
 
-import { humanizeGatewayError } from "../../../../model/gateway-error-copy";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 
 /**
  * A budget on a scope no active key can reach is refused, because it would

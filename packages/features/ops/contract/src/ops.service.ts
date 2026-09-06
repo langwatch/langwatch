@@ -1,4 +1,4 @@
-import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin";
+import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin.ts";
 import type {
   DeleteBlobInput,
   DeleteBlobResult,
@@ -9,8 +9,8 @@ import type {
   OpsBlobStoreStats,
   BlobSweepReport,
   RunBlobCleanupInput,
-} from "./blob-store";
-import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice";
+} from "./blob-store.ts";
+import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice.ts";
 import type {
   ListPausedSchedulesInput,
   ListScheduledJobsInput,
@@ -19,8 +19,8 @@ import type {
   ScheduleControlInput,
   SchedulerAuditEntryView,
   SetScheduleActiveInput,
-} from "./ops-scheduler";
-import type { Anomaly, AnomalyKind } from "./ops-anomaly";
+} from "./ops-scheduler.ts";
+import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type {
   GroupInfo,
   OpsBlockedSummary,
@@ -34,7 +34,7 @@ import type {
   OpsQueueReconcileResult,
   QueueInfo,
   QueueSummaryInfo,
-} from "./ops-queue";
+} from "./ops-queue.ts";
 
 /** The single portable capability for platform operations and backoffice work. */
 export abstract class OpsService {

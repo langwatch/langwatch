@@ -11,9 +11,9 @@ import type {
   BetterAuthFederationPort,
   BetterAuthIdentityCeremoniesPort,
   BetterAuthStoragePort,
-} from "../../../ports/better-auth.port";
-import { createAuthOptions, type BetterAuthDeploymentConfiguration } from "../better-auth.api";
-import type { SignInRouterShadowPort } from "../sign-in-router-shadow.api";
+} from "../../../ports/better-auth.port.ts";
+import { createAuthOptions, type BetterAuthDeploymentConfiguration } from "../better-auth.api.ts";
+import type { SignInRouterShadowPort } from "../sign-in-router-shadow.api.ts";
 
 const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
 const OKTA: SignInMethod = { id: "okta", kind: "federated", connectionId: "org_acme" };

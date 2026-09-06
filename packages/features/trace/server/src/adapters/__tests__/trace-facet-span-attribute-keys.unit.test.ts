@@ -1,8 +1,8 @@
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
-import { ClickHouseSpanAttributeKeysFacetAdapter } from "../trace-facet-span-attribute-keys.clickhouse.adapter";
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseSpanAttributeKeysFacetAdapter } from "../trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 import { describe, expect, it } from "vitest";
-import { KEY_DISCOVERY_SETTINGS } from "../trace-facet-query.clickhouse.adapter";
-import { SPAN_ATTRIBUTE_KEYS_FACET } from "../trace-facet-span-attribute-keys.clickhouse.adapter";
+import { KEY_DISCOVERY_SETTINGS } from "../trace-facet-query.clickhouse.adapter.ts";
+import { SPAN_ATTRIBUTE_KEYS_FACET } from "../trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 
 const baseCtx = {
   tenantId: "tenant-A",

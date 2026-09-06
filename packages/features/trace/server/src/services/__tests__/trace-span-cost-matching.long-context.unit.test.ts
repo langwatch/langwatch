@@ -1,4 +1,4 @@
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
 import { describe, expect, it } from "vitest";
 import { getStaticModelCostRates, matchModelCost } from "@langwatch/model-provider-contract";
 

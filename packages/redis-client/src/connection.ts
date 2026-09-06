@@ -13,8 +13,8 @@ import {
   type RedisConfigResolution,
   type RedisEnvironment,
   type RedisStandaloneConfig,
-} from "./config";
-import type { RedisConnection, RedisLogger } from "./types";
+} from "./config.ts";
+import type { RedisConnection, RedisLogger } from "./types.ts";
 
 export interface RedisConnectionServiceOptions {
   /** Receives connection lifecycle events and configuration warnings. */

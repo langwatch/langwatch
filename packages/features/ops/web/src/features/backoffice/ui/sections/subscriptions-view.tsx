@@ -19,12 +19,12 @@ import { useDebounce } from "use-debounce";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 
-import { PlanTypes, SubscriptionStatus } from "../../model/backoffice-enums";
-import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells";
-import { BackofficeTable } from "./backoffice-table-shell";
+import { PlanTypes, SubscriptionStatus } from "../../model/backoffice-enums.ts";
+import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 interface AdminSubscription {
   id: string;
   organizationId: string;

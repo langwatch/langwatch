@@ -1,10 +1,10 @@
 import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, Clock } from "lucide-react";
-import { CollapsibleSection, CopyButton } from "../elements/http-test-components";
+import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
 import {
   type HttpTestErrorExplanationPort,
   type HttpTestResult,
-} from "../../model/http-test.types";
+} from "../../model/http-test.types.ts";
 
 export function getStatusColor(status: number): string {
   if (status >= 200 && status < 300) return "green";

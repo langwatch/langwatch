@@ -3,7 +3,7 @@
  * port, service or transport names the generated client. Each mirrors
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
-import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget";
+import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type GatewayJsonObject = { [Key in string]?: GatewayJsonValue };

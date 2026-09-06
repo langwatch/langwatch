@@ -10,9 +10,9 @@
  */
 import { z } from "zod";
 
-import { validateModelAliasesAgainstBoundProviders } from "../../../model/virtual-key-alias-validation";
+import { validateModelAliasesAgainstBoundProviders } from "../../../model/virtual-key-alias-validation.ts";
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { isModelTier, MODEL_TIERS, type ModelTier } from "./model-tier-presets";
+import { isModelTier, MODEL_TIERS, type ModelTier } from "./model-tier-presets.ts";
 
 /** The four dimensions a restriction rule can target. */
 export const RESTRICTION_DIMENSIONS = ["tools", "mcp", "urls", "models"] as const;

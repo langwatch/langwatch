@@ -17,27 +17,27 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "@langwatch/prompt-contract";
-import { describeLocalFileUpdate } from "../ports/prompt-describe-local-file-update.port";
+import { describeLocalFileUpdate } from "../ports/prompt-describe-local-file-update.port.ts";
 import {
   HandleGenerationError,
   NotFoundError,
   SystemPromptRequiredError,
 } from "@langwatch/prompt-contract";
-import { toHandleSlug } from "../ports/prompt-handle-slug.port";
+import { toHandleSlug } from "../ports/prompt-handle-slug.port.ts";
 import { hoistSystemMessage } from "@langwatch/prompt-contract";
-import { mergeAutoDetectedInputs } from "../ports/prompt-merge-auto-detected-inputs.port";
-import { PromptVersionService } from "./prompt-version.service";
+import { mergeAutoDetectedInputs } from "../ports/prompt-merge-auto-detected-inputs.port.ts";
+import { PromptVersionService } from "./prompt-version.service.ts";
 import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
-import { PromptTagService } from "./prompt-tag.service";
-import { remoteConfigDataOf } from "../rules/prompt-sync.rules";
+import { PromptTagService } from "./prompt-tag.service.ts";
+import { remoteConfigDataOf } from "../rules/prompt-sync.rules.ts";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
-} from "../repositories/prompt.repository";
+} from "../repositories/prompt.repository.ts";
 import {
   PromptTagAssignmentRepository,
   TagValidationError,
-} from "../repositories/prompt-tag-assignment.repository";
+} from "../repositories/prompt-tag-assignment.repository.ts";
 import {
   diffRuntimeParameters,
   type getLatestConfigVersionSchema,
@@ -47,8 +47,8 @@ import {
   parseRuntimeParameters,
   runtimeParametersEqual,
 } from "@langwatch/prompt-contract";
-import { PromptTagRepository } from "../repositories/prompt-tag.repository";
-import { transformCamelToSnake, transformSnakeToCamel } from "../ports/prompt-transform-db.port";
+import { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
+import { transformCamelToSnake, transformSnakeToCamel } from "../ports/prompt-transform-db.port.ts";
 
 const logger = createLogger("langwatch:prompt-service");
 

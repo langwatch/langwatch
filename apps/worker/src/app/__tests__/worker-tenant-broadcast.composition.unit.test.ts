@@ -1,6 +1,6 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
-import { tryCreateWorkerTenantBroadcast } from "../worker-tenant-broadcast.composition";
+import { tryCreateWorkerTenantBroadcast } from "../worker-tenant-broadcast.composition.ts";
 
 /**
  * Spec: packages/features/notification/specs/tenant-broadcast-twin.feature

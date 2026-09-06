@@ -18,8 +18,8 @@ import {
 } from "@langwatch/scenario-server";
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime";
-import { ScenarioWorkerFeatureInstaller } from "../scenario-worker-feature.installer";
+import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime.ts";
+import { ScenarioWorkerFeatureInstaller } from "../scenario-worker-feature.installer.ts";
 
 type JobConfig = {
   name: string;

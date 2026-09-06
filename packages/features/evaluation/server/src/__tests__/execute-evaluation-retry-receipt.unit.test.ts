@@ -6,7 +6,7 @@ import {
   buildExecuteCommand,
   buildExecutionDeps,
   TestEvaluationExecutionReceipt,
-} from "../ports/__tests__/support/evaluation-execution.fixtures";
+} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
 
 function reportedCostId(events: EvaluationProcessingEvent[]) {
   const event = events.find((candidate) => candidate.type === "lw.evaluation.reported");

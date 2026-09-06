@@ -28,9 +28,9 @@ import { z } from "zod";
 import type {
   AnalyticsMetricSource as RepositoryMetricSource,
   GraphTriggerSentRepository,
-} from "../repositories/graph-trigger-sent.repository";
-import type { TriggerRepository } from "../repositories/trigger.repository";
-import type { AutomationHeartbeatPort, AutomationLoggerPort } from "../ports/automation-graph.port";
+} from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationHeartbeatPort, AutomationLoggerPort } from "../ports/automation-graph.port.ts";
 
 export type AnalyticsMetricSource = RepositoryMetricSource;
 export type ClickHouseClient = {

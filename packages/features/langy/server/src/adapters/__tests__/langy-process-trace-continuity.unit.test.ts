@@ -17,16 +17,16 @@ import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../../ports/langy-conversation-process.port";
-import { langyConversationProcess } from "../../processes/langy-conversation.process";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../../ports/langy-conversation-process.port.ts";
+import { langyConversationProcess } from "../../processes/langy-conversation.process.ts";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
   PROJECT_ID,
   T0,
-} from "./helpers/langyEventFixtures";
+} from "./helpers/langyEventFixtures.ts";
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own

@@ -1,5 +1,5 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import type { OpsExplainClientResolution } from "../ports/ops-explain-client.port";
+import type { OpsExplainClientResolution } from "../ports/ops-explain-client.port.ts";
 
 /**
  * The one call this repository makes, as it asks for it. Narrower than the

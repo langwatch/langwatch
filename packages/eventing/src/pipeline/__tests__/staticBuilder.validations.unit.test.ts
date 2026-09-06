@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineAggregate, defineEvents } from "../../domain/definitions";
-import type { Event } from "../../domain/types";
-import type { StateProjectionDefinition } from "../../projections/stateProjection.types";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import type { Event } from "../../domain/types.ts";
+import type { StateProjectionDefinition } from "../../projections/stateProjection.types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
-} from "../../services/__tests__/testHelpers";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
-import { definePipeline } from "../staticBuilder";
+} from "../../services/__tests__/testHelpers.ts";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
+import { definePipeline } from "../staticBuilder.ts";
 
 function testPipeline<E extends Event>() {
   return definePipeline<E>({

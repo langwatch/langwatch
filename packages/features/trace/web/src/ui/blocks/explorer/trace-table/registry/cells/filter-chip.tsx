@@ -2,7 +2,7 @@ import { Box, type BoxProps, chakra, Icon } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type React from "react";
 import { forwardRef } from "react";
-import { Link } from "../../../../link";
+import { Link } from "../../../../link.tsx";
 
 interface FilterChipBaseProps {
   /** Toggle the facet filter for this value. */

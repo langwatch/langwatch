@@ -6,11 +6,11 @@ import { Controller, useForm } from "react-hook-form";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PromptScope } from "@langwatch/workflow-contract";
-import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-handle-check";
+import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-handle-check.ts";
 import {
   type ChangeHandleFormValues,
   createChangeHandleFormSchema,
-} from "../../../../surfaces/prompt-form";
+} from "../../../../surfaces/prompt-form/index.ts";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;

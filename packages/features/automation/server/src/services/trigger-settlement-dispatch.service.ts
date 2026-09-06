@@ -6,26 +6,26 @@ import type {
   LogOverflowIntent,
   NotifyDigestIntent,
   PersistMatchIntent,
-} from "../intents/trigger-settlement.intent";
-import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
+} from "../intents/trigger-settlement.intent.ts";
+import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 import type {
   AutomationSlackProviderPort,
   AutomationWebhookProviderPort,
-} from "../ports/automation-provider.port";
+} from "../ports/automation-provider.port.ts";
 import type {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
-} from "../ports/automation-settlement.port";
-import { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port";
-import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
-import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port";
-import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port";
-import type { AutomationEmailCapService } from "./email-cap.service";
-import type { AutomationPersistActionService } from "./persist-action.service";
-import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service";
-import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service";
+} from "../ports/automation-settlement.port.ts";
+import { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port.ts";
+import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
+import type { AutomationSettlementTraceReaderPort } from "../ports/automation-settlement-read.port.ts";
+import type { AutomationProjectIdentityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
+import type { AutomationPersistActionService } from "./persist-action.service.ts";
+import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
+import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 

@@ -6,8 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ModelSelector } from "../model-selector";
-import { NoModelsConfiguredCallout } from "../no-models-configured-callout";
+import { ModelSelector } from "../model-selector.tsx";
+import { NoModelsConfiguredCallout } from "../no-models-configured-callout.tsx";
 
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({

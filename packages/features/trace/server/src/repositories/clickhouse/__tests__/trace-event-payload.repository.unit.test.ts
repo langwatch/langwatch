@@ -1,11 +1,11 @@
 import { Ksuid, generate } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { TraceClickHousePort, type TraceClickHouseClient } from "../../../ports/clickhouse.port";
+import { TraceClickHousePort, type TraceClickHouseClient } from "../../../ports/clickhouse.port.ts";
 import {
   ClickHouseTraceEventPayloadRepository,
   TraceEventPayloadFieldNotFoundError,
   TraceEventPayloadNotFoundError,
-} from "../trace-event-payload.repository";
+} from "../trace-event-payload.repository.ts";
 
 type Query = { query: string; query_params?: Record<string, unknown> };
 

@@ -1,11 +1,11 @@
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./langy-database.mapper";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
 
-import { LangyConversationRepository } from "../langy-conversation-projection.repository";
+import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRow,
-} from "../langy-conversation-projection.repository";
+} from "../langy-conversation-projection.repository.ts";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 

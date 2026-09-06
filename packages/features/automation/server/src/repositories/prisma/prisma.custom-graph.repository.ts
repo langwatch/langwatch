@@ -1,5 +1,5 @@
 import type { CustomGraph, CustomGraphNameRef } from "@langwatch/automation-contract";
-import { CustomGraphRepository } from "../custom-graph.repository";
+import { CustomGraphRepository } from "../custom-graph.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const BUILDER_CHART_KIND = "builder";

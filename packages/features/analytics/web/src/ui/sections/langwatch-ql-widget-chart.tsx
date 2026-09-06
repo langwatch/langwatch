@@ -28,7 +28,7 @@ import {
 } from "@langwatch/analytics-contract/visualization";
 import { starterVegaLiteSpec } from "@langwatch/analytics-contract/visualization";
 
-import { ThemedLangWatchQLVegaLiteChart } from "./themed-langwatch-ql-vega-lite-chart";
+import { ThemedLangWatchQLVegaLiteChart } from "./themed-langwatch-ql-vega-lite-chart.tsx";
 
 export interface LangWatchQLWidgetChartProps {
   readonly columns: readonly LangWatchQLDatasetColumn[];

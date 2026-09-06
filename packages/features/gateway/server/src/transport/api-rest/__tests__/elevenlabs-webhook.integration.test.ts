@@ -18,21 +18,21 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { PrismaGatewayElevenLabsCredentialRepository } from "../../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository";
+import { PrismaGatewayElevenLabsCredentialRepository } from "../../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
-import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter";
-import { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port";
-import { GatewaySpendConfirmationPort } from "../../../ports/gateway-spend-confirmation.port";
-import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process";
-import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service";
+import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port.ts";
+import { GatewaySpendConfirmationPort } from "../../../ports/gateway-spend-confirmation.port.ts";
+import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process.ts";
+import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
-} from "../../../services/gateway-realtime-session.service";
-import { createElevenLabsWebhookRestApp } from "../elevenlabs-webhook.api";
-import { PrismaGatewayRealtimeSessionRepository } from "../../../repositories/prisma/prisma.gateway-realtime-session.repository";
+} from "../../../services/gateway-realtime-session.service.ts";
+import { createElevenLabsWebhookRestApp } from "../elevenlabs-webhook.api.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {

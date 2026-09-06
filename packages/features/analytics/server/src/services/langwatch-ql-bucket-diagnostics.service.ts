@@ -4,7 +4,7 @@
  */
 import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules";
+import type { LangWatchQLDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 
 /**
  * Buckets needed before a gap can be told from the spacing. Two buckets one hour apart are

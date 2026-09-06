@@ -18,7 +18,7 @@ import { z } from "zod";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { slugify } from "@langwatch/design-system/slugify";
-import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators";
+import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/surfaces/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
@@ -37,17 +37,17 @@ import {
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,
-} from "../../../model/evaluations/types";
+} from "../../../model/evaluations/types.ts";
 import { type MappingState, mappingStateSchema } from "@langwatch/trace-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping";
+import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import DynamicZodForm from "./dynamic-zod-form";
-import { EvaluationManualIntegration } from "./evaluation-manual-integration";
-import { EvaluatorSelection } from "./evaluator-selection";
-import { PreconditionsField } from "../../elements/checks/preconditions-field";
-import { TryItOut } from "./try-it-out";
+import DynamicZodForm from "./dynamic-zod-form.tsx";
+import { EvaluationManualIntegration } from "./evaluation-manual-integration.tsx";
+import { EvaluatorSelection } from "./evaluator-selection.tsx";
+import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
+import { TryItOut } from "./try-it-out.tsx";
 
 export interface CheckConfigFormData {
   name: string;

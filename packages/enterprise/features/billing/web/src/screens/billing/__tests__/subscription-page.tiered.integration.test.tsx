@@ -7,15 +7,15 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../model/billing-plans";
+import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../model/billing-plans.ts";
 import {
   type BillingFailureNotice,
   type BillingHostOrganization,
   BillingHostPort,
   BillingHostProvider,
   type BillingSuccessNotice,
-} from "../../../model/billing-host";
-import { SubscriptionPage } from "../subscription-page";
+} from "../../../model/billing-host.ts";
+import { SubscriptionPage } from "../subscription-page.tsx";
 import {
   createMockPlan,
   mockCreateSubscription,
@@ -23,7 +23,7 @@ import {
   mockOrganization,
   resetMocks,
   setMockOrganization,
-} from "./subscription-test-setup";
+} from "./subscription-test-setup.ts";
 
 class TestBillingHost extends BillingHostPort {
   readonly successes: BillingSuccessNotice[] = [];
@@ -91,7 +91,7 @@ const renderSubscriptionPage = () => {
 // vi.mock declarations (hoisted — must be at module top-level)
 // ---------------------------------------------------------------------------
 vi.mock("@langwatch/ui-host/upgrade-modal-store", async () => {
-  const setup = await import("./subscription-test-setup");
+  const setup = await import("./subscription-test-setup.ts");
   return {
     useUpgradeModalStore: (
       selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
@@ -99,8 +99,8 @@ vi.mock("@langwatch/ui-host/upgrade-modal-store", async () => {
   };
 });
 
-vi.mock("../../../behavior/billing-api", async () => {
-  const setup = await import("./subscription-test-setup");
+vi.mock("../../../behavior/billing-api.ts", async () => {
+  const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
       plan: {

@@ -8,13 +8,13 @@ import { Box, chakra, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
-import { ParameterRowsEditor } from "./parameter-rows-editor";
-import type { RunDialogForm } from "./use-run-dialog-form";
-import { ParameterLineField } from "./parameter-line-field";
-import { errorOnLine, parameterPlaceholder } from "./parameter-suggestions";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
+import type { RunDialogForm } from "./use-run-dialog-form.ts";
+import { ParameterLineField } from "./parameter-line-field.tsx";
+import { errorOnLine, parameterPlaceholder } from "./parameter-suggestions.ts";
 
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";

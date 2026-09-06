@@ -14,12 +14,12 @@
  * integration tests can stay about rendering.
  */
 import { describe, expect, it } from "vitest";
-import { recordingGovernanceToaster } from "../../../testing";
+import { recordingGovernanceToaster } from "../../../testing.tsx";
 import {
   buildCreateInput,
   type ComposerState,
   PARSER_FIELDS,
-} from "../governance-inventory.screen";
+} from "../governance-inventory.screen.tsx";
 
 const genieFields = PARSER_FIELDS.databricks_genie;
 const keysInOrder = genieFields.map((f) => f.key);

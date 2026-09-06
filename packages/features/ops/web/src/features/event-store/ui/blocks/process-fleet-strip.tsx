@@ -1,7 +1,7 @@
 import { HStack } from "@chakra-ui/react";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
-import { formatCount } from "../../../../model/ops-formatters";
-import { LinkedStat } from "../elements/dashboard-linked-stat";
+import { formatCount } from "../../../../model/ops-formatters.ts";
+import { LinkedStat } from "../elements/dashboard-linked-stat.tsx";
 
 /** The fleet's headline numbers, one row, trouble colored. */
 export function ProcessFleetStrip({ rows }: { rows: ProcessFleetSummary[] }) {

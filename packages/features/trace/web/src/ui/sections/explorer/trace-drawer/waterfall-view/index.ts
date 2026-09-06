@@ -1,2 +1,2 @@
-export type { WaterfallViewProps } from "./types";
-export { WaterfallView } from "./waterfall-view";
+export type { WaterfallViewProps } from "./types.ts";
+export { WaterfallView } from "./waterfall-view.tsx";

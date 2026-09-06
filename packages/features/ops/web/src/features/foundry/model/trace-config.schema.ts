@@ -1,4 +1,4 @@
-import { INPUT_OUTPUT_TYPES, SPAN_TYPES } from "./foundry-types";
+import { INPUT_OUTPUT_TYPES, SPAN_TYPES } from "./foundry-types.ts";
 
 /** JSON Schema for TraceConfig — used by Monaco for intellisense + validation. */
 export const traceConfigJsonSchema = {

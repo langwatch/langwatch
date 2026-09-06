@@ -5,7 +5,7 @@
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
-import { HttpProxyTrpcApi } from "../http-proxy.api";
+import { HttpProxyTrpcApi } from "../http-proxy.api.ts";
 
 type ExecutionState = Extract<
   StudioServerEvent,

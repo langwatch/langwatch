@@ -7,27 +7,27 @@
 import { Box, chakra, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
-} from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
-import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
-import { targetColor } from "../../../elements/agent-testing/shared/target-colors";
+} from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
+import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { targetColor } from "../../../elements/agent-testing/shared/target-colors.ts";
 import {
   type CompareRow,
   compareRowColorIndexes,
   DUPLICATE_TARGETS_MESSAGE,
   type ParameterDefaults,
-} from "./compare-rows";
-import { ParameterLineField } from "./parameter-line-field";
+} from "./compare-rows.ts";
+import { ParameterLineField } from "./parameter-line-field.tsx";
 import {
   errorOnLine,
   type ParameterFieldError,
   parameterPlaceholder,
-} from "./parameter-suggestions";
-import type { RunDialogAgent } from "./run-target-picker";
+} from "./parameter-suggestions.ts";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
 
 export const COMPARE_HINT =
   "The same agent twice with different parameters works: one connection, two models.";

@@ -1,11 +1,11 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import type { TraceListItem } from "../types/trace";
-import type { ConversationGroup } from "./conversation-groups";
-import type { TraceGroup } from "./registry/cells/group/types";
-import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
-import { SelectHeaderCheckbox } from "./select-header-checkbox";
-import { SkeletonSelectCell } from "./skeleton-cell-content";
-import { withoutPlaceholderTraceIds } from "./skeleton-placeholders";
+import type { TraceListItem } from "../types/trace.ts";
+import type { ConversationGroup } from "./conversation-groups.ts";
+import type { TraceGroup } from "./registry/cells/group/types.ts";
+import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
+import { SelectHeaderCheckbox } from "./select-header-checkbox.tsx";
+import { SkeletonSelectCell } from "./skeleton-cell-content.tsx";
+import { withoutPlaceholderTraceIds } from "./skeleton-placeholders.ts";
 
 const SELECT_COLUMN_SIZE = 36;
 

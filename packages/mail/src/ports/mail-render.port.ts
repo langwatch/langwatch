@@ -1,4 +1,4 @@
-import type { TriggerDigestMail } from "../templates/trigger-digest-email";
+import type { TriggerDigestMail } from "../templates/trigger-digest-email.tsx";
 
 /**
  * The messages a backend process asks this package to render for it.

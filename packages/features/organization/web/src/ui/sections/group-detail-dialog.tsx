@@ -12,13 +12,13 @@ import {
 } from "@chakra-ui/react";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { RandomColorAvatar } from "../elements/random-color-avatar";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import type { TeamUserRole } from "../../model/prisma-types";
-import type { RouterOutputs } from "../../behavior/organization-api";
-import { api } from "../../behavior/organization-api";
+import type { TeamUserRole } from "../../model/prisma-types.ts";
+import type { RouterOutputs } from "../../behavior/organization-api.ts";
+import { api } from "../../behavior/organization-api.ts";
 import {
   BindingInputRow,
   type BindingInputRowHandle,
@@ -26,8 +26,8 @@ import {
   roleBadgeColor,
   SourceBadge,
   scopeTypeLabel,
-} from "./group-binding-input-row";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+} from "./group-binding-input-row.tsx";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 type PendingAddition = { userId: string; label: string; image: string | null };

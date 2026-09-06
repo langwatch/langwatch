@@ -4,7 +4,7 @@ import {
   MAX_HEADER_TEXT_CHARS,
   MAX_MARKDOWN_TEXT_CHARS,
   MAX_SECTION_TEXT_CHARS,
-} from "../block-kit-allowlist";
+} from "../block-kit-allowlist.ts";
 
 describe("filterBlockKit", () => {
   describe("when given a mix of allowed and disallowed blocks", () => {

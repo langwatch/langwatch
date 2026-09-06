@@ -10,7 +10,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { GatewayConfigAssemblyAdapter } from "../postgres.gateway-config-assembly.adapter";
+import { GatewayConfigAssemblyAdapter } from "../postgres.gateway-config-assembly.adapter.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 

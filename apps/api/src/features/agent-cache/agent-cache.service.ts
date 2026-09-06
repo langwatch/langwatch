@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { DEFAULT_TTL_SECONDS } from "./agent-cache-rest";
-import { CacheEntryNotFoundError } from "./agent-cache.errors";
-import { AgentCacheRepository, type AgentCacheEntryStorePort } from "./agent-cache.repository";
+import { DEFAULT_TTL_SECONDS } from "./agent-cache-rest.ts";
+import { CacheEntryNotFoundError } from "./agent-cache.errors.ts";
+import { AgentCacheRepository, type AgentCacheEntryStorePort } from "./agent-cache.repository.ts";
 
 const logger = createLogger("langwatch:agent-cache");
 

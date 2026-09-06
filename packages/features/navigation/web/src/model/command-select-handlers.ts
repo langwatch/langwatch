@@ -1,4 +1,4 @@
-import type { Command, CommandDrawerName, RecentItem, SearchResult } from "./command-bar-types";
+import type { Command, CommandDrawerName, RecentItem, SearchResult } from "./command-bar-types.ts";
 
 /**
  * Navigation helper type for handling tab behavior.

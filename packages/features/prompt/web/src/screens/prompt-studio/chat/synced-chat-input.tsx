@@ -1,15 +1,15 @@
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
-import { useIsTabActive } from "../../../behavior/use-is-tab-active";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
+import { useIsTabActive } from "../../../behavior/use-is-tab-active.ts";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
 import {
   ChatSendButton,
   ChatSyncCheckbox,
   ChatTextArea,
   usePromptPlaygroundChatSync,
   useTabId,
-} from "../studio-internals";
+} from "../studio-internals.ts";
 
 /**
  * Custom chat input with sync across tabs functionality.

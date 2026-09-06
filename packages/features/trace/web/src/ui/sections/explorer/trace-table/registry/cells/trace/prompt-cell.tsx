@@ -1,11 +1,11 @@
 import { Badge, Text } from "@chakra-ui/react";
 import type React from "react";
-import { useFilterStore } from "../../../../../../../behavior/filter.store";
-import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project";
-import { api } from "../../../../../../../behavior/trace-api";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
-import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip";
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../../../../behavior/trace-api.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 
 type Density = "compact" | "comfortable";
 

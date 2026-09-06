@@ -1,23 +1,23 @@
-import type { SuppressEmailCommand } from "./automation.commands";
-import type { EmailSuppression } from "./automation";
-import type { CustomGraph, CustomGraphNameRef } from "./custom-graph";
-import type { WebhookDeliveryInput, WebhookDeliveryRow } from "./webhook-delivery";
-import type { Trigger } from "./trigger";
-import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands";
+import type { SuppressEmailCommand } from "./automation.commands.ts";
+import type { EmailSuppression } from "./automation.ts";
+import type { CustomGraph, CustomGraphNameRef } from "./custom-graph.ts";
+import type { WebhookDeliveryInput, WebhookDeliveryRow } from "./webhook-delivery.ts";
+import type { Trigger } from "./trigger.ts";
+import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
 import type {
   ReportSchedule,
   TriggerFire,
   TriggerFireStats,
   TriggerSummary,
-} from "./trigger.queries";
+} from "./trigger.queries.ts";
 import type {
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
-} from "./graph-alert";
-import type { AutomationPersistCapBreach } from "./runaway";
-import type { AutomationPersistCapCount, AutomationPersistCapDecision } from "./persist-cap";
-import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire";
+} from "./graph-alert.ts";
+import type { AutomationPersistCapBreach } from "./runaway.ts";
+import type { AutomationPersistCapCount, AutomationPersistCapDecision } from "./persist-cap.ts";
+import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
 export abstract class AutomationService {
   abstract validateTemplateDraft(input: TestFireTemplateDraft): void;
   abstract testFire(input: TestFireInput): Promise<TestFireResult>;

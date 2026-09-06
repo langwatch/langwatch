@@ -41,7 +41,7 @@ import {
   Workflow,
 } from "lucide-react";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { Command } from "./command-bar-types";
+import type { Command } from "./command-bar-types.ts";
 
 /**
  * Static navigation commands that map to main app routes.

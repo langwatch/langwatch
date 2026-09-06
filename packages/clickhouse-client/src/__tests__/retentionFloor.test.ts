@@ -6,7 +6,7 @@ import {
   DEFAULT_RETENTION_FLOOR_MARGIN_MS,
   type RetentionDaysProvider,
   RetentionFloorService,
-} from "../retentionFloor";
+} from "../retentionFloor.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NINETY_DAYS = 90 * DAY_MS;

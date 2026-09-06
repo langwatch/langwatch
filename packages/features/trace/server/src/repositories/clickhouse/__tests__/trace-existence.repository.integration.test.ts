@@ -11,11 +11,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository";
+import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const tenantId = `test-texist-${nanoid()}`;
 const otherTenantId = `test-texist-other-${nanoid()}`;

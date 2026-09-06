@@ -14,7 +14,7 @@ import {
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import type { TopicAssignedEvent } from "@langwatch/trace-contract";
-import { TraceTopicAssignmentCommandPort } from "../ports/trace-topic-assignment-command.port";
+import { TraceTopicAssignmentCommandPort } from "../ports/trace-topic-assignment-command.port.ts";
 
 /**
  * Command handler for assigning topics to traces in the trace processing pipeline.

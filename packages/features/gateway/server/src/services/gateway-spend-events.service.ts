@@ -6,7 +6,7 @@ import type {
   SpendFilters,
   SpendGroupByKey,
   SpendSummaryRow,
-} from "../ports/gateway-spend-events.port";
+} from "../ports/gateway-spend-events.port.ts";
 
 export class GatewaySpendEventsService {
   private constructor(private readonly repository: GatewaySpendEventsPort) {}

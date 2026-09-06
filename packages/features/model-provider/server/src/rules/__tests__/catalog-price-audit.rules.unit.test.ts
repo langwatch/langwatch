@@ -8,7 +8,7 @@ import {
   pricedUnits,
   renderAuditMarkdown,
   type AuditBaseline,
-} from "../catalog-price-audit.rules";
+} from "../catalog-price-audit.rules.ts";
 
 function model(id: string, pricing: Partial<LLMModelPricing>): LLMModelEntry {
   return {

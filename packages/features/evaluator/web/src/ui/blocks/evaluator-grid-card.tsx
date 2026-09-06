@@ -7,8 +7,8 @@ import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { useState } from "react";
 
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { EvaluatorApiUsageDialog } from "./evaluator-api-usage-dialog";
-import { EvaluatorCard, type EvaluatorCardProps } from "./evaluator-card";
+import { EvaluatorApiUsageDialog } from "./evaluator-api-usage-dialog.tsx";
+import { EvaluatorCard, type EvaluatorCardProps } from "./evaluator-card.tsx";
 
 export type EvaluatorGridCardProps = Omit<
   EvaluatorCardProps,

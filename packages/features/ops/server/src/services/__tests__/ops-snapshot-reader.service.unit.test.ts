@@ -5,8 +5,8 @@ import {
   type DetailSnapshot,
   type LiveSnapshot,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRepository } from "../../repositories/ops-snapshot.repository";
-import { DefaultOpsSnapshotService } from "../ops-snapshot-reader.service";
+import { OpsSnapshotRepository } from "../../repositories/ops-snapshot.repository.ts";
+import { DefaultOpsSnapshotService } from "../ops-snapshot-reader.service.ts";
 
 const live = (over: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
   version: SNAPSHOT_VERSION,

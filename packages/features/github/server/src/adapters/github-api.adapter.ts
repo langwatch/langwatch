@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
-import { GithubApiPort } from "../ports/github-api.port";
+import { GithubApiPort } from "../ports/github-api.port.ts";
 import {
   GithubInstallationNotFoundError,
   type GithubInstallationDetails,
@@ -12,8 +12,8 @@ import {
   GithubRateLimitedError,
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port";
-import type { GithubHostPort } from "../ports/github-host.port";
+} from "../ports/github-app-token.port.ts";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
 
 const logger = createLogger("langwatch:github:api");
 const HTTP_TIMEOUT_MS = 10_000;

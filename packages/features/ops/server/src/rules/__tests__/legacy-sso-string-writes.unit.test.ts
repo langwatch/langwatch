@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { AdminBackofficeService } from "../../services/admin-backoffice.service";
+import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
 import {
   AuditStub,
   AuthStub,
   organizationEdit,
   RepositoryStub,
   UsersStub,
-} from "../../services/__tests__/support/backoffice-doubles";
+} from "../../services/__tests__/support/backoffice-doubles.ts";
 import {
   legacySsoStringColumnsIn,
   legacySsoStringWritesToRefuse,
-} from "../legacy-sso-string-writes.rules";
+} from "../legacy-sso-string-writes.rules.ts";
 
 function backoffice(retired: boolean) {
   const repository = new RepositoryStub();

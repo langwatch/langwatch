@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalisation, makeStubSpan } from "./test-helpers";
+import { canonicalisation, makeStubSpan } from "./test-helpers.ts";
 
 const stubSpan = makeStubSpan({
   name: "chat claude-opus-4-6",

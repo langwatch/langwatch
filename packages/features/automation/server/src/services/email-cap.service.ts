@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { AutomationEmailCapStorePort } from "../ports/email-cap.port";
+import type { AutomationEmailCapStorePort } from "../ports/email-cap.port.ts";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 

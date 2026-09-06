@@ -4,8 +4,8 @@ import {
   removeEvaluatorScoreRangeInQuery,
   setEvaluatorScoreRangeInQuery,
   toggleEvaluatorSubFilterInQuery,
-} from "../trace-query-evaluator-group";
-import { parse } from "../trace-query-parser";
+} from "../trace-query-evaluator-group.ts";
+import { parse } from "../trace-query-parser.ts";
 
 const toggleVerdict = (currentQuery: string, value: string) =>
   toggleEvaluatorSubFilterInQuery({

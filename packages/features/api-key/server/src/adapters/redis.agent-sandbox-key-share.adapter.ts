@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
   AgentSandboxKeySharePort,
-} from "../ports/agent-sandbox-key-share.port";
+} from "../ports/agent-sandbox-key-share.port.ts";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 

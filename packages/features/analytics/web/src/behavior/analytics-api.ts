@@ -49,8 +49,8 @@ import type {
 } from "@langwatch/dashboard-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
-import type { FilterField } from "../model/analytics-filter-definition";
-import type { FilterParam } from "../model/analytics-filter-params";
+import type { FilterField } from "../model/analytics-filter-definition.ts";
+import type { FilterParam } from "../model/analytics-filter-params.ts";
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };

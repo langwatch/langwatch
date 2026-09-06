@@ -21,7 +21,7 @@ import {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 
 const canonicaliser = TraceCanonicalisationService.create();
 const ioService = TraceIOExtractionService.create(canonicaliser);

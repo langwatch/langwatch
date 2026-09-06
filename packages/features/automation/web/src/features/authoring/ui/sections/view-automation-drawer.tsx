@@ -14,17 +14,17 @@ import { differenceInMinutes, differenceInSeconds } from "@langwatch/time";
 import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
-import { resolveSeriesLabel } from "../../../../model/graph-series";
-import { type TriggerActionParams } from "../../../overview";
-import { FilterDisplay } from "../../../../ui/elements/filter-display";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import { type TriggerActionParams } from "../../../overview/index.ts";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./draft-model";
-import { CLIENT_PROVIDERS } from "./client-providers";
-import type { RouterOutputs } from "../../../../behavior/automation-api";
-import { useOrganizationTeamProject } from "../../../../behavior/automation-session";
-import { api } from "../../../../behavior/automation-api";
-import { formatTimeAgo } from "../../../../model/relative-time";
+import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./draft-model.ts";
+import { CLIENT_PROVIDERS } from "./client-providers.ts";
+import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { api } from "../../../../behavior/automation-api.ts";
+import { formatTimeAgo } from "../../../../model/relative-time.ts";
 
 interface ViewAutomationDrawerProps {
   automationId: string;

@@ -46,9 +46,9 @@ import type { ProcessStore } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import type { GovernanceEventsWorkerCapability } from "../features/governance/governance-events-worker-feature.installer";
-import type { GatewaySpendWorkerCapability } from "../features/gateway/gateway-spend-worker-feature.installer";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { GovernanceEventsWorkerCapability } from "../features/governance/governance-events-worker-feature.installer.ts";
+import type { GatewaySpendWorkerCapability } from "../features/gateway/gateway-spend-worker-feature.installer.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /** The Prisma models the spend graph's debit and webhook paths read and write. */
 export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase;

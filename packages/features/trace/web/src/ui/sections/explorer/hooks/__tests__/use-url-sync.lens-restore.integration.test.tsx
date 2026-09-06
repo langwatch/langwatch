@@ -25,7 +25,7 @@ const SHARED_LENS = { id: "custom-abc", name: "Shared", filterText: "" };
 let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (sel: (s: unknown) => unknown) =>
     sel({
       activeLensId,
@@ -36,7 +36,7 @@ vi.mock("../../../../../behavior/view.store", () => ({
   getPersistedActiveLensId: () => persistedLens,
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (sel: (s: unknown) => unknown) =>
     sel({
       queryText: "",
@@ -52,7 +52,7 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-import { useURLSync } from "../use-url-sync";
+import { useURLSync } from "../use-url-sync.ts";
 
 function Harness() {
   return (

@@ -1,1 +1,1 @@
-export * from "../../model/evaluation-status";
+export * from "../../model/evaluation-status.ts";

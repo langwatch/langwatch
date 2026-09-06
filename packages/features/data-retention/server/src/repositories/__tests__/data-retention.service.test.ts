@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ResolvedRetention, RetentionPolicy } from "@langwatch/data-retention-contract";
 import { TeamNotFoundError, type OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
-import { DataRetentionRepository } from "../data-retention.repository";
-import { DataRetentionService } from "../../services/data-retention.service";
-import { PinnedTraceRepository } from "../pinned-trace.repository";
-import { DataRetentionCacheStore } from "../../stores/data-retention-cache.store";
+import { DataRetentionRepository } from "../data-retention.repository.ts";
+import { DataRetentionService } from "../../services/data-retention.service.ts";
+import { PinnedTraceRepository } from "../pinned-trace.repository.ts";
+import { DataRetentionCacheStore } from "../../stores/data-retention-cache.store.ts";
 
 class Repository extends DataRetentionRepository {
   rows: RetentionPolicy[] = [];

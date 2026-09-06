@@ -32,9 +32,9 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { MoreVertical, Plus } from "lucide-react";
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import { toLLMModelCostRow } from "../../model/llm-model-cost-row";
-import { useModelProviderHost } from "../../model/model-provider-host";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 
 /** The grant that decides whether cost rules can be written from this page. */
 export const MODEL_COST_MANAGE_PERMISSION = "project:manage";

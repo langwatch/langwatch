@@ -6,8 +6,8 @@ import {
   type AuthzScopeLineageResult,
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
-import type { ApiActor, ApiAuditEvent, ApiHttpOptions, ApiRequestContext } from "./api.application";
-import type { ApiTrpcSession } from "./app-trpc/app-trpc.context";
+import type { ApiActor, ApiAuditEvent, ApiHttpOptions, ApiRequestContext } from "./api.application.ts";
+import type { ApiTrpcSession } from "./app-trpc/app-trpc.context.ts";
 
 /**
  * Authenticates a web request without coupling the API process to a session

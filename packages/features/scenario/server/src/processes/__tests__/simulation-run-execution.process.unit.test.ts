@@ -18,8 +18,8 @@ import { describe, expect, it } from "vitest";
 import {
   SimulationRunExecutionEvolution,
   STALL_THRESHOLD_MS,
-} from "../simulation-run-execution-evolution.process";
-import { simulationRunExecutionPM } from "../simulation-run-execution.process";
+} from "../simulation-run-execution-evolution.process.ts";
+import { simulationRunExecutionPM } from "../simulation-run-execution.process.ts";
 import {
   CANCEL_GRACE_MS,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
@@ -27,8 +27,8 @@ import {
   type SimulationRunProcessEventView,
   finishRunIntentSchema,
   simulationRunProcessEventViewSchema,
-} from "../simulation-run-execution-data.process";
-import { TestSimulationService } from "../../testing";
+} from "../simulation-run-execution-data.process.ts";
+import { TestSimulationService } from "../../testing.ts";
 
 const PROJECT_ID = "project-1";
 const RUN_ID = "run-1";

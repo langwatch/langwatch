@@ -8,11 +8,11 @@ import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
 
-import { workflowApi } from "../../model/workflow-api";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { workflowApi } from "../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
-import { WorkflowChatBox } from "../../ui/sections/workflow-chat-box";
+import { WorkflowChatBox } from "../../ui/sections/workflow-chat-box.tsx";
 
 export default function WorkflowChatScreen() {
   const host = useWorkflowHost();

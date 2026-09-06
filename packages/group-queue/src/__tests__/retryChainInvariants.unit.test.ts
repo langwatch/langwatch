@@ -14,8 +14,8 @@
  * production.
  */
 import { describe, expect, it } from "vitest";
-import { GROUP_ATTEMPT_TTL_SECONDS } from "../groupQueue";
-import { getBackoffMs, JOB_RETRY_CONFIG } from "../retry";
+import { GROUP_ATTEMPT_TTL_SECONDS } from "../groupQueue.ts";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "../retry.ts";
 
 describe("retry chain invariants", () => {
   describe("the group attempt counter", () => {

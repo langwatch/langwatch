@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { api } from "../../../behavior/ops-api";
-import type { DeadLetterMessage } from "../model/dead-letter-types";
+import { api } from "../../../behavior/ops-api.ts";
+import type { DeadLetterMessage } from "../model/dead-letter-types.ts";
 
-import { useOpsMutationOutcomes } from "../../../behavior/ops-mutation-outcome";
+import { useOpsMutationOutcomes } from "../../../behavior/ops-mutation-outcome.ts";
 /** Which bulk act is awaiting confirmation, if any. */
 export type BulkDeadLetterAction = "redrive" | "discard" | null;
 

@@ -13,7 +13,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 
-import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api";
+import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api.ts";
 
 const AUTHORIZED_PROJECT = "project_authorized";
 const OWNING_PROJECT = "project_owner";

@@ -15,9 +15,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ProjectService } from "@langwatch/project-contract";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the

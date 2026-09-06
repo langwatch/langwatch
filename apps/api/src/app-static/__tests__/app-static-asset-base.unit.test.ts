@@ -6,7 +6,7 @@ import {
   assetBaseOrigin,
   injectAssetBaseIntoHtml,
   normalizeAssetBase,
-} from "../app-static.asset-base";
+} from "../app-static.asset-base.ts";
 
 const CDN = "https://cdn.langwatch.ai/abc123/";
 

@@ -4,13 +4,13 @@ import {
   savedWorkbenchChartDefinitionSchema,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
-import { SavedWorkbenchChartPolicy } from "../ports/dashboard.port";
+import { SavedWorkbenchChartPolicy } from "../ports/dashboard.port.ts";
 import { createLogger } from "@langwatch/observability";
 import {
   LWQL_QUERY_RESULT_DATASET,
   validateVegaLiteSpecStructure,
 } from "@langwatch/analytics-contract/visualization/validation";
-import { SavedWorkbenchChartSpecificationRefusedError } from "./saved-workbench-chart-errors.adapter";
+import { SavedWorkbenchChartSpecificationRefusedError } from "./saved-workbench-chart-errors.adapter.ts";
 
 const logger = createLogger("langwatch:dashboard:saved-workbench-chart-policy");
 

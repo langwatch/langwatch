@@ -3,13 +3,13 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../model/edge-mapping";
+} from "../../../model/edge-mapping.ts";
 import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowCodeEditorProps,
@@ -17,7 +17,7 @@ import type {
   WorkflowVariablesProps,
   WorkflowVariable,
   WorkflowPanelFieldMapping,
-} from "./workflow-properties.ports";
+} from "./workflow-properties.ports.ts";
 
 const CODE_OUTPUT_TYPES: Field["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 

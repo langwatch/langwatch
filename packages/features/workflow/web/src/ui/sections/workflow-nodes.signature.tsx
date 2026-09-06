@@ -1,11 +1,11 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import type { Signature } from "@langwatch/workflow-contract";
-import { ComponentNode } from "./workflow-nodes";
+import { ComponentNode } from "./workflow-nodes.tsx";
 import {
   PromptingTechniqueDropArea,
   PromptingTechniqueWrapper,
-} from "./workflow-nodes.prompting-technique";
+} from "./workflow-nodes.prompting-technique.tsx";
 
 const isPromptingTechniqueReference = (value: unknown): value is { ref: string } =>
   typeof value === "object" && value !== null && "ref" in value && typeof value.ref === "string";

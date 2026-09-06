@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { suiteTargetSchema } from "./suite";
-import { suiteScopeSchema } from "./suite.scope";
+import { suiteTargetSchema } from "./suite.ts";
+import { suiteScopeSchema } from "./suite.scope.ts";
 
 const suiteDefinitionFieldsSchema = z
   .object({

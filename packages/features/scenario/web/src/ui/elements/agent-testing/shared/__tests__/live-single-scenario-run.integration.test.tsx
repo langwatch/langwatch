@@ -8,13 +8,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StreamingMessage } from "../../../../../behavior/use-simulation-streaming-state";
+import type { StreamingMessage } from "../../../../../behavior/use-simulation-streaming-state.ts";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { TestCasesTab } from "../../../../sections/agent-testing/cases/test-cases-tab";
-import { AgentTestingRunDrawer } from "../../../../sections/agent-testing/drawers/agent-testing-run-drawer";
-import { RunDialog } from "../../../../sections/agent-testing/run/run-dialog";
-import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store";
-import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge";
+import { TestCasesTab } from "../../../../sections/agent-testing/cases/test-cases-tab.tsx";
+import { AgentTestingRunDrawer } from "../../../../sections/agent-testing/drawers/agent-testing-run-drawer.tsx";
+import { RunDialog } from "../../../../sections/agent-testing/run/run-dialog.tsx";
+import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
+import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge.tsx";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
@@ -41,7 +41,7 @@ const emptyQuery = vi.hoisted(() => () => ({
   isLoading: false,
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -134,15 +134,15 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../sections/scenarios/scenario-form-drawer", () => ({
+vi.mock("../../../../sections/scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit Scenario</div> : null),
 }));
 
-vi.mock("../../../../sections/scenarios/run-scenario-modal", () => ({
+vi.mock("../../../../sections/scenarios/run-scenario-modal.tsx", () => ({
   RunScenarioModal: () => null,
 }));
 
-vi.mock("../../../../sections/use-run-scenario", () => ({
+vi.mock("../../../../sections/use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
 }));
 
@@ -152,11 +152,11 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-provider-settings", () => 
   }),
 }));
 
-vi.mock("../../../../../behavior/use-simulation-update-listener", () => ({
+vi.mock("../../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
 
-vi.mock("../../../../../behavior/use-simulation-streaming-state", () => ({
+vi.mock("../../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: mockStreaming.value,
     handleStreamingEvent: vi.fn(),
@@ -168,14 +168,14 @@ vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
 
-vi.mock("../../../../../behavior/use-drawer-run-callbacks", () => ({
+vi.mock("../../../../../behavior/use-drawer-run-callbacks.ts", () => ({
   useDrawerRunCallbacks: () => ({
     onRunComplete: vi.fn(),
     onRunFailed: vi.fn(),
   }),
 }));
 
-vi.mock("../../../../sections/use-scenario-target", () => ({
+vi.mock("../../../../sections/use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),
@@ -186,7 +186,7 @@ vi.mock("../../../../sections/use-scenario-target", () => ({
   writeScenarioTarget: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
@@ -205,7 +205,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },

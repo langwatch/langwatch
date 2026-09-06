@@ -1,6 +1,6 @@
-import { type AddRowsPayload, addRowsPayloadSchema } from "../schemas";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
-import type { Transform } from "./types";
+import { type AddRowsPayload, addRowsPayloadSchema } from "../schemas.ts";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import type { Transform } from "./types.ts";
 
 const paddedTo = ({ values, length }: { values: string[]; length: number }): string[] => {
   const padded = [...values];

@@ -1,4 +1,4 @@
-import { renderLiquid } from "./engine";
+import { renderLiquid } from "./engine.ts";
 
 export interface FallbackRender {
   output: string;

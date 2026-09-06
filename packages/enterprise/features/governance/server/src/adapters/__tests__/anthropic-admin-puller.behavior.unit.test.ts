@@ -9,13 +9,13 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 6 and 7).
  */
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port";
+import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter";
-import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
+import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter.ts";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port.ts";
+import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 

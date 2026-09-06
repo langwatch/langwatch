@@ -12,8 +12,8 @@ import {
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { useGatewayDeployment } from "../../../../behavior/gateway-session";
-import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url";
+import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
+import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts";
 
 export type VirtualKeyUsageSnippetProps = {
   /**

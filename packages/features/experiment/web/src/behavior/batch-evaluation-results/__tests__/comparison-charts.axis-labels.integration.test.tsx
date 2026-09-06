@@ -48,15 +48,15 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 // The leaderboard rollout check reaches for tRPC, which has no withTRPC
 // wrapper here. The leaderboard is a different chart and not under test.
-vi.mock("../use-show-comparison-leaderboard", () => ({
+vi.mock("../use-show-comparison-leaderboard.ts", () => ({
   useShowComparisonLeaderboard: () => false,
 }));
 
 import {
   type ComparisonRunData,
   transformBatchEvaluationData,
-} from "../../../ui/sections/batch-evaluation-results.types";
-import { ComparisonCharts } from "../../../ui/sections/batch-results/comparison-charts";
+} from "../../../ui/sections/batch-evaluation-results.types.ts";
+import { ComparisonCharts } from "../../../ui/sections/batch-results/comparison-charts.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

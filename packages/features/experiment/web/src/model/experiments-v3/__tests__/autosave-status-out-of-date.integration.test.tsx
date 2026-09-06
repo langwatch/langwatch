@@ -8,8 +8,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status";
-import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants";
+import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
+import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants.ts";
 
 const renderStatus = (props: Parameters<typeof AutosaveStatus>[0]) =>
   render(

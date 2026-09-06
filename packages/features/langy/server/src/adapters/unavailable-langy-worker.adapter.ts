@@ -6,7 +6,7 @@ import {
   type LangyWorkerDispatchInput,
   type LangyWorkerProbeInput,
   type LangyWorkerWarmInput,
-} from "../ports/langy-turn-runtime.port";
+} from "../ports/langy-turn-runtime.port.ts";
 
 export class UnavailableLangyWorkerAdapter extends LangyWorkerPort {
   private constructor(private readonly metrics: LangyWorkerMetricsPort) {

@@ -12,11 +12,11 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer";
+import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer.tsx";
 
 const ORG_ID = "org-acme";
 const TEAM_ID = "team-platform";
@@ -47,7 +47,7 @@ const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } = v
   capturedApplicableInputs: [] as unknown[],
 }));
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: {

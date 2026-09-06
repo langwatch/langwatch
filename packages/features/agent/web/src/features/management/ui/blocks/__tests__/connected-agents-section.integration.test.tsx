@@ -9,7 +9,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConnectedAgentsSection } from "../connected-agents-section";
+import { ConnectedAgentsSection } from "../connected-agents-section.tsx";
 import type { ConnectedAgentInstance, ConnectedAgentView } from "@langwatch/agent-contract";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

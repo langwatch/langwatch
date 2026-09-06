@@ -2,8 +2,8 @@ import { guardOrganizationId } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
-import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository";
-import { PostgresSystemMigrationsAdapter } from "../postgres.system-migrations.adapter";
+import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+import { PostgresSystemMigrationsAdapter } from "../postgres.system-migrations.adapter.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ScenarioWorkflowMappingService } from "../index";
+import { ScenarioWorkflowMappingService } from "../index.ts";
 
 const mappings = ScenarioWorkflowMappingService.create();
 

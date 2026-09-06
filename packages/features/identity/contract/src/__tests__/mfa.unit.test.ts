@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IdentityMfaCodeInvalidError, IdentityMfaEnrollmentExpiredError } from "../identity.errors";
+import { IdentityMfaCodeInvalidError, IdentityMfaEnrollmentExpiredError } from "../identity.errors.ts";
 import {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,
@@ -19,7 +19,7 @@ import {
   mfaVerificationFailedPayloadSchema,
   reduceMfaEnrollment,
   remainingBackupCodes,
-} from "../mfa";
+} from "../mfa.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

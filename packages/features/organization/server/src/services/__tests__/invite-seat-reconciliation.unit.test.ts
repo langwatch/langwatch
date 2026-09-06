@@ -2,8 +2,8 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service";
-import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
+import { InviteService } from "../invite.service.ts";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
 /**
  * A self-hosted deployment runs uncapped without a license, so an organization can hold more active members than the seats it just bought. Activation itself always succeeds (see `LicensePlanSourceService`, which accepts any signed key regardless of the org's

@@ -16,7 +16,7 @@ import {
   parseSkipListInput,
   resolveSkipList,
   skipListToInput,
-} from "../catalog/langy-skip-permissions";
+} from "../catalog/langy-skip-permissions.ts";
 
 function allows({ provider, modelId }: { provider: string; modelId: string }): boolean {
   return matchesSkipList({

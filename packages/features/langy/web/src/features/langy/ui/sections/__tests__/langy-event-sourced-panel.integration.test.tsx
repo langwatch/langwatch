@@ -170,7 +170,7 @@ vi.mock("@ai-sdk/react", async () => {
 // Cuts the model picker's dependency chain onto the (unrelated) workflow
 // studio host — these tests are about the conversation and turn projection,
 // not the picker.
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
@@ -183,10 +183,10 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const React = await import("react");
   const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
 
   /** A minimal, `enabled`-honouring stand-in for a tRPC query. */
   const useSnapshotQuery = <TData,>(resolve: () => TData, enabled: boolean) => {
@@ -299,14 +299,14 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   return { api: withFallback(explicitApi), trpcClient: {} };
 });
 
-import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangySidecar } from "../langy-panel.tsx";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -4,12 +4,12 @@ import type {
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "@langwatch/prisma-client/generated";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
-import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service";
+import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service.ts";
 import {
   BillingSubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-} from "../../ports/subscription.port";
+} from "../../ports/subscription.port.ts";
 
 /**
  * Prisma-backed implementation of SubscriptionRepository.

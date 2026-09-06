@@ -9,8 +9,8 @@ import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "@langwatch
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { TrpcAuthorizationPort } from "../trpc-policy-ports.js";
-import { createScopeLineageGuard } from "../trpc-scope-lineage.js";
+import type { TrpcAuthorizationPort } from "../trpc-policy-ports.ts";
+import { createScopeLineageGuard } from "../trpc-scope-lineage.ts";
 
 function makePorts(
   checkScopeLineage: ReturnType<

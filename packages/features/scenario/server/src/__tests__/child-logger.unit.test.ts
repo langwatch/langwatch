@@ -37,7 +37,7 @@ import {
   decodeScenarioLogContext,
   encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
-} from "../index";
+} from "../index.ts";
 
 describe("child-logger", () => {
   beforeEach(() => {

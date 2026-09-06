@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { Event } from "../../domain/types";
-import { EventSourcingService } from "../eventSourcingService";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
   createMockFoldProjectionDefinition,
@@ -12,7 +12,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
-} from "./testHelpers";
+} from "./testHelpers.ts";
 
 describe("EventSourcingService - Security Flows", () => {
   const aggregateType = createTestAggregateType();

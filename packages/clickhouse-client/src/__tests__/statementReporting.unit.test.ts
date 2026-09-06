@@ -7,8 +7,8 @@
  * the slow one without the noise of every field on every request.
  */
 import { describe, expect, it } from "vitest";
-import { QUERY_CAUSE_FIELD } from "../resilience";
-import { StatementReporter, type StatementLogSink } from "../statementReporting";
+import { QUERY_CAUSE_FIELD } from "../resilience.ts";
+import { StatementReporter, type StatementLogSink } from "../statementReporting.ts";
 
 function recordingSink(): StatementLogSink & {
   lines: { level: "debug" | "warn" | "error"; fields: Record<string, unknown>; message: string }[];

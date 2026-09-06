@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../model/batch-evaluation-results.bt-leaderboard";
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "../ui/sections/batch-evaluation-results.verdict";
-import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+} from "../ui/sections/batch-evaluation-results.verdict.ts";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 
 const makeEntry = ({
   variantId,

@@ -4,8 +4,8 @@ export {
   hostedMcpRoutePolicies,
   registerHostedMcpRoutePolicies,
   type McpHandler,
-} from "./transport/api-mcp/hosted-mcp.api";
-export { HeaderMcpClientAddressAdapter } from "./adapters/header.mcp-client-address.adapter";
+} from "./transport/api-mcp/hosted-mcp.api.ts";
+export { HeaderMcpClientAddressAdapter } from "./adapters/header.mcp-client-address.adapter.ts";
 export {
   McpApiKeyCipherPort,
   McpClientAddressPort,
@@ -15,11 +15,11 @@ export {
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpToolServer,
-} from "./ports/hosted-mcp.port";
+} from "./ports/hosted-mcp.port.ts";
 export {
   createMcpAuthorizeRestApp,
   MCP_AUTHORIZE_PERMISSION,
   type McpAuthorizeProject,
   type McpAuthorizeRestPorts,
   type McpAuthorizeSession,
-} from "./transport/api-rest/mcp-authorize.api";
+} from "./transport/api-rest/mcp-authorize.api.ts";

@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseClient } from "../ports/gateway-clickhouse.port";
+import type { GatewayClickHouseClient } from "../ports/gateway-clickhouse.port.ts";
 import {
   GatewayOpenAdmissionsPort,
   type OpenAdmission,
   type OpenAdmissionQuery,
-} from "../ports/gateway-open-admissions.port";
-import { ClickHouseGatewayOpenAdmissionsRepository } from "../repositories/clickhouse/clickhouse.gateway-open-admissions.repository";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../intents/gateway-spend-settlement.intent";
+} from "../ports/gateway-open-admissions.port.ts";
+import { ClickHouseGatewayOpenAdmissionsRepository } from "../repositories/clickhouse/clickhouse.gateway-open-admissions.repository.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../intents/gateway-spend-settlement.intent.ts";
 
 export { ClickHouseGatewayOpenAdmissionsRepository };
 

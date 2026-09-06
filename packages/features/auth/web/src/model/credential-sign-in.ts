@@ -1,4 +1,4 @@
-import { authFailureMessage } from "./auth-failure-message";
+import { authFailureMessage } from "./auth-failure-message.ts";
 
 /** What the auth client answers a credential sign-in with. */
 export interface CredentialSignInResponse {

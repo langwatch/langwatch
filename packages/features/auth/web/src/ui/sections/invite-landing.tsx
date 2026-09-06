@@ -1,14 +1,14 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { AuthCard } from "../elements/auth-card";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
-import { readHandledError } from "../../model/read-handled-error";
-import { authApi as api } from "../../behavior/auth-api";
-import { signIn, signOut, useSession } from "../../behavior/auth-client";
-import Link from "../elements/router-link";
-import { hardRedirect } from "../../behavior/hard-redirect";
-import { useSignInRouting } from "../../behavior/use-sign-in-routing";
-import { SignInMethodPicker } from "./sign-in-method-picker";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { authApi as api } from "../../behavior/auth-api.ts";
+import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
+import Link from "../elements/router-link.tsx";
+import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
 /**
  * The invitation landing (D13, ADR-117 §6; the rules underneath are D11's).

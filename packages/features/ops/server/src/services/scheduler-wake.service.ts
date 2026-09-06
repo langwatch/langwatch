@@ -1,4 +1,4 @@
-import { SchedulerWakePort } from "../ports/scheduler-wake.port";
+import { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 
 export class NoopSchedulerWakeService extends SchedulerWakePort {
   private constructor() {

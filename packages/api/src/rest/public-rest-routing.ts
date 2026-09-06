@@ -2,13 +2,13 @@ import type { Context, Hono, MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 import { uniqueSymbol } from "hono-openapi";
 
-import { ApiVersionUnavailableError, InvalidApiVersionError } from "../errors.js";
-import { runMiddlewareStack } from "./middleware-stack.js";
-import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
-import type { BaseApp, EndpointRegistration, HttpMethod, ServiceConfig } from "./types.js";
-import { canonicalV1Path, undescribedStack } from "./v1-alias.js";
-import { isDateVersion } from "./types.js";
-import { type ResolvedEndpoint, VERSION_LATEST } from "./versioning.js";
+import { ApiVersionUnavailableError, InvalidApiVersionError } from "../errors.ts";
+import { runMiddlewareStack } from "./middleware-stack.ts";
+import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.ts";
+import type { BaseApp, EndpointRegistration, HttpMethod, ServiceConfig } from "./types.ts";
+import { canonicalV1Path, undescribedStack } from "./v1-alias.ts";
+import { isDateVersion } from "./types.ts";
+import { type ResolvedEndpoint, VERSION_LATEST } from "./versioning.ts";
 
 type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;

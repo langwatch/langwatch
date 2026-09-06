@@ -2,7 +2,7 @@
  * Creation dates of organizations named by an age rule, memoised per process. Keyed by
  * organization rather than by flag, and outliving a flag-row cache window.
  */
-import type { FeatureFlagRepository } from "../repositories/feature-flag.repository";
+import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
 
 /**
  * An organization's creation date never changes, so this window bounds how many rows a process

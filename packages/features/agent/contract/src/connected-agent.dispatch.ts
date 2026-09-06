@@ -10,7 +10,7 @@
  * @see specs/agents/connected-agents.feature
  */
 
-import type { CallEnvelope, CallOutput } from "./connected-agent.protocol";
+import type { CallEnvelope, CallOutput } from "./connected-agent.protocol.ts";
 
 /** What a caller hands the dispatcher for one turn. */
 export interface DispatchCall {

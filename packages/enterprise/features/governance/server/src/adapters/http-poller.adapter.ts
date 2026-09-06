@@ -18,11 +18,11 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port";
+import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port.ts";
 import {
   NullIngestionPullDiagnosticsPort,
   type IngestionPullDiagnosticsPort,
-} from "../ports/ingestion-pull-worker.port";
+} from "../ports/ingestion-pull-worker.port.ts";
 
 import type {
   GovernancePuller as PullerAdapter,

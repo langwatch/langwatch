@@ -15,10 +15,10 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   buildVariantDisplayNames,
   buildVariantIdentifiers,
-} from "../processes/experiment-comparison-candidates.process";
-import { type ComparisonSkipReason } from "../processes/experiment-comparison-skip.process";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
-import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service";
+} from "../processes/experiment-comparison-candidates.process.ts";
+import { type ComparisonSkipReason } from "../processes/experiment-comparison-skip.process.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

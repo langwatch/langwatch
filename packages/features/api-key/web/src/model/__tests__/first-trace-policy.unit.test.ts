@@ -12,7 +12,7 @@ import {
   FIRST_TRACE_POLL_INTERVAL_MS,
   resolveFirstTracePolling,
   resolveFirstTraceTransition,
-} from "../first-trace-policy";
+} from "../first-trace-policy.ts";
 
 const base = {
   hasProject: true,

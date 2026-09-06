@@ -9,8 +9,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createPromptTrpcRouter } from "./prompt-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createPromptTrpcRouter } from "./prompt-trpc.mount.ts";
 
 /**
  * The product signal a project's new prompt fires, for a deployment that has
@@ -28,7 +28,7 @@ export type PromptPeers = Readonly<{
   modelProviders?: ModelProviderService;
 }>;
 
-import type { ComposedPromptFeature } from "./prompt.composition.types";
+import type { ComposedPromptFeature } from "./prompt.composition.types.ts";
 
 /** Composes the prompt library over this process's own graph. */
 export function composePromptFeature(options: {

@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { studioWorkflowSchema } from "./studio-workflow";
-import { workflowSchema, workflowVersionSchema } from "./workflow";
+import { studioWorkflowSchema } from "./studio-workflow.ts";
+import { workflowSchema, workflowVersionSchema } from "./workflow.ts";
 import type {
   Workflow,
   WorkflowVersion,
   WorkflowVersionHistoryEntry,
   WorkflowWithVersion,
-} from "./workflow";
+} from "./workflow.ts";
 
 /**
  * The transport inputs the workflow surface publishes.

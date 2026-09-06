@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveFeatureFlagEnvVarName,
   resolveFeatureFlagEnvOverride,
-} from "../feature-flag-environment";
+} from "../feature-flag-environment.ts";
 
 function reader(values: Record<string, string>) {
   return (name: string): string | undefined => values[name];

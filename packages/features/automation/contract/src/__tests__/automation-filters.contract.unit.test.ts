@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseAutomationFiltersWire } from "../automation-filters";
-import { parseTriggerTemplatesWire } from "../trigger";
+import { parseAutomationFiltersWire } from "../automation-filters.ts";
+import { parseTriggerTemplatesWire } from "../trigger.ts";
 
 describe("parseAutomationFiltersWire", () => {
   it.each([{ "spans.model": ["gpt-5-mini"] }, JSON.stringify({ "spans.model": ["gpt-5-mini"] })])(

@@ -1,12 +1,12 @@
 import { Box } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
-import { ThreadedTurnView } from "./threaded-turn-view";
+import { ThreadedTurnView } from "./threaded-turn-view.tsx";
 import {
   type ChatLayout,
   type ConversationTurn,
   LONG_THREAD_THRESHOLD,
-} from "../../../model/transcript/types";
+} from "../../../model/transcript/types.ts";
 
 interface TurnRowProps {
   turn: ConversationTurn;

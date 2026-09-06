@@ -1,7 +1,7 @@
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { type StoredSpanRow, TraceFullRecordMapper } from "../trace-full-record.mapper";
+import { type StoredSpanRow, TraceFullRecordMapper } from "../trace-full-record.mapper.ts";
 
 const row = (): StoredSpanRow => ({
   SpanId: "span-1",

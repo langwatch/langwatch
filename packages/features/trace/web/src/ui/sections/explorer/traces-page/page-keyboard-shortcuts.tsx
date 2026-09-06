@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
-import { useUIStore } from "../../../../behavior/ui.store";
-import { useAskLangyFromSearch } from "../search-bar/use-ask-langy-from-search";
-import { KeyboardShortcutsHelp, type ShortcutGroup } from "../trace-drawer/keyboard-shortcuts-help";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { useAskLangyFromSearch } from "../search-bar/use-ask-langy-from-search.ts";
+import { KeyboardShortcutsHelp, type ShortcutGroup } from "../trace-drawer/keyboard-shortcuts-help.tsx";
 
 // ⌘I fires the search bar's ask affordance, which belongs to Langy when
 // Langy is available — so the dialog names whoever will actually answer.

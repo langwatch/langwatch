@@ -1,4 +1,4 @@
-import type { JoinRequestGuardsService } from "../services/join-request-guards.service";
+import type { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -20,7 +20,7 @@ import {
   RejectJoinCommand,
   RequestJoinCommand,
   WithdrawJoinCommand,
-} from "../intents/join-request.intent";
+} from "../intents/join-request.intent.ts";
 import {
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
@@ -31,17 +31,17 @@ import {
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
-} from "../processes/join-request-lifecycle.process";
+} from "../processes/join-request-lifecycle.process.ts";
 import {
   type JoinRequestEvent,
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
-} from "../projections/join-request-state.projection";
+} from "../projections/join-request-state.projection.ts";
 import {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import { runExpireRequest, runRemindAdmins } from "../intents/join-request-lifecycle.intent";
+import { runExpireRequest, runRemindAdmins } from "../intents/join-request-lifecycle.intent.ts";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer

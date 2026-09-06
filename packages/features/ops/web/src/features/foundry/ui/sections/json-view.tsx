@@ -3,9 +3,9 @@ import type { Monaco } from "@monaco-editor/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
-import { useTraceStore } from "../../behavior/trace.store";
-import type { SpanConfig } from "../../model/foundry-types";
-import { traceConfigJsonSchema } from "../../model/trace-config.schema";
+import { useTraceStore } from "../../behavior/trace.store.ts";
+import type { SpanConfig } from "../../model/foundry-types.ts";
+import { traceConfigJsonSchema } from "../../model/trace-config.schema.ts";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

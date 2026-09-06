@@ -9,7 +9,7 @@ import type {
   CliAdminContactPort,
   CliBudgetOverview,
   CliBudgetOverviewPort,
-} from "../ports/cli-bootstrap.port";
+} from "../ports/cli-bootstrap.port.ts";
 
 type AiToolCliCatalogReader = {
   resolveCliCatalogForUser(input: CliBootstrapInput): Promise<AiToolCliCatalog>;

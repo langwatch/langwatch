@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "./schemas/metric-processing/constants";
-import { canonicalMetricDataPointSchema } from "./schemas/metric-processing/metric-data-point";
+import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "./schemas/metric-processing/constants.ts";
+import { canonicalMetricDataPointSchema } from "./schemas/metric-processing/metric-data-point.ts";
 
 /** Portable envelope for a canonical metric event. */
 export const metricEventEnvelopeSchema = z.object({

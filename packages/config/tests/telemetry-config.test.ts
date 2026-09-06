@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNodeInstrumentationRuntime, resolveTelemetryConfiguration } from "../src";
+import { isNodeInstrumentationRuntime, resolveTelemetryConfiguration } from "../src/index.ts";
 
 describe("telemetry configuration projection", () => {
   it("keeps the Next runtime gate outside the legacy application runtime", () => {

@@ -10,9 +10,9 @@
 
 import type { Loader } from "vega";
 
-import { lwqlVegaError } from "./vega-lite-policy";
-import { JSON_POINTER_ROOT } from "./vega-lite-structure";
-import type { VegaValidationError } from "./visualization-types";
+import { lwqlVegaError } from "./vega-lite-policy.ts";
+import { JSON_POINTER_ROOT } from "./vega-lite-structure.ts";
+import type { VegaValidationError } from "./visualization-types.ts";
 
 /**
  * The subset of Vega's `Loader` a view ever calls. Every method rejects, so the

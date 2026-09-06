@@ -21,9 +21,9 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing";
-import { UserAvatar } from "../../elements/user-avatar";
-import { AvatarUploadControl } from "../avatar-upload-control";
+import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
+import { UserAvatar } from "../../elements/user-avatar.tsx";
+import { AvatarUploadControl } from "../avatar-upload-control.tsx";
 
 const CROPPED = "data:image/png;base64,Y3JvcHBlZA==";
 const UPLOADED = "/api/user-avatar/project-1/object-1";
@@ -35,7 +35,7 @@ type AvatarMutate = (input: unknown) => void;
 const setAvatar = vi.fn<AvatarMutate>();
 const removeAvatar = vi.fn<AvatarMutate>();
 
-vi.mock("../../../behavior/personal-workspace-api", () => ({
+vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
     user: {
@@ -45,7 +45,7 @@ vi.mock("../../../behavior/personal-workspace-api", () => ({
   },
 }));
 
-vi.mock("../../../model/process-avatar-image", () => ({
+vi.mock("../../../model/process-avatar-image.ts", () => ({
   processAvatarImage: vi.fn<(file: File) => Promise<string>>(async () => CROPPED),
 }));
 

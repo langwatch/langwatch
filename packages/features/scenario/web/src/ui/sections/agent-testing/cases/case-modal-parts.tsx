@@ -17,26 +17,26 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Play } from "lucide-react";
-import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form";
-import { SimulationModelSelect } from "../../scenarios/simulation-model-select";
+import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
+import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { TagList } from "../../../elements/tag-list";
-import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips";
+import { TagList } from "../../../elements/tag-list.tsx";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
-} from "../../../elements/agent-testing/shared/dialog-fields";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import { CaseVersionHistoryPopover } from "./case-version-history-popover";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
-import type { CaseDraft, CaseEditorState } from "./use-case-editor";
+} from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { CaseDraft, CaseEditorState } from "./use-case-editor.ts";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { ParameterLineField } from "../run/parameter-line-field";
-import { parameterPlaceholder } from "../run/parameter-suggestions";
-import { useAgentDeclaredParameters } from "../run/use-agent-declared-parameters";
-import { CaseRecentRunsButton } from "./case-recent-runs-button";
+import { ParameterLineField } from "../run/parameter-line-field.tsx";
+import { parameterPlaceholder } from "../run/parameter-suggestions.ts";
+import { useAgentDeclaredParameters } from "../run/use-agent-declared-parameters.ts";
+import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
 
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 

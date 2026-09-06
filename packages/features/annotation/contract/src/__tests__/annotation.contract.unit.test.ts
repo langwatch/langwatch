@@ -4,7 +4,7 @@ import {
   createAnnotationInputSchema,
   readableAnnotationAnchor,
   resolveAnnotationSuggestionTarget,
-} from "../index";
+} from "../index.ts";
 
 describe("annotation contract", () => {
   it("rejects an incomplete anchor", () => {

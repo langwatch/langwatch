@@ -1,4 +1,4 @@
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 export function DeletePayloadDialog({

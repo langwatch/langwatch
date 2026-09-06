@@ -32,7 +32,7 @@ const invalidator = (name: string) => ({
   },
 });
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
       organization: { getAll: invalidator("organization.getAll") },
@@ -64,8 +64,8 @@ vi.mock("../../../behavior/organization-api", () => ({
   },
 }));
 
-import { EditProjectDrawer } from "../edit-project-drawer";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing";
+import { EditProjectDrawer } from "../edit-project-drawer.tsx";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
 
 const OPEN_FOR_MY_CHATBOT = (
   <EditProjectDrawer projectId="proj-1" projectName="My Chatbot" currentTeamId="team-1" />

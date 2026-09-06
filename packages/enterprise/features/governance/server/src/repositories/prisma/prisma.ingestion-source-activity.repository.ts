@@ -39,7 +39,7 @@ import {
   ActivityMonitorRepository,
   type GovernanceClickHouseClientPort,
   type GovernanceClickHouseResolverPort,
-} from "../../ports/ingestion-source-activity.port";
+} from "../../ports/ingestion-source-activity.port.ts";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";

@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/analytics-contract";
 
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
-import type { DeepRequired, Unpacked } from "./analytics-value-types";
+import type { DeepRequired, Unpacked } from "./analytics-value-types.ts";
 
 export type AnalyticsMetric = {
   label: string;

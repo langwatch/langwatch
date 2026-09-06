@@ -2,9 +2,9 @@ import { Skeleton, Text } from "@chakra-ui/react";
 import { Database } from "lucide-react";
 import React from "react";
 
-import type { DatasetReference } from "../../../model/experiments-v3/types";
-import { DatasetTabs } from "./DatasetSection/dataset-tabs";
-import { SuperHeader } from "../../elements/experiments-v3/super-header";
+import type { DatasetReference } from "../../../model/experiments-v3/types.ts";
+import { DatasetTabs } from "./DatasetSection/dataset-tabs.tsx";
+import { SuperHeader } from "../../elements/experiments-v3/super-header.tsx";
 
 export type DatasetHandlers = {
   onSelectExisting: () => void;

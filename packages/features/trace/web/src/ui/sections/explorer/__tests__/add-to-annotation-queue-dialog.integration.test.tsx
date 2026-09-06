@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -66,11 +66,11 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/auth-session", () => ({
+vi.mock("../../../../behavior/auth-session.ts", () => ({
   useSession: () => ({ data: { user: { id: mocks.sessionUserId } } }),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),
@@ -84,18 +84,18 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mocks.toastCreate },
 }));
 
-vi.mock("../../errors", () => ({
+vi.mock("../../errors/index.ts", () => ({
   showErrorToast: mocks.showErrorToast,
 }));
 
-vi.mock("../../add-annotation-queue-drawer", () => ({
+vi.mock("../../add-annotation-queue-drawer.tsx", () => ({
   AddAnnotationQueueDrawer: () => <div data-testid="new-queue-drawer" />,
 }));
 
 // The participants picker is a Chakra multi-select the dialog only composes.
 // The stub keeps the contract the dialog depends on (annotators state in,
 // `sendToQueue` out) without driving Ark's select in jsdom.
-vi.mock("../../traces/add-participants", () => ({
+vi.mock("../../traces/add-participants.tsx", () => ({
   AddParticipants: ({
     annotators,
     setAnnotators,
@@ -123,7 +123,7 @@ vi.mock("../../traces/add-participants", () => ({
   ),
 }));
 
-import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog";
+import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog.tsx";
 
 const onClose = vi.fn();
 

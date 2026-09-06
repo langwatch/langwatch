@@ -7,7 +7,7 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import { NotificationRepository } from "../notification.repository";
+import { NotificationRepository } from "../notification.repository.ts";
 
 /** Prisma implementation of the private Notification repository port. */
 /**

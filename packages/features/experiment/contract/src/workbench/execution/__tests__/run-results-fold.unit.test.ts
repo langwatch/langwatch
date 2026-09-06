@@ -5,8 +5,8 @@
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { describe, expect, it } from "vitest";
-import { runResultsAreEmpty } from "../run-results";
-import { foldEvents } from "./run-results-fixtures";
+import { runResultsAreEmpty } from "../run-results.ts";
+import { foldEvents } from "./run-results-fixtures.ts";
 
 describe("run result folding", () => {
   describe("given a cell the engine reported as an error rather than a result", () => {

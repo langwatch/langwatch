@@ -13,11 +13,11 @@
 import { Badge, Box, Spinner } from "@chakra-ui/react";
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { LangWatchQLWorkbench } from "../../ui/sections/langwatch-ql-workbench-panel";
-import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../model/lwql-failure";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { analyticsApi, type LangWatchQLUnavailableReason } from "../../behavior/analytics-api";
+import { LangWatchQLWorkbench } from "../../ui/sections/langwatch-ql-workbench-panel.tsx";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../model/lwql-failure.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { analyticsApi, type LangWatchQLUnavailableReason } from "../../behavior/analytics-api.ts";
 
 type AvailabilityReason = LangWatchQLUnavailableReason;
 

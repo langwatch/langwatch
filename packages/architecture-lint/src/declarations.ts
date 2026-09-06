@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const FORBIDDEN_DECLARATION = [
   { pattern: /@prisma\/client/, name: "Prisma" },

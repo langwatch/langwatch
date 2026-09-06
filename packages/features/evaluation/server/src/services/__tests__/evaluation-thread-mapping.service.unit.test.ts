@@ -4,8 +4,8 @@
  */
 import type { MappingState, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationSpanDigestPort } from "../../ports/evaluation-execution.port";
-import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service";
+import type { EvaluationSpanDigestPort } from "../../ports/evaluation-execution.port.ts";
+import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service.ts";
 
 const spanDigest = {
   format: vi.fn(async (spans: { name?: string }[]) =>

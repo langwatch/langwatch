@@ -29,9 +29,9 @@ import {
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
-} from "../organization.port";
-import { TeamRepository } from "../../repositories/team.repository";
-import { OrganizationService } from "../../services/organization.service";
+} from "../organization.port.ts";
+import { TeamRepository } from "../../repositories/team.repository.ts";
+import { OrganizationService } from "../../services/organization.service.ts";
 
 class StubRepository extends OrganizationRepository {
   settings: OrganizationSettings | null = null;
@@ -270,10 +270,10 @@ function createService(
     teams,
     groups: {
       listMembersForGroups: () => Promise.resolve(new Map()),
-    } as unknown as import("../../repositories/group.repository").GroupRepository,
+    } as unknown as import("../../repositories/group.repository.ts").GroupRepository,
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
-    groupIdentities: {} as import("../organization.port").GroupIdentityPort,
+    groupIdentities: {} as import("../organization.port.ts").GroupIdentityPort,
     authz: {
       listScopeBindings: () => Promise.resolve(teamBindings),
     } as unknown as AuthzService,

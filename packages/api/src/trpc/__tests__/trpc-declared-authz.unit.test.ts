@@ -17,12 +17,12 @@ import {
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { TrpcAuthorizationDecisions, TrpcMiddlewareContext } from "../trpc-policy-ports.js";
+import type { TrpcAuthorizationDecisions, TrpcMiddlewareContext } from "../trpc-policy-ports.ts";
 import {
   createDeclaredAuthzMiddlewares,
   type TrpcDeclaredAuthzContext,
   type TrpcDeclaredAuthzPorts,
-} from "../trpc-declared-authz.js";
+} from "../trpc-declared-authz.ts";
 
 function makePorts({
   actorId = "alice",

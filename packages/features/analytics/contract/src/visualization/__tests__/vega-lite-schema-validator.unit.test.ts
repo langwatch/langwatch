@@ -9,12 +9,12 @@ import {
   generateVegaLiteValidatorSource,
   readBundledVegaLiteSchema,
   VEGA_LITE_AJV_OPTIONS,
-} from "../../../scripts/generate-vega-lite-validator";
+} from "../../../scripts/generate-vega-lite-validator.ts";
 
-import { getVegaLiteSchemaValidator } from "../vega-lite-schema";
-import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial";
-import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid";
-import { VALID_VEGA_FIXTURES } from "./fixtures/valid";
+import { getVegaLiteSchemaValidator } from "../vega-lite-schema.ts";
+import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial/index.ts";
+import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid/index.ts";
+import { VALID_VEGA_FIXTURES } from "./fixtures/valid/index.ts";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 

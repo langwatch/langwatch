@@ -16,13 +16,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
-import { LicenseStatusPanel } from "../license-status-panel";
+import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
 const { statusResult } = vi.hoisted(() => ({
   statusResult: { current: undefined as unknown },
 }));
 
-vi.mock("../../../behavior/licensing-api", () => ({
+vi.mock("../../../behavior/licensing-api.ts", () => ({
   licensingApi: {
     license: {
       getStatus: {
@@ -37,7 +37,7 @@ vi.mock("../../../behavior/licensing-api", () => ({
   },
 }));
 
-vi.mock("../use-license-actions", () => ({
+vi.mock("../use-license-actions.ts", () => ({
   useLicenseActions: () => ({
     upload: vi.fn(),
     remove: vi.fn(),
@@ -46,7 +46,7 @@ vi.mock("../use-license-actions", () => ({
   }),
 }));
 
-vi.mock("../license-generator-drawer", () => ({
+vi.mock("../license-generator-drawer.tsx", () => ({
   LicenseGeneratorDrawer: () => null,
 }));
 

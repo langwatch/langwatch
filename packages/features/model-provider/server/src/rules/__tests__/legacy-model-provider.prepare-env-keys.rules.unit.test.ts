@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LegacyModelProviderExecution } from "../legacy-model-provider.rules";
-import { prepareEnvKeys } from "../legacy-model-provider.rules";
+import type { LegacyModelProviderExecution } from "../legacy-model-provider.rules.ts";
+import { prepareEnvKeys } from "../legacy-model-provider.rules.ts";
 
 // prepareEnvKeys reads the credential names off the provider's keysSchema. Providers whose
 // credentials are valid in more than one combination wrap their object in

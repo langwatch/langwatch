@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiInstanceAdminKeyAdapter } from "../api-instance-admin-key.adapter";
+import { ApiInstanceAdminKeyAdapter } from "../api-instance-admin-key.adapter.ts";
 
 function adapterFor(instanceAdminApiKey: string | undefined): ApiInstanceAdminKeyAdapter {
   return ApiInstanceAdminKeyAdapter.create({ config: { instanceAdminApiKey } });

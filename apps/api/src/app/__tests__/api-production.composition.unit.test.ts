@@ -40,8 +40,8 @@ const processMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../api.process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../api.process")>();
+vi.mock("../../api.process.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../api.process.ts")>();
   return { ...actual, ApiProcess: { create: processMocks.create } };
 });
 
@@ -82,9 +82,9 @@ const queueMocks = vi.hoisted(() => {
   return { redis, composed, tryCreate: vi.fn(() => composed.value) };
 });
 
-vi.mock("../../platform/infrastructure/api-queue.infrastructure", async (importOriginal) => {
+vi.mock("../../platform/infrastructure/api-queue.infrastructure.ts", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../platform/infrastructure/api-queue.infrastructure")>();
+    await importOriginal<typeof import("../../platform/infrastructure/api-queue.infrastructure.ts")>();
   return { ...actual, ApiQueueInfrastructure: { tryCreate: queueMocks.tryCreate } };
 });
 
@@ -154,29 +154,29 @@ const databaseMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../platform/infrastructure/api-database.infrastructure", async (importOriginal) => {
+vi.mock("../../platform/infrastructure/api-database.infrastructure.ts", async (importOriginal) => {
   const actual =
     await importOriginal<
-      typeof import("../../platform/infrastructure/api-database.infrastructure")
+      typeof import("../../platform/infrastructure/api-database.infrastructure.ts")
     >();
   return { ...actual, ApiDatabaseInfrastructure: { tryCreate: databaseMocks.tryCreate } };
 });
 
-import { ApiMetricsPort } from "../../api-process.lifecycle";
-import { ApiProcessGraphPort } from "../../api.process";
-import { ApiAgentsComposition } from "../api-agents.composition";
+import { ApiMetricsPort } from "../../api-process.lifecycle.ts";
+import { ApiProcessGraphPort } from "../../api.process.ts";
+import { ApiAgentsComposition } from "../api-agents.composition.ts";
 import {
   ApiAuthComposition,
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
-} from "../api-auth.composition";
+} from "../api-auth.composition.ts";
 import {
   ApiProductionComposition,
   type ApiOwnedRestFeaturePorts,
-} from "../api-production.composition";
+} from "../api-production.composition.ts";
 import { createLogger } from "@langwatch/observability";
-import { ApiAuditPort } from "../../api-request.policy";
-import { resolveApiConfig } from "../../platform/config/api.config";
+import { ApiAuditPort } from "../../api-request.policy.ts";
+import { resolveApiConfig } from "../../platform/config/api.config.ts";
 
 const resolvedKey: ResolvedApiKeyToken = {
   type: "apiKey",

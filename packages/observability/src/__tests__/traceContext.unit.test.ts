@@ -1,7 +1,7 @@
 import { propagation, trace } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { INVALID_TRACE_ID } from "../constants";
-import { getActiveTraceId, injectTraceContextHeaders } from "../trace/traceContext";
+import { INVALID_TRACE_ID } from "../constants.ts";
+import { getActiveTraceId, injectTraceContextHeaders } from "../trace/traceContext.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },

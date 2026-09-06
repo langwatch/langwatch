@@ -11,7 +11,7 @@ import type {
   ScenarioReferenceState,
   ScenarioRunConfig,
   ScenarioUpdateInput,
-} from "./scenario";
+} from "./scenario.ts";
 import type {
   ScenarioDuplicateInput,
   ScenarioMoveInput,
@@ -20,9 +20,9 @@ import type {
   ScenarioVersionListInput,
   ScenarioVersionRestoreInput,
   ScenarioVersionSummary,
-} from "./scenario.version";
-import type { RunParameterValues } from "./scenario.parameters";
-import type { RunSecretCiphertext } from "./run-secret-ciphertext";
+} from "./scenario.version.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
 
 export interface CancelScenarioRunInput {
   projectId: string;

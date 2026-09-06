@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let capturedOnTraceSummaryUpdated: ((traceIds: string[]) => void) | null = null;
 
-vi.mock("../../../use-trace-update-listener", () => ({
+vi.mock("../../../use-trace-update-listener.ts", () => ({
   useTraceUpdateListener: (opts: {
     onTraceSummaryUpdated?: (ids: string[]) => void;
     onSpanStored?: (ids: string[]) => void;
@@ -16,13 +16,13 @@ vi.mock("../../../use-trace-update-listener", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
 // The discover-freshness subscription opens a real SSE connection when
 // unmocked; these tests only exercise the trace_summary_updated paths.
-vi.mock("../../../../../behavior/use-sse-subscription", () => ({
+vi.mock("../../../../../behavior/use-sse-subscription.ts", () => ({
   useSSESubscription: () => ({
     connectionState: "disconnected" as const,
     retryCount: 0,
@@ -44,7 +44,7 @@ let visibleIdsResult = {
 
 // useVisibleTraceIds is in hooks/ (same level as useTraceFreshness), so
 // from __tests__/ the path to reach it is ../useVisibleTraceIds.
-vi.mock("../use-visible-trace-ids", () => ({
+vi.mock("../use-visible-trace-ids.ts", () => ({
   useVisibleTraceIds: () => visibleIdsResult,
 }));
 
@@ -56,7 +56,7 @@ const mockNewCountInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverCancel = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     // The hook passes this procedure object to (the mocked)
     // useSSESubscription — it only needs to exist, not function.
@@ -92,7 +92,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
 
 // The stores live in @langwatch/trace-web. Mocking the module rather than the
 // barrel keeps the rest of the package real for the hook under test.
-vi.mock("../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({ traceId: null, occurredAtMs: null }),
     { getState: () => ({ traceId: null, occurredAtMs: null }) },
@@ -102,7 +102,7 @@ vi.mock("../../../../../behavior/drawer.store", () => ({
 // Mutable live-updates mode — mutated in beforeEach / test body.
 let liveUpdatesMode: "live" | "ask" | "paused" = "live";
 
-vi.mock("../../../../../behavior/sse-status.store", () => ({
+vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -126,13 +126,13 @@ vi.mock("../../../../../behavior/sse-status.store", () => ({
 // Track pulse calls per traceId.
 const pulseMock = vi.fn();
 
-vi.mock("../../../../../behavior/row-pulse.store", () => ({
+vi.mock("../../../../../behavior/row-pulse.store.ts", () => ({
   useRowPulseStore: (selector: (s: { pulse: typeof pulseMock }) => unknown) =>
     selector({ pulse: pulseMock }),
 }));
 
 // ─── Module under test ────────────────────────────────────────────────────
-import { useTraceFreshness } from "../use-trace-freshness";
+import { useTraceFreshness } from "../use-trace-freshness.ts";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────
 

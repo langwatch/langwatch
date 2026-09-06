@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { TraceSharedFiltersInput } from "./trace-legacy-read.types";
+import type { TraceSharedFiltersInput } from "./trace-legacy-read.types.ts";
 
 /**
  * Export mode: "summary" yields one row per trace; "full" yields one row per

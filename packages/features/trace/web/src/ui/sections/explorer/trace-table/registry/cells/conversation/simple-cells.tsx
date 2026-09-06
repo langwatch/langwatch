@@ -1,14 +1,14 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TraceStatus } from "../../../../types/trace";
-import { formatTokens } from "../../../../../../../model/display-formatters";
-import type { ConversationGroup } from "../../../conversation-groups";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import { StatusDot, StatusIndicator } from "../../../status-row";
-import type { CellDef } from "../../types";
-import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder";
-import { createCostCell, createDurationCell, createTokensCell } from "../shared-summary-cells";
+import type { TraceStatus } from "../../../../types/trace.ts";
+import { formatTokens } from "../../../../../../../model/display-formatters.ts";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import { StatusDot, StatusIndicator } from "../../../status-row.tsx";
+import type { CellDef } from "../../types.ts";
+import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import { createCostCell, createDurationCell, createTokensCell } from "../shared-summary-cells.tsx";
 
 const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
   ok: "Healthy",

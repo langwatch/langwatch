@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { routeRef } = vi.hoisted(() => ({ routeRef: { current: "/" } }));
 
-vi.mock("../use-route", () => ({
+vi.mock("../use-route.ts", () => ({
   useRouter: () => ({
     route: routeRef.current,
     pathname: routeRef.current,
@@ -27,7 +27,7 @@ vi.mock("../use-route", () => ({
   }),
 }));
 
-vi.mock("../auth-client", () => ({
+vi.mock("../auth-client.tsx", () => ({
   useSession: ({
     required,
     onUnauthenticated,
@@ -40,7 +40,7 @@ vi.mock("../auth-client", () => ({
   },
 }));
 
-import { useRequiredSession } from "../use-required-session";
+import { useRequiredSession } from "../use-required-session.ts";
 
 function Probe() {
   useRequiredSession();

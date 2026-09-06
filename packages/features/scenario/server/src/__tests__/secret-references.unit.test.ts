@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { AuthConfig } from "@langwatch/scenario-contract";
-import { ScenarioSecretReferenceAdapter } from "../index";
+import { ScenarioSecretReferenceAdapter } from "../index.ts";
 
 const SECRETS = { AGENT_TOKEN: "tok-live-123", OTHER: "other-value" };
 

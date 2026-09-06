@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../../rules/experiment-run-event-types.rules";
-import type { ExperimentRunProcessingEvent } from "../../processes/experiment-run-events.process";
+} from "../../rules/experiment-run-event-types.rules.ts";
+import type { ExperimentRunProcessingEvent } from "../../processes/experiment-run-events.process.ts";
 import {
   isEvaluatorResultEvent,
   isExperimentRunCompletedEvent,
   isExperimentRunStartedEvent,
   isTargetResultEvent,
-} from "../../processes/experiment-run-event-guards.process";
+} from "../../processes/experiment-run-event-guards.process.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

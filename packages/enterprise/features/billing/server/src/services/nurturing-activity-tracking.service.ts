@@ -1,4 +1,4 @@
-import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 

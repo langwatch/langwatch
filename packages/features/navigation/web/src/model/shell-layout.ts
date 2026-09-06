@@ -1,4 +1,4 @@
-import { MENU_WIDTH_COMPACT } from "./menu-widths";
+import { MENU_WIDTH_COMPACT } from "./menu-widths.ts";
 
 /**
  * The sidebar column in the navigation-v2 shells. Wider than the

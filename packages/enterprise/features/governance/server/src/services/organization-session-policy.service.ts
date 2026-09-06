@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   OrganizationSessionPolicyPort,
   type OrganizationSessionPolicy,
-} from "../ports/session-policy.port";
+} from "../ports/session-policy.port.ts";
 
 /**
  * The maximum lifetime an organization admin may enforce on CLI/device sessions. Zero means

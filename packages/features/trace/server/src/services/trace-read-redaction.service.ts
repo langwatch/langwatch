@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { VisibilityWindowService } from "./trace-visibility-window.service";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type {

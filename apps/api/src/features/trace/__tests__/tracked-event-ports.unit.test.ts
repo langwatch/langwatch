@@ -20,7 +20,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApiTrackedEventPorts } from "../tracked-event-ports.adapter";
+import { createApiTrackedEventPorts } from "../tracked-event-ports.adapter.ts";
 
 const TRACE_ID = "trace_0123456789abcdef";
 

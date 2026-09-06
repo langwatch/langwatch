@@ -5,7 +5,7 @@
  */
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitest-alias-table";
+import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitest-alias-table.ts";
 
 /** The test-harness package root, standing in for a config's own directory. */
 const APP_ROOT = resolve(__dirname, "../../..");

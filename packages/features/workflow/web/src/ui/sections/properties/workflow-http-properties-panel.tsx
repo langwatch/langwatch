@@ -3,15 +3,15 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { WorkflowPanelFieldMapping } from "./workflow-properties.ports";
+import type { WorkflowPanelFieldMapping } from "./workflow-properties.ports.ts";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Component, Field as DslField } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../model/edge-mapping";
+} from "../../../model/edge-mapping.ts";
 import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowHttpConfigProps,
@@ -20,7 +20,7 @@ import type {
   WorkflowOutputsProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports";
+} from "./workflow-properties.ports.ts";
 
 const CODE_OUTPUT_TYPES: DslField["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 

@@ -1,7 +1,7 @@
 import { Button, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
-import { GroupJobCard } from "./queue-group-job-card";
-import { jobMatchesFilter } from "../../model/queue-job-context";
+import { GroupJobCard } from "./queue-group-job-card.tsx";
+import { jobMatchesFilter } from "../../model/queue-job-context.ts";
 
 function JobsPager({
   page,

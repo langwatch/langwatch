@@ -11,7 +11,7 @@ import { z } from "zod";
 import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
-} from "../../rules/scenario-generate-nlpgo-error.rules";
+} from "../../rules/scenario-generate-nlpgo-error.rules.ts";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 

@@ -13,11 +13,11 @@ const harness = vi.hoisted(() => ({
   view: { columnOrder: ["time", "trace", "annotations"] },
 }));
 
-vi.mock("../../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: harness.useAnnotationsByTraceIds,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
     hasPermission: (permission: string) =>
@@ -25,14 +25,14 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import type { TraceListItem } from "../../types/trace";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { useTraceListAnnotations } from "../use-trace-list-annotations";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { useTraceListAnnotations } from "../use-trace-list-annotations.ts";
 
 /** A row with nothing said about it, so only what the hook merges shows up. */
 function row(traceId: string): TraceListItem {

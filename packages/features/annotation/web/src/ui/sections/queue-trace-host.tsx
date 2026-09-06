@@ -18,7 +18,7 @@ import {
 } from "@langwatch/trace-web/surfaces/trace-host";
 import { useMemo, type ReactNode } from "react";
 
-import { useAnnotationHost, type AnnotationHostPort } from "../../model/annotation-host";
+import { useAnnotationHost, type AnnotationHostPort } from "../../model/annotation-host.ts";
 
 class AnnotationTraceHost extends TraceHostPort {
   constructor(private readonly host: AnnotationHostPort) {

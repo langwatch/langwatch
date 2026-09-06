@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useLangyLocalControlStore } from "../../../../../behavior/langy-local-control.store";
+import { useLangyLocalControlStore } from "../../../../../behavior/langy-local-control.store.ts";
 
 const live = (over: Record<string, unknown> = {}) => ({
   waitId: "wait-1",

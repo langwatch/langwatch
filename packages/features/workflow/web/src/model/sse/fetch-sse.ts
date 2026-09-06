@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { toError } from "@langwatch/ui-host/errors";
-import { FetchSSETimeoutError } from "./errors";
+import { FetchSSETimeoutError } from "./errors.ts";
 
 const logger = createLogger("sseClient");
 const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";

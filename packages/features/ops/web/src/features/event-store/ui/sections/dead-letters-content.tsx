@@ -1,14 +1,14 @@
 import { Button, Center, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
-import { DeadLetterAttemptHistory } from "../elements/dead-letter-attempt-history";
-import { DeadLettersEmpty } from "../elements/dead-letter-empty";
-import { DeadLetterSummary } from "../blocks/dead-letter-summary";
-import { DeadLettersTable } from "../blocks/dead-letter-table";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
-import { useDeadLetterActions } from "../../behavior/use-dead-letter-actions";
+import { DeadLetterAttemptHistory } from "../elements/dead-letter-attempt-history.tsx";
+import { DeadLettersEmpty } from "../elements/dead-letter-empty.tsx";
+import { DeadLetterSummary } from "../blocks/dead-letter-summary.tsx";
+import { DeadLettersTable } from "../blocks/dead-letter-table.tsx";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useDeadLetterActions } from "../../behavior/use-dead-letter-actions.ts";
 
 const PAGE_SIZE = 25;
 

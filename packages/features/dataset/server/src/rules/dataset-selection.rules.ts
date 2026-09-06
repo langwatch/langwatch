@@ -1,5 +1,5 @@
 import type { DatasetEntrySelection, DatasetRecord } from "@langwatch/dataset-contract";
-import { stripNullBytes } from "./dataset-sanitize.rules";
+import { stripNullBytes } from "./dataset-sanitize.rules.ts";
 
 /** The url-safe name a dataset is addressed by. */
 export function datasetSlugOf(value: string): string {

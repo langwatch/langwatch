@@ -4,7 +4,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature (@unit scenarios)
  */
 import { describe, expect, it } from "vitest";
-import { isCancellableStatus, ScenarioRunStatus } from "../index";
+import { isCancellableStatus, ScenarioRunStatus } from "../index.ts";
 
 describe("isCancellableStatus()", () => {
   describe("when status is PENDING", () => {

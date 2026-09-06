@@ -6,12 +6,12 @@ import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redi
 import Redis from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service";
+import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service.ts";
 import {
   LangyUiActionCatalogPort,
   type LangyUiActionDefinition,
-} from "../../ports/langy-ui-action-catalog.port";
-import { testRedisUrl } from "../../__tests__/support/test-redis-url";
+} from "../../ports/langy-ui-action-catalog.port.ts";
+import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   "workbench.duplicateTarget": {

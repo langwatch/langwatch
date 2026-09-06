@@ -11,12 +11,12 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Event } from "../../domain/types";
-import { buildProcessManager } from "../../pipeline/processBuilder";
-import type { ProcessDefinition, ProcessEventEnvelope } from "../processManager.types";
-import { ProcessManagerService } from "../processManagerService";
-import { buildProcessDefinition } from "../processRuntime";
-import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
+import type { Event } from "../../domain/types.ts";
+import { buildProcessManager } from "../../pipeline/processBuilder.ts";
+import type { ProcessDefinition, ProcessEventEnvelope } from "../processManager.types.ts";
+import { ProcessManagerService } from "../processManagerService.ts";
+import { buildProcessDefinition } from "../processRuntime.ts";
+import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 
 const PROCESS_NAME = "transientProbe";
 const PROJECT = "project-1";

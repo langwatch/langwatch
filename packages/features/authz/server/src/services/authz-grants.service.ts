@@ -38,17 +38,17 @@ import {
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
-import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port";
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository";
+import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
+import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
   RoleBindingWrite,
-} from "../repositories/authz-grant.repository";
-import { AuthzGrantGuardsService } from "./authz-grant-guards.service";
-import { AuthzBindingWriterService } from "./authz-binding-writer.service";
-import { AuthzOffboardingService } from "./authz-offboarding.service";
+} from "../repositories/authz-grant.repository.ts";
+import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
+import { AuthzBindingWriterService } from "./authz-binding-writer.service.ts";
+import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
  * The app-owned effect seams, composed once in the app's runtime (the application AuthZ

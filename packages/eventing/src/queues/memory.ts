@@ -7,7 +7,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   QueueSendOptions,
-} from "../queues";
+} from "../queues/index.ts";
 
 interface QueuedJob<Payload> {
   payload: Payload;

@@ -13,36 +13,36 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExecutionState, StudioWorkflow, WorkflowService } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
-import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
-import { type LoadedEvaluators } from "./experiment-execution-data.service";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service";
-import { ExperimentCarriedBoardService } from "./experiment-carried-board.service";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
-import { ExperimentCellPlanService, type SeededTargetOutput } from "./experiment-cell-plan.service";
+import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port.ts";
+import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";
+import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
+import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import { ExperimentCellPlanService, type SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
-} from "./experiment-comparison-plan.service";
+} from "./experiment-comparison-plan.service.ts";
 import {
   ExperimentCellExecutionService,
   type LoadedCellData,
-} from "./experiment-cell-execution.service";
-import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service";
-import { ExperimentConnectedCellService } from "./experiment-connected-cell.service";
-import { ExperimentRunStorageService } from "./experiment-run-storage.service";
+} from "./experiment-cell-execution.service.ts";
+import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
+import { ExperimentConnectedCellService } from "./experiment-connected-cell.service.ts";
+import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
   type ComparisonSkipReason,
-} from "../processes/experiment-comparison-skip.process";
+} from "../processes/experiment-comparison-skip.process.ts";
 import type {
   ConnectedCellInput,
   ExperimentRunPorts,
   OrchestratorInput,
-} from "../rules/experiment-run-input.rules";
-import { ExperimentRunDriverService } from "./experiment-run-driver.service";
+} from "../rules/experiment-run-input.rules.ts";
+import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
 
 const cellPlan = ExperimentCellPlanService.create();
 
@@ -55,7 +55,7 @@ const comparisonPlan = ({
 }) => ExperimentComparisonPlanService.create({ loadedPrompts, loadedEvaluators });
 
 /** Re-exported so it moved with its owner without duplicating the type. */
-export type { ComparisonSkipReason } from "../processes/experiment-comparison-skip.process";
+export type { ComparisonSkipReason } from "../processes/experiment-comparison-skip.process.ts";
 
 const cellExecution = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
   ExperimentCellExecutionService.create({ ports, workflows });

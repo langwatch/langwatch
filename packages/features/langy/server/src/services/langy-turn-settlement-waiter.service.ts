@@ -5,7 +5,7 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 
 export type TurnSettlement =
   | {

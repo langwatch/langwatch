@@ -2,8 +2,8 @@ import { useCallback } from "react";
 import type { AutosaveState } from "@langwatch/dataset-web/surfaces/dataset-table";
 import { useDatasetRecordSync } from "@langwatch/dataset-web/surfaces/dataset-record-sync";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import type { DatasetReference } from "../../model/experiments-v3/types";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import type { DatasetReference } from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * Syncs saved dataset record changes from the workbench store to the database. Thin

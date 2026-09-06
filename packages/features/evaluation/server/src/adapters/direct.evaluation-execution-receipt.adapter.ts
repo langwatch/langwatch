@@ -7,7 +7,7 @@ import {
   EvaluationCostRecorderPort,
   EvaluationExecutionPort,
   EvaluationExecutionReceiptPort,
-} from "../ports/evaluation.port";
+} from "../ports/evaluation.port.ts";
 
 const logger = createLogger("langwatch:evaluation:execution-receipt");
 

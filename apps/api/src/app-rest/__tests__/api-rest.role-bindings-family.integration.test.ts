@@ -19,8 +19,8 @@ import {
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features";
-import type { ApiPackagedRestCollaborators } from "../app-rest.packaged-families";
+import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import type { ApiPackagedRestCollaborators } from "../app-rest.packaged-families.ts";
 
 const ORG_ID = "organization-1";
 

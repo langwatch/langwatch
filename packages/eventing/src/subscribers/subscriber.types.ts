@@ -1,6 +1,6 @@
-import type { Event } from "../domain/types";
-import type { DeduplicationConfig } from "../queues/queue.types";
-import type { ExecutionTarget } from "../runtime.types";
+import type { Event } from "../domain/types.ts";
+import type { DeduplicationConfig } from "../queues/queue.types.ts";
+import type { ExecutionTarget } from "../runtime.types.ts";
 
 /**
  * INTERNAL dispatch-plane context for a subscriber registration's handle

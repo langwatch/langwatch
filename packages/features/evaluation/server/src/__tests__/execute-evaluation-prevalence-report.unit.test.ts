@@ -36,7 +36,7 @@ import {
   buildExecuteCommand,
   buildExecutionDeps,
   buildMonitor as buildTypedMonitor,
-} from "../ports/__tests__/support/evaluation-execution.fixtures";
+} from "../ports/__tests__/support/evaluation-execution.fixtures.ts";
 
 const USER_PROMPT = "Is the response empathetic and polite in tone?";
 

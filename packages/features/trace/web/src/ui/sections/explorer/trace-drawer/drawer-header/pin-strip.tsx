@@ -1,9 +1,9 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";
-import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store";
-import { Chip } from "../../../../elements/explorer/trace-drawer/chip";
-import { PinnedMetricPill } from "./metric-pill";
+import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store.ts";
+import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
+import { PinnedMetricPill } from "./metric-pill.tsx";
 
 export type PinCategory = "identity" | "run" | "tag" | "custom";
 

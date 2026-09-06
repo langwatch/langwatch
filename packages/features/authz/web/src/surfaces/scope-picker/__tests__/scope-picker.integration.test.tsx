@@ -28,7 +28,7 @@ import {
   ScopeChipPicker,
   ScopeFilter,
   scopeChipTooltip,
-} from "../index";
+} from "../index.ts";
 
 afterEach(cleanup);
 

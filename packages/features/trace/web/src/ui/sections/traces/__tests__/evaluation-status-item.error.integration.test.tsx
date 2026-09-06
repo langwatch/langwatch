@@ -12,7 +12,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: { project: "test-proj" } }),
 }));
 
-vi.mock("../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),
@@ -24,14 +24,14 @@ vi.mock("../../../../behavior/use-drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-test", slug: "test-proj" },
     organization: { id: "org-test" },
   }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     evaluators: {
       getById: {
@@ -46,7 +46,7 @@ vi.mock("../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { EvaluationStatusItem } from "../evaluation-status-item";
+import { EvaluationStatusItem } from "../evaluation-status-item.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -18,7 +18,7 @@ import {
   targetParametersLabel,
   targetSortKey,
   withCanonicalOverrides,
-} from "../target-key";
+} from "../target-key.ts";
 
 /** The first eight hex characters of node's own SHA-1, the reference answer. */
 function referenceHash(text: string): string {

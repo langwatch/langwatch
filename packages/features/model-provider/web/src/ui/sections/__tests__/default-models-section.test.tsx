@@ -18,15 +18,15 @@
 
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
-import { DefaultModelsSection } from "../default-models-section";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { DefaultModelsSection } from "../default-models-section.tsx";
 import "@testing-library/jest-dom/vitest";
 
 const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
 const mockDelete = vi.fn();
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {

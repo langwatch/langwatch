@@ -20,7 +20,7 @@ import {
   finalizeDirectUpload,
   putFileToPresignedUrl,
   requestDirectUpload,
-} from "./direct-upload";
+} from "./direct-upload.ts";
 
 /** Max times we re-attempt the CREATE under a bumped name on a slug conflict
  *  before giving up (a pathological run where every candidate is taken). */

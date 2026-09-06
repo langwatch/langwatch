@@ -6,11 +6,11 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 const integration = describe.skipIf(!clickHouseConfigured);

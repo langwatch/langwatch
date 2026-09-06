@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { api } from "../../../../behavior/trace-api";
-import { useConversationContext } from "./use-conversation-context";
-import { useDrawerProjectId } from "./use-drawer-project-id";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useConversationContext } from "./use-conversation-context.ts";
+import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 /** How long to wait after a trace settles before warming siblings. */
 const PREFETCH_DELAY_MS = 600;

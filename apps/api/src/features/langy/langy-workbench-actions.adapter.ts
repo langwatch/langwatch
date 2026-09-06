@@ -27,7 +27,7 @@ import {
 } from "@langwatch/langy-server";
 import { LangyUiActionRestCatalogPort } from "@langwatch/langy-server";
 
-import type { ApiExperimentRun } from "../../app/api-experiment-run.composition";
+import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
 
 /** The workbench half of this process's experiment feature, where it composed one. */
 export type ApiLangyWorkbenchPeer = Readonly<{

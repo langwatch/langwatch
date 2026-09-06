@@ -12,8 +12,8 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "../../queryDefaults";
-import { ClickHouseMigrateTask } from "../clickhouse-migrate.task";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "../../queryDefaults.ts";
+import { ClickHouseMigrateTask } from "../clickhouse-migrate.task.ts";
 
 interface DimensionRow {
   table: string;

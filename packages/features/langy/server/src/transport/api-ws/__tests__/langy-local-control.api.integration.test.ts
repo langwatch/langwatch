@@ -24,16 +24,16 @@ import { LangyTurnInProgressError } from "@langwatch/langy-contract";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
 import type { UpgradeHandler } from "@langwatch/api";
-import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api";
-import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api";
-import { presenceKey } from "../../../rules/langy-local-control-keys.rules";
+import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api.ts";
+import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api.ts";
+import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
 import { LOCAL_CONTROL_PROTOCOL_VERSION } from "@langwatch/langy-contract";
 import {
   LangyLocalControlRuntimeAdapter,
   type LocalControlRuntime,
-} from "../../../adapters/langy-local-control-runtime.adapter";
-import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service";
-import { testRedisUrl } from "../../../__tests__/support/test-redis-url";
+} from "../../../adapters/langy-local-control-runtime.adapter.ts";
+import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service.ts";
+import { testRedisUrl } from "../../../__tests__/support/test-redis-url.ts";
 
 const ns = `local-control-${nanoid(8)}`;
 

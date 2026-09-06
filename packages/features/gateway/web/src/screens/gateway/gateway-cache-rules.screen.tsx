@@ -15,16 +15,16 @@ import {
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
-import { CacheRuleCreateDrawer } from "../../features/cache-rules/ui/sections/cache-rule-create-drawer";
-import { CacheRuleEditDrawer } from "../../features/cache-rules/ui/sections/cache-rule-edit-drawer";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
+import { CacheRuleCreateDrawer } from "../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
+import { CacheRuleEditDrawer } from "../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel";
+import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel.tsx";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 type CacheRuleListRow = {
   id: string;

@@ -10,7 +10,7 @@ import {
   evaluationsTagLabel,
   guardrailsTagLabel,
   summarizeEvaluationsTag,
-} from "../evaluation-summary-counts";
+} from "../evaluation-summary-counts.ts";
 
 function makeEvaluation(overrides: Partial<ElasticSearchEvaluation> = {}): ElasticSearchEvaluation {
   return {

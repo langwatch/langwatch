@@ -1,5 +1,5 @@
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { DeadLetterAttempt } from "../../model/dead-letter-types";
+import type { DeadLetterAttempt } from "../../model/dead-letter-types.ts";
 
 export function DeadLetterAttemptHistory({
   isPending,

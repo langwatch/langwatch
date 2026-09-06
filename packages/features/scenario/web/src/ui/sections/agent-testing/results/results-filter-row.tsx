@@ -11,17 +11,17 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker";
-import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button";
-import { GroupByTabs } from "./group-by-tabs";
-import { ResultsFilterMenu, type ResultsFilterOption } from "./results-filter-menu";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
+import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
+import { GroupByTabs } from "./group-by-tabs.tsx";
+import { ResultsFilterMenu, type ResultsFilterOption } from "./results-filter-menu.tsx";
 import {
   EMPTY_RESULT_FILTERS,
   isNarrowed,
   type ResultFilters,
   type ResultGrouping,
-} from "./result-atoms";
+} from "./result-atoms.ts";
 
 /**
  * The height and the type size every control of the row shares. The filter

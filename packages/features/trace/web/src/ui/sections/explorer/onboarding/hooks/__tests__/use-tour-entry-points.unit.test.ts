@@ -14,15 +14,15 @@ const mockSetTourActive = vi.fn();
 
 // ─── Store / dependency mocks ─────────────────────────────────────────────────
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-tour-test" } }),
 }));
 
-vi.mock("../../../../../../behavior/explorer/use-project-has-traces", () => ({
+vi.mock("../../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: true }),
 }));
 
-vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       setupDismissedByProject: mockSetupDismissedByProject,
@@ -32,11 +32,11 @@ vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store",
     }),
 }));
 
-vi.mock("../../../../../../behavior/explorer/onboarding/use-onboarding-active", () => ({
+vi.mock("../../../../../../behavior/explorer/onboarding/use-onboarding-active.ts", () => ({
   useOnboardingActive: () => mockTourActive,
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       tracesV2: {
@@ -50,7 +50,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
 }));
 
 // Stub store getState calls made in onLaunchTour
-vi.mock("../../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../../behavior/view.store.ts", () => ({
   useViewStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -61,7 +61,7 @@ vi.mock("../../../../../../behavior/view.store", () => ({
   ),
 }));
 
-vi.mock("../../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -82,7 +82,7 @@ vi.mock("../../../../../../behavior/filter.store", () => ({
 }));
 
 // ─── Module under test ────────────────────────────────────────────────────────
-import { useTourEntryPoints } from "../use-tour-entry-points";
+import { useTourEntryPoints } from "../use-tour-entry-points.ts";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

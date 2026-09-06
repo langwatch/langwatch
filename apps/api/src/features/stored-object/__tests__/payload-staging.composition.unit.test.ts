@@ -3,7 +3,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
-import { refusingStoredObjectFeature } from "../stored-object.composition";
+import { refusingStoredObjectFeature } from "../stored-object.composition.ts";
 
 describe("the object store's payload staging port", () => {
   describe("given a process that composed no object storage", () => {

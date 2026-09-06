@@ -4,13 +4,13 @@ import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette";
+import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import {
   DEFAULT_THINKING_VERBS,
   useCyclingVerb,
-} from "../../../../behavior/explorer/ai/use-cycling-verb";
+} from "../../../../behavior/explorer/ai/use-cycling-verb.ts";
 
 const ICON_GRADIENT_ID = "ai-icon-gradient";
 

@@ -16,7 +16,7 @@ import {
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { apiLangyRestMetrics, composeApiLangyRest } from "../langy-rest.mount";
+import { apiLangyRestMetrics, composeApiLangyRest } from "../langy-rest.mount.ts";
 
 const KEY = { "x-auth-token": "lw_key" };
 

@@ -6,8 +6,8 @@ import {
   type EvaluationRunLookup,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
-import { EvaluationRunProjectionPort } from "../ports/evaluation-run-projection.port";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository";
+import { EvaluationRunProjectionPort } from "../ports/evaluation-run-projection.port.ts";
+import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 /**
  * Evaluation's run store, without the execution capability around it.

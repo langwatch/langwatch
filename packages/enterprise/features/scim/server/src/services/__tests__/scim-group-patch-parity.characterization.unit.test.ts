@@ -2,10 +2,10 @@
 
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScimDirectoryRepository } from "../scim-directory.service";
-import { ScimDirectoryService } from "../scim-directory.service";
-import { ScimGrantsService } from "../scim-grants.service";
-import { GrantsFake } from "../../__tests__/support/grants-fake";
+import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
+import { ScimDirectoryService } from "../scim-directory.service.ts";
+import { ScimGrantsService } from "../scim-grants.service.ts";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 
 const schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const group = {

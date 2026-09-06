@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
-import type { Event } from "../../domain/types";
-import { EventSourcingService } from "../eventSourcingService";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   cleanupTestEnvironment,
   createMockEventStore,
@@ -10,7 +10,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
-} from "./testHelpers";
+} from "./testHelpers.ts";
 
 describe("EventSourcingService - Projection Flows", () => {
   const { aggregateType, tenantId, context } = createTestContext();

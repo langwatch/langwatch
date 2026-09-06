@@ -1,8 +1,8 @@
 import type { Row } from "@tanstack/react-table";
 import type { ReactNode } from "react";
-import type { DensityTokens } from "../../hooks/use-density-tokens";
-import type { Density } from "../../../../../behavior/density.store";
-import type { RowStyle } from "../status-row";
+import type { DensityTokens } from "../../hooks/use-density-tokens.ts";
+import type { Density } from "../../../../../behavior/density.store.ts";
+import type { RowStyle } from "../status-row.tsx";
 
 export interface RowActions {
   onSelect?: () => void;

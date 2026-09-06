@@ -1,5 +1,5 @@
-import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
-import { AnchorCommentButton } from "./anchor-comment-button";
+import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
+import { AnchorCommentButton } from "./anchor-comment-button.tsx";
 
 /**
  * The comment affordance for one field, reading its own comments.

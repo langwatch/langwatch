@@ -12,23 +12,23 @@ const harness = vi.hoisted(() => ({
   projectId: { value: "proj-1" as string | undefined },
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { facetValues: { useQuery: harness.useQuery } } },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 10, to: 20, label: undefined } }),
 }));
 
-import { useAttributeValues } from "../use-attribute-values";
-import { useFacetSearch } from "../use-facet-search";
+import { useAttributeValues } from "../use-attribute-values.ts";
+import { useFacetSearch } from "../use-facet-search.ts";
 
 const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
 const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];

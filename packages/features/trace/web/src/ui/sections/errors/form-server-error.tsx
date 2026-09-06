@@ -2,7 +2,7 @@ import { Alert } from "@chakra-ui/react";
 import type { Control, FieldValues } from "react-hook-form";
 import { useFormState } from "react-hook-form";
 
-import { FORM_SERVER_ERROR_KEY } from "../../../behavior/errors/logic/apply-handled-error-to-form";
+import { FORM_SERVER_ERROR_KEY } from "../../../behavior/errors/logic/apply-handled-error-to-form.ts";
 
 export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: { control: Control<TFieldValues> };

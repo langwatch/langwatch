@@ -1,6 +1,6 @@
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
-import { SchemaVersion } from "./prompt.enums";
+import { SchemaVersion } from "./prompt.enums.ts";
 
 /**
  * The parameter types a prompt input may declare.

@@ -5,7 +5,7 @@ import type {
   ListSecretsInput,
   Secret,
   UpdateSecretInput,
-} from "./secret";
+} from "./secret.ts";
 
 export abstract class SecretService {
   abstract list(input: ListSecretsInput): Promise<Secret[]>;

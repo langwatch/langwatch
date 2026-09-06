@@ -10,7 +10,7 @@
  * field walk already reads the policy's error builder.
  */
 
-import { isPlainObject, visitPredicate } from "./vega-lite-structure";
+import { isPlainObject, visitPredicate } from "./vega-lite-structure.ts";
 
 /** What one transform step reads and what it leaves behind. */
 export interface TransformEffect {

@@ -1,8 +1,8 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { OffboardIncompleteError, type AuthzOffboardOutput } from "@langwatch/authz-contract";
-import type { AuthzGrantRepository } from "../repositories/authz-grant.repository";
-import type { AuthzReadRepository } from "../repositories/authz-read.repository";
-import { AuthzCollectorService } from "./authz-collector.service";
+import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
+import { AuthzCollectorService } from "./authz-collector.service.ts";
 
 export class AuthzOffboardingService {
   static create(repository: AuthzGrantRepository): AuthzOffboardingService {

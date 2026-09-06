@@ -1,5 +1,5 @@
-import { reserveNavigate } from "../langy-navigate-dedup";
-import type { LangyUiActionHandlers } from "./langy-ui-action-types";
+import { reserveNavigate } from "../langy-navigate-dedup.ts";
+import type { LangyUiActionHandlers } from "./langy-ui-action-types.ts";
 
 /**
  * The panel-side orchestration for one `ui` stream entry

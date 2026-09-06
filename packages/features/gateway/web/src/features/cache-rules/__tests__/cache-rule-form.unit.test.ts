@@ -6,7 +6,7 @@ import {
   fromWire,
   toWire,
   validateForm,
-} from "../ui/blocks/cache-rule-form";
+} from "../ui/blocks/cache-rule-form.tsx";
 
 function buildState(overrides: Partial<CacheRuleFormState> = {}): CacheRuleFormState {
   return { ...emptyFormState(), ...overrides };

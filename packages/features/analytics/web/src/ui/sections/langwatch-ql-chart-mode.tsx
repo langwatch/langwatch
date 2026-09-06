@@ -40,9 +40,9 @@ import type {
   LangWatchQLVegaConfig,
 } from "@langwatch/analytics-contract/visualization";
 
-import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure";
-import { LangWatchQLVegaLiteChart } from "./langwatch-ql-vega-lite-chart";
-import { VegaLiteSpecEditor } from "../elements/vega-lite-spec-editor";
+import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure.tsx";
+import { LangWatchQLVegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
+import { VegaLiteSpecEditor } from "../elements/vega-lite-spec-editor.tsx";
 
 /** The shape of a LangWatchQL result, narrowed to what a chart reads. */
 export interface LangWatchQLChartResult {

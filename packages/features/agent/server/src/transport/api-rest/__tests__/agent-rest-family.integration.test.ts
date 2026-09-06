@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Agent } from "@langwatch/agent-contract";
 
-import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.api";
-import { buildAgentApps, PROJECT_ID } from "./agent-rest.test-harness";
+import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.api.ts";
+import { buildAgentApps, PROJECT_ID } from "./agent-rest.test-harness.ts";
 
 describe("given a project with a valid API key", () => {
   let api: ReturnType<typeof buildAgentApps>;

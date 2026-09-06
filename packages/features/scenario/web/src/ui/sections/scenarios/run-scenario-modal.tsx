@@ -2,8 +2,8 @@ import { Button, Checkbox, HStack, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { TargetSelector } from "./target-selector";
-import type { TargetValue } from "../../../model/scenario-target";
+import { TargetSelector } from "./target-selector.tsx";
+import type { TargetValue } from "../../../model/scenario-target.ts";
 
 interface RunScenarioModalProps {
   open: boolean;

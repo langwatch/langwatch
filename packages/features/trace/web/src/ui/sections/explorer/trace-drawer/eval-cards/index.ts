@@ -1,1 +1,1 @@
-export { EvalsList } from "./evals-list";
+export { EvalsList } from "./evals-list.tsx";

@@ -1,7 +1,7 @@
 import { Box, Combobox, HStack, Portal } from "@chakra-ui/react";
 import { Check, Plus, Search } from "lucide-react";
-import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items";
-import { ProjectAvatar } from "../elements/project-avatar";
+import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**
  * The portaled popup of the project switcher combobox: the search field,

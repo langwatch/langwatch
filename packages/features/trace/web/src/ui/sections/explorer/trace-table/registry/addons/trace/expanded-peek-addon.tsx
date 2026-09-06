@@ -2,13 +2,13 @@ import { Box, Circle, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/re
 import type React from "react";
 import { useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { useTraceSpanTree } from "../../../../hooks/use-trace-span-tree";
-import type { TraceEvalResult, TraceListItem } from "../../../../types/trace";
-import { formatDuration } from "../../../../../../../model/display-formatters";
-import { spanTypeColor } from "../../../../utils/span-type-color";
-import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
-import { evalChipColor, formatEvalScore } from "../../shared-chips";
-import type { AddonDef } from "../../types";
+import { useTraceSpanTree } from "../../../../hooks/use-trace-span-tree.ts";
+import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
+import { formatDuration } from "../../../../../../../model/display-formatters.ts";
+import { spanTypeColor } from "../../../../utils/span-type-color.ts";
+import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
+import { evalChipColor, formatEvalScore } from "../../shared-chips.tsx";
+import type { AddonDef } from "../../types.ts";
 
 const PEEK_INDENT_PX = 16;
 const PEEK_SPAN_TYPE_ICONS: Record<string, string> = {

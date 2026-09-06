@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCustomRole } from "../custom-role-naming.rules";
+import { isCustomRole } from "../custom-role-naming.rules.ts";
 
 describe("isCustomRole", () => {
   it("returns true for custom role strings", () => {

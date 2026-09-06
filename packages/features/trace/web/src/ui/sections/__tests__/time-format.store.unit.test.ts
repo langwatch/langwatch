@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { timeColumnSizing, useTimeFormatStore } from "../../../behavior/time-format.store";
+import { timeColumnSizing, useTimeFormatStore } from "../../../behavior/time-format.store.ts";
 
 const STORAGE_KEY = "langwatch:traces-v2:time-format:v1";
 

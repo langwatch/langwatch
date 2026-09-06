@@ -6,8 +6,8 @@ import {
   buildFeedbacksQuery,
   buildTimeseriesQuery,
   buildTopDocumentsQuery,
-} from "../clickhouse.aggregation-builder.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+} from "../clickhouse.aggregation-builder.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 const { mapEvalAggregationToOuter, extractTraceAggregationColumn, hasEvalMixedWithTraceMetrics } =
   __testOnly__;

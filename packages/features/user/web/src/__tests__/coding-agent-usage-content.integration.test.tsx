@@ -19,7 +19,7 @@ type UsageState = {
 // A mutable boundary the mock reads, so each test picks the query state.
 let usageState: UsageState = { data: undefined, isLoading: true };
 
-vi.mock("../behavior/personal-workspace-api", () => ({
+vi.mock("../behavior/personal-workspace-api.ts", () => ({
   api: {
     codingAgents: {
       usageTotals: {
@@ -29,7 +29,7 @@ vi.mock("../behavior/personal-workspace-api", () => ({
   },
 }));
 
-import { CodingAgentUsageContent } from "../ui/sections/coding-agent-usage-content";
+import { CodingAgentUsageContent } from "../ui/sections/coding-agent-usage-content.tsx";
 
 function renderCard() {
   return render(

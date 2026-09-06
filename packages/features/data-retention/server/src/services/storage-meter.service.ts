@@ -8,12 +8,12 @@ import {
   RETENTION_TABLE_CATEGORY_MAP,
   PRODUCTION_STORAGE_METER_TABLES,
 } from "@langwatch/data-retention-contract/retention-tables";
-import type { StorageMeterClickHouseResolver } from "../ports/storage-meter-clickhouse.port";
+import type { StorageMeterClickHouseResolver } from "../ports/storage-meter-clickhouse.port.ts";
 import {
   RedisStorageMeterCacheStore,
   type StorageMeterRedis,
   type StorageMeterCacheStore,
-} from "../stores/storage-meter-cache.store";
+} from "../stores/storage-meter-cache.store.ts";
 
 const logger = createLogger("langwatch:data-retention:metering");
 const STORAGE_FRESH_MS = 5 * 60 * 1_000;

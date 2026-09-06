@@ -5,7 +5,7 @@ import {
   SIBLING_GROUP_THRESHOLD,
   type SiblingGroup,
   type WaterfallTreeNode,
-} from "./types";
+} from "./types.ts";
 
 /**
  * Whether the timeline/flame-graph panel fits. `0` means "not measured yet"

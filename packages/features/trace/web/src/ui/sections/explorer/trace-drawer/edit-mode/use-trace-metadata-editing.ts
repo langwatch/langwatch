@@ -6,8 +6,8 @@ import {
 import {
   selectTraceMetadataBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
-import type { AttributeEditing } from "../attribute-table";
+} from "../../../../../behavior/trace-edit.store.ts";
+import type { AttributeEditing } from "../attribute-table.tsx";
 
 /**
  * Connects the summary's metadata table to the draft.

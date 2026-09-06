@@ -14,7 +14,7 @@ import {
   ScenarioFailureHandlerService,
   ScenarioExecutionRunnerPort,
   UnavailableScenarioExecutionPoolService,
-} from "../index";
+} from "../index.ts";
 
 const job: ScenarioExecutionJob = {
   projectId: "project-1",

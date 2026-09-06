@@ -1,9 +1,9 @@
 import { NativeSelect } from "@chakra-ui/react";
 
-import { api } from "../../behavior/organization-api";
+import { api } from "../../behavior/organization-api.ts";
 
-import type { DepartmentOption } from "../../behavior/use-department-column";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+import type { DepartmentOption } from "../../behavior/use-department-column.ts";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 /**
  * Inline single-select that assigns a person / team / project to a department where it is

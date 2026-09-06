@@ -19,7 +19,7 @@ const setLocalPolicy = vi.fn();
 /** What the answer mutation does, so one test can make the server refuse it. */
 const answerOutcome: { refusal: unknown } = { refusal: null };
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       answerLocalPermission: {
@@ -42,9 +42,9 @@ vi.mock("../../../../../behavior/langy-api", () => ({
   },
 }));
 
-import { LangyLocalPermissionCard, SKIP_NOT_ALLOWED_HINT } from "../langy-local-permission-card";
-import type { LangyPermissionCardData } from "../../../../../model/langy-local-waits";
-import { useLangyLocalControlStore } from "../../../../../behavior/langy-local-control.store";
+import { LangyLocalPermissionCard, SKIP_NOT_ALLOWED_HINT } from "../langy-local-permission-card.tsx";
+import type { LangyPermissionCardData } from "../../../../../model/langy-local-waits.ts";
+import { useLangyLocalControlStore } from "../../../../../behavior/langy-local-control.store.ts";
 
 afterEach(cleanup);
 beforeEach(() => {

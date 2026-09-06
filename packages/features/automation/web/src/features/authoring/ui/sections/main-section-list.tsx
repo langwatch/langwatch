@@ -1,13 +1,13 @@
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { AutomationNameField } from "../elements/name-field";
-import { AutomationSeveritySection } from "../blocks/severity-section";
-import { AutomationTypePicker, type AutomationSource } from "../blocks/automation-type-picker";
-import { useAutomationStore } from "./automation-store";
-import { useConfigComplete, useDraft } from "./automation-selectors";
-import { CadenceSection } from "./cadence-section-adapter";
-import { DeliveryPicker } from "./delivery-picker";
-import { SubjectSection } from "./subject-section";
+import { AutomationNameField } from "../elements/name-field.tsx";
+import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
+import { AutomationTypePicker, type AutomationSource } from "../blocks/automation-type-picker.tsx";
+import { useAutomationStore } from "./automation-store.ts";
+import { useConfigComplete, useDraft } from "./automation-selectors.ts";
+import { CadenceSection } from "./cadence-section-adapter.tsx";
+import { DeliveryPicker } from "./delivery-picker.tsx";
+import { SubjectSection } from "./subject-section.tsx";
 
 /** The collapsible facets, in ADR-043 order. Name sits above as a plain field;
  *  Severity self-hides for non-alerts. */

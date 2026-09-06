@@ -7,12 +7,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderDefaultsWriteService } from "../services/model-provider-defaults-write.service";
-import { ModelProviderResolutionService } from "../services/model-provider-resolution.service";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
+import { ModelProviderDefaultsWriteService } from "../services/model-provider-defaults-write.service.ts";
+import { ModelProviderResolutionService } from "../services/model-provider-resolution.service.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import {
   DB_URL,
   PrismaProjects,
@@ -23,7 +23,7 @@ import {
   idService,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 function roleComputingAuthz(admins: Set<string>): AuthzService {
   return {

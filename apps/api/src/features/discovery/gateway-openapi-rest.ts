@@ -5,7 +5,7 @@
 import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
-import { respondWithApiDocument } from "./openapi-serve";
+import { respondWithApiDocument } from "./openapi-serve.ts";
 
 export function createGatewayOpenApiRestApp(options: {
   security: AppRestSecurity;

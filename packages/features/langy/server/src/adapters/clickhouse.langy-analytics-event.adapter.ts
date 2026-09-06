@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   LangyAnalyticsEventSinkPort,
   type LangyAnalyticsEventRecord,
-} from "../ports/langy-analytics-event-sink.port";
+} from "../ports/langy-analytics-event-sink.port.ts";
 
 /**
  * The one ClickHouse operation this sink performs, named structurally.

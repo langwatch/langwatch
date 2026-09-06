@@ -3,7 +3,7 @@ import {
   type WebhookDeliveryControls,
   type WebhookDestinationKind,
 } from "@langwatch/enterprise-webhook-contract";
-import { WebhookDestinationService } from "./webhook-destination.service";
+import { WebhookDestinationService } from "./webhook-destination.service.ts";
 
 export type WebhookEndpointConfigurationInput = {
   allowInsecureLocalUrls?: boolean;

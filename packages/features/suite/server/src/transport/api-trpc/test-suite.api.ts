@@ -15,8 +15,8 @@ import {
 import { SuiteNotFoundError } from "@langwatch/suite-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { projectSchema } from "../../rules/suite-schemas.rules";
-import type { SuiteTrpcContext, SuiteTrpcProcedures } from "../../rules/suite-trpc-context.rules";
+import { projectSchema } from "../../rules/suite-schemas.rules.ts";
+import type { SuiteTrpcContext, SuiteTrpcProcedures } from "../../rules/suite-trpc-context.rules.ts";
 
 export function createTestSuiteRouter<
   TContext extends SuiteTrpcContext,

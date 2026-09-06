@@ -1,5 +1,5 @@
 import { Box, Container, VStack } from "@chakra-ui/react";
-import APICard from "./api-card";
+import APICard from "./api-card.tsx";
 
 /**
  * WelcomeLayout

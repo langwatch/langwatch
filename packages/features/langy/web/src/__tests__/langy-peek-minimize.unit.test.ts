@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyStore } from "../behavior/langy.store";
+import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * Minimise-to-peek is a MINIMISE, not a close: `isOpen: false` sinks the panel to its edge peek with everything underneath intact, and

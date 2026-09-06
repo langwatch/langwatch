@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { TEST_FIRE_NOTICE } from "../banner";
-import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults";
-import { renderTriggerSlack } from "../render-slack";
-import { makeContext, makeMatch } from "./fixtures";
+import { TEST_FIRE_NOTICE } from "../banner.ts";
+import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults.ts";
+import { renderTriggerSlack } from "../render-slack.ts";
+import { makeContext, makeMatch } from "./fixtures.ts";
 
 const MRKDWN_INJECTION = "<https://evil|click> <!channel> & a < b > c";
 

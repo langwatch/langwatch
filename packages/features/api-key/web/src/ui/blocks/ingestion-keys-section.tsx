@@ -4,7 +4,7 @@ import { Radio, Trash2 } from "lucide-react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
-import { apiKeyRowAnchorId } from "../../model/api-key-anchor";
+import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */

@@ -1,13 +1,13 @@
-import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
 import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
-import { GenerateApiSnippetButton } from "./dialogs/generate-api-snippet-button";
-import { usePromptProject } from "../../behavior/use-prompt-project";
-import type { PromptConfigFormValues } from "../../surfaces/prompt-form";
-import { GeneratePromptApiSnippetDialog } from "./dialogs/generate-prompt-api-snippet-dialog";
-import { SavePromptButton } from "./save-prompt-button";
-import { VersionHistoryButton } from "./version-history-button";
+import { GenerateApiSnippetButton } from "./dialogs/generate-api-snippet-button.tsx";
+import { usePromptProject } from "../../behavior/use-prompt-project.ts";
+import type { PromptConfigFormValues } from "../../surfaces/prompt-form/index.ts";
+import { GeneratePromptApiSnippetDialog } from "./dialogs/generate-prompt-api-snippet-dialog.tsx";
+import { SavePromptButton } from "./save-prompt-button.tsx";
+import { VersionHistoryButton } from "./version-history-button.tsx";
 
 export type PromptEditorFooterProps = {
   /** Callback when save button is clicked */

@@ -4,7 +4,7 @@
  */
 import type { inferProcedureInput, inferProcedureOutput } from "@trpc/server";
 import { describe, expectTypeOf, it } from "vitest";
-import type { AppRouter } from "../app-trpc.types";
+import type { AppRouter } from "../app-trpc.types.ts";
 
 describe("given a browser package builds its client from AppRouter", () => {
   describe("when it reads the application's own two routers", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLangyConversationDate } from "../langy-conversation-date";
+import { formatLangyConversationDate } from "../langy-conversation-date.ts";
 
 const NOW = Date.parse("2026-07-16T12:00:00.000Z");
 

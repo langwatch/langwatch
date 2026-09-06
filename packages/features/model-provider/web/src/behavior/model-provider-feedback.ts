@@ -24,7 +24,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useModelProviderHost } from "../model/model-provider-host";
+import { useModelProviderHost } from "../model/model-provider-host.ts";
 
 /** The subset of the application toaster's create options this family uses. */
 export type ModelProviderToast = {

@@ -7,7 +7,7 @@ import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { streamText } from "ai";
 
-import { getProjectModelProviders } from "../../rules/legacy-model-provider.rules";
+import { getProjectModelProviders } from "../../rules/legacy-model-provider.rules.ts";
 
 /** The signed-in person this door reads. */
 export type PlaygroundRestSession = Readonly<{ user: Readonly<{ id: string }> }>;

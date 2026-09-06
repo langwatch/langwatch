@@ -2,10 +2,10 @@ import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react"
 import { Cable, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces";
-import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { IntegrateDrawer } from "./integrate-drawer";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { IntegrateDrawer } from "./integrate-drawer.tsx";
 
 /**
  * 14-day snooze window in milliseconds. After this period the card

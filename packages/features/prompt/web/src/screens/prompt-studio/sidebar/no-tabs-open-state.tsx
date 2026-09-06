@@ -1,6 +1,6 @@
 import { Center, EmptyState, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { LuFileText } from "react-icons/lu";
-import { AddPromptButton } from "./add-prompt-button";
+import { AddPromptButton } from "./add-prompt-button.tsx";
 
 /**
  * Empty state for when user has prompts but no tabs open.

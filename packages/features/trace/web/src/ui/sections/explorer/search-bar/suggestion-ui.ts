@@ -1,9 +1,9 @@
 import type { SearchFieldGroup } from "@langwatch/trace-contract";
-import type { SuggestionState } from "../../../../model/get-suggestion-state";
+import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
 import {
   getFieldSuggestions,
   getValueSuggestions,
-} from "../../../../model/explorer/search-bar/suggestion-items";
+} from "../../../../model/explorer/search-bar/suggestion-items.ts";
 
 /**
  * Single row in the dropdown. `value` is what lands in the editor; `label` is what

@@ -15,11 +15,11 @@ import {
   type ExperimentService,
 } from "@langwatch/experiment-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
-import type { SeededTargetOutput } from "./experiment-cell-plan.service";
-import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service";
+import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
+import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

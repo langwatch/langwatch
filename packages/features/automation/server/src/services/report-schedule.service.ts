@@ -5,10 +5,10 @@ import {
   type ReportActionParams,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
-import { AutomationClockPort } from "../ports/automation-clock.port";
-import { ScheduledJobStorePort } from "../ports/scheduled-jobs.port";
-import { SchedulerWakePort } from "../ports/scheduler-wake.port";
-import type { TriggerRepository } from "../repositories/trigger.repository";
+import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
+import { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 export class ReportScheduleService {
   private constructor(
     private readonly jobs: ScheduledJobStorePort,

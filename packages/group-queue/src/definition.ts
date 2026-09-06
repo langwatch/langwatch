@@ -1,4 +1,4 @@
-import type { GroupQueueDefinition, GroupQueuePayloadSchema } from "./contracts";
+import type { GroupQueueDefinition, GroupQueuePayloadSchema } from "./contracts.ts";
 
 export function defineGroupQueue<
   Payload extends Record<string, unknown>,

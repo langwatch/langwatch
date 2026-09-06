@@ -21,10 +21,10 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
-import Head from "../../elements/compat/next-head";
+import Head from "../../elements/compat/next-head.tsx";
 import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-image-preview-table";
 import { EvaluationProgressBar } from "@langwatch/experiment-web/surfaces/evaluation-progress-bar";
-import { LogoIcon } from "../../elements/logo-icon";
+import { LogoIcon } from "../../elements/logo-icon.tsx";
 import {
   useColorMode,
   useColorModeValue,
@@ -34,30 +34,30 @@ import { Link } from "@langwatch/ui-host/link";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving";
-import { WorkflowAutosave } from "../workflow-autosave";
-import { WorkflowDragPreview } from "../workflow-drag-preview";
-import { WorkflowEdge } from "../workflow-edge";
-import { type WorkflowEmojiPickerRenderProps, WorkflowNamePopover } from "../workflow-name-popover";
+import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
+import { WorkflowAutosave } from "../workflow-autosave.tsx";
+import { WorkflowDragPreview } from "../workflow-drag-preview.tsx";
+import { WorkflowEdge } from "../workflow-edge.tsx";
+import { type WorkflowEmojiPickerRenderProps, WorkflowNamePopover } from "../workflow-name-popover.tsx";
 import {
   WorkflowNodeSelectionPanel,
   WorkflowNodeSelectionPanelButton,
-} from "../workflow-node-selection-panel";
-import { workflowNodeComponents } from "../workflow-nodes.registry";
-import { WorkflowProgressToast } from "../workflow-progress-toast";
+} from "../workflow-node-selection-panel.tsx";
+import { workflowNodeComponents } from "../workflow-nodes.registry.ts";
+import { WorkflowProgressToast } from "../workflow-progress-toast.tsx";
 import {
   WorkflowRunUntilHereDialog,
   getWorkflowEntryNode,
-} from "../workflow-run-until-here-dialog";
-import { WorkflowRunningStatus } from "../workflow-running-status";
-import { WorkflowUndoRedo } from "../workflow-undo-redo";
-import { PostEventProvider, usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
-import { isConnectionAllowed } from "../../../model/control-flow";
-import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host";
+} from "../workflow-run-until-here-dialog.tsx";
+import { WorkflowRunningStatus } from "../workflow-running-status.tsx";
+import { WorkflowUndoRedo } from "../workflow-undo-redo.tsx";
+import { PostEventProvider, usePostEvent } from "./use-post-event.tsx";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { isConnectionAllowed } from "../../../model/control-flow.ts";
+import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -67,27 +67,27 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
-import { HoverableBigText } from "../hoverable-big-text";
-import { StudioNodeDrawer } from "./drawers/studio-node-drawer";
-import { Evaluate } from "./evaluate";
-import { History } from "./history";
-import { ComponentIcon } from "../../elements/workflow-icons";
-import { useComponentExecution } from "./use-component-execution";
-import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version";
-import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
-import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow";
-import { useEvaluationExecution } from "./use-evaluation-execution";
-import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow";
-import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow";
-import { useOptimizationExecution } from "./use-optimization-execution";
-import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-prompt-picker-flow";
-import { useWorkflowExecution } from "./use-workflow-execution";
-import { Optimize } from "./optimize";
-import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal";
-import { Publish } from "./publish";
-import { ResultsPanel } from "./results-panel";
+import { HoverableBigText } from "../hoverable-big-text.tsx";
+import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
+import { Evaluate } from "./evaluate.tsx";
+import { History } from "./history.tsx";
+import { ComponentIcon } from "../../elements/workflow-icons.tsx";
+import { useComponentExecution } from "./use-component-execution.ts";
+import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
+import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
+import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
+import { useEvaluationExecution } from "./use-evaluation-execution.ts";
+import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow.ts";
+import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
+import { useOptimizationExecution } from "./use-optimization-execution.ts";
+import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-prompt-picker-flow.ts";
+import { useWorkflowExecution } from "./use-workflow-execution.ts";
+import { Optimize } from "./optimize.tsx";
+import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
+import { Publish } from "./publish.tsx";
+import { ResultsPanel } from "./results-panel.tsx";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api } from "../../../model/workflow-api-client";
+import { api } from "../../../model/workflow-api-client.ts";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({

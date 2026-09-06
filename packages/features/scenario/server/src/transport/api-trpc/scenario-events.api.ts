@@ -29,7 +29,7 @@ import { z } from "zod";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcProcedures,
-} from "../../rules/scenario-trpc-context.rules";
+} from "../../rules/scenario-trpc-context.rules.ts";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 

@@ -1,8 +1,8 @@
 import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
-import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository";
+import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
 
 const TABLE_NAME = "session_metric_series" as const;
 

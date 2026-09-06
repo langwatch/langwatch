@@ -7,7 +7,7 @@
  * serves, and a screen that framed itself again would give this address two.
  */
 
-import { NotFoundScene } from "../../ui/sections/not-found-scene";
+import { NotFoundScene } from "../../ui/sections/not-found-scene.tsx";
 
 export default function NotFoundScreen() {
   return <NotFoundScene />;

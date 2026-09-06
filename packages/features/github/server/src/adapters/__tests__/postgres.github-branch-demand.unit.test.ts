@@ -15,8 +15,8 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubProjectActivityPort } from "../../ports/github-project-activity.port";
-import { PostgresGithubBranchDemandAdapter } from "../postgres.github-branch-demand.adapter";
+import { GithubProjectActivityPort } from "../../ports/github-project-activity.port.ts";
+import { PostgresGithubBranchDemandAdapter } from "../postgres.github-branch-demand.adapter.ts";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,

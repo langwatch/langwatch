@@ -5,7 +5,7 @@ import type {
   RunParameterValues,
   TargetAdapterData,
 } from "@langwatch/scenario-contract";
-import type { ScenarioHttpPort } from "./scenario-http.port";
+import type { ScenarioHttpPort } from "./scenario-http.port.ts";
 
 /** The serialized description one agent adapter is built from. */
 export type AgentAdapterBuildInput = {

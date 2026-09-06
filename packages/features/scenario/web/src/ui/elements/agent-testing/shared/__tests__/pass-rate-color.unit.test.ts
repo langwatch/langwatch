@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import {
   formatPassRate,
@@ -12,7 +12,7 @@ import {
   PASS_RATE_AMBER_FLOOR,
   passRateBand,
   passRateColor,
-} from "../pass-rate-color";
+} from "../pass-rate-color.ts";
 
 describe("the colour of a pass rate", () => {
   describe("when the same rate is read for the text and for the bar", () => {

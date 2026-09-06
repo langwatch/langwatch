@@ -10,7 +10,7 @@
 // Neither is re-exported here.
 // ---------------------------------------------------------------------------
 
-export { TrpcRootDefinition, type TrpcRoot } from "./trpc-root.js";
+export { TrpcRootDefinition, type TrpcRoot } from "./trpc-root.ts";
 export {
   appTrpcCustomPolicy,
   appTrpcNoPermissionPolicy,
@@ -26,17 +26,17 @@ export {
   type TrpcApiPublicMount,
   type TrpcApiPublicService,
   type TrpcApiService,
-} from "./trpc-api-service.js";
-export { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.js";
-export { redactAuditArgs } from "./trpc-audit-redaction.js";
+} from "./trpc-api-service.ts";
+export { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.ts";
+export { redactAuditArgs } from "./trpc-audit-redaction.ts";
 export {
   handleTrpcCallLogging,
   isSilencedCall,
   recordTrpcCall,
   resetSlowCallThrottle,
   resolveSlowCallBudgetMs,
-} from "./trpc-call-logging.js";
-export { callerTraceContext } from "./trpc-caller-trace.js";
+} from "./trpc-call-logging.ts";
+export { callerTraceContext } from "./trpc-caller-trace.ts";
 export {
   createDeclaredAuthzMiddlewares,
   type TrpcContextOnlyCheckParams,
@@ -47,20 +47,20 @@ export {
   type TrpcDeclaredCheck,
   type TrpcDeclaredCheckParams,
   type TrpcOrganizationRole,
-} from "./trpc-declared-authz.js";
+} from "./trpc-declared-authz.ts";
 export {
   createTrpcErrorFormatter,
   type TrpcErrorCausePayloadPort,
-} from "./trpc-error-formatter.js";
-export { TrpcFailureTraceIds, trpcFailureTraceIds } from "./trpc-failure-trace.js";
+} from "./trpc-error-formatter.ts";
+export { TrpcFailureTraceIds, trpcFailureTraceIds } from "./trpc-failure-trace.ts";
 export {
   createIsPublicProcedure,
   createPermissionProcedureBuilder,
   type PendingPermissionProcedureBuilder,
   type TrpcCheckMiddleware,
   type TrpcPolicyChainMiddlewares,
-} from "./trpc-permission-builder.js";
-export type { TrpcPolicyContext } from "./trpc-policy-context.js";
+} from "./trpc-permission-builder.ts";
+export type { TrpcPolicyContext } from "./trpc-policy-context.ts";
 export type {
   TrpcActor,
   TrpcActorPort,
@@ -76,7 +76,7 @@ export type {
   TrpcRequestLike,
   TrpcResponseLike,
   TrpcTranslatedCause,
-} from "./trpc-policy-ports.js";
+} from "./trpc-policy-ports.ts";
 export {
   createTrpcProcedure,
   createTrpcService,
@@ -89,6 +89,6 @@ export {
   type TrpcServiceConfig,
   type TrpcServiceProcedures,
   type TrpcUndeclared,
-} from "./trpc-service-builder.js";
-export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.js";
-export { createScopeLineageGuard } from "./trpc-scope-lineage.js";
+} from "./trpc-service-builder.ts";
+export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.ts";
+export { createScopeLineageGuard } from "./trpc-scope-lineage.ts";

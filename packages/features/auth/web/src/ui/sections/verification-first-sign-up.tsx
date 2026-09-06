@@ -1,31 +1,31 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
-import { AuthCard } from "../elements/auth-card";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
-import { readHandledError } from "../../model/read-handled-error";
-import { authApi as api } from "../../behavior/auth-api";
-import { signIn } from "../../behavior/auth-client";
-import Link from "../elements/router-link";
-import { useSearchParams } from "../../behavior/use-route";
-import { hardRedirect } from "../../behavior/hard-redirect";
-import { useSignInRouting } from "../../behavior/use-sign-in-routing";
-import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email";
-import type { FrontDoorDepth } from "../../model/ground-palette";
-import { usePublishFrontDoorStage } from "../../model/ground-stage";
-import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method";
-import { CheckYourEmail } from "../elements/check-your-email";
-import { CredentialSignInForm } from "./credential-sign-in-form";
-import { FrontDoorFinePrint } from "./front-door-fine-print";
-import { IdentifierStepForm } from "./identifier-step-form";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { authApi as api } from "../../behavior/auth-api.ts";
+import { signIn } from "../../behavior/auth-client.tsx";
+import Link from "../elements/router-link.tsx";
+import { useSearchParams } from "../../behavior/use-route.ts";
+import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
+import type { FrontDoorDepth } from "../../model/ground-palette.ts";
+import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
+import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
+import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
+import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
+import { IdentifierStepForm } from "./identifier-step-form.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
   useShowsAllSocialMethods,
   SignInMethodPicker,
-} from "./sign-in-method-picker";
-import { SignUpCredentialForm } from "./sign-up-credential-form";
-import { SuccessPulse } from "../elements/success-pulse";
+} from "./sign-in-method-picker.tsx";
+import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
+import { SuccessPulse } from "../elements/success-pulse.tsx";
 
 /**
  * Where a new account goes before it makes an organization: the

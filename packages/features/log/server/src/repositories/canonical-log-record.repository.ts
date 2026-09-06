@@ -1,5 +1,5 @@
 import type { CanonicalTraceLogRecord } from "@langwatch/log-contract";
-import { CanonicalLogRecordAppendRepository } from "./canonical-log-record-append.repository";
+import { CanonicalLogRecordAppendRepository } from "./canonical-log-record-append.repository.ts";
 
 /**
  * The whole canonical-log surface: the append port durable processing uses,

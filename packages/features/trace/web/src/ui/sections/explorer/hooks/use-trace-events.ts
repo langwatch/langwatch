@@ -1,7 +1,7 @@
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useSharedTrace } from "../context/shared-trace-context";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 export interface TraceEventsResult {
   events: DerivedTraceEvent[];

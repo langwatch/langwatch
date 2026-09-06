@@ -1,29 +1,29 @@
 import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
-import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer";
-import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer";
-import type { TraceListItem } from "../../../../types/trace";
-import { formatDuration } from "../../../../../../../model/display-formatters";
-import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner";
-import { TraceIdPeek } from "../../../../trace-id-peek";
+import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
+import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { formatDuration } from "../../../../../../../model/display-formatters.ts";
+import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner.tsx";
+import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
 import {
   findMessageContent,
   parseSystemPrompt,
-} from "../../../../../../../model/explorer/trace-table/chat-content";
-import type { ConversationGroup } from "../../../conversation-groups";
-import { type RowStyle, StatusDot } from "../../../status-row";
-import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
-import { Bubble } from "./bubble";
-import { ConversationSummaryLine } from "./conversation-summary";
-import { EXPANDED_BG_CSS } from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles";
+} from "../../../../../../../model/explorer/trace-table/chat-content.ts";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import { type RowStyle, StatusDot } from "../../../status-row.tsx";
+import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
+import { Bubble } from "./bubble.tsx";
+import { ConversationSummaryLine } from "./conversation-summary.tsx";
+import { EXPANDED_BG_CSS } from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles.ts";
 import {
   formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
   TURN_GAP_VISIBLE_SECONDS,
   turnGapSeconds,
-} from "./turn-gap";
-import { SHOW_MORE_STEP, useTurnsWindow } from "./turns-window";
+} from "./turn-gap.ts";
+import { SHOW_MORE_STEP, useTurnsWindow } from "./turns-window.ts";
 
 interface ChatTurnsProps {
   group: ConversationGroup;

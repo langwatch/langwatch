@@ -1,9 +1,9 @@
-import { ExperimentType, type Prisma, type PrismaClient } from "../src/generated/client";
+import { ExperimentType, type Prisma, type PrismaClient } from "../src/generated/client.ts";
 import {
   DEMO_HTTP_AGENT_CONFIG,
   DEMO_PLATFORM_IDS,
   DEMO_PROMPT_CONFIG_DATA,
-} from "./demo-platform-ids";
+} from "./demo-platform-ids.ts";
 
 const DATASET_ROWS = [
   {

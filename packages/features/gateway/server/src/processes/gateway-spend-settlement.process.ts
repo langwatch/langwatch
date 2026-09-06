@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
   runSpendSettlementSweep,
   type SpendSettlementProcessDeps,
-} from "../intents/gateway-spend-settlement.intent";
-import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent";
+} from "../intents/gateway-spend-settlement.intent.ts";
+import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent.ts";
 
 export const SPEND_SETTLEMENT_PROCESS_NAME = "spendSettlement" as const;
 

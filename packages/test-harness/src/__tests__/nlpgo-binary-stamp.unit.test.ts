@@ -8,7 +8,7 @@ import {
   digestGoSources,
   readStamp,
   writeStamp,
-} from "../nlpgo-binary-stamp";
+} from "../nlpgo-binary-stamp.ts";
 
 /**
  * Binds specs/ci/nlpgo-test-binary-reuse.feature.

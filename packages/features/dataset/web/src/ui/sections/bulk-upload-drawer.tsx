@@ -64,30 +64,30 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { datasetApi } from "../../behavior/dataset-api";
+import { datasetApi } from "../../behavior/dataset-api.ts";
 import {
   abortPendingUpload,
   finalizeDirectUpload,
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
-} from "../../behavior/direct-upload";
+} from "../../behavior/direct-upload.ts";
 import {
   type BulkFile,
   type BulkUploadTransport,
   useBulkUpload,
-} from "../../behavior/use-bulk-upload";
-import { invalidColumnNameKeys } from "../../model/column-validation";
-import { reorderColumnsBySourceHeader } from "../../model/column-reorder";
-import { useDatasetHost } from "../../model/dataset-host";
-import { formatFileSize } from "../../model/parse-tabular-file";
-import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../elements/column-type-select";
+} from "../../behavior/use-bulk-upload.ts";
+import { invalidColumnNameKeys } from "../../model/column-validation.ts";
+import { reorderColumnsBySourceHeader } from "../../model/column-reorder.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { formatFileSize } from "../../model/parse-tabular-file.ts";
+import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../elements/column-type-select.tsx";
 import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
-} from "../elements/dataset-dropzone-styles";
+} from "../elements/dataset-dropzone-styles.tsx";
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
 // reachable + operable by keyboard.

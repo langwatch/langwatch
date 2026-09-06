@@ -3,15 +3,15 @@
  * @see ./provisioning.ts — the access model applied over them
  * @see specs/analytics/lwql-api.feature
  */
-import { TENANT_COLUMN } from "../rules/lwql-view-catalog.rules";
-import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service";
+import { TENANT_COLUMN } from "../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
-} from "./langwatch-ql-catalog-shapes.service";
-import { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./langwatch-ql-access-model.service";
+} from "./langwatch-ql-catalog-shapes.service.ts";
+import { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./langwatch-ql-access-model.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const sqlText = LangWatchQLSqlTextService.create();

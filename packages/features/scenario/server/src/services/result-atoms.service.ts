@@ -11,8 +11,8 @@ import {
   MAX_TREND_POINTS,
   type RawGroupRow,
   type ResultAtomsReadPort,
-} from "../ports/result-atoms-read.port";
-import type { ScenarioRepository } from "../repositories/scenario.repository";
+} from "../ports/result-atoms-read.port.ts";
+import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 import {
   fillSeries,
   foldTrend,
@@ -27,7 +27,7 @@ import {
   toCost,
   toGroup,
   withQuietPlans,
-} from "../rules/result-atoms-fold.rules";
+} from "../rules/result-atoms-fold.rules.ts";
 
 const HOUR_SECONDS = 60 * 60;
 const DAY_SECONDS = 24 * HOUR_SECONDS;

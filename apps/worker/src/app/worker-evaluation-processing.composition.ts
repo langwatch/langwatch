@@ -40,8 +40,8 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { mappingStateSchema } from "@langwatch/trace-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer";
-import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter";
+import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer.ts";
+import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter.ts";
 
 /**
  * Reports the composition decision an unrunnable evaluator would otherwise hide.

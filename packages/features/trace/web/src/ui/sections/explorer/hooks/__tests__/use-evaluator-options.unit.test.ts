@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const useTraceFacetsMock = vi.fn();
 
-vi.mock("../use-trace-facets", () => ({
+vi.mock("../use-trace-facets.ts", () => ({
   useTraceFacets: () => useTraceFacetsMock(),
 }));
 
-import { useEvaluatorOptions } from "../use-evaluator-options";
+import { useEvaluatorOptions } from "../use-evaluator-options.ts";
 
 beforeEach(() => {
   useTraceFacetsMock.mockReset();

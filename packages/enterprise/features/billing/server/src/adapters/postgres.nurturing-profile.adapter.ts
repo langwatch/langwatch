@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository";
-import { PrismaNurturingProfileRepository } from "../repositories/prisma/prisma.nurturing-profile.repository";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
+import { PrismaNurturingProfileRepository } from "../repositories/prisma/prisma.nurturing-profile.repository.ts";
 
 /** The Postgres seam a process registers the lifecycle-signal reads from. */
 export class PostgresNurturingProfileAdapter {

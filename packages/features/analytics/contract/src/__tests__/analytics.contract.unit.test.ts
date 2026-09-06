@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyticsTimeseriesInputSchema } from "../index";
+import { analyticsTimeseriesInputSchema } from "../index.ts";
 
 describe("Analytics timeseries contract", () => {
   it("requires a tenant and timezone while defaulting filters", () => {

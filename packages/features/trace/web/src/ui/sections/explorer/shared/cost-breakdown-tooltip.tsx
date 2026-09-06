@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-import { formatCost } from "../../../../model/display-formatters";
-import { TooltipRow } from "../../../elements/explorer/shared/tooltip-row";
+import { formatCost } from "../../../../model/display-formatters.ts";
+import { TooltipRow } from "../../../elements/explorer/shared/tooltip-row.tsx";
 
 interface CostBreakdownTooltipContentProps {
   /** Bundled = the LLM cost is not billed per token (e.g. Claude Max). */

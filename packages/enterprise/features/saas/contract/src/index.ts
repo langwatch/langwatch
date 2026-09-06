@@ -1,1 +1,1 @@
-export * from "./saas-browser.service";
+export * from "./saas-browser.service.ts";

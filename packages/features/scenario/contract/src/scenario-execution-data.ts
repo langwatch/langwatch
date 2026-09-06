@@ -7,8 +7,8 @@
  */
 
 import { z } from "zod";
-import { FieldMappingSchema } from "./field-mapping";
-import { runParameterValuesSchema } from "./scenario.parameters";
+import { FieldMappingSchema } from "./field-mapping.ts";
+import { runParameterValuesSchema } from "./scenario.parameters.ts";
 
 // ============================================================================
 // Field Mapping Types

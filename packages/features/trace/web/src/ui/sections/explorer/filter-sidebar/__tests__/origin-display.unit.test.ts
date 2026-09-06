@@ -1,10 +1,10 @@
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import { FACET_COLORS } from "../../../../../behavior/facet-constants";
-import { ORIGIN_DISPLAY } from "../../../../../model/origin-display";
-import { facetLabel, paletteFromColor } from "../utils";
-import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells";
-import type { TraceListItem } from "../../types/trace";
+import { FACET_COLORS } from "../../../../../behavior/facet-constants.ts";
+import { ORIGIN_DISPLAY } from "../../../../../model/origin-display.ts";
+import { facetLabel, paletteFromColor } from "../utils.ts";
+import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells.tsx";
+import type { TraceListItem } from "../../types/trace.ts";
 
 const knownOrigins = Object.keys(ORIGIN_DISPLAY) as Array<keyof typeof ORIGIN_DISPLAY>;
 

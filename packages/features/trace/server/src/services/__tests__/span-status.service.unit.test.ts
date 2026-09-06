@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 
-import { SpanStatusService } from "../span-status.service";
+import { SpanStatusService } from "../span-status.service.ts";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {

@@ -1,4 +1,4 @@
-import { TraceReadRedactionService } from "../trace-read-redaction.service";
+import { TraceReadRedactionService } from "../trace-read-redaction.service.ts";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

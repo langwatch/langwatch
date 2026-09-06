@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { operatorFeatureFlagCatalogueSchema } from "../index";
+import { operatorFeatureFlagCatalogueSchema } from "../index.ts";
 
 const updatedAt = new Date("2026-08-27T12:00:00.000Z");
 const catalogue = {

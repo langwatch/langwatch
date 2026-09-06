@@ -1,4 +1,4 @@
-import type { ProjectionPlan } from "./trace-projection.types";
+import type { ProjectionPlan } from "./trace-projection.types.ts";
 
 /**
  * The shared analytics filter selection, as the legacy trace read consumes it.

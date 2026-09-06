@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
-import { isAbortLikeError, nlpgoHandledErrorFrom } from "../scenario-generate-nlpgo-error.rules";
+import { isAbortLikeError, nlpgoHandledErrorFrom } from "../scenario-generate-nlpgo-error.rules.ts";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */
 const MISSING_PROVIDER_BODY = JSON.stringify({

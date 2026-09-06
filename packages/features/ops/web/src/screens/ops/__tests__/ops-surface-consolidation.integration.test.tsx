@@ -3,10 +3,10 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { fakeOpsHost } from "../../../testing";
-import { OpsHostProvider } from "../../../model/ops-host";
-import OpsProjectionsPage from "../ops-projections.screen";
-import OpsSchedulesPage from "../ops-schedules.screen";
+import { fakeOpsHost } from "../../../testing.tsx";
+import { OpsHostProvider } from "../../../model/ops-host.ts";
+import OpsProjectionsPage from "../ops-projections.screen.tsx";
+import OpsSchedulesPage from "../ops-schedules.screen.tsx";
 
 /**
  * Where each ops surface lives after the consolidation.
@@ -24,23 +24,23 @@ import OpsSchedulesPage from "../ops-schedules.screen";
  * `src/__tests__/retiredPageRedirects.integration.test.tsx`.
  */
 
-vi.mock("../../../ui/sections/event-sourcing-layout", () => ({
+vi.mock("../../../ui/sections/event-sourcing-layout.tsx", () => ({
   EventSourcingLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../features/event-store/ui/sections/upcoming-work-panel", () => ({
+vi.mock("../../../features/event-store/ui/sections/upcoming-work-panel.tsx", () => ({
   UpcomingWorkCard: () => <div>upcoming-work-card</div>,
 }));
-vi.mock("../../../features/event-store/ui/sections/scheduler-panel", () => ({
+vi.mock("../../../features/event-store/ui/sections/scheduler-panel.tsx", () => ({
   SchedulerContent: () => <div>scheduler-content</div>,
 }));
-vi.mock("../../../features/event-store/ui/sections/replay-history-panel", () => ({
+vi.mock("../../../features/event-store/ui/sections/replay-history-panel.tsx", () => ({
   ReplayHistorySection: () => <div>replay-history-section</div>,
 }));
-vi.mock("../../../features/event-store/ui/sections/projections-panel", () => ({
+vi.mock("../../../features/event-store/ui/sections/projections-panel.tsx", () => ({
   ProjectionsCard: () => <div>projections-card</div>,
 }));
-vi.mock("../../../features/event-store/ui/sections/ops-replay-drawer", () => ({
+vi.mock("../../../features/event-store/ui/sections/ops-replay-drawer.tsx", () => ({
   OpsReplayDrawer: () => <div>ops-replay-drawer</div>,
 }));
 

@@ -26,7 +26,7 @@
  */
 
 import type { ComponentType } from "react";
-import type { AnnotationView } from "../../model/annotation-view";
+import type { AnnotationView } from "../../model/annotation-view.ts";
 
 /**
  * The screen takes its VIEW as a prop, so the loader's module type says so.
@@ -38,13 +38,13 @@ export type AnnotationScreenLoader = () => Promise<{
 }>;
 
 export const annotationScreens = {
-  annotations: () => import("./annotations.screen"),
+  annotations: () => import("./annotations.screen.tsx"),
 } as const satisfies Record<string, AnnotationScreenLoader>;
 
 export type AnnotationScreenName = keyof typeof annotationScreens;
 
-export { annotationApi } from "../../behavior/annotation-api";
-export { annotationViewCopy } from "../../model/annotation-view";
+export { annotationApi } from "../../behavior/annotation-api.ts";
+export { annotationViewCopy } from "../../model/annotation-view.ts";
 export type { AnnotationView };
 export {
   AnnotationHostPort,
@@ -55,7 +55,7 @@ export {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
-} from "../../model/annotation-host";
+} from "../../model/annotation-host.ts";
 
 /**
  * The annotation queue WALKER, the fifth address of this family.
@@ -69,7 +69,7 @@ export {
 export type MyQueueScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const myQueueScreens = {
-  myQueue: () => import("./my-queue.screen"),
+  myQueue: () => import("./my-queue.screen.tsx"),
 } as const satisfies Record<string, MyQueueScreenLoader>;
 
 export type MyQueueScreenName = keyof typeof myQueueScreens;

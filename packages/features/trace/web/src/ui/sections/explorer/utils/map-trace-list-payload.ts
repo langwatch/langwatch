@@ -1,5 +1,5 @@
-import type { TraceEvalResult, TraceListItem } from "../types/trace";
-import { NO_TRACE_EVENTS } from "../types/trace";
+import type { TraceEvalResult, TraceListItem } from "../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../types/trace.ts";
 
 interface TraceListPayload {
   items: unknown[];

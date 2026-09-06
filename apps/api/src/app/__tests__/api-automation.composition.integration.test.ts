@@ -18,8 +18,8 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { composeApiAutomationApp } from "../api-automation.composition";
-import { createAutomationTrpcRouter } from "../../features/automation/automation-trpc.mount";
+import { composeApiAutomationApp } from "../api-automation.composition.ts";
+import { createAutomationTrpcRouter } from "../../features/automation/automation-trpc.mount.ts";
 
 const PROJECT_ID = "project_report_calendar";
 const USER_ID = "user_report_calendar";

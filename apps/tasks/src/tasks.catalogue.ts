@@ -27,15 +27,15 @@ import {
 import { PostgresProcessManagerPurgeAdapter, ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
 import { PostgresUserDataEraseAdapter, UserDataEraseTask } from "@langwatch/user-server";
-import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition";
-import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition";
-import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition";
-import { buildStalledRunsBackfillTask } from "./platform/stalled-runs-backfill.composition";
-import { buildSystemMigrationsPassTask } from "./platform/system-migrations.composition";
-import type { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition";
-import { modelProviderCredentialCipherFromEnv } from "./platform/model-provider-credential-cipher.composition";
-import { PrismaMigrateTask } from "./tasks/prisma-migrate.task";
-import type { TasksHost } from "./platform/tasks-host.composition";
+import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition.ts";
+import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition.ts";
+import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition.ts";
+import { buildStalledRunsBackfillTask } from "./platform/stalled-runs-backfill.composition.ts";
+import { buildSystemMigrationsPassTask } from "./platform/system-migrations.composition.ts";
+import type { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition.ts";
+import { modelProviderCredentialCipherFromEnv } from "./platform/model-provider-credential-cipher.composition.ts";
+import { PrismaMigrateTask } from "./tasks/prisma-migrate.task.ts";
+import type { TasksHost } from "./platform/tasks-host.composition.ts";
 
 /**
  * The one list this process's tasks live in: a feature's task is here or it does not exist as

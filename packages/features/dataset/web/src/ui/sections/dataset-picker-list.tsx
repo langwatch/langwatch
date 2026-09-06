@@ -3,7 +3,7 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import {
   DatasetPickerList as DatasetPickerListView,
   type DatasetPickerSelection,
-} from "../blocks/dataset-picker-list";
+} from "../blocks/dataset-picker-list.tsx";
 
 export type { DatasetPickerSelection };
 

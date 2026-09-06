@@ -8,8 +8,8 @@ import {
 import {
   LangyConversationService,
   type LangyConversationCommands,
-} from "../langy-conversation.service";
-import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository";
+} from "../langy-conversation.service.ts";
+import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository.ts";
 
 /** Latest-version fold row the read repository returns. */
 type Row = {

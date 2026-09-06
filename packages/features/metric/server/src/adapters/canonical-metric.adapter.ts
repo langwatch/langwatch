@@ -3,20 +3,20 @@ import type {
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 import { z } from "zod";
-import { MetricPointAdapter } from "./metric-point.adapter";
+import { MetricPointAdapter } from "./metric-point.adapter.ts";
 const { buildPoint } = MetricPointAdapter;
-import { METRIC_KIND_DATA_KEY } from "./metric-kinds.adapter";
-import { MetricKindsAdapter } from "./metric-kinds.adapter";
+import { METRIC_KIND_DATA_KEY } from "./metric-kinds.adapter.ts";
+import { MetricKindsAdapter } from "./metric-kinds.adapter.ts";
 const { candidatePointCount, metricKind } = MetricKindsAdapter;
-import { type UnknownRecord } from "./metric-serialization.adapter";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { isRecord } = MetricSerializationAdapter;
-import { MetricRedactionAdapter } from "./metric-redaction.adapter";
+import { MetricRedactionAdapter } from "./metric-redaction.adapter.ts";
 import {
   MetricPreparationPort,
   type MetricPreparationInput,
-} from "../ports/metric-preparation.port";
-import type { MetricRedactionPort } from "../ports/metric-redaction.port";
+} from "../ports/metric-preparation.port.ts";
+import type { MetricRedactionPort } from "../ports/metric-redaction.port.ts";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportMetricsRequestSchema = z

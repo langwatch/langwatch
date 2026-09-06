@@ -11,17 +11,17 @@
 
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import {
   TraceMediaReferencePort,
   type TraceMediaReference,
-} from "../../ports/trace-media-reference.port";
+} from "../../ports/trace-media-reference.port.ts";
 import {
   TraceIoExtractionPort,
   type TraceIoSide,
   type TraceIoValue,
-} from "../../ports/trace-io-extraction.port";
-import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service";
+} from "../../ports/trace-io-extraction.port.ts";
+import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 
 type Extracted = { rich?: TraceIoValue | null; fallback?: TraceIoValue | null };
 

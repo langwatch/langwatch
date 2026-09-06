@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GrantFact } from "@langwatch/authz-contract";
-import { AuthzGrantMapper } from "../prisma.authz-grant.mapper";
+import { AuthzGrantMapper } from "../prisma.authz-grant.mapper.ts";
 
 const ORG = "org_acme";
 

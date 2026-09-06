@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/workflow-contract";
 import isEqual from "lodash-es/isEqual";
 
-import type { PromptConfigFormValues } from "./prompt-form.schemas";
+import type { PromptConfigFormValues } from "./prompt-form.schemas.ts";
 
 export function inputsAndOutputsToDemostrationColumns(
   inputs: PromptConfigFormValues["version"]["configData"]["inputs"],

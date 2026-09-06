@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 
 // The header's translate hook dispatches through tRPC; these tests pin
 // container chrome, so stub it to the identity passthrough.
-vi.mock("../../hooks/use-text-translation", () => ({
+vi.mock("../../hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -22,20 +22,20 @@ vi.mock("../../hooks/use-text-translation", () => ({
 
 // The toolbar checks the annotation permission and reads the field's
 // comments; neither matters to container chrome.
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: () => false,
   }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useQueries: () => [],
   },
 }));
 
-import { IOViewer } from "../io-viewer";
+import { IOViewer } from "../io-viewer.tsx";
 
 afterEach(cleanup);
 

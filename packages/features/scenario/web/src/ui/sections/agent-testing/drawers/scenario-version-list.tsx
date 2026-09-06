@@ -6,12 +6,12 @@
 
 import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { useCan } from "../../../../behavior/use-can";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
-import { ScenarioVersionRow } from "./scenario-version-row";
-import type { VersionEntry } from "../../../../model/agent-testing/drawers/scenario-versions";
-import { useVersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore";
+import { useCan } from "../../../../behavior/use-can.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { ScenarioVersionRow } from "./scenario-version-row.tsx";
+import type { VersionEntry } from "../../../../model/agent-testing/drawers/scenario-versions.ts";
+import { useVersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";
 
 /** The read that failed, with a way to try it again. */
 function VersionHistoryError({ onRetry }: { onRetry: () => void }) {

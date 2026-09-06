@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getSuiteSetId, isSuiteSetId, tryExtractSuiteId } from "../suite-set-id";
+import { getSuiteSetId, isSuiteSetId, tryExtractSuiteId } from "../suite-set-id.ts";
 
 describe("suite set IDs", () => {
   /** @scenario "Suite run uses suite ID as setId" */

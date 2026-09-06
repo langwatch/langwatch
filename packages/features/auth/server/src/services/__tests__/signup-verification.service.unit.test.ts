@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,
-} from "../signup-verification.service";
+} from "../signup-verification.service.ts";
 
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6). The service is composed

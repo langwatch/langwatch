@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RenderTimeoutError, renderLiquid } from "../engine";
+import { RenderTimeoutError, renderLiquid } from "../engine.ts";
 
 describe("renderLiquid", () => {
   describe("when the template references provided variables", () => {

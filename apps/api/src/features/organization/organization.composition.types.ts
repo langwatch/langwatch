@@ -5,13 +5,13 @@ import type {
   OrganizationProvisioningPort,
   OrganizationRestService,
 } from "@langwatch/organization-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
   createOrganizationTrpcRouter,
-} from "./organization-trpc.mount";
+} from "./organization-trpc.mount.ts";
 
 /** The four namespaces this feature mounts, and the slice behind them. */
 export type ComposedOrganizationFeature = Readonly<{

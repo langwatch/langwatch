@@ -11,7 +11,7 @@ import {
   formatInvoiceAmount,
   formatInvoiceDate,
   getInvoiceStatusColor,
-} from "../model/invoice-utils";
+} from "../model/invoice-utils.ts";
 
 describe("getInvoiceStatusColor", () => {
   describe("when status is paid", () => {

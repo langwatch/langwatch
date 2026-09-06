@@ -35,8 +35,8 @@ import {
 import { roleBindingScopeTypeSchema } from "@langwatch/authz-contract";
 import { Users } from "lucide-react";
 import { useState } from "react";
-import { authzApi } from "../../behavior/authz-api";
-import { useAuthzHost } from "../../model/authz-host";
+import { authzApi } from "../../behavior/authz-api.ts";
+import { useAuthzHost } from "../../model/authz-host.ts";
 import {
   type BindingPrincipal,
   type BindingScopeFilter,
@@ -47,9 +47,9 @@ import {
   scopeLabel,
   scopePalette,
   scopePillText,
-} from "../../model/role-binding-principals";
-import { EnterpriseUpsell } from "../../ui/elements/enterprise-upsell";
-import { PrincipalAvatar } from "../../ui/elements/principal-avatar";
+} from "../../model/role-binding-principals.ts";
+import { EnterpriseUpsell } from "../../ui/elements/enterprise-upsell.tsx";
+import { PrincipalAvatar } from "../../ui/elements/principal-avatar.tsx";
 
 const SCOPE_TIERS = roleBindingScopeTypeSchema.enum;
 

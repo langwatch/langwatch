@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useEvaluationsV3Store } from "../use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -58,12 +58,12 @@ vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("../../../model/posthog-error-capture", () => ({
+vi.mock("../../../model/posthog-error-capture.ts", () => ({
   captureException: vi.fn(),
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-import { type AutosaveOutcome, useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3";
+import { type AutosaveOutcome, useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3.ts";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },

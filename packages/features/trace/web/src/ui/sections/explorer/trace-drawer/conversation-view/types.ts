@@ -1,5 +1,5 @@
-import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts";
-import type { TraceListItem } from "../../types/trace";
+import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
+import type { TraceListItem } from "../../types/trace.ts";
 
 export type Mode = "thread" | "bubbles" | "markdown";
 

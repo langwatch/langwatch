@@ -3,7 +3,7 @@
  * Defines the structure of API responses for scenario runs, batches, and events.
  */
 import { z } from "zod";
-import { ScenarioRunStatus } from "../scenario-run";
+import { ScenarioRunStatus } from "../scenario-run.ts";
 import {
   batchRunIdSchema,
   langwatchMetadataSchema,
@@ -13,7 +13,7 @@ import {
   scenarioMessageSnapshotSchema,
   scenarioResultsSchema,
   scenarioRunIdSchema,
-} from "./event-schemas";
+} from "./event-schemas.ts";
 
 /**
  * Standard success response schema

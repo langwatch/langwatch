@@ -19,8 +19,8 @@ import {
   buildLangWatchQLVegaSpec,
   mergeConfig,
   referencedDatasetNames,
-} from "../build-langwatch-ql-vega-spec";
-import type { LangWatchQLDataset } from "../visualization-types";
+} from "../build-langwatch-ql-vega-spec.ts";
+import type { LangWatchQLDataset } from "../visualization-types.ts";
 
 const QUERY_ROWS: LangWatchQLDataset = [
   { model: "gpt-5-mini", total: 3 },

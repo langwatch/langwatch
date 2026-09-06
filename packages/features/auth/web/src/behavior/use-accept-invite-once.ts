@@ -1,9 +1,9 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../model/invite-messages";
-import { authApi as api } from "./auth-api";
-import { hardRedirect } from "./hard-redirect";
-import { captureException, toError } from "./error-capture";
+import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../model/invite-messages.ts";
+import { authApi as api } from "./auth-api.ts";
+import { hardRedirect } from "./hard-redirect.ts";
+import { captureException, toError } from "./error-capture.ts";
 
 /**
  * Module-scoped set of invite codes that have already had a `mutate` call

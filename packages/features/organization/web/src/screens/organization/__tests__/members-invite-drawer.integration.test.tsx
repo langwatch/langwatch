@@ -9,10 +9,10 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing";
-import MembersScreen from "../members.screen";
+import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
+import MembersScreen from "../members.screen.tsx";
 
-vi.mock("../../../behavior/organization-api", () => {
+vi.mock("../../../behavior/organization-api.ts", () => {
   /**
    * Every read this screen makes, answered empty. The screen reads six
    * endpoints on the way to rendering its header, and none of them is what
@@ -51,7 +51,7 @@ vi.mock("../../../behavior/organization-api", () => {
   return { api: root };
 });
 
-vi.mock("../../../behavior/use-join-requests", () => ({
+vi.mock("../../../behavior/use-join-requests.ts", () => ({
   useJoinRequests: () => ({
     requests: [],
     isLoading: false,
@@ -62,11 +62,11 @@ vi.mock("../../../behavior/use-join-requests", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { HAS_EMAIL_PROVIDER_KEY: true } }),
 }));
 
-vi.mock("../../../behavior/use-required-session", () => ({
+vi.mock("../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 

@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { useNavigationHost } from "../model/navigation-host";
+import { useNavigationHost } from "../model/navigation-host.ts";
 import {
   type CommandFeatureFlagValues,
   filterCommandsByFeatureFlags,
   topLevelNavigationCommands,
-} from "../model/command-catalogue";
-import type { Command } from "../model/command-bar-types";
+} from "../model/command-catalogue.ts";
+import type { Command } from "../model/command-bar-types.ts";
 
 /**
  * Release flags the command list reads.

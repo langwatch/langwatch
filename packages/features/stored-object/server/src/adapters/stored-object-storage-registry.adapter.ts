@@ -4,7 +4,7 @@ import {
   redactStoredObjectStorageUri,
   type StoredObjectStorageScheme,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectStoragePort } from "../ports/stored-object-storage.port";
+import { StoredObjectStoragePort } from "../ports/stored-object-storage.port.ts";
 
 /** Provider byte operations supplied by process composition. */
 export interface StoredObjectStorageDriver {

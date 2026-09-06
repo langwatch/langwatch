@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { compilePiiExceptPatterns, redactEssentialPiiInText } from "../essentialPii.js";
-import { subtractProtectedRanges } from "../essentialPii.js";
+import { compilePiiExceptPatterns, redactEssentialPiiInText } from "../essentialPii.ts";
+import { subtractProtectedRanges } from "../essentialPii.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

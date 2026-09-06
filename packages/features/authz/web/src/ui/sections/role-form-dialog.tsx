@@ -20,7 +20,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { PermissionSelector } from "../blocks/permission-selector";
+import { PermissionSelector } from "../blocks/permission-selector.tsx";
 
 export type RoleFormData = {
   name: string;

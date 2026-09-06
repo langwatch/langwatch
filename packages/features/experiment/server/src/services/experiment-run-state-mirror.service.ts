@@ -5,7 +5,7 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
+import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-state-mirror");
 

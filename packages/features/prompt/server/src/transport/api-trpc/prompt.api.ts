@@ -52,7 +52,7 @@ import type {
   PromptTrpcContext,
   PromptTrpcPorts,
   PromptTrpcProcedures,
-} from "../../rules/prompt-trpc-context.rules";
+} from "../../rules/prompt-trpc-context.rules.ts";
 
 /** Installs the complete `prompts.*` tRPC surface on a process-owned root. */
 export class PromptTrpcApi {

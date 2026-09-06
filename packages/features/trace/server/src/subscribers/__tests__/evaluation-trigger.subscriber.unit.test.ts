@@ -9,17 +9,17 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port";
+import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port.ts";
 import {
   TraceEvaluationLoopMetricsPort,
   type TraceEvaluationLoopBlockReason,
-} from "../../ports/trace-evaluation-loop-metrics.port";
-import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port";
-import { MAX_PROCESSED_SPANS } from "../../projections/trace-summary.projection";
+} from "../../ports/trace-evaluation-loop-metrics.port.ts";
+import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port.ts";
+import { MAX_PROCESSED_SPANS } from "../../projections/trace-summary.projection.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
-} from "../evaluation-trigger.subscriber";
+} from "../evaluation-trigger.subscriber.ts";
 
 /**
  * Spec: packages/features/trace/specs/evaluation-trigger.feature

@@ -1,7 +1,7 @@
 import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { create } from "zustand";
-import { isPreviewTraceId } from "../model/preview-trace-id";
-import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store";
+import { isPreviewTraceId } from "../model/preview-trace-id.ts";
+import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store.ts";
 
 export type DrawerViewMode = "trace" | "summary" | "conversation" | "terminal" | "session";
 // Flame's time-weighted blocks show where time is spent better than the indented waterfall does.

@@ -5,26 +5,26 @@ import type { ProjectService } from "@langwatch/project-contract";
 import {
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
-} from "../repositories/prisma/github-installations.repository";
+} from "../repositories/prisma/github-installations.repository.ts";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../repositories/prisma/github-pull-requests.repository";
-import { GithubInstallationsService } from "../services/github-installations.service";
-import { GithubInstallationAccessService } from "../services/github-installation-access.service";
-import { GithubBranchDemandService } from "../services/github-branch-demand.service";
-import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service";
-import { GithubBranchMappingService } from "../services/github-branch-mapping.service";
-import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service";
-import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service";
-import { GithubPullRequestStatusCacheService } from "../services/github-pull-request-status-cache.service";
-import { GithubFeatureService } from "../services/github.service";
-import { GithubAppTokenAdapter } from "./github-app-token.adapter";
-import { GithubHostAdapter } from "./github-host.adapter";
-import { GithubInstallResponseAdapter } from "./github-install-response.adapter";
-import { GithubInstallStateAdapter } from "./github-install-state.adapter";
-import { GithubPullRequestEventAdapter } from "./github-pull-request-event.adapter";
-import { RedisGithubAdapter } from "./redis.github.adapter";
+} from "../repositories/prisma/github-pull-requests.repository.ts";
+import { GithubInstallationsService } from "../services/github-installations.service.ts";
+import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
+import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
+import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
+import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
+import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
+import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
+import { GithubPullRequestStatusCacheService } from "../services/github-pull-request-status-cache.service.ts";
+import { GithubFeatureService } from "../services/github.service.ts";
+import { GithubAppTokenAdapter } from "./github-app-token.adapter.ts";
+import { GithubHostAdapter } from "./github-host.adapter.ts";
+import { GithubInstallResponseAdapter } from "./github-install-response.adapter.ts";
+import { GithubInstallStateAdapter } from "./github-install-state.adapter.ts";
+import { GithubPullRequestEventAdapter } from "./github-pull-request-event.adapter.ts";
+import { RedisGithubAdapter } from "./redis.github.adapter.ts";
 
 /** Everything the whole GitHub capability reads through, in one client. */
 export type GithubDatabase = PrismaGithubInstallationsDatabase & PrismaGithubPullRequestsDatabase;

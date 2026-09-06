@@ -14,14 +14,14 @@ import {
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { OrganizationMembershipService } from "../services/organization-membership.service";
-import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import type {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
-} from "../ports/organization-membership.port";
+} from "../ports/organization-membership.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

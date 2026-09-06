@@ -2,7 +2,7 @@ import {
   UsageStatsClickHouseRepositoryPort,
   type UsageStatsClickHouseClientResolverPort,
   type UsageStatsCountInput,
-} from "../../ports/usage-stats-worker.port";
+} from "../../ports/usage-stats-worker.port.ts";
 import { z } from "zod";
 
 const usageStatsCountRowsSchema = z.array(z.object({ Total: z.string() }));

@@ -15,11 +15,11 @@ import {
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
-import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
+import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port.ts";
 import {
   GatewayBudgetSpendPort,
   type GatewayBudgetSpendRecord,
-} from "../../ports/gateway-budget-spend.port";
+} from "../../ports/gateway-budget-spend.port.ts";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;

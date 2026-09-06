@@ -6,7 +6,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useTraceSwitchOverlay } from "../use-trace-switch-overlay";
+import { useTraceSwitchOverlay } from "../use-trace-switch-overlay.ts";
 
 describe("useTraceSwitchOverlay", () => {
   beforeEach(() => vi.useFakeTimers());

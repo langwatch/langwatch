@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { SIMULATION_RUN_COMMAND_TYPES } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
-import type { ComputeRunMetricsDeps } from "../compute-run-metrics.adapter";
-import { ComputeRunMetricsCommand } from "../compute-run-metrics.adapter";
+import type { ComputeRunMetricsDeps } from "../compute-run-metrics.adapter.ts";
+import { ComputeRunMetricsCommand } from "../compute-run-metrics.adapter.ts";
 
 function makeDeps(overrides: Partial<ComputeRunMetricsDeps> = {}): ComputeRunMetricsDeps {
   return {

@@ -5,20 +5,20 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
 } from "@langwatch/trace-web/surfaces/suggestion-ui";
-import { useReportOpenList } from "../../../elements/agent-testing/shared/open-list-context";
+import { useReportOpenList } from "../../../elements/agent-testing/shared/open-list-context.ts";
 import {
   acceptParameterField,
   type ParameterFieldMode,
   type ParameterSuggestionRow,
   parameterFieldState,
   parameterSuggestions,
-} from "./parameter-suggestions";
+} from "./parameter-suggestions.ts";
 
 /** How long a blur waits before the list closes, so a click on a row lands. */
 const CLOSE_AFTER_BLUR_MS = 150;

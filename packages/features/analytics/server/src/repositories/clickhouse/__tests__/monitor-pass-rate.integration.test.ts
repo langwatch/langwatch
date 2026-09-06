@@ -34,8 +34,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
-} from "../../../__tests__/migrated-clickhouse.harness";
-import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository";
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
+import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 const tenantId = `test-monitor-rate-${randomUUID()}`;
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;

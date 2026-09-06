@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { PromptRef } from "../model/trace-generator";
-import { useFoundryTransport } from "./foundry-runtime";
+import type { PromptRef } from "../model/trace-generator.ts";
+import { useFoundryTransport } from "./foundry-runtime.tsx";
 
 export function useFoundryPrompts({
   enabled,

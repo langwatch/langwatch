@@ -1,5 +1,5 @@
-import { PostgresIngestionPullRunProjectionAdapter } from "../postgres.ingestion-pull-run-projection.adapter";
-import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection";
+import { PostgresIngestionPullRunProjectionAdapter } from "../postgres.ingestion-pull-run-projection.adapter.ts";
+import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
 import type { StoredProjection } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";

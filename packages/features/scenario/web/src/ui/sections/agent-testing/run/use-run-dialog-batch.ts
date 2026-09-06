@@ -8,15 +8,15 @@ import { generate } from "@langwatch/ksuid";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback, useRef } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
-import { writeScenarioTarget } from "../../use-scenario-target";
-import { api } from "../../../../behavior/scenario-api";
+import { writeScenarioTarget } from "../../use-scenario-target.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit.ts";
 import { flushSync } from "react-dom";
-import type { TargetValue } from "../../../../model/scenario-target";
-import { type RunScope, toSuiteScope } from "./run-configuration";
-import type { RunStartedInfo } from "./run-dialog-types";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { type RunScope, toSuiteScope } from "./run-configuration.ts";
+import type { RunStartedInfo } from "./run-dialog-types.ts";
 
 type RunAttempt = {
   /** What the person is queueing: subject, targets, note and parameters. */

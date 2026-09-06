@@ -13,7 +13,7 @@
  * which is what the one procedure returns.
  */
 
-import { annotationApi } from "./annotation-api";
+import { annotationApi } from "./annotation-api.ts";
 
 export type FieldRedactionReading = {
   isRedacted: boolean | undefined;

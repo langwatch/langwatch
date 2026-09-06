@@ -16,16 +16,16 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 
-import type { ApiAuditPort } from "../../api-request.policy";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
 import {
   createProjectTrpcRouter,
   type ProjectTrpcChecks,
   type ProjectTrpcMountPorts,
-} from "./project-trpc.mount";
+} from "./project-trpc.mount.ts";
 
 /** The other services one project's own surfaces reach. */
 export type ProjectPeers = Readonly<{
@@ -43,7 +43,7 @@ export type ProjectPeers = Readonly<{
   viewerProtections?: ApiViewerProtectionsPort | undefined;
 }>;
 
-import type { ComposedProjectFeature } from "./project.composition.types";
+import type { ComposedProjectFeature } from "./project.composition.types.ts";
 
 /** Composes `project.*` over this process's own graph. */
 export function composeProjectFeature(options: {

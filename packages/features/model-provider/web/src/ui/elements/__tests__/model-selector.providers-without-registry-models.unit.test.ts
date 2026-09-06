@@ -14,7 +14,7 @@
  * specs/model-providers/google-agent-platform.feature.
  */
 import { describe, expect, it } from "vitest";
-import { providersWithoutRegistryModels } from "../model-selector";
+import { providersWithoutRegistryModels } from "../model-selector.tsx";
 
 const apRow = {
   provider: "gemini",

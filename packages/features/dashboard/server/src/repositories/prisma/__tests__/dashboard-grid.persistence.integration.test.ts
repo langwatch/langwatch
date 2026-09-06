@@ -6,7 +6,7 @@ import {
   type LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
-import { SavedWorkbenchChartPolicy } from "../../../ports/dashboard.port";
+import { SavedWorkbenchChartPolicy } from "../../../ports/dashboard.port.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -21,9 +21,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   DashboardGraphVisibilityPolicyPort,
   DashboardIdGenerator,
-} from "../../../ports/dashboard.port";
-import { PrismaDashboardRepository } from "../prisma.dashboard.repository";
-import { DashboardService } from "../../../services/dashboard.service";
+} from "../../../ports/dashboard.port.ts";
+import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
+import { DashboardService } from "../../../services/dashboard.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

@@ -17,7 +17,7 @@ import {
   matchingPreset,
   readAnnotationPeriod,
   relativePeriodAddress,
-} from "../annotation-period";
+} from "../annotation-period.ts";
 
 const NOW = new Date("2026-08-08T12:00:00Z");
 

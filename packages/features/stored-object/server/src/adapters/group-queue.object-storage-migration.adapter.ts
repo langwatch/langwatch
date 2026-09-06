@@ -4,7 +4,7 @@ import {
   readEnvelopeTieredRefFromHeader,
   splitEnvelope,
 } from "@langwatch/group-queue/operational";
-import type { QueueMigrationBlocker } from "../services/object-storage-migration.service";
+import type { QueueMigrationBlocker } from "../services/object-storage-migration.service.ts";
 
 /**
  * Small Redis surface used by the one-off migration audit. IORedis implements

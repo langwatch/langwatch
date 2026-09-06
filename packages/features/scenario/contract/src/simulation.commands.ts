@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { simulationMessageSchema } from "./simulation";
+import { simulationMessageSchema } from "./simulation.ts";
 
 const simulationRunIdentitySchema = z.object({
   tenantId: z.string(),

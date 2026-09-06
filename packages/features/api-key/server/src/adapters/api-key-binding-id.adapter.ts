@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port";
+import { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
 
 /**
  * The AuthZ binding identifier an API-key grant is written under.

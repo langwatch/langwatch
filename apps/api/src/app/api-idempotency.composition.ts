@@ -34,7 +34,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
+import { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
 
 export type ApiIdempotencyCompositionOptions = Readonly<{
   /** The one guarded connection this process's receipts are claimed on. */

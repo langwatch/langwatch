@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../surfaces/prompt-form";
-import { useLatestPromptVersion } from "../../behavior/use-latest-prompt-version";
+import type { PromptConfigFormValues } from "../../surfaces/prompt-form/index.ts";
+import { useLatestPromptVersion } from "../../behavior/use-latest-prompt-version.ts";
 
 export type SavePromptButtonProps = {
   /** Callback when save button is clicked */

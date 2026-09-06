@@ -1,8 +1,8 @@
 import { createRestService } from "@langwatch/api/rest";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
-import { SECRET_PUBLIC_API_VERSION, SecretPublicRestApi } from "../secret.api";
-import { SecretApp } from "../../../app/secret.app";
+import { SECRET_PUBLIC_API_VERSION, SecretPublicRestApi } from "../secret.api.ts";
+import { SecretApp } from "../../../app/secret.app.ts";
 
 const secret: Secret = {
   id: "secret-1",

@@ -25,7 +25,7 @@ import {
   PromptSystemPromptRequiredError,
 } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
-import { createPromptServiceForTest } from "./prompt-service.test-fixture";
+import { createPromptServiceForTest } from "./prompt-service.test-fixture.ts";
 
 describe("PromptService.createPrompt — missing system prompt (Issue #3196 regression)", () => {
   describe("given a PromptService", () => {

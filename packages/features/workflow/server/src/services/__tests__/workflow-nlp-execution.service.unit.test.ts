@@ -11,9 +11,9 @@ import {
   WorkflowNlpRuntimePort,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
-} from "../../ports/workflow.port";
-import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service";
-import { TestModelProviderService } from "./model-provider.service.fake";
+} from "../../ports/workflow.port.ts";
+import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service.ts";
+import { TestModelProviderService } from "./model-provider.service.fake.ts";
 
 class FixedWorkflowIdPort extends WorkflowIdPort {
   next(): string {

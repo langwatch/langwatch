@@ -20,7 +20,7 @@ import {
   ModelProviderTestRateLimitedError,
   ModelRestrictedForExecutionError,
   ModelRestrictedForFeatureError,
-} from "../model-provider.errors";
+} from "../model-provider.errors.ts";
 
 function expectHandledWire(
   error: HandledError,

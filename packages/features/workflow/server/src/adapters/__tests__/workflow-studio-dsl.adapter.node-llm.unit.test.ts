@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError, type ModelProviderService } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { ModelProviderWorkflowStudioDslAdapter } from "../workflow-studio-dsl.adapter";
+import { ModelProviderWorkflowStudioDslAdapter } from "../workflow-studio-dsl.adapter.ts";
 
 function signatureNode(llmValue: unknown) {
   return {

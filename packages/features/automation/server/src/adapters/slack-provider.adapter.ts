@@ -4,7 +4,7 @@ import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automation-contract";
-import { AutomationSlackProviderPort } from "../ports/automation-provider.port";
+import { AutomationSlackProviderPort } from "../ports/automation-provider.port.ts";
 
 export interface AutomationSecretCrypto {
   encrypt(value: string): string;

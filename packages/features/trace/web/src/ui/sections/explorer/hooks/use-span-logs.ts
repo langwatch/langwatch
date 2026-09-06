@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
  * The open drawer trace's log records, grouped by the span that emitted them.

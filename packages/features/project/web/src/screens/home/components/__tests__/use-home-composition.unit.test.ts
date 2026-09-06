@@ -3,7 +3,7 @@
  * Spec: specs/home/signal-focused-home-rollout.feature,
  */
 import { describe, expect, it } from "vitest";
-import { resolveHomeComposition } from "../use-home-composition";
+import { resolveHomeComposition } from "../use-home-composition.ts";
 
 describe("resolveHomeComposition", () => {
   describe("when the signal-focused rollout is on", () => {

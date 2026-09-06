@@ -10,14 +10,14 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   composeApiGateway,
   type ApiGatewayClickHousePort,
   type ApiGatewayIdempotencyPort,
-} from "../../app/api-gateway.composition";
-import { createGatewayTrpcRouters } from "./gateway-trpc.mount";
+} from "../../app/api-gateway.composition.ts";
+import { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {
@@ -59,7 +59,7 @@ export type GatewayFeatureOptions = Readonly<{
   idempotency?: ApiGatewayIdempotencyPort | undefined;
 }>;
 
-import type { ComposedGatewayFeature } from "./gateway.composition.types";
+import type { ComposedGatewayFeature } from "./gateway.composition.types.ts";
 
 /** Composes the gateway over this process's graph, or over its refusals. */
 export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedGatewayFeature {

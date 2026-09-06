@@ -1,7 +1,7 @@
 import { Heading } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 /**
  * Extract greeting name from user's name.

@@ -21,10 +21,10 @@ import {
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
-} from "../../../model/batch-evaluation-results.bt-leaderboard";
-import { computeParetoDominance, type ParetoDominance } from "../batch-evaluation-results.pareto";
-import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics";
-import { VARIANT_COLORS } from "./win-rate-chart";
+} from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { computeParetoDominance, type ParetoDominance } from "../batch-evaluation-results.pareto.ts";
+import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics.ts";
+import { VARIANT_COLORS } from "./win-rate-chart.tsx";
 
 export type ParetoAxis = "cost" | "duration";
 

@@ -8,7 +8,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { composeUserFeature } from "../user.composition";
+import { composeUserFeature } from "../user.composition.ts";
 
 const USER_ID = "user-1";
 const CREDENTIAL_ACCOUNT_ID = "account-credential";

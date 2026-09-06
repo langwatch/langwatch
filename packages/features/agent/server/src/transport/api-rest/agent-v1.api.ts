@@ -32,17 +32,17 @@ import type { ErrorHandler } from "hono";
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
-import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
-import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port.ts";
+import type { LongPollTransportService } from "../../services/connected-agent-long-poll.service.ts";
 import {
   ConnectedAgentPresenceService,
   NO_PRESENCE,
   type AgentPresence,
-} from "../../services/connected-agent-presence.service";
-import { agentListRowOf, type AgentListRow } from "../../rules/agent-view.rules";
-import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api";
-import { registerConnectEndpoints } from "./agent-connect.api";
-import type { AgentPlatformUrlBuilder } from "./agent-legacy.api";
+} from "../../services/connected-agent-presence.service.ts";
+import { agentListRowOf, type AgentListRow } from "../../rules/agent-view.rules.ts";
+import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api.ts";
+import { registerConnectEndpoints } from "./agent-connect.api.ts";
+import type { AgentPlatformUrlBuilder } from "./agent-legacy.api.ts";
 
 // ── schemas ──────────────────────────────────────────────────────────────────
 

@@ -3,11 +3,11 @@ import type {
   ComparisonEvaluatorConfig,
   DatasetReference,
   EvaluationResults,
-} from "../../experiment-workbench";
-import { computeTargetAggregates } from "../compute-aggregates";
-import { toComparisonConfig } from "../normalize-comparison";
-import { disambiguateNames } from "../variant-disambiguation";
-import type { WorkbenchState } from "./transforms";
+} from "../../experiment-workbench.ts";
+import { computeTargetAggregates } from "../compute-aggregates.ts";
+import { toComparisonConfig } from "../normalize-comparison.ts";
+import { disambiguateNames } from "../variant-disambiguation.ts";
+import type { WorkbenchState } from "./transforms/index.ts";
 
 /**
  * A compact, serializable view of the workbench, for an agent reading the board before

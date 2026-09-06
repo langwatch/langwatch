@@ -9,7 +9,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createEnterprisePlanGate } from "../src";
+import { createEnterprisePlanGate } from "../src/index.ts";
 
 const getActivePlan = vi.fn();
 

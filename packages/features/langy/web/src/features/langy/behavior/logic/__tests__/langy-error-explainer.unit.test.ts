@@ -8,7 +8,7 @@ import {
   type LangyDomainError,
   readLangyStreamError,
   resolveLiveTurnError,
-} from "../langy-error-explainer";
+} from "../langy-error-explainer.ts";
 
 /**
  * The kind list is the contract between the worker's turn classifier (the Langy server

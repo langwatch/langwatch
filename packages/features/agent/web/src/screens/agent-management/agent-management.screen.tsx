@@ -3,17 +3,17 @@ import type { ConnectedAgentConfig, ConnectedAgentView } from "@langwatch/agent-
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { agentApi } from "../../behavior/agent-api";
-import { getAgentEditorDrawer } from "../../features/editor/model/get-agent-editor-drawer";
+import { agentApi } from "../../behavior/agent-api.ts";
+import { getAgentEditorDrawer } from "../../features/editor/model/get-agent-editor-drawer.ts";
 import {
   AgentTypeSelectorDrawer,
   type AgentType,
-} from "../../features/editor/ui/sections/agent-type-selector-drawer";
-import { AgentHistoryDrawer } from "../../features/history/ui/sections/agent-history-drawer";
-import { AgentArchiveDialog } from "../../features/management/ui/blocks/agent-archive-dialog";
-import { AgentPushDialog } from "../../features/management/ui/blocks/agent-push-dialog";
-import { AgentReplicateDialog } from "../../features/management/ui/blocks/agent-replicate-dialog";
-import { AgentCard } from "../../features/management/ui/blocks/agent-card";
+} from "../../features/editor/ui/sections/agent-type-selector-drawer.tsx";
+import { AgentHistoryDrawer } from "../../features/history/ui/sections/agent-history-drawer.tsx";
+import { AgentArchiveDialog } from "../../features/management/ui/blocks/agent-archive-dialog.tsx";
+import { AgentPushDialog } from "../../features/management/ui/blocks/agent-push-dialog.tsx";
+import { AgentReplicateDialog } from "../../features/management/ui/blocks/agent-replicate-dialog.tsx";
+import { AgentCard } from "../../features/management/ui/blocks/agent-card.tsx";
 import {
   AgentManagementCardPort,
   AgentManagementFeedbackPort,
@@ -26,12 +26,12 @@ import {
   type AgentCopyDialogInput,
   type AgentPushDialogInput,
   type AgentWithFields,
-} from "../../features/management/ui/sections/agent-management-page";
+} from "../../features/management/ui/sections/agent-management-page.tsx";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   useAgentManagementHost,
   type AgentManagementHostPort,
-} from "../../model/agent-management-host";
+} from "../../model/agent-management-host.ts";
 
 /**
  * The Agents page, as `/:project/agents` serves it.

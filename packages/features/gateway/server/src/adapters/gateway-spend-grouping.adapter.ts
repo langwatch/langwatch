@@ -3,10 +3,10 @@
  * can safely walk.
  */
 
-import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port";
+import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port.ts";
 
 import { GatewaySpendGroupByUnstableError } from "@langwatch/gateway-contract";
-import { type SpendBucket, type SpendGroupByKey } from "../ports/gateway-spend-events.port";
+import { type SpendBucket, type SpendGroupByKey } from "../ports/gateway-spend-events.port.ts";
 
 /**
  * The keys the fold rewrites after admission. Requested model and provider

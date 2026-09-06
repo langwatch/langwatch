@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
-import type { ExperimentTargetEntityNamesPort } from "../ports/experiment-target-entity-names.port";
+import type { ExperimentTargetEntityNamesPort } from "../ports/experiment-target-entity-names.port.ts";
 
 const logger = createLogger("langwatch:experiment:workbench-target-names");
 

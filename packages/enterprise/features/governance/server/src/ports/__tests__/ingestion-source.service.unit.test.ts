@@ -2,23 +2,23 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port";
+import { GovernanceDiagnosticsPort } from "../governance-diagnostics.port.ts";
 import {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type UpdateIngestionSourceRecord,
-} from "../ingestion-source.port";
-import { GovernanceEncryptionPort } from "../governance-encryption.port";
-import { IngestionCredentialsService } from "../../services/ingestion-credentials.service";
+} from "../ingestion-source.port.ts";
+import { GovernanceEncryptionPort } from "../governance-encryption.port.ts";
+import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../../services/ingestion-source-secret.service";
-import { IngestionSourceService } from "../../services/ingestion-source.service";
-import { PullDestinationService } from "../../services/pull-destination.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../../services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
+import { PullDestinationService } from "../../services/pull-destination.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 

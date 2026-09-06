@@ -2,7 +2,7 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ColorModeProvider } from "../src/color-mode";
+import { ColorModeProvider } from "../src/color-mode/index.tsx";
 
 // jsdom ships no matchMedia, and next-themes reads it on mount. Answer as a
 // reader who has asked for less motion.

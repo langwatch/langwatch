@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-events-meter.repository";
+import { BillableEventsMeterClickHouseRepository } from "../clickhouse.billable-events-meter.repository.ts";
 
 function record() {
   return {

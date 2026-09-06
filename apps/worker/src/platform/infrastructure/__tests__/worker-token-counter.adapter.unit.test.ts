@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerTiktokenCounterAdapter } from "../worker-token-counter.adapter";
+import { WorkerTiktokenCounterAdapter } from "../worker-token-counter.adapter.ts";
 
 /**
  * Spec: packages/features/trace/specs/span-token-estimation.feature

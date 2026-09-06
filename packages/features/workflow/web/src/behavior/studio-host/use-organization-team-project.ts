@@ -4,9 +4,9 @@
 
 import { useMemo } from "react";
 
-import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host";
+import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
 import type { Project } from "@langwatch/workflow-contract";
-import { api } from "../../model/workflow-api-client";
+import { api } from "../../model/workflow-api-client.ts";
 
 /**
  * The project row, as the studio's closure reads it.

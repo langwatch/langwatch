@@ -22,14 +22,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { CustomEvaluationSync } from "../custom-evaluation-sync.subscriber";
+import { CustomEvaluationSync } from "../custom-evaluation-sync.subscriber.ts";
 import {
   createContext,
   createFoldState,
   createOtlpSpan,
   createSpanReceivedEvent,
   OCCURRED_AT,
-} from "./subscribers/support/trace-subscriber.fixtures";
+} from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

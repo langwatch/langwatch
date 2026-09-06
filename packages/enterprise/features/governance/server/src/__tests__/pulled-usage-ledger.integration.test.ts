@@ -29,11 +29,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PulledUsageLedgerIntent,
   type WritePulledUsagePayload,
-} from "../intents/pulled-usage-ledger.intent";
+} from "../intents/pulled-usage-ledger.intent.ts";
 import {
   PulledUsageLedgerPort,
   type PulledUsageLedgerRow,
-} from "../ports/pulled-usage-ledger.port";
+} from "../ports/pulled-usage-ledger.port.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

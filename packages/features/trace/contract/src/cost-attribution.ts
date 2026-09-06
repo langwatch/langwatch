@@ -1,4 +1,4 @@
-import { ATTR_KEYS } from "./trace-attributes";
+import { ATTR_KEYS } from "./trace-attributes.ts";
 
 /** Resource attribute stamped on traces whose provider cost is bundled. */
 export const NON_BILLABLE_ATTR = ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE;

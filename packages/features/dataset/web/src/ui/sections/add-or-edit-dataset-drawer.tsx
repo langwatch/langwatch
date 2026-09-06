@@ -36,11 +36,11 @@ import {
 } from "@langwatch/dataset-contract";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetSlugValidation } from "../../behavior/use-dataset-slug-validation";
-import { useDatasetHost } from "../../model/dataset-host";
-import { DatasetSlugDisplay } from "../blocks/dataset-slug-display";
-import { LabelledField } from "../elements/labelled-field";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetSlugValidation } from "../../behavior/use-dataset-slug-validation.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { DatasetSlugDisplay } from "../blocks/dataset-slug-display.tsx";
+import { LabelledField } from "../elements/labelled-field.tsx";
 
 /**
  * Columns a freshly created dataset starts with, matching the trace fields a

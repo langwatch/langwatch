@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiLangyNavigateResourceAdapter,
   type ApiLangyNavigateResources,
-} from "../langy-navigate-resource.adapter";
+} from "../langy-navigate-resource.adapter.ts";
 
 /**
  * Every directory answers with the row it was asked for, so one table can say

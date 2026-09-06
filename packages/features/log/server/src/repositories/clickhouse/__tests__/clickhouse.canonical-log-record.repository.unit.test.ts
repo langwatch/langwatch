@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse.canonical-log-record.repository";
-import type { LogClickHouseClient } from "../clickhouse.canonical-log-record-append.repository";
+import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse.canonical-log-record.repository.ts";
+import type { LogClickHouseClient } from "../clickhouse.canonical-log-record-append.repository.ts";
 
 function createRepository(resolveClient: () => Promise<LogClickHouseClient>) {
   return ClickHouseCanonicalLogRecordRepository.create({

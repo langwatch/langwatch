@@ -6,8 +6,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AutomationDrawer } from "../ui/sections/automation-drawer";
-import { useAutomationStore } from "../ui/sections/automation-store";
+import { AutomationDrawer } from "../ui/sections/automation-drawer.tsx";
+import { useAutomationStore } from "../ui/sections/automation-store.ts";
 
 // The saved row the edit-mode query resolves to. Mutable so a test can
 // emulate a tRPC background refetch handing back a *different* row after the
@@ -39,7 +39,7 @@ const {
   mockUpsertMutate: vi.fn(),
 }));
 
-vi.mock("../../../behavior/automation-session", () => ({
+vi.mock("../../../behavior/automation-session.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", name: "Proj", slug: "proj" },
     organization: { id: "org-1" },
@@ -49,13 +49,13 @@ vi.mock("../../../behavior/automation-session", () => ({
   useAppBaseUrl: () => "https://app.langwatch.ai",
 }));
 
-vi.mock("../../../behavior/automation-feedback", () => ({
+vi.mock("../../../behavior/automation-feedback.ts", () => ({
   useAutomationToaster: () => ({ create: vi.fn() }),
   useShowErrorToast: () => vi.fn(),
   useDescribeError: () => () => "Something went wrong",
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     automation: {
       getTriggerById: {

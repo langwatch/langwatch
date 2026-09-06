@@ -46,10 +46,10 @@ import {
   type ProjectDiagnosticsPort,
   type ProjectKeyMapPort,
   type ProjectStoredObjectsPort,
-} from "../ports/project.port";
-import type { ProjectRepository } from "../repositories/project.repository";
-import { ProjectMetadataService } from "./project-metadata.service";
-import { ProjectSlugService } from "./project-slug.service";
+} from "../ports/project.port.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
+import { ProjectMetadataService } from "./project-metadata.service.ts";
+import { ProjectSlugService } from "./project-slug.service.ts";
 
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 

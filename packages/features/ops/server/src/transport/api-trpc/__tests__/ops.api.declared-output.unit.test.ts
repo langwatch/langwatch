@@ -15,9 +15,9 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { OpsEventingIntrospectionPort } from "../../../ports/eventing-introspection.port";
-import { OpsApp, type OpsCapability } from "../../../app/ops.app";
-import { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "../ops.api";
+import { OpsEventingIntrospectionPort } from "../../../ports/eventing-introspection.port.ts";
+import { OpsApp, type OpsCapability } from "../../../app/ops.app.ts";
+import { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "../ops.api.ts";
 
 const trpc = initTRPC.context<OpsTrpcContext>().create();
 

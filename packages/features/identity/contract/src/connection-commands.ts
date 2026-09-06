@@ -4,8 +4,8 @@ import {
   ssoConnectionTypeSchema,
   ssoIdpMetadataSchema,
   ssoVerificationCeremonyMethodSchema,
-} from "./connection";
-import { identityActorSchema } from "./vocabulary";
+} from "./connection.ts";
+import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * The SSO connection commands (ADR-117 §5, D04). Every verb the lifecycle

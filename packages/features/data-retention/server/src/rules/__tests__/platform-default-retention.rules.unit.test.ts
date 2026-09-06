@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_RETENTION_DAYS } from "@langwatch/data-retention-contract";
-import { resolvePlatformDefaultRetentionDays } from "../platform-default-retention.rules";
+import { resolvePlatformDefaultRetentionDays } from "../platform-default-retention.rules.ts";
 
 describe("resolvePlatformDefaultRetentionDays", () => {
   describe("given the variable is not set", () => {

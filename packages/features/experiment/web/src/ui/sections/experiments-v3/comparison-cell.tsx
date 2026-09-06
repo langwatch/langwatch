@@ -3,14 +3,14 @@ import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { Markdown } from "@langwatch/workflow-web/surfaces/markdown";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { scrollToTargetColumn } from "../../../behavior/experiments-v3/use-open-target-editor";
-import { useTargetName } from "../../../behavior/experiments-v3/use-target-name";
-import type { TargetConfig } from "../../../model/experiments-v3/types";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { scrollToTargetColumn } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
+import { useTargetName } from "../../../behavior/experiments-v3/use-target-name.ts";
+import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import {
   explainEvaluatorDomainError,
   MISSING_MODEL_API_KEY_EXPLANATION,
-} from "../../../model/experiments-v3/explain-evaluator-domain-error";
+} from "../../../model/experiments-v3/explain-evaluator-domain-error.ts";
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
 
 /**

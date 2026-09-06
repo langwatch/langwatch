@@ -10,7 +10,7 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   ExperimentExecutionDataService,
   type LoadedWorkflow,
-} from "./experiment-execution-data.service";
+} from "./experiment-execution-data.service.ts";
 
 export class ExperimentTargetDataService {
   private constructor() {}

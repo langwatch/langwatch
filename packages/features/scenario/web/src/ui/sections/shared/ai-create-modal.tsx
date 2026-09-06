@@ -14,11 +14,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Deep import on purpose: `ErrorActions` is deliberately absent from the
 // `~/features/errors` barrel, which would put it in an import cycle with the
 // toaster. `components/ui/toaster.tsx` reaches for it the same way.
-import { ErrorActions } from "../../../behavior/errors";
+import { ErrorActions } from "../../../behavior/errors.tsx";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web/surfaces/langy-mark";
 import "@langwatch/langy-web/surfaces/langy-theme.css";
 import { CARD } from "@langwatch/langy-web/surfaces/asaplangy";
-import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error";
+import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────

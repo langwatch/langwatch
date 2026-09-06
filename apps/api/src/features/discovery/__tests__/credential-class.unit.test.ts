@@ -26,7 +26,7 @@ import {
   publicEndpoint,
   requires,
   securityForCredentialClass,
-} from "../../../app-rest";
+} from "../../../app-rest/index.ts";
 
 const SPEC_PATH = join(dirname(fileURLToPath(import.meta.url)), "../openapi-document.json");
 

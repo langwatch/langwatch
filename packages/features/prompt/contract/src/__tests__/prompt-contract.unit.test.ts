@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPromptCommandSchema, promptConfigDataSchema, promptHandleSchema } from "../index";
+import { createPromptCommandSchema, promptConfigDataSchema, promptHandleSchema } from "../index.ts";
 
 describe("Prompt contract", () => {
   it("accepts the portable prompt configuration shape", () => {

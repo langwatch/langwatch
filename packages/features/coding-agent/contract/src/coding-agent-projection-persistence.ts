@@ -3,7 +3,7 @@ import type {
   CodingAgentSessionEventRecord,
   CodingAgentSessionMetricSeriesRecord,
   CodingAgentTraceSessionRecord,
-} from "./coding-agent";
+} from "./coding-agent.ts";
 
 /** Process-lifecycle port used by Coding Agent's durable event projections. */
 export abstract class CodingAgentProjectionPersistence {

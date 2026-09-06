@@ -2,9 +2,9 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceTokenCounterPort } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
-import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/worker-token-counter.adapter";
-import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimation.composition";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
+import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/worker-token-counter.adapter.ts";
+import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimation.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/span-token-estimation.feature

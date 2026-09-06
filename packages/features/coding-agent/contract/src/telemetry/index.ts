@@ -1,10 +1,10 @@
-import type { CodingAgentDefinition } from "./coding-agent-definition";
-import { claudeCodeAgent } from "./claude-code";
-import { claudeCoworkAgent } from "./claude-cowork";
-import { codexAgent } from "./codex";
-import { copilotAgent } from "./copilot";
-import { geminiCliAgent } from "./gemini-cli";
-import { opencodeAgent } from "./opencode";
+import type { CodingAgentDefinition } from "./coding-agent-definition.ts";
+import { claudeCodeAgent } from "./claude-code.ts";
+import { claudeCoworkAgent } from "./claude-cowork.ts";
+import { codexAgent } from "./codex.ts";
+import { copilotAgent } from "./copilot.ts";
+import { geminiCliAgent } from "./gemini-cli.ts";
+import { opencodeAgent } from "./opencode.ts";
 
 export type {
   CodingAgent,
@@ -13,9 +13,9 @@ export type {
   CodingAgentMetric,
   CodingAgentSignal,
   TokenType,
-} from "./coding-agent-definition";
-export { codingAgentSchema } from "./coding-agent-definition";
-export { isModelCallSpan, readString } from "./coding-agent-span";
+} from "./coding-agent-definition.ts";
+export { codingAgentSchema } from "./coding-agent-definition.ts";
+export { isModelCallSpan, readString } from "./coding-agent-span.ts";
 
 /**
  * The agent registry — ordered, first match wins.

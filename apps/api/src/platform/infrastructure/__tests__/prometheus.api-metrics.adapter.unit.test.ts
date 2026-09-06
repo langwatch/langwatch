@@ -1,6 +1,6 @@
 import { Counter, Registry } from "prom-client";
 import { describe, expect, it } from "vitest";
-import { PrometheusApiMetricsAdapter } from "../prometheus.api-metrics.adapter";
+import { PrometheusApiMetricsAdapter } from "../prometheus.api-metrics.adapter.ts";
 
 const KEY = "metrics-bearer-key";
 

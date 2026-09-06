@@ -15,9 +15,9 @@ import {
   applyEvaluatorResult,
   applyTargetError,
   applyTargetOutput,
-} from "../../model/experiments-v3/execution/results-fold";
+} from "../../model/experiments-v3/execution/results-fold.ts";
 import { createExecutionCellSet } from "@langwatch/experiment-contract";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 // ============================================================================
 // Types

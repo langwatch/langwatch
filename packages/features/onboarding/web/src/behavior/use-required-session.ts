@@ -8,7 +8,7 @@
  * whether that answer has arrived.
  */
 
-import { useOnboardingHost } from "../model/onboarding-host";
+import { useOnboardingHost } from "../model/onboarding-host.ts";
 
 export function useRequiredSession() {
   const host = useOnboardingHost();

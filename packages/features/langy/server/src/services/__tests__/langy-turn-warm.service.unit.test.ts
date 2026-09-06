@@ -12,12 +12,12 @@ import {
   LangySessionKeyScopeError,
   type LangyWorkerProbeInput,
   type LangyWorkerWarmInput,
-} from "../../ports/langy-turn-runtime.port";
+} from "../../ports/langy-turn-runtime.port.ts";
 import type {
   LangyTurnServiceDependencies,
   LangyTurnServiceDeps,
-} from "../langy-turn-shared.service";
-import { LangyTurnWarmService } from "../langy-turn-warm.service";
+} from "../langy-turn-shared.service.ts";
+import { LangyTurnWarmService } from "../langy-turn-warm.service.ts";
 
 const SESSION = { user: { id: "user-1" } };
 

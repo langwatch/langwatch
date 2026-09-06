@@ -8,10 +8,10 @@ import {
   observeEsFoldCacheEntryBytes,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
-} from "../metrics";
-import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry";
-import type { FoldProjectionStore } from "./foldProjection.types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
+} from "../metrics.ts";
+import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry.ts";
+import type { FoldProjectionStore } from "./foldProjection.types.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 

@@ -12,8 +12,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { scanTestSourceForUnsafeDeleteMany } from "../teardown-scan";
-import { parseSourceText, parseSourceTexts } from "../ts-ast";
+import { scanTestSourceForUnsafeDeleteMany } from "../teardown-scan.ts";
+import { parseSourceText, parseSourceTexts } from "../ts-ast.ts";
 
 function scan(sourceText: string) {
   return scanTestSourceForUnsafeDeleteMany(

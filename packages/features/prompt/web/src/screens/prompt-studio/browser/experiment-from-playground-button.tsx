@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -8,18 +8,18 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LocalPromptConfig, TargetConfig } from "@langwatch/experiment-contract";
 import { createInitialState, type DatasetReference } from "@langwatch/experiment-contract";
 import { extractPersistedState } from "@langwatch/experiment-contract";
-import { inferAllTargetMappings } from "../../../model/target-mapping-inference";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
+import { inferAllTargetMappings } from "../../../model/target-mapping-inference.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import type { Field } from "@langwatch/workflow-contract";
 import {
   areFormValuesEqual,
   computeInitialFormValuesForPrompt,
-} from "../../../surfaces/prompt-form";
-import { promptApi } from "../../../behavior/prompt-api";
-import { usePromptHost } from "../../../model/prompt-host";
-import { generateHumanReadableId } from "../../../model/human-readable-id";
-import type { TabData } from "../studio-internals";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
+} from "../../../surfaces/prompt-form/index.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { generateHumanReadableId } from "../../../model/human-readable-id.ts";
+import type { TabData } from "../studio-internals.ts";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
 
 /**
  * Converts a playground tab's form values to a LocalPromptConfig.

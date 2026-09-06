@@ -11,7 +11,7 @@ import {
   ModelProviderCredentialProbePort,
   type ModelProviderEgressPort,
   type ModelProviderEgressResponse,
-} from "../ports/model-provider.port";
+} from "../ports/model-provider.port.ts";
 
 /**
  * The documented API root and default endpoint of every provider the probe

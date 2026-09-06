@@ -2,10 +2,10 @@ import { Input, Textarea } from "@chakra-ui/react";
 import { AnnotationScoreEditor } from "@langwatch/annotation-web/surfaces/annotation-form";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../errors";
-import { AnnotationScoreDataType } from "../../../model/prisma-types";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/trace-api";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../errors/index.ts";
+import { AnnotationScoreDataType } from "../../../model/prisma-types.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/trace-api.ts";
 import { toaster } from "@langwatch/design-system/toaster";
 
 type FormData = {

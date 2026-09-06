@@ -6,10 +6,10 @@ import {
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
   MAX_BLOB_BYTES,
-} from "./blobConstants";
-import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
-import { CachedLuaScript } from "./cachedLuaScript";
-import { gqJobsDispatchedOverrideTotal } from "./metrics";
+} from "./blobConstants.ts";
+import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
+import { CachedLuaScript } from "./cachedLuaScript.ts";
+import { gqJobsDispatchedOverrideTotal } from "./metrics.ts";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.

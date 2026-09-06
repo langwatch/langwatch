@@ -1,6 +1,6 @@
 import { Button, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Drawer } from "./studio-drawer";
+import { Drawer } from "./studio-drawer.tsx";
 
 function Crashing(): never {
   throw new Error("readNodeParameters is not a function");

@@ -19,31 +19,31 @@
  */
 
 // Commands
-export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command";
-export type { CommandEnvelope } from "./commands/commandEnvelope";
-export { stripEnvelope, withCommandEnvelope } from "./commands/commandEnvelope";
-export type { CommandHandlerClass } from "./commands/commandHandlerClass";
-export type { CommandSchema } from "./commands/commandSchema";
-export { defineCommandSchema } from "./commands/commandSchema";
-export type { DefinedCommandClass } from "./commands/defineCommand";
-export { defineCommand } from "./commands/defineCommand";
-export { eventIdempotencyKey } from "./commands/idempotency-key";
+export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";
+export type { CommandEnvelope } from "./commands/commandEnvelope.ts";
+export { stripEnvelope, withCommandEnvelope } from "./commands/commandEnvelope.ts";
+export type { CommandHandlerClass } from "./commands/commandHandlerClass.ts";
+export type { CommandSchema } from "./commands/commandSchema.ts";
+export { defineCommandSchema } from "./commands/commandSchema.ts";
+export type { DefinedCommandClass } from "./commands/defineCommand.ts";
+export { defineCommand } from "./commands/defineCommand.ts";
+export { eventIdempotencyKey } from "./commands/idempotency-key.ts";
 // Domain types
-export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType";
+export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType.ts";
 export {
   createEventCatalogue,
   defineAggregate,
   defineEvent,
   defineEvents,
   EventCatalogue,
-} from "./domain/definitions";
-export type { AggregateDefinition, EventDefinition } from "./domain/definitions";
-export type { EventType } from "./domain/eventType";
-export type { TenantId } from "./domain/tenantId";
-export { createTenantId, TenantIdSchema } from "./domain/tenantId";
-export type { Event, Projection } from "./domain/types";
-export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types";
-export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types";
+} from "./domain/definitions.ts";
+export type { AggregateDefinition, EventDefinition } from "./domain/definitions.ts";
+export type { EventType } from "./domain/eventType.ts";
+export type { TenantId } from "./domain/tenantId.ts";
+export { createTenantId, TenantIdSchema } from "./domain/tenantId.ts";
+export type { Event, Projection } from "./domain/types.ts";
+export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types.ts";
+export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types.ts";
 export type {
   EsKillSwitchKey,
   KillSwitchComponent,
@@ -52,81 +52,81 @@ export type {
   KillSwitchDescriptor,
   KillSwitchOptions,
   KillSwitchQuery,
-} from "./kill-switch";
+} from "./kill-switch/index.ts";
 export {
   generateKillSwitchKey,
   isComponentKilled,
   killSwitchDescriptorsFor,
   KillSwitchPort,
-} from "./kill-switch";
-export type { EventSourcingOptions } from "./eventSourcing";
+} from "./kill-switch/index.ts";
+export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
-export { EventSourcing } from "./eventSourcing";
+export { EventSourcing } from "./eventSourcing.ts";
 // Pipeline (static definitions)
-export { definePipeline } from "./pipeline/staticBuilder";
-export type { ProcessManagerApplier } from "./pipeline/processBuilder";
-export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition";
+export { definePipeline } from "./pipeline/staticBuilder.ts";
+export type { ProcessManagerApplier } from "./pipeline/processBuilder.ts";
+export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition.ts";
 export type {
   CommandHandlerOptions,
   NoCommands,
   RegisteredCommand,
   StaticPipelineDefinition,
-} from "./pipeline/staticBuilder.types";
+} from "./pipeline/staticBuilder.types.ts";
 // Pipeline (runtime)
 export type {
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   PipelineWithCommandHandlers,
   RegisteredPipeline,
-} from "./pipeline/types";
-export type { MapEventHandlers } from "./projections/abstractMapProjection";
-export { AbstractMapProjection } from "./projections/abstractMapProjection";
+} from "./pipeline/types.ts";
+export type { MapEventHandlers } from "./projections/abstractMapProjection.ts";
+export { AbstractMapProjection } from "./projections/abstractMapProjection.ts";
 // Projections
 export type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
   FoldProjectionStore,
-} from "./projections/foldProjection.types";
+} from "./projections/foldProjection.types.ts";
 export type {
   AppendStore,
   BulkAppendContext,
   MapProjectionDefinition,
   MapProjectionOptions,
-} from "./projections/mapProjection.types";
-export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
-export { RepositoryFoldStore } from "./projections/repositoryFoldStore";
+} from "./projections/mapProjection.types.ts";
+export type { ProjectionStoreContext } from "./projections/projectionStoreContext.ts";
+export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
 export type {
   ProjectionCursor,
   StateProjectionDefinition,
   StateProjectionOptions,
   StateProjectionStore,
   StoredProjection,
-} from "./projections/stateProjection.types";
+} from "./projections/stateProjection.types.ts";
 // Queues
-export type { EventSourcedQueueProcessor } from "./queues";
-export { EventSourcingPipeline } from "./runtimePipeline";
+export type { EventSourcedQueueProcessor } from "./queues/index.ts";
+export { EventSourcingPipeline } from "./runtimePipeline.ts";
 // Services
-export { EventSourcingService } from "./services/eventSourcingService";
-export type { JobRegistryEntry } from "./services/queues/queueManager";
+export { EventSourcingService } from "./services/eventSourcingService.ts";
+export type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 // Stores
 export type {
   EventStore,
   EventStoreEventReadInput,
   EventStoreReadContext,
-} from "./stores/eventStore.types";
+} from "./stores/eventStore.types.ts";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
-} from "./stores/projectionStore.types";
+} from "./stores/projectionStore.types.ts";
 // Event-only subscribers
 export type {
   EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
-} from "./subscribers/eventSubscriber.types";
-export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types";
-export { throttledPerWindow, throttledWindow } from "./subscribers/throttleWindow";
+} from "./subscribers/eventSubscriber.types.ts";
+export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types.ts";
+export { throttledPerWindow, throttledWindow } from "./subscribers/throttleWindow.ts";
 
 export type {
   CutoffInfo,
@@ -134,52 +134,52 @@ export type {
   OccurredAtBounds,
   ReplayEvent,
   ReplayEventSource,
-} from "./replay/replayEventSource";
-export { ReplayService } from "./replay/replayService";
+} from "./replay/replayEventSource.ts";
+export { ReplayService } from "./replay/replayService.ts";
 
 // Utilities
-export { EventUtils } from "./utils/event.utils";
+export { EventUtils } from "./utils/event.utils.ts";
 
 // Framework authoring and runtime surfaces used by application composition.
-export * from "./deferred";
-export * from "./disabledPipeline";
-export * from "./mapCommands";
+export * from "./deferred.ts";
+export * from "./disabledPipeline.ts";
+export * from "./mapCommands.ts";
 export {
   NOOP_EVENT_SOURCING_METRICS,
   PROMETHEUS_EVENT_SOURCING_METRICS,
   type EventSourcingStoreMetrics,
-} from "./metrics";
-export * from "./parseErrorText";
-export * from "./pipeline/processBuilder";
-export * from "./pipeline/processManagerDefinition";
-export * from "./process-manager";
-export * from "./process-manager/failureDiagnostic";
-export * from "./process-manager/metrics";
-export * from "./process-manager/processRuntime";
-export * from "./projections/abstractFoldProjection";
-export * from "./projections/foldProjectionExecutor";
-export * from "./projections/foldCache/foldCacheEntry";
-export * from "./projections/mapProjectionExecutor";
-export * from "./projections/projectionRouter";
-export * from "./projections/projectionStoreContext";
-export * from "./projections/redisCachedFoldStore";
-export * from "./projections/stateProjectionExecutor";
-export * from "./queues/dispatchError";
-export * from "./queues/groupQueueFactory";
-export * from "./queues/queue.types";
-export * from "./projections/replayMarkerCheck";
-export * from "./replay/pMapLimited";
-export * from "./replay/replayConstants";
-export * from "./replay/replayEngine";
-export * from "./replay/replayLog";
-export * from "./replay/replayStatePath";
-export * from "./replay/replayMarkers";
-export * from "./replay/types";
-export * from "./services/errorHandling";
-export * from "./stores/eventStoreUtils";
-export * from "./stores/abstractEventStore";
-export * from "./stores/eventStoreProducerOnly";
-export * from "./stores/baseMemoryProjectionStore";
-export * from "./stores/rehydrationWindow";
-export * from "./stores/repositories/eventRepository.types";
-export * from "./utils/compareOrdinal";
+} from "./metrics.ts";
+export * from "./parseErrorText.ts";
+export * from "./pipeline/processBuilder.ts";
+export * from "./pipeline/processManagerDefinition.ts";
+export * from "./process-manager/index.ts";
+export * from "./process-manager/failureDiagnostic.ts";
+export * from "./process-manager/metrics.ts";
+export * from "./process-manager/processRuntime.ts";
+export * from "./projections/abstractFoldProjection.ts";
+export * from "./projections/foldProjectionExecutor.ts";
+export * from "./projections/foldCache/foldCacheEntry.ts";
+export * from "./projections/mapProjectionExecutor.ts";
+export * from "./projections/projectionRouter.ts";
+export * from "./projections/projectionStoreContext.ts";
+export * from "./projections/redisCachedFoldStore.ts";
+export * from "./projections/stateProjectionExecutor.ts";
+export * from "./queues/dispatchError.ts";
+export * from "./queues/groupQueueFactory.ts";
+export * from "./queues/queue.types.ts";
+export * from "./projections/replayMarkerCheck.ts";
+export * from "./replay/pMapLimited.ts";
+export * from "./replay/replayConstants.ts";
+export * from "./replay/replayEngine.ts";
+export * from "./replay/replayLog.ts";
+export * from "./replay/replayStatePath.ts";
+export * from "./replay/replayMarkers.ts";
+export * from "./replay/types.ts";
+export * from "./services/errorHandling.ts";
+export * from "./stores/eventStoreUtils.ts";
+export * from "./stores/abstractEventStore.ts";
+export * from "./stores/eventStoreProducerOnly.ts";
+export * from "./stores/baseMemoryProjectionStore.ts";
+export * from "./stores/rehydrationWindow.ts";
+export * from "./stores/repositories/eventRepository.types.ts";
+export * from "./utils/compareOrdinal.ts";

@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from "react";
-import { useAuthHost } from "../model/auth-host";
+import { useAuthHost } from "../model/auth-host.ts";
 
 /** The query string, as `next/navigation` handed it over. */
 export function useSearchParams(): URLSearchParams {

@@ -1,4 +1,4 @@
-import { type ProductId, productById } from "./products";
+import { type ProductId, productById } from "./products.ts";
 
 export interface LandingDestinationInput {
   /**

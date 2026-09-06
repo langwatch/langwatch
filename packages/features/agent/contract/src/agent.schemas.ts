@@ -9,8 +9,8 @@
  * a deployment uses is the process's decision rather than the contract's.
  */
 import { z } from "zod";
-import { createAgentCommandSchema } from "./agent.commands";
-import type { AgentWithFields } from "./agent";
+import { createAgentCommandSchema } from "./agent.commands.ts";
+import type { AgentWithFields } from "./agent.ts";
 
 /** One project. The list read names it and nothing else. */
 export const agentApiProjectInputSchema = z.object({ projectId: z.string() });

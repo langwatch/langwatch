@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaShareRepository } from "../prisma.share.repository";
+import { PrismaShareRepository } from "../prisma.share.repository.ts";
 
 /**
  * Tenant-isolation guard, carried over from #5834 (which pinned the same

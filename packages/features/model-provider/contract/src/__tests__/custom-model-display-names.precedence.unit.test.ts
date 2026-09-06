@@ -39,7 +39,7 @@
 import { describe, expect, it } from "vitest";
 import { toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
-import { makeProvider } from "./model-provider.test-helpers";
+import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a real display name and a legacy identity row that collide on the same model id", () => {
   const realRow = makeProvider({

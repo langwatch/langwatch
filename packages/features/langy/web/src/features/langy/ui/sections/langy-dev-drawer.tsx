@@ -8,13 +8,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import { useLangyStore } from "../../../../behavior/langy.store";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
-} from "../../../../model/langy-panel-layout";
+} from "../../../../model/langy-panel-layout.ts";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,
@@ -29,8 +29,8 @@ import {
   tokenStreamText,
   toolCallsFrom,
   useLangyDevLog,
-} from "../../behavior/stores/langy-dev-log";
-import { resolveCliCapability } from "../../model/capabilities/capability-registry";
+} from "../../behavior/stores/langy-dev-log.ts";
+import { resolveCliCapability } from "../../model/capabilities/capability-registry.ts";
 
 const MotionBox = motion.create(Box);
 

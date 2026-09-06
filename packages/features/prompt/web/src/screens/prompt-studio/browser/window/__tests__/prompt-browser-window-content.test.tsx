@@ -9,7 +9,7 @@ import {
   getStoreForTesting,
   type PromptTabsCapabilities,
   type TabData,
-} from "../../../studio-internals";
+} from "../../../studio-internals.ts";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -47,7 +47,7 @@ const capabilities: PromptTabsCapabilities = {
 const TEST_PROJECT_ID = "test-project";
 
 // Mock useOrganizationTeamProject
-vi.mock("../../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: { id: TEST_PROJECT_ID },
     projectId: TEST_PROJECT_ID,

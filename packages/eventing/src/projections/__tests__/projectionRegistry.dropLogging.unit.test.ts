@@ -16,9 +16,9 @@
  * Spec: specs/observability/retryable-failure-log-level.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import type { FoldProjectionDefinition } from "../foldProjection.types";
-import { ProjectionRegistry } from "../projectionRegistry";
+import type { Event } from "../../domain/types.ts";
+import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
+import { ProjectionRegistry } from "../projectionRegistry.ts";
 
 // `createLogger` hands back one instance per name, so every registry in this
 // file shares a logger and a spy left in place would keep counting the next

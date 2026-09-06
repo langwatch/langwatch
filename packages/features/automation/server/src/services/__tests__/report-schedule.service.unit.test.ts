@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { AutomationClockPort } from "../../ports/automation-clock.port";
-import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port";
-import { SchedulerWakePort } from "../../ports/scheduler-wake.port";
+import { AutomationClockPort } from "../../ports/automation-clock.port.ts";
+import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port.ts";
+import { SchedulerWakePort } from "../../ports/scheduler-wake.port.ts";
 import type {
   ReportScheduleTarget,
   TriggerRepository,
-} from "../../repositories/trigger.repository";
-import { ReportScheduleService } from "../report-schedule.service";
+} from "../../repositories/trigger.repository.ts";
+import { ReportScheduleService } from "../report-schedule.service.ts";
 
 /** Only the one read the reconcile sweep makes; the rest is not this test's subject. */
 function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {

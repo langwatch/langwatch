@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import type { PaginationState } from "../elements/backoffice-cells";
+import type { PaginationState } from "../elements/backoffice-cells.tsx";
 
 export interface BackofficeTableProps {
   title: string;

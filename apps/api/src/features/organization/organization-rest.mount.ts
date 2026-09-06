@@ -40,8 +40,8 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
 
-import { ApiRestCapabilityUnavailableError } from "../../app/api-rest-ports";
-import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "./organization-settings.effects";
+import { ApiRestCapabilityUnavailableError } from "../../app/api-rest-ports.ts";
+import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "./organization-settings.effects.ts";
 
 /** `/api/organization`, bound to one process's organization graph. */
 export function mountOrganizationRest(options: {

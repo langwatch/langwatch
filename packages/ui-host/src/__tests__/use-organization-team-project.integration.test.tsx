@@ -6,7 +6,7 @@ import {
   createUiScopeHost,
   UiScopeHostProvider,
   useOrganizationTeamProject,
-} from "../use-organization-team-project";
+} from "../use-organization-team-project.ts";
 
 const host = createUiScopeHost({
   project: () => ({ id: "project_1", name: "Checkout", slug: "checkout" }),

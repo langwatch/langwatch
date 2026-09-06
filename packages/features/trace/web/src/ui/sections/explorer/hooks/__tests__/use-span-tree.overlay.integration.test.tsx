@@ -24,7 +24,7 @@ vi.mock("@tanstack/react-query", () => ({
 // The correction arrives the way the drawer receives it, through the query the
 // real `useTraceEditOverlay` reads, so the hook under test runs against the
 // production overlay hooks rather than a stand-in for them.
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: vi.fn() } },
@@ -40,19 +40,19 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../context/shared-trace-context", () => ({
+vi.mock("../../context/shared-trace-context.tsx", () => ({
   useSharedTrace: () => null,
   asSharedQueryResult: (data: unknown) => ({ data }),
 }));
 
-vi.mock("../span-tree-paged-query", () => ({
+vi.mock("../span-tree-paged-query.ts", () => ({
   spanTreeQueryKey: () => ["spanTree", "trace-1"],
   spanTreeQueryFn: () => vi.fn(),
   spanTreeDeltaSinceMs: () => 0,
   mergeSpanTreeDelta: (existing: unknown) => existing,
 }));
 
-vi.mock("../use-trace-query-args", () => ({
+vi.mock("../use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({
     isLive: false,
     isReady: true,
@@ -60,9 +60,9 @@ vi.mock("../use-trace-query-args", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
-import { useSpanTree, useSpanTreeWithCaptured } from "../use-span-tree";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { useSpanTree, useSpanTreeWithCaptured } from "../use-span-tree.ts";
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
   return {

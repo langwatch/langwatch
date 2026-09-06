@@ -1,15 +1,15 @@
-import { Drawer } from "../../drawer";
-import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights";
+import { Drawer } from "../../drawer.tsx";
+import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights.tsx";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../../../behavior/drawer.store";
-import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
-import { ResizeRail } from "./panes/resize-rail";
-import { TraceDrawerContent } from "./trace-drawer-content";
-import { TraceDrawerEmptyState } from "./trace-drawer-empty-state";
-import { useTraceDrawerScaffold } from "./use-trace-drawer-scaffold";
+} from "../../../../behavior/drawer.store.ts";
+import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help.tsx";
+import { ResizeRail } from "./panes/resize-rail.tsx";
+import { TraceDrawerContent } from "./trace-drawer-content.tsx";
+import { TraceDrawerEmptyState } from "./trace-drawer-empty-state.tsx";
+import { useTraceDrawerScaffold } from "./use-trace-drawer-scaffold.ts";
 
 export interface TraceV2DrawerShellProps {
   open?: boolean;

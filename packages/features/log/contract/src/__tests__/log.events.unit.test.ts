@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { logEventEnvelopeSchema } from "../log.events";
+import { logEventEnvelopeSchema } from "../log.events.ts";
 
 const envelope = {
   id: "event_1",

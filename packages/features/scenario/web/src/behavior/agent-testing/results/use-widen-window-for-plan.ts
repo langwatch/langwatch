@@ -7,7 +7,7 @@
 import { subDays } from "@langwatch/time";
 import { useEffect } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { widenedWindowDays } from "./run-plans";
+import { widenedWindowDays } from "./run-plans.ts";
 
 /**
  * Widens the window until the last run of the plan being opened is inside it,

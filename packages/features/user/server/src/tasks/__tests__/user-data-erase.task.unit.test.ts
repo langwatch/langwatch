@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task";
-import type { GdprUserDataEraseRepository } from "../../repositories/prisma/prisma.user-data-erase.repository";
+import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task.ts";
+import type { GdprUserDataEraseRepository } from "../../repositories/prisma/prisma.user-data-erase.repository.ts";
 
 /**
  * A repository double with no organizations, teams or projects for the user.

@@ -10,8 +10,8 @@ import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/api";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service";
-import type { PresenceHeartbeat } from "../../ports/langy-local-presence.port";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
+import type { PresenceHeartbeat } from "../../ports/langy-local-presence.port.ts";
 import {
   type CliFrame,
   cliFrameSchema,
@@ -22,7 +22,7 @@ import type {
   ControlCredential,
   ControlSession,
   LocalControlSessionCoreService,
-} from "../../services/langy-local-session.service";
+} from "../../services/langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:gateway");
 

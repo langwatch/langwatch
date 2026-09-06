@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
+import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 export const NoneFacetRow = memo(function NoneFacetRow({
   active,

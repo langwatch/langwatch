@@ -1,10 +1,10 @@
-import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter";
+import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter.ts";
 import {
   IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
-} from "./identity-pipeline-definition.adapter";
-import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository";
-import { PrismaMfaEnrollmentProjectionRepository } from "../repositories/prisma/prisma.mfa-enrollment-projection.repository";
+} from "./identity-pipeline-definition.adapter.ts";
+import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
+import { PrismaMfaEnrollmentProjectionRepository } from "../repositories/prisma/prisma.mfa-enrollment-projection.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** Every model the identity ledger reads or writes, and no other. */

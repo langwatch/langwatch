@@ -5,9 +5,9 @@
  * UX contract: specs/model-config/unified-reasoning-form.feature.
  */
 import { describe, expect, it } from "vitest";
-import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
-import { buildDefaultFormValues } from "../default-form-values";
-import { formSchema } from "../prompt-form.schemas";
+import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
+import { buildDefaultFormValues } from "../default-form-values.ts";
+import { formSchema } from "../prompt-form.schemas.ts";
 
 describe("formValuesToTriggerSaveVersionParams", () => {
   describe("when form values include reasoning", () => {

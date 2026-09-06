@@ -5,7 +5,7 @@ import {
   LIST_GROUPS,
   LIST_USERS,
   SCIM_SPEC_OPTIONS,
-} from "../scim-openapi.api";
+} from "../scim-openapi.api.ts";
 
 describe("SCIM transport characterization", () => {
   it("keeps discovery public and carries the documented page-size cap", () => {

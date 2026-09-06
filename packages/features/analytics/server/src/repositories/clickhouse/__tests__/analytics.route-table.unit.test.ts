@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper";
+import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
 
 describe("Analytics timeseries route table", () => {
   it("uses the evaluation rollup for safe evaluation sums", () => {

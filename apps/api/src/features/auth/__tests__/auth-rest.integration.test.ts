@@ -8,8 +8,8 @@ import type { AuthCliDeviceFlowRestPorts } from "@langwatch/auth-server";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
-import { composeApiAuthRest } from "../auth-rest.mount";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { composeApiAuthRest } from "../auth-rest.mount.ts";
 
 const BASE_URL = "https://app.test";
 

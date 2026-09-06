@@ -1,7 +1,7 @@
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
-} from "../../repositories/identity-reservations.repository";
+} from "../../repositories/identity-reservations.repository.ts";
 
 /**
  * The address lock, in memory (ADR-116 §6).

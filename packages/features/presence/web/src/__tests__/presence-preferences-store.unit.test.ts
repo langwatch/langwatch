@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { usePresencePreferencesStore } from "../presence-preferences-store";
+import { usePresencePreferencesStore } from "../presence-preferences-store.ts";
 
 beforeEach(() => {
   usePresencePreferencesStore.getState().setHidden(false);

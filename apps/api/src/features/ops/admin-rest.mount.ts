@@ -4,7 +4,7 @@
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AdminRestPorts, OpsApp } from "@langwatch/ops-server";
 
-import type { ApiBrowserSessionTransportPort } from "../../app/api-auth.composition";
+import type { ApiBrowserSessionTransportPort } from "../../app/api-auth.composition.ts";
 
 export type ApiAdminRestOptions = Readonly<{
   /** The operator application, where this process composed one. */

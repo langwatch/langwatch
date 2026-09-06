@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { llmModels } from "./model-catalog";
-import { resolveLatestAlias } from "./latest-aliases";
-import type { LLMModelEntry } from "./model-catalog.types";
+import { llmModels } from "./model-catalog.ts";
+import { resolveLatestAlias } from "./latest-aliases.ts";
+import type { LLMModelEntry } from "./model-catalog.types.ts";
 
 const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
 type ModelTier = (typeof MODEL_TIERS)[number];

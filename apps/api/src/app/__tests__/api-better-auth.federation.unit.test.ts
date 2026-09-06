@@ -7,7 +7,7 @@ import type { LicensingService } from "@langwatch/enterprise-licensing-contract"
 import type { Logger } from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiBetterAuthFederation } from "../api-better-auth.composition";
+import { ApiBetterAuthFederation } from "../api-better-auth.composition.ts";
 
 function testLogger(): Logger {
   return { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as Logger;

@@ -9,9 +9,9 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { PrismaProcessStore } from "../../../server/adapters/postgres/prisma-process-store";
-import type { NewOutboxMessage, ProcessCommit } from "../../stores/processStore.types";
-import { OutboxDispatcherService } from "../outboxDispatcherService";
+import { PrismaProcessStore } from "../../../server/adapters/postgres/prisma-process-store.ts";
+import type { NewOutboxMessage, ProcessCommit } from "../../stores/processStore.types.ts";
+import { OutboxDispatcherService } from "../outboxDispatcherService.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

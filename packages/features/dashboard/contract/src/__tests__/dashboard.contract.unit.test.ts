@@ -4,7 +4,7 @@ import {
   graphLayoutSchema,
   savedWorkbenchChartDefinitionSchema,
   savedWorkbenchChartPlacementSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("dashboard contract", () => {
   it("bounds dashboard names at the contract boundary", () => {

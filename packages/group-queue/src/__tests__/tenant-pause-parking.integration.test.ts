@@ -9,7 +9,7 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GroupStagingScripts } from "../scripts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 const QUEUE_NAME = "{test/tenant-pause-parking}";
 

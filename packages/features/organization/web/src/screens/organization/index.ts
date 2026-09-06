@@ -28,27 +28,27 @@ import type { ComponentType } from "react";
 export type OrganizationScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const organizationScreens = {
-  auditLog: () => import("./audit-log.screen"),
-  groups: () => import("./groups.screen"),
-  members: () => import("./members.screen"),
-  teams: () => import("./teams.screen"),
-  teamDetail: () => import("./team-detail.screen"),
+  auditLog: () => import("./audit-log.screen.tsx"),
+  groups: () => import("./groups.screen.tsx"),
+  members: () => import("./members.screen.tsx"),
+  teams: () => import("./teams.screen.tsx"),
+  teamDetail: () => import("./team-detail.screen.tsx"),
 } as const satisfies Record<string, OrganizationScreenLoader>;
 
 export type OrganizationScreenName = keyof typeof organizationScreens;
 
-export { AUDIT_LOG_PAGE_PERMISSION } from "./audit-log.screen";
-export { GROUPS_PAGE_PERMISSION } from "./groups.screen";
-export { MEMBERS_PAGE_PERMISSION } from "./members.screen";
-export { TEAMS_PAGE_PERMISSION } from "./teams.screen";
-export { TEAM_DETAIL_PAGE_PERMISSION } from "./team-detail.screen";
-export { organizationApi } from "../../behavior/organization-api";
+export { AUDIT_LOG_PAGE_PERMISSION } from "./audit-log.screen.tsx";
+export { GROUPS_PAGE_PERMISSION } from "./groups.screen.tsx";
+export { MEMBERS_PAGE_PERMISSION } from "./members.screen.tsx";
+export { TEAMS_PAGE_PERMISSION } from "./teams.screen.tsx";
+export { TEAM_DETAIL_PAGE_PERMISSION } from "./team-detail.screen.tsx";
+export { organizationApi } from "../../behavior/organization-api.ts";
 export type {
   AuditLogFilters,
   AuditLogPage,
   OrganizationApiMap,
   OrganizationMemberMatch,
-} from "../../behavior/organization-api";
+} from "../../behavior/organization-api.ts";
 export {
   OrganizationHostPort,
   OrganizationHostProvider,
@@ -61,7 +61,7 @@ export {
   type OrganizationRouteReading,
   type OrganizationScope,
   type OrganizationTeamReading,
-} from "../../model/organization-host";
+} from "../../model/organization-host.ts";
 
 /**
  * The department picker and its column, published for `@langwatch/project-web`.
@@ -72,5 +72,5 @@ export {
  * `departments.*` transport would be a second opinion about what an assignment
  * is. The edge is the finding every family since governance carries one of.
  */
-export { DepartmentPicker } from "../../ui/sections/department-picker";
-export { useDepartmentColumn } from "../../behavior/use-department-column";
+export { DepartmentPicker } from "../../ui/sections/department-picker.tsx";
+export { useDepartmentColumn } from "../../behavior/use-department-column.ts";

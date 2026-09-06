@@ -8,10 +8,10 @@
  * rather than exempting it.
  */
 
-export * from "./langwatch-ql-chart-mode";
-export * from "./langwatch-ql-vega-lite-chart";
-export * from "../../behavior/use-langwatch-ql-chart-model";
-export * from "../../behavior/use-langwatch-ql-vega-view";
+export * from "./langwatch-ql-chart-mode.tsx";
+export * from "./langwatch-ql-vega-lite-chart.tsx";
+export * from "../../behavior/use-langwatch-ql-chart-model.ts";
+export * from "../../behavior/use-langwatch-ql-vega-view.ts";
 export type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,

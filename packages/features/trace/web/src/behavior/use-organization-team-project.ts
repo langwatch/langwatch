@@ -2,7 +2,7 @@
  * The scope reading the explorer has always made, answered by the host.
  */
 
-import { useTraceHost } from "./trace-host";
+import { useTraceHost } from "./trace-host.ts";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

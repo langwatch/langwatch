@@ -2,7 +2,7 @@ import {
   nonNegativeSafeIntegerOrUndefined,
   positiveSafeIntegerOrUndefined,
 } from "@langwatch/config";
-import type { GroupQueuePolicy } from "./contracts";
+import type { GroupQueuePolicy } from "./contracts.ts";
 
 /**
  * The env-string shape both API and worker (and any future process) hand this

@@ -4,8 +4,8 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { readAttribution } from "../attribution";
-import { useAttributionCapture } from "../use-attribution-capture";
+import { readAttribution } from "../attribution.ts";
+import { useAttributionCapture } from "../use-attribution-capture.ts";
 
 function setUrl(search: string) {
   window.history.replaceState({}, "", `/${search}`);

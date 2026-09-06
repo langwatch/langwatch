@@ -8,8 +8,8 @@ import {
   buildStoredSpansConditions,
   buildTraceSummariesConditions,
   extractStandardResults,
-} from "./clickhouse.filter-query-helpers.mapper";
-import type { ClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper";
+} from "./clickhouse.filter-query-helpers.mapper.ts";
+import type { ClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;

@@ -13,19 +13,19 @@ import {
 } from "@langwatch/gateway-web/surfaces/budget-overview";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { usePersonalContext } from "../../behavior/use-personal-context";
+import { usePersonalContext } from "../../behavior/use-personal-context.ts";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
-} from "../../ui/blocks/personal-traces-empty-state";
-import { PersonalWorkspaceViewOnlyNotice } from "../../ui/sections/personal-workspace-view-only-notice";
-import { Link } from "../../ui/elements/personal-link";
-import { AiToolsPortal } from "../../ui/sections/ai-tools-portal";
-import { CodingAgentUsageContent } from "../../ui/sections/coding-agent-usage-content";
-import { ConnectYourAgentButton } from "../../ui/sections/connect-your-agent-button";
-import { PersonalRecentTracesTable } from "../../ui/sections/personal-recent-traces-table";
-import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout";
-import { TraceIngestSection } from "../../ui/sections/trace-ingest-section";
+} from "../../ui/blocks/personal-traces-empty-state.tsx";
+import { PersonalWorkspaceViewOnlyNotice } from "../../ui/sections/personal-workspace-view-only-notice.tsx";
+import { Link } from "../../ui/elements/personal-link.tsx";
+import { AiToolsPortal } from "../../ui/sections/ai-tools-portal.tsx";
+import { CodingAgentUsageContent } from "../../ui/sections/coding-agent-usage-content.tsx";
+import { ConnectYourAgentButton } from "../../ui/sections/connect-your-agent-button.tsx";
+import { PersonalRecentTracesTable } from "../../ui/sections/personal-recent-traces-table.tsx";
+import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
+import { TraceIngestSection } from "../../ui/sections/trace-ingest-section.tsx";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.

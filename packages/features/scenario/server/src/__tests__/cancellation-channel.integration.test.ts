@@ -5,7 +5,7 @@ import {
   RedisCancellationPublisherAdapter,
   RedisCancellationSubscriberAdapter,
   type CancellationMessage,
-} from "../index";
+} from "../index.ts";
 
 let connection: RedisConnection;
 

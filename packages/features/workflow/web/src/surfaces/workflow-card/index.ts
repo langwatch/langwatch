@@ -1,1 +1,1 @@
-export * from "../../ui/elements/workflow-card";
+export * from "../../ui/elements/workflow-card.tsx";

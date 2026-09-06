@@ -5,7 +5,7 @@ import {
   experimentDspyStepSchema,
   experimentTypeSchema,
   saveExperimentInputSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("Experiment contract", () => {
   it("accepts only the stable experiment type vocabulary", () => {

@@ -17,14 +17,14 @@ import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-
 import { applyHandledErrorToForm } from "@langwatch/ui-host/errors";
 import { FormServerError } from "@langwatch/workflow-web/surfaces/handled-error-views";
 
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import { useModelProviderHost } from "../../model/model-provider-host";
-import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row";
-import { exactModelMatchRegex, isSafeRegex } from "../../model/safe-regex";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { exactModelMatchRegex, isSafeRegex } from "../../model/safe-regex.ts";
 import {
   LLMModelCostMatchingSpans,
   type MatchingSpansPreviewInput,
-} from "./llm-model-cost-matching-spans";
+} from "./llm-model-cost-matching-spans.tsx";
 
 export function LLMModelCostDrawer({
   id,

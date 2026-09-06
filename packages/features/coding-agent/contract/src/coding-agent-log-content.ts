@@ -1,4 +1,4 @@
-import { normalizeEventName } from "./telemetry/coding-agent-normalization";
+import { normalizeEventName } from "./telemetry/coding-agent-normalization.ts";
 
 /**
  * Which log attribute carries captured content, and which content category it

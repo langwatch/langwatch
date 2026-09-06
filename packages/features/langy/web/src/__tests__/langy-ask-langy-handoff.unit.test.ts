@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyStore } from "../behavior/langy.store";
+import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * The command bar's "Ask Langy" hands a question to the panel through the store: `askLangy` opens the panel on a

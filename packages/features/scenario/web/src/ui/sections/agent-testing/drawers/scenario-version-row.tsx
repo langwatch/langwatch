@@ -5,15 +5,15 @@
  */
 
 import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   authorOf,
   changeLineOf,
   type VersionEntry,
-} from "../../../../model/agent-testing/drawers/scenario-versions";
-import type { VersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore";
+} from "../../../../model/agent-testing/drawers/scenario-versions.ts";
+import type { VersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore.ts";
 
 export type ScenarioVersionRowProps = {
   scenarioId: string;

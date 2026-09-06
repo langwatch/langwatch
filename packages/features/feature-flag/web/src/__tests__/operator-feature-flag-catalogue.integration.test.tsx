@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   OperatorFeatureFlagCatalogueView,
   type OperatorFeatureFlagCatalogueRead,
-} from "../operator-feature-flag-catalogue";
+} from "../operator-feature-flag-catalogue.tsx";
 
 const CATALOGUE: OperatorFeatureFlagCatalogueRead = {
   flags: [

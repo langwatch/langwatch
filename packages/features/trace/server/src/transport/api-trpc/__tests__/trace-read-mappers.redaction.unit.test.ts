@@ -10,7 +10,7 @@ import {
   redactV2Content as redactV2ContentWithPorts,
   type TraceContentPrivacyPort,
   type V2Protections,
-} from "../trace-read-mappers.api";
+} from "../trace-read-mappers.api.ts";
 
 import {
   CONTENT_KEY_CATALOG,
@@ -19,7 +19,7 @@ import {
   stripRolesFromChatArrayJson,
 } from "@langwatch/data-privacy-contract";
 
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
+import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 
 /**
  * The data-privacy vocabulary the mappers take as a port, wired to the REAL catalog and chat-turn stripper so these assertions still cover the keys ingestion actually classifies. Only the resolved-policy read is absent — nothing here derives the trace-level DROP banner.

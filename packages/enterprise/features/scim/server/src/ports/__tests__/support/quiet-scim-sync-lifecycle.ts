@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { ScimSyncLifecyclePort } from "../../scim-sync-lifecycle.port";
+import { ScimSyncLifecyclePort } from "../../scim-sync-lifecycle.port.ts";
 
 /** Existing characterization suites do not exercise the eventing adapter. */
 export class QuietScimSyncLifecycle extends ScimSyncLifecyclePort {

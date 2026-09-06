@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suiteRunStateDataSchema, suiteTargetSchema } from "../index";
+import { suiteRunStateDataSchema, suiteTargetSchema } from "../index.ts";
 
 describe("Suite contract", () => {
   it("accepts prompt mappings", () => {

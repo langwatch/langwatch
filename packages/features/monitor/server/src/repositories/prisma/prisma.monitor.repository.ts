@@ -18,7 +18,7 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
-import { MonitorRepository } from "../monitor.repository";
+import { MonitorRepository } from "../monitor.repository.ts";
 
 export type MonitorDatabase = Pick<PrismaClient, "monitor">;
 

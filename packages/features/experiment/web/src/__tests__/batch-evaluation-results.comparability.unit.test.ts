@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard.ts";
 import {
   comparabilityOf,
   computeComparability,
-} from "../model/batch-evaluation-results.comparability";
+} from "../model/batch-evaluation-results.comparability.ts";
 
 /**
  * These pin the two shapes that defeated the old per-variant guard.

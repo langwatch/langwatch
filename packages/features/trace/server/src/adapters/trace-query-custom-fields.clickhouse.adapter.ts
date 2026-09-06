@@ -1,6 +1,6 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter";
+import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter.ts";
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
-import { TraceQueryValuesAdapter } from "./trace-query-values.clickhouse.adapter";
+import { TraceQueryValuesAdapter } from "./trace-query-values.clickhouse.adapter.ts";
 
 export class ClickHouseTraceQueryCustomFieldsAdapter {
   static create(): ClickHouseTraceQueryCustomFieldsAdapter {

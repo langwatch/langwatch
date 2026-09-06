@@ -7,12 +7,12 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import {
   KNOWN_METRIC_KEYS,
   buildMetricAlias,
   translateMetric,
-} from "../clickhouse.metric-translator.mapper";
+} from "../clickhouse.metric-translator.mapper.ts";
 
 const INJECTION = "x, (SELECT groupArray(TenantId) FROM trace_summaries) AS leak, 1 -- ";
 

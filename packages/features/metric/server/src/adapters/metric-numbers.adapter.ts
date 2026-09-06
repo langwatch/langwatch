@@ -1,5 +1,5 @@
-import { type UnknownRecord } from "./metric-serialization.adapter";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { isRecord } = MetricSerializationAdapter;
 
 export const MAX_UINT32 = (1n << 32n) - 1n;

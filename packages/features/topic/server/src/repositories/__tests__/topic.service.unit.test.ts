@@ -1,8 +1,8 @@
 import type { TopicClusteringRunHistoryEntry, Topic } from "@langwatch/topic-contract";
-import { TopicService } from "../../services/topic.service";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository";
+import { TopicService } from "../../services/topic.service.ts";
+import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
 import { describe, expect, it } from "vitest";
-import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port";
+import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port.ts";
 
 class FakeTopicRepository extends TopicRepository {
   async findAll(): Promise<Topic[]> {

@@ -11,7 +11,7 @@ import {
 import {
   ModelDefaultRepository,
   type ModelDefaultConfigSaveInput,
-} from "../../ports/model-provider.port";
+} from "../../ports/model-provider.port.ts";
 
 type Database = Pick<
   PrismaClient,

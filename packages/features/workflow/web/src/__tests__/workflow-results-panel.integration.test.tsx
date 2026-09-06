@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   WorkflowEvaluationResultsLayout,
   WorkflowResultsPanel,
-} from "../ui/elements/workflow-results-panel";
+} from "../ui/elements/workflow-results-panel.tsx";
 
 function Wrapper({ children }: { children: ReactNode }) {
   return <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>;

@@ -1,8 +1,8 @@
 import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import { createLogger } from "@langwatch/observability";
-import { classify as classifyEgressAddress } from "./address";
-import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts";
+import { classify as classifyEgressAddress } from "./address.ts";
+import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts.ts";
 
 /**
  * Which addresses a process may open a connection to, and what it must connect to once it has

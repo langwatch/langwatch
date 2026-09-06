@@ -1,7 +1,7 @@
 import type { SlackActionParams } from "@langwatch/automation-contract";
 import type { Trigger } from "@langwatch/automation-contract";
 import type { GraphAlertTemplateContext } from "@langwatch/automation-contract";
-import type { ClickHouseClient } from "../services/graph-trigger-heartbeat.service";
+import type { ClickHouseClient } from "../services/graph-trigger-heartbeat.service.ts";
 
 export type GraphAlertDispatchInput = {
   trigger: Trigger;

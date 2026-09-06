@@ -15,12 +15,12 @@ const { publicEnvRef } = vi.hoisted(() => ({
   publicEnvRef: { current: { IS_SAAS: false } as Record<string, unknown> },
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-import { AuthCard } from "../../elements/auth-card";
-import { FrontDoorShell } from "../front-door-shell";
+import { AuthCard } from "../../elements/auth-card.tsx";
+import { FrontDoorShell } from "../front-door-shell.tsx";
 
 const renderShell = (props: Record<string, unknown> = {}) =>
   render(

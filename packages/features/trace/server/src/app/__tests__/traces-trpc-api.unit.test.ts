@@ -12,9 +12,9 @@
  * policy chain, the viewer's protections and the filter schemas are now handed
  * in rather than imported.
  */
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
-import { TracesTrpcApi } from "../../transport/api-trpc/traces.api";
-import { TraceApp, type TraceAppDependencies } from "../trace.app";
+import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
+import { TracesTrpcApi } from "../../transport/api-trpc/traces.api.ts";
+import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { z } from "zod";

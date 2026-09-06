@@ -7,7 +7,7 @@
  */
 import { userFullProfileSchema } from "@langwatch/user-contract";
 import { z } from "zod";
-import { annotationSchema, annotationUserSchema } from "./annotation.record";
+import { annotationSchema, annotationUserSchema } from "./annotation.record.ts";
 
 /** One comment beside the person who left it, as a trace's list renders it. */
 export const annotationWithUserSummarySchema = annotationSchema.extend({

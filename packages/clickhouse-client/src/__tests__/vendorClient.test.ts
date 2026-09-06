@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StatementLogSink, StatementMetrics } from "../statementReporting";
-import { VendorClientResilience, type VendorStatementClient } from "../vendorClient";
+import type { StatementLogSink, StatementMetrics } from "../statementReporting.ts";
+import { VendorClientResilience, type VendorStatementClient } from "../vendorClient.ts";
 
 function recordingMetrics(): StatementMetrics & {
   durations: [string, string, number][];

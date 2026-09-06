@@ -6,7 +6,7 @@ import {
   chooseSubject,
   planTestColocation,
   rewriteRelativeSpecifiers,
-} from "../src/test-colocation";
+} from "../src/test-colocation.ts";
 
 let root = "";
 

@@ -1,4 +1,4 @@
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 interface ProjectHasTracesResult {
   /**

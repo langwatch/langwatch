@@ -20,9 +20,9 @@ import {
   IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
-} from "../../ports/ingestion-source-key.port";
+} from "../../ports/ingestion-source-key.port.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import { IngestionKeyService } from "../ingestion-source-key.service";
+import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-personal";

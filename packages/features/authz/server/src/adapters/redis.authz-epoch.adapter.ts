@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { AuthzEpochPort } from "../ports/authz-epoch.port";
+import { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
 
 const logger = createLogger("langwatch:authz:epoch");
 const EPOCH_KEY_PREFIX = "authz:epoch:";

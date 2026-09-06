@@ -4,7 +4,7 @@ import {
   type RoutableConnection,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SignInDomainRoutingPort } from "../services/signin-router.service";
+import type { SignInDomainRoutingPort } from "../services/signin-router.service.ts";
 
 const logger = createLogger("langwatch:identity:ssoconn-routing-shadow");
 

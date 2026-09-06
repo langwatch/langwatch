@@ -14,7 +14,7 @@ vi.mock("@langwatch/observability", () => ({
   createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 
-import { BestEffortService } from "../index";
+import { BestEffortService } from "../index.ts";
 
 const bestEffort = BestEffortService.create();
 

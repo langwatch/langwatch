@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { useGovernanceHost } from "../model/governance-host";
+import { useGovernanceHost } from "../model/governance-host.ts";
 
 export type GovernanceRouter = {
   query: Readonly<Record<string, string | undefined>>;

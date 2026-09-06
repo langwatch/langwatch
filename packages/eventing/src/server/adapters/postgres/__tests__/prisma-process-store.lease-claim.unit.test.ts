@@ -1,7 +1,7 @@
 /** Spec: packages/eventing/specs/process-outbox-lease-hardening.feature */
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaProcessStore } from "../prisma-process-store";
+import { PrismaProcessStore } from "../prisma-process-store.ts";
 
 /**
  * A stand-in that satisfies the store's structural client check and records

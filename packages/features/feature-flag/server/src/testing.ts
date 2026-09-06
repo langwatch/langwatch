@@ -4,14 +4,14 @@ import {
   type FeatureFlagConfig,
   type FeatureFlagRegistry,
 } from "@langwatch/feature-flag-contract";
-import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "./ports/feature-flag-cache.port";
-import { MemoryFeatureFlagExperimentRepository } from "./repositories/memory/feature-flag-experiment-setting.repository";
-import { MemoryFeatureFlagRepository } from "./repositories/memory/feature-flag.repository";
-import { FeatureFlagService } from "./services/feature-flag.service";
-import { CachedFeatureFlagRowAdapter } from "./adapters/cached.feature-flag-row.adapter";
+import { FeatureFlagCachePort, type FeatureFlagCacheSlot } from "./ports/feature-flag-cache.port.ts";
+import { MemoryFeatureFlagExperimentRepository } from "./repositories/memory/feature-flag-experiment-setting.repository.ts";
+import { MemoryFeatureFlagRepository } from "./repositories/memory/feature-flag.repository.ts";
+import { FeatureFlagService } from "./services/feature-flag.service.ts";
+import { CachedFeatureFlagRowAdapter } from "./adapters/cached.feature-flag-row.adapter.ts";
 
 export { MemoryFeatureFlagExperimentRepository, MemoryFeatureFlagRepository };
-export { MemoryFeatureFlagService } from "./services/memory-feature-flag.service";
+export { MemoryFeatureFlagService } from "./services/memory-feature-flag.service.ts";
 
 /** Shared cache tier held in process, for tests that need no Redis. */
 export class MemoryFeatureFlagCache extends FeatureFlagCachePort {

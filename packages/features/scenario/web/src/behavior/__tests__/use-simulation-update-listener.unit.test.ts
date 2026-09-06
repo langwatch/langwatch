@@ -35,7 +35,7 @@ vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
 
 const mockInvalidateRunState = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../scenario-api", () => ({
+vi.mock("../scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -53,7 +53,7 @@ vi.mock("../scenario-api", () => ({
   },
 }));
 
-import { useSimulationUpdateListener } from "../use-simulation-update-listener";
+import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 
 function simulateSSEEvent(payload: { event: string }) {
   capturedOnData?.({ event: JSON.stringify(payload) });

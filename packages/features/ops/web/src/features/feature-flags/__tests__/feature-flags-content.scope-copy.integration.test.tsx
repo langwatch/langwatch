@@ -3,8 +3,8 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FeatureFlagsContent } from "../ui/sections/feature-flags-content";
-import { renderWithOpsHost, fakeOpsHost } from "../../../testing";
+import { FeatureFlagsContent } from "../ui/sections/feature-flags-content.tsx";
+import { renderWithOpsHost, fakeOpsHost } from "../../../testing.tsx";
 
 /**
  * This page's copy is the only thing that tells an operator where a flag's
@@ -52,7 +52,7 @@ const FLAGS = [
 
 const isSaas = vi.fn(() => true);
 
-vi.mock("../../../behavior/ops-session", () => ({
+vi.mock("../../../behavior/ops-session.ts", () => ({
   useOpsPermission: () => ({ scope: { kind: "platform" } }),
 }));
 
@@ -61,7 +61,7 @@ vi.mock("~/features/errors", () => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("../../../behavior/ops-api", () => ({
+vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     useUtils: () => ({
       ops: { listFeatureFlags: { invalidate: vi.fn() } },

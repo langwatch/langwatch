@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   CodingAgentCostMetricsPort,
   type CodingAgentCostMetric,
-} from "../ports/coding-agent-cost-metrics.port";
+} from "../ports/coding-agent-cost-metrics.port.ts";
 
 /**
  * The cost-drift canary (see specs/trace-processing/coding-agent-cost.feature).

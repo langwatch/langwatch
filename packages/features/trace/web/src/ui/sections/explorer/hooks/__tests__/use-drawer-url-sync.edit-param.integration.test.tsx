@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
   updateDrawerParams: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
   useDrawerParams: () => {
     const params: Record<string, string | undefined> = {};
     for (const [key, value] of Object.entries(harness.query)) {
@@ -28,8 +28,8 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: harness.query }),
 }));
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useDrawerUrlSync } from "../use-drawer-url-sync";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useDrawerUrlSync } from "../use-drawer-url-sync.ts";
 
 /** The params an open drawer already carries, so only `drawer.edit` is in play. */
 function openOn({ traceId, edit }: { traceId: string; edit?: string }) {

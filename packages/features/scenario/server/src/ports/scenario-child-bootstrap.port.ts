@@ -1,5 +1,5 @@
 import type { ChildProcessJobData, ScenarioExecutionResult } from "@langwatch/scenario-contract";
-import type { ExecutionJobData } from "../services/scenario-execution-pool.service";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 export interface ScenarioChildEnvironment {
   labels: string[];

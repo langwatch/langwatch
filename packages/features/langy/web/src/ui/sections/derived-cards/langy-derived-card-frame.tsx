@@ -6,8 +6,8 @@ import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../behavior/use-reduced-motion";
-import { langyThinkingShimmerStyles } from "../../../model/values/langy-shimmer";
+import { useReducedMotion } from "../../../behavior/use-reduced-motion.ts";
+import { langyThinkingShimmerStyles } from "../../../model/values/langy-shimmer.ts";
 
 /** The provenance line, and the longer answer behind it. */
 const MADE_BY_LANGY_LABEL = "Made by Langy";

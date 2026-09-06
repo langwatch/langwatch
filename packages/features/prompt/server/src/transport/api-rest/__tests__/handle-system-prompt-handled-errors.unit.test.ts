@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { SystemPromptConflictError, SystemPromptRequiredError } from "@langwatch/prompt-contract";
 
-import { handleSystemPromptHandledErrors } from "../prompt.api";
+import { handleSystemPromptHandledErrors } from "../prompt.api.ts";
 
 describe("handleSystemPromptHandledErrors", () => {
   describe("when given a SystemPromptRequiredError (Issue #3196)", () => {

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { promptApi } from "./prompt-api";
+import { promptApi } from "./prompt-api.ts";
 
 export type TagDefinition = {
   name: string;

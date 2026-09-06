@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import { resolveRunModels } from "@langwatch/scenario-contract";
 import type { TraceService } from "@langwatch/trace-contract";
 
-import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service";
+import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
@@ -14,9 +14,9 @@ import type {
 import {
   type ModelParamsResult,
   ScenarioModelParametersService,
-} from "./scenario-model-parameters.service";
-import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service";
-import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service";
+} from "./scenario-model-parameters.service.ts";
+import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
+import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 

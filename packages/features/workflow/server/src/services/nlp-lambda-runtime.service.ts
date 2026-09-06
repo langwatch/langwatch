@@ -8,7 +8,7 @@ import {
   NlpLambdaArnCachePort,
   NlpLambdaArnResolverPort,
   type NlpLambdaArnEntry,
-} from "../ports/nlp-lambda-arn.port";
+} from "../ports/nlp-lambda-arn.port.ts";
 
 /** The shared key one project's ARN is filed under. */
 export const NLP_LAMBDA_ARN_CACHE_PREFIX = "lambda_arn:";

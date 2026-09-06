@@ -1,5 +1,5 @@
-import type { ContentSource } from "./trace-content-part.types";
-import { tryParseRecord } from "./trace-content-part.record-schema";
+import type { ContentSource } from "./trace-content-part.types.ts";
+import { tryParseRecord } from "./trace-content-part.record-schema.ts";
 
 interface NormalizedMediaPart {
   type: "image" | "audio" | "video" | "document";

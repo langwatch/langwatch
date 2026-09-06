@@ -11,11 +11,11 @@ import {
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
 } from "@langwatch/identity-contract";
-import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
+import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { ScimSyncEvent } from "../projections/scim-sync-state.projection";
-import { scimSyncEventsFor } from "../intents/scim-sync-events.intent";
+import type { ScimSyncEvent } from "../projections/scim-sync-state.projection.ts";
+import { scimSyncEventsFor } from "../intents/scim-sync-events.intent.ts";
 
 /**
  * The directory-sync pipeline's five verbs, as the queue's STAGED RE-RUN of each: the same guard

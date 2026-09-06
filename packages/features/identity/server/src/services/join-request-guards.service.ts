@@ -24,7 +24,7 @@ import {
   WITHDRAW_JOIN_COMMAND_TYPE,
   type WithdrawJoinCommandData,
 } from "@langwatch/identity-contract";
-import type { JoinRequestReadRepository } from "../repositories/join-request.repository";
+import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
 
 /**
  * The join-request guards (ADR-117, D12): what runs BEFORE any fact exists.

@@ -4,7 +4,7 @@ import { type Control, type UseFormRegister, useFieldArray } from "react-hook-fo
 
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 
-import type { RoutingPolicyFormValues } from "../../model/routing-policy-form";
+import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
 
 /**
  * Free-form model name mapping: everything that is not one of the reserved

@@ -17,24 +17,24 @@ import {
 import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
-} from "../services/langy-cli-envelope.service";
+} from "../services/langy-cli-envelope.service.ts";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import { verifyFrame } from "../ports/langy-frame-auth.port";
+import { verifyFrame } from "../ports/langy-frame-auth.port.ts";
 import {
   type LangyFrameEnvelope,
   type LangyRelayFrame,
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
-} from "../rules/langy-relay-frame.rules";
-import type { LangyLinkRedis, LangyResourceLinkStore } from "./redis.langy-resource-links.adapter";
-import { LangyFrameDedupAdapter } from "./redis.langy-frame-dedup.adapter";
-import type { LangyFrameDedupRedis } from "./redis.langy-frame-dedup.adapter";
-import { LangyResourceLinksAdapter } from "./redis.langy-resource-links.adapter";
-import { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
-import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.adapter";
-import { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
-import type { LangyStreamRedis } from "../ports/langy-token-buffer.port";
-import { LANGY_EMPTY_TURN_FALLBACK } from "../rules/langy-empty-turn.rules";
+} from "../rules/langy-relay-frame.rules.ts";
+import type { LangyLinkRedis, LangyResourceLinkStore } from "./redis.langy-resource-links.adapter.ts";
+import { LangyFrameDedupAdapter } from "./redis.langy-frame-dedup.adapter.ts";
+import type { LangyFrameDedupRedis } from "./redis.langy-frame-dedup.adapter.ts";
+import { LangyResourceLinksAdapter } from "./redis.langy-resource-links.adapter.ts";
+import { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.adapter.ts";
+import { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
+import type { LangyStreamRedis } from "../ports/langy-token-buffer.port.ts";
+import { LANGY_EMPTY_TURN_FALLBACK } from "../rules/langy-empty-turn.rules.ts";
 
 type PlatformProgress = { headline: string };
 

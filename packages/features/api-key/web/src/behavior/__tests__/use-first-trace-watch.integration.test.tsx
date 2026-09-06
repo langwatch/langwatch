@@ -21,10 +21,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiKeyHostProvider } from "../../model/api-key-host";
-import { FIRST_TRACE_REDIRECT_DELAY_MS } from "../../model/first-trace-policy";
-import { FakeApiKeyHost } from "../../testing";
-import { FirstTraceRedirect } from "../../ui/sections/first-trace-redirect";
+import { ApiKeyHostProvider } from "../../model/api-key-host.ts";
+import { FIRST_TRACE_REDIRECT_DELAY_MS } from "../../model/first-trace-policy.ts";
+import { FakeApiKeyHost } from "../../testing.tsx";
+import { FirstTraceRedirect } from "../../ui/sections/first-trace-redirect.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -33,7 +33,7 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../api-key-api", () => ({
+vi.mock("../api-key-api.ts", () => ({
   apiKeyApi: {
     project: {
       getHasFirstMessage: {

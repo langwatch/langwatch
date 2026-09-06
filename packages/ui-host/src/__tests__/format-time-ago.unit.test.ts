@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTimeAgo, formatTimeAgoCompact } from "../format-time-ago";
+import { formatTimeAgo, formatTimeAgoCompact } from "../format-time-ago.ts";
 
 describe("formatTimeAgo", () => {
   describe("given a timestamp inside the relative window", () => {

@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { usePromptProject } from "./use-prompt-project";
-import { areFormValuesEqual, computeInitialFormValuesForPrompt } from "../model/prompt-form";
-import { promptApi } from "./prompt-api";
-import { useTabById } from "./use-tab-by-id";
+import { usePromptProject } from "./use-prompt-project.ts";
+import { areFormValuesEqual, computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
+import { promptApi } from "./prompt-api.ts";
+import { useTabById } from "./use-tab-by-id.ts";
 
 /**
  * Determines whether the prompt in the specified tab has unsaved changes.

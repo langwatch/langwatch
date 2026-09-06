@@ -52,7 +52,7 @@ const mockApi = {
 
 // Getters, so the factory reads the map after this module has initialised it:
 // a hoisted factory that named `mockApi` directly would run before the const.
-vi.mock("../model-provider-api", () => ({
+vi.mock("../model-provider-api.ts", () => ({
   get api() {
     return mockApi;
   },
@@ -63,13 +63,13 @@ vi.mock("../model-provider-api", () => ({
 
 // The toaster reaches the application through the host port; stand the port's
 // two bindings in so the hook renders without a host.
-vi.mock("../model-provider-feedback", () => ({
+vi.mock("../model-provider-feedback.ts", () => ({
   useModelProviderToaster: () => ({ create: vi.fn() }),
   useShowErrorToast: () => vi.fn(),
 }));
 
 // Import the hook after mocking
-import { useModelProviderForm } from "../use-model-provider-form";
+import { useModelProviderForm } from "../use-model-provider-form.ts";
 
 describe("useModelProviderForm()", () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isModelCallSpan, readString } from "../index";
+import { isModelCallSpan, readString } from "../index.ts";
 
 describe("coding-agent span vocabulary", () => {
   it("recognises model calls without counting nested provider calls", () => {

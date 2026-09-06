@@ -1,12 +1,12 @@
 import { Alert, Box, Card, GridItem, Heading, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
-import { CustomGraph, type CustomGraphInput } from "../../ui/sections/custom-graph";
-import { FilterSidebar } from "../../ui/sections/filter-sidebar";
-import AnalyticsLayout from "../../ui/sections/analytics-layout";
-import { Link } from "../../ui/elements/analytics-link";
-import { useAnalyticsHost } from "../../model/analytics-host";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { CustomGraph, type CustomGraphInput } from "../../ui/sections/custom-graph.tsx";
+import { FilterSidebar } from "../../ui/sections/filter-sidebar.tsx";
+import AnalyticsLayout from "../../ui/sections/analytics-layout.tsx";
+import { Link } from "../../ui/elements/analytics-link.tsx";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 
 // Time unit conversion constants

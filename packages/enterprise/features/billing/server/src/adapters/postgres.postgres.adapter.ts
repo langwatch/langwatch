@@ -1,23 +1,23 @@
 import {
   PrismaOrganizationPricingRepository,
   type BillingOrganizationPricingDatabase,
-} from "../repositories/prisma/prisma.organization-pricing.repository";
+} from "../repositories/prisma/prisma.organization-pricing.repository.ts";
 import {
   PrismaSubscriptionRepository,
   type BillingSubscriptionDatabase,
-} from "../repositories/prisma/prisma.subscription.repository";
+} from "../repositories/prisma/prisma.subscription.repository.ts";
 import {
   PrismaBillingOrganizationRepository,
   type BillingOrganizationDatabase,
-} from "../repositories/prisma/prisma.billing-account-facts.repository";
+} from "../repositories/prisma/prisma.billing-account-facts.repository.ts";
 import {
   PrismaBillingCheckpointRepository,
   type BillingCheckpointDatabase,
-} from "../repositories/prisma/prisma.billing-checkpoint.repository";
-import type { OrganizationPricingRepository } from "../ports/organization-pricing.port";
-import type { BillingSubscriptionRepository } from "../ports/subscription.port";
-import type { BillingOrganizationPort } from "../ports/organization.port";
-import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port";
+} from "../repositories/prisma/prisma.billing-checkpoint.repository.ts";
+import type { OrganizationPricingRepository } from "../ports/organization-pricing.port.ts";
+import type { BillingSubscriptionRepository } from "../ports/subscription.port.ts";
+import type { BillingOrganizationPort } from "../ports/organization.port.ts";
+import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port.ts";
 
 export type PostgresBillingPersistence = {
   organizationPricing: OrganizationPricingRepository;

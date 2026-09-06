@@ -15,7 +15,7 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PostgresAgentAdapter } from "../../adapters/postgres.agent.adapter";
+import { PostgresAgentAdapter } from "../../adapters/postgres.agent.adapter.ts";
 
 /** This suite writes and reads its own rows, so it composes no tenant guard. */
 class AllowTestQueries extends PrismaQueryGuard {

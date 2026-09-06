@@ -18,7 +18,7 @@ import type {
   TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
-} from "./project";
+} from "./project.ts";
 
 export abstract class ProjectService {
   abstract tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null>;

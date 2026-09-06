@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useState } from "react";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 
 export type DrawerLayout = "vertical" | "horizontal";
 

@@ -2,9 +2,9 @@ import { Badge, Box, Button, HStack, Separator, Spinner, Text, VStack } from "@c
 import { useEffect, useMemo, useState } from "react";
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Link } from "../../../../ui/elements/gateway-link";
-import { api } from "../../../../behavior/gateway-api";
-import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback";
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
+import { api } from "../../../../behavior/gateway-api.ts";
+import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
 
 type GuardrailDirectionEnum = "PRE" | "POST" | "STREAM_CHUNK";
 type WireDirection = "pre" | "post" | "stream_chunk";

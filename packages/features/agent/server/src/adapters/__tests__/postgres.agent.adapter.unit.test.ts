@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { LinkedWorkflowCopyPort } from "../../ports/linked-workflow-copy.port";
-import { PostgresAgentAdapter } from "../postgres.agent.adapter";
+import { LinkedWorkflowCopyPort } from "../../ports/linked-workflow-copy.port.ts";
+import { PostgresAgentAdapter } from "../postgres.agent.adapter.ts";
 
 type Row = Record<string, unknown>;
 

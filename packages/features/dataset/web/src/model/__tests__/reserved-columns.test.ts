@@ -3,7 +3,7 @@ import {
   getSafeColumnName,
   isReservedColumnName,
   RESERVED_COLUMN_NAMES,
-} from "../reserved-columns";
+} from "../reserved-columns.ts";
 
 /**
  * Tests for reserved column names utilities

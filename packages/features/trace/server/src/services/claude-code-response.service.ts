@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { asNumber } from "../rules/canonical-guard.rules";
-import { capPayloadString } from "../rules/trace-payload-cap.rules";
+import { asNumber } from "../rules/canonical-guard.rules.ts";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 
 const responseContentBlockSchema = z.looseObject({
   type: z.string().optional(),

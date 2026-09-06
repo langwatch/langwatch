@@ -13,7 +13,7 @@
  */
 
 import { useMemo } from "react";
-import { useGovernanceHost, type GovernanceOrganization } from "../model/governance-host";
+import { useGovernanceHost, type GovernanceOrganization } from "../model/governance-host.ts";
 
 export type GovernanceScopeReading = {
   organization: GovernanceOrganization | undefined;

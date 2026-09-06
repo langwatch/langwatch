@@ -7,8 +7,8 @@ import {
   tapeUpTo,
   tokenStreamText,
   useLangyDevLog,
-} from "../langy-dev-log";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+} from "../langy-dev-log.ts";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 /**
  * The inspector's tape: four lanes on one ring, recorded only while armed, and a REPLAY

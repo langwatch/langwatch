@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { WorkerMain, type WorkerMainProcessPort } from "../worker.main";
+import { WorkerMain, type WorkerMainProcessPort } from "../worker.main.ts";
 import type {
   WorkerShutdownSignal,
   WorkerSignalSource,
-} from "../platform/lifecycle/worker.signals";
+} from "../platform/lifecycle/worker.signals.ts";
 
 class Signals implements WorkerSignalSource {
   private readonly listeners = new Map<WorkerShutdownSignal, Set<() => void>>();

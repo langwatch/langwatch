@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { GithubBranchInstallationsPort } from "../../ports/github-branch-installations.port";
+import { GithubBranchInstallationsPort } from "../../ports/github-branch-installations.port.ts";
 import {
   GithubAppTokenPort,
   type GithubPullRequestSummary,
-} from "../../ports/github-app-token.port";
-import { GithubHostPort } from "../../ports/github-host.port";
-import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository";
+} from "../../ports/github-app-token.port.ts";
+import { GithubHostPort } from "../../ports/github-host.port.ts";
+import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
   GithubBranchCheckRow,
   UpsertGithubBranchCheckInput,
-} from "../../repositories/github-pull-requests.repository";
+} from "../../repositories/github-pull-requests.repository.ts";
 import {
   GithubBranchMappingService,
   type BranchMappingTarget,
-} from "../github-branch-mapping.service";
+} from "../github-branch-mapping.service.ts";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();
 

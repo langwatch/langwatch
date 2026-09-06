@@ -4,8 +4,8 @@ import {
   getStripeEnvironmentFromNodeEnv,
   parseStripePricesFile,
   resolveStripePriceMap,
-} from "../index";
-import { STRIPE_PRICE_NAMES } from "../index";
+} from "../index.ts";
+import { STRIPE_PRICE_NAMES } from "../index.ts";
 
 describe("stripeCatalog", () => {
   describe("parseStripePricesFile()", () => {

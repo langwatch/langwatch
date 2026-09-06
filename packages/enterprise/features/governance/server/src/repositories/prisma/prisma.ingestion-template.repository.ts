@@ -10,7 +10,7 @@ import {
   IngestionTemplateRepository,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
-} from "../../ports/ingestion-template.port";
+} from "../../ports/ingestion-template.port.ts";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 

@@ -6,7 +6,7 @@ import {
   foldStream,
   foldUser,
   primaryChanged,
-} from "./support/identifier-facts";
+} from "./support/identifier-facts.ts";
 
 describe("what one head cannot see", () => {
   describe("given a partial replay window, which is the only way to reach these", () => {

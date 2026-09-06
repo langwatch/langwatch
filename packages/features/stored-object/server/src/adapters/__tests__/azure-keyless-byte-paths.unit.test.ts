@@ -19,22 +19,22 @@ vi.mock("@azure/identity", () => ({
   },
 }));
 
-import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter.ts";
 import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-} from "../azure-blob-credentials.adapter";
-import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter";
+} from "../azure-blob-credentials.adapter.ts";
+import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
-import { AzureBlobTokenProviderAdapter } from "../azure-blob-token-provider.adapter";
+import { AzureBlobTokenProviderAdapter } from "../azure-blob-token-provider.adapter.ts";
 const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;
 import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-} from "../stored-object-destination-policy.adapter";
-import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
+} from "../stored-object-destination-policy.adapter.ts";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter.ts";
 
 const PROJECT_ID = "proj-1";
 const HISTORICAL_URI = `azure-blob://lwacct/written-long-ago/${PROJECT_ID}/abc123`;

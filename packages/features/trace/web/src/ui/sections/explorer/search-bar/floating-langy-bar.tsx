@@ -4,11 +4,11 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { filterContextChip } from "../../langy/hooks/use-langy-filter-context";
-import type { FloatRect } from "../../../../behavior/use-float-rect";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { AiPromptInput } from "../ai/ai-prompt-input";
-import { AiShaderBackdrop } from "./ai-shader-backdrop";
+import { filterContextChip } from "../../langy/hooks/use-langy-filter-context.ts";
+import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { AiPromptInput } from "../ai/ai-prompt-input.tsx";
+import { AiShaderBackdrop } from "./ai-shader-backdrop.tsx";
 
 interface FloatingLangyBarProps {
   rect: FloatRect | null;

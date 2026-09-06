@@ -5,8 +5,8 @@
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { TrendPoint } from "@langwatch/scenario-contract";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { formatPassRate, PASS_RATE_BAR_OPACITY, passRateColor } from "./pass-rate-color";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { formatPassRate, PASS_RATE_BAR_OPACITY, passRateColor } from "./pass-rate-color.ts";
 
 /** How tall the tallest bar is drawn, and so how tall the row of them is. */
 const TREND_HEIGHT = 16;

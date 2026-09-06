@@ -19,4 +19,4 @@
  * it. The registry adapter passes the navigator's own close.
  */
 
-export { RoutingPolicyDrawer } from "../features/routing-policies/ui/sections/routing-policy-drawer";
+export { RoutingPolicyDrawer } from "../features/routing-policies/ui/sections/routing-policy-drawer.tsx";

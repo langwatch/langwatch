@@ -12,8 +12,8 @@ import type {
   RedisInfo,
   ThroughputPoint,
 } from "@langwatch/ops-contract";
-import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
+import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
+import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 
 const logger = createLogger("langwatch:ops:metrics-window");
 

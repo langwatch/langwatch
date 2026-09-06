@@ -5,7 +5,7 @@
 import { Currency as CurrencyValues } from "@langwatch/enterprise-billing-contract";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { z } from "zod";
-import type { Currency } from "./billing-plans";
+import type { Currency } from "./billing-plans.ts";
 
 export const isValidEmail = (value: string) => z.string().email().safeParse(value).success;
 export const countFullMembers = (list: { memberType: MemberType }[]) =>

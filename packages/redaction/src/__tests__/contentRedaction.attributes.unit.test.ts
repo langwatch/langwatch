@@ -14,7 +14,7 @@ import {
   redactAttributeNative,
   redactStringNative,
   type RedactionPolicy,
-} from "../contentRedaction.js";
+} from "../contentRedaction.ts";
 
 function policy({
   secretsEnabled = true,

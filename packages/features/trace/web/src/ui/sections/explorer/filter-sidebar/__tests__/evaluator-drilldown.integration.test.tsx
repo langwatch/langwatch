@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
-import { EvaluatorDrilldown } from "../evaluator-drilldown";
-import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types";
+import { EvaluatorDrilldown } from "../evaluator-drilldown.tsx";
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 
 const buildItem = (aggregates?: Partial<NonNullable<FacetItem["aggregates"]>>): FacetItem => ({
   value: "faithfulness",

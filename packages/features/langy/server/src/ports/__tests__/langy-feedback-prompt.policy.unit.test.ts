@@ -4,7 +4,7 @@ import {
   FEEDBACK_QUIET_PERIOD_MS,
   LangyFeedbackPromptPolicy,
   type LangyFeedbackPromptRedis,
-} from "../langy-feedback-prompt.port";
+} from "../langy-feedback-prompt.port.ts";
 
 const NOW = 1_700_000_000_000;
 

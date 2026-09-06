@@ -1,4 +1,4 @@
-import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process";
+import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
 
 /**
  * Hands a confirmation to the gateway spend pipeline.

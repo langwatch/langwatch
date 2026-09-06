@@ -1,10 +1,10 @@
 /**
  * Ingest-time derivation of useful content out of raw LLM API bodies. An emitter logging its raw provider request/response ships a 60 KB JSON blob per call, and every consumer wants the same few things from it — parsed ONCE here and stamped on the record, so reads stay cheap and the data becomes queryable as ordinary log attributes.
  */
-import { TraceLogContentDerivationService } from "../trace-log-content-derivation.service";
+import { TraceLogContentDerivationService } from "../trace-log-content-derivation.service.ts";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { DERIVED_ATTRS } from "../trace-log-content-derivation.service";
+import { DERIVED_ATTRS } from "../trace-log-content-derivation.service.ts";
 
 const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
 const traceCanonicalisation = TraceCanonicalisationService.create();

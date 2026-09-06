@@ -2,19 +2,19 @@ import { Badge, Center, EmptyState, HStack, Spinner, Table, Text } from "@chakra
 import { CalendarClock } from "lucide-react";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
-import type { SchedulerJobStatus } from "../../model/scheduler-presentation";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups";
-import { SchedulerHeader } from "../blocks/scheduler-header";
-import { SchedulerRecentActions } from "../elements/scheduler-recent-actions";
-import { SchedulerStatusBadge } from "../blocks/scheduler-status-badge";
+import type { SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
+import { SchedulerHeader } from "../blocks/scheduler-header.tsx";
+import { SchedulerRecentActions } from "../elements/scheduler-recent-actions.tsx";
+import { SchedulerStatusBadge } from "../blocks/scheduler-status-badge.tsx";
 import {
   compareForAttention,
   deriveLoopHealth,
   deriveStatus,
   latenessMs,
   summarize,
-} from "../../model/scheduler-presentation";
+} from "../../model/scheduler-presentation.ts";
 
 /**
  * The scheduler surface, page-independent: scheduled work across every

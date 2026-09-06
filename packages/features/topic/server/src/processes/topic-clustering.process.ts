@@ -12,7 +12,7 @@ import {
 } from "@langwatch/topic-contract";
 import crypto from "crypto";
 import { z } from "zod";
-import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic-events.adapter";
+import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic-events.adapter.ts";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -22,7 +22,7 @@ import {
   topicClusteringRunIntentSchema,
   type TopicClusteringDispatchDeps,
   type TopicClusteringIntents,
-} from "../intents/topic-clustering.intent";
+} from "../intents/topic-clustering.intent.ts";
 
 export const TOPIC_CLUSTERING_PROCESS_NAME = "topicClustering" as const;
 

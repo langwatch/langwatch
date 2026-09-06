@@ -14,8 +14,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository";
-import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service";
+import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
+import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

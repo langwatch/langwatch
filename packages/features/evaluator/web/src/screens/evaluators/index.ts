@@ -21,18 +21,18 @@ import type { ComponentType } from "react";
 export type EvaluatorScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const evaluatorScreens = {
-  evaluators: () => import("./evaluators.screen"),
+  evaluators: () => import("./evaluators.screen.tsx"),
 } as const satisfies Record<string, EvaluatorScreenLoader>;
 
 export type EvaluatorScreenName = keyof typeof evaluatorScreens;
 
-export { EVALUATORS_PAGE_PERMISSION } from "./evaluators.screen";
-export { evaluatorApi } from "../../behavior/evaluator-api";
+export { EVALUATORS_PAGE_PERMISSION } from "./evaluators.screen.tsx";
+export { evaluatorApi } from "../../behavior/evaluator-api.ts";
 export type {
   EvaluatorApiMap,
   EvaluatorCascadeArchiveResult,
   EvaluatorRelatedEntities,
-} from "../../behavior/evaluator-api";
+} from "../../behavior/evaluator-api.ts";
 export {
   EvaluatorHostPort,
   EvaluatorHostProvider,
@@ -42,4 +42,4 @@ export {
   type EvaluatorRouteReading,
   type EvaluatorScope,
   type EvaluatorSuccessNotice,
-} from "../../model/evaluator-host";
+} from "../../model/evaluator-host.ts";

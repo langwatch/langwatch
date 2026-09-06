@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { deriveSkills, skillSourceDirs } from "../../../../../scripts/generate-langy-skills";
-import { findSkill, LANGY_SKILLS } from "../langy-skills";
+import { deriveSkills, skillSourceDirs } from "../../../../../scripts/generate-langy-skills.ts";
+import { findSkill, LANGY_SKILLS } from "../langy-skills.ts";
 import GENERATED from "../langySkills.generated.json";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../../../../../..");

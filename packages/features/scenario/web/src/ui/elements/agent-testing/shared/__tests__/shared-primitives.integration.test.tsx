@@ -9,10 +9,10 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { CaseVersionChip } from "../case-version-chip";
-import { LastResultLabel } from "../last-result-label";
-import { ResultMetricsInline } from "../result-metrics-inline";
-import { TestSuiteHeaderRow } from "../test-suite-header-row";
+import { CaseVersionChip } from "../case-version-chip.tsx";
+import { LastResultLabel } from "../last-result-label.tsx";
+import { ResultMetricsInline } from "../result-metrics-inline.tsx";
+import { TestSuiteHeaderRow } from "../test-suite-header-row.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

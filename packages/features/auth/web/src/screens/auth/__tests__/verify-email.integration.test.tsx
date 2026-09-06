@@ -17,11 +17,11 @@ const { searchParamsRef } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-import VerifyEmail from "../verify-email.screen";
+import VerifyEmail from "../verify-email.screen.tsx";
 
 const renderPage = () =>
   render(

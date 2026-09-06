@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RETENTION_MANAGED_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-import { buildRetentionTTLExpression, hasRetentionTTL, TABLE_TTL_CONFIG } from "../ttl.reconciler";
+import { buildRetentionTTLExpression, hasRetentionTTL, TABLE_TTL_CONFIG } from "../ttl.reconciler.ts";
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:

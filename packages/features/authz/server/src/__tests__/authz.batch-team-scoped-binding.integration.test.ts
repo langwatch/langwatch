@@ -17,11 +17,11 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
-} from "../repositories/prisma/prisma.authz-binding.repository";
-import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository";
-import type { AuthzDatabase } from "../repositories/authz-read.repository";
-import { AuthzService } from "../services/authz.service";
+} from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
+import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
+import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
 

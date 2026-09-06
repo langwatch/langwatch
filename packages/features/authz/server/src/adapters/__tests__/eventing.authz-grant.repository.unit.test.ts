@@ -16,10 +16,10 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../eventing.authz-ledger.adapter";
-import type { AuthzReadRepository } from "../../repositories/authz-read.repository";
-import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository";
-import { RoutedAuthzReadRepository } from "../../repositories/routed/routed.authz-read.repository";
+import type { EventingAuthzLedgerAdapter } from "../eventing.authz-ledger.adapter.ts";
+import type { AuthzReadRepository } from "../../repositories/authz-read.repository.ts";
+import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
+import { RoutedAuthzReadRepository } from "../../repositories/routed/routed.authz-read.repository.ts";
 
 const ORG_ID = "org_ledger";
 const ACTOR: LedgerActor = { type: "user", id: "user_admin" };

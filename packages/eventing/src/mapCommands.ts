@@ -1,4 +1,4 @@
-import type { EventSourcedQueueProcessor, QueueSendOptions } from "./queues";
+import type { EventSourcedQueueProcessor, QueueSendOptions } from "./queues/index.ts";
 
 /** Convert pipeline command dispatchers to plain async functions. */
 export type MappedCommand<P> = {

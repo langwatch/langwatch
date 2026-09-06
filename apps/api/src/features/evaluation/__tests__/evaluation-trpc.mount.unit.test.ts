@@ -21,7 +21,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
-import { createEvaluationTrpcRouter } from "../evaluation-trpc.mount";
+import { createEvaluationTrpcRouter } from "../evaluation-trpc.mount.ts";
 
 const PROJECT_ID = "project_evaluation_mount";
 const USER_ID = "user_evaluation_mount";

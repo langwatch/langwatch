@@ -8,15 +8,15 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import { getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { ApiRestSecurity } from "../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition.ts";
 import {
   createSseSubscriptionApp,
   sseErrorFrame,
   SSE_KEEPALIVE_INTERVAL_MS,
   type SseSubscriptionPorts,
-} from "../app-trpc.sse";
-import { sameOriginSseInit } from "./support/sse-browser-request";
+} from "../app-trpc.sse.ts";
+import { sameOriginSseInit } from "./support/sse-browser-request.ts";
 
 class TestHandledError extends HandledError {
   constructor(code: string, message: string, fault: "customer" | "platform" = "customer") {

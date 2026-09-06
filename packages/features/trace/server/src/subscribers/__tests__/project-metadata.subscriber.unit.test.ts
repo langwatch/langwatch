@@ -20,7 +20,7 @@ import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
   type ProjectMetadataSubscriberDeps,
   ProjectMetadataSync,
-} from "../project-metadata.subscriber";
+} from "../project-metadata.subscriber.ts";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {

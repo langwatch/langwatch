@@ -11,14 +11,14 @@
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { SpanStorageClickHouseRepository } from "../../repositories/clickhouse/span-storage.repository";
-import type { SpanSummaryQueryRow } from "../../repositories/clickhouse/span-storage.repository";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { SpanStorageMapProjection } from "../span-storage.projection";
-import { TraceAnalyticsFoldProjection } from "../trace-derived.projection";
-import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+import { SpanStorageClickHouseRepository } from "../../repositories/clickhouse/span-storage.repository.ts";
+import type { SpanSummaryQueryRow } from "../../repositories/clickhouse/span-storage.repository.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { SpanStorageMapProjection } from "../span-storage.projection.ts";
+import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
+import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 const TRACE_ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const SPAN_ID = "bbbb000000000001";

@@ -1,15 +1,15 @@
 import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import { FEATURES } from "../../../../../model/shared/langy/feature-map";
+import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
-import { CAPABILITY_CATALOG } from "../../../../../model/langy-capability-catalog";
+import { CAPABILITY_CATALOG } from "../../../../../model/langy-capability-catalog.ts";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
   withDecidedCard,
-} from "../capability-registry";
+} from "../capability-registry.ts";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {

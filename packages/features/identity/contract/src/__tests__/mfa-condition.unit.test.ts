@@ -10,7 +10,7 @@ import {
   satisfiesOrganizationMfaRequirement,
   secondFactorsIn,
   signInProvedSecondFactor,
-} from "../mfa-condition";
+} from "../mfa-condition.ts";
 
 /** A sign-in that proved nothing beyond a password. */
 const PASSWORD_ONLY = [PASSWORD_AMR];

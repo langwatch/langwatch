@@ -15,10 +15,10 @@ import {
   type GatewayCacheRule,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
-import type { GatewayAuditPort } from "../../ports/gateway-audit.port";
-import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port";
-import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
+import type { GatewayAuditPort } from "../../ports/gateway-audit.port.ts";
+import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port.ts";
+import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();
 /**

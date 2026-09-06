@@ -31,7 +31,7 @@ import {
   retentionPresetsForTier,
   retentionUnitCollection,
   SCOPE_ICON,
-} from "../../model/retention-constants";
+} from "../../model/retention-constants.ts";
 
 /** A row the overflow menu's Edit action targets: a single scope's policy,
  *  prefilled into the drawer with the scope locked. */

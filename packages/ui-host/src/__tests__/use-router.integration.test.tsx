@@ -11,8 +11,8 @@ import {
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
   type UiRouteReadingValues,
-} from "../capabilities";
-import { useRouter } from "../use-router";
+} from "../capabilities.ts";
+import { useRouter } from "../use-router.ts";
 
 const navigated: { to: string; replace: boolean }[] = [];
 const queries: { next: Record<string, string | undefined>; replace: boolean }[] = [];

@@ -1,7 +1,7 @@
 import {
   PrismaExperimentWorkflowVersionRepository,
   type ExperimentWorkflowVersionDatabase,
-} from "../repositories/prisma/prisma.experiment-workflow-version.repository";
+} from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import type {
   ExperimentService as ExperimentServiceContract,
   SerializedHandledError,
@@ -14,14 +14,14 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import {
   PrismaExperimentRepository,
   type ExperimentDatabase,
-} from "../repositories/prisma/prisma.experiment.repository";
-import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
-import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
-import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
-import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
-import { UnavailableExperimentExecutionAdapter } from "./unavailable-experiment-execution.adapter";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "./noop-experiment-workbench-updates.adapter";
-import { ExperimentService } from "../services/experiment.service";
+} from "../repositories/prisma/prisma.experiment.repository.ts";
+import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
+import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
+import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port.ts";
+import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port.ts";
+import { UnavailableExperimentExecutionAdapter } from "./unavailable-experiment-execution.adapter.ts";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "./noop-experiment-workbench-updates.adapter.ts";
+import { ExperimentService } from "../services/experiment.service.ts";
 
 export type PostgresExperimentAdapterOptions = {
   /** The primary Postgres store plus workflow-version metadata for run reads. */

@@ -35,7 +35,7 @@ import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contrac
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
-import { composeApiModelProviders } from "../api-model-provider.composition";
+import { composeApiModelProviders } from "../api-model-provider.composition.ts";
 
 /** The one provider row these scenarios read, with its credentials at rest. */
 function providerRow(customKeys: unknown) {

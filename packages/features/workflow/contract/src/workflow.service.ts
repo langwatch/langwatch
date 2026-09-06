@@ -6,7 +6,7 @@ import type {
   RunWorkflowCommand,
   SaveWorkflowVersionCommand,
   UpdateWorkflowCommand,
-} from "./workflow.commands";
+} from "./workflow.commands.ts";
 import type {
   Workflow,
   WorkflowEvaluatorFields,
@@ -14,8 +14,8 @@ import type {
   WorkflowVersionHistoryEntry,
   WorkflowVersionHistoryMode,
   WorkflowWithVersion,
-} from "./workflow";
-import type { StudioClientEvent } from "./studio-events";
+} from "./workflow.ts";
+import type { StudioClientEvent } from "./studio-events.ts";
 
 export abstract class WorkflowService {
   abstract enrichStudioEvent(input: {

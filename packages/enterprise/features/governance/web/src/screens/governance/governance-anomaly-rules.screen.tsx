@@ -15,16 +15,16 @@ import {
 } from "@chakra-ui/react";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface";
-import GovernanceLayout from "../../ui/sections/governance-layout";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
+import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../ui/elements/governance-link";
-import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useShowErrorToast } from "../../behavior/governance-feedback";
-import { useGovernanceScope } from "../../behavior/governance-session";
-import { api, type RouterOutputs } from "../../behavior/governance-api";
+import { Link } from "../../ui/elements/governance-link.tsx";
+import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useShowErrorToast } from "../../behavior/governance-feedback.ts";
+import { useGovernanceScope } from "../../behavior/governance-session.ts";
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 import { docsUrl } from "@langwatch/config/docs-url";
 /**
  * Anomaly rule authoring surface, wired to api.anomalyRules.* (Sergey

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store";
-import { TraceSummaryStore } from "../../stores/eventing/eventing.trace-summary.store";
-import { TraceAnalyticsFoldProjection } from "../trace-derived.projection";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
+import { TraceSummaryStore } from "../../stores/eventing/eventing.trace-summary.store.ts";
+import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * A structural contract behind `trustAbsentMiss` (the always-write change): a

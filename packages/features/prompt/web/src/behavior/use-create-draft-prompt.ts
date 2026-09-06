@@ -1,10 +1,10 @@
 import { useCallback } from "react";
-import { getMaxTokenLimit } from "../model/token-limits";
-import { useModelProvidersSettings } from "./use-model-providers-settings";
-import { usePromptProject } from "./use-prompt-project";
-import { buildDefaultFormValues } from "../model/prompt-form";
-import { promptApi } from "./prompt-api";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+import { getMaxTokenLimit } from "../model/token-limits.ts";
+import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
+import { buildDefaultFormValues } from "../model/prompt-form/index.ts";
+import { promptApi } from "./prompt-api.ts";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**
  * Default system prompt for new prompts created in the playground.

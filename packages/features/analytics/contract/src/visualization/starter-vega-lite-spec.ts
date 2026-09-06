@@ -11,8 +11,8 @@
  * shape it can produce through the real validator.
  */
 
-import { VEGA_LITE_SCHEMA_URL } from "./vega-lite-schema";
-import type { LangWatchQLDatasetColumn } from "./visualization-types";
+import { VEGA_LITE_SCHEMA_URL } from "./vega-lite-schema.ts";
+import type { LangWatchQLDatasetColumn } from "./visualization-types.ts";
 
 /** ClickHouse types that belong on a time axis. */
 const TEMPORAL_TYPE = /\b(Date|Date32|DateTime|DateTime64)\b/;

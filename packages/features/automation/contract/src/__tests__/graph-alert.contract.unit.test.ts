@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../graph-alert";
+import { extractGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../graph-alert.ts";
 
 describe("graph-alert contract", () => {
   it("validates the portable threshold shape", () => {

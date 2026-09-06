@@ -15,9 +15,9 @@
 import type { SecretService } from "@langwatch/secret-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { SecretApp } from "../secret.app";
+import { SecretApp } from "../secret.app.ts";
 
-import { SecretTrpcApi, type SecretTrpcPolicy } from "../../transport/api-trpc/secret.api";
+import { SecretTrpcApi, type SecretTrpcPolicy } from "../../transport/api-trpc/secret.api.ts";
 
 /** The `.use()` surface the injected policy applies its middleware through. */
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };

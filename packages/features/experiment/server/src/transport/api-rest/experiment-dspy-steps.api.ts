@@ -32,7 +32,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
 import type { ExperimentService } from "@langwatch/experiment-contract";
-import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service";
+import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 
 const logger = createLogger("langwatch:experiment:dspy");
 

@@ -9,7 +9,7 @@ import {
   Auth0ApiError,
   Auth0PasswordService,
   type Auth0ManagementCredentials,
-} from "../auth0-password.service";
+} from "../auth0-password.service.ts";
 
 let auth0Issuer = "http://127.0.0.1:0";
 

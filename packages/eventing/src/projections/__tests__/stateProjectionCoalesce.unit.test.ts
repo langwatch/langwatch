@@ -13,12 +13,12 @@
  *   `processBatch`, which is the condition the GroupQueue keys batching on.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import { QueueManager } from "../../services/queues/queueManager";
-import { ProjectionRouter } from "../projectionRouter";
-import type { StateProjectionDefinition } from "../stateProjection.types";
+import type { Event } from "../../domain/types.ts";
+import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
+import { QueueManager } from "../../services/queues/queueManager.ts";
+import { ProjectionRouter } from "../projectionRouter.ts";
+import type { StateProjectionDefinition } from "../stateProjection.types.ts";
 
 function stateProjectionOf({
   name,

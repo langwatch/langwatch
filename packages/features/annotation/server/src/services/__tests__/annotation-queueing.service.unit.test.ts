@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { AnnotationService } from "@langwatch/annotation-contract";
-import { AnnotationQueueingService } from "../annotation-queueing.service";
+import { AnnotationQueueingService } from "../annotation-queueing.service.ts";
 
 function fakeAnnotations(): AnnotationService & {
   createQueueItems: ReturnType<typeof vi.fn>;

@@ -5,7 +5,7 @@ import type {
   PiiLevel,
 } from "@langwatch/data-privacy-contract";
 import { Building2, Folder, Users } from "lucide-react";
-import type { AudienceFormState } from "./data-privacy-rule-config";
+import type { AudienceFormState } from "./data-privacy-rule-config.ts";
 
 /**
  * The words this family puts on the four categories, the three dispositions and

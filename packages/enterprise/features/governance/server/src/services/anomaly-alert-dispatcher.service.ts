@@ -7,11 +7,11 @@ import {
   safeParseDestinationConfig,
   type WebhookDestination,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyAlertHttpPort } from "../ports/anomaly-alert-http.port";
+import type { AnomalyAlertHttpPort } from "../ports/anomaly-alert-http.port.ts";
 import {
   GovernanceDiagnosticsPort,
   NullGovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port";
+} from "../ports/governance-diagnostics.port.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 2;

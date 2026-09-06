@@ -1,9 +1,9 @@
 import type { Logger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
-import type { SchedulerWakeRedis } from "./scheduler-wake.repository";
-import { computeCatchUp, computeNextRunAt } from "./next-run-at";
-import type { SchedulerRegistry } from "./scheduler.registry";
-import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types";
+import type { SchedulerWakeRedis } from "./scheduler-wake.repository.ts";
+import { computeCatchUp, computeNextRunAt } from "./next-run-at.ts";
+import type { SchedulerRegistry } from "./scheduler.registry.ts";
+import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types.ts";
 
 /**
  * Best-effort cross-pod wake (ADR-044, user decision 2026-07-10). Postgres is

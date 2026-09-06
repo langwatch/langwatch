@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { legacyTraceToTurn } from "../legacy-trace-to-turn";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { legacyTraceToTurn } from "../legacy-trace-to-turn.ts";
 
 const trace = (overrides: Partial<Trace> = {}): Trace =>
   ({

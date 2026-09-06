@@ -18,14 +18,14 @@ import {
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
-} from "./direct-upload";
-import { parseHeaderColumns } from "../model/parse-header-columns";
-import { baseNameFromFilename, batchDedupeNames, bumpName } from "../model/batch-name-dedup";
+} from "./direct-upload.ts";
+import { parseHeaderColumns } from "../model/parse-header-columns.ts";
+import { baseNameFromFilename, batchDedupeNames, bumpName } from "../model/batch-name-dedup.ts";
 import {
   runWithConcurrency,
   uploadSingleFile,
   type UploadSingleFileDeps,
-} from "./bulk-upload-orchestrator";
+} from "./bulk-upload-orchestrator.ts";
 
 /** Files prepared at once; the rest queue (the "queues the rest" behaviour). */
 export const BULK_UPLOAD_CONCURRENCY = 3;

@@ -8,7 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) =>
     selector({
@@ -21,14 +21,14 @@ vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
 // Langy is available — the dialog row must name whoever answers. The gate
 // hook carries session/tRPC wiring this dialog test doesn't mount.
 const askGate = { langy: false };
-vi.mock("../../search-bar/use-ask-langy-from-search", () => ({
+vi.mock("../../search-bar/use-ask-langy-from-search.ts", () => ({
   useAskLangyFromSearch: () => ({
     langyRoutesAsk: askGate.langy,
     askLangyFromSearch: vi.fn(),
   }),
 }));
 
-import { PageKeyboardShortcuts } from "../page-keyboard-shortcuts";
+import { PageKeyboardShortcuts } from "../page-keyboard-shortcuts.tsx";
 
 afterEach(() => {
   cleanup();

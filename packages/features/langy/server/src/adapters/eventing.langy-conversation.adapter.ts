@@ -12,9 +12,9 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
 import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy-contract";
-import { langyConversationProcess } from "../processes/langy-conversation.process";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../ports/langy-conversation-process.port";
-import type { LangyEffectPorts } from "../ports/langy-effect.port";
+import { langyConversationProcess } from "../processes/langy-conversation.process.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../ports/langy-conversation-process.port.ts";
+import type { LangyEffectPorts } from "../ports/langy-effect.port.ts";
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,
@@ -38,15 +38,15 @@ import {
   SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
-} from "../intents/langy-conversation.intent";
+} from "../intents/langy-conversation.intent.ts";
 import {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
-} from "../projections/langy-analytics-event.projection";
-import { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection";
-import { LangyConversationTurnFoldProjection } from "../projections/langy-conversation-turn.projection";
-import { LangyMessageOperationalMapProjection } from "../projections/langy-message-operational.projection";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
+} from "../projections/langy-analytics-event.projection.ts";
+import { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection.ts";
+import { LangyConversationTurnFoldProjection } from "../projections/langy-conversation-turn.projection.ts";
+import { LangyMessageOperationalMapProjection } from "../projections/langy-message-operational.projection.ts";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;

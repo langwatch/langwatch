@@ -36,7 +36,7 @@ import {
 } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { FullLogo } from "../elements/full-logo";
+import { FullLogo } from "../elements/full-logo.tsx";
 
 const MotionBox = motion.create(Box);
 const MotionText = motion.create(Text);

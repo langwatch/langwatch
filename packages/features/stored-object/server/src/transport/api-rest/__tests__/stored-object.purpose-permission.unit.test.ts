@@ -8,7 +8,7 @@
  * post-read gate (`authorizeFilePurpose`) applies.
  */
 import { describe, expect, it } from "vitest";
-import { requiredPermissionForPurpose } from "../stored-object.api";
+import { requiredPermissionForPurpose } from "../stored-object.api.ts";
 
 describe("requiredPermissionForPurpose", () => {
   describe("given a trace-content object", () => {

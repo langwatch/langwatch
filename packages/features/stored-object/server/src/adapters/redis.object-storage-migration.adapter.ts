@@ -7,8 +7,8 @@ import { Cluster } from "ioredis";
 import {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
-} from "./group-queue.object-storage-migration.adapter";
-import type { QueueMigrationBlocker } from "../services/object-storage-migration.service";
+} from "./group-queue.object-storage-migration.adapter.ts";
+import type { QueueMigrationBlocker } from "../services/object-storage-migration.service.ts";
 
 export type MigrationCutoverRedisConfig = {
   url?: string;

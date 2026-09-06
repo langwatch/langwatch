@@ -4,10 +4,10 @@ import {
   type FrameworkKey,
   LARGE_FRAMEWORK_ICON_KEYS,
   type PlatformKey,
-} from "../../../model/observability/types";
-import { FRAMEWORKS_BY_PLATFORM } from "./ui-options";
-import type { IconData } from "../../../model/shared/types";
-import { SelectableIconCard } from "../../elements/shared/selectable-icon-card";
+} from "../../../model/observability/types.ts";
+import { FRAMEWORKS_BY_PLATFORM } from "./ui-options.ts";
+import type { IconData } from "../../../model/shared/types.ts";
+import { SelectableIconCard } from "../../elements/shared/selectable-icon-card.tsx";
 
 type FrameworksByPlatform = Record<
   PlatformKey,

@@ -3,15 +3,15 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import type { TargetValue } from "../../../../model/scenario-target";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type {
   RunParameterValues,
   ScenarioParameterDefinition,
   ScenarioParameterValue,
 } from "@langwatch/scenario-contract";
 import { canonicalOverrides, targetIdentityKey, targetSortKey } from "@langwatch/suite-contract";
-import { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line";
-import type { RunDialogAgent } from "./run-target-picker";
+import { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
 
 /** One target of the comparison, as the dialog holds it. */
 export type CompareRow = {

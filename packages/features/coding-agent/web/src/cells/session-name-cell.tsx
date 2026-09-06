@@ -1,5 +1,5 @@
 import { chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { SessionListRow } from "../session-list-row";
+import type { SessionListRow } from "../session-list-row.ts";
 import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";

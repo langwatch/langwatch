@@ -1,5 +1,5 @@
 import type { MonitorSummary } from "@langwatch/monitor-contract";
-import type { MonitorRepository } from "../repositories/monitor.repository";
+import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 /**
  * The monitor listing that trace ingestion reads.

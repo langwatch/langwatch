@@ -3,15 +3,15 @@ import type {
   AgentInputBinding as FieldMapping,
   Field as Variable,
 } from "@langwatch/agent-contract";
-import { AuthConfigSection } from "../elements/http-auth-config-section";
-import { BodyTemplateEditor } from "../elements/http-body-template-editor";
-import { HeadersConfigSection } from "../elements/http-headers-config-section";
-import { HttpTestPanel } from "./http-test-panel";
-import { OutputPathInput } from "../elements/http-output-path-input";
-import { SessionPathInput } from "../elements/http-session-path-input";
+import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
+import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
+import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
+import { HttpTestPanel } from "./http-test-panel.tsx";
+import { OutputPathInput } from "../elements/http-output-path-input.tsx";
+import { SessionPathInput } from "../elements/http-session-path-input.tsx";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
-import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation";
-import type { HttpTestResult } from "../../model/http-test.types";
+import type { AgentHttpEditorPresentationPort } from "./agent-http-editor.presentation.tsx";
+import type { HttpTestResult } from "../../model/http-test.types.ts";
 
 export type AgentHttpEditorTabsProps = {
   activeTab: string;

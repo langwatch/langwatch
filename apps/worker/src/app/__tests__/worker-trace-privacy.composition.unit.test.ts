@@ -9,11 +9,11 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { WorkerTracePrivacyConfig } from "../../platform/config/worker.config";
+import type { WorkerTracePrivacyConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerTracePrivacy,
   WORKER_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
-} from "../worker-trace-privacy.composition";
+} from "../worker-trace-privacy.composition.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
-} from "../evaluation-execution.service";
+} from "../evaluation-execution.service.ts";
 
 /** A slug removed from the catalog. */
 const RETIRED_EVALUATOR_TYPE = "legacy/ragas_faithfulness";

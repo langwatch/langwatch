@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { readFeatureCatalogue, type ArchitectureViolation } from "../src";
+import { readFeatureCatalogue, type ArchitectureViolation } from "../src/index.ts";
 
 let root = "";
 

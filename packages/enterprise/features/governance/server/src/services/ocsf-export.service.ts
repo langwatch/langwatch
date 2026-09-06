@@ -6,7 +6,7 @@ import {
 import type {
   GovernanceOcsfEventsReaderPort,
   GovernanceOcsfExportRepository,
-} from "../ports/ocsf-export.port";
+} from "../ports/ocsf-export.port.ts";
 
 export class DefaultGovernanceOcsfExportService {
   private constructor(

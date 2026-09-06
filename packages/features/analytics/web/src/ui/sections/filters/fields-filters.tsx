@@ -25,14 +25,14 @@ import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { type FilterParam, useFilterParams } from "../use-filter-params";
-import { filterOutEmptyFilters } from "../analytics/utils";
+import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
+import { filterOutEmptyFilters } from "../analytics/utils.ts";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
 } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { availableFilters } from "../../../model/filters/registry";
-import type { FilterDefinition, FilterField } from "../../../model/filters/types";
+import { availableFilters } from "../../../model/filters/registry.ts";
+import type { FilterDefinition, FilterField } from "../../../model/filters/types.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";
@@ -41,7 +41,7 @@ import { InputGroup } from "@langwatch/design-system/input-group";
 import { Popover } from "@langwatch/design-system/popover";
 import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { SaveAsViewButton } from "./save-as-view-button";
+import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 export function QueryStringFieldsFilters({
   hideTriggerButton = false,

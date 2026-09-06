@@ -20,7 +20,7 @@
 
 import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithAnnotationHost } from "../../../testing";
+import { renderWithAnnotationHost } from "../../../testing.tsx";
 
 const mocks = vi.hoisted(() => ({
   annotations: [] as unknown[],
@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
 
 // The list has its own two suites; here it only has to report what the view
 // handed it, which is the whole subject of this file.
-vi.mock("../../../ui/sections/annotation-list", () => ({
+vi.mock("../../../ui/sections/annotation-list.tsx", () => ({
   AnnotationList: (props: Record<string, unknown>) => {
     mocks.listProps = props;
     return (
@@ -47,15 +47,15 @@ vi.mock("../../../ui/sections/annotation-list", () => ({
   },
 }));
 
-vi.mock("../../../ui/sections/annotation-queue-editor", () => ({
+vi.mock("../../../ui/sections/annotation-queue-editor.tsx", () => ({
   AnnotationQueueEditor: ({ queueId }: { queueId?: string }) => (
     <div data-testid="queue-editor">{queueId ?? "new"}</div>
   ),
 }));
 
-vi.mock("../../../behavior/download-csv", () => ({ downloadCsv: mocks.downloadCsv }));
+vi.mock("../../../behavior/download-csv.ts", () => ({ downloadCsv: mocks.downloadCsv }));
 
-vi.mock("../../../behavior/annotation-api", () => ({
+vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
     annotation: {
       getPendingItemsCount: { useQuery: () => ({ data: 4 }) },
@@ -70,7 +70,7 @@ vi.mock("../../../behavior/annotation-api", () => ({
   },
 }));
 
-const { AnnotationsScreen } = await import("../annotations.screen");
+const { AnnotationsScreen } = await import("../annotations.screen.tsx");
 
 const annotation = (overrides: Record<string, unknown> = {}) => ({
   id: "a1",

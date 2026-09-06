@@ -1,4 +1,4 @@
-import { isPathUnder, isSettingsShellRoute, type ProductId, productFromPathname } from "./products";
+import { isPathUnder, isSettingsShellRoute, type ProductId, productFromPathname } from "./products.ts";
 
 export interface ShellRoute {
   /**

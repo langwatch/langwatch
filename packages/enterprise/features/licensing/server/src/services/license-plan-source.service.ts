@@ -3,8 +3,8 @@ import {
   mapToPlanInfo,
   type PlanInfo,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port";
-import type { OrganizationLicensePort } from "../ports/organization-license.port";
+import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import type { OrganizationLicensePort } from "../ports/organization-license.port.ts";
 
 export type LicensePlanSourceOptions = {
   /** Where the organization's activated licence key is read from. */

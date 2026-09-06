@@ -53,9 +53,9 @@ import {
   type CustomRolePermissionsRow,
   type OrganizationMembership,
   type ShareLinkRow,
-} from "../authz-read.repository";
-import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository";
-import { PrismaAuthzReadRepository } from "../prisma/prisma.authz-read.repository";
+} from "../authz-read.repository.ts";
+import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository.ts";
+import { PrismaAuthzReadRepository } from "../prisma/prisma.authz-read.repository.ts";
 
 type AuthzReadHeads = Readonly<{
   legacy: AuthzReadRepository;

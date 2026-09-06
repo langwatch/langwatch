@@ -25,7 +25,7 @@
  */
 
 import { createContext, useContext } from "react";
-import type { PromptTabsCapabilities } from "./browser-capabilities";
+import type { PromptTabsCapabilities } from "./browser-capabilities.ts";
 
 /** The organization, team and project the address is about. */
 export type PromptHostScope = {

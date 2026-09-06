@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-feature-flags";
+import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 
 /**
  * The targets an experiment can be evaluated for.

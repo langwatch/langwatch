@@ -2,33 +2,33 @@ import { type IdentityCommand, normalizeIdentifierValue } from "@langwatch/ident
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter";
-import { deriveNewbornUserId } from "../../rules/identifier-hash.rules";
-import { BetterAuthIdentityBirthAdapter } from "../../adapters/better-auth.identity-birth.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter.ts";
+import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
+import { BetterAuthIdentityBirthAdapter } from "../../adapters/better-auth.identity-birth.adapter.ts";
 import {
   type IdentityBirthPort,
   IdentityEngineUnavailableError,
-} from "../../ports/identity-birth.port";
+} from "../../ports/identity-birth.port.ts";
 import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,
-} from "../../adapters/better-auth.identity-ceremonies.adapter";
-import { BetterAuthIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter";
+} from "../../adapters/better-auth.identity-ceremonies.adapter.ts";
+import { BetterAuthIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter.ts";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,
-} from "../../rules/identity-storage-ports.rules";
-import { IdentityGuardsService } from "../../services/identity-guards.service";
+} from "../../rules/identity-storage-ports.rules.ts";
+import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import {
   adoptUserEmailCommandId,
   newIdentityCommandId,
-} from "../../rules/identity-command-id.rules";
-import type { IdentityUsersRepository } from "../../repositories/identity-users.repository";
-import { IdentityService } from "../../services/identity.service";
-import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store";
-import { InMemoryHeads, T0 } from "./in-memory-heads";
-import { InMemoryReservations } from "./in-memory-reservations";
-import { inertIdentityPorts, InMemoryIdentityStorage } from "./in-memory-identity-storage";
+} from "../../rules/identity-command-id.rules.ts";
+import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
+import { IdentityService } from "../../services/identity.service.ts";
+import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store.ts";
+import { InMemoryHeads, T0 } from "./in-memory-heads.ts";
+import { InMemoryReservations } from "./in-memory-reservations.ts";
+import { inertIdentityPorts, InMemoryIdentityStorage } from "./in-memory-identity-storage.ts";
 
 export const PASSWORD = "correct-horse-battery";
 export const NEW_PASSWORD = "staple-battery-horse";

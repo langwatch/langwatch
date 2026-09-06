@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TRACE_NAME_MIN_LENGTH } from "./trace.constants";
+import { TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
 
 /**
  * The transport inputs and results the trace EXPLORER's browser code sends, as

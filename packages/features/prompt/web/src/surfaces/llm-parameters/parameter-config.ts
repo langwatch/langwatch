@@ -14,7 +14,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { ReasoningConfig } from "@langwatch/model-provider-contract";
-import { type ParameterDefinition, parameterRegistry } from "./parameter-registry";
+import { type ParameterDefinition, parameterRegistry } from "./parameter-registry.ts";
 
 // ============================================================================
 // Parameter Name Mapping (snake_case ↔ camelCase)
@@ -70,7 +70,7 @@ export type {
   ParameterDefinition as ParameterConfig,
   SelectParameterDefinition as SelectParameterConfig,
   SliderParameterDefinition as SliderParameterConfig,
-} from "./parameter-registry";
+} from "./parameter-registry.ts";
 
 // ============================================================================
 // Parameter Definitions (derived from registry)

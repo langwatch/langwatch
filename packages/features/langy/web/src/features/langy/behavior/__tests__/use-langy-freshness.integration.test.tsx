@@ -37,11 +37,11 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: PROJECT_ID } }),
 }));
 
-vi.mock("../../../../behavior/langy-api", () => ({
+vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({
       langy: {
@@ -54,7 +54,7 @@ vi.mock("../../../../behavior/langy-api", () => ({
   },
 }));
 
-vi.mock("../use-langy-conversation-update-listener", () => ({
+vi.mock("../use-langy-conversation-update-listener.ts", () => ({
   useLangyConversationUpdateListener: (opts: {
     onConversationUpdated: (s: LangyConversationUpdateSignal[]) => void;
   }) => {
@@ -62,8 +62,8 @@ vi.mock("../use-langy-conversation-update-listener", () => ({
   },
 }));
 
-import { useLangyStore } from "../../../../behavior/langy.store";
-import { useLangyFreshness } from "../use-langy-freshness";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyFreshness } from "../use-langy-freshness.ts";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({
   acceptedAt,

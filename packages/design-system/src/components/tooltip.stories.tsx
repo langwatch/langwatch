@@ -1,6 +1,6 @@
 import { Button, Link, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "./tooltip.tsx";
 
 const meta = {
   title: "Primitives/Tooltip",

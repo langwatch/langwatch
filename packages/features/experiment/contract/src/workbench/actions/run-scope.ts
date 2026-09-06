@@ -1,5 +1,5 @@
-import type { ExecutionScope } from "../execution/types";
-import type { RunPayload } from "./schemas";
+import type { ExecutionScope } from "../execution/types.ts";
+import type { RunPayload } from "./schemas.ts";
 
 /**
  * Map a `workbench.run` payload onto an ExecutionScope.

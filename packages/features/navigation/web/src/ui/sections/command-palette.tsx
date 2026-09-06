@@ -1,31 +1,31 @@
 import { Box } from "@chakra-ui/react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAutoFocusInput } from "../../behavior/use-auto-focus-input";
-import { useCommandBarItems } from "../../behavior/use-command-bar-items";
-import { useCommandBarKeyboard } from "../../behavior/use-command-bar-keyboard";
-import { useCommandSearch } from "../../behavior/use-command-search";
-import { useEasterEggEffects } from "../../behavior/use-easter-egg-effects";
-import { useFilteredCommands } from "../../behavior/use-filtered-commands";
-import { useFilteredProjects } from "../../behavior/use-filtered-projects";
-import { useRecentItems } from "../../behavior/use-recent-items";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { useScrollIntoView } from "../../behavior/use-scroll-into-view";
-import { findEasterEgg } from "../../model/command-easter-eggs";
-import type { ListItem } from "../../model/command-icon-info";
-import { beginLangyHandoff } from "../../model/command-langy-handoff";
+import { useAutoFocusInput } from "../../behavior/use-auto-focus-input.ts";
+import { useCommandBarItems } from "../../behavior/use-command-bar-items.ts";
+import { useCommandBarKeyboard } from "../../behavior/use-command-bar-keyboard.ts";
+import { useCommandSearch } from "../../behavior/use-command-search.ts";
+import { useEasterEggEffects } from "../../behavior/use-easter-egg-effects.ts";
+import { useFilteredCommands } from "../../behavior/use-filtered-commands.ts";
+import { useFilteredProjects } from "../../behavior/use-filtered-projects.ts";
+import { useRecentItems } from "../../behavior/use-recent-items.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { useScrollIntoView } from "../../behavior/use-scroll-into-view.ts";
+import { findEasterEgg } from "../../model/command-easter-eggs.ts";
+import type { ListItem } from "../../model/command-icon-info.ts";
+import { beginLangyHandoff } from "../../model/command-langy-handoff.ts";
 import {
   handleCommandSelect,
   handleProjectSelect,
   handleRecentItemSelect,
   handleSearchResultSelect,
-} from "../../model/command-select-handlers";
-import { useNavigationHost } from "../../model/navigation-host";
-import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode";
-import { CommandBarFooter } from "../elements/command-bar-footer";
-import { CommandBarInput } from "../elements/command-bar-input";
-import { HintsSection } from "../elements/command-bar-hints";
-import { CommandBarResults } from "./command-bar-results";
+} from "../../model/command-select-handlers.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
+import { CommandBarFooter } from "../elements/command-bar-footer.tsx";
+import { CommandBarInput } from "../elements/command-bar-input.tsx";
+import { HintsSection } from "../elements/command-bar-hints.tsx";
+import { CommandBarResults } from "./command-bar-results.tsx";
 
 /** Never collapse the results to a sliver, however little room is left. */
 const RESULTS_PANEL_MIN_HEIGHT = 180;

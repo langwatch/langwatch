@@ -4,7 +4,7 @@
  */
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port";
+import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port.ts";
 import type { TenantId } from "@langwatch/eventing";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import {
@@ -12,7 +12,7 @@ import {
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
 } from "@langwatch/redaction/pii";
-import { type PIICheckOptions, PiiAnalysisPort } from "../ports/pii-analysis.port";
+import { type PIICheckOptions, PiiAnalysisPort } from "../ports/pii-analysis.port.ts";
 
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";

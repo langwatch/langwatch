@@ -3,10 +3,10 @@ import { OnboardingMeshBackground } from "@langwatch/onboarding-web/surfaces/onb
 import {
   findStageDef,
   type HeroLayout,
-} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import { useEdgeGripAnchor } from "../../../../behavior/explorer/onboarding/use-edge-grip-anchor";
-import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { TracesEmptyOnboarding } from "./traces-empty-onboarding";
+} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { useEdgeGripAnchor } from "../../../../behavior/explorer/onboarding/use-edge-grip-anchor.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { TracesEmptyOnboarding } from "./traces-empty-onboarding.tsx";
 
 /**
  * Onboarding overlay rendered above the populated trace preview when the project hasn't

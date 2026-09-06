@@ -4,7 +4,7 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
-} from "./evaluation-event.constants";
+} from "./evaluation-event.constants.ts";
 
 /**
  * Base metadata for evaluation events.

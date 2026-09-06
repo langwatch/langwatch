@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HoverableBigText } from "../hoverable-big-text";
+import { HoverableBigText } from "../hoverable-big-text.tsx";
 
 const renderText = () =>
   render(<HoverableBigText>a very long value</HoverableBigText>, {

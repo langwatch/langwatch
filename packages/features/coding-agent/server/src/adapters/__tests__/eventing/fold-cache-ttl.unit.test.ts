@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTestCodingAgentProcessingPipeline } from "../fixtures/coding-agent-processing.fixture";
+import { buildTestCodingAgentProcessingPipeline } from "../fixtures/coding-agent-processing.fixture.ts";
 
 describe("coding-agent Eventing fold cache", () => {
   it("forwards the process-configured TTL to its session cache", () => {

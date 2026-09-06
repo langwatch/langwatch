@@ -3,8 +3,8 @@ import { MoreVertical } from "lucide-react";
 
 import { Menu } from "@langwatch/design-system/menu";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
-import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "../../model/blob-formatters";
-import { formatBytes } from "../../../../model/ops-formatters";
+import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "../../model/blob-formatters.ts";
+import { formatBytes } from "../../../../model/ops-formatters.ts";
 
 export function BlobRow({
   blob,

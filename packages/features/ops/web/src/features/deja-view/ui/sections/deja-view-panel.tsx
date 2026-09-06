@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { describeError } from "../../../../model/describe-error";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert";
-import { useDejaViewState } from "../../behavior/deja-view-state";
-import { type EventResult } from "../../model/deja-view-types";
-import { DejaView } from "./deja-view-content";
-import { Kbd } from "../../../../ui/elements/ops-kbd";
-import { api } from "../../../../behavior/ops-api";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router";
+import { describeError } from "../../../../model/describe-error.ts";
+import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
+import { useDejaViewState } from "../../behavior/deja-view-state.ts";
+import { type EventResult } from "../../model/deja-view-types.ts";
+import { DejaView } from "./deja-view-content.tsx";
+import { Kbd } from "../../../../ui/elements/ops-kbd.tsx";
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 
 export function DejaViewContent() {
   const router = useRouter();

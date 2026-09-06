@@ -33,13 +33,13 @@ import { useAnalytics } from "react-contextual-analytics";
 
 import { Drawer } from "@langwatch/design-system/drawer";
 
-import { useOrganizationToaster } from "../../behavior/organization-feedback";
-import { api } from "../../behavior/organization-api";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { useOrganizationHost } from "../../model/organization-host";
-import { NEW_TEAM_VALUE } from "../../model/project-form-validation";
-import { ProjectForm, type ProjectFormData } from "./project-form";
+import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { api } from "../../behavior/organization-api.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useOrganizationHost } from "../../model/organization-host.ts";
+import { NEW_TEAM_VALUE } from "../../model/project-form-validation.ts";
+import { ProjectForm, type ProjectFormData } from "./project-form.tsx";
 
 /** Every list a freshly created project has to show up in right away. */
 function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): void {

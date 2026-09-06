@@ -1,6 +1,6 @@
-import type { SuiteEventingCapabilities } from "../ports/suite-runtime.port";
-import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
-import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository";
+import type { SuiteEventingCapabilities } from "../ports/suite-runtime.port.ts";
+import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port.ts";
+import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 
 export type ClickHouseSuiteEventingAdapterOptions = {
   resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;

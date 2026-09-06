@@ -11,7 +11,7 @@
 
 import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { ArchiveSetCommand } from "../simulation-processing-commands.adapter";
+import { ArchiveSetCommand } from "../simulation-processing-commands.adapter.ts";
 import {
   type SimulationProcessingEvent,
   SimulationSetArchivedEventSchema,

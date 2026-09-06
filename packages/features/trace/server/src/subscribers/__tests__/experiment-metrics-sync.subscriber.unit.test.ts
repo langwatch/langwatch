@@ -10,7 +10,7 @@ import {
   createExperimentMetricsSyncHandler,
   type ExperimentMetricsSyncSubscriberDeps,
   hasExperimentCostMetrics,
-} from "../experiment-metrics-sync.subscriber";
+} from "../experiment-metrics-sync.subscriber.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

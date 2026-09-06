@@ -9,8 +9,8 @@ import {
   type TraceProductEvent,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition";
-import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition";
+import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
+import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/trace-ingestion-narrow-ports.feature

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { copyShareLink } from "../copy-share-link";
+import { copyShareLink } from "../copy-share-link.ts";
 
 function stubClipboard(writeText: () => Promise<void>) {
   Object.defineProperty(navigator, "clipboard", {

@@ -16,7 +16,7 @@ import type {
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentBrowserPort } from "../../../model/agent-browser.port";
+import { AgentBrowserPort } from "../../../model/agent-browser.port.ts";
 import {
   AgentManagementHostPort,
   AgentManagementHostProvider,
@@ -26,7 +26,7 @@ import {
   type AgentHostProject,
   type AgentRouteReading,
   type AgentSuccessNotice,
-} from "../../../model/agent-management-host";
+} from "../../../model/agent-management-host.ts";
 
 const agent: AgentWithFields = {
   id: "agent_1",
@@ -78,7 +78,7 @@ const invalidateAgents = vi.fn(async () => undefined);
 const invalidateLimit = vi.fn(async () => undefined);
 const listedAgents = { current: [agent] as AgentWithFields[] };
 
-vi.mock("../../../behavior/agent-api", () => ({
+vi.mock("../../../behavior/agent-api.ts", () => ({
   agentApi: {
     agents: { getAll: { useQuery: () => ({ data: listedAgents.current, isLoading: false }) } },
     useUtils: () => ({
@@ -202,7 +202,7 @@ class TestHost extends AgentManagementHostPort {
 }
 
 async function mountScreen(query: Record<string, string | undefined> = {}) {
-  const { AgentManagementScreen } = await import("../agent-management.screen");
+  const { AgentManagementScreen } = await import("../agent-management.screen.tsx");
   const browser = new TestAgentBrowser();
   const host = new TestHost(browser, query);
   render(

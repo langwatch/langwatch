@@ -2,7 +2,7 @@
  * The scope reading the dock has always made, answered by the host.
  */
 
-import { useLangyHost } from "../model/langy-host";
+import { useLangyHost } from "../model/langy-host.ts";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

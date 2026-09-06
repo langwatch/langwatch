@@ -24,7 +24,7 @@ import type {
   AuthzRevokeResourceGrantsInput,
   AuthzRevokeResourceGrantsOutput,
   AuthzUpdateGrantInput,
-} from "./authz.commands";
+} from "./authz.commands.ts";
 import type {
   AuthzApplyMemberBindingsInput,
   AuthzBindingMutationSuccess,
@@ -32,7 +32,7 @@ import type {
   AuthzCreateBindingOutput,
   AuthzDeleteBindingInput,
   AuthzUpdateBindingInput,
-} from "./authz.binding-management";
+} from "./authz.binding-management.ts";
 
 /** The one portable mutation and offboarding capability for authorization. */
 export abstract class AuthzGrantsService {

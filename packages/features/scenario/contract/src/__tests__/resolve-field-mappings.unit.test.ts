@@ -8,7 +8,7 @@ import {
   computeBestMatchMappings,
   resolveFieldMappings,
   sourceFieldOf,
-} from "../resolve-field-mappings";
+} from "../resolve-field-mappings.ts";
 
 const makeAgentInput = (overrides: Partial<ScenarioInput> = {}): ScenarioInput => ({
   threadId: "thread-1",

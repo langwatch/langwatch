@@ -5,14 +5,14 @@ import {
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
-import { AdminAccessService } from "../admin-access.service";
+import { AdminAccessService } from "../admin-access.service.ts";
 import {
   AdminAuditSink,
   ImpersonationRepository,
   ImpersonationService,
   type ImpersonationTarget,
   type ImpersonationWindow,
-} from "../impersonation.service";
+} from "../impersonation.service.ts";
 
 class InMemoryImpersonationRepository extends ImpersonationRepository {
   window: ImpersonationWindow | null = null;

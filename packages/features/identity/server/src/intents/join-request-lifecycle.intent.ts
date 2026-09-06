@@ -4,7 +4,7 @@ import type {
   expireRequestIntentSchema,
   JoinRequestLifecyclePort,
   remindAdminsIntentSchema,
-} from "../processes/join-request-lifecycle.process";
+} from "../processes/join-request-lifecycle.process.ts";
 
 const logger = createLogger("langwatch:identity:join-request-lifecycle");
 

@@ -5,7 +5,7 @@ import type { GithubService } from "@langwatch/github-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { GithubTrpcApi } from "../github.api";
+import { GithubTrpcApi } from "../github.api.ts";
 
 type TestContext = {
   app: { github: GithubService };

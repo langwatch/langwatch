@@ -9,7 +9,7 @@
  */
 import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
-import { verifyElevenLabsSignature } from "../elevenlabs-webhook.api";
+import { verifyElevenLabsSignature } from "../elevenlabs-webhook.api.ts";
 
 const SECRET = "wsec_test";
 const BODY = '{"type":"post_call_transcription","data":{"conversation_id":"conv_1"}}';

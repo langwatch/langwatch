@@ -3,14 +3,14 @@ import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
-} from "../../../experiment-workbench";
-import type { ExecutionScope } from "../types";
+} from "../../../experiment-workbench.ts";
+import type { ExecutionScope } from "../types.ts";
 import {
   buildExecutionRequest,
   comparisonDependencies,
   type ExecutionRequestState,
   planComparisonSeeding,
-} from "../build-execution-request";
+} from "../build-execution-request.ts";
 
 const dataset = (): DatasetReference => ({
   id: "ds-1",

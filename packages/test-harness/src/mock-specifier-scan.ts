@@ -9,7 +9,7 @@ import {
   isStringLiteral,
   SyntaxKind,
 } from "typescript/unstable/ast";
-import type { ModuleAlias } from "./vitest-alias-table";
+import type { ModuleAlias } from "./vitest-alias-table.ts";
 
 /**
  * Static scan for `vi.mock` specifiers that name no module.

@@ -13,7 +13,7 @@
  * `@langwatch/organization-contract`, where the two halves could name it.
  */
 
-import { OrganizationUserRole, TeamUserRole } from "./prisma-types";
+import { OrganizationUserRole, TeamUserRole } from "./prisma-types.ts";
 
 export type TeamRoleValue = TeamUserRole | `custom:${string}`;
 

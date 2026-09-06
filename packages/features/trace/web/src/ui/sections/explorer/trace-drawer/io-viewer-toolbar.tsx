@@ -1,15 +1,15 @@
 import { Box, Flex, HStack, Icon } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
-import type { useTextTranslation } from "../hooks/use-text-translation";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
-import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select";
-import { CopyButton } from "./io-toolbar-buttons";
-import { type IOAction, useIOActions } from "./io-actions";
-import { formatSelectOptions } from "./io-format-options";
-import type { ChatLayout } from "./transcript";
-import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state";
+import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+import type { useTextTranslation } from "../hooks/use-text-translation.ts";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
+import { CopyButton } from "./io-toolbar-buttons.tsx";
+import { type IOAction, useIOActions } from "./io-actions.tsx";
+import { formatSelectOptions } from "./io-format-options.ts";
+import type { ChatLayout } from "./transcript/index.ts";
+import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 
 /**
  * Room held back on the right edge of the actions row for the overflow

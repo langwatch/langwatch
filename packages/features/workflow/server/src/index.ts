@@ -1,69 +1,69 @@
 export {
   PostgresWorkflowAdapter,
   type PostgresWorkflowAdapterOptions,
-} from "./adapters/postgres.workflow.adapter";
+} from "./adapters/postgres.workflow.adapter.ts";
 export {
   PrismaWorkflowAgentMappingAdapter,
   type WorkflowAgentMappingDatabase,
-} from "./adapters/prisma.workflow-agent-mapping.adapter";
+} from "./adapters/prisma.workflow-agent-mapping.adapter.ts";
 export {
   PrismaWorkflowProjectEnvironmentAdapter,
   UnavailableWorkflowEnvironmentDecryptor,
   type WorkflowEnvironmentDecryptor,
   type WorkflowProjectEnvironmentDatabase,
-} from "./adapters/prisma.workflow-project-environment.adapter";
+} from "./adapters/prisma.workflow-project-environment.adapter.ts";
 export {
   PrismaWorkflowRowAdapter,
   type WorkflowRowDatabase,
-} from "./adapters/prisma.workflow-row.adapter";
-export { ContractWorkflowDslMigrationAdapter } from "./adapters/workflow-dsl-migration.adapter";
+} from "./adapters/prisma.workflow-row.adapter.ts";
+export { ContractWorkflowDslMigrationAdapter } from "./adapters/workflow-dsl-migration.adapter.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
   NLP_KEEP_ALIVE_EVENT,
   type NlpDispatchRequest,
   type NlpOrigin,
-} from "./adapters/workflow-nlp-runtime.adapter";
+} from "./adapters/workflow-nlp-runtime.adapter.ts";
 export {
   InvokePayloadTooLargeError,
   NlpInvokeTransportAdapter,
   type NlpInvokeRequest,
   type NlpInvokeResponse,
   type NlpInvokeStagingConfig,
-} from "./adapters/workflow-nlp-lambda.adapter";
+} from "./adapters/workflow-nlp-lambda.adapter.ts";
 export {
   NlpLambdaInvokePort,
   NlpPayloadStagingPort,
   STAGED_PAYLOAD_HEADER,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
-} from "./ports/workflow-nlp-lambda.port";
+} from "./ports/workflow-nlp-lambda.port.ts";
 export {
   NlpLambdaArnCachePort,
   NlpLambdaArnResolverPort,
   type NlpLambdaArnEntry,
-} from "./ports/nlp-lambda-arn.port";
+} from "./ports/nlp-lambda-arn.port.ts";
 export {
   NLP_LAMBDA_ARN_CACHE_PREFIX,
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
-} from "./services/nlp-lambda-runtime.service";
+} from "./services/nlp-lambda-runtime.service.ts";
 export {
   LWA_DEFAULT_STATUS,
   LWA_PRELUDE_SEPARATOR_LENGTH,
   findLwaPreludeSeparator,
-} from "./rules/lambda-web-adapter-stream.rules";
-export { LambdaWebAdapterStreamService } from "./services/lambda-web-adapter-stream.service";
-export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter";
+} from "./rules/lambda-web-adapter-stream.rules.ts";
+export { LambdaWebAdapterStreamService } from "./services/lambda-web-adapter-stream.service.ts";
+export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter.ts";
 export {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
-} from "./adapters/workflow-studio-stream.adapter";
+} from "./adapters/workflow-studio-stream.adapter.ts";
 export {
   WorkflowStudioDispatchService,
   type WorkflowStudioDispatchInput,
-} from "./services/workflow-studio-dispatch.service";
-export { WorkflowApp, type WorkflowAppDependencies, type WorkflowCaller } from "./app/workflow.app";
+} from "./services/workflow-studio-dispatch.service.ts";
+export { WorkflowApp, type WorkflowAppDependencies, type WorkflowCaller } from "./app/workflow.app.ts";
 export {
   WorkflowAgentMappingPort,
   WorkflowDslMigrationPort,
@@ -80,31 +80,31 @@ export {
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
   type WorkflowRowDraft,
-} from "./ports/workflow.port";
+} from "./ports/workflow.port.ts";
 export {
   WorkflowAiCallPort,
   WorkflowCommitMessageModelPort,
   type WorkflowAiCallFeature,
-} from "./ports/workflow-commit-message.port";
-export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service";
-export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-message.rules";
-export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service";
+} from "./ports/workflow-commit-message.port.ts";
+export { WorkflowCommitMessageService } from "./services/workflow-commit-message.service.ts";
+export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-message.rules.ts";
+export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
 export {
   WorkflowStudioCopyService,
   type CopyStudioWorkflowInput,
   type WorkflowStudioCopyServiceOptions,
   type WorkflowStudioCopySource,
-} from "./services/workflow-studio-copy.service";
+} from "./services/workflow-studio-copy.service.ts";
 export {
   WorkflowStudioVersionService,
   type SaveStudioWorkflowVersionInput,
   type WorkflowStudioVersionServiceOptions,
-} from "./services/workflow-studio-version.service";
+} from "./services/workflow-studio-version.service.ts";
 export {
   WorkflowOptimizationTrpcApi,
   type WorkflowOptimizationTrpcContext,
   type WorkflowOptimizationTrpcPorts,
-} from "./transport/api-trpc/workflow-optimization.api";
+} from "./transport/api-trpc/workflow-optimization.api.ts";
 export {
   WorkflowTrpcApi,
   type WorkflowCascadeArchiveResult,
@@ -117,33 +117,33 @@ export {
   type WorkflowTrpcContext,
   type WorkflowTrpcPorts,
   type WorkflowVersionRow,
-} from "./transport/api-trpc/workflow.api";
+} from "./transport/api-trpc/workflow.api.ts";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,
   type WorkflowEvaluationTrigger,
   type WorkflowRestPorts,
-} from "./transport/api-rest/workflow.api";
+} from "./transport/api-rest/workflow.api.ts";
 export {
   createWorkflowStudioRestApp,
   type WorkflowStudioRestDispatch,
   type WorkflowStudioRestPorts,
   type WorkflowStudioRestSession,
-} from "./transport/api-rest/workflow-studio.api";
+} from "./transport/api-rest/workflow-studio.api.ts";
 export {
   WORKFLOW_CODE_COMPLETION_FEATURE_KEY,
   WorkflowCodeCompletionAdapter,
   type WorkflowModelResolverPort,
-} from "./adapters/workflow-code-completion.adapter";
+} from "./adapters/workflow-code-completion.adapter.ts";
 export {
   createWorkflowRunRestApp,
   type WorkflowRunRestCredential,
   type WorkflowRunRestPorts,
-} from "./transport/api-rest/workflow-run.api";
-export { NlpLambdaFleetPort, type NlpLambdaFunction } from "./ports/nlp-lambda-fleet.port";
-export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter";
+} from "./transport/api-rest/workflow-run.api.ts";
+export { NlpLambdaFleetPort, type NlpLambdaFunction } from "./ports/nlp-lambda-fleet.port.ts";
+export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {
   NLP_LAMBDA_NAME_PREFIX,
   NlpLambdaCleanupService,
   type NlpLambdaCleanupReport,
-} from "./services/nlp-lambda-cleanup.service";
+} from "./services/nlp-lambda-cleanup.service.ts";

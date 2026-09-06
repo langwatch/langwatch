@@ -1,9 +1,9 @@
 import { Button, HStack, type StackProps } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
 import { TracePreviewHoverCard } from "@langwatch/trace-web/surfaces/trace-id-peek";
-import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/scenario-api";
+import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 
 // Constants
 export const TRACE_QUERY_CONFIG = {

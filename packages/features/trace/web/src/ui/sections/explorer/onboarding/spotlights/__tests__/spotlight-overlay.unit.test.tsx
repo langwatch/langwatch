@@ -21,7 +21,7 @@ const mockSetCurrentSpotlightId = vi.fn((id: string | null) => {
 });
 const mockPersistDismissal = vi.fn();
 
-vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       spotlightsActive: mockSpotlightsActive,
@@ -31,7 +31,7 @@ vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store",
     }),
 }));
 
-vi.mock("../../hooks/use-trace-explorer-tour-preference", () => ({
+vi.mock("../../hooks/use-trace-explorer-tour-preference.ts", () => ({
   useTraceExplorerTourPreference: () => ({
     dismiss: mockPersistDismissal,
     isDismissed: false,
@@ -57,8 +57,8 @@ import {
   isAnchorParkedOffscreen,
   isAnchorSettled,
   SpotlightOverlay,
-} from "../spotlight-overlay";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../../model/explorer/onboarding/spotlights/spotlights";
+} from "../spotlight-overlay.tsx";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

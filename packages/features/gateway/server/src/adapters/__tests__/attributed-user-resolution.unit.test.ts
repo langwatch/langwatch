@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
-import { PrismaGatewayBudgetResolutionRepository } from "../../repositories/prisma/prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetResolutionRepository } from "../../repositories/prisma/prisma.gateway-budget-resolution.repository.ts";
 
 /**
  * Resolution unit over a stubbed Prisma: the queries this service runs are

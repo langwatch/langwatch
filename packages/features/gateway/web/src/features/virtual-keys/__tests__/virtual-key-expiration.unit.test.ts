@@ -9,7 +9,7 @@ import {
   isExpired,
   resolveExpiresAt,
   VIRTUAL_KEY_EXPIRATION_OPTIONS,
-} from "../model/virtual-key-expiration";
+} from "../model/virtual-key-expiration.ts";
 
 /**
  * The date a period resolves to is the one fact the drawer states back, so

@@ -1,10 +1,10 @@
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaTenantDirectoryRepository } from "../repositories/prisma/prisma.tenant-directory.repository";
+import { PrismaTenantDirectoryRepository } from "../repositories/prisma/prisma.tenant-directory.repository.ts";
 import {
   TenantDirectoryService,
   type TenantOwnershipReader,
-} from "../services/tenant-directory.service";
+} from "../services/tenant-directory.service.ts";
 
 /**
  * The routing directory every process composes: this deployment's Postgres

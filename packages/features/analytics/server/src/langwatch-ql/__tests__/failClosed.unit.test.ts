@@ -9,10 +9,10 @@ import {
   clickHouseSqlParser,
   type LangWatchQLParser,
   type SqlAstNode,
-} from "../../rules/langwatch-ql-parser.rules";
-import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules";
-import { validateLangWatchQL } from "./lwql-validate";
-import type { LangWatchQLViolationCode } from "../../rules/langwatch-ql-violations.rules";
+} from "../../rules/langwatch-ql-parser.rules.ts";
+import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
+import type { LangWatchQLViolationCode } from "../../rules/langwatch-ql-violations.rules.ts";
 
 const POLICY = {
   allowedTables: ["analytics.traces"],

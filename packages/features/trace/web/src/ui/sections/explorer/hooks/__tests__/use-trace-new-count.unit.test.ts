@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useTraceNewCount } from "../use-trace-new-count";
+import { useTraceNewCount } from "../use-trace-new-count.ts";
 
 type QueryInput = {
   projectId: string;
@@ -53,7 +53,7 @@ const queryResult: {
   errorUpdatedAt: 0,
 };
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     tracesV2: {
       newCount: {
@@ -71,15 +71,15 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../../../../behavior/use-page-visibility", () => ({
+vi.mock("../../../../../behavior/use-page-visibility.ts", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedTimeRange: stores.debouncedTimeRange,
@@ -87,7 +87,7 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/sse-status.store", () => ({
+vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -99,7 +99,7 @@ vi.mock("../../../../../behavior/sse-status.store", () => ({
   ),
 }));
 
-vi.mock("../use-trace-list-refresh", () => ({
+vi.mock("../use-trace-list-refresh.ts", () => ({
   useTraceListRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 

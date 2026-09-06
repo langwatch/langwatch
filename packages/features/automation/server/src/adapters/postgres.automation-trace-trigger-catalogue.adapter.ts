@@ -1,9 +1,9 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { AutomationTraceTriggerCataloguePort } from "../ports/automation-trace-trigger-catalogue.port";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
-import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service";
+import { AutomationTraceTriggerCataloguePort } from "../ports/automation-trace-trigger-catalogue.port.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
+import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service.ts";
 
 /**
  * The one table this read touches, named here and nowhere above it.

@@ -3,22 +3,22 @@ import {
   emptyIdentityHeads,
   reduceIdentity,
 } from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../../services/identity-guards.service";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
-import { IdentityService } from "../../services/identity.service";
+import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
+import { IdentityService } from "../../services/identity.service.ts";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../projections/identity-state.projection";
-import type { IdentityFoldState } from "../../projections/identity-state.projection";
+import type { IdentityEvent } from "../../projections/identity-state.projection.ts";
+import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import { IdentityLedgerWriterAdapter } from "../identity-ledger.adapter";
-import { identityProjectionConvergenceTimeoutsTotal } from "../metrics.identity-ledger.adapter";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
-import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
-import { identityEventsFor } from "../../intents/identity-events.intent";
+import { IdentityLedgerWriterAdapter } from "../identity-ledger.adapter.ts";
+import { identityProjectionConvergenceTimeoutsTotal } from "../metrics.identity-ledger.adapter.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter.ts";
+import { identityEventsFor } from "../../intents/identity-events.intent.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

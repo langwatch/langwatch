@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { FilterField, PreconditionTraceData } from "@langwatch/analytics-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { LegacyFilterMatchingService } from "../legacy-filter-matching.service";
+import { LegacyFilterMatchingService } from "../legacy-filter-matching.service.ts";
 
 const SUBJECT = LegacyFilterMatchingService.create();
 

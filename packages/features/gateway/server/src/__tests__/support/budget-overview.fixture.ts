@@ -6,7 +6,7 @@ import { usdToNanoUsd, groupBucketScopeId } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 
-import type { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import type { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 export const suffix = nanoid(8);
 export const ORG_ID = `org-bov-${suffix}`;

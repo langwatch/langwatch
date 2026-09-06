@@ -3,8 +3,8 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 const TRACK_EVENT_SPAN_NAME = "langwatch.track_event";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
-import { SpanTimingService } from "../span-timing.service";
-import { isValidTimestamp } from "../../rules/span-timing.rules";
+import { SpanTimingService } from "../span-timing.service.ts";
+import { isValidTimestamp } from "../../rules/span-timing.rules.ts";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {

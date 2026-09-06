@@ -4,9 +4,9 @@
  */
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import { DataPrivacyDirectoryPort } from "../../ports/data-privacy-directory.port";
-import { DataPrivacyPermissionsPort } from "../../ports/data-privacy-permissions.port";
-import { DataPrivacyScopeAuthorizationService } from "../data-privacy-scope-authorization.service";
+import { DataPrivacyDirectoryPort } from "../../ports/data-privacy-directory.port.ts";
+import { DataPrivacyPermissionsPort } from "../../ports/data-privacy-permissions.port.ts";
+import { DataPrivacyScopeAuthorizationService } from "../data-privacy-scope-authorization.service.ts";
 
 class FakeDirectory extends DataPrivacyDirectoryPort {
   async tryGetProjectLineage() {

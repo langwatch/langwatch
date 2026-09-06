@@ -4,10 +4,10 @@ import { useState } from "react";
 
 import { Dialog } from "@langwatch/design-system/dialog";
 
-import { usePersonalDeployment } from "../../behavior/personal-workspace-session";
-import { InstallCliCard } from "../blocks/install-cli-card";
-import { TileIcon } from "../elements/tile-icon";
-import type { AiToolConfigOf } from "../../model/ai-tool-config";
+import { usePersonalDeployment } from "../../behavior/personal-workspace-session.ts";
+import { InstallCliCard } from "../blocks/install-cli-card.tsx";
+import { TileIcon } from "../elements/tile-icon.tsx";
+import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 interface Props {
   displayName: string;

@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import type { ArchitectureViolation } from "./types";
-import { walkFiles } from "./files";
+import type { ArchitectureViolation } from "./types.ts";
+import { walkFiles } from "./files.ts";
 import {
   MAX_COMMENT_BLOCK_LINES,
   REVIEW_LINE_COUNT,

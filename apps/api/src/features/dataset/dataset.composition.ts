@@ -13,9 +13,9 @@ import {
 } from "@langwatch/dataset-server";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount.ts";
 
 /**
  * The ONE dataset service on this process.
@@ -36,7 +36,7 @@ export type DatasetPeers = Readonly<{
   experimentLookup: DatasetExperimentLookup;
 }>;
 
-import type { ComposedDatasetFeature } from "./dataset.composition.types";
+import type { ComposedDatasetFeature } from "./dataset.composition.types.ts";
 
 /** Composes the dataset surface over this process's own graph. */
 export function composeDatasetFeature(options: {

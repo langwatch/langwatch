@@ -5,7 +5,7 @@ import {
   parsePublicAppConfigMetaContent,
   PUBLIC_APP_CONFIG_META_NAME,
   type PublicAppConfig,
-} from "../public-app-config";
+} from "../public-app-config.ts";
 
 const config: PublicAppConfig = {
   appBaseUrl: "https://app.example.com",

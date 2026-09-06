@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import type { SpendFilters, SpendMetadataFilter } from "../ports/gateway-spend-events.port";
+import type { SpendFilters, SpendMetadataFilter } from "../ports/gateway-spend-events.port.ts";
 
 export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 

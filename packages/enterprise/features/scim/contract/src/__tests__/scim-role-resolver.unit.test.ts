@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
-import { resolveHighestRole, type ScimRole } from "../scim-role-resolver";
+import { resolveHighestRole, type ScimRole } from "../scim-role-resolver.ts";
 
 describe("resolveHighestRole()", () => {
   describe("when resolving built-in roles", () => {

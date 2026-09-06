@@ -12,7 +12,7 @@ import pino from "pino";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
-import { prettyConsoleOptions } from "../logger";
+import { prettyConsoleOptions } from "../logger.ts";
 import { createRequire } from "node:module";
 
 const prettyStream = createRequire(import.meta.url)("pino-pretty") as (

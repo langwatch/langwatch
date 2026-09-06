@@ -21,8 +21,8 @@ import {
   fakePersonalWorkspaceHost,
   renderWithPersonalWorkspaceHost,
   FAKE_ORGANIZATION,
-} from "../../../testing";
-import AuthenticationScreen from "../authentication.screen";
+} from "../../../testing.tsx";
+import AuthenticationScreen from "../authentication.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -44,7 +44,7 @@ const calls = vi.hoisted(() => ({
   invalidateHasPassword: vi.fn(),
 }));
 
-vi.mock("../../../behavior/personal-workspace-api", () => {
+vi.mock("../../../behavior/personal-workspace-api.ts", () => {
   const mutation = (run: (input: unknown) => unknown) => ({
     useMutation: () => ({
       isPending: false,

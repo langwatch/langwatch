@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ComposedWorkerReportTraceList } from "../worker-report-schedule.composition";
+import { ComposedWorkerReportTraceList } from "../worker-report-schedule.composition.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const WINDOW = { from: 1_000, to: 2_000 };

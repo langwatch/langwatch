@@ -17,22 +17,22 @@ import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { applyHandledErrorToForm, describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { FormServerError } from "../../../behavior/errors";
-import type { SimulationSuite } from "../../../model/prisma-types";
+import { FormServerError } from "../../../behavior/errors.tsx";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
-import { api } from "../../../behavior/scenario-api";
-import { AgentHttpEditorDrawer } from "../agents/agent-http-editor-drawer";
-import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer";
-import { SimulationModelSelect } from "../scenarios/simulation-model-select";
+import { api } from "../../../behavior/scenario-api.ts";
+import { AgentHttpEditorDrawer } from "../agents/agent-http-editor-drawer.tsx";
+import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
+import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
-import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section";
+import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section.tsx";
 import { type SuiteFormData, useSuiteForm } from "@langwatch/suite-web/surfaces/suite-form";
 import { ScenarioPicker, TargetPicker } from "@langwatch/suite-web/surfaces/suite-pickers";
-import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution";
-import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation";
+import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
+import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 
 /** Callbacks passed via flowCallbacks from the parent page. */
 export type SuiteFormDrawerProps = {

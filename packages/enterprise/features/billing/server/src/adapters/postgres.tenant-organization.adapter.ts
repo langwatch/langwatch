@@ -3,8 +3,8 @@
 import {
   PrismaBillingTenantOrganizationRepository,
   type BillingTenantOrganizationDatabase,
-} from "../repositories/prisma/prisma.tenant-organization.repository";
-import type { BillingTenantOrganizationPort } from "../ports/tenant-organization.port";
+} from "../repositories/prisma/prisma.tenant-organization.repository.ts";
+import type { BillingTenantOrganizationPort } from "../ports/tenant-organization.port.ts";
 
 /** The Prisma slice this feature's attribution lookup names; see the repository. */
 export type { BillingTenantOrganizationDatabase };

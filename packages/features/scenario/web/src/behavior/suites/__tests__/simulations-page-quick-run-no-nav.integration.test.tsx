@@ -18,7 +18,7 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-import type { UseRunSuiteOptions } from "../use-run-suite";
+import type { UseRunSuiteOptions } from "../use-run-suite.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any import that touches the module
@@ -91,7 +91,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 
 // Capture onRunScheduled from useRunSuite — do NOT mock useSuiteRouting so
 // navigateToSuite runs for real and calls router.push (that is what we observe).
-vi.mock("../use-run-suite", () => ({
+vi.mock("../use-run-suite.ts", () => ({
   useRunSuite: (opts: UseRunSuiteOptions) => {
     capturedOnRunScheduled.current = opts.onRunScheduled ?? null;
     capturedOnViewRun.current = opts.onViewRun ?? null;
@@ -115,7 +115,7 @@ vi.mock("../use-run-suite", () => ({
   },
 }));
 
-vi.mock("../../use-organization-team-project", () => ({
+vi.mock("../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -132,21 +132,21 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../use-simulation-update-listener", () => ({
+vi.mock("../../use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => undefined,
 }));
 
-vi.mock("../../../ui/sections/dashboard-layout", () => ({
+vi.mock("../../../ui/sections/dashboard-layout.tsx", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dashboard-layout">{children}</div>
   ),
 }));
 
-vi.mock("../../../ui/sections/suites/run-history-panel", () => ({
+vi.mock("../../../ui/sections/suites/run-history-panel.tsx", () => ({
   RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
-vi.mock("../../scenario-api", () => ({
+vi.mock("../../scenario-api.ts", () => ({
   api: {
     featureFlag: {
       isEnabled: {
@@ -256,7 +256,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
   // costs more than a test's own budget, so it is imported once for the file.
   // The import is dynamic so the mocks above are applied before it evaluates.
   beforeAll(async () => {
-    SimulationsPage = (await import("../../../ui/sections/suites/simulations-page")).default;
+    SimulationsPage = (await import("../../../ui/sections/suites/simulations-page.tsx")).default;
   }, 60_000);
 
   afterEach(() => {

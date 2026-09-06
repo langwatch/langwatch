@@ -19,8 +19,8 @@ import type {
   ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
 import { useCallback, useRef, useState } from "react";
-import { describeFailure, describeRefusal } from "../model/connection-verdict-copy";
-import { modelProviderApi } from "./model-provider-api";
+import { describeFailure, describeRefusal } from "../model/connection-verdict-copy.ts";
+import { modelProviderApi } from "./model-provider-api.ts";
 
 /**
  * The wire shape of a verdict — the contract's own type, not a copy of it.

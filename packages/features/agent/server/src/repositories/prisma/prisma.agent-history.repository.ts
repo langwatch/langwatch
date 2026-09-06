@@ -1,6 +1,6 @@
 import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AgentsAuditLogPort } from "../../ports/agent.port";
+import type { AgentsAuditLogPort } from "../../ports/agent.port.ts";
 
 /**
  * One agent's edit history, read out of the project's audit log.

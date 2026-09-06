@@ -7,8 +7,8 @@ import {
   computeMetricStats,
   type MetricStats,
 } from "@langwatch/experiment-contract";
-import { bootstrapMeanCI } from "../../model/batch-evaluation-results.bootstrap-ci";
-import type { BatchResultRow } from "./batch-evaluation-results.types";
+import { bootstrapMeanCI } from "../../model/batch-evaluation-results.bootstrap-ci.ts";
+import type { BatchResultRow } from "./batch-evaluation-results.types.ts";
 
 export type VariantMetrics = {
   variantId: string;

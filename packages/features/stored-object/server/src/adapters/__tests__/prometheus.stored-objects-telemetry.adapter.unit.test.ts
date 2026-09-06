@@ -7,7 +7,7 @@
 import { register } from "prom-client";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { PrometheusStoredObjectsTelemetryAdapter } from "../prometheus.stored-objects-telemetry.adapter";
+import { PrometheusStoredObjectsTelemetryAdapter } from "../prometheus.stored-objects-telemetry.adapter.ts";
 
 describe("stored_object metrics are registered", () => {
   const telemetry = PrometheusStoredObjectsTelemetryAdapter.create();

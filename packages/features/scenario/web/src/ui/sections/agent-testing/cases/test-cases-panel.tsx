@@ -4,10 +4,10 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { toExternalPlanSlug } from "../../../../behavior/agent-testing/results/run-plans";
-import { CasesPanel } from "./cases-panel";
-import { collectLabels } from "../../../../model/agent-testing/cases/test-cases";
-import type { TestCasesTabModel } from "./use-test-cases-tab";
+import { toExternalPlanSlug } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { CasesPanel } from "./cases-panel.tsx";
+import { collectLabels } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { TestCasesTabModel } from "./use-test-cases-tab.ts";
 import { useMemo } from "react";
 
 export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {

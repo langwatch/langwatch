@@ -1,6 +1,6 @@
 import { keepPreviousData as holdPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, type RouterOutputs } from "../../behavior/trace-api";
+import { api, type RouterOutputs } from "../../behavior/trace-api.ts";
 
 export type AnnotationByTrace = RouterOutputs["annotation"]["getByTraceIds"][number];
 

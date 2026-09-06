@@ -24,7 +24,7 @@ import {
   MAX_UINT64,
   MIN_INT32,
   MetricNumbersAdapter,
-} from "../metric-numbers.adapter";
+} from "../metric-numbers.adapter.ts";
 
 const uint64 = (value: unknown) =>
   MetricNumbersAdapter.checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });

@@ -5,8 +5,8 @@
  */
 
 import type { LiqeQuery } from "liqe";
-import { walkAST } from "./trace-query-ast";
-import type { FacetState } from "./trace-query-metadata";
+import { walkAST } from "./trace-query-ast.ts";
+import type { FacetState } from "./trace-query-metadata.ts";
 
 /**
  * Walk the AST after a successful syntactic parse and reject queries the

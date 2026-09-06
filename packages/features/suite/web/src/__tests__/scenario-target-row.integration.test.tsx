@@ -10,9 +10,9 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
 } from "@langwatch/scenario-contract";
-import { ScenarioTargetRow } from "../scenario-target-row";
-import { makeScenarioRunData } from "./test-helpers";
-import { cssRulesForElement } from "./emotion-test-css";
+import { ScenarioTargetRow } from "../scenario-target-row.tsx";
+import { makeScenarioRunData } from "./test-helpers.ts";
+import { cssRulesForElement } from "./emotion-test-css.ts";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
 

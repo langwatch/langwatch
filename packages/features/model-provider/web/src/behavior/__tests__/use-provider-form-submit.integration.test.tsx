@@ -12,7 +12,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { FormSnapshot } from "../use-provider-form-submit";
+import type { FormSnapshot } from "../use-provider-form-submit.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures variables are available when vi.mock factories
@@ -80,7 +80,7 @@ const mockApi = {
 
 // Getters, so the factory reads the map after this module has initialised it:
 // a hoisted factory that named `mockApi` directly would run before the const.
-vi.mock("../model-provider-api", () => ({
+vi.mock("../model-provider-api.ts", () => ({
   get api() {
     return mockApi;
   },
@@ -91,7 +91,7 @@ vi.mock("../model-provider-api", () => ({
 
 // The toaster reaches the application through the host port; the port's two
 // bindings are stood in so the assertions on `toaster.create` travel unchanged.
-vi.mock("../model-provider-feedback", () => ({
+vi.mock("../model-provider-feedback.ts", () => ({
   useModelProviderToaster: () => ({ create: mockToasterCreate }),
   useShowErrorToast:
     () =>
@@ -101,7 +101,7 @@ vi.mock("../model-provider-feedback", () => ({
 
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 // Import after mocks
-import { useProviderFormSubmit } from "../use-provider-form-submit";
+import { useProviderFormSubmit } from "../use-provider-form-submit.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

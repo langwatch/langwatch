@@ -5,7 +5,7 @@ import {
   performRedo,
   performUndo,
   useEvaluationsV3Store,
-} from "../../../behavior/experiments-v3/use-evaluations-v3-store";
+} from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 /**
  * UndoRedo component with keyboard shortcuts.

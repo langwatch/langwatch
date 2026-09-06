@@ -2,13 +2,13 @@ import { Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { PipelineNode } from "@langwatch/ops-contract";
 import { useMemo, useState } from "react";
 
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
-import { filterTree } from "../../model/queue-pipeline-utils";
-import { PipelineTreeNode } from "../blocks/queue-pipeline-tree-node";
-import { PipelineTreeFilter } from "../elements/queue-pipeline-tree-filter";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { filterTree } from "../../model/queue-pipeline-utils.ts";
+import { PipelineTreeNode } from "../blocks/queue-pipeline-tree-node.tsx";
+import { PipelineTreeFilter } from "../elements/queue-pipeline-tree-filter.tsx";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 export function PipelineTreeCard({
   pipelineTree,
   pausedKeys,

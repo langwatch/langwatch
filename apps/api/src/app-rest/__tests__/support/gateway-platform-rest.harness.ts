@@ -19,11 +19,11 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { Hono } from "hono";
 
-import { ApiRestSecurity } from "../../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { ApiTenancyComposition } from "../../../app/api-tenancy.composition";
-import { composeApiGateway } from "../../../app/api-gateway.composition";
-import { composeApiIdempotency } from "../../../app/api-idempotency.composition";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { ApiTenancyComposition } from "../../../app/api-tenancy.composition.ts";
+import { composeApiGateway } from "../../../app/api-gateway.composition.ts";
+import { composeApiIdempotency } from "../../../app/api-idempotency.composition.ts";
 
 /** 32 bytes of hex, which is what the stored-secret cipher refuses anything else for. */
 const CREDENTIALS_SECRET = "c".repeat(64);

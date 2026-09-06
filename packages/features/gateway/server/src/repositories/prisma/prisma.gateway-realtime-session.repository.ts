@@ -9,7 +9,7 @@ import {
   GatewayRealtimeSessionRepository,
   type NewGatewayRealtimeSession,
   type ReserveResult,
-} from "../gateway-realtime-session.repository";
+} from "../gateway-realtime-session.repository.ts";
 
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<

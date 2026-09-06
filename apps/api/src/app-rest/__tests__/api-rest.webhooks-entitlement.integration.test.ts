@@ -7,10 +7,10 @@ import type { Plan } from "@langwatch/entitlement-contract";
 import { requestTraceIds } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import { canonicalErrorFor } from "../../app/api-canonical-error";
-import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition";
-import { composeApiWebhookApplication } from "../../features/enterprise/enterprise-webhook.composition";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import { canonicalErrorFor } from "../../app/api-canonical-error.ts";
+import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition.ts";
+import { composeApiWebhookApplication } from "../../features/enterprise/enterprise-webhook.composition.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /** A deployment that composed no Enterprise governance application at all. */
 const uncomposedGovernance = () => composeEnterpriseGovernanceApplication(undefined);

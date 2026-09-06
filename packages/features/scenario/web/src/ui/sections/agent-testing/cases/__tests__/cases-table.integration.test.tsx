@@ -10,17 +10,17 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { CasesPanel } from "../cases-panel";
-import type { CaseLastResult } from "../cases-table";
-import type { TestCase, TestSuiteEntry } from "../../../../../model/agent-testing/cases/test-cases";
-import { useSuiteRecentRuns } from "../use-suite-recent-runs";
-import { useTestCasesView } from "../use-test-cases-view";
-import type { AgentTestingSelection } from "../../../../../behavior/agent-testing/use-agent-testing-routing";
+import { CasesPanel } from "../cases-panel.tsx";
+import type { CaseLastResult } from "../cases-table.tsx";
+import type { TestCase, TestSuiteEntry } from "../../../../../model/agent-testing/cases/test-cases.ts";
+import { useSuiteRecentRuns } from "../use-suite-recent-runs.ts";
+import { useTestCasesView } from "../use-test-cases-view.ts";
+import type { AgentTestingSelection } from "../../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 
 const suiteRunDataQuery = vi.hoisted(() => vi.fn());
 const suitesGetAllQuery = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
@@ -45,7 +45,7 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     projectId: "proj_1",

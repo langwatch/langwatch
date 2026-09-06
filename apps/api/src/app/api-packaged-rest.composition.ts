@@ -32,53 +32,53 @@ import {
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 
-import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
-import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition.types";
-import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition.types";
-import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition.types";
-import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition.types";
-import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types";
-import type { ComposedOrganizationFeature } from "../features/organization/organization.composition.types";
-import type { ComposedAutomationFeature } from "../features/automation/automation.composition.types";
-import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types";
-import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types";
-import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types";
-import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types";
-import type { ComposedRoleFeature } from "../features/role/role.composition.types";
-import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types";
-import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types";
-import type { ApiAuthzComposition } from "./api-authz.composition";
-import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
-import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
-import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition";
-import { createApiTrackedEventPorts } from "../features/trace/tracked-event-ports.adapter";
-import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url";
-import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth";
-import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter";
-import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url";
+import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition.ts";
+import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition.types.ts";
+import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition.types.ts";
+import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition.types.ts";
+import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition.types.ts";
+import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types.ts";
+import type { ComposedOrganizationFeature } from "../features/organization/organization.composition.types.ts";
+import type { ComposedAutomationFeature } from "../features/automation/automation.composition.types.ts";
+import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types.ts";
+import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types.ts";
+import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types.ts";
+import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types.ts";
+import type { ComposedRoleFeature } from "../features/role/role.composition.types.ts";
+import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types.ts";
+import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types.ts";
+import type { ApiAuthzComposition } from "./api-authz.composition.ts";
+import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
+import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session.ts";
+import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition.ts";
+import { createApiTrackedEventPorts } from "../features/trace/tracked-event-ports.adapter.ts";
+import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url.ts";
+import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth.ts";
+import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter.ts";
+import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url.ts";
 import {
   MemoryAgentCacheEntryStore,
   RedisAgentCacheEntryStore,
-} from "../features/agent-cache/agent-cache.store";
-import { AgentCacheService } from "../features/agent-cache/agent-cache.service";
-import { canonicalErrorFor } from "./api-canonical-error";
-import { composeApiWebhookApplication } from "../features/enterprise/enterprise-webhook.composition";
-import { orgRequestLedgerActor } from "./api-ledger-actor";
-import { createApiDualCredentialAuth } from "./api-dual-credential-auth";
-import { ApiRestCapabilityUnavailableError, createOrganizationMiddleware } from "./api-rest-ports";
+} from "../features/agent-cache/agent-cache.store.ts";
+import { AgentCacheService } from "../features/agent-cache/agent-cache.service.ts";
+import { canonicalErrorFor } from "./api-canonical-error.ts";
+import { composeApiWebhookApplication } from "../features/enterprise/enterprise-webhook.composition.ts";
+import { orgRequestLedgerActor } from "./api-ledger-actor.ts";
+import { createApiDualCredentialAuth } from "./api-dual-credential-auth.ts";
+import { ApiRestCapabilityUnavailableError, createOrganizationMiddleware } from "./api-rest-ports.ts";
 import type {
   ApiPackagedRestCollaborators,
   ApiPackagedRestFamilyName,
-} from "../app-rest/app-rest.packaged-families";
-import { ApiPackagedRestAbsenceReport } from "../app-rest/app-rest.packaged-families";
-import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition";
+} from "../app-rest/app-rest.packaged-families.ts";
+import { ApiPackagedRestAbsenceReport } from "../app-rest/app-rest.packaged-families.ts";
+import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
-import type { ApiAuditPort } from "../api-request.policy";
+import type { ApiAuditPort } from "../api-request.policy.ts";
 import { requestTraceIds } from "@langwatch/api/rest";
 
 /** What the packaged families are composed from, all of it already open. */

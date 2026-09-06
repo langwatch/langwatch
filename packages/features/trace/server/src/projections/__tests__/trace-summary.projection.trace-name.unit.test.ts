@@ -5,13 +5,13 @@ import {
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {
   createInitState,
   createTestRuntime,
   createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+} from "./fixtures/trace-summary-test.fixtures.ts";
 
 const runtime = createTestRuntime();
 const applySpanToSummary = (input: {

@@ -6,12 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
-} from "../../ports/authz-grants-command-dispatcher.port";
-import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter";
-import { PostgresAuthzAdapter } from "../postgres.authz.adapter";
-import { type AuthzCounter, AuthzMetricsPort } from "../../ports/authz-metrics.port";
-import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration";
+} from "../../ports/authz-grants-command-dispatcher.port.ts";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter.ts";
+import { PostgresAuthzAdapter } from "../postgres.authz.adapter.ts";
+import { type AuthzCounter, AuthzMetricsPort } from "../../ports/authz-metrics.port.ts";
+import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port.ts";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;

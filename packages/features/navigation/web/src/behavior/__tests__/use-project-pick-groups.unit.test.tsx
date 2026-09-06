@@ -6,9 +6,9 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ReactNode } from "react";
-import { NavigationHostProvider } from "../../model/navigation-host";
-import { StubNavigationHost } from "../../testing";
-import { useProjectPickGroups } from "../use-project-pick-groups";
+import { NavigationHostProvider } from "../../model/navigation-host.ts";
+import { StubNavigationHost } from "../../testing.tsx";
+import { useProjectPickGroups } from "../use-project-pick-groups.ts";
 
 const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 

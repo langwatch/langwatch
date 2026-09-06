@@ -9,8 +9,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
 
-import { AgentApp } from "../agent.app";
-import { NO_PRESENCE, type AgentPresence } from "../../services/connected-agent-presence.service";
+import { AgentApp } from "../agent.app.ts";
+import { NO_PRESENCE, type AgentPresence } from "../../services/connected-agent-presence.service.ts";
 
 const connectedAgent: AgentWithFields = {
   id: "agent_1",

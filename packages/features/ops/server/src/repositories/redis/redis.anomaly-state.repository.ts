@@ -7,7 +7,7 @@ import {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { AnomalyStatePort } from "../../ports/anomaly-state.port";
+import { AnomalyStatePort } from "../../ports/anomaly-state.port.ts";
 
 const logger = createLogger("langwatch:observability:anomalyState");
 

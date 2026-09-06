@@ -9,5 +9,5 @@
  * engine's read side (e.g. a cutover org's grants) reaches them here rather
  * than the package root, so the import reads as a declared test seam.
  */
-export { AuthzCollectorService } from "./services/authz-collector.service";
-export { PostgresAuthzAdapter } from "./adapters/postgres.authz.adapter";
+export { AuthzCollectorService } from "./services/authz-collector.service.ts";
+export { PostgresAuthzAdapter } from "./adapters/postgres.authz.adapter.ts";

@@ -1,13 +1,13 @@
-import { type ScenarioListItem } from "../../../model/scenario-list.types";
-import { ScenarioTable as ScenarioTableView } from "../scenario-table";
+import { type ScenarioListItem } from "../../../model/scenario-list.types.ts";
+import { ScenarioTable as ScenarioTableView } from "../scenario-table.tsx";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
 import {
   LangyContextTarget,
   scenarioContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
-import type { Scenario } from "../../../model/prisma-types";
+import type { Scenario } from "../../../model/prisma-types.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { TagList } from "../tag-list";
+import { TagList } from "../tag-list.tsx";
 
 export type ScenarioTableProps = {
   scenarios: Scenario[];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { getSchemaShape } from "../model-provider-credential";
+import { getSchemaShape } from "../model-provider-credential.ts";
 
 /**
  * Against real zod schemas, not hand-built stand-ins.

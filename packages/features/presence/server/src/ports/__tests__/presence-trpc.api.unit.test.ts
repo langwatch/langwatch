@@ -10,10 +10,10 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceTrpcApi, type PresenceTrpcContext } from "../../transport/api-trpc/presence.api";
-import { PresenceBroadcastPort, PresenceEmitterPort } from "../presence.port";
-import { PresenceRepository } from "../../repositories/presence.repository";
-import { PresenceService as ComposedPresenceService } from "../../services/presence.service";
+import { PresenceTrpcApi, type PresenceTrpcContext } from "../../transport/api-trpc/presence.api.ts";
+import { PresenceBroadcastPort, PresenceEmitterPort } from "../presence.port.ts";
+import { PresenceRepository } from "../../repositories/presence.repository.ts";
+import { PresenceService as ComposedPresenceService } from "../../services/presence.service.ts";
 
 const location: PresenceLocation = { lens: "traces", route: { traceId: "trace-1" } };
 

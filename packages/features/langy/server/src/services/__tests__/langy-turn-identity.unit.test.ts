@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LangyTurnSharedService } from "../langy-turn-shared.service";
+import { LangyTurnSharedService } from "../langy-turn-shared.service.ts";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();

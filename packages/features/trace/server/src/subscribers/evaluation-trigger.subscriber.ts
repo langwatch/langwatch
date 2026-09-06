@@ -10,18 +10,18 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../adapters/eventing.deferred-origin.adapter";
-import type { TraceEvaluationDispatchPort } from "../ports/trace-evaluation-dispatch.port";
+import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../adapters/eventing.deferred-origin.adapter.ts";
+import type { TraceEvaluationDispatchPort } from "../ports/trace-evaluation-dispatch.port.ts";
 import type {
   TraceEvaluationLoopBlockReason,
   TraceEvaluationLoopMetricsPort,
-} from "../ports/trace-evaluation-loop-metrics.port";
-import type { TraceEvaluationMonitorPort } from "../ports/trace-evaluation-monitor.port";
-import { MAX_PROCESSED_SPANS } from "../projections/trace-summary.projection";
+} from "../ports/trace-evaluation-loop-metrics.port.ts";
+import type { TraceEvaluationMonitorPort } from "../ports/trace-evaluation-monitor.port.ts";
+import { MAX_PROCESSED_SPANS } from "../projections/trace-summary.projection.ts";
 import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
-} from "./origin-guarded.subscriber";
+} from "./origin-guarded.subscriber.ts";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG = "ops_es_causality_loop_guard_disabled";
 

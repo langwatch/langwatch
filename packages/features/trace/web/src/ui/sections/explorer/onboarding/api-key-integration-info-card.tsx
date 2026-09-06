@@ -2,14 +2,14 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { showErrorToast } from "../../errors";
+import { showErrorToast } from "../../errors/index.ts";
 import { CodePreview } from "@langwatch/onboarding-web/surfaces/code-preview";
 import { CLOUD_ENDPOINT } from "@langwatch/onboarding-web/surfaces/build-mcp-config";
 import { InlineCopyButton } from "@langwatch/onboarding-web/surfaces/inline-copy-button";
-import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types";
-import { usePublicEnv } from "../../use-public-env";
-import { api } from "../../../../behavior/trace-api";
-import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint";
+import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types.ts";
+import { usePublicEnv } from "../../use-public-env.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
 
 interface ApiKeyIntegrationInfoCardProps {
   organizationId: string;

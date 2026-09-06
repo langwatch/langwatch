@@ -1,21 +1,21 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "lucide-react";
 import { LuClock, LuCopyPlus, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
-import { DeleteConfirmationDialog } from "../../../ui/blocks/delete-confirmation-dialog";
+import { DeleteConfirmationDialog } from "../../../ui/blocks/delete-confirmation-dialog.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { usePromptHost } from "../../../model/prompt-host";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { CopyPromptDialog } from "../dialogs/copy-prompt-dialog";
-import { PushToCopiesDialog } from "../dialogs/push-to-copies-dialog";
-import { usePrompts } from "../../../behavior/use-prompts";
-import { useRenamePromptHandle } from "../../../behavior/use-rename-prompt-handle";
-import { computeInitialFormValuesForPrompt } from "../../../surfaces/prompt-form";
-import { getDisplayHandle } from "../../../surfaces/prompt-reference";
-import { promptApi } from "../../../behavior/prompt-api";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { CopyPromptDialog } from "../dialogs/copy-prompt-dialog.tsx";
+import { PushToCopiesDialog } from "../dialogs/push-to-copies-dialog.tsx";
+import { usePrompts } from "../../../behavior/use-prompts.ts";
+import { useRenamePromptHandle } from "../../../behavior/use-rename-prompt-handle.ts";
+import { computeInitialFormValuesForPrompt } from "../../../surfaces/prompt-form/index.ts";
+import { getDisplayHandle } from "../../../surfaces/prompt-reference/index.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
 
 interface PublishedPromptActionsProps {
   promptId: string;

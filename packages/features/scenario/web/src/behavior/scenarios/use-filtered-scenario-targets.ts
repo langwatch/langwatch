@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { connectedAgentSelectability } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
-import type { TargetValue } from "../../model/scenario-target";
+import type { TargetValue } from "../../model/scenario-target.ts";
 
 /** Agent types that can be used as scenario targets */
 const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([

@@ -5,11 +5,11 @@ import { slackActionParamsSchema } from "@langwatch/automation-contract";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { TriggerAction } from "@langwatch/automation-contract";
-import type { AnnotationQueueSlice } from "../ui/sections/annotation-queue.client";
-import { type DatasetSlice, deriveMappingFromColumns } from "../ui/sections/dataset.client";
-import type { EmailSlice } from "../ui/sections/email.client";
-import { CLIENT_PROVIDERS } from "../ui/sections/client-providers";
-import type { SlackSlice } from "../ui/sections/slack.client";
+import type { AnnotationQueueSlice } from "../ui/sections/annotation-queue.client.tsx";
+import { type DatasetSlice, deriveMappingFromColumns } from "../ui/sections/dataset.client.tsx";
+import type { EmailSlice } from "../ui/sections/email.client.tsx";
+import { CLIENT_PROVIDERS } from "../ui/sections/client-providers.ts";
+import type { SlackSlice } from "../ui/sections/slack.client.tsx";
 
 /**
  * Build a `SavedTriggerRow` from a provider's `toActionParams` output so we can

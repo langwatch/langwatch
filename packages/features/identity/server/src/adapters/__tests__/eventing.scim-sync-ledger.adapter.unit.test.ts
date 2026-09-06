@@ -11,8 +11,8 @@ import {
   type ScimSyncFactInput,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEventingPort } from "../../ports/identity-eventing.port";
-import { ScimSyncLedgerWriterAdapter } from "../eventing.scim-sync-ledger.adapter";
+import { IdentityEventingPort } from "../../ports/identity-eventing.port.ts";
+import { ScimSyncLedgerWriterAdapter } from "../eventing.scim-sync-ledger.adapter.ts";
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_1";

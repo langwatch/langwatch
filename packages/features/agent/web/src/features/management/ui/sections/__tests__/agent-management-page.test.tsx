@@ -12,7 +12,7 @@ import type {
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { AgentBrowserPort } from "../../../../../model/agent-browser.port";
+import { AgentBrowserPort } from "../../../../../model/agent-browser.port.ts";
 import {
   type AgentCardRenderInput,
   AgentManagementCardPort,
@@ -25,7 +25,7 @@ import {
   AgentPageCompositionPort,
   type AgentPushDialogInput,
   type AgentWithFields as WireAgentWithFields,
-} from "../agent-management-page";
+} from "../agent-management-page.tsx";
 
 afterEach(cleanup);
 

@@ -4,8 +4,8 @@ import {
   type ModelCost,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import { ModelCostRepository } from "../../ports/model-provider.port";
-import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules";
+import { ModelCostRepository } from "../../ports/model-provider.port.ts";
+import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
 
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 

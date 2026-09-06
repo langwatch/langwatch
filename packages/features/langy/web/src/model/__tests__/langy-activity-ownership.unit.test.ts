@@ -3,7 +3,7 @@ import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
   resolveLangyActivityOwnership,
-} from "../langy-activity-ownership";
+} from "../langy-activity-ownership.ts";
 
 const progressSample = {
   current: 24,

@@ -12,10 +12,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GithubHostPort } from "../../ports/github-host.port";
-import type { BranchMappingTarget } from "../github-branch-mapping.service";
-import { GithubBranchDemandService } from "../github-branch-demand.service";
-import { TestProjectService } from "./fixtures/github-services.fixture";
+import { GithubHostPort } from "../../ports/github-host.port.ts";
+import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
+import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
+import { TestProjectService } from "./fixtures/github-services.fixture.ts";
 
 const REQUEST = {
   tenantId: "project-1",

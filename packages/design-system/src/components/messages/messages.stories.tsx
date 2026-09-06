@@ -1,6 +1,6 @@
 import { HStack, Stack, Textarea } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { AddMessageButton, MessageRoleLabel, RemoveMessageButton } from "./index";
+import { AddMessageButton, MessageRoleLabel, RemoveMessageButton } from "./index.ts";
 
 const meta = {
   title: "Components/Messages",

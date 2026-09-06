@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeAutoDetectedInputs } from "../prompt-merge-auto-detected-inputs.port";
+import { mergeAutoDetectedInputs } from "../prompt-merge-auto-detected-inputs.port.ts";
 
 describe("mergeAutoDetectedInputs()", () => {
   describe("given a prompt with simple mustache variables", () => {

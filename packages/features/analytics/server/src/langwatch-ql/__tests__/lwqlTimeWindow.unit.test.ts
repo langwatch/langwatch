@@ -6,16 +6,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { pinTimezone } from "./pinTimezone";
+import { pinTimezone } from "./pinTimezone.ts";
 
-import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service";
+import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
 } from "@langwatch/analytics-contract";
-import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 
 const PERIOD: LangWatchQLParameter[] = [
   { name: "period_start", type: "DateTime" },

@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   generateOpenApiDocument,
   type GeneratedOpenApiDocument,
-} from "../openapi-document.generator";
+} from "../openapi-document.generator.ts";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 const EXPERIMENTS_PAGES = join(REPO_ROOT, "docs/api-reference/experiments");

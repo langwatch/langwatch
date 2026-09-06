@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OtlpTraceRequestService } from "../otlp-trace-request.service";
+import { OtlpTraceRequestService } from "../otlp-trace-request.service.ts";
 
 const { reconstructFlattenedArrays } = OtlpTraceRequestService;
 

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { disambiguateLabels } from "../disambiguate-labels";
+import { disambiguateLabels } from "../disambiguate-labels.ts";
 
 describe("given a list of labels", () => {
   describe("when none of them collide", () => {

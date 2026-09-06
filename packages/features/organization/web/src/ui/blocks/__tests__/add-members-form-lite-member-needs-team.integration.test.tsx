@@ -18,13 +18,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     role: { getAll: { useQuery: () => ({ data: [] }) } },
   },
 }));
 
-import { AddMembersForm } from "../../sections/add-members-form";
+import { AddMembersForm } from "../../sections/add-members-form.tsx";
 
 const WARNING = "lite-member-needs-team-warning";
 const TEAM = { label: "Research", value: "team-research" };

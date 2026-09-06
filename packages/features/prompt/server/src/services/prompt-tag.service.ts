@@ -9,7 +9,7 @@ import {
   PROTECTED_TAGS,
   PromptTagRepository,
   type ProtectedTag,
-} from "../repositories/prompt-tag.repository";
+} from "../repositories/prompt-tag.repository.ts";
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (

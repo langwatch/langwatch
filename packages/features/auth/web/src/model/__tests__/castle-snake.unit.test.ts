@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { SnakeGame } from "../castle-snake";
-import { advance, advanceChaser, createGame, queueTurn } from "../castle-snake";
+import type { SnakeGame } from "../castle-snake.ts";
+import { advance, advanceChaser, createGame, queueTurn } from "../castle-snake.ts";
 
 /** Deterministic: the token always lands on the first free node it tries. */
 const noRandom = () => 0;

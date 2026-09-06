@@ -2,10 +2,10 @@ import { Field, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group";
-import { PhoneNumberInput } from "../elements/inputs/phone-number-input";
-import { companySizeItems, solutionTypeItems } from "../../behavior/onboarding-data";
-import type { CompanySize, SolutionType, UsageStyle } from "../../behavior/types";
+import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
+import { PhoneNumberInput } from "../elements/inputs/phone-number-input.tsx";
+import { companySizeItems, solutionTypeItems } from "../../behavior/onboarding-data.ts";
+import type { CompanySize, SolutionType, UsageStyle } from "../../behavior/types.ts";
 
 interface BasicInfoConditionalFieldsProps {
   usageStyle: UsageStyle | undefined;

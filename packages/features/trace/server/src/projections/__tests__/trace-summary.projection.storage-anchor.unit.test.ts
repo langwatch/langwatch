@@ -1,12 +1,12 @@
 import { LOG_RECORD_RECEIVED_EVENT_TYPE, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceSummaryFoldProjection } from "../trace-summary.projection";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
   msToUnixNano,
-} from "./fixtures/trace-summary-test.fixtures";
+} from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * The trace-summary fold's STORAGE ANCHOR (ADR-087, migration 00072).

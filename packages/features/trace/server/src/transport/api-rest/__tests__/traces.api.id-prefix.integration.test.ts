@@ -19,7 +19,7 @@ import {
   traceSearchBodyExtensions,
   type TraceSearchBody,
   type TracesRestPorts,
-} from "../traces.api";
+} from "../traces.api.ts";
 
 /** What `langwatch trace search --limit 1` prints, and the trace behind it. */
 const DISPLAYED_PREFIX = "63dc535cea6335c506bc";

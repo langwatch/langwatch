@@ -7,8 +7,8 @@ import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../anomaly-rule.port";
-import { AnomalyRuleService } from "../../services/anomaly-rule.service";
+} from "../anomaly-rule.port.ts";
+import { AnomalyRuleService } from "../../services/anomaly-rule.service.ts";
 
 const FIXED_NOW = new Date("2026-08-24T12:00:00.000Z");
 

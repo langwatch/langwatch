@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { retentionDaysInputSchema, resolveRetention } from "../index";
+import { retentionDaysInputSchema, resolveRetention } from "../index.ts";
 
 describe("data-retention contract", () => {
   /** @scenario "Reject invalid retention values" */

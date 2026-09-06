@@ -5,18 +5,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useScenarioRunDetail } from "../../simulations/scenario-run-detail-drawer";
+import { useScenarioRunDetail } from "../../simulations/scenario-run-detail-drawer.tsx";
 import {
   isCancellableStatus,
   useCancelScenarioRun,
-} from "../../../../behavior/suites/use-cancel-scenario-run";
-import { useCan } from "../../../../behavior/use-can";
+} from "../../../../behavior/suites/use-cancel-scenario-run.ts";
+import { useCan } from "../../../../behavior/use-can.ts";
 import { useDrawerParams } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { api } from "../../../../behavior/scenario-api";
+import { api } from "../../../../behavior/scenario-api.ts";
 import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useTargetNameMap } from "../../../../behavior/use-target-name-map";
+import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
 
 /** Everything one open drawer knows about the run it is showing. */
 export type RunDrawerState = ReturnType<typeof useRunDrawerState>;

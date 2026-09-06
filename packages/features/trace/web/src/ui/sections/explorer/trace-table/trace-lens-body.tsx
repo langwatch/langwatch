@@ -10,15 +10,15 @@ import {
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
-import { useEvaluatorOptions } from "../hooks/use-evaluator-options";
-import type { LensConfig } from "../../../../behavior/view.store";
-import { getColumnSizingKey, useColumnSizingStore } from "../../../../behavior/column-sizing.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
-import type { TraceListItem } from "../types/trace";
-import { ADD_COLUMN_ID } from "./add-column-header";
-import { RegistryRow } from "./registry";
-import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
+import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
+import { getColumnSizingKey, useColumnSizingStore } from "../../../../behavior/column-sizing.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
+import { ADD_COLUMN_ID } from "./add-column-header.tsx";
+import { RegistryRow } from "./registry/index.ts";
+import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
 
 /**
  * Module-level singleton so `pinnedColumnIds` stays referentially stable, else SortableContext
@@ -26,14 +26,14 @@ import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
  */
 const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 
-import type { TraceTableMeta } from "./select-column";
-import { buildTracePlaceholderRows } from "./skeleton-placeholders";
-import { TraceTableShell } from "./trace-table-shell";
-import { TraceStatisticsProvider } from "./trace-statistics-context";
-import { useTraceLensColumns } from "./use-trace-lens-columns";
-import { useTraceLensKeyboard } from "./use-trace-lens-keyboard";
-import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer";
-import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer";
+import type { TraceTableMeta } from "./select-column.tsx";
+import { buildTracePlaceholderRows } from "./skeleton-placeholders.ts";
+import { TraceTableShell } from "./trace-table-shell.tsx";
+import { TraceStatisticsProvider } from "./trace-statistics-context.tsx";
+import { useTraceLensColumns } from "./use-trace-lens-columns.ts";
+import { useTraceLensKeyboard } from "./use-trace-lens-keyboard.ts";
+import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer.ts";
+import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 
 interface TraceLensBodyProps {
   traces: TraceListItem[];

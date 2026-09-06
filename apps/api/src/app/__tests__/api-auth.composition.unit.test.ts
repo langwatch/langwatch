@@ -26,9 +26,9 @@ import {
   BetterAuthBrowserSessionTransportAdapter,
   type ApiAuthSessionDependencies,
   type BetterAuthSessionLookup,
-} from "../api-auth.composition";
-import { ApiUserAvatarStorageAdapter } from "../../features/user/user-avatar-storage.adapter";
-import { ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
+} from "../api-auth.composition.ts";
+import { ApiUserAvatarStorageAdapter } from "../../features/user/user-avatar-storage.adapter.ts";
+import { ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
 
 const verified: VerifiedBrowserSession = {
   session: { id: "session-1", expiresAt: new Date("2026-08-28T12:00:00.000Z") },

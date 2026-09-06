@@ -13,34 +13,34 @@ import {
   RequestTopicClusteringCommand,
   recordTopicsDedupeId,
   type TopicClusteringDispatchDeps,
-} from "../intents/topic-clustering.intent";
-import type { TopicClusteringProcessingEvent } from "./eventing.topic-events.adapter";
+} from "../intents/topic-clustering.intent.ts";
+import type { TopicClusteringProcessingEvent } from "./eventing.topic-events.adapter.ts";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
-} from "../processes/topic-clustering.process";
+} from "../processes/topic-clustering.process.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
-} from "../projections/topic-clustering-run-history.projection";
+} from "../projections/topic-clustering-run-history.projection.ts";
 import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
-} from "../projections/topic-clustering-run-status.projection";
+} from "../projections/topic-clustering-run-status.projection.ts";
 import {
   type TopicModelData,
   TopicModelFoldProjection,
-} from "../projections/topic-model.projection";
+} from "../projections/topic-model.projection.ts";
 
 // Composition needs the projection state types to declare its stores; the
 // projection implementations stay private to the feature server.
-export type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection";
+export type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection.ts";
 export {
   topicClusteringRunHistoryProjectionEntrySchema,
   type TopicClusteringRunHistoryEntry,
-} from "../projections/topic-clustering-run-history.projection";
-export type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection";
-export type { ProjectedTopic, TopicModelData } from "../projections/topic-model.projection";
+} from "../projections/topic-clustering-run-history.projection.ts";
+export type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection.ts";
+export type { ProjectedTopic, TopicModelData } from "../projections/topic-model.projection.ts";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { pilotDefinition, pilotEvent, T0 } from "../../__tests__/helpers/pilotProcess.fixture";
-import { ProcessManagerService } from "../../processManagerService";
-import { InMemoryProcessStore } from "../inMemoryProcessStore";
+import { pilotDefinition, pilotEvent, T0 } from "../../__tests__/helpers/pilotProcess.fixture.ts";
+import { ProcessManagerService } from "../../processManagerService.ts";
+import { InMemoryProcessStore } from "../inMemoryProcessStore.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

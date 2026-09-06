@@ -3,7 +3,7 @@ import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provide
 import {
   type ManagedProviderCredentials,
   ManagedProviderCredentialsPort,
-} from "../ports/managed-provider-credentials.port";
+} from "../ports/managed-provider-credentials.port.ts";
 
 export class AwsStsManagedProviderCredentialAdapter extends ManagedProviderCredentialsPort {
   private constructor() {

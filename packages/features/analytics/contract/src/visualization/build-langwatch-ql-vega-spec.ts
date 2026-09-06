@@ -3,9 +3,9 @@
  * pinned theme configuration last. Work from a deep clone; never mutate input.
  */
 
-import type { LangWatchQLVegaConfig } from "./langwatch-vega-config";
-import { isPlainObject, visitJsonObjects } from "./vega-lite-structure";
-import type { LangWatchQLDataset } from "./visualization-types";
+import type { LangWatchQLVegaConfig } from "./langwatch-vega-config.ts";
+import { isPlainObject, visitJsonObjects } from "./vega-lite-structure.ts";
+import type { LangWatchQLDataset } from "./visualization-types.ts";
 
 /**
  * Top-level keys that make a specification a composition Vega-Lite refuses to

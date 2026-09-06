@@ -17,11 +17,11 @@ import {
   type AccessPolicy,
   type CredentialClass,
   type RegisteredRoute,
-} from "../../app-rest";
+} from "../../app-rest/index.ts";
 import {
   composeOpenApiDocumentSurface,
   type OpenApiSurfaceAbsence,
-} from "./openapi-document.surface";
+} from "./openapi-document.surface.ts";
 
 /**
  * Where the entry points write when nobody says. A build cache, deliberately. It is NOT a

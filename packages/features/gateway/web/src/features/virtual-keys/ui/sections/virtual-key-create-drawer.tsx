@@ -14,58 +14,58 @@ import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import { useCurrentUser } from "../../../../behavior/gateway-session";
-import { api } from "../../../../behavior/gateway-api";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useCurrentUser } from "../../../../behavior/gateway-session.ts";
+import { api } from "../../../../behavior/gateway-api.ts";
 import {
   buildScopeHierarchy,
   firstEligibleDefaultModel,
   type OrgModelProvider,
   resolveEligible,
-} from "../../model/eligible-model-providers";
+} from "../../model/eligible-model-providers.ts";
 import {
   TAGS_CSV_MAX_LENGTH,
   VK_TAGS_FIELD_DESCRIPTION,
   parseTagsCsv,
   tagsBeyondLimitsNotice,
-} from "../../model/virtual-key-tags-field";
-import { humanizeGatewayError } from "../../../../model/gateway-error-copy";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback";
+} from "../../model/virtual-key-tags-field.ts";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
   VirtualKeyBudgetSection,
   type VirtualKeyBudgetValue,
-} from "./virtual-key-budget-section";
+} from "./virtual-key-budget-section.tsx";
 import {
   NEVER_EXPIRES,
   VirtualKeyExpirationSection,
   type VirtualKeyExpirationValue,
-} from "../elements/virtual-key-expiration-section";
+} from "../elements/virtual-key-expiration-section.tsx";
 import {
   ownershipIncompleteReason,
   ownershipToScopes,
   ownershipTraceProjectId,
   type VirtualKeyOwnership,
   VirtualKeyOwnershipSection,
-} from "../blocks/virtual-key-ownership-section";
+} from "../blocks/virtual-key-ownership-section.tsx";
 import {
   ALL_PROVIDERS,
   type ProviderAccessValue,
   providerAccessInvalidReason,
   providerAccessToConfig,
   VirtualKeyProviderAccessSection,
-} from "../blocks/virtual-key-provider-access-section";
+} from "../blocks/virtual-key-provider-access-section.tsx";
 import {
   ROUTING_NONE,
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
-} from "../elements/virtual-key-routing-section";
+} from "../elements/virtual-key-routing-section.tsx";
 import {
   expiryFieldErrorFrom,
   expiryIncompleteReason,
   resolveExpiresAt,
-} from "../../model/virtual-key-expiration";
+} from "../../model/virtual-key-expiration.ts";
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;

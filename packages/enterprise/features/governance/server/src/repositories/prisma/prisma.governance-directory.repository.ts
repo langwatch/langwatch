@@ -5,7 +5,7 @@ import {
   GovernanceDirectoryPort,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "../../ports/governance-directory.port";
+} from "../../ports/governance-directory.port.ts";
 
 type Database = Pick<PrismaClient, "user" | "organizationUser" | "project">;
 

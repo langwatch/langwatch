@@ -10,24 +10,24 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   AutomationGraphActivityPort,
   type AutomationProjectIdentityPort,
-} from "../ports/automation-graph-activity.port";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
+} from "../ports/automation-graph-activity.port.ts";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import {
   AutomationSlackBotTokenDecryptorPort,
   type AutomationDispatchErrorPort,
   type AutomationLoggerPort,
-} from "../ports/automation-graph.port";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
-import { PrismaCustomGraphRepository } from "../repositories/prisma/prisma.custom-graph.repository";
-import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
-import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service";
-import type { AutomationEmailCapService } from "../services/email-cap.service";
-import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service";
-import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service";
-import { PostgresAutomationGraphDeliveryAdapter } from "./postgres.automation-graph-delivery.adapter";
-import { SlackProviderAdapter, type AutomationSecretCrypto } from "./slack-provider.adapter";
-import { WebhookProviderAdapter } from "./webhook-provider.adapter";
+} from "../ports/automation-graph.port.ts";
+import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import { PrismaCustomGraphRepository } from "../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
+import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service.ts";
+import type { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service.ts";
+import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import { PostgresAutomationGraphDeliveryAdapter } from "./postgres.automation-graph-delivery.adapter.ts";
+import { SlackProviderAdapter, type AutomationSecretCrypto } from "./slack-provider.adapter.ts";
+import { WebhookProviderAdapter } from "./webhook-provider.adapter.ts";
 
 /**
  * The tables this vertical reads and writes, and no others.

@@ -7,12 +7,12 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contract";
 import { GroupQueueProcessor } from "@langwatch/group-queue";
-import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service";
-import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository";
-import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture";
-import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository";
-import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service";
-import type { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port";
+import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
+import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
+import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
+import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
+import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
+import type { OpsSnapshotRedisPort } from "../ports/ops-snapshot-redis.port.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;

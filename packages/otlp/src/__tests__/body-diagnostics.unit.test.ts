@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces } from "../body";
+import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces } from "../body.ts";
 
 /** A string no parser could invent, so finding it proves it came from the body. */
 const MARKER = "CUSTOMERSECRETMARKER";

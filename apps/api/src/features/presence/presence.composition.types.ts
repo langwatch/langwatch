@@ -1,8 +1,8 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { PresenceService } from "@langwatch/presence-contract";
 import type { BroadcastAdapter, PresenceEmitterPort } from "@langwatch/presence-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createPresenceTrpcRouter } from "./presence-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createPresenceTrpcRouter } from "./presence-trpc.mount.ts";
 
 /** The one namespace this feature mounts, and the two slices behind it. */
 export type ComposedPresenceFeature = Readonly<{

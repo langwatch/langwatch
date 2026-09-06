@@ -4,8 +4,8 @@ import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import type { UiSlotProps } from "@langwatch/ui-host/slots";
 import { Crown } from "lucide-react";
 import { useState } from "react";
-import { billingApi } from "../../behavior/billing-api";
-import { formatBillingPeriod } from "./billing-period";
+import { billingApi } from "../../behavior/billing-api.ts";
+import { formatBillingPeriod } from "./billing-period.ts";
 
 type ProrationQuote = {
   amountDueCents: number;

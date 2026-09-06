@@ -5,7 +5,7 @@ import type {
   BatchEvaluationData,
   BatchResultRow,
   BatchTargetColumn,
-} from "./batch-evaluation-results.types";
+} from "./batch-evaluation-results.types.ts";
 import {
   computeMetricStats,
   type MetricStats,

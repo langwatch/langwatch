@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AnalyticsComparisonWindowService } from "../analytics-comparison-window.service";
+import { AnalyticsComparisonWindowService } from "../analytics-comparison-window.service.ts";
 
 const service = AnalyticsComparisonWindowService.create();
 

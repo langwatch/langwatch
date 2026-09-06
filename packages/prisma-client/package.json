@@ -31,7 +31,7 @@
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "node --experimental-transform-types prisma/seed.ts"
   },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
@@ -57,7 +57,6 @@
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",
     "prisma": "7.9.1",
-    "tsx": "^4.22.4",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

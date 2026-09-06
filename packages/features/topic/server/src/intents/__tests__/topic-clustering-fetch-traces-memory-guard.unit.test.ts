@@ -11,8 +11,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fetchTracesFromClickHouse } from "../topic-clustering-runner.intent";
-import type { TopicClusteringClickHousePort } from "../../ports/topic-clustering-clickhouse.port";
+import { fetchTracesFromClickHouse } from "../topic-clustering-runner.intent.ts";
+import type { TopicClusteringClickHousePort } from "../../ports/topic-clustering-clickhouse.port.ts";
 
 describe("topicClustering page fetch memory guard", () => {
   describe("when the page of traces is fetched", () => {

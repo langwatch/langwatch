@@ -5,12 +5,12 @@
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 
 import { Slider } from "@langwatch/design-system/slider";
-import { useSliderControl } from "./use-slider-control";
+import { useSliderControl } from "./use-slider-control.ts";
 import type {
   ParameterConfig,
   SelectParameterConfig,
   SliderParameterConfig,
-} from "./parameter-config";
+} from "./parameter-config.ts";
 
 // ============================================================================
 // Types

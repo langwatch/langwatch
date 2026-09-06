@@ -37,18 +37,18 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // "mount once per project", so the tests need to tell a surviving panel apart
 // from a remounted one.
 const sidecarMounts = { count: 0 };
-vi.mock("../langy-panel", () => ({
+vi.mock("../langy-panel.tsx", () => ({
   LangySidecar: () => <LangySidecarStub />,
 }));
 
 // The follow-along deep link reads a tRPC query, and this suite renders the layout with no
 // tRPC provider. Its own behaviour is pinned by langy-conversation-deep-link.unit.test.tsx.
-vi.mock("../../../../../behavior/use-langy-conversation-deep-link", () => ({
+vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
   useLangyConversationDeepLink: () => undefined,
 }));
 
-import ProjectLangyLayout from "../project-langy-layout";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import ProjectLangyLayout from "../project-langy-layout.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
@@ -56,7 +56,7 @@ import {
   type LangyHostProject,
   type LangyHostTeam,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 
 function LangySidecarStub() {
   const isOpen = useLangyStore((s) => s.isOpen);

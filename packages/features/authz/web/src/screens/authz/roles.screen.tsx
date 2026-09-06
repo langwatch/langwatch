@@ -42,13 +42,13 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ShieldUser } from "lucide-react";
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
-import { authzApi } from "../../behavior/authz-api";
-import { AUTHZ_MANAGE_PERMISSION, type AuthzHostPort, useAuthzHost } from "../../model/authz-host";
-import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../../model/builtin-roles";
-import { EnterpriseUpsell } from "../../ui/elements/enterprise-upsell";
-import { PermissionViewer } from "../../ui/blocks/permission-viewer";
-import { RoleCard } from "../../ui/blocks/role-card";
-import { RoleFormDialog, type RoleFormData } from "../../ui/sections/role-form-dialog";
+import { authzApi } from "../../behavior/authz-api.ts";
+import { AUTHZ_MANAGE_PERMISSION, type AuthzHostPort, useAuthzHost } from "../../model/authz-host.ts";
+import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../../model/builtin-roles.ts";
+import { EnterpriseUpsell } from "../../ui/elements/enterprise-upsell.tsx";
+import { PermissionViewer } from "../../ui/blocks/permission-viewer.tsx";
+import { RoleCard } from "../../ui/blocks/role-card.tsx";
+import { RoleFormDialog, type RoleFormData } from "../../ui/sections/role-form-dialog.tsx";
 
 /**
  * A stored role's permission list, as the editor reads it.

@@ -4,14 +4,14 @@ import type { Protections } from "@langwatch/trace-contract";
  * Unit tests for the TraceLegacyReadClickHouseRepository -> blob-resolution seam. Mocks only the lowest-level CH driver (getClickHouseClientForTenant), wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService so full resolution + recomputed-IO fires end-to-end.
  */
 
-import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service";
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service";
-import { BlobNotFoundError } from "../../../services/trace-blob-store.service";
+import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service";
+import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -177,15 +177,15 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 // ---------------------------------------------------------------------------
 
 describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-022)", () => {
-  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository").TraceLegacyReadClickHouseRepository;
+  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository.ts").TraceLegacyReadClickHouseRepository;
   let blobStore: TraceBlobStoreService;
-  let resolveTraceSpansFn: import("../trace-legacy-read.repository").ResolveTraceSpansFn;
+  let resolveTraceSpansFn: import("../trace-legacy-read.repository.ts").ResolveTraceSpansFn;
   let traceCanonicalisation: TraceCanonicalisationService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    const mod = await import("../trace-legacy-read.repository");
+    const mod = await import("../trace-legacy-read.repository.ts");
     TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
 
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });

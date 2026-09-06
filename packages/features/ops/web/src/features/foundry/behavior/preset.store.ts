@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { builtInPresets } from "../model/foundry-presets";
-import type { Preset, TraceConfig } from "../model/foundry-types";
-import { shortId } from "../model/foundry-types";
+import { builtInPresets } from "../model/foundry-presets.ts";
+import type { Preset, TraceConfig } from "../model/foundry-types.ts";
+import { shortId } from "../model/foundry-types.ts";
 
 function loadUserPresets(): Preset[] {
   if (typeof window === "undefined") return [];

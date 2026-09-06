@@ -9,7 +9,7 @@
  */
 
 import { create } from "zustand";
-import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
+import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms.ts";
 
 function isValidGroupBy(value: unknown): value is RunGroupType {
   return typeof value === "string" && (RUN_GROUP_TYPES as readonly string[]).includes(value);

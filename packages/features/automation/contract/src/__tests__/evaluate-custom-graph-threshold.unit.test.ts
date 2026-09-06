@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCustomGraphThreshold, isNoDataPredicate } from "../index";
+import { evaluateCustomGraphThreshold, isNoDataPredicate } from "../index.ts";
 
 describe("evaluateCustomGraphThreshold", () => {
   describe("when operator is gt", () => {

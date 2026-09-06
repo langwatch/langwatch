@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { LANGY_SESSION_KEY_REAP_PROCESS_NAME } from "../processes/langy-session-key-reap.process";
+import { LANGY_SESSION_KEY_REAP_PROCESS_NAME } from "../processes/langy-session-key-reap.process.ts";
 
 const logger = createLogger("langwatch:langy:session-key-reap");
 

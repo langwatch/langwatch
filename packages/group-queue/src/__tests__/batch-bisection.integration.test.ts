@@ -1,10 +1,10 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts";
-import { NonRetryableGroupQueueError } from "../errors";
-import { GroupQueueProcessor } from "../groupQueue";
-import { DEFAULT_BISECTION_SPLITS_PER_DISPATCH } from "../scripts";
+import type { GroupQueueRuntimeDefinition, JobDelivery } from "../contracts.ts";
+import { NonRetryableGroupQueueError } from "../errors.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import { DEFAULT_BISECTION_SPLITS_PER_DISPATCH } from "../scripts.ts";
 
 type TestPayload = {
   id: string;

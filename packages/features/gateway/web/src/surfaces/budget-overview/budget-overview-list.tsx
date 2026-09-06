@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 
-import { formatBudgetUsd } from "../../model/format-budget-usd";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**

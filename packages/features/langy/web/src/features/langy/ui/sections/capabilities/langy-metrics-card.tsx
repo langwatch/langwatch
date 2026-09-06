@@ -4,14 +4,14 @@
 
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
-import { type LangyTurnMetric } from "../../../../../model/values/langy-turn";
-import { formatMoneyShort } from "../../../../../ui/elements/langy-money";
-import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card";
+import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
+import { formatMoneyShort } from "../../../../../ui/elements/langy-money.tsx";
+import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import {
   type CapabilityCardInput,
   extractToolText,
-} from "../../../model/capabilities/capability-registry";
-import { LangyCapabilityCard } from "./langy-capability-card";
+} from "../../../model/capabilities/capability-registry.ts";
+import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 type ParsedAnalytics = {
   metric: string | null;

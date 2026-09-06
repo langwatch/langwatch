@@ -1,10 +1,10 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceDerivationSpanReaderPort } from "../../ports/trace-derivation-span-reader.port";
-import { TraceModelCostPort } from "../../ports/trace-model-cost.port";
-import { ScenarioRoleMetricsDerivationService } from "../scenario-role-metrics-derivation.service";
-import { SpanCostService } from "../span-cost.service";
-import { TraceEventDerivationService } from "../trace-event-derivation.service";
+import { TraceDerivationSpanReaderPort } from "../../ports/trace-derivation-span-reader.port.ts";
+import { TraceModelCostPort } from "../../ports/trace-model-cost.port.ts";
+import { ScenarioRoleMetricsDerivationService } from "../scenario-role-metrics-derivation.service.ts";
+import { SpanCostService } from "../span-cost.service.ts";
+import { TraceEventDerivationService } from "../trace-event-derivation.service.ts";
 
 /**
  * Read amplification across a coalesced fold batch. A coalesced batch dispatches

@@ -4,7 +4,7 @@
  */
 
 import { Text } from "@chakra-ui/react";
-import { formatPassRate, passRateColor } from "./pass-rate-color";
+import { formatPassRate, passRateColor } from "./pass-rate-color.ts";
 
 export type PassRateTextProps = {
   /** 0 to 100, or null when nothing settled. */

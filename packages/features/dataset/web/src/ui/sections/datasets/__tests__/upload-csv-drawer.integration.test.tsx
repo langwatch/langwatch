@@ -39,7 +39,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/direct-upload", async (importOriginal) => ({
+vi.mock("../../../../behavior/direct-upload.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
   requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
@@ -66,7 +66,7 @@ vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { CSVReaderComponent, DatasetUploadProcessing, UploadCSVForm } from "../upload-csv-drawer";
+import { CSVReaderComponent, DatasetUploadProcessing, UploadCSVForm } from "../upload-csv-drawer.tsx";
 
 /** Error shaped like an aborted fetch. */
 const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });

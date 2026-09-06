@@ -21,7 +21,7 @@ import {
   suggestionExportLine,
   type AnnotationRow,
   type AnnotationTrace,
-} from "./annotation-row";
+} from "./annotation-row.ts";
 
 /** A header row and the rows under it. */
 export type AnnotationExport = {

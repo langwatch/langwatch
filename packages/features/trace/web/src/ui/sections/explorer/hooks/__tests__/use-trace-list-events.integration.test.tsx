@@ -12,28 +12,28 @@ const harness = vi.hoisted(() => ({
   view: { columnOrder: ["time", "trace", "events"], grouping: "flat" },
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store", () => ({
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 1_000, to: 2_000 } }),
 }));
 
-vi.mock("../../../../../behavior/view.store", () => ({
+vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 
-import type { TraceListItem } from "../../types/trace";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { useTraceListEvents } from "../use-trace-list-events";
+import type { TraceListItem } from "../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { useTraceListEvents } from "../use-trace-list-events.ts";
 
 /** A row with no events of its own, so only what the hook merges in shows up. */
 function row(traceId: string): TraceListItem {

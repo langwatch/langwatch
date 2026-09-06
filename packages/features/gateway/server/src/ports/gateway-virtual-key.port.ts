@@ -8,7 +8,7 @@ export const gatewayRoutingPolicySelect = {
 } as const;
 
 import type { ResourceMetadata } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "./gateway-change-events.port";
+import type { GatewayPersistenceTransaction } from "./gateway-change-events.port.ts";
 
 export type GatewayVirtualKeyScope = {
   scopeType: "ORGANIZATION" | "PROJECT" | "TEAM";

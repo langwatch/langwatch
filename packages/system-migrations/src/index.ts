@@ -1,21 +1,21 @@
-export type { MigrationLeaseRepository } from "./lease.repository";
+export type { MigrationLeaseRepository } from "./lease.repository.ts";
 export {
   type MigrationCohort,
   type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
-} from "./runner.service";
-export type { SystemMigrationStateRepository } from "./state.repository";
-export type { SystemMigration } from "./system-migration";
-export type { TenantSource } from "./tenant-source";
+} from "./runner.service.ts";
+export type { SystemMigrationStateRepository } from "./state.repository.ts";
+export type { SystemMigration } from "./system-migration.ts";
+export type { TenantSource } from "./tenant-source.ts";
 export {
   isTerminalTenantStatus,
   type MigrationPassSummary,
   type TenantMigrationOutcome,
   type TenantMigrationRecord,
   type TenantMigrationStatus,
-} from "./types";
+} from "./types.ts";
 export {
   driveSystemMigrationsToConvergence,
   startSystemMigrations,
   type SystemMigrationPass,
-} from "./convergence";
+} from "./convergence.ts";

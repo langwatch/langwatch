@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { SchedulerRegistry } from "../scheduler.registry";
-import type { ScheduledJobFire } from "../scheduler.types";
+import { SchedulerRegistry } from "../scheduler.registry.ts";
+import type { ScheduledJobFire } from "../scheduler.types.ts";
 
 const noopHandler = async (_fire: ScheduledJobFire): Promise<void> => {};
 

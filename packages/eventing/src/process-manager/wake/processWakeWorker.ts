@@ -1,10 +1,10 @@
 import type { Logger } from "@langwatch/observability";
 
-import { observeEsProcessWakeLag } from "../../metrics";
+import { observeEsProcessWakeLag } from "../../metrics.ts";
 
-import { toSafeFailureDiagnostic } from "../failureDiagnostic";
-import type { HandleResult } from "../processManagerService";
-import type { DueWake, ProcessStore } from "../stores/processStore.types";
+import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import type { HandleResult } from "../processManagerService.ts";
+import type { DueWake, ProcessStore } from "../stores/processStore.types.ts";
 
 const DEFAULT_INTERVAL_MS = 5_000;
 const DEFAULT_BATCH_SIZE = 20;

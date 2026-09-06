@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FieldInfoTooltip } from "./field-info-tooltip";
+import { FieldInfoTooltip } from "./field-info-tooltip.tsx";
 
 const meta = {
   title: "Components/Field info tooltip",

@@ -4,12 +4,12 @@ import type React from "react";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "../../../../../../blocks/model-providers/icons-map";
-import { useFilterStore } from "../../../../../../../behavior/filter.store";
-import type { TraceListItem } from "../../../../types/trace";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
-import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip";
+} from "../../../../../../blocks/model-providers/icons-map.tsx";
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 
 // When the +N popover would otherwise render a wall of model names,
 // cap the visible list and direct the user to the drawer for the rest.

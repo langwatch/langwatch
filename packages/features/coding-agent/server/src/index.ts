@@ -4,41 +4,41 @@ export {
   CodingAgentRuntime,
   type CodingAgentProjectionPersistenceOptions,
   type CodingAgentRuntimeOptions,
-} from "./adapters/coding-agent.adapter";
-export { CodingAgentBillingPolicyPort } from "./ports/coding-agent-billing.port";
-export { CodingAgentClickHousePort } from "./ports/coding-agent-clickhouse.port";
-export { CodingAgentClockPort } from "./ports/coding-agent-clock.port";
+} from "./adapters/coding-agent.adapter.ts";
+export { CodingAgentBillingPolicyPort } from "./ports/coding-agent-billing.port.ts";
+export { CodingAgentClickHousePort } from "./ports/coding-agent-clickhouse.port.ts";
+export { CodingAgentClockPort } from "./ports/coding-agent-clock.port.ts";
 export {
   CodingAgentPullRequestMappingBackfillService,
   type CodingAgentBackfillProjects,
   type CodingAgentSessionReads,
-} from "./services/coding-agent-pull-request-mapping-backfill.service";
-export { CodingAgentCostEstimatorPort } from "./ports/coding-agent-cost-estimator.port";
-export { CodingAgentProjectActivityPort } from "./ports/coding-agent-project-activity.port";
-export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-request-mapping.port";
-export { SystemCodingAgentClockAdapter } from "./adapters/coding-agent-clock.adapter";
-export { ModelCatalogCostEstimatorAdapter } from "./adapters/model-catalog.cost-estimator.adapter";
+} from "./services/coding-agent-pull-request-mapping-backfill.service.ts";
+export { CodingAgentCostEstimatorPort } from "./ports/coding-agent-cost-estimator.port.ts";
+export { CodingAgentProjectActivityPort } from "./ports/coding-agent-project-activity.port.ts";
+export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-request-mapping.port.ts";
+export { SystemCodingAgentClockAdapter } from "./adapters/coding-agent-clock.adapter.ts";
+export { ModelCatalogCostEstimatorAdapter } from "./adapters/model-catalog.cost-estimator.adapter.ts";
 export {
   ClickHouseCodingAgentProcessingAdapter,
   type ClickHouseCodingAgentProcessingAdapterOptions,
-} from "./adapters/clickhouse.coding-agent-processing.adapter";
+} from "./adapters/clickhouse.coding-agent-processing.adapter.ts";
 export {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
   type CodingAgentProcessingPipelineDeps,
-} from "./adapters/eventing.coding-agent-processing.adapter";
-export { OtelCodingAgentCostMetricsAdapter } from "./adapters/otel.coding-agent-cost-metrics.adapter";
-export { CodingAgentCostMetricsPort } from "./ports/coding-agent-cost-metrics.port";
-export { CodingAgentTraceProcessingPort } from "./ports/coding-agent-trace-processing.port";
-export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/coding-agent-log-facts-dispatch.subscriber";
-export { createCodingAgentMetricFactsDispatchSubscriber } from "./subscribers/coding-agent-metric-facts-dispatch.subscriber";
-export { createCodingAgentSpanFactsDispatchSubscriber } from "./subscribers/coding-agent-span-facts-dispatch.subscriber";
-export { createPullRequestMappingSubscriber } from "./subscribers/pull-request-mapping.subscriber";
+} from "./adapters/eventing.coding-agent-processing.adapter.ts";
+export { OtelCodingAgentCostMetricsAdapter } from "./adapters/otel.coding-agent-cost-metrics.adapter.ts";
+export { CodingAgentCostMetricsPort } from "./ports/coding-agent-cost-metrics.port.ts";
+export { CodingAgentTraceProcessingPort } from "./ports/coding-agent-trace-processing.port.ts";
+export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/coding-agent-log-facts-dispatch.subscriber.ts";
+export { createCodingAgentMetricFactsDispatchSubscriber } from "./subscribers/coding-agent-metric-facts-dispatch.subscriber.ts";
+export { createCodingAgentSpanFactsDispatchSubscriber } from "./subscribers/coding-agent-span-facts-dispatch.subscriber.ts";
+export { createPullRequestMappingSubscriber } from "./subscribers/pull-request-mapping.subscriber.ts";
 export {
   CodingAgentReadMetricsPort,
   NoopCodingAgentReadMetricsPort,
   type CodingAgentSessionListReadOutcome,
-} from "./adapters/coding-agent-read-metrics.adapter";
+} from "./adapters/coding-agent-read-metrics.adapter.ts";
 /**
  * The feature's application: the one typed thing its transports are given.
  * Both doors reach the same object, so a rule written on it is the rule both
@@ -49,15 +49,15 @@ export {
   type CallerProjectDisplay,
   type CallerProjectScope,
   type CodingAgentCallerScopeDependencies,
-} from "./services/coding-agent-caller-scope.service";
-export { createCodingAgentV1RestApp } from "./transport/api-rest/coding-agent-v1.api";
+} from "./services/coding-agent-caller-scope.service.ts";
+export { createCodingAgentV1RestApp } from "./transport/api-rest/coding-agent-v1.api.ts";
 export {
   CodingAgentCallerScopeDirectoryPort,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
   CodingAgentScopePermissionsPort,
   type CodingAgentScopeProject,
-} from "./ports/coding-agent-caller-scope.port";
+} from "./ports/coding-agent-caller-scope.port.ts";
 export {
   CodingAgentApp,
   type CodingAgentAppDependencies,
@@ -65,19 +65,19 @@ export {
   type CodingAgentCallerScope,
   type CodingAgentPullRequestRef,
   type CodingAgentScopePorts,
-} from "./app/coding-agent.app";
+} from "./app/coding-agent.app.ts";
 export {
   CodingAgentTrpcApi,
   type CodingAgentTrpcContext,
   type CodingAgentTrpcPorts,
   type CodingAgentTrpcRequest,
   type CodingAgentViewerVisibility,
-} from "./transport/api-trpc/coding-agent.api";
+} from "./transport/api-trpc/coding-agent.api.ts";
 export {
   createCodingAgentRestApp,
   type CodingAgentRestAuditPort,
-} from "./transport/api-rest/coding-agent.api";
+} from "./transport/api-rest/coding-agent.api.ts";
 export {
   CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
   OtelCodingAgentReadMetricsAdapter,
-} from "./adapters/coding-agent-read-metrics.adapter";
+} from "./adapters/coding-agent-read-metrics.adapter.ts";

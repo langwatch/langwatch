@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mergeRunData, ScenarioRunStatus, type ScenarioRunData } from "../index";
+import { mergeRunData, ScenarioRunStatus, type ScenarioRunData } from "../index.ts";
 
 function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {

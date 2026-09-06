@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretService as SecretServiceContract } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "../ports/secret.port";
-import { PrismaSecretRepository } from "../repositories/prisma/prisma.secret.repository";
-import { SecretService } from "../services/secret.service";
+import type { SecretEncryptionPort } from "../ports/secret.port.ts";
+import { PrismaSecretRepository } from "../repositories/prisma/prisma.secret.repository.ts";
+import { SecretService } from "../services/secret.service.ts";
 
 export interface PostgresSecretAdapterOptions {
   /**

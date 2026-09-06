@@ -36,16 +36,16 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { useAnalyticsPeriod } from "../../behavior/use-analytics-period";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 
-import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run";
-import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice";
+import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
+import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 
-import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart";
+import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart.tsx";
 
 /**
  * The default datapoint step for a widget whose chart declares the granularity

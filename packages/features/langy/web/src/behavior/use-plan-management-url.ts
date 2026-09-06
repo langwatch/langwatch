@@ -2,7 +2,7 @@
  * Where a reader goes to lift a plan limit, and what the button says.
  */
 
-import { useLangyHost } from "../model/langy-host";
+import { useLangyHost } from "../model/langy-host.ts";
 
 export function usePlanManagementUrl(): {
   url: string;

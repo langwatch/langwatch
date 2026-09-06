@@ -2,11 +2,11 @@ import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import { useState } from "react";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback";
-import { usePersonalContext } from "../../behavior/use-personal-context";
-import { formatRelativeTime } from "../../model/relative-time";
-import { InstallCliCard } from "../blocks/install-cli-card";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import { usePersonalContext } from "../../behavior/use-personal-context.ts";
+import { formatRelativeTime } from "../../model/relative-time.ts";
+import { InstallCliCard } from "../blocks/install-cli-card.tsx";
 
 /**
  * Where the CLI is signed in, and the way to take a device's access away.

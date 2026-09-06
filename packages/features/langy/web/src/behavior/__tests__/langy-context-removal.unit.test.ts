@@ -4,9 +4,9 @@
  * @see specs/langy/langy-context-attach.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { traceContextChip } from "../langy-context-chips";
-import { removeContextChip, useLangyContextTargetStore } from "../langy-context-target.store";
-import { useLangyStore } from "../langy.store";
+import { traceContextChip } from "../langy-context-chips.ts";
+import { removeContextChip, useLangyContextTargetStore } from "../langy-context-target.store.ts";
+import { useLangyStore } from "../langy.store.ts";
 
 const TRACE_ID = "abc123def456";
 const chip = traceContextChip(TRACE_ID);

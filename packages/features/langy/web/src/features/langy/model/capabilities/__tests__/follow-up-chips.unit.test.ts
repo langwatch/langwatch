@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveFollowUpChips, MAX_FOLLOW_UP_CHIPS, type SettledCall } from "../follow-up-chips";
+import { deriveFollowUpChips, MAX_FOLLOW_UP_CHIPS, type SettledCall } from "../follow-up-chips.ts";
 
 /**
  * A settled trace search exactly as the live transport hands it to the panel:

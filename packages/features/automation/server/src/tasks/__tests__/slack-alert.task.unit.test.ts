@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SlackAlertTask } from "../slack-alert.task";
+import { SlackAlertTask } from "../slack-alert.task.ts";
 
 describe("SlackAlertTask", () => {
   describe("given no webhook URL is supplied", () => {

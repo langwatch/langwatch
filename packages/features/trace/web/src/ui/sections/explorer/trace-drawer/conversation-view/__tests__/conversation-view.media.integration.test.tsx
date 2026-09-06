@@ -10,11 +10,11 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
-vi.mock("../../../hooks/use-conversation-turns", () => ({
+vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations", () => ({
+vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -24,15 +24,15 @@ vi.mock("../../../hooks/use-conversation-annotations", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events", () => ({
+vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../../hooks/use-text-translation", () => ({
+vi.mock("../../../hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -41,21 +41,21 @@ vi.mock("../../../hooks/use-text-translation", () => ({
   }),
 }));
 
-vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
+vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
 }));
 
-vi.mock("../turn-annotations", () => ({
+vi.mock("../turn-annotations.tsx", () => ({
   TurnEditTraceAction: () => null,
   TurnSessionCheckbox: () => null,
   TurnAnnotationBadges: () => null,
 }));
 
-vi.mock("../../../../markdown", () => ({
+vi.mock("../../../../markdown.tsx", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: () => false,
@@ -67,15 +67,15 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
  * Here it only has to report which source it was handed, so the test can say
  * which recording landed under which message.
  */
-vi.mock("../../../../simulations/media-part", () => ({
+vi.mock("../../../../simulations/media-part.tsx", () => ({
   MediaPart: ({ part }: { part: { source?: { value?: string }; url?: string } }) => (
     <div data-testid="media-part">{part.source?.value ?? part.url}</div>
   ),
 }));
 
 import type { TraceMediaRef } from "@langwatch/trace-contract";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
-import { ConversationView } from "../conversation-view";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import { ConversationView } from "../conversation-view.tsx";
 
 const CALLER_RECORDING = "/api/files/project-1/caller";
 const REPLY_RECORDING = "/api/files/project-1/reply";

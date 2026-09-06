@@ -7,7 +7,7 @@ import { parseDataplaneS3RoutingTable } from "@langwatch/config";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
-import { TasksProjectS3SourcePort } from "../tasks-stored-object-storage.adapter";
+import { TasksProjectS3SourcePort } from "../tasks-stored-object-storage.adapter.ts";
 
 const ACME = {
   endpoint: "https://s3.eu-central-1.amazonaws.com",

@@ -6,7 +6,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { ApiDatabaseConfigResolution } from "../config/api.config";
+import type { ApiDatabaseConfigResolution } from "../config/api.config.ts";
 
 export type ApiDatabaseInfrastructureOptions = {
   resources: ResourceScope;

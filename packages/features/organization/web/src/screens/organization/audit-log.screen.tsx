@@ -29,13 +29,13 @@ import { ArrowLeft, Download, Search } from "lucide-react";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
-import { organizationApi, type AuditLogFilters } from "../../behavior/organization-api";
+import { organizationApi, type AuditLogFilters } from "../../behavior/organization-api.ts";
 import {
   auditLogCsvTable,
   auditLogExportOffsets,
   auditLogFileName,
   AUDIT_LOG_EXPORT_BATCH_SIZE,
-} from "../../model/audit-log-export";
+} from "../../model/audit-log-export.ts";
 import {
   auditBackLink,
   matchMemberId,
@@ -45,13 +45,13 @@ import {
   withAuditPageOffset,
   withAuditPageSize,
   withoutAuditTarget,
-} from "../../model/audit-log-filters";
-import { auditPeriodLabel, auditPeriodQuery, readAuditPeriod } from "../../model/audit-period";
-import { disambiguateLabels } from "../../model/disambiguate-labels";
-import { useOrganizationHost } from "../../model/organization-host";
-import { AuditPaginationFooter } from "../../ui/elements/audit-pagination-footer";
-import { AuditPeriodPicker } from "../../ui/elements/audit-period-picker";
-import { Link } from "../../ui/elements/organization-link";
+} from "../../model/audit-log-filters.ts";
+import { auditPeriodLabel, auditPeriodQuery, readAuditPeriod } from "../../model/audit-period.ts";
+import { disambiguateLabels } from "../../model/disambiguate-labels.ts";
+import { useOrganizationHost } from "../../model/organization-host.ts";
+import { AuditPaginationFooter } from "../../ui/elements/audit-pagination-footer.tsx";
+import { AuditPeriodPicker } from "../../ui/elements/audit-period-picker.tsx";
+import { Link } from "../../ui/elements/organization-link.tsx";
 
 /**
  * The grant the page carries. `organization:manage` one for one with the platform page's

@@ -1,10 +1,10 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import type { PausedSchedule } from "../../model/paused-schedule";
+import type { PausedSchedule } from "../../model/paused-schedule.ts";
 
 export const PAUSED_SCHEDULES_HREF = "/ops/event-sourcing/schedules";
 
-export type { PausedSchedule } from "../../model/paused-schedule";
+export type { PausedSchedule } from "../../model/paused-schedule.ts";
 
 /**
  * Schedules that are switched off.

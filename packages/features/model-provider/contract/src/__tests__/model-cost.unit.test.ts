@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getStaticModelCostRates, resolveCacheWrite1hRate } from "../catalog/static-model-costs";
-import type { ModelCostRate } from "../model-provider";
+import { getStaticModelCostRates, resolveCacheWrite1hRate } from "../catalog/static-model-costs.ts";
+import type { ModelCostRate } from "../model-provider.ts";
 import {
   estimateCost as estimateCostUnderOneRate,
   matchModelCost,
   normalizeBedrockModelId,
   normalizeModelName,
-} from "../model-cost";
+} from "../model-cost.ts";
 
 /**
  * The catalogue's own rates, under the name this suite has always used.

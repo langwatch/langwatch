@@ -6,7 +6,7 @@
  */
 
 import { context as otelContext, propagation, trace } from "@opentelemetry/api";
-import { INVALID_TRACE_ID } from "../constants";
+import { INVALID_TRACE_ID } from "../constants.ts";
 
 interface InjectResult {
   headers: Record<string, string>;

@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { useOpsHost } from "../model/ops-host";
+import { useOpsHost } from "../model/ops-host.ts";
 
 export type OpsOverlay = {
   /** The value the address carries for this overlay, or null when it is shut. */

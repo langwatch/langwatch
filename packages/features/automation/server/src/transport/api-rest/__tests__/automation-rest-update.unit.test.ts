@@ -6,8 +6,8 @@ import type { HandledError } from "@langwatch/handled-error";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { AutomationApp, type AutomationAppDependencies } from "../../../app/automation.app";
-import { createTriggerRestApp } from "../automation.api";
+import { AutomationApp, type AutomationAppDependencies } from "../../../app/automation.app.ts";
+import { createTriggerRestApp } from "../automation.api.ts";
 
 const storedTrigger = {
   id: "trigger_1",

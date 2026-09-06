@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
 
 export const TraceIdCell = {
   id: "trace-id",

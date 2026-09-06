@@ -24,7 +24,7 @@ import {
 import type {
   MonitorPerformanceBucket,
   MonitorPerformanceRepository,
-} from "../repositories/monitor-performance.repository";
+} from "../repositories/monitor-performance.repository.ts";
 
 export class MonitorPerformanceService {
   static create(options: { repository: MonitorPerformanceRepository }): MonitorPerformanceService {

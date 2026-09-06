@@ -12,9 +12,9 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
-import { WebhookBatchPlannerService, type PendingEnvelope } from "./webhook-batch-planner.service";
-import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
-import type { WebhookDestinationConfig } from "./webhook-destination.service";
+import { WebhookBatchPlannerService, type PendingEnvelope } from "./webhook-batch-planner.service.ts";
+import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service.ts";
+import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   attributedColumns,
@@ -26,7 +26,7 @@ import {
   resolvedModel,
   settledDeliverPayload,
   withStashedOutcome,
-} from "../rules/webhook-spend-payload.rules";
+} from "../rules/webhook-spend-payload.rules.ts";
 
 export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
 export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;

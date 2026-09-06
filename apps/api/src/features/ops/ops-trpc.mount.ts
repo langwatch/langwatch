@@ -5,7 +5,7 @@
  */
 import { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "@langwatch/ops-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { policyForCheck, type AppTrpcPolicyKit } from "../../app-trpc/app-trpc.policy-kit";
+import { policyForCheck, type AppTrpcPolicyKit } from "../../app-trpc/app-trpc.policy-kit.ts";
 
 export type { OpsTrpcContext };
 

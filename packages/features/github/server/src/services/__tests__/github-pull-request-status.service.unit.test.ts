@@ -7,8 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GithubPullRequestStatusService,
   MAX_STATUS_REFS,
-} from "../github-pull-request-status.service";
-import { GithubRateLimitedError } from "../../adapters/github-app-token.adapter";
+} from "../github-pull-request-status.service.ts";
+import { GithubRateLimitedError } from "../../adapters/github-app-token.adapter.ts";
 import {
   GithubAppTokenPort,
   type GithubInstallationDetails,
@@ -16,17 +16,17 @@ import {
   type GithubPullRequestSummary,
   GithubRedisPort,
   type MintInstallationTokenInput,
-} from "../../ports/github-app-token.port";
-import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository";
+} from "../../ports/github-app-token.port.ts";
+import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubPullRequestRow,
   NullGithubPullRequestsRepository,
   type RefreshGithubPullRequestSnapshotInput,
-} from "../../repositories/github-pull-requests.repository";
-import { GithubInstallationAccessService } from "../github-installation-access.service";
-import { GithubInstallationsService } from "../github-installations.service";
-import { GithubPullRequestStatusCacheService } from "../github-pull-request-status-cache.service";
-import { TestOrganizationService } from "./fixtures/github-services.fixture";
+} from "../../repositories/github-pull-requests.repository.ts";
+import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
+import { GithubInstallationsService } from "../github-installations.service.ts";
+import { GithubPullRequestStatusCacheService } from "../github-pull-request-status-cache.service.ts";
+import { TestOrganizationService } from "./fixtures/github-services.fixture.ts";
 
 const REF = {
   repositoryHost: "github.com",

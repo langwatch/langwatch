@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "../../dialog";
+} from "../../dialog.tsx";
 
 interface LensNameDialogProps {
   open: boolean;

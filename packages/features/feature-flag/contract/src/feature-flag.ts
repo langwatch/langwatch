@@ -14,7 +14,7 @@
  * @see ../../adrs/001-feature-flag-service-boundary.md
  */
 
-import type { FeatureFlagExperiment } from "./feature-flag-experiment";
+import type { FeatureFlagExperiment } from "./feature-flag-experiment.ts";
 
 export type FeatureFlagScope = "SYSTEM" | "PRODUCT";
 

@@ -27,7 +27,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiGatewayComposition } from "./api-gateway.composition";
+import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
 import { GatewayScopeResolutionService } from "@langwatch/gateway-server";
 import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";

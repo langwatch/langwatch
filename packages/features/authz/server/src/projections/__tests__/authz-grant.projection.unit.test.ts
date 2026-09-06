@@ -9,12 +9,12 @@ import {
 } from "@langwatch/authz-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { AuthzGrantsEvent } from "../../adapters/eventing.authz.adapter";
+import type { AuthzGrantsEvent } from "../../adapters/eventing.authz.adapter.ts";
 import {
   AuthzGrantProjection,
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
-} from "../authz-grant.projection";
+} from "../authz-grant.projection.ts";
 
 const TENANT_ID = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;

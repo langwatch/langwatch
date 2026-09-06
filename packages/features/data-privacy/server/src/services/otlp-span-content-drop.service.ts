@@ -8,8 +8,8 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port";
-import { ContentDropPolicyService } from "./content-drop-policy.service";
+import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port.ts";
+import { ContentDropPolicyService } from "./content-drop-policy.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:content-drop");
 

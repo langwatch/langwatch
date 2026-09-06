@@ -1,16 +1,16 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SignInDomainRoutingPort } from "../services/signin-router.service";
-import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
-import { SsoConnectionService } from "../services/sso-connection.service";
+import type { SignInDomainRoutingPort } from "../services/signin-router.service.ts";
+import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
-} from "./support/in-memory-connections";
+} from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
 const T0 = 1_756_000_000_000;

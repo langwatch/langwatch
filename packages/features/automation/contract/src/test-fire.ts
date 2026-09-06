@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AlertType } from "./trigger";
+import type { AlertType } from "./trigger.ts";
 
 export const testFireChannelSchema = z.enum(["email", "slack", "webhook"]);
 export type TestFireChannel = z.infer<typeof testFireChannelSchema>;

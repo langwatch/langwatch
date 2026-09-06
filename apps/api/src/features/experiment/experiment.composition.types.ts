@@ -2,9 +2,9 @@
 import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiExperimentRun } from "../../app/api-experiment-run.composition";
-import type { createExperimentTrpcRouter } from "./experiment-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
+import type { createExperimentTrpcRouter } from "./experiment-trpc.mount.ts";
 
 /** The namespace, the `ctx.app.experiments` application and the run loop. */
 export type ComposedExperimentFeature = Readonly<{

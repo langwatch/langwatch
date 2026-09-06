@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { LeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict";
-import { formatLeaderboardHeadline } from "../ui/sections/batch-evaluation-results.headline";
+import type { LeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict.ts";
+import { formatLeaderboardHeadline } from "../ui/sections/batch-evaluation-results.headline.ts";
 
 const NAMES = { a: "warm", b: "warm-premium", c: "blunt" };
 

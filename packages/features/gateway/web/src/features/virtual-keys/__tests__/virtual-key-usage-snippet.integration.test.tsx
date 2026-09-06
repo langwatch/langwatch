@@ -11,8 +11,8 @@
 import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
-import { VirtualKeyUsageSnippet } from "../ui/sections/virtual-key-usage-snippet";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
+import { VirtualKeyUsageSnippet } from "../ui/sections/virtual-key-usage-snippet.tsx";
 
 /** Where the snippet says to point an SDK, as a local deployment answers it. */
 const host = fakeGatewayHost({

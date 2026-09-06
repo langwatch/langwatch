@@ -13,8 +13,8 @@
 
 import { useCallback } from "react";
 
-import { useAnalyticsHost } from "../model/analytics-host";
-import { useFilterParams } from "./use-filter-params";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
+import { useFilterParams } from "./use-filter-params.ts";
 
 export function useFilterToggle({ defaultShowFilters = false } = {}) {
   const host = useAnalyticsHost();

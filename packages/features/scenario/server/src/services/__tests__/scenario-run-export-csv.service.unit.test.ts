@@ -2,7 +2,7 @@ import Parse from "papaparse";
 import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { ScenarioRunExportCsvService } from "../scenario-run-export-csv.service";
+import { ScenarioRunExportCsvService } from "../scenario-run-export-csv.service.ts";
 const { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } = ScenarioRunExportCsvService;
 
 function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {

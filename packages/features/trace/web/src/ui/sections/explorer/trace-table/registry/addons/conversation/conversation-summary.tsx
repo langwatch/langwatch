@@ -5,8 +5,8 @@ import {
   formatCost,
   formatTokens,
   formatWallClock,
-} from "../../../../../../../model/display-formatters";
-import type { ConversationGroup } from "../../../conversation-groups";
+} from "../../../../../../../model/display-formatters.ts";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
 
 interface SummaryProps {
   group: ConversationGroup;

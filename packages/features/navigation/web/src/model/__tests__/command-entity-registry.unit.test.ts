@@ -12,7 +12,7 @@ import {
   agentPath,
   entityRegistry,
   findEntityByPrefix,
-} from "../command-entity-registry";
+} from "../command-entity-registry.ts";
 
 describe("entityRegistry", () => {
   describe("when looking up scenario prefixes", () => {

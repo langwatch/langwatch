@@ -5,8 +5,8 @@ import {
   type InternalProjectQuery,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { ProjectCredentialsPort } from "../ports/project.port";
-import type { ProjectRepository } from "../repositories/project.repository";
+import type { ProjectCredentialsPort } from "../ports/project.port.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
  * The one team read the internal-project mint makes.

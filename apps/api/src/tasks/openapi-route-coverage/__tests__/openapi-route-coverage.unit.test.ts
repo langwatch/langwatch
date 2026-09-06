@@ -15,20 +15,20 @@ import { createService, type MountedRoute } from "@langwatch/api/rest";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { composeOpenApiDocumentSurface } from "../../openapi-document/openapi-document.surface";
+import { composeOpenApiDocumentSurface } from "../../openapi-document/openapi-document.surface.ts";
 import {
   auditCoverage,
   coverageFailed,
   excludes,
   renderCoverageReport,
   type CoverageRoute,
-} from "../openapi-route-coverage.auditor";
-import { type Exclusion, UNPUBLISHED } from "../openapi-route-coverage.exclusions";
+} from "../openapi-route-coverage.auditor.ts";
+import { type Exclusion, UNPUBLISHED } from "../openapi-route-coverage.exclusions.ts";
 import {
   documentAddressOf,
   readCoverageSurface,
   type CoverageSurface,
-} from "../openapi-route-coverage.surface";
+} from "../openapi-route-coverage.surface.ts";
 
 const route = ({
   key,

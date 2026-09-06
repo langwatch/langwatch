@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
-import { walkFiles } from "./files";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
+import { walkFiles } from "./files.ts";
 
 const BASELINE_FILE = "port-module-baseline.json";
 

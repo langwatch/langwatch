@@ -1,7 +1,7 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import type React from "react";
 import { BookOpen, ExternalLink } from "react-feather";
-import { Link } from "../../elements/link";
+import { Link } from "../../elements/link.tsx";
 
 interface DocsLinksProps {
   docs?: {

@@ -2,7 +2,7 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 import {
   CodingAgentSessionContextMemoPort,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,
-} from "../ports/coding-agent-session-context.port";
+} from "../ports/coding-agent-session-context.port.ts";
 
 /**
  * How many sessions the no-Redis fallback keeps.

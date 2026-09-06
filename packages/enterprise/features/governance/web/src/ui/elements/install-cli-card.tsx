@@ -7,9 +7,9 @@ import { Box, Button, Code, Heading, HStack, IconButton, Text, VStack } from "@c
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
-import { useGovernanceHost } from "../../model/governance-host";
+import { useGovernanceHost } from "../../model/governance-host.ts";
 import { docsUrl } from "@langwatch/config/docs-url";
-import { Link } from "./governance-link";
+import { Link } from "./governance-link.tsx";
 
 /**
  * Empty-state install affordance for the LangWatch CLI.

@@ -5,7 +5,7 @@ import {
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port";
+import { SpendSpikeAnomalyRepository } from "../../ports/spend-spike-anomaly.port.ts";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 

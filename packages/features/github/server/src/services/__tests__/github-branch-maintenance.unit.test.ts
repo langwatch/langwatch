@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { GithubAppTokenAdapter } from "../../adapters/github-app-token.adapter";
-import { GithubHostAdapter } from "../../adapters/github-host.adapter";
-import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository";
+import { GithubAppTokenAdapter } from "../../adapters/github-app-token.adapter.ts";
+import { GithubHostAdapter } from "../../adapters/github-host.adapter.ts";
+import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubBranchCheckRow,
   NullGithubPullRequestsRepository,
-} from "../../repositories/github-pull-requests.repository";
-import { GithubInstallationAccessService } from "../github-installation-access.service";
-import { GithubBranchMappingService } from "../github-branch-mapping.service";
-import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service";
+} from "../../repositories/github-pull-requests.repository.ts";
+import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
+import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
+import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service.ts";
 
 const NOW = Date.UTC(2026, 5, 1);
 const DAY = 24 * 60 * 60 * 1000;

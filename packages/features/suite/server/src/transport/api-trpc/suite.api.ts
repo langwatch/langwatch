@@ -19,15 +19,15 @@ import { createTrpcService } from "@langwatch/api/trpc";
 import { SUITE_KINDS, tryExtractSuiteId } from "@langwatch/suite-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { createTestSuiteRouter } from "./test-suite.api";
+import { createTestSuiteRouter } from "./test-suite.api.ts";
 import {
   createSuiteSchema,
   projectSchema,
   runPlanSchema,
   suiteTargetSchema,
   updateSuiteSchema,
-} from "../../rules/suite-schemas.rules";
-import type { SuiteTrpcContext, SuiteTrpcProcedures } from "../../rules/suite-trpc-context.rules";
+} from "../../rules/suite-schemas.rules.ts";
+import type { SuiteTrpcContext, SuiteTrpcProcedures } from "../../rules/suite-trpc-context.rules.ts";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

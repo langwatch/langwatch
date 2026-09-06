@@ -1,6 +1,6 @@
 import { Button, HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Toaster, toaster } from "./toaster";
+import { Toaster, toaster } from "./toaster.tsx";
 
 const meta = {
   title: "Components/Toaster",

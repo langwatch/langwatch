@@ -14,7 +14,7 @@ import {
   lwqlCellCopyText,
   lwqlCellText,
   readLangWatchQLCell,
-} from "../lwql-value-format";
+} from "../lwql-value-format.ts";
 
 /** Beyond `Number.MAX_SAFE_INTEGER`, and not representable as a double. */
 const WIDE_INTEGER = "9007199254740993";

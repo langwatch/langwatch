@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseFragment } from "@langwatch/trace-web/surfaces/trace-filters";
-import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key";
+import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key.ts";
 
 /**
  * Exercises the Trace Explorer's real fragment format rather than asserting

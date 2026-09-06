@@ -1,9 +1,9 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { UserService as UserServiceContract } from "@langwatch/user-contract";
-import type { UserAvatarStoragePort } from "../ports/user.port";
-import { PrismaUserRepository } from "../repositories/prisma/prisma.user.repository";
-import type { UserDatabase } from "../repositories/prisma/prisma.user.repository";
-import { UserService } from "../services/user.service";
+import type { UserAvatarStoragePort } from "../ports/user.port.ts";
+import { PrismaUserRepository } from "../repositories/prisma/prisma.user.repository.ts";
+import type { UserDatabase } from "../repositories/prisma/prisma.user.repository.ts";
+import { UserService } from "../services/user.service.ts";
 
 export interface PostgresUserAdapterOptions {
   database: UserDatabase;

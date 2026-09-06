@@ -11,7 +11,7 @@
  * URL is a supported shape rather than a degraded one — it is what every
  * self-hosted install and every local stack already runs.
  */
-import { WorkflowStudioStreamPort, type WorkflowStudioStreamInput } from "../ports/workflow.port";
+import { WorkflowStudioStreamPort, type WorkflowStudioStreamInput } from "../ports/workflow.port.ts";
 
 /** The engine's streaming studio route at a single configured address. */
 export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {

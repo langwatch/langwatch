@@ -1,5 +1,5 @@
 import { IdentityEventingPort } from "@langwatch/identity-server";
-import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition";
+import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition.ts";
 
 /**
  * The identity ledgers' event stack, over this process's own eventing.

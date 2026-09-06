@@ -29,7 +29,7 @@
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently

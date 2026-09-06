@@ -24,8 +24,8 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import type { GovernanceIngestionWorkerCapability } from "../features/governance/governance-ingestion-worker-feature.installer";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { GovernanceIngestionWorkerCapability } from "../features/governance/governance-ingestion-worker-feature.installer.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 export type WorkerGovernanceIngestionOptions = Readonly<{
   config: WorkerConfig;

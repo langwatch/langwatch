@@ -7,7 +7,7 @@
 import { AdminSurfaceHiddenError, OpsService } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SsoConnectionTrpcApi, type SsoConnectionTrpcContext } from "../sso-connection.api";
+import { SsoConnectionTrpcApi, type SsoConnectionTrpcContext } from "../sso-connection.api.ts";
 
 const backoffice = {
   list: vi.fn(),

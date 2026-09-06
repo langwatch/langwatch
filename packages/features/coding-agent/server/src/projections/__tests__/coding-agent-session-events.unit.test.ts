@@ -8,7 +8,7 @@ import {
   type CodingAgentSessionEventRecord,
   CodingAgentSessionEventsMapProjection,
   EVENT_KIND_BY_RAW_NAME,
-} from "../coding-agent-session-events.projection";
+} from "../coding-agent-session-events.projection.ts";
 
 const SESSION_ID = "28a0697b-9057-47c4-a927-b53a9e80f139";
 

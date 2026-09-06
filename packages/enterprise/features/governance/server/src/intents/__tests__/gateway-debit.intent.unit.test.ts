@@ -5,8 +5,8 @@
  * ClickHouse or Postgres.
  */
 import { describe, expect, it, vi } from "vitest";
-import { GatewayDebitIntent, writeGatewayDebitsSchema } from "../gateway-debit.intent";
-import { GatewayDebitPort, type GatewayResolvedBudget } from "../../ports/gateway-debit.port";
+import { GatewayDebitIntent, writeGatewayDebitsSchema } from "../gateway-debit.intent.ts";
+import { GatewayDebitPort, type GatewayResolvedBudget } from "../../ports/gateway-debit.port.ts";
 
 function budget(onBreach: "BLOCK" | "WARN", id = `budget-${onBreach}`): GatewayResolvedBudget {
   return {

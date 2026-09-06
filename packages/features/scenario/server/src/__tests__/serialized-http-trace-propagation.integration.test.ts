@@ -9,8 +9,8 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-tr
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
-import { createOtelEchoServer } from "./support/otel-echo-server";
-import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.port";
+import { createOtelEchoServer } from "./support/otel-echo-server.ts";
+import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.port.ts";
 
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9]{2})$/;
 

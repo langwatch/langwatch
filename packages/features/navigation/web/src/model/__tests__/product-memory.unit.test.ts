@@ -4,7 +4,7 @@
  * Spec: specs/navigation/navigation-v2-product-memory.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readLastVisitedProduct, writeLastVisitedProduct } from "../product-memory";
+import { readLastVisitedProduct, writeLastVisitedProduct } from "../product-memory.ts";
 
 beforeEach(() => {
   localStorage.clear();

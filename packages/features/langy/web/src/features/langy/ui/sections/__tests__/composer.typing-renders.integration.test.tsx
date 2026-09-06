@@ -25,15 +25,15 @@ const pillRenders = vi.hoisted(() => ({ count: 0 }));
 
 // The pill is the render-count probe: the real one drags the whole model
 // catalogue in, and this test is about WHEN it renders, not what it shows.
-vi.mock("../../elements/langy-model-pill", () => ({
+vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => {
     pillRenders.count += 1;
     return <div data-testid="model-pill" />;
   },
 }));
 
-import { Composer } from "../composer";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { Composer } from "../composer.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 function renderComposer(onSend: (input: string) => void = () => {}) {
   return render(

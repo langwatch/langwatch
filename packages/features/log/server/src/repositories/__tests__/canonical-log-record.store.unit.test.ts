@@ -1,8 +1,8 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository";
+import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 
-import { CanonicalLogRecordStore } from "../../stores/eventing/eventing.canonical-log-record.store";
+import { CanonicalLogRecordStore } from "../../stores/eventing/eventing.canonical-log-record.store.ts";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 
 describe("CanonicalLogRecordStore", () => {

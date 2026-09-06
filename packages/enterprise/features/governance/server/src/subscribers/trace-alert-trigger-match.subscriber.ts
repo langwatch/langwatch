@@ -1,13 +1,13 @@
 import type {
   GovernanceTraceContext,
   GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port";
+} from "../ports/governance-subscriber.port.ts";
 import {
   TraceAlertMetricsPort,
   TraceAlertOriginGuardPort,
   TraceAlertTriggerMatchPort,
   TraceAlertTriggerPort,
-} from "../ports/governance-subscriber.port";
+} from "../ports/governance-subscriber.port.ts";
 
 export class TraceAlertTriggerMatchSubscriber {
   private constructor(

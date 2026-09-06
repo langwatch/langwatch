@@ -14,12 +14,12 @@ import {
   verdictPassedOf,
   verdictScoreOf,
 } from "@langwatch/evaluation-contract";
-import { type EvaluationAnalyticsData } from "./evaluation-analytics-row.projection";
+import { type EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 
 export type {
   EvaluationAnalyticsData,
   EvaluationAnalyticsRow,
-} from "./evaluation-analytics-row.projection";
+} from "./evaluation-analytics-row.projection.ts";
 
 const evaluationAnalyticsEvents = [
   evaluationScheduledEventSchema,

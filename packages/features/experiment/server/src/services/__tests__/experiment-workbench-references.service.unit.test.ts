@@ -13,7 +13,7 @@ import {
   WorkbenchMissingReferenceError,
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
-import { ExperimentWorkbenchReferencesService } from "../experiment-workbench-references.service";
+import { ExperimentWorkbenchReferencesService } from "../experiment-workbench-references.service.ts";
 
 type Answers = {
   prompts?: Array<{ id: string; handle?: string | null }>;

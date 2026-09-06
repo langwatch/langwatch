@@ -18,7 +18,7 @@ import {
   paginationView,
   SERVER_MAX_LIMIT,
   stallSkipRequest,
-} from "../model/governance-events-pager";
+} from "../model/governance-events-pager.ts";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 

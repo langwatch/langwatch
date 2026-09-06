@@ -5,7 +5,7 @@ import {
   percentileToPercent,
   translateMetric,
   translatePipelineAggregation,
-} from "../clickhouse.metric-translator.mapper";
+} from "../clickhouse.metric-translator.mapper.ts";
 
 describe("metric-translator", () => {
   describe("percentileToPercent", () => {

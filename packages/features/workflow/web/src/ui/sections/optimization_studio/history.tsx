@@ -11,24 +11,24 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
-import { UserAvatar } from "../../elements/user-avatar";
+import { UserAvatar } from "../../elements/user-avatar.tsx";
 
 import { HistoryIcon } from "@langwatch/model-provider-web/surfaces/history-icon";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../model/workflow-api-client";
-import { workflowApi } from "../../../model/workflow-api";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
-import { serializeWorkflow } from "../../../behavior/workflow-store";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../model/workflow-api-client.ts";
+import { workflowApi } from "../../../model/workflow-api.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 import {
   hasDSLChanged,
   parseStudioWorkflow,
   type Project,
   studioWorkflowSchema,
 } from "@langwatch/workflow-contract";
-import { NewVersionFields } from "./version-to-be-used";
+import { NewVersionFields } from "./version-to-be-used.tsx";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();

@@ -8,7 +8,7 @@ import {
   type GovernanceKpiContribution,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
-} from "../ports/governance-subscriber.port";
+} from "../ports/governance-subscriber.port.ts";
 
 export const GOVERNANCE_KPIS_SYNC_WINDOW_MS = 30_000;
 

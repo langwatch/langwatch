@@ -32,7 +32,7 @@ import {
   type FieldMapping,
   isComparisonEvaluator,
   type TargetConfig,
-} from "../../model/experiments-v3/types";
+} from "../../model/experiments-v3/types.ts";
 import {
   deriveComparisonTargetMappings,
   inferAllEvaluatorMappings,

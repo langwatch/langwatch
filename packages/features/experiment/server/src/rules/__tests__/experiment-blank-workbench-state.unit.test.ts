@@ -13,7 +13,7 @@ import {
   extractPersistedState,
   persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
-import { createBlankWorkbenchState } from "../experiment-blank-workbench-state.rules";
+import { createBlankWorkbenchState } from "../experiment-blank-workbench-state.rules.ts";
 
 describe("the blank workbench state", () => {
   describe("given the persisted state schema", () => {

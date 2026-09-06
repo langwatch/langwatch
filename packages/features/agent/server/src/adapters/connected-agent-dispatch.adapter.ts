@@ -40,14 +40,14 @@ import {
   replyChannel,
   resultKey,
   threadPinKey,
-} from "../rules/connected-agent-keys.rules";
+} from "../rules/connected-agent-keys.rules.ts";
 import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
 import {
   ConnectedAgentDispatchPort,
   type ConnectedAgentRegistryPort,
   type DispatchParams,
   type LiveInstance,
-} from "../ports/connected-agent-runtime.port";
+} from "../ports/connected-agent-runtime.port.ts";
 
 const logger = createLogger("langwatch:connected-agents:dispatcher");
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "../index";
-import { mapToPlanInfo } from "../index";
-import type { LicenseData } from "../index";
+import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "../index.ts";
+import { mapToPlanInfo } from "../index.ts";
+import type { LicenseData } from "../index.ts";
 
 describe("mapToPlanInfo", () => {
   const createLicenseData = (planOverrides: Partial<LicenseData["plan"]> = {}): LicenseData => ({

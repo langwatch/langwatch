@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ALERT_TRIGGER_DEFAULTS, REPORT_TRIGGER_DEFAULTS } from "../defaults";
-import { renderWebhookBody } from "../render-webhook-body";
+import { ALERT_TRIGGER_DEFAULTS, REPORT_TRIGGER_DEFAULTS } from "../defaults.ts";
+import { renderWebhookBody } from "../render-webhook-body.ts";
 import {
   buildExampleReportTemplateContext,
   buildGraphAlertTemplateContext,
-} from "../template-context";
-import { makeContext, makeMatch } from "./fixtures";
+} from "../template-context.ts";
+import { makeContext, makeMatch } from "./fixtures.ts";
 
 // Trace content that would break out of a naive JSON template — the `| json`
 // discipline in the defaults must keep the envelope parseable.

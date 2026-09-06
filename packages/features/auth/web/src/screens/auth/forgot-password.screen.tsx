@@ -14,13 +14,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
-import { authClient } from "../../behavior/auth-client";
-import Link from "../../ui/elements/router-link";
-import { AuthCard } from "../../ui/elements/auth-card";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
-import { LogoIcon } from "../../ui/elements/logo-icon";
-import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { authClient } from "../../behavior/auth-client.tsx";
+import Link from "../../ui/elements/router-link.tsx";
+import { AuthCard } from "../../ui/elements/auth-card.tsx";
+import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
+import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
+import { usePublicEnvWithCapabilities } from "../../behavior/use-public-env.ts";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 

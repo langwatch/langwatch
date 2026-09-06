@@ -15,7 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaDatasetContentRepository } from "../prisma.dataset-content.repository";
+import { PrismaDatasetContentRepository } from "../prisma.dataset-content.repository.ts";
 
 /** Every query the repository issued, in order, with the arguments it sent. */
 class RecordingGuard extends PrismaQueryGuard {

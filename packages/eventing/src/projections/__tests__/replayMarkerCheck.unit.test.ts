@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Event } from "../../domain/types";
-import { isAtOrBeforeCutoff, isAtOrBeforeCutoffMarker } from "../../replay/replayConstants";
-import { RedisReplayMarkerChecker, ReplayDeferralError } from "../replayMarkerCheck";
+import type { Event } from "../../domain/types.ts";
+import { isAtOrBeforeCutoff, isAtOrBeforeCutoffMarker } from "../../replay/replayConstants.ts";
+import { RedisReplayMarkerChecker, ReplayDeferralError } from "../replayMarkerCheck.ts";
 
 function makeEvent(overrides: Partial<Event> = {}): Event {
   return {

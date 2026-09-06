@@ -15,25 +15,25 @@ import {
 } from "@chakra-ui/react";
 import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
-import { BudgetCreateDrawer } from "../../features/budgets/ui/sections/budget-create-drawer";
-import { BudgetEditDrawer } from "../../features/budgets/ui/sections/budget-edit-drawer";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
+import { BudgetCreateDrawer } from "../../features/budgets/ui/sections/budget-create-drawer.tsx";
+import { BudgetEditDrawer } from "../../features/budgets/ui/sections/budget-edit-drawer.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { formatBudgetUsd } from "../../model/format-budget-usd";
-import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
+import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel.tsx";
 import {
   ProviderScopeChips,
   type ProviderScopeType,
 } from "@langwatch/authz-web/surfaces/scope-picker";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Link } from "../../ui/elements/gateway-link";
+import { Link } from "../../ui/elements/gateway-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
-import { useGatewayRouter } from "../../behavior/gateway-router";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
+import { useGatewayRouter } from "../../behavior/gateway-router.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
 

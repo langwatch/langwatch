@@ -2,7 +2,7 @@
  * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { describe, expect, it } from "vitest";
-import { sameAttributeValue } from "../attribute-value-equality";
+import { sameAttributeValue } from "../attribute-value-equality.ts";
 
 /** `gen_ai.input.messages` as the trace recorded it, trimmed to two turns. */
 const MESSAGES = [

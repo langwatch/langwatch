@@ -3,7 +3,7 @@ import {
   GatewayTraceDestinationReportRepository,
   type TraceDestinationKeyRow,
   type TraceDestinationProjectRow,
-} from "../gateway-trace-destination-report.repository";
+} from "../gateway-trace-destination-report.repository.ts";
 
 const PROJECT_SELECT = {
   id: true,

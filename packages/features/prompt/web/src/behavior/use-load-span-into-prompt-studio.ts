@@ -7,17 +7,17 @@
 import { useEffect, useRef } from "react";
 import { LLM_PARAMETER_MAP } from "@langwatch/prompt-contract";
 import type { ChatMessage, PromptStudioSpanResult } from "@langwatch/trace-contract";
-import { DEFAULT_MODEL } from "../model/prompt-constants";
+import { DEFAULT_MODEL } from "../model/prompt-constants.ts";
 import {
   computeInitialFormValuesForPrompt,
   formSchema,
   type PromptConfigFormValues,
-} from "../model/prompt-form";
-import { usePromptHost } from "../model/prompt-host";
-import { promptApi } from "./prompt-api";
-import { usePromptProject } from "./use-prompt-project";
-import { TabDataSchema } from "../model/prompt-tabs-store";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+} from "../model/prompt-form/index.ts";
+import { usePromptHost } from "../model/prompt-host.ts";
+import { promptApi } from "./prompt-api.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
+import { TabDataSchema } from "../model/prompt-tabs-store.ts";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 const QUERY_PARAM_ACTION = "action";

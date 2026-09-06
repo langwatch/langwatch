@@ -14,7 +14,7 @@ vi.mock("fs/promises", () => ({
   },
 }));
 
-import { LocalDatasetStorageAdapter } from "../local.dataset-storage.adapter";
+import { LocalDatasetStorageAdapter } from "../local.dataset-storage.adapter.ts";
 
 /** Build an Error carrying a Node errno `code`, mirroring what fs rejects with. */
 const errnoError = (code: string): Error => {

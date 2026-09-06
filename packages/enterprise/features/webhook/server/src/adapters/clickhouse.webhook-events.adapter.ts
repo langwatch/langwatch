@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { WebhookEventsClickHouseRepository } from "../repositories/clickhouse/clickhouse.webhook-events.repository";
-import type { WebhookClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.webhook-events.repository";
-import type { WebhookEventsRepositoryPort } from "../ports/webhook-events.port";
+import { WebhookEventsClickHouseRepository } from "../repositories/clickhouse/clickhouse.webhook-events.repository.ts";
+import type { WebhookClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.webhook-events.repository.ts";
+import type { WebhookEventsRepositoryPort } from "../ports/webhook-events.port.ts";
 
 /**
  * The composition seam for webhook event reads.

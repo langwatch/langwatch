@@ -1,5 +1,5 @@
-import type { EventingTracePipelineAdapter } from "../adapters/eventing.trace-pipeline.adapter";
-import type { TraceDeferredOriginSchedulerPort } from "../adapters/eventing.deferred-origin.adapter";
+import type { EventingTracePipelineAdapter } from "../adapters/eventing.trace-pipeline.adapter.ts";
+import type { TraceDeferredOriginSchedulerPort } from "../adapters/eventing.deferred-origin.adapter.ts";
 
 /**
  * The exact definition Trace's own builder produces, commands and projections

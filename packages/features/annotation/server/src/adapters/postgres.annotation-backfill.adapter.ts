@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   AnnotationBackfillSourcePort,
   type BackfillableAnnotation,
-} from "../ports/annotation-backfill.port";
+} from "../ports/annotation-backfill.port.ts";
 
 /**
  * The annotations of record, read through the process's guarded client.

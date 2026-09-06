@@ -3,13 +3,13 @@ import type {
   CanonicalAttributesPort,
   ExtractorContext,
   LogExtractorContext,
-} from "../ports/canonical-attributes.port";
-import { asNumber } from "../rules/canonical-guard.rules";
+} from "../ports/canonical-attributes.port.ts";
+import { asNumber } from "../rules/canonical-guard.rules.ts";
 import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
-} from "../rules/claude-code-call-policy.rules";
-import { ClaudeCodeResponseService } from "./claude-code-response.service";
+} from "../rules/claude-code-call-policy.rules.ts";
+import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 

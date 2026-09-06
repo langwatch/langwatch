@@ -1,9 +1,9 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { z, type ZodTypeAny } from "zod";
-import { storedObjectDeliveryAudienceSchema } from "./audiences";
-import { storedObjectIdSchema, storedObjectProjectIdSchema } from "./ids";
-import { storedObjectLifecycleStatusSchema, storedObjectMetadataSchema } from "./metadata";
-import { storedObjectDeliveryCapabilitySchema } from "./references";
+import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";
+import { storedObjectIdSchema, storedObjectProjectIdSchema } from "./ids.ts";
+import { storedObjectLifecycleStatusSchema, storedObjectMetadataSchema } from "./metadata.ts";
+import { storedObjectDeliveryCapabilitySchema } from "./references.ts";
 
 const internalIdentitySchema = z
   .object({

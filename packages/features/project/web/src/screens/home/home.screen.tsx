@@ -9,22 +9,22 @@ import {
   BriefingMockSwitcher,
   HomeBriefingSection,
   SetupHairline,
-} from "../../screens/home/briefing";
-import { homeApi } from "../../behavior/home-api";
-import { DocsGuides } from "./components/docs-guides";
-import { HomeStateSwitcher } from "./components/dev/home-state-switcher";
-import { chartVariantFor, useHomeDevState } from "./components/dev/home-dev-state";
-import { HomeFortune } from "./components/home-fortune";
-import { HomePageBanners } from "./components/home-page-banners";
-import { LangyHomeHero } from "./components/langy-home-hero";
-import { LearningResources } from "./components/learning-resources";
-import { OnboardingProgress } from "./components/onboarding-progress";
-import { RecentItemsSection } from "./components/recent-items-section";
-import { TracesOverview } from "./components/traces-overview";
-import { useHomeComposition } from "./components/use-home-composition";
-import { useProjectReach } from "./components/use-project-reach";
-import { WelcomeHeader } from "./components/welcome-header";
-import { useProjectHomeHost } from "../../model/project-home-host";
+} from "../../screens/home/briefing/index.ts";
+import { homeApi } from "../../behavior/home-api.ts";
+import { DocsGuides } from "./components/docs-guides.tsx";
+import { HomeStateSwitcher } from "./components/dev/home-state-switcher.tsx";
+import { chartVariantFor, useHomeDevState } from "./components/dev/home-dev-state.ts";
+import { HomeFortune } from "./components/home-fortune.tsx";
+import { HomePageBanners } from "./components/home-page-banners.tsx";
+import { LangyHomeHero } from "./components/langy-home-hero.tsx";
+import { LearningResources } from "./components/learning-resources.tsx";
+import { OnboardingProgress } from "./components/onboarding-progress.tsx";
+import { RecentItemsSection } from "./components/recent-items-section.tsx";
+import { TracesOverview } from "./components/traces-overview.tsx";
+import { useHomeComposition } from "./components/use-home-composition.ts";
+import { useProjectReach } from "./components/use-project-reach.ts";
+import { WelcomeHeader } from "./components/welcome-header.tsx";
+import { useProjectHomeHost } from "../../model/project-home-host.ts";
 
 /**
  * The application shell is not this page's — chrome layout draws it. A

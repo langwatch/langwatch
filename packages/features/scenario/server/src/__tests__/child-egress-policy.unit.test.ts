@@ -9,7 +9,7 @@ import {
   decodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
   type ScenarioChildProcessConfig,
-} from "../index";
+} from "../index.ts";
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/apps/worker",

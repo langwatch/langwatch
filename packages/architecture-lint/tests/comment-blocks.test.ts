@@ -8,7 +8,7 @@ import {
   compareCommentBlockRoots,
   lintCommentBlockRoots,
   lintCommentBlocks,
-} from "../src";
+} from "../src/index.ts";
 
 function lineComments(lines: number): string {
   return Array.from({ length: lines }, () => "// comment").join("\n");

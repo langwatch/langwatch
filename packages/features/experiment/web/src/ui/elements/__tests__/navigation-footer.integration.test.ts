@@ -17,7 +17,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-const { useMessagesNavigationFooter } = await import("../navigation-footer");
+const { useMessagesNavigationFooter } = await import("../navigation-footer.tsx");
 
 describe("useMessagesNavigationFooter()", () => {
   describe("given a project-scoped route with default pagination", () => {

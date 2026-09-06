@@ -1,10 +1,10 @@
 import { useRef } from "react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import { DatasetCellDisplay } from "./dataset-cell-display";
-import { FloatingCellEditor } from "./floating-cell-editor";
-import { useDatasetTable } from "../../model/dataset-table-context";
+import { DatasetCellDisplay } from "./dataset-cell-display.tsx";
+import { FloatingCellEditor } from "./floating-cell-editor.tsx";
+import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 
-export { JSON_LIKE_TYPES } from "../../model/editable-cell-value";
+export { JSON_LIKE_TYPES } from "../../model/editable-cell-value.ts";
 
 type EditableCellProps = {
   value: string;

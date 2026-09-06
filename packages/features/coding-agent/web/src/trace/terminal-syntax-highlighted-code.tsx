@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import { memo, useEffect, useState } from "react";
 import { codeToHtmlDark } from "@langwatch/design-system/shiki";
-import { AnsiText } from "./terminal-ansi-text";
-import { TERMINAL_FONT_STACK } from "./terminal-palette";
+import { AnsiText } from "./terminal-ansi-text.tsx";
+import { TERMINAL_FONT_STACK } from "./terminal-palette.ts";
 
 /**
  * A file's content, syntax-highlighted the way an editor would show it — not

@@ -16,15 +16,15 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
-import { NANO_USD_PER_USD } from "../adapters/model-catalog.gateway-spend-rating.adapter";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import { NANO_USD_PER_USD } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import type { GatewayService } from "../services/gateway.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the

@@ -14,20 +14,20 @@ import {
   MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
-import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service";
-import { isCustomRole } from "../rules/custom-role-naming.rules";
-import type { TeamRoleValue } from "../rules/member-role-constraints.rules";
+import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
+import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
   type OrganizationPlanUser,
-} from "../ports/organization-membership.port";
+} from "../ports/organization-membership.port.ts";
 import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
-} from "../repositories/organization-membership.repository";
+} from "../repositories/organization-membership.repository.ts";
 
 /**
  * The union of permissions granted by the custom roles behind these team bindings, or

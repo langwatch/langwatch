@@ -1,6 +1,6 @@
 import { render, type RenderOptions } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { DesignSystemProvider } from "../provider";
+import { DesignSystemProvider } from "../provider/index.tsx";
 
 export function renderWithDesignSystem(
   element: ReactElement,

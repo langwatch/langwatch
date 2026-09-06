@@ -22,12 +22,12 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import type { TraceBlobStoreService } from "../trace-blob-store.service";
-import { BlobNotFoundError } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import type { SpanStorageRepository } from "../../repositories/span-storage.repository";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
-import { TraceSummaryService } from "../trace-summary-read.service";
+import type { SpanStorageRepository } from "../../repositories/span-storage.repository.ts";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
+import { TraceSummaryService } from "../trace-summary-read.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — mirrors resolve-offloaded-traces.unit.test.ts's fixtures.

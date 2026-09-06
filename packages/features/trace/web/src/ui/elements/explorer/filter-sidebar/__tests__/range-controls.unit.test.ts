@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { commitRange, stepForSpan } from "../range-controls";
+import { commitRange, stepForSpan } from "../range-controls.tsx";
 
 describe("stepForSpan", () => {
   describe("given a sub-unit span", () => {

@@ -2,7 +2,7 @@ import type {
   ProcessDefinition,
   ProcessEventEnvelope,
   ProcessRef,
-} from "../../processManager.types";
+} from "../../processManager.types.ts";
 
 /**
  * Test-only miniature of the Langy conversation process from ADR-049 §4:

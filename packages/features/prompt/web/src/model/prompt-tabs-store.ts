@@ -8,9 +8,9 @@ import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { chatMessageSchema } from "@langwatch/trace-contract";
-import type { PromptTabsCapabilities } from "./browser-capabilities";
-import type { PromptConfigFormValues } from "./prompt-form";
-import { createTabId, createWindowId } from "./tab-id-generators";
+import type { PromptTabsCapabilities } from "./browser-capabilities.ts";
+import type { PromptConfigFormValues } from "./prompt-form/index.ts";
+import { createTabId, createWindowId } from "./tab-id-generators.ts";
 
 /**
  * Zod schema for the data associated with a tab in the prompt playground browser.

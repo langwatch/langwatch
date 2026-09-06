@@ -6,14 +6,14 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../model-providers.screen";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../model-providers.screen.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const { mockState } = vi.hoisted(() => ({
   mockState: { providers: [] as Array<Record<string, unknown>> },
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
@@ -79,7 +79,7 @@ vi.mock("@langwatch/design-system/page-layout", () => ({
   },
 }));
 
-const { default: ModelProvidersScreen } = await import("../model-providers.screen");
+const { default: ModelProvidersScreen } = await import("../model-providers.screen.tsx");
 
 const AVAILABLE = {
   organization: { id: "org-1", name: "ACME" },

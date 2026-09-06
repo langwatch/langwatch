@@ -6,10 +6,10 @@ import { HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { LuInfo, LuScissors } from "react-icons/lu";
 
-import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard";
-import { computeParetoDominance } from "../batch-evaluation-results.pareto";
-import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics";
-import { formatTradeoffSummary } from "../batch-evaluation-results.tradeoff";
+import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { computeParetoDominance } from "../batch-evaluation-results.pareto.ts";
+import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics.ts";
+import { formatTradeoffSummary } from "../batch-evaluation-results.tradeoff.ts";
 
 export type TradeoffSummaryLineProps = {
   leaderboard: BTLeaderboard;

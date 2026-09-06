@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { normalizedSpanSchema } from "./trace.spans";
-import { logTraceContributionSchema } from "./trace-log-contribution";
-import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./trace.constants";
-import { metricCorrelationFields } from "./trace-metric-correlation";
+import { normalizedSpanSchema } from "./trace.spans.ts";
+import { logTraceContributionSchema } from "./trace-log-contribution.ts";
+import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
+import { metricCorrelationFields } from "./trace-metric-correlation.ts";
 
 export {
   DEFAULT_PII_REDACTION_LEVEL,
   piiRedactionLevelSchema,
   recordSpanCommandDataSchema,
-} from "./trace-ingress.commands";
-export type { PIIRedactionLevel, RecordSpanCommandData } from "./trace-ingress.commands";
+} from "./trace-ingress.commands.ts";
+export type { PIIRedactionLevel, RecordSpanCommandData } from "./trace-ingress.commands.ts";
 
 export const recordTraceSpanEventDataSchema = z.object({
   ingressEventId: z.string(),

@@ -4,7 +4,7 @@
  * unchanged by the move. See specs/home/welcome-header.feature.
  */
 import { describe, expect, it } from "vitest";
-import { getGreeting, getGreetingName, getTimeOfDay } from "../welcome-header";
+import { getGreeting, getGreetingName, getTimeOfDay } from "../welcome-header.tsx";
 
 describe("WelcomeHeader", () => {
   describe("getGreetingName", () => {

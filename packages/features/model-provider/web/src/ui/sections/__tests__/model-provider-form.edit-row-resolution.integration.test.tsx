@@ -43,11 +43,11 @@ const {
   mockListAllForProjectForFrontendQuery: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: (...args: unknown[]) => mockUseModelProvidersSettings(...args),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const modelProvider = {
     listAllForOrganizationForFrontend: { useQuery: mockListAllForOrganizationForFrontendQuery },
     listAllForProjectForFrontend: { useQuery: mockListAllForProjectForFrontendQuery },
@@ -81,7 +81,7 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
-vi.mock("../../../behavior/use-model-provider-api-key-validation", () => ({
+vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
   useModelProviderApiKeyValidation: () => ({
     validate: vi.fn().mockResolvedValue(true),
     validateWithCustomUrl: vi.fn().mockResolvedValue(true),
@@ -93,10 +93,10 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation", () => ({
 
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form";
-import { FakeModelProviderHost } from "../../../testing";
-import { ModelProviderHostProvider } from "../../../model/model-provider-host";
-import { Wrapper } from "./model-provider-drawer-harness";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
+import { FakeModelProviderHost } from "../../../testing.tsx";
+import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
+import { Wrapper } from "./model-provider-drawer-harness.tsx";
 
 // rowA is the edit TARGET: the wider (organization) scope, absent from the
 // collapsed record because rowB (narrower scope) wins the provider-type

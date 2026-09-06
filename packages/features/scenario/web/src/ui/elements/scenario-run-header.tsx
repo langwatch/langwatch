@@ -1,8 +1,8 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { CopyIdChip } from "./copy-id-chip";
-import { ScenarioRunStatusIcon } from "./scenario-run-status-icon";
+import { CopyIdChip } from "./copy-id-chip.tsx";
+import { ScenarioRunStatusIcon } from "./scenario-run-status-icon.tsx";
 
 interface CopyableId {
   label: string;

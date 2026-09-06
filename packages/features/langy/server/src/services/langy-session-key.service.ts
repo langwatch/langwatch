@@ -2,10 +2,10 @@ import { LANGY_SESSION_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-k
 import type { AuthzService } from "@langwatch/authz-contract";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
-import { LangySessionKeyPort, LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
-import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository";
-import { LangySessionKeyReapService } from "./langy-session-key-reap.service";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
+import { LangySessionKeyPort, LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port.ts";
+import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository.ts";
+import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
 
 const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;

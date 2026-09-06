@@ -14,30 +14,30 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
-import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
   type LangWatchQLTable,
-} from "../../services/langwatch-ql-access-model.service";
+} from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
   LangWatchQLServerConfigService,
-} from "../../services/langwatch-ql-server-config.service";
+} from "../../services/langwatch-ql-server-config.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
-} from "../../services/langwatch-ql-catalog-shapes.service";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
-} from "../../services/langwatch-ql-postgres-mapping.service";
+} from "../../services/langwatch-ql-postgres-mapping.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
-import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository";
+import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
 
 const stateRow = {
   SuiteRunId: "run_1",

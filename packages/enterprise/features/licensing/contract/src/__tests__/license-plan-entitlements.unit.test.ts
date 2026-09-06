@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { UNLIMITED_PLAN } from "../index";
-import { applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../index";
-import type { PlanInfo } from "../index";
+import { UNLIMITED_PLAN } from "../index.ts";
+import { applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../index.ts";
+import type { PlanInfo } from "../index.ts";
 
 /**
  * Spec: specs/licensing/plan-entitlements.feature

@@ -4,7 +4,7 @@ import {
   type GraphAlertTemplateContext,
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry";
+import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry.ts";
 
 /**
  * `history` is `[...previousPoints, ...currentPoints]` — oldest first, easily

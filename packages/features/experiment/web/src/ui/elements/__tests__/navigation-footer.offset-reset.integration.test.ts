@@ -18,7 +18,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-const { useMessagesNavigationFooter } = await import("../navigation-footer");
+const { useMessagesNavigationFooter } = await import("../navigation-footer.tsx");
 
 const lastQuery = () => mockPush.mock.lastCall![0].query;
 

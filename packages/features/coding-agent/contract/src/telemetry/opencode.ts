@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 const OPENCODE_TOOL_SPAN = "opencode.tool.";
 

@@ -4,7 +4,7 @@ import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-co
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
-} from "../../model/scenario-run-status-config";
+} from "../../model/scenario-run-status-config.ts";
 
 interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;

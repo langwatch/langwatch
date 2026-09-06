@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 
 /**
  * Langy's mark: LangWatch's own logo, repainted in the brand gradient.

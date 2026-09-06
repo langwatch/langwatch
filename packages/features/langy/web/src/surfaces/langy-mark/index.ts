@@ -1,1 +1,1 @@
-export * from "../../ui/sections/langy-mark";
+export * from "../../ui/sections/langy-mark.tsx";

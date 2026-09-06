@@ -1,4 +1,4 @@
-import { type ProductFlowConfig, ProductScreenIndex } from "./types";
+import { type ProductFlowConfig, ProductScreenIndex } from "./types.ts";
 
 export const PRODUCT_FLOW_CONFIG: ProductFlowConfig = {
   variant: "product",

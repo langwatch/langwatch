@@ -29,7 +29,7 @@ import type {
   RoleType,
   SolutionType,
   UsageStyle,
-} from "./types";
+} from "./types.ts";
 
 export const usageStyleItems: IconFormItem<UsageStyle>[] = [
   {

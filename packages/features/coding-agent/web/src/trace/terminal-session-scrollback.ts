@@ -1,5 +1,5 @@
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import type { TerminalToolSpan } from "./terminal-tool-spans";
+import type { TerminalToolSpan } from "./terminal-tool-spans.ts";
 
 export const CONVERSATION_TURN_CAP = 200;
 

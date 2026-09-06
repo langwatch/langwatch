@@ -1,14 +1,14 @@
 import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
-import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role";
-import { BlockStack } from "./block-stack";
+import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role.tsx";
+import { BlockStack } from "./block-stack.tsx";
 import {
   getRolePalette,
   ROLE_ICONS,
   ROLE_LABELS,
   type RolePalette,
-} from "../../blocks/transcript/role-chip";
-import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types";
+} from "../../blocks/transcript/role-chip.tsx";
+import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types.ts";
 
 /**
  * Flat, ChatGPT-style turn body. Renders the role chip on its own row followed by the

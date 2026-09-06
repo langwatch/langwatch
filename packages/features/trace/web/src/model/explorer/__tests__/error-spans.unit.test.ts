@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { rankedErrorSpans } from "../error-spans";
+import { rankedErrorSpans } from "../error-spans.ts";
 
 function span(partial: Partial<SpanTreeNode>): SpanTreeNode {
   return {

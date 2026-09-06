@@ -4,7 +4,7 @@ import {
   type LangyConversationUpdateSignal,
   langyConversationUpdateSignalSchema,
 } from "@langwatch/langy-contract";
-import { api } from "../../../behavior/langy-api";
+import { api } from "../../../behavior/langy-api.ts";
 
 interface UseLangyConversationUpdateListenerOptions {
   projectId: string;

@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { InMemoryWebhookDispatchRateLimiterAdapter, WebhookEgressService } from "@langwatch/egress";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerGatewaySpend,
   dispatchWebhookThrough,
   resolveWebhookPlan,
   WorkerGatewaySpendAbsenceReportPort,
-} from "../worker-gateway-spend.composition";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
+} from "../worker-gateway-spend.composition.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 /**
  * Spec: specs/ai-gateway/worker-gateway-spend-conversion.feature

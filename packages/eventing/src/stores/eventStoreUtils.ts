@@ -1,14 +1,14 @@
-import type { AggregateType } from "../domain/aggregateType";
-import { createTenantId } from "../domain/tenantId";
-import type { Event } from "../domain/types";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import { createTenantId } from "../domain/tenantId.ts";
+import type { Event } from "../domain/types.ts";
 import {
   ErrorCategory,
   SecurityError,
   StoreError,
   ValidationError,
-} from "../services/errorHandling";
-import type { EventStoreReadContext } from "./eventStore.types";
-import type { EventRecord } from "./repositories/eventRepository.types";
+} from "../services/errorHandling.ts";
+import type { EventStoreReadContext } from "./eventStore.types.ts";
+import type { EventRecord } from "./repositories/eventRepository.types.ts";
 
 /**
  * Transforms an EventRecord from storage into a domain Event.

@@ -8,21 +8,21 @@ import {
   type LangWatchQLParser,
   type SqlAstNode,
   type SqlSourcePosition,
-} from "../rules/langwatch-ql-parser.rules";
+} from "../rules/langwatch-ql-parser.rules.ts";
 import {
   type LangWatchQLPolicy,
   qualifyTableName,
   RESERVED_DATABASES,
   type ResolvedLangWatchQLPolicy,
   DEFAULT_LWQL_LIMITS,
-} from "../rules/langwatch-ql-policy.rules";
-import { positionOf, ROOT_FRAME, walkNode } from "../rules/langwatch-ql-query-walk.rules";
+} from "../rules/langwatch-ql-policy.rules.ts";
+import { positionOf, ROOT_FRAME, walkNode } from "../rules/langwatch-ql-query-walk.rules.ts";
 import type {
   LangWatchQLValidation,
   RejectedLangWatchQL,
   WalkContext,
-} from "../rules/langwatch-ql-validation-shape.rules";
-import type { LangWatchQLViolationCode } from "../rules/langwatch-ql-violations.rules";
+} from "../rules/langwatch-ql-validation-shape.rules.ts";
+import type { LangWatchQLViolationCode } from "../rules/langwatch-ql-violations.rules.ts";
 
 export interface ValidateLangWatchQLInput extends LangWatchQLPolicy {
   /** The SQL exactly as the caller submitted it. Never rewritten. */

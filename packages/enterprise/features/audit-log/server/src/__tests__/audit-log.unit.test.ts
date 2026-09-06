@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AuditLogAdapter } from "../index";
+import { AuditLogAdapter } from "../index.ts";
 
 describe("DefaultAuditLogService", () => {
   /** @scenario "Legacy request context is normalised at the server edge" */

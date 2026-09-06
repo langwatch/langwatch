@@ -14,15 +14,15 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter";
-import { GatewaySpendRatingPort } from "../../../ports/gateway-spend-rating.port";
+import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/postgres.gateway-internal-store.adapter.ts";
+import { GatewaySpendRatingPort } from "../../../ports/gateway-spend-rating.port.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
   createGatewayInternalRestApp,
   type GatewayInternalRestPorts,
-} from "../gateway-internal.api";
-import { testRestSecurity } from "./support/rest-security.support";
+} from "../gateway-internal.api.ts";
+import { testRestSecurity } from "./support/rest-security.support.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

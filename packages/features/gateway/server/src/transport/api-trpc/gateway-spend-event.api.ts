@@ -8,7 +8,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { gatewaySpendEventPageSchema } from "@langwatch/gateway-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { spendFiltersSchema } from "../../adapters/gateway-spend-filters.adapter";
+import { spendFiltersSchema } from "../../adapters/gateway-spend-filters.adapter.ts";
 import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */

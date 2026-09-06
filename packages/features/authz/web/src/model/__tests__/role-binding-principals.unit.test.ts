@@ -15,7 +15,7 @@ import {
   roleBadgePalette,
   scopeLabel,
   scopePillText,
-} from "../role-binding-principals";
+} from "../role-binding-principals.ts";
 
 function binding(overrides: Partial<RoleBinding> & { id: string }): RoleBinding {
   return {

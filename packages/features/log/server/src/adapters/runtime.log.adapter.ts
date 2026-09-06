@@ -1,13 +1,13 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingEvent, LogService as LogServiceContract } from "@langwatch/log-contract";
-import type { LogRedactionPort } from "../ports/log-redaction.port";
-import { CanonicalLogAdapter } from "./canonical-log.adapter";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter";
-import { LogService } from "../services/log.service";
-import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository";
-import type { LogClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository";
-import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository";
-import { NullCanonicalLogRecordRepository } from "../repositories/null/null.canonical-log-record.repository";
+import type { LogRedactionPort } from "../ports/log-redaction.port.ts";
+import { CanonicalLogAdapter } from "./canonical-log.adapter.ts";
+import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter.ts";
+import { LogService } from "../services/log.service.ts";
+import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
+import type { LogClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
+import { NullCanonicalLogRecordRepository } from "../repositories/null/null.canonical-log-record.repository.ts";
 
 /** Process composition for the log service and its durable processing pipeline. */
 export class LogRuntimeAdapter {

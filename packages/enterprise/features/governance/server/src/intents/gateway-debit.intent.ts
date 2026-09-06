@@ -5,7 +5,7 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
   type GatewaySpendUsage,
-} from "../ports/gateway-debit.port";
+} from "../ports/gateway-debit.port.ts";
 
 export const writeGatewayDebitsSchema = z.object({
   gateway_request_id: z.string(),

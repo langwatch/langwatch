@@ -14,7 +14,7 @@ import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
   const ensureConversation = vi.fn(async () => ({ id: "conversation-1", isNew: false }));

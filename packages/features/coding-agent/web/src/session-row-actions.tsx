@@ -4,7 +4,7 @@ import type React from "react";
 
 import { Menu } from "@langwatch/design-system/menu";
 
-import type { SessionListRow } from "./session-list-row";
+import type { SessionListRow } from "./session-list-row.ts";
 
 /**
  * Everything a reader can do with a row other than choose it. Choosing the row

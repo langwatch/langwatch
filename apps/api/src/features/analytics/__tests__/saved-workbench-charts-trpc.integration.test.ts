@@ -47,7 +47,7 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createSavedWorkbenchChartTrpcRouter } from "../../dashboard/dashboard-trpc.mount";
+import { createSavedWorkbenchChartTrpcRouter } from "../../dashboard/dashboard-trpc.mount.ts";
 
 const SQL = "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";
 

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import * as contract from "../index";
+import * as contract from "../index.ts";
 import {
   type AuthzAttachBindingsInput,
   type AuthzAttachBindingsOutput,
@@ -32,7 +32,7 @@ import {
   authzRevokeBindingsWhereOutputSchema,
   authzRevokeResourceGrantsInputSchema,
   authzRevokeResourceGrantsOutputSchema,
-} from "../index";
+} from "../index.ts";
 
 const actor = { type: "user" as const, id: "user_admin" };
 

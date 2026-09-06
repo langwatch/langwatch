@@ -19,7 +19,7 @@ import type { ComponentType } from "react";
 export type DataPrivacyScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const dataPrivacyScreens = {
-  dataPrivacy: () => import("./data-privacy.screen"),
+  dataPrivacy: () => import("./data-privacy.screen.tsx"),
 } as const satisfies Record<string, DataPrivacyScreenLoader>;
 
 export type DataPrivacyScreenName = keyof typeof dataPrivacyScreens;
@@ -30,8 +30,8 @@ export {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
   PRIVACY_SCOPE_QUERY_KEY,
-} from "./data-privacy.screen";
-export { dataPrivacyApi } from "../../behavior/data-privacy-api";
+} from "./data-privacy.screen.tsx";
+export { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 export {
   DataPrivacyHostPort,
   DataPrivacyHostProvider,
@@ -39,4 +39,4 @@ export {
   type PrivacyHostScope,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
-} from "../../model/data-privacy-host";
+} from "../../model/data-privacy-host.ts";

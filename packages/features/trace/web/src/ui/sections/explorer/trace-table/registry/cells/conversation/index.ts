@@ -1,8 +1,8 @@
-import type { ConversationGroup } from "../../../conversation-groups";
-import type { CellDef } from "../../types";
-import { ConversationSelectCell } from "../select-cells";
-import { ConversationCell } from "./conversation-cell";
-import { LastTurnCell } from "./last-turn-cell";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import type { CellDef } from "../../types.ts";
+import { ConversationSelectCell } from "../select-cells.tsx";
+import { ConversationCell } from "./conversation-cell.tsx";
+import { LastTurnCell } from "./last-turn-cell.tsx";
 import {
   CompactionsCell,
   CostCell,
@@ -15,9 +15,9 @@ import {
   SessionContextSizeCell,
   StatusCell,
   TokensCell,
-} from "./simple-cells";
-import { StartedCell } from "./started-cell";
-import { TurnsCell } from "./turns-cell";
+} from "./simple-cells.tsx";
+import { StartedCell } from "./started-cell.tsx";
+import { TurnsCell } from "./turns-cell.tsx";
 
 export const conversationCells: Record<string, CellDef<ConversationGroup>> = {
   [ConversationSelectCell.id]: ConversationSelectCell,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationIntentSchema } from "./organization";
+import { organizationIntentSchema } from "./organization.ts";
 
 /**
  * The transport inputs the organization, membership and invitation surface

@@ -24,7 +24,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { PrivacyRuleDrawer } from "../privacy-rule-drawer";
+import { PrivacyRuleDrawer } from "../privacy-rule-drawer.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -4,8 +4,8 @@ import {
   LogService as LogServiceContract,
   type LogPiiRedactionLevel,
 } from "@langwatch/log-contract";
-import type { LogPreparationPort } from "../ports/log-preparation.port";
-import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository";
+import type { LogPreparationPort } from "../ports/log-preparation.port.ts";
+import type { CanonicalLogRecordRepository } from "../repositories/canonical-log-record.repository.ts";
 
 export class LogService extends LogServiceContract {
   private constructor(

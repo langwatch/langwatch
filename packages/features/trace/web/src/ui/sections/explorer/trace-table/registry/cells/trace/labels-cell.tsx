@@ -1,9 +1,9 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { useFilterStore } from "../../../../../../../behavior/filter.store";
-import { getColorPaletteForString } from "../../../../../../../model/rotating-colors";
-import type { TraceListItem } from "../../../../types/trace";
-import type { CellDef } from "../../types";
-import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip";
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import { getColorPaletteForString } from "../../../../../../../model/rotating-colors.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 
 type Density = "compact" | "comfortable";
 

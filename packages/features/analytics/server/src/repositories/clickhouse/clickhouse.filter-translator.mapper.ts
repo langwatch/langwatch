@@ -17,7 +17,7 @@
  */
 
 import type { FilterField } from "@langwatch/analytics-contract";
-import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper";
+import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
 
 /**
  * Result of translating an ES filter to CH WHERE clause

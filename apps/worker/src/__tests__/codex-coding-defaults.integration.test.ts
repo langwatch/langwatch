@@ -30,14 +30,14 @@ import { SimulationService, type TargetConfig } from "@langwatch/scenario-contra
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { resolveWorkerStoredSecretCipher } from "../app/worker-automation-graph.composition";
-import { createWorkerModelProviders } from "../app/worker-model-provider.composition";
+import { resolveWorkerStoredSecretCipher } from "../app/worker-automation-graph.composition.ts";
+import { createWorkerModelProviders } from "../app/worker-model-provider.composition.ts";
 import {
   createWorkerScenarioExecutionPrefetcher,
   type WorkerScenarioPrefetcherPrerequisites,
-} from "../app/worker-scenario-execution.composition";
-import { createWorkerTenancy } from "../app/worker-tenancy.composition";
-import { resolveWorkerConfig, type WorkerConfig } from "../platform/config/worker.config";
+} from "../app/worker-scenario-execution.composition.ts";
+import { createWorkerTenancy } from "../app/worker-tenancy.composition.ts";
+import { resolveWorkerConfig, type WorkerConfig } from "../platform/config/worker.config.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

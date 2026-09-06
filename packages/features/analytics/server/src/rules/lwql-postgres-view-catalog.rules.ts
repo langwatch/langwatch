@@ -4,7 +4,7 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 
 /**
  * How far behind the application's writes these datasets can be. They are read live off the

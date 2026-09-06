@@ -14,7 +14,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaScenarioRepository } from "../scenario.repository";
+import { PrismaScenarioRepository } from "../scenario.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

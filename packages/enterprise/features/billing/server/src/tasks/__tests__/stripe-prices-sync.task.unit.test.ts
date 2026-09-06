@@ -18,7 +18,7 @@ import {
   resolveRequiredMeterMappings,
   transformPrice,
   validateMappings,
-} from "../stripe-prices-sync.task";
+} from "../stripe-prices-sync.task.ts";
 
 const createMapping = (
   testPrefix = "price_test",

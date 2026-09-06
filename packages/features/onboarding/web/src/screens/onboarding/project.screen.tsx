@@ -19,12 +19,12 @@ import {
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "../../behavior/onboarding-api";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { useRequiredSession } from "../../behavior/use-required-session";
-import { SetupLayout } from "../../ui/elements/setup-layout";
-import ErrorPage from "../../ui/elements/compat/next-error";
-import { getSafeReturnToPath } from "../../model/get-safe-return-to-path";
+import { api } from "../../behavior/onboarding-api.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { SetupLayout } from "../../ui/elements/setup-layout.tsx";
+import ErrorPage from "../../ui/elements/compat/next-error.tsx";
+import { getSafeReturnToPath } from "../../model/get-safe-return-to-path.ts";
 
 export default function ProjectOnboarding() {
   useRequiredSession();

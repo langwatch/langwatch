@@ -6,11 +6,11 @@
 
 import type { LangWatchQLProtections, LangWatchQLSchema } from "@langwatch/analytics-contract";
 
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-} from "../services/langwatch-ql-catalog-shapes.service";
+} from "../services/langwatch-ql-catalog-shapes.service.ts";
 
 /** How many columns an example query names. Enough to be a template, not a dump. */
 const EXAMPLE_COLUMN_COUNT = 3;

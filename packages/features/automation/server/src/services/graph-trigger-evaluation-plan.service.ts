@@ -1,6 +1,6 @@
 import { parseSeriesIndex } from "@langwatch/automation-contract";
 import type { GraphTriggerEvaluationResult, Trigger } from "@langwatch/automation-contract";
-import { TriggerEvaluatorService } from "./trigger-evaluator.service";
+import { TriggerEvaluatorService } from "./trigger-evaluator.service.ts";
 import type {
   GraphActionParams,
   GraphEvaluationPlan,
@@ -8,7 +8,7 @@ import type {
   GraphSeries,
   StoredGraphConfig,
   TimeseriesInputType,
-} from "./trigger-evaluator.service";
+} from "./trigger-evaluator.service.ts";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}

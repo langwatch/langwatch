@@ -23,19 +23,19 @@ import {
   Webhook,
 } from "lucide-react";
 import { useState } from "react";
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { UiSlot } from "@langwatch/ui-host/slots";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
-import { WebhookDeliveriesDrawer } from "../../features/webhooks/ui/sections/webhook-deliveries-drawer";
-import { WebhookDestinationCell } from "../../features/webhooks/ui/elements/webhook-destination-cell";
-import { WebhookEndpointDrawer } from "../../features/webhooks/ui/sections/webhook-endpoint-drawer";
-import { WebhookSecretDialog } from "../../features/webhooks/ui/sections/webhook-secret-dialog";
-import { useActivePlan } from "../../behavior/gateway-session";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api, type RouterOutputs } from "../../behavior/gateway-api";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { WebhookDeliveriesDrawer } from "../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
+import { WebhookDestinationCell } from "../../features/webhooks/ui/elements/webhook-destination-cell.tsx";
+import { WebhookEndpointDrawer } from "../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
+import { WebhookSecretDialog } from "../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
+import { useActivePlan } from "../../behavior/gateway-session.ts";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api, type RouterOutputs } from "../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 type EventTypesView = RouterOutputs["webhookEndpoints"]["eventTypes"];

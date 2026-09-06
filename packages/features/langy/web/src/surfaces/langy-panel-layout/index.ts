@@ -1,1 +1,1 @@
-export * from "../../model/langy-panel-layout";
+export * from "../../model/langy-panel-layout.ts";

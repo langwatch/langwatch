@@ -1,10 +1,10 @@
 import { Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { ParkedTenant } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
-import { ParkedTenantsSection, type ParkedGroupsRender } from "../blocks/parked-tenants-section";
-import type { PausedSchedule } from "../elements/paused-schedules-section";
-import { PausedSchedulesSection } from "../elements/paused-schedules-section";
-import { PausedSubscribersSection } from "../elements/paused-subscribers-section";
+import { ParkedTenantsSection, type ParkedGroupsRender } from "../blocks/parked-tenants-section.tsx";
+import type { PausedSchedule } from "../elements/paused-schedules-section.tsx";
+import { PausedSchedulesSection } from "../elements/paused-schedules-section.tsx";
+import { PausedSubscribersSection } from "../elements/paused-subscribers-section.tsx";
 
 export interface PausedCardProps {
   parkedTenants: ParkedTenant[];

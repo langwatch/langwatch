@@ -16,12 +16,12 @@ import {
   type MigrationInventory,
   ObjectStorageMigrationService,
   type ObjectStorageMigrationDeps,
-} from "../services/object-storage-migration.service";
-import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules";
+} from "../services/object-storage-migration.service.ts";
+import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
 import {
   MigrationCutoverRedisAuditAdapter,
   type MigrationCutoverRedisConfig,
-} from "../adapters/redis.object-storage-migration.adapter";
+} from "../adapters/redis.object-storage-migration.adapter.ts";
 
 const logger = createLogger("langwatch:tasks:migrate-object-storage");
 

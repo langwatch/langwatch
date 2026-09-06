@@ -1,7 +1,7 @@
 import { deriveLangyChoicesLockState } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { langyChoicesTimeline } from "../langy-choices-timeline";
+import { langyChoicesTimeline } from "../langy-choices-timeline.ts";
 
 const questionPart = (blockId: string) => ({
   type: "langy-card",

@@ -11,9 +11,9 @@ import {
   type AutomationDraft as WebAutomationDraft,
   INITIAL_GRAPH_ALERT_DRAFT,
   INITIAL_REPORT_DRAFT,
-} from "../model/draft-reducer";
-import { createClientProviderRegistry } from "../../../model/provider-registry";
-import type { SummaryIdentity } from "../../../model/provider-types";
+} from "../model/draft-reducer.ts";
+import { createClientProviderRegistry } from "../../../model/provider-registry.ts";
+import type { SummaryIdentity } from "../../../model/provider-types.ts";
 
 interface EmailSlice {
   members: string[];

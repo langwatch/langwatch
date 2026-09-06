@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
-} from "../app-rest.process-features";
+} from "../app-rest.process-features.ts";
 
 const SECRET = "integration-internal-secret";
 

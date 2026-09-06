@@ -2,8 +2,8 @@
 
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SearchInput } from "../src/components/search-input";
-import { renderWithDesignSystem } from "../src/testing";
+import { SearchInput } from "../src/components/search-input.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 describe("SearchInput", () => {
   /** @scenario Shared controls expose accessible names and focus */

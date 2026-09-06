@@ -3,12 +3,12 @@
  * optional injected front end so a test can drive the walk with a tree the
  * shipped grammar cannot produce.
  */
-import type { LangWatchQLParser } from "../../rules/langwatch-ql-parser.rules";
-import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules";
+import type { LangWatchQLParser } from "../../rules/langwatch-ql-parser.rules.ts";
+import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import {
   LangWatchQLValidationService,
   type ValidateLangWatchQLInput,
-} from "../../services/langwatch-ql-validation.service";
+} from "../../services/langwatch-ql-validation.service.ts";
 
 export function validateLangWatchQL({
   parser,

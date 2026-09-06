@@ -5,8 +5,8 @@ import type {
   GroupQueueRuntimeDefinition,
   JobDelivery,
   QueueSendOptions,
-} from "./contracts";
-import { GroupQueueProcessor } from "./groupQueue";
+} from "./contracts.ts";
+import { GroupQueueProcessor } from "./groupQueue.ts";
 
 function assertRuleResult(rule: "groupBy" | "identify", value: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {

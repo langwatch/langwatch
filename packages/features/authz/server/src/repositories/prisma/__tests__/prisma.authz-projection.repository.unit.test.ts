@@ -14,9 +14,9 @@
  * are; whether Postgres honours them is the integration lane's question.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration";
-import type { GrantProjectionWrite } from "../../../projections/authz-grant.projection";
-import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository";
+import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
+import type { GrantProjectionWrite } from "../../../projections/authz-grant.projection.ts";
+import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
 const ORG = "org_acme";
 

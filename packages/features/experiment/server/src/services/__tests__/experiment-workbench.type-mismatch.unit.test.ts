@@ -6,8 +6,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
-import { ExperimentWorkbenchService } from "../experiment-workbench.service";
-import type { ExperimentRepository } from "../../repositories/experiment.repository";
+import { ExperimentWorkbenchService } from "../experiment-workbench.service.ts";
+import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";
 
 /** Minimally valid so `parseWorkbenchState` clears before the repository's
  *  own row-type refusal is reached. */

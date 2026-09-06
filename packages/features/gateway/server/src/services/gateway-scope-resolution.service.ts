@@ -4,12 +4,12 @@
  * soft-deleted rows, and ordering follows the routing policy or else fallback priority.
  */
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
-import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
+import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
 import type {
   EligibleModelProvider,
   GatewayScopeResolutionRepository,
-} from "../repositories/gateway-scope-resolution.repository";
+} from "../repositories/gateway-scope-resolution.repository.ts";
 
 /**
  * Which model providers a virtual key reaches, and in which dispatch order.

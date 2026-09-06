@@ -17,15 +17,15 @@ import { createLogger } from "@langwatch/observability";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
-import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter";
-import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter.ts";
+import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
 import {
   ApiScimAbsenceReport,
   composeApiScimRest,
   type ApiScimCompositionOptions,
   type ApiScimRestPorts,
-} from "../../../app/api-scim.composition";
+} from "../../../app/api-scim.composition.ts";
 
 const ORGANIZATION_ID = "organization-acme";
 /** The connection a token is minted against, and the whole of its authority. */

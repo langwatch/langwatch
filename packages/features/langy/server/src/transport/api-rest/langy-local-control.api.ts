@@ -31,7 +31,7 @@ import { z } from "zod";
 import type { LocalControlRuntime } from "#adapters/langy-local-control-runtime.adapter";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
-import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api";
+import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api.ts";
 
 /** Everything the control family reaches that Langy does not own. */
 export type LangyLocalControlRestPorts = Readonly<{

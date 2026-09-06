@@ -10,7 +10,7 @@ import { createHmac } from "crypto";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { composeApiGithubRest } from "../github-rest.mount";
+import { composeApiGithubRest } from "../github-rest.mount.ts";
 
 const WEBHOOK_SECRET = "webhook-secret";
 

@@ -5,8 +5,8 @@ import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
 } from "@langwatch/analytics-contract";
-import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget";
-import { useAnalyticsHost } from "../../model/analytics-host";
+import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";
 

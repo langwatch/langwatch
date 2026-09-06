@@ -30,17 +30,17 @@ import {
   PassRateCircle,
 } from "@langwatch/design-system/pass-rate-indicator";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { SimulationSuite } from "../../../model/prisma-types";
-import { useNow } from "../../../behavior/use-now";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
+import { useNow } from "../../../behavior/use-now.ts";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import { SearchInput } from "@langwatch/design-system/search-input";
-import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing";
+import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing.ts";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
-import { ShadowDivider } from "../../elements/shadow-divider";
+import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 
 type SuiteSidebarProps = {
   projectSlug: string;

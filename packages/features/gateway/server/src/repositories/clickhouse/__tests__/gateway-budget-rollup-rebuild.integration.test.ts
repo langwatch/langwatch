@@ -10,12 +10,12 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
 
-import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository";
+import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   startMigratedGatewayClickHouse,
   type MigratedClickHouse,
-} from "./support/migrated-clickhouse.harness";
-import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay";
+} from "./support/migrated-clickhouse.harness.ts";
+import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay.ts";
 
 const suffix = nanoid(8);
 const TENANT_ID = `proj-rebuild-${suffix}`;

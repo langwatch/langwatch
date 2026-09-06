@@ -4,8 +4,8 @@ import { absorbContextTarget } from "@langwatch/langy-web/surfaces/langy-context
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import type { TargetConfig } from "../../model/experiments-v3/types";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * The "Optimize this prompt" handoff: choose the experiment chip the page already

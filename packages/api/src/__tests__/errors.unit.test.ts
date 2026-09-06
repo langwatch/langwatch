@@ -2,7 +2,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 import { type ZodError, z } from "zod";
 
-import { createErrorHandler, formatError } from "../errors.js";
+import { createErrorHandler, formatError } from "../errors.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { JoinRequestAudiencePort } from "../ports/join-request-audience.port";
-import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
+import type { JoinRequestAudiencePort } from "../ports/join-request-audience.port.ts";
+import type { JoinRequestMailPort } from "../ports/join-request-mail.port.ts";
 
 const logger = createLogger("langwatch:identity:join-request-notification");
 

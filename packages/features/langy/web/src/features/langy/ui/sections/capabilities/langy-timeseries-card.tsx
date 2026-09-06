@@ -20,13 +20,13 @@ import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api } from "../../../../../behavior/langy-api";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../../behavior/langy-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
-import { formatMoneyShort, Money } from "../../../../../ui/elements/langy-money";
-import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry";
-import { LangyCapabilityCard } from "./langy-capability-card";
+import { formatMoneyShort, Money } from "../../../../../ui/elements/langy-money.tsx";
+import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
+import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 interface TimeseriesPoint {
   t: string | number;

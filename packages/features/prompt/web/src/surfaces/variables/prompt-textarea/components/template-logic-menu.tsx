@@ -5,7 +5,7 @@ import { Popover } from "@langwatch/design-system/popover";
 import {
   TEMPLATE_SYNTAX_DOCS_URL,
   type TemplateLogicConstruct,
-} from "../template-logic-constructs";
+} from "../template-logic-constructs.ts";
 
 // ============================================================================
 // Types

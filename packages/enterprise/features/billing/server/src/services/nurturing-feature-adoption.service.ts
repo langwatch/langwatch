@@ -1,4 +1,4 @@
-import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service.ts";
 
 export class NurturingFeatureAdoptionService {
   static create(): NurturingFeatureAdoptionService {

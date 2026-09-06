@@ -114,9 +114,9 @@ import type { ApiErrorBody } from "@langwatch/api/rest";
 import {
   type AgentCacheStore,
   createAgentCacheRestApp,
-} from "../features/agent-cache/agent-cache-rest";
-import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
-import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event-rest.mount";
+} from "../features/agent-cache/agent-cache-rest.ts";
+import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest.ts";
+import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event-rest.mount.ts";
 
 /**
  * The product services this process may or may not have composed.

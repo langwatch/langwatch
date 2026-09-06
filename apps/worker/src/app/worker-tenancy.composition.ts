@@ -60,7 +60,7 @@ import {
   ProjectDiagnosticsPort,
 } from "@langwatch/project-server";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * Reports what a composed tenancy graph does NOT serve on this tier.

@@ -3,10 +3,10 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-clickhouse.port";
-import { StoredObjectsRepository } from "../stored-objects.repository";
-import type { StoredObject } from "../../rules/stored-object-row.rules";
-import { storedObjectSchema } from "../../rules/stored-object-row.rules";
+import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-clickhouse.port.ts";
+import { StoredObjectsRepository } from "../stored-objects.repository.ts";
+import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
+import { storedObjectSchema } from "../../rules/stored-object-row.rules.ts";
 
 const TABLE_NAME = "stored_objects" as const;
 

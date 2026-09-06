@@ -4,8 +4,8 @@
  */
 
 import { parseSuiteScope, parseSuiteTargets } from "@langwatch/suite-contract";
-import type { RunScope } from "./run-configuration";
-import type { RunDialogSubject } from "./run-dialog-types";
+import type { RunScope } from "./run-configuration.ts";
+import type { RunDialogSubject } from "./run-dialog-types.ts";
 
 /** A stored suite row, as much of it as the run dialog needs. */
 export type StoredPlanRow = {

@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createFeatureFlagTrpcRouter } from "./feature-flag-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createFeatureFlagTrpcRouter } from "./feature-flag-trpc.mount.ts";
 
 /** The namespace and the one service every other rollout gate reads. */
 export type ComposedFeatureFlagFeature = Readonly<{

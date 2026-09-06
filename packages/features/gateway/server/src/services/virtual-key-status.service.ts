@@ -5,19 +5,19 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { GatewayAuditPort } from "../ports/gateway-audit.port";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port";
+import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
+import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
+import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
+import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
 import type {
   GatewayVirtualKeysPort,
   VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port";
-import { VirtualKeyBudgetService } from "./virtual-key-budget.service";
+} from "../ports/gateway-virtual-key.port.ts";
+import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,
   type RevokeVirtualKeyInput,
-} from "./virtual-key-validation.service";
+} from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyStatusService {
   private constructor(

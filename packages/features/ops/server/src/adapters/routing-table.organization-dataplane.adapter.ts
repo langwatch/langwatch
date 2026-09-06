@@ -1,7 +1,7 @@
 import {
   type OrganizationDataplane,
   OrganizationDataplanePort,
-} from "../ports/organization-dataplane.port";
+} from "../ports/organization-dataplane.port.ts";
 
 /**
  * The dataplane answer, read off the ClickHouse routing table the deployment's

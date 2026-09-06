@@ -8,7 +8,7 @@
  */
 import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
 import type { LicensingCaller } from "@langwatch/enterprise-licensing-server";
-import { ApiSeatAllowancePort } from "./enterprise.composition";
+import { ApiSeatAllowancePort } from "./enterprise.composition.ts";
 
 /** The one decision this adapter takes off the organization half's seat gate. */
 export type ApiSeatGate = Readonly<{

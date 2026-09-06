@@ -22,9 +22,9 @@
 
 import { Button, HStack, type StackProps } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
-import { promptApi } from "../../../behavior/prompt-api";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
-import { usePromptHost } from "../../../model/prompt-host";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
 
 export const TRACE_QUERY_CONFIG = {
   retry: 10,

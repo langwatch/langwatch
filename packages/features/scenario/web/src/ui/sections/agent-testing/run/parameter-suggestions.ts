@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
-import type { DeclaredParameter, ParameterSource } from "../../../../behavior/suites/use-run-suite";
+import type { DeclaredParameter, ParameterSource } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
@@ -12,7 +12,7 @@ import {
 import { rankByMatch } from "@langwatch/trace-web/surfaces/suggestion-items";
 import type { SuggestionRow } from "@langwatch/trace-web/surfaces/suggestion-ui";
 import { displayTypedValue } from "@langwatch/design-system/json-value-text";
-import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line";
+import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line.ts";
 
 /** What the line shows while it is empty and nothing is declared. */
 export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";

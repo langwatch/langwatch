@@ -31,10 +31,10 @@ import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaScenarioAdapter } from "../index";
-import { ScenarioClockPort } from "../ports/scenario-clock.port";
-import { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port";
-import { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
+import { PrismaScenarioAdapter } from "../index.ts";
+import { ScenarioClockPort } from "../ports/scenario-clock.port.ts";
+import { ScenarioIdPort, ScenarioTestSuiteIdPort } from "../ports/scenario-id.port.ts";
+import { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

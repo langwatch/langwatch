@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { identityActorSchema } from "./vocabulary";
+import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * The join-request vocabulary (ADR-117, D12): what somebody asking to join an

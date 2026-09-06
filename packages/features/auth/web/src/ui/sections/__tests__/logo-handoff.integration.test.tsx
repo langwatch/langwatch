@@ -16,14 +16,14 @@ const { publicEnvRef } = vi.hoisted(() => ({
   publicEnvRef: { current: { IS_SAAS: false } as Record<string, unknown> },
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-import { AuthCard } from "../../elements/auth-card";
-import { _resetEntranceForTests } from "../../../model/entrance";
-import { FrontDoorShell } from "../front-door-shell";
-import { _resetLogoHandoffForTests } from "../logo-handoff";
+import { AuthCard } from "../../elements/auth-card.tsx";
+import { _resetEntranceForTests } from "../../../model/entrance.ts";
+import { FrontDoorShell } from "../front-door-shell.tsx";
+import { _resetLogoHandoffForTests } from "../logo-handoff.tsx";
 
 const setReducedMotion = (reduce: boolean) => {
   // A fresh `matchMedia` identity on purpose: `useReducedMotion` caches its

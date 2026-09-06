@@ -14,7 +14,7 @@ import {
   type SimulationRunExecutionProcessState,
   type SimulationRunProcessEventView,
   simulationRunProcessEventViewSchema,
-} from "../processes/simulation-run-execution-data.process";
+} from "../processes/simulation-run-execution-data.process.ts";
 
 /** A run is stalled only after twice the isolated child hard timeout. */
 export const STALL_THRESHOLD_MS = 30 * 60 * 1000;

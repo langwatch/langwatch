@@ -2,7 +2,7 @@ import {
   UsageStatsOrganizationRepositoryPort,
   type UsageStatsOrganization,
   type UsageStatsOrganizationDatabase,
-} from "../../ports/usage-stats-worker.port";
+} from "../../ports/usage-stats-worker.port.ts";
 
 export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizationRepositoryPort {
   private constructor(private readonly database: UsageStatsOrganizationDatabase) {

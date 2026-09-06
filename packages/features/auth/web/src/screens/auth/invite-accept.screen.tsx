@@ -1,15 +1,15 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 
-import { InviteLanding } from "../../ui/sections/invite-landing";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { signOut } from "../../behavior/auth-client";
-import { useRouter } from "../../behavior/use-route";
-import { hardRedirect } from "../../behavior/hard-redirect";
-import { LoadingScreen } from "../../ui/sections/loading-screen";
-import { SetupLayout } from "../../ui/sections/setup-layout";
-import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once";
-import { useRequiredSession } from "../../behavior/use-required-session";
+import { InviteLanding } from "../../ui/sections/invite-landing.tsx";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { signOut } from "../../behavior/auth-client.tsx";
+import { useRouter } from "../../behavior/use-route.ts";
+import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { LoadingScreen } from "../../ui/sections/loading-screen.tsx";
+import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
+import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
 
 /**
  * The invitation link's landing (ADR-117 §6, D13).

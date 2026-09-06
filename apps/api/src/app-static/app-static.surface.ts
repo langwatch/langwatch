@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 import { canonicalOtlpPath } from "@langwatch/otlp";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { resolvePublicAppConfig } from "@langwatch/config/public-app-config/projection";
-import { ApiRawRequestSurfacePort } from "../api-http.listener";
-import { isRootDiscoveryPath } from "../features/discovery/discovery-locations";
-import { assetBaseOrigin, normalizeAssetBase } from "./app-static.asset-base";
-import { serveStaticOrFallback } from "./app-static.handler";
-import { buildSecurityHeaders } from "./app-static.security-headers";
+import { ApiRawRequestSurfacePort } from "../api-http.listener.ts";
+import { isRootDiscoveryPath } from "../features/discovery/discovery-locations.ts";
+import { assetBaseOrigin, normalizeAssetBase } from "./app-static.asset-base.ts";
+import { serveStaticOrFallback } from "./app-static.handler.ts";
+import { buildSecurityHeaders } from "./app-static.security-headers.ts";
 
 /**
  * The built browser bundle, served by the API process. ONE image serves both halves. `apps/ui`

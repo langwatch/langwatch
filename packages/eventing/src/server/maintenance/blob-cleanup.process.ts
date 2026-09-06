@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { IntentSpec, WakeHandler } from "../../pipeline/processManagerDefinition";
+import type { IntentSpec, WakeHandler } from "../../pipeline/processManagerDefinition.ts";
 
 export const BLOB_CLEANUP_PROCESS_NAME = "blobCleanup" as const;
 

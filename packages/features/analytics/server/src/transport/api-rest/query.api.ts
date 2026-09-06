@@ -18,16 +18,16 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 
-import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../../rules/langwatch-ql-diagnostics-shape.rules";
-import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
+import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service.ts";
 import { z } from "zod";
-import { LWQL_COLUMN_UNITS } from "../../services/langwatch-ql-catalog-shapes.service";
-import { LWQL_DIAGNOSTIC_CODES } from "../../rules/langwatch-ql-diagnostics-shape.rules";
-import { MAX_LWQL_LENGTH } from "../../rules/langwatch-ql-sql-literal.rules";
+import { LWQL_COLUMN_UNITS } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LWQL_DIAGNOSTIC_CODES } from "../../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { MAX_LWQL_LENGTH } from "../../rules/langwatch-ql-sql-literal.rules.ts";
 import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
-} from "../../services/langwatch-ql-time-window.service";
+} from "../../services/langwatch-ql-time-window.service.ts";
 
 const logger = createLogger("langwatch:api:query");
 

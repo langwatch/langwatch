@@ -24,11 +24,11 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
-import type { IdentifierIdentityPort } from "../ports/identifier-identity.port";
-import { computeIdentifierHash } from "../rules/identifier-hash.rules";
-import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
-import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
+import type { IdentifierIdentityPort } from "../ports/identifier-identity.port.ts";
+import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the

@@ -28,11 +28,11 @@ import {
   DEFAULT_NAVIGATION_MODE,
   type NavigationMode,
   useNavigationModeStore,
-} from "../../behavior/navigation-mode.store";
-import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries";
-import { useNavigationHost, type NavigationHostPort } from "../../model/navigation-host";
-import { NavigationLink } from "../elements/navigation-link";
-import { UserAvatar } from "../elements/user-avatar";
+} from "../../behavior/navigation-mode.store.ts";
+import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
+import { useNavigationHost, type NavigationHostPort } from "../../model/navigation-host.ts";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { UserAvatar } from "../elements/user-avatar.tsx";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
   "product-switcher": "Product switcher",

@@ -8,7 +8,7 @@
  * Everything here is pure, so the drawer and the server gate read the same
  * rule. Nothing in this module touches the database.
  */
-import { modelProviders } from "../model-provider-registry";
+import { modelProviders } from "../model-provider-registry.ts";
 
 /** One entry per line, blanks and surrounding spaces dropped. */
 export function parseSkipListInput(text: string): string[] {

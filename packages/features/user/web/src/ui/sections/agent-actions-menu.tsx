@@ -16,7 +16,7 @@ import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 
-import { usePersonalToaster } from "../../behavior/personal-workspace-feedback";
+import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
 
 /** The icon + label + hint row every agent-menu entry renders. */
 function AgentMenuOption({

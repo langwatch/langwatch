@@ -7,13 +7,13 @@ import {
   groupSiblings,
   shouldShowTimeline,
   siblingGroupKey,
-} from "../tree";
+} from "../tree.ts";
 import {
   COLLAPSE_TIMELINE_BELOW_PX,
   isTwoLineSpan,
   SIBLING_GROUP_THRESHOLD,
   type SiblingGroup,
-} from "../types";
+} from "../types.ts";
 
 function makeSpan(spanId: string, parentSpanId: string | null, startTimeMs = 0): SpanTreeNode {
   return {

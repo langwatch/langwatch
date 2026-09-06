@@ -11,11 +11,11 @@ import {
 } from "@langwatch/model-provider-web/surfaces/model-selector";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
-import { api } from "../../../model/workflow-api-client";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { api } from "../../../model/workflow-api-client.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { useVersionState } from "./history";
+import { useVersionState } from "./history.tsx";
 
 export const VersionToBeUsed = () => {
   const { checkCanCommitNewVersion } = useWorkflowStore(({ checkCanCommitNewVersion }) => ({

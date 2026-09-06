@@ -20,7 +20,7 @@ import {
   type TestFireTemplateDraft,
   type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
-import type { AutomationTestFirePort } from "../ports/automation-test-fire.port";
+import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
 
 const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
 const SLACK_TEMPLATE_TYPE_SET: ReadonlySet<string> = new Set(SLACK_TEMPLATE_TYPES);

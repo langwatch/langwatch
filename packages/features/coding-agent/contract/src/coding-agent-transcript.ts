@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization";
-import { codingAgentSchema, type CodingAgent } from "./telemetry";
+import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization.ts";
+import { codingAgentSchema, type CodingAgent } from "./telemetry/index.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { collectLogEntries } from "./coding-agent-transcript-log";
+import { collectLogEntries } from "./coding-agent-transcript-log.ts";
 import {
   type SpanReply,
   type TranscriptLogRecord,
   indexCodexToolLogsByCallId,
-} from "./coding-agent-transcript-state";
-import { collectSpanEntries } from "./coding-agent-transcript-span";
-import { readUnknown } from "./coding-agent-transcript-value";
+} from "./coding-agent-transcript-state.ts";
+import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
+import { readUnknown } from "./coding-agent-transcript-value.ts";
 
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
 const PROMPT_STUB_SAME_TURN_MS = 2_000;
@@ -94,7 +94,7 @@ export type CodingAgentTranscript = z.infer<typeof codingAgentTranscriptSchema>;
 
 type UserPromptEntry = Extract<TranscriptEntry, { kind: "user_prompt" }>;
 
-export type { TranscriptLogRecord } from "./coding-agent-transcript-state";
+export type { TranscriptLogRecord } from "./coding-agent-transcript-state.ts";
 
 /** Build the transport-neutral transcript shared by the UI, CLI, and exports. */
 export function buildCodingAgentTranscript({

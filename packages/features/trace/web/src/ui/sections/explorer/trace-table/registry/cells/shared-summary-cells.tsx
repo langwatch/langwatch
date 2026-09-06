@@ -3,9 +3,9 @@ import {
   formatCost,
   formatDuration,
   formatTokens,
-} from "../../../../../../model/display-formatters";
-import { MonoCell } from "../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../types";
+} from "../../../../../../model/display-formatters.ts";
+import { MonoCell } from "../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../types.ts";
 
 type ComfortableTextStyle = "xs" | "sm";
 

@@ -28,7 +28,7 @@ import { useCallback, useMemo } from "react";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
-import { useAnalyticsHost } from "../model/analytics-host";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
 
 /** The query parameter the whole picker state is encoded into. */
 export const WIDGET_GRANULARITY_QUERY_PARAMETER = "widgetGranularity";

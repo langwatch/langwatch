@@ -42,11 +42,11 @@ import {
 import { z } from "zod";
 
 import type { CodingAgentApp } from "#app/coding-agent.app";
-import type { CodingAgentRestAuditPort } from "./coding-agent.api";
+import type { CodingAgentRestAuditPort } from "./coding-agent.api.ts";
 import {
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
-} from "../../rules/pull-request-usage-wire.rules";
+} from "../../rules/pull-request-usage-wire.rules.ts";
 
 /** REST for the organization-keyed coding-agent reads, `/api/v1/coding-agent`. */
 export function createCodingAgentV1RestApp(options: {

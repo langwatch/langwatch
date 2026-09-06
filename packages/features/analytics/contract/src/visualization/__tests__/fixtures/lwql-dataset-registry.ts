@@ -9,7 +9,7 @@
 import type {
   DatasetRowCounts,
   LangWatchQLDatasetColumn,
-} from "../../visualization-types";
+} from "../../visualization-types.ts";
 
 export const LWQL_FIXTURE_COLUMNS: Readonly<
   Record<string, readonly LangWatchQLDatasetColumn[]>

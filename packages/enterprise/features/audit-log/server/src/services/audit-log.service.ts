@@ -4,7 +4,7 @@ import {
   type AuditLogJsonValue,
   type RecordAuditLogCommand,
 } from "@langwatch/enterprise-audit-log-contract";
-import type { AuditLogRepository } from "../repositories/audit-log.repository";
+import type { AuditLogRepository } from "../repositories/audit-log.repository.ts";
 
 export type DefaultAuditLogServiceOptions = {
   repository: AuditLogRepository;

@@ -2,15 +2,15 @@ import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "../../../../../model/display-formatters";
-import { isSkillSpan } from "../transcript/skill-invocation";
+import { formatDuration } from "../../../../../model/display-formatters.ts";
+import { isSkillSpan } from "../transcript/skill-invocation.ts";
 import {
   GROUP_ROW_HEIGHT,
   getSpanBarColor,
   getSpanPalette,
   INDENT_PX,
   type SiblingGroup,
-} from "./types";
+} from "./types.ts";
 
 /**
  * Folded "N duplicated siblings" row.

@@ -11,7 +11,7 @@ import {
   type FieldMapping,
   type Variable,
   VariablesSection,
-} from "../variables-section";
+} from "../variables-section.tsx";
 
 const mockSources: AvailableSource[] = [
   {

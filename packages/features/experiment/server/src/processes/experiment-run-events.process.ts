@@ -2,7 +2,7 @@ import { EventSchema } from "@langwatch/eventing";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { experimentRunEventingTargetSchema as targetSchema } from "@langwatch/experiment-contract";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules.ts";
 
 /**
  * Base metadata for experiment run events.

@@ -8,7 +8,7 @@ import {
   overBroadSecretPatternProbe,
   redactSecretsInText,
   SHAPE_ONLY_SECRET_RULE_IDS,
-} from "../secrets.js";
+} from "../secrets.ts";
 
 const redact = (text: string, customPatterns?: readonly RegExp[]) =>
   redactSecretsInText({ text, customPatterns });

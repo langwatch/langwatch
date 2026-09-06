@@ -4,7 +4,7 @@ import {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,
   passwordProblem,
-} from "../password-policy";
+} from "../password-policy.ts";
 
 /**
  * The rules the sign-up form and the mutation behind it both read. What is

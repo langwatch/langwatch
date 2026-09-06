@@ -29,12 +29,12 @@ import type { UiActionRedis } from "@langwatch/langy-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { Counter, register } from "prom-client";
 
-import { extractApiKeyRequestCredentials } from "../../app/api-key-request-credentials";
+import { extractApiKeyRequestCredentials } from "../../app/api-key-request-credentials.ts";
 import {
   ApiWorkbenchUiActionBackend,
   ApiWorkbenchUiActionCatalog,
   type ApiLangyWorkbenchPeer,
-} from "./langy-workbench-actions.adapter";
+} from "./langy-workbench-actions.adapter.ts";
 
 /** Everything this process can hand the Langy doors, where it has them. */
 export type ApiLangyRestComposition = Readonly<{

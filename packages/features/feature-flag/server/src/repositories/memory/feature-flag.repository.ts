@@ -1,6 +1,6 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagRow } from "../../ports/feature-flag-cache.port";
-import { FeatureFlagRepository } from "../feature-flag.repository";
+import type { FeatureFlagRow } from "../../ports/feature-flag-cache.port.ts";
+import { FeatureFlagRepository } from "../feature-flag.repository.ts";
 
 type MemoryRecord = {
   enabled: boolean;

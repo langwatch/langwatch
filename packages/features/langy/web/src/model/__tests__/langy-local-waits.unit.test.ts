@@ -7,7 +7,7 @@ import {
   mergeLangyWaitStatus,
   routeLangyChoiceAnswer,
   toolCallIdOfQuestionBlock,
-} from "../langy-local-waits";
+} from "../langy-local-waits.ts";
 
 const permissionWait = (over: Record<string, unknown> = {}) => ({
   waitId: "wait-1",

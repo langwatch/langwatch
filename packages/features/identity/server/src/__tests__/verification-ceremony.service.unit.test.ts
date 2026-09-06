@@ -6,16 +6,16 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { s256Challenge } from "../rules/pkce.rules";
+import { s256Challenge } from "../rules/pkce.rules.ts";
 import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
-} from "../repositories/identity-verification.repository";
+} from "../repositories/identity-verification.repository.ts";
 import {
   IDENTITY_VERIFICATION_TTL_MS,
   VerificationCeremonyService,
-} from "../services/verification-ceremony.service";
-import { fact, USER } from "./support/in-memory-heads";
+} from "../services/verification-ceremony.service.ts";
+import { fact, USER } from "./support/in-memory-heads.ts";
 
 const WORK = "idf_work";
 const PERSONAL = "idf_personal";

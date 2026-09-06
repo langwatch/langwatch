@@ -3,10 +3,10 @@ import { keyframes } from "@emotion/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { ConnectionState } from "../../../../behavior/use-sse-subscription";
-import { useTraceListRefresh } from "../hooks/use-trace-list-refresh";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store";
+import type { ConnectionState } from "../../../../behavior/use-sse-subscription.ts";
+import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },

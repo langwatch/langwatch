@@ -3,7 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { Link } from "../../elements/link";
+import { Link } from "../../elements/link.tsx";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -15,10 +15,10 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useWorkflowTargetAgentData } from "../../../behavior/agents/use-workflow-target-agent-data";
+import { useWorkflowTargetAgentData } from "../../../behavior/agents/use-workflow-target-agent-data.ts";
 
 export type AgentWorkflowTargetEditorDrawerProps = {
   open?: boolean;

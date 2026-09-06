@@ -22,11 +22,11 @@ const resolverData = {
   isLoading: false,
 };
 
-vi.mock("../../../behavior/personal-workspace-feedback", () => ({
+vi.mock("../../../behavior/personal-workspace-feedback.ts", () => ({
   useShowErrorToast: () => () => {},
 }));
 
-vi.mock("../../../behavior/personal-workspace-api", () => ({
+vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   api: {
     user: {
       homePagePickerState: { useQuery: () => stateData },
@@ -40,7 +40,7 @@ vi.mock("../../../behavior/personal-workspace-api", () => ({
   },
 }));
 
-import { HomePagePicker } from "../home-page-picker";
+import { HomePagePicker } from "../home-page-picker.tsx";
 
 afterEach(cleanup);
 

@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { AuthzEpochPort } from "../../authz-epoch.port";
+import { AuthzEpochPort } from "../../authz-epoch.port.ts";
 
 export class StubAuthzEpoch extends AuthzEpochPort {
   readonly tryRead = vi.fn<(input: { organizationId: string }) => Promise<number | null>>(

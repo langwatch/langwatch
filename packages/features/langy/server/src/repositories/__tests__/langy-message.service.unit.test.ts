@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { LangyMessageService } from "../../services/langy-message.service";
+import { LangyMessageService } from "../../services/langy-message.service.ts";
 import type {
   LangyConversationRepository,
   LangyConversationRow,
-} from "../langy-conversation-projection.repository";
-import type { LangyMessageRepository } from "../langy-message.repository";
+} from "../langy-conversation-projection.repository.ts";
+import type { LangyMessageRepository } from "../langy-message.repository.ts";
 
 function makeMessageRepo(overrides?: Partial<LangyMessageRepository>) {
   return {

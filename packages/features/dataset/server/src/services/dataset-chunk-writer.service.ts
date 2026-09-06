@@ -8,8 +8,8 @@ import {
   type ChunkMeta,
   chunkedMeta,
   chunkMetaOf,
-} from "../rules/dataset-chunking.rules";
-import type { DatasetStorage } from "../ports/dataset-storage.port";
+} from "../rules/dataset-chunking.rules.ts";
+import type { DatasetStorage } from "../ports/dataset-storage.port.ts";
 
 /**
  * A buffer that accumulates parsed records and flushes them to chunk objects as soon as their

@@ -4,23 +4,23 @@
 
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { SimulationSuite } from "../../model/prisma-types";
+import type { SimulationSuite } from "../../model/prisma-types.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import {
   parseScenarioParameterDefinitions,
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
 import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
-import { api } from "../scenario-api";
+import { api } from "../scenario-api.ts";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import {
   displayTypedValue,
   serializeOptionalTypedScalarValue,
 } from "@langwatch/design-system/json-value-text";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showSuiteRunError } from "./show-suite-run-error";
+import { showSuiteRunError } from "./show-suite-run-error.ts";
 
 export interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;

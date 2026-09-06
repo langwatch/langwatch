@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { ClickHouseSchemaLock } from "../schema-lock";
-import { parseRoutingTable } from "../tenancy";
-import { runMigrations } from "./goose.migration-runner";
-import { reconcileTTL } from "./ttl.reconciler";
+import { ClickHouseSchemaLock } from "../schema-lock.ts";
+import { parseRoutingTable } from "../tenancy.ts";
+import { runMigrations } from "./goose.migration-runner.ts";
+import { reconcileTTL } from "./ttl.reconciler.ts";
 
 const logger = createLogger("langwatch:task:clickhouse-migrate");
 

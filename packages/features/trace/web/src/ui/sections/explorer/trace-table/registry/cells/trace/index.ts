@@ -1,22 +1,22 @@
-import type { TraceListItem } from "../../../../types/trace";
-import type { TraceColumnId } from "../../../columns";
-import type { CellDef } from "../../types";
-import { type SELECT_COLUMN_ID, TraceSelectCell } from "../select-cells";
-import { AnnotationsCell } from "./annotations-cell";
-import { ContextSizeCell } from "./context-size-cell";
-import { CostCell } from "./cost-cell";
-import { DurationCell } from "./duration-cell";
-import { ErrorTextCell } from "./error-text-cell";
-import { EvaluationsCell } from "./evaluations-cell";
-import { EventsCell } from "./events-cell";
-import { InputCell } from "./input-cell";
-import { LabelsCell } from "./labels-cell";
-import { ModelCell } from "./model-cell";
-import { OutputCell } from "./output-cell";
-import { PromptCell } from "./prompt-cell";
-import { RootSpanNameCell } from "./root-span-name-cell";
-import { RootSpanTypeCell } from "./root-span-type-cell";
-import { ServiceCell } from "./service-cell";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceColumnId } from "../../../columns.ts";
+import type { CellDef } from "../../types.ts";
+import { type SELECT_COLUMN_ID, TraceSelectCell } from "../select-cells.tsx";
+import { AnnotationsCell } from "./annotations-cell.tsx";
+import { ContextSizeCell } from "./context-size-cell.tsx";
+import { CostCell } from "./cost-cell.tsx";
+import { DurationCell } from "./duration-cell.tsx";
+import { ErrorTextCell } from "./error-text-cell.tsx";
+import { EvaluationsCell } from "./evaluations-cell.tsx";
+import { EventsCell } from "./events-cell.tsx";
+import { InputCell } from "./input-cell.tsx";
+import { LabelsCell } from "./labels-cell.tsx";
+import { ModelCell } from "./model-cell.tsx";
+import { OutputCell } from "./output-cell.tsx";
+import { PromptCell } from "./prompt-cell.tsx";
+import { RootSpanNameCell } from "./root-span-name-cell.tsx";
+import { RootSpanTypeCell } from "./root-span-type-cell.tsx";
+import { ServiceCell } from "./service-cell.tsx";
 import {
   ConversationIdCell,
   OriginCell,
@@ -24,17 +24,17 @@ import {
   TokensInCell,
   TokensOutCell,
   UserIdCell,
-} from "./simple-cells";
-import { SinceCell } from "./since-cell";
-import { SizeCell } from "./size-cell";
-import { SpanCountCell } from "./span-count-cell";
-import { TimeCell } from "./time-cell";
-import { TimestampCell } from "./timestamp-cell";
-import { TokensCell } from "./tokens-cell";
-import { TraceCell } from "./trace-cell";
-import { TraceIdCell } from "./trace-id-cell";
-import { TraceNameCell } from "./trace-name-cell";
-import { TtftCell } from "./ttft-cell";
+} from "./simple-cells.tsx";
+import { SinceCell } from "./since-cell.tsx";
+import { SizeCell } from "./size-cell.tsx";
+import { SpanCountCell } from "./span-count-cell.tsx";
+import { TimeCell } from "./time-cell.tsx";
+import { TimestampCell } from "./timestamp-cell.tsx";
+import { TokensCell } from "./tokens-cell.tsx";
+import { TraceCell } from "./trace-cell.tsx";
+import { TraceIdCell } from "./trace-id-cell.tsx";
+import { TraceNameCell } from "./trace-name-cell.tsx";
+import { TtftCell } from "./ttft-cell.tsx";
 
 /**
  * Cell renderers keyed by column id. Every TraceColumnId must have a cell;

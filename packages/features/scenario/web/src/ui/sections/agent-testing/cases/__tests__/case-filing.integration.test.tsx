@@ -7,8 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioForm, UNFILED_OPTION_LABEL } from "../../../../elements/scenario-form";
-import { TestCasesTab } from "../test-cases-tab";
+import { ScenarioForm, UNFILED_OPTION_LABEL } from "../../../../elements/scenario-form.tsx";
+import { TestCasesTab } from "../test-cases-tab.tsx";
 
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
@@ -39,7 +39,7 @@ const mutation = vi.hoisted(() => (mutate: (...args: unknown[]) => void) => () =
   isPending: false,
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -90,7 +90,7 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../use-run-scenario", () => ({
+vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
 }));
 
@@ -98,7 +98,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-provider-settings", () => 
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
-vi.mock("../../../../../behavior/use-can", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
@@ -112,7 +112,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },

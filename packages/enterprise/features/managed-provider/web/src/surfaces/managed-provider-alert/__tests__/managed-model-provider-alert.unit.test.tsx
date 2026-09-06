@@ -2,7 +2,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ManagedModelProviderAlert } from "../index";
+import { ManagedModelProviderAlert } from "../index.ts";
 
 describe("ManagedModelProviderAlert", () => {
   it("renders the managed provider and validation error", () => {

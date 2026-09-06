@@ -4,22 +4,22 @@ import {
   IdentityCommandRefusedError,
   orphanedIdentifierRows,
 } from "@langwatch/identity-contract";
-import { mintUserHashKey } from "../rules/user-hash-key.rules";
+import { mintUserHashKey } from "../rules/user-hash-key.rules.ts";
 import {
   IdentityBackfillPlanService,
   type PlannedIdentifier,
-} from "./identity-backfill-plan.service";
+} from "./identity-backfill-plan.service.ts";
 import type {
   BackfillAccountRow,
   IdentityBackfillRepository,
-} from "../repositories/identity-backfill.repository";
+} from "../repositories/identity-backfill.repository.ts";
 import {
   detachOrphanCommandId,
   establishUserEmailCommandId,
-} from "../rules/identity-command-id.rules";
-import type { IdentitySecretCarryService } from "./identity-secret-carry.service";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
-import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules";
+} from "../rules/identity-command-id.rules.ts";
+import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules.ts";
 
 export const IDENTITY_BACKFILL_ACTOR = {
   type: "system" as const,

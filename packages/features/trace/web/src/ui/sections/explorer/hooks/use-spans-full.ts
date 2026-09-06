@@ -2,12 +2,12 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { expandDeletedSpanIds, indexSpanPatches } from "@langwatch/trace-contract";
-import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
+import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
-import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+import { api } from "../../../../behavior/trace-api.ts";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /** Every span's detail exactly as captured, before any correction. */
 export function useSpansFullCanonical(enabled: boolean) {

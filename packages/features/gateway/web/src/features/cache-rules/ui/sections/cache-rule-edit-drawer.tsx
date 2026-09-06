@@ -2,9 +2,9 @@ import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session";
-import { api } from "../../../../behavior/gateway-api";
-import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { api } from "../../../../behavior/gateway-api.ts";
+import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
 
 import {
   CacheRuleForm,
@@ -14,7 +14,7 @@ import {
   fromWire,
   toWire,
   validateForm,
-} from "../blocks/cache-rule-form";
+} from "../blocks/cache-rule-form.tsx";
 
 type Rule = {
   id: string;

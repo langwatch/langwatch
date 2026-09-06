@@ -3,7 +3,7 @@ import {
   type MetricDataPointPreparation,
   type MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
-import { MetricPreparationPort } from "../ports/metric-preparation.port";
+import { MetricPreparationPort } from "../ports/metric-preparation.port.ts";
 
 /** Concrete process-wide implementation of the metric contract. */
 export class MetricService extends MetricServiceContract {

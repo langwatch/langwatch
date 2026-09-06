@@ -14,16 +14,16 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter";
-import { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port";
-import { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port";
-import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process";
+import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port.ts";
+import { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port.ts";
+import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
 import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
-} from "../services/gateway-realtime-session.service";
-import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository";
+} from "../services/gateway-realtime-session.service.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {

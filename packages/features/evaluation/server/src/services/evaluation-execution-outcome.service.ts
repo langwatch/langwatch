@@ -5,12 +5,12 @@ import type {
   ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
-import { EvaluationExecutionReceiptPort } from "../ports/evaluation.port";
-import type { PreparedEvaluation } from "./evaluation-execution-preparation.service";
+import { EvaluationExecutionReceiptPort } from "../ports/evaluation.port.ts";
+import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
 import {
   EvaluationReportedEventService,
   type EvaluationReportedResult,
-} from "./evaluation-reported-event.service";
+} from "./evaluation-reported-event.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

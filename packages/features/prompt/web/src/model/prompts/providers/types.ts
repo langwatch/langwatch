@@ -1,4 +1,4 @@
-import type { WireVersionedPrompt } from "../../wire-versioned-prompt";
+import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
 import type { RouterInputs } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**

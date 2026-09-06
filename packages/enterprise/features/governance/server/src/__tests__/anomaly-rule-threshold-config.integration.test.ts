@@ -15,8 +15,8 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { safeParseSpendSpikeThresholdConfig } from "@langwatch/enterprise-governance-contract";
-import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository";
-import { AnomalyRuleService } from "../services/anomaly-rule.service";
+import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
+import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

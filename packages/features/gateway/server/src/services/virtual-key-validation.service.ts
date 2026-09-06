@@ -23,13 +23,13 @@ import {
   GatewayTraceProjectUnknownError,
   VirtualKeyExpiryInPastError,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
 import {
   type ScopeInput,
   type GatewayVirtualKeysPort,
   type VirtualKeyWithScopes,
-} from "../ports/gateway-virtual-key.port";
+} from "../ports/gateway-virtual-key.port.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 

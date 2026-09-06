@@ -37,7 +37,7 @@ import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
-import type { AutomationToast, AutomationToaster } from "./behavior/automation-feedback";
+import type { AutomationToast, AutomationToaster } from "./behavior/automation-feedback.ts";
 import {
   AutomationHostPort,
   AutomationHostProvider,
@@ -50,7 +50,7 @@ import {
   type AutomationScope,
   type AutomationSuccessNotice,
   type AutomationTeam,
-} from "./model/automation-host";
+} from "./model/automation-host.ts";
 
 export type AutomationQuery = Readonly<Record<string, string | undefined>>;
 

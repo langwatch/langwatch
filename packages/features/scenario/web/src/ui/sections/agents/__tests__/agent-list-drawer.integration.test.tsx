@@ -7,8 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../../../behavior/scenario-api";
-import { AgentListDrawer } from "../agent-list-drawer";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { AgentListDrawer } from "../agent-list-drawer.tsx";
 
 // Mock dependencies
 vi.mock("@langwatch/ui-drawer", () => ({
@@ -21,7 +21,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => null,
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project-id" },
     organization: { id: "test-org-id" },
@@ -82,7 +82,7 @@ const mockAgents = [
 ];
 
 // Mock the API
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getAll: {

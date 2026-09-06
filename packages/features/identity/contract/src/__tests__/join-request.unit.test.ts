@@ -9,7 +9,7 @@ import {
   type JoinRequestAggregateState,
   type JoinRequestFact,
   reduceJoinRequest,
-} from "../join-request";
+} from "../join-request.ts";
 
 /**
  * The fold, as the four endings.

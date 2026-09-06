@@ -4,7 +4,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioUpdateInput } from "../scenario";
+import type { ScenarioUpdateInput } from "../scenario.ts";
 import {
   buildSnapshotEnvelope,
   changedSnapshotFields,
@@ -14,7 +14,7 @@ import {
   type ScenarioSnapshotFields,
   snapshotFieldsOf,
   touchesVersionedFields,
-} from "../scenario.version";
+} from "../scenario.version.ts";
 
 function fields(overrides: Partial<ScenarioSnapshotFields> = {}): ScenarioSnapshotFields {
   return {

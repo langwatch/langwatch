@@ -8,8 +8,8 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app";
-import { TeamTrpcApi } from "../../transport/api-trpc/team.api";
+import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app.ts";
+import { TeamTrpcApi } from "../../transport/api-trpc/team.api.ts";
 
 type TestContext = {
   app: { organizations: OrganizationApp };

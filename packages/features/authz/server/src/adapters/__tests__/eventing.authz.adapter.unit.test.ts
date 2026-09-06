@@ -19,12 +19,12 @@ import {
   DeleteRoleCommand,
   EventingAuthzAdapter,
   RevokeGrantCommand,
-} from "../eventing.authz.adapter";
-import { AuthzAuditTrailStore, type AuthzAuditRow } from "../eventing.authz-audit.adapter";
+} from "../eventing.authz.adapter.ts";
+import { AuthzAuditTrailStore, type AuthzAuditRow } from "../eventing.authz-audit.adapter.ts";
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
-} from "../../projections/authz-grant.projection";
+} from "../../projections/authz-grant.projection.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;

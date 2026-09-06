@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 
 const ACTION_LABELS: Record<string, string> = {
   "ops.scheduler.pause": "paused",

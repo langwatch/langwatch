@@ -28,19 +28,19 @@ import {
   type AutomationPersistCapCount,
   type AutomationPersistCapDecision,
 } from "@langwatch/automation-contract";
-import { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository";
-import { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
-import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository";
-import { TriggerRepository } from "../repositories/trigger.repository";
-import { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port";
-import { AutomationClockPort } from "../ports/automation-clock.port";
-import { ReportScheduleService } from "./report-schedule.service";
-import { CustomGraphRepository } from "../repositories/custom-graph.repository";
-import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
-import { AutomationGraphService } from "./trigger-graph.service";
-import { ActiveTriggerCacheService } from "./active-trigger-cache.service";
-import { AutomationTemplateService } from "./automation-template.service";
-import type { AutomationPersistCapService } from "./persist-cap.service";
+import { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
+import { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
+import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
+import { TriggerRepository } from "../repositories/trigger.repository.ts";
+import { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
+import { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { ReportScheduleService } from "./report-schedule.service.ts";
+import { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import { AutomationGraphService } from "./trigger-graph.service.ts";
+import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
+import { AutomationTemplateService } from "./automation-template.service.ts";
+import type { AutomationPersistCapService } from "./persist-cap.service.ts";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 export class AutomationService extends AutomationCapability {

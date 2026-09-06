@@ -8,9 +8,9 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
   type ProjectHomeProject,
-} from "../../../../../model/project-home-host";
-import type { BriefingData, BriefingReceipt } from "../../types";
-import { LangyBriefing } from "../langy-briefing";
+} from "../../../../../model/project-home-host.ts";
+import type { BriefingData, BriefingReceipt } from "../../types.ts";
+import { LangyBriefing } from "../langy-briefing.tsx";
 
 /** Only `navigate` is exercised — internal Trace Explorer links route through it. */
 class StubProjectHomeHost extends ProjectHomeHostPort {

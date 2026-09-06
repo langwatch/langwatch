@@ -23,12 +23,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
-import { createSimulationMetricsSyncHandler } from "../simulation-metrics-sync.subscriber";
+import { createSimulationMetricsSyncHandler } from "../simulation-metrics-sync.subscriber.ts";
 import {
   createContext,
   createFoldState,
   createTraceEvent,
-} from "./subscribers/support/trace-subscriber.fixtures";
+} from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

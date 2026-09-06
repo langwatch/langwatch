@@ -1,1 +1,1 @@
-export { TracesPage } from "./traces-page";
+export { TracesPage } from "./traces-page.tsx";

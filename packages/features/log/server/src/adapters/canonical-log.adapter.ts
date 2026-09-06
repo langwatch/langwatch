@@ -13,8 +13,8 @@ import {
 import { normalizeOtlpAttributeMap } from "@langwatch/otlp";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { LogPreparationPort, type LogPreparationInput } from "../ports/log-preparation.port";
-import type { LogRedactionPort } from "../ports/log-redaction.port";
+import { LogPreparationPort, type LogPreparationInput } from "../ports/log-preparation.port.ts";
+import type { LogRedactionPort } from "../ports/log-redaction.port.ts";
 
 type UnknownRecord = Record<string, unknown>;
 type PIIRedactionLevel = LogPiiRedactionLevel;

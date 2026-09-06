@@ -1,6 +1,6 @@
 import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
-import { convertDatasetRecordsToColumnTypes } from "../convert-record-values";
+import { convertDatasetRecordsToColumnTypes } from "../convert-record-values.ts";
 
 const columns: DatasetColumns = [
   { name: "number", type: "number" },

@@ -13,9 +13,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { DatasetRepository } from "../../repositories/dataset.repository";
-import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository";
-import { DatasetService } from "../dataset.service";
+import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
+import { DatasetService } from "../dataset.service.ts";
 
 const PROJECT_ID = "project-1";
 

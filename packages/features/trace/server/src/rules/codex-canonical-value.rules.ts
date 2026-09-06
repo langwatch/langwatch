@@ -1,4 +1,4 @@
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 export const CODEX_EVENT_NAME_PREFIX = "codex.";
 export const CODEX_PROVIDER_KEY = "openai_codex";

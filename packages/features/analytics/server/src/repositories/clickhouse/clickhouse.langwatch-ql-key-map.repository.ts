@@ -1,6 +1,6 @@
-import type { LwqlKeyMapRow } from "../../services/langwatch-ql-production-provisioning.service";
-import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository";
-import { LwqlKeyMapRepository } from "../langwatch-ql-key-map.repository";
+import type { LwqlKeyMapRow } from "../../services/langwatch-ql-production-provisioning.service.ts";
+import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository.ts";
+import { LwqlKeyMapRepository } from "../langwatch-ql-key-map.repository.ts";
 
 /**
  * The key-map insert contract, shared because two paths write this table:

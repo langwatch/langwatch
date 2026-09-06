@@ -7,7 +7,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
-} from "../better-auth.api";
+} from "../better-auth.api.ts";
 
 export function deployment(
   overrides: Partial<BetterAuthDeploymentConfiguration> = {},

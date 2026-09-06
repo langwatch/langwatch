@@ -23,10 +23,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createDataPrivacyTrpcRouter, type DataPrivacyTrpcChecks } from "./data-privacy-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createDataPrivacyTrpcRouter, type DataPrivacyTrpcChecks } from "./data-privacy-trpc.mount.ts";
 
 /** The two directories the privacy cascade is resolved through. */
 export type DataPrivacyPeers = Readonly<{
@@ -36,7 +36,7 @@ export type DataPrivacyPeers = Readonly<{
   organizations: OrganizationService;
 }>;
 
-import type { ComposedDataPrivacyFeature } from "./data-privacy.composition.types";
+import type { ComposedDataPrivacyFeature } from "./data-privacy.composition.types.ts";
 
 /** The three answers the privacy surface needs from this deployment. */
 type ApiDataPrivacyPorts = DataPrivacyTrpcPorts<DataPrivacySnapshot, DataPrivacyPolicy>;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { useNavigationHost } from "../model/navigation-host";
-import type { RecentItemType } from "../model/command-bar-types";
-import { useRecentItems } from "./use-recent-items";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import type { RecentItemType } from "../model/command-bar-types.ts";
+import { useRecentItems } from "./use-recent-items.ts";
 
 /**
  * Entity type detection from URL patterns.

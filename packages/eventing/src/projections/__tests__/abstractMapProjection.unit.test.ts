@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { EventSchema } from "../../domain/types";
-import { AbstractMapProjection, type MapEventHandlers } from "../abstractMapProjection";
-import type { AppendStore } from "../mapProjection.types";
+import { EventSchema } from "../../domain/types.ts";
+import { AbstractMapProjection, type MapEventHandlers } from "../abstractMapProjection.ts";
+import type { AppendStore } from "../mapProjection.types.ts";
 
 // Test schemas
 const fooEventSchema = EventSchema.extend({

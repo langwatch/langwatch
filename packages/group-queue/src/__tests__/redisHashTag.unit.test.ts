@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasRedisHashTag } from "../redisHashTag";
+import { hasRedisHashTag } from "../redisHashTag.ts";
 
 describe("hasRedisHashTag", () => {
   describe("given a name with a non-empty hash tag", () => {

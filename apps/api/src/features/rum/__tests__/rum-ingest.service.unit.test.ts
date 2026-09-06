@@ -5,7 +5,7 @@
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { collectorHeaders } from "../../../platform/config/rum-collector.config";
+import { collectorHeaders } from "../../../platform/config/rum-collector.config.ts";
 import {
   countSpans,
   ingestBrowserTraces,
@@ -18,7 +18,7 @@ import {
   readCappedBody,
   type RumRateLimiter,
   stampIdentity,
-} from "../rum-ingest.service";
+} from "../rum-ingest.service.ts";
 
 /**
  * A fixed-window counter in a Map, standing in for the process's Redis one.

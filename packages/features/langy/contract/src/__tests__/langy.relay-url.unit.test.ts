@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPreciseResourceHref, toRelativeSameOriginHref } from "../index";
+import { isPreciseResourceHref, toRelativeSameOriginHref } from "../index.ts";
 
 describe("toRelativeSameOriginHref", () => {
   it("preserves the path, query and hash of a same-origin URL", () => {

@@ -17,25 +17,25 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
-import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository";
-import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service";
-import type { GatewayService } from "../services/gateway.service";
-import { VirtualKeyService } from "../services/virtual-key.service";
-import { TestProjectService } from "./support/test-project-service";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
+import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { VirtualKeyService } from "../services/virtual-key.service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
-import { PostgresVirtualKeyAdapter } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
-import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
+import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 /**
  * The tenancy guard names a project on every query. This suite writes the
  * organizations and projects it then reads, so it composes the client without

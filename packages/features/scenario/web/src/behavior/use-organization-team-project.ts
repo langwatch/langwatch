@@ -2,7 +2,7 @@
  * The scope reading these screens have always made, answered by the host.
  */
 
-import { useScenarioHost } from "../model/scenario-host";
+import { useScenarioHost } from "../model/scenario-host.ts";
 
 export function useOrganizationTeamProject(_options?: {
   redirectToProjectOnboarding?: boolean;

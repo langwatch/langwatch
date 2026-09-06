@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { langyEventCursorSchema } from "./event-sourcing/contracts/cursor";
-import { langyConversationTurnEventSchema } from "./event-sourcing/contracts/turn-wire";
-import { langyMessageRoleSchema } from "./json";
+import { langyEventCursorSchema } from "./event-sourcing/contracts/cursor.ts";
+import { langyConversationTurnEventSchema } from "./event-sourcing/contracts/turn-wire.ts";
+import { langyMessageRoleSchema } from "./json.ts";
 
 /**
  * Slim, per-use-case DTOs for the Langy read surface. Wide-defaulted so an

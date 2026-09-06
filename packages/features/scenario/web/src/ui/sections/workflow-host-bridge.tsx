@@ -15,7 +15,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 type Reading = {
   scope: WorkflowScope;

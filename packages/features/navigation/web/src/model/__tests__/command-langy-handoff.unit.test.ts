@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { beginLangyHandoff, LANGY_HANDOFF_DURATION_MS } from "../command-langy-handoff";
+import { beginLangyHandoff, LANGY_HANDOFF_DURATION_MS } from "../command-langy-handoff.ts";
 
 describe("beginLangyHandoff", () => {
   it("opens Langy before scheduling the command bar close", () => {

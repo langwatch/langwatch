@@ -10,8 +10,8 @@
  * rather than the contract's.
  */
 import { z } from "zod";
-import { evaluatorFieldSchema, evaluatorSchema, evaluatorTypeSchema } from "./evaluator";
-import type { Evaluator, EvaluatorWithFields } from "./evaluator";
+import { evaluatorFieldSchema, evaluatorSchema, evaluatorTypeSchema } from "./evaluator.ts";
+import type { Evaluator, EvaluatorWithFields } from "./evaluator.ts";
 
 /** One project. The list read names it and nothing else. */
 export const evaluatorApiProjectInputSchema = z.object({ projectId: z.string() });

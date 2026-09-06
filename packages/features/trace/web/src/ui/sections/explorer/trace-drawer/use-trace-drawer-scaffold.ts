@@ -1,18 +1,18 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
-import { getTopDrawer, useDrawer } from "../../../../behavior/use-drawer";
+import { getTopDrawer, useDrawer } from "../../../../behavior/use-drawer.ts";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useConversationContext } from "../hooks/use-conversation-context";
-import { useConversationPrefetch } from "../hooks/use-conversation-prefetch";
-import { useDrawerUrlSync } from "../hooks/use-drawer-url-sync";
-import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail";
-import { useSpanTreeWithCaptured } from "../hooks/use-span-tree";
-import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation";
-import { useTraceDrawerShortcuts } from "../hooks/use-trace-drawer-shortcuts";
-import { useTraceHeader } from "../hooks/use-trace-header";
-import { useTraceRefresh } from "../hooks/use-trace-refresh";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { guardTraceEditExit } from "../utils/trace-edit-mode";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useConversationContext } from "../hooks/use-conversation-context.ts";
+import { useConversationPrefetch } from "../hooks/use-conversation-prefetch.ts";
+import { useDrawerUrlSync } from "../hooks/use-drawer-url-sync.ts";
+import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
+import { useSpanTreeWithCaptured } from "../hooks/use-span-tree.ts";
+import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
+import { useTraceDrawerShortcuts } from "../hooks/use-trace-drawer-shortcuts.ts";
+import { useTraceHeader } from "../hooks/use-trace-header.ts";
+import { useTraceRefresh } from "../hooks/use-trace-refresh.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 
 interface TraceDrawerScaffold {
   traceId: string | undefined;

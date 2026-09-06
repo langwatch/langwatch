@@ -2,7 +2,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import "./auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme";
+import { SHAPE } from "../../model/front-door-theme.ts";
 
 /**
  * One seat in the rail of ways in.

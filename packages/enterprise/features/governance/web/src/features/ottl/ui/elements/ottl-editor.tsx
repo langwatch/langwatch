@@ -29,7 +29,7 @@ import {
 } from "@chakra-ui/react";
 import { FileText, Info, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GovernanceOttlValidationClient } from "../../model/governance-ottl-validation-client";
+import type { GovernanceOttlValidationClient } from "../../model/governance-ottl-validation-client.ts";
 
 interface OttlEditorProps {
   organizationId: string;

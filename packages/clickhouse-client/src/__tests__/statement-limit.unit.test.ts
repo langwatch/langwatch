@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { ClickHouseClientCreationInput } from "../connection";
+import type { ClickHouseClientCreationInput } from "../connection.ts";
 import {
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
@@ -16,8 +16,8 @@ import {
   withClickHouseStatementLimit,
   type ClickHouseStatementOperation,
   type ClickHouseVendorClient,
-} from "../managed-client";
-import { AcquireAbortedError, QueueFullError, type LimiterStats } from "../rateLimit";
+} from "../managed-client.ts";
+import { AcquireAbortedError, QueueFullError, type LimiterStats } from "../rateLimit.ts";
 
 class OverloadedError extends Error {
   constructor(readonly cause: unknown) {

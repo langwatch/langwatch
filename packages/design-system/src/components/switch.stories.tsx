@@ -1,6 +1,6 @@
 import { HStack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Switch } from "./switch";
+import { Switch } from "./switch.tsx";
 
 const meta = {
   title: "Primitives/Switch",

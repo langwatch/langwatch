@@ -1,14 +1,14 @@
-import { pMapLimited } from "./pMapLimited";
-import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain";
+import { pMapLimited } from "./pMapLimited.ts";
+import { pauseProjection, unpauseProjection, waitForAllActiveJobs } from "./replayDrain.ts";
 import type {
   CutoffInfo,
   DiscoveredAggregate,
   OccurredAtBounds,
   ReplayEvent,
-} from "./replayEventSource";
-import { FoldAccumulator, MapAccumulator } from "./replayExecutor";
-import type { ReplayLogWriter } from "./replayLog";
-import { nullLog } from "./replayLog";
+} from "./replayEventSource.ts";
+import { FoldAccumulator, MapAccumulator } from "./replayExecutor.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
+import { nullLog } from "./replayLog.ts";
 import {
   aggregateKey,
   cleanupAll,
@@ -18,7 +18,7 @@ import {
   markCutoffForProjections,
   markPendingForProjections,
   unmarkForProjections,
-} from "./replayMarkers";
+} from "./replayMarkers.ts";
 import type {
   BatchPhase,
   ProjectionKind,
@@ -29,7 +29,7 @@ import type {
   ReplayContext,
   ReplayProgress,
   ReplayResult,
-} from "./types";
+} from "./types.ts";
 
 /**
  * Emit replay-phase progress once per this many applied events (plus once at

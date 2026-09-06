@@ -2,9 +2,9 @@ import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "../../../model/display-formatters";
-import { formatPercent } from "../../../behavior/flame/tree";
-import type { FlameNode } from "../../../behavior/flame/types";
+import { formatDuration } from "../../../model/display-formatters.ts";
+import { formatPercent } from "../../../behavior/flame/tree.ts";
+import type { FlameNode } from "../../../behavior/flame/types.ts";
 
 interface FlameBreadcrumbsProps {
   breadcrumbs: FlameNode[];

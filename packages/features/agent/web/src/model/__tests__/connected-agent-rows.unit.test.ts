@@ -11,7 +11,7 @@ import {
   instanceCountLabel,
   presenceLabel,
   sortConnectedAgents,
-} from "../connected-agent-rows";
+} from "../connected-agent-rows.ts";
 
 function agent(overrides: Partial<ConnectedAgentView> = {}): ConnectedAgentView {
   return {

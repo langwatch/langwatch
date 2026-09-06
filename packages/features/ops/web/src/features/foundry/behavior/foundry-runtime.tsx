@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import type { PromptRef } from "../model/trace-generator";
+import type { PromptRef } from "../model/trace-generator.ts";
 
 export type FoundryProject = {
   id: string;

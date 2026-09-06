@@ -1,57 +1,57 @@
-export * from "./cost-attribution";
-export * from "./derive-trace-origin";
-export * from "./derive-trace-status";
-export * from "./derive-trace-timestamp";
-export * from "./trace";
-export * from "./trace-view.contract";
-export * from "./trace-explorer.contract";
-export * from "./trace-canonicalisation";
-export * from "./trace-ingress.commands";
-export * from "./trace-ingress.events";
-export * from "./trace-content-part";
-export * from "./trace-content-part.visitor";
-export * from "./trace-attributes";
-export * from "./trace-query-analysis";
-export * from "./trace-query-ast";
-export * from "./trace-query-evaluator-group";
-export * from "./trace-query-grammar";
-export * from "./trace-query-metadata";
-export * from "./trace-query-mutations";
-export * from "./trace-query-parser";
-export * from "./trace-query.contract";
-export * from "./trace.queries";
-export * from "./trace.service";
-export * from "./trace-record";
-export * from "./trace.errors";
-export * from "./trace-projection";
-export * from "./trace-processing.commands";
-export * from "./trace-topic-assignment";
-export * from "./trace-processing.events";
-export * from "./trace-log-contribution";
-export * from "./trace-metric-correlation";
-export * from "./trace-message.schemas";
-export { safeUnflatten } from "./trace-attribute-unflatten";
-export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-event.schemas";
-export * from "./trace-evaluation.contract";
-export * from "./trace-format.schemas";
-export * from "./trace-full-read.contract";
-export * from "./event-metrics";
-export * from "./trace-derived-event";
-export * from "./trace-list.queries";
-export * from "./trace-list-view";
-export * from "./trace-media-part.collector";
-export * from "./trace-media-markers";
-export * from "./trace-media-ref";
-export * from "./trace-media-role";
-export * from "./trace-offload.contract";
-export * from "./trace-read.contract";
-export * from "./trace.responses";
-export * from "./trace-session-group";
-export * from "./trace-share.schemas";
-export * from "./trace-span-io";
-export * from "./trace-span-read-model";
-export * from "./trace-ai-query";
-export * from "./trace-edit-overlay.contract";
+export * from "./cost-attribution.ts";
+export * from "./derive-trace-origin.ts";
+export * from "./derive-trace-status.ts";
+export * from "./derive-trace-timestamp.ts";
+export * from "./trace.ts";
+export * from "./trace-view.contract.ts";
+export * from "./trace-explorer.contract.ts";
+export * from "./trace-canonicalisation.ts";
+export * from "./trace-ingress.commands.ts";
+export * from "./trace-ingress.events.ts";
+export * from "./trace-content-part.ts";
+export * from "./trace-content-part.visitor.ts";
+export * from "./trace-attributes.ts";
+export * from "./trace-query-analysis.ts";
+export * from "./trace-query-ast.ts";
+export * from "./trace-query-evaluator-group.ts";
+export * from "./trace-query-grammar.ts";
+export * from "./trace-query-metadata.ts";
+export * from "./trace-query-mutations.ts";
+export * from "./trace-query-parser.ts";
+export * from "./trace-query.contract.ts";
+export * from "./trace.queries.ts";
+export * from "./trace.service.ts";
+export * from "./trace-record.ts";
+export * from "./trace.errors.ts";
+export * from "./trace-projection.ts";
+export * from "./trace-processing.commands.ts";
+export * from "./trace-topic-assignment.ts";
+export * from "./trace-processing.events.ts";
+export * from "./trace-log-contribution.ts";
+export * from "./trace-metric-correlation.ts";
+export * from "./trace-message.schemas.ts";
+export { safeUnflatten } from "./trace-attribute-unflatten.ts";
+export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-event.schemas.ts";
+export * from "./trace-evaluation.contract.ts";
+export * from "./trace-format.schemas.ts";
+export * from "./trace-full-read.contract.ts";
+export * from "./event-metrics.ts";
+export * from "./trace-derived-event.ts";
+export * from "./trace-list.queries.ts";
+export * from "./trace-list-view.ts";
+export * from "./trace-media-part.collector.ts";
+export * from "./trace-media-markers.ts";
+export * from "./trace-media-ref.ts";
+export * from "./trace-media-role.ts";
+export * from "./trace-offload.contract.ts";
+export * from "./trace-read.contract.ts";
+export * from "./trace.responses.ts";
+export * from "./trace-session-group.ts";
+export * from "./trace-share.schemas.ts";
+export * from "./trace-span-io.ts";
+export * from "./trace-span-read-model.ts";
+export * from "./trace-ai-query.ts";
+export * from "./trace-edit-overlay.contract.ts";
 export {
   normalizedSpanSchema,
   NormalizedSpanKind,
@@ -62,7 +62,7 @@ export {
   type NormalizedEvent,
   type NormalizedLink,
   type NormalizedSpan,
-} from "./trace.spans";
+} from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
   ANNOTATION_ADDED_EVENT_TYPE,
@@ -125,7 +125,7 @@ export {
   isStorageAnchoredVersion,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
-} from "./trace.constants";
+} from "./trace.constants.ts";
 export {
   anyValueSchema,
   arrayValueSchema,
@@ -152,21 +152,21 @@ export {
   type OtlpKeyValueList,
   type OtlpResource,
   type OtlpSpan,
-} from "./trace.otlp";
-export * from "./trace-edit-overlay-apply";
-export * from "./trace-prompt-reference";
-export * from "./trace-python-repr";
-export * from "./trace-list-window";
-export * from "./trace-collector-common";
-export * from "./trace-rag-chunks";
-export * from "./trace-rag-extraction";
-export * from "./trace-mapping";
-export * from "./trace-pcm-to-wav";
-export * from "./trace-metadata-editable-keys";
-export * from "./trace-otel-ids";
-export * from "./trace-viewer-protections.contract";
-export * from "./trace-export.errors";
-export * from "./trace-export.vocabulary";
-export * from "./trace-legacy-read.types";
-export * from "./trace-projection.types";
-export * from "./trace-query-evaluation.types";
+} from "./trace.otlp.ts";
+export * from "./trace-edit-overlay-apply.ts";
+export * from "./trace-prompt-reference.ts";
+export * from "./trace-python-repr.ts";
+export * from "./trace-list-window.ts";
+export * from "./trace-collector-common.ts";
+export * from "./trace-rag-chunks.ts";
+export * from "./trace-rag-extraction.ts";
+export * from "./trace-mapping.ts";
+export * from "./trace-pcm-to-wav.ts";
+export * from "./trace-metadata-editable-keys.ts";
+export * from "./trace-otel-ids.ts";
+export * from "./trace-viewer-protections.contract.ts";
+export * from "./trace-export.errors.ts";
+export * from "./trace-export.vocabulary.ts";
+export * from "./trace-legacy-read.types.ts";
+export * from "./trace-projection.types.ts";
+export * from "./trace-query-evaluation.types.ts";

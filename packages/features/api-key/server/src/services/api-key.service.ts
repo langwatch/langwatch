@@ -23,17 +23,17 @@ import {
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port";
-import type { ApiKeyTokenPort } from "../ports/api-key-token.port";
-import type { ApiKeyRepository } from "../repositories/api-key.repository";
-import { ApiKeyCatalogService } from "./api-key-catalog.service";
-import { ApiKeyCliService } from "./api-key-cli.service";
-import { ApiKeyEnrichmentService } from "./api-key-enrichment.service";
-import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service";
-import { ApiKeyLifecycleService } from "./api-key-lifecycle.service";
-import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service";
-import { ApiKeyVisibilityService } from "./api-key-visibility.service";
-import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service";
+import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
+import type { ApiKeyTokenPort } from "../ports/api-key-token.port.ts";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
+import { ApiKeyCliService } from "./api-key-cli.service.ts";
+import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
+import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
+import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
+import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
+import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts";
 
 export type ApiKeyDependencies = {
   authz: AuthzService;

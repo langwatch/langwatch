@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { keepPreviousData } from "../../../model/keep-previous-data";
+import { keepPreviousData } from "../../../model/keep-previous-data.ts";
 
 import type { OpsBlobSort, OpsBlobSummary } from "@langwatch/ops-contract";
-import { api } from "../../../behavior/ops-api";
+import { api } from "../../../behavior/ops-api.ts";
 
 /** One SCAN page per fetch, bounded so a browser never pulls a whole keyspace. */
 const PAGE_SIZE = 100;

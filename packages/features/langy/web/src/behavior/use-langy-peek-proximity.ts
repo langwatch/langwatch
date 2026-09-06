@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { resolvePeekProximity } from "../model/langy-peek-dock";
+import { resolvePeekProximity } from "../model/langy-peek-dock.ts";
 
 /**
  * Does the pointer stand near the minimised peek's edge region?

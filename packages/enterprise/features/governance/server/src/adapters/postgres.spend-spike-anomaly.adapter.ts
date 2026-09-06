@@ -1,8 +1,8 @@
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
-import type { AnomalySpendReaderPort } from "../ports/spend-spike-anomaly.port";
-import { PrismaSpendSpikeAnomalyRepository } from "../repositories/prisma/prisma.spend-spike-anomaly.repository";
-import type { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service";
-import { SpendSpikeAnomalyEvaluatorService } from "../services/spend-spike-anomaly-evaluator.service";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
+import type { AnomalySpendReaderPort } from "../ports/spend-spike-anomaly.port.ts";
+import { PrismaSpendSpikeAnomalyRepository } from "../repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
+import type { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service.ts";
+import { SpendSpikeAnomalyEvaluatorService } from "../services/spend-spike-anomaly-evaluator.service.ts";
 
 export class PostgresSpendSpikeAnomalyAdapter {
   private constructor(

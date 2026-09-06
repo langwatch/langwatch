@@ -6,13 +6,13 @@
 
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
-import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules";
+import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules.ts";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
   LangyLocalPresencePort,
   type PresenceHeartbeat,
-} from "../ports/langy-local-presence.port";
+} from "../ports/langy-local-presence.port.ts";
 
 /** How long the skip choice outlives the socket that carried it. */
 const POLICY_TTL_SECONDS = 6 * 60 * 60;

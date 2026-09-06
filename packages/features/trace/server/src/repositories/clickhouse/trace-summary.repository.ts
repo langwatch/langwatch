@@ -5,12 +5,12 @@ import {
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
-import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port";
-import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules";
-import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository";
-import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
+import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
+import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
+import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
 
 /**
  * Fields that are read identically by both the trace summary repository

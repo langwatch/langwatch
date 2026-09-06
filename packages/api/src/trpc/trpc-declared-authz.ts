@@ -42,7 +42,7 @@ import type {
   TrpcAuthorizationDenialPort,
   TrpcAuthorizationPort,
   TrpcMiddlewareContext,
-} from "./trpc-policy-ports.js";
+} from "./trpc-policy-ports.ts";
 
 const logger = createLogger("langwatch:authz");
 

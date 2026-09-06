@@ -1,9 +1,9 @@
 import { Card, Table } from "@chakra-ui/react";
-import { DeadLetterRow } from "./dead-letter-row";
+import { DeadLetterRow } from "./dead-letter-row.tsx";
 import type {
   DeadLetterAttemptHistoryRenderer,
   DeadLetterMessage,
-} from "../../model/dead-letter-types";
+} from "../../model/dead-letter-types.ts";
 
 /** The dead messages themselves, newest retirement first. */
 export function DeadLettersTable({

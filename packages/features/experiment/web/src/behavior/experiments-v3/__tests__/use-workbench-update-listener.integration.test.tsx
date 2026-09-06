@@ -32,8 +32,8 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { useEvaluationsV3Store } from "../use-evaluations-v3-store";
-import { useWorkbenchUpdateListener } from "../use-workbench-update-listener";
+import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
+import { useWorkbenchUpdateListener } from "../use-workbench-update-listener.ts";
 
 function emitSignal(version: number, slug = "my-exp", extra: { runId?: string } = {}) {
   const call = sseCalls.at(-1)!;

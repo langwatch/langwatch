@@ -7,18 +7,18 @@ import { createPortal } from "react-dom";
 import { Columns, Copy, MoreHorizontal, Trash2, X } from "react-feather";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
-import { HoverableBigText } from "../../hoverable-big-text";
+import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
-import { DrawerFooterContext } from "../../../elements/studio-drawer-footer";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { DrawerFooterContext } from "../../../elements/studio-drawer-footer.tsx";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
-import { ComponentIcon } from "../../../elements/workflow-icons";
-import { InputPanel } from "../component_execution/input-panel";
-import { OutputPanel } from "../component_execution/output-panel";
-import { ComponentExecutionButton } from "../../workflow-node-execution";
-import { getNodeDisplayName } from "../../workflow-nodes";
+import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
+import { InputPanel } from "../component_execution/input-panel.tsx";
+import { OutputPanel } from "../component_execution/output-panel.tsx";
+import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";
+import { getNodeDisplayName } from "../../workflow-nodes.tsx";
 
 /**
  * Determines whether a node type supports the expand (Input/Output panels)

@@ -4,9 +4,9 @@ import {
   type CollectedGrants,
   type ResourceGrant,
 } from "@langwatch/authz-contract";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port";
-import type { AuthzReadRepository } from "../repositories/authz-read.repository";
-import { AuthzCollectorService } from "./authz-collector.service";
+import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
+import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
+import { AuthzCollectorService } from "./authz-collector.service.ts";
 
 const MAX_CACHE_ENTRIES = 10_000;
 const DEFAULT_CACHE_MAX_AGE_MS = 30_000;

@@ -12,14 +12,14 @@ import {
   MetricDataPointAppendRepository,
   type MetricDataPointBulkWrite,
   type MetricDataPointWrite,
-} from "../metric-data-point-append.repository";
+} from "../metric-data-point-append.repository.ts";
 import {
   MetricDataPointMapper,
   ROLLUP_SELECT,
   type RollupSourceRow,
   SEEK_SELECT,
   type SeekMetricRow,
-} from "./clickhouse.metric-data-point.mapper";
+} from "./clickhouse.metric-data-point.mapper.ts";
 
 export interface MetricClickHouseClient {
   insert(params: {

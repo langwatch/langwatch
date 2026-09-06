@@ -38,18 +38,18 @@ import type {
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
-} from "../ports/dataset.port";
+} from "../ports/dataset.port.ts";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
-import { DatasetRecordService } from "./dataset-record.service";
-import { datasetSlugOf } from "../rules/dataset-selection.rules";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
-import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";
+import { DatasetRecordService } from "./dataset-record.service.ts";
+import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
+import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository.ts";
+import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 
 export type DatasetServiceOptions = {
   repository: DatasetRepository;

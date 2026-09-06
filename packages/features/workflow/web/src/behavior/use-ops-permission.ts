@@ -1,4 +1,4 @@
-import { api } from "../model/workflow-api-client";
+import { api } from "../model/workflow-api-client.ts";
 
 // Ops scope reflects the signed-in user's grants on this project — it
 // doesn't change mid-session. Without an explicit staleTime React Query

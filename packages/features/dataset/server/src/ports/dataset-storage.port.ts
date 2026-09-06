@@ -4,7 +4,7 @@
  */
 import type { Readable } from "node:stream";
 import type { S3Client } from "@aws-sdk/client-s3";
-import type { ChunkOffset, DatasetChunk } from "../rules/dataset-chunking.rules";
+import type { ChunkOffset, DatasetChunk } from "../rules/dataset-chunking.rules.ts";
 
 /** A freshly-minted presigned upload target (server-owned staging key). */
 export type PresignedUpload = { uploadId: string; key: string; url: string };

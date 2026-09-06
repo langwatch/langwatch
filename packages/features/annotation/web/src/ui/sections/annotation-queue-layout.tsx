@@ -17,9 +17,9 @@
 
 import type { PropsWithChildren } from "react";
 
-import { annotationApi } from "../../behavior/annotation-api";
-import { useAnnotationHost } from "../../model/annotation-host";
-import { AnnotationSidebar } from "./annotation-sidebar";
+import { annotationApi } from "../../behavior/annotation-api.ts";
+import { useAnnotationHost } from "../../model/annotation-host.ts";
+import { AnnotationSidebar } from "./annotation-sidebar.tsx";
 
 export default function AnnotationsLayout({ children }: PropsWithChildren) {
   const host = useAnnotationHost();

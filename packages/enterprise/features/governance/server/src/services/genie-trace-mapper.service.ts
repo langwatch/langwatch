@@ -43,14 +43,14 @@ import {
   type ConversationSeeds,
   ConversationTraceAssemblyService,
   type OtlpJsonSpan,
-} from "./conversation-trace-assembly.service";
+} from "./conversation-trace-assembly.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { GenieSpanAttributesService } from "./genie-span-attributes.service";
+import { GenieSpanAttributesService } from "./genie-span-attributes.service.ts";
 import type {
   GenieMessageFrame,
   GenieMessagePayload,
   GenieRoutingOrigin,
-} from "../rules/genie-message.rules";
+} from "../rules/genie-message.rules.ts";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 

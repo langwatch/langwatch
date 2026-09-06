@@ -1,6 +1,6 @@
 import { EventingAgentSandboxMaintenanceAdapter } from "@langwatch/api-key-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */
 export abstract class WorkerAgentSandboxKeyReapPort {

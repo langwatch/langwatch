@@ -1,13 +1,13 @@
 import { type ReactNode, useCallback, useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { PromptTemplateFieldsContext } from "../../../behavior/experiments-v3/use-prompt-template-fields";
-import type { TargetConfig } from "../../../model/experiments-v3/types";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { PromptTemplateFieldsContext } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import {
   getFieldsUsedByPromptTemplate,
   type PromptTemplateMessage,
-} from "../../../model/experiments-v3/mapping-validation";
+} from "../../../model/experiments-v3/mapping-validation.ts";
 
 /** What one resolved prompt query answers with, of the parts read here. */
 type ResolvedPrompt = {

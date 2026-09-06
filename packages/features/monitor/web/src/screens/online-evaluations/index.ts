@@ -39,18 +39,18 @@ import type { ComponentType } from "react";
 export type MonitorScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const monitorScreens = {
-  onlineEvaluations: () => import("./online-evaluations.screen"),
+  onlineEvaluations: () => import("./online-evaluations.screen.tsx"),
 } as const satisfies Record<string, MonitorScreenLoader>;
 
 export type MonitorScreenName = keyof typeof monitorScreens;
 
-export { ONLINE_EVALUATIONS_PAGE_PERMISSION } from "./online-evaluations.screen";
-export { monitorApi } from "../../behavior/monitor-api";
+export { ONLINE_EVALUATIONS_PAGE_PERMISSION } from "./online-evaluations.screen.tsx";
+export { monitorApi } from "../../behavior/monitor-api.ts";
 export type {
   MonitorApiMap,
   MonitorExperimentRow,
   MonitorListRow,
-} from "../../behavior/monitor-api";
+} from "../../behavior/monitor-api.ts";
 export {
   MonitorHostPort,
   MonitorHostProvider,
@@ -60,4 +60,4 @@ export {
   type MonitorRouteReading,
   type MonitorScope,
   type MonitorSuccessNotice,
-} from "../../model/monitor-host";
+} from "../../model/monitor-host.ts";

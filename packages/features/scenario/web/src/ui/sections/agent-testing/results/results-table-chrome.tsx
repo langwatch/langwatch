@@ -9,7 +9,7 @@ import {
   FG_MUTED,
   ROW_HOVER_BG,
   TABLE_HEADER_BG,
-} from "../../../../model/agent-testing/shared/design";
+} from "../../../../model/agent-testing/shared/design.ts";
 
 /** The card every results table sits in. */
 export function ResultsTableCard({ children, testId }: { children: ReactNode; testId?: string }) {

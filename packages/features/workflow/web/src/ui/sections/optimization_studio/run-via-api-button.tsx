@@ -1,13 +1,13 @@
 import { Button } from "@chakra-ui/react";
 import { Terminal } from "react-feather";
 
-import { type ApiSnippetTab, GenerateApiSnippetDialog } from "../generate-api-snippet-dialog";
-import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker";
+import { type ApiSnippetTab, GenerateApiSnippetDialog } from "../generate-api-snippet-dialog.tsx";
+import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";
 import {
   buildRunSnippet,
   type RunSnippetDataSource,
-} from "../../../model/run-via-api/run-snippets";
-import { useRunViaApiTabs } from "../run-via-api/use-run-via-api-tabs";
+} from "../../../model/run-via-api/run-snippets.ts";
+import { useRunViaApiTabs } from "../run-via-api/use-run-via-api-tabs.ts";
 
 import type { WorkflowField } from "@langwatch/workflow-contract";
 

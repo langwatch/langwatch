@@ -4,12 +4,12 @@
  * them in bounded-concurrency waves, then rebuild clone-on-write along rewritten paths only.
  */
 
-import { TraceContentExtractionService } from "./trace-content-extraction.service";
+import { TraceContentExtractionService } from "./trace-content-extraction.service.ts";
 import { containsMediaMarkers } from "@langwatch/trace-contract";
 import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract";
 import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
-import type { ExtractedRef } from "../rules/content-part-extraction.rules";
-import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
+import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
+import type { TraceMediaStorePort } from "../ports/trace-media-store.port.ts";
 
 /** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
 const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;

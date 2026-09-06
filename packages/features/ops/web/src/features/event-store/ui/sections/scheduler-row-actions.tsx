@@ -1,12 +1,12 @@
 import { Field, IconButton, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 
-import { api } from "../../../../behavior/ops-api";
-import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation";
+import { api } from "../../../../behavior/ops-api.ts";
+import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 
 /**

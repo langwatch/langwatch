@@ -17,11 +17,11 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { StorageStatsMetricsPort } from "../../ports/storage-stats-metrics.port";
+import { StorageStatsMetricsPort } from "../../ports/storage-stats-metrics.port.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
-} from "../storage-stats-collection.service";
+} from "../storage-stats-collection.service.ts";
 
 class SilentMetrics extends StorageStatsMetricsPort {
   beginTick(): void {}

@@ -97,13 +97,13 @@ vi.mock("ai", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: PROJECT_ID, slug: "demo" },
   }),
 }));
 
-vi.mock("../../../../../behavior/use-feature-flag", () => ({
+vi.mock("../../../../../behavior/use-feature-flag.ts", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
@@ -124,10 +124,10 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const React = await import("react");
   const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
 
   /** Re-read whichever of this file's two queries is asking. */
   const useLocalState = () => {
@@ -242,10 +242,10 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel";
+import { LangySidecar } from "../langy-panel.tsx";
 import { MemoryRouter } from "react-router";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>

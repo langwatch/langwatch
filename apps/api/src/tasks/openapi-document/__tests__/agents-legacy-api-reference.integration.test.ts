@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   generateOpenApiDocument,
   type GeneratedOpenApiDocument,
-} from "../openapi-document.generator";
+} from "../openapi-document.generator.ts";
 
 /** Every operation of the family that predates the move to `/api/v1/agents`. */
 const LEGACY_OPERATIONS = [

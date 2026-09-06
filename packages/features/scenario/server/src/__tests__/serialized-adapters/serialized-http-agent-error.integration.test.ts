@@ -20,7 +20,7 @@ import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
-import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.port";
+import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.port.ts";
 
 // ---------------------------------------------------------------------------
 // Shared constants

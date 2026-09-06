@@ -4,7 +4,7 @@
  */
 
 import type { RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
-import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing";
+import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing.ts";
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 import type {
   ExternalSetSummary,
@@ -12,7 +12,7 @@ import type {
   SuiteRunSummary,
 } from "@langwatch/scenario-contract";
 import { parseSuiteScope, getSuiteSetId } from "@langwatch/suite-contract";
-import { RESULTS_SEGMENT } from "../use-agent-testing-routing";
+import { RESULTS_SEGMENT } from "../use-agent-testing-routing.ts";
 
 /**
  * The label the command line puts on the throwaway suite it makes for

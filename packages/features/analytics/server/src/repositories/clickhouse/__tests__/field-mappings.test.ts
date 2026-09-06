@@ -10,7 +10,7 @@ import {
   qualifiedColumn,
   requiresJoin,
   tableAliases,
-} from "../clickhouse.field-mappings.mapper";
+} from "../clickhouse.field-mappings.mapper.ts";
 
 describe("field-mappings", () => {
   describe("fieldMappings", () => {

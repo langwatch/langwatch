@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/eventing";
 import type { WebhookEgressService } from "@langwatch/egress";
-import { HttpWebhookDestinationAdapter } from "../http.webhook-destination.adapter";
-import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port";
+import { HttpWebhookDestinationAdapter } from "../http.webhook-destination.adapter.ts";
+import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port.ts";
 
 // The SSRF-fenced egress service (which also owns the hourly dispatch cap) is
 // the boundary; the classification under test is the real one.

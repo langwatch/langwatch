@@ -1,8 +1,8 @@
 import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
-} from "../repositories/prisma/prisma.api-key.repository";
-import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service";
+} from "../repositories/prisma/prisma.api-key.repository.ts";
+import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service.ts";
 
 /**
  * The process's Prisma client, as the sweep receives it.

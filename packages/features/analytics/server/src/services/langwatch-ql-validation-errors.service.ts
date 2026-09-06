@@ -5,8 +5,8 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import type { RejectedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules";
-import type { LangWatchQLViolation } from "../rules/langwatch-ql-violations.rules";
+import type { RejectedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
+import type { LangWatchQLViolation } from "../rules/langwatch-ql-violations.rules.ts";
 
 /**
  * `meta` for both codes: the violations, verbatim. Named consumer, as the contract requires —

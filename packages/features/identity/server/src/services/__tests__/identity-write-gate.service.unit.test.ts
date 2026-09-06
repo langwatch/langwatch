@@ -3,11 +3,11 @@ import type {
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 import {
   IDENTITY_WRITE_GATE_TTL_MS,
   IdentityWriteGateService,
-} from "../identity-write-gate.service";
+} from "../identity-write-gate.service.ts";
 
 const USER = "user_sam";
 

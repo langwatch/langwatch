@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(["annotations:create"]),
 }));
 
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
 vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => ({
@@ -22,16 +22,16 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => (
   useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
     selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
-vi.mock("../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
-vi.mock("../../../me/use-personal-feature-gate", () => ({
+vi.mock("../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: { open: false },
@@ -39,7 +39,7 @@ vi.mock("../../../me/use-personal-feature-gate", () => ({
 }));
 // The dialog is covered on its own; here we only care that the bar hands it
 // the right traces at the right moment.
-vi.mock("../../add-to-annotation-queue-dialog", () => ({
+vi.mock("../../add-to-annotation-queue-dialog.tsx", () => ({
   AddToAnnotationQueueDialog: (props: { open: boolean; traceIds: string[] }) => {
     return props.open ? (
       <div data-testid="annotation-queue-dialog">{props.traceIds.join(",")}</div>
@@ -47,8 +47,8 @@ vi.mock("../../add-to-annotation-queue-dialog", () => ({
   },
 }));
 
-import { useSelectionStore } from "../../../../../behavior/selection.store";
-import { BulkActionBar } from "../bulk-action-bar";
+import { useSelectionStore } from "../../../../../behavior/selection.store.ts";
+import { BulkActionBar } from "../bulk-action-bar.tsx";
 
 const renderBar = () =>
   render(

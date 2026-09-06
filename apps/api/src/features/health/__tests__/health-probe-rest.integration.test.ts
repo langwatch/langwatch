@@ -5,7 +5,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createHealthProbeRestApp, type HealthProbeRestPorts } from "../health-probe-rest";
+import { createHealthProbeRestApp, type HealthProbeRestPorts } from "../health-probe-rest.ts";
 
 describe("given a subsystem health probe", () => {
   describe("when the request carries no credential", () => {

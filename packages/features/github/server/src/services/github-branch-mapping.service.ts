@@ -7,13 +7,13 @@ import {
   type GithubAppTokenPort,
   type GithubPullRequestSummary,
   GithubRateLimitedError,
-} from "../ports/github-app-token.port";
-import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port";
-import type { GithubHostPort } from "../ports/github-host.port";
+} from "../ports/github-app-token.port.ts";
+import type { GithubBranchInstallationsPort } from "../ports/github-branch-installations.port.ts";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
-} from "../repositories/github-pull-requests.repository";
+} from "../repositories/github-pull-requests.repository.ts";
 
 const logger = createLogger("langwatch:github:branch-mapping");
 const FRESH_MAPPING_MS = 15 * 60 * 1000;

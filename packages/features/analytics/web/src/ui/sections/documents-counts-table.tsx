@@ -1,8 +1,8 @@
 import { Box, Table, Text, VStack } from "@chakra-ui/react";
-import { useFilterParams } from "../../behavior/use-filter-params";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { SummaryMetricValue } from "../elements/summary-metric";
+import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
 export const DocumentsCountsTable = () => {
   const { filterParams, queryOpts } = useFilterParams();

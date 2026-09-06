@@ -4,8 +4,8 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 
-import type { GithubRedisPort } from "../ports/github-app-token.port";
-import { GithubInstallStatePort } from "../ports/github-install-state.port";
+import type { GithubRedisPort } from "../ports/github-app-token.port.ts";
+import { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;

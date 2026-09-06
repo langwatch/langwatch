@@ -38,7 +38,7 @@ import type {
   TraceSummaryData,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port";
+import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
 
 const logger = createLogger("langwatch:trace:app");
 

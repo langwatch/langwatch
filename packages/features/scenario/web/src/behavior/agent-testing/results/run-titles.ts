@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { runOrdinal } from "./run-plans";
+import { runOrdinal } from "./run-plans.ts";
 
 /** Every run of a plan reads by its number inside the window. */
 export function runTitle({

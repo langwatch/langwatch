@@ -3,17 +3,17 @@ import {
   type TraceByIdInput,
   type TraceDerivedEventsInput,
 } from "@langwatch/trace-contract";
-import { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
-import { TraceQueryClassificationPort } from "./ports/trace-query-classification.port";
-import { TraceRecordPort } from "./ports/trace-record.port";
-import { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
-import { TracePayloadReaderPort } from "./ports/trace-payload-reader.port";
+import { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts";
+import { TraceQueryClassificationPort } from "./ports/trace-query-classification.port.ts";
+import { TraceRecordPort } from "./ports/trace-record.port.ts";
+import { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port.ts";
+import { TracePayloadReaderPort } from "./ports/trace-payload-reader.port.ts";
 
-export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
-export { SpanNormalizationPipelineService } from "./services/span-normalization.service";
-export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes";
-export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service";
-export { ClickHouseTraceQuerySubqueryAdapter } from "./adapters/trace-query-subquery.clickhouse.adapter";
+export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
+export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
+export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";
+export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
+export { ClickHouseTraceQuerySubqueryAdapter } from "./adapters/trace-query-subquery.clickhouse.adapter.ts";
 
 export class MissingTraceRecordPort extends TraceRecordPort {
   async getById(input: TraceByIdInput): Promise<never> {

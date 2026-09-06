@@ -18,7 +18,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { SavedChartsToolbar } from "../saved-charts-toolbar";
+import { SavedChartsToolbar } from "../saved-charts-toolbar.tsx";
 
 const withChakra = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);

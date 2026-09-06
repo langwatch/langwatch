@@ -3,14 +3,14 @@
  * Unit tests for CSV serializers (summary and full mode). Pure function tests — no mocking needed.
  */
 
-import { TraceExportService } from "../trace-export.service";
+import { TraceExportService } from "../trace-export.service.ts";
 import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
 import {
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
-} from "../../rules/trace-export-csv.rules";
+} from "../../rules/trace-export-csv.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Test data builders

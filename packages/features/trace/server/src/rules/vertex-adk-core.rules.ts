@@ -1,7 +1,7 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
-import { inferSpanTypeIfAbsent } from "./canonical-extraction.rules";
-import { isNonEmptyString } from "./canonical-guard.rules";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import { inferSpanTypeIfAbsent } from "./canonical-extraction.rules.ts";
+import { isNonEmptyString } from "./canonical-guard.rules.ts";
 
 export const VERTEX_ADK_RULE_PREFIX = "vertex-adk";
 export const VERTEX_ADK_PROVIDER = "gcp.vertex.agent";

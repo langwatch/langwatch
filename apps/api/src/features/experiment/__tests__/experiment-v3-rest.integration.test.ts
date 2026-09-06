@@ -7,10 +7,10 @@ import type { ExperimentApp } from "@langwatch/experiment-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountExperimentV3Rest } from "../experiment-v3-rest.mount";
-import type { ApiExperimentRun } from "../../../app/api-experiment-run.composition";
-import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session";
-import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential";
+import { mountExperimentV3Rest } from "../experiment-v3-rest.mount.ts";
+import type { ApiExperimentRun } from "../../../app/api-experiment-run.composition.ts";
+import type { ApiHandlerManagedSessionPort } from "../../../app/api-handler-managed-session.ts";
+import type { HandlerManagedCredential } from "../../../app/api-handler-managed-credential.ts";
 
 describe("given the workbench's saved-setup doors", () => {
   describe("when a project key that may view experiments reads a setup", () => {

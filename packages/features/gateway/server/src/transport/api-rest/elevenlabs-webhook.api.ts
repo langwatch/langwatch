@@ -18,11 +18,11 @@ import { z } from "zod";
 import {
   GatewayElevenLabsCredentialService,
   type ElevenLabsCredentialCollaborators,
-} from "../../services/gateway-elevenlabs-credential.service";
+} from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
-} from "../../services/gateway-realtime-session.service";
+} from "../../services/gateway-realtime-session.service.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:api:elevenlabs");

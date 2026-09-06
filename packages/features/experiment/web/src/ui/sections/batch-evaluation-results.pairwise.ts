@@ -2,8 +2,8 @@
  * Adapts a Comparison column's per-row verdicts into the input shape
  * `computeBTLeaderboard` expects (#5103). Pure, no I/O.
  */
-import type { PairwiseComparison } from "../../model/batch-evaluation-results.bt-leaderboard";
-import type { BatchComparisonColumn } from "./batch-evaluation-results.types";
+import type { PairwiseComparison } from "../../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { BatchComparisonColumn } from "./batch-evaluation-results.types.ts";
 
 export function buildPairwiseComparisons(column: BatchComparisonColumn): PairwiseComparison[] {
   return Object.values(column.verdictsByRow).map((verdict) => {

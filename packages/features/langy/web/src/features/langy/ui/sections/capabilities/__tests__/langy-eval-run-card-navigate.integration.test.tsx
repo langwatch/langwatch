@@ -13,9 +13,9 @@ import {
   type LangyHostProject,
   type LangyHostTeam,
   type LangyRouteReading,
-} from "../../../../../../model/langy-host";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry";
-import { LangyEvalRunCard } from "../langy-eval-run-card";
+} from "../../../../../../model/langy-host.ts";
+import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
+import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
 
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
@@ -65,7 +65,7 @@ class FakeLangyHost extends LangyHostPort {
 }
 const host = new FakeLangyHost();
 
-vi.mock("../../../../behavior/use-capability-data", () => ({
+vi.mock("../../../../behavior/use-capability-data.ts", () => ({
   useCapabilityData: () => ({
     status: "unavailable",
     rows: [],

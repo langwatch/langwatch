@@ -2,20 +2,20 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService as WorkflowServiceContract } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
-import { WorkflowIdPort } from "../ports/workflow.port";
+import { WorkflowIdPort } from "../ports/workflow.port.ts";
 import type {
   WorkflowDslMigrationPort,
   WorkflowLlmParametersPort,
   WorkflowNlpRuntimePort,
   WorkflowProjectEnvironmentPort,
-} from "../ports/workflow.port";
+} from "../ports/workflow.port.ts";
 import {
   PrismaWorkflowRepository,
   type WorkflowDatabase,
-} from "../repositories/prisma/prisma.workflow.repository";
-import { StudioEventPreparerService } from "../services/studio-event-preparer.service";
-import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service";
-import { WorkflowService } from "../services/workflow.service";
+} from "../repositories/prisma/prisma.workflow.repository.ts";
+import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
+import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
+import { WorkflowService } from "../services/workflow.service.ts";
 
 export type PostgresWorkflowAdapterOptions = {
   /** Generated Prisma client supplied by the application composition root. */

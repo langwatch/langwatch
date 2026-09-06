@@ -1,4 +1,4 @@
-import type { AnalyticsSeries } from "./analytics.timeseries";
+import type { AnalyticsSeries } from "./analytics.timeseries.ts";
 
 export interface BuiltAnalyticsQuery {
   readonly sql: string;

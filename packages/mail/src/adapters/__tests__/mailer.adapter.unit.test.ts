@@ -6,13 +6,13 @@ const { close, create, send } = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 
-vi.mock("../../providers/smtp", () => ({
+vi.mock("../../providers/smtp.ts", () => ({
   SmtpEmailProvider: { create },
 }));
 
-import { MailerAdapter } from "../mailer.adapter";
-import type { SesAwsClientConfiguration } from "../../providers/ses";
-import type { MailerConfiguration } from "../../providers/types";
+import { MailerAdapter } from "../mailer.adapter.ts";
+import type { SesAwsClientConfiguration } from "../../providers/ses.ts";
+import type { MailerConfiguration } from "../../providers/types.ts";
 
 /**
  * SES is never selected in this suite — the configuration names SMTP — so the

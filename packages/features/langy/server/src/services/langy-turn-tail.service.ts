@@ -1,8 +1,8 @@
-import { LangyTurnSettlementWaiterService } from "./langy-turn-settlement-waiter.service";
+import { LangyTurnSettlementWaiterService } from "./langy-turn-settlement-waiter.service.ts";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import type { LangyStreamRead } from "../ports/langy-token-buffer.port";
-import type { SettlementOutcome, TurnHealth } from "../rules/langy-turn-settlement.rules";
-import { advanceSettlement, NO_SETTLEMENT_STREAKS } from "../rules/langy-turn-settlement.rules";
+import type { LangyStreamRead } from "../ports/langy-token-buffer.port.ts";
+import type { SettlementOutcome, TurnHealth } from "../rules/langy-turn-settlement.rules.ts";
+import { advanceSettlement, NO_SETTLEMENT_STREAKS } from "../rules/langy-turn-settlement.rules.ts";
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */
 export const SETTLEMENT_POLL_MS = 5_000;

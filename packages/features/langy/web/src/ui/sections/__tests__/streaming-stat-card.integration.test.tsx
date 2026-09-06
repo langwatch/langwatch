@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StreamingStatCard } from "../streaming-stat-card";
+import { StreamingStatCard } from "../streaming-stat-card.tsx";
 
 /**
  * The ticker springs the number up from zero, so a test that reads the DOM

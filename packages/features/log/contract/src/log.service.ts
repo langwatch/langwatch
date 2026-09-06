@@ -1,4 +1,4 @@
-import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "./log-record";
+import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "./log-record.ts";
 
 export type LogPiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
 

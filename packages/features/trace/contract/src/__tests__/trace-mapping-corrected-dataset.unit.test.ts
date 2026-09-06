@@ -6,10 +6,10 @@
  * expected output. The captured trace is untouched and still identifies the row.
  */
 import { describe, expect, it } from "vitest";
-import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping";
-import type { Trace } from "../trace-format.schemas";
-import { applyOverlayToTrace } from "../trace-edit-overlay-apply";
-import type { TraceEditOverlayPatch } from "../trace-edit-overlay.contract";
+import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping.ts";
+import type { Trace } from "../trace-format.schemas.ts";
+import { applyOverlayToTrace } from "../trace-edit-overlay-apply.ts";
+import type { TraceEditOverlayPatch } from "../trace-edit-overlay.contract.ts";
 
 const capturedTrace = {
   trace_id: "trace-1",

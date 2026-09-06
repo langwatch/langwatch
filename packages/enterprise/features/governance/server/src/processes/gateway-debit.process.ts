@@ -3,7 +3,7 @@ import {
   GatewayDebitIntent,
   type WriteGatewayDebitsPayload,
   writeGatewayDebitsSchema,
-} from "../intents/gateway-debit.intent";
+} from "../intents/gateway-debit.intent.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -14,7 +14,7 @@ import {
   type GatewaySpendFailedData,
   type GatewaySpendOutcomeData,
   type GatewaySpendProcessingEvent,
-} from "../ports/gateway-debit.port";
+} from "../ports/gateway-debit.port.ts";
 
 export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 

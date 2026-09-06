@@ -1,7 +1,7 @@
 import { mapReasoningToProvider } from "@langwatch/prompt-contract";
 import { z } from "zod";
 
-import { llmConfigSchema, type LLMConfig, type LocalPromptLlmConfig } from "./studio-workflow";
+import { llmConfigSchema, type LLMConfig, type LocalPromptLlmConfig } from "./studio-workflow.ts";
 
 export type SupportedLlmParameter = string;
 

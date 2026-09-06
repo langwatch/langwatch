@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HEADER_PARSE_MAX_BYTES, parseHeaderColumns } from "../parse-header-columns";
+import { HEADER_PARSE_MAX_BYTES, parseHeaderColumns } from "../parse-header-columns.ts";
 
 const file = (content: string, name: string) => new File([content], name);
 

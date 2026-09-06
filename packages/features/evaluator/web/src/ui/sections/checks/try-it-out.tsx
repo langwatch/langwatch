@@ -32,8 +32,8 @@ import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
-} from "../../../model/evaluations/preconditions";
-import type { CheckPreconditions } from "../../../model/evaluations/types";
+} from "../../../model/evaluations/preconditions.ts";
+import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { Money } from "@langwatch/design-system/type-utils";
@@ -47,8 +47,8 @@ import {
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { RedactedField } from "@langwatch/workflow-web/surfaces/redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { CheckConfigFormData } from "./check-config-form";
-import { evaluationStatusColor } from "../../../model/evaluation-status";
+import type { CheckConfigFormData } from "./check-config-form.tsx";
+import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 
 export function TryItOut({
   form,

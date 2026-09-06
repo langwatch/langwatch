@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import type { ExecutionScope } from "@langwatch/experiment-contract";
-import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation";
+import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
 
 type ExecutionControlsProps = {
   /** Whether the evaluation is ready to run (all mappings configured) */

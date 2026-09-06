@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "../worker-runtime.port";
-import { WorkerRuntime } from "../worker.runtime";
+import { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "../worker-runtime.port.ts";
+import { WorkerRuntime } from "../worker.runtime.ts";
 
 class TestWorkerHandle extends WorkerHandlePort {
   readonly shutdown = vi.fn(async (): Promise<void> => void 0);

@@ -2,7 +2,7 @@
  * Compatibility layer: next/navigation → the family's route port.
  */
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useWorkflowHost } from "../../model/workflow-host";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export { useRouter } from "@langwatch/ui-host/use-router";
 

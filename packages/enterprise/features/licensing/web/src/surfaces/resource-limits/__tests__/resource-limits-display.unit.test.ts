@@ -4,7 +4,7 @@ import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
   type ResourceLimits,
-} from "../resource-limits-display";
+} from "../resource-limits-display.tsx";
 
 /**
  * Pure unit tests for ResourceLimitsDisplay mapping functions.

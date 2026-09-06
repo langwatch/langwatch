@@ -10,7 +10,7 @@ import {
   hasMigratableChunkCount,
   paginate,
   sha256OfStream,
-} from "../rules/object-storage-migration-transfer.rules";
+} from "../rules/object-storage-migration-transfer.rules.ts";
 
 /**
  * The later of two version timestamps, nudged a millisecond past `previous`

@@ -5,7 +5,7 @@ import {
   canConvergeOnInput,
   computeNodeGuards,
   guardsAreMutuallyExclusive,
-} from "../model/edge-convergence";
+} from "../model/edge-convergence.ts";
 
 const node = (id: string, type: string): Node => ({
   id,

@@ -10,8 +10,8 @@ import { MonitorEvaluatorRequiredError, type Monitor } from "@langwatch/monitor-
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { MonitorApp } from "../monitor.app";
-import { createMonitorRestApp } from "../../transport/api-rest/monitor.api";
+import type { MonitorApp } from "../monitor.app.ts";
+import { createMonitorRestApp } from "../../transport/api-rest/monitor.api.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

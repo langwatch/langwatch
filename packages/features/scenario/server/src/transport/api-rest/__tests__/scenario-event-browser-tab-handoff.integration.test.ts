@@ -7,7 +7,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { ScenarioTabRegistry } from "@langwatch/scenario-contract";
-import { createScenarioEventsRestApp } from "../scenario-event.api";
+import { createScenarioEventsRestApp } from "../scenario-event.api.ts";
 
 const PROJECT = { id: "project-1", slug: "project-one" };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CAPABILITY_HYDRATORS } from "../capability-hydrators";
+import { CAPABILITY_HYDRATORS } from "../capability-hydrators.ts";
 
 describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
   describe("given a list of trace ids to hydrate for the capability card", () => {

@@ -5,11 +5,11 @@ import { createTrpcService } from "@langwatch/api/trpc";
 import { runConfigurationEntrySchema } from "@langwatch/scenario-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { MAX_RUN_CONFIGURATIONS } from "../../ports/run-configurations-read.port";
+import { MAX_RUN_CONFIGURATIONS } from "../../ports/run-configurations-read.port.ts";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcProcedures,
-} from "../../rules/scenario-trpc-context.rules";
+} from "../../rules/scenario-trpc-context.rules.ts";
 
 export function createRunConfigurationsRouter<
   TContext extends ScenarioTrpcContext,

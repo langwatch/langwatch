@@ -36,7 +36,7 @@ vi.mock("@langwatch/github-web/surfaces/github-connect-popup", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", () => ({
+vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       getLocalWorkspace: {
@@ -70,7 +70,7 @@ vi.mock("../../../../../behavior/langy-api", () => ({
   },
 }));
 
-import { LangyCodeAccessCard } from "../../../../../ui/sections/derived-cards/langy-code-access-card";
+import { LangyCodeAccessCard } from "../../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 
 afterEach(cleanup);
 

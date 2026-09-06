@@ -1,9 +1,9 @@
 import type {
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
-} from "./webhook.commands";
-import type { ListWebhookEventsQuery, ListWebhookEventsResult } from "./webhook.queries";
-import type { WebhookEndpointHealth, WebhookEndpointView } from "./webhook";
+} from "./webhook.commands.ts";
+import type { ListWebhookEventsQuery, ListWebhookEventsResult } from "./webhook.queries.ts";
+import type { WebhookEndpointHealth, WebhookEndpointView } from "./webhook.ts";
 
 export abstract class WebhookEndpointService {
   abstract create(
@@ -30,7 +30,7 @@ export abstract class WebhookEventsService {
   abstract tryGetEmittedEventById(input: {
     organizationId: string;
     id: string;
-  }): Promise<import("./webhook").WebhookEnvelope | null>;
+  }): Promise<import("./webhook.ts").WebhookEnvelope | null>;
   abstract getEmittedEvents(query: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
 }
 

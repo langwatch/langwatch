@@ -2,4 +2,4 @@ export {
   metricDataPointReceivedEventSchema,
   type MetricDataPointReceivedEvent,
   type MetricProcessingEvent,
-} from "../../metric.events";
+} from "../../metric.events.ts";

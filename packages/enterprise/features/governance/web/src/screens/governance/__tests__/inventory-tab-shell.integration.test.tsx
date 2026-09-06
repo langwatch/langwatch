@@ -26,7 +26,7 @@ import {
   fakeGovernanceHost,
   renderWithGovernanceHost,
   type GovernanceQuery,
-} from "../../../testing";
+} from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   /** Every procedure path whose `useQuery` was NOT disabled. */
@@ -39,7 +39,7 @@ const VIEWER_PERMISSIONS = ["organization:view", "governance:view", "ingestionSo
 /** The viewer set plus the catalog's own grant. */
 const CATALOG_ADMIN_PERMISSIONS = [...VIEWER_PERMISSIONS, "aiTools:manage"];
 
-vi.mock("../../../behavior/governance-api", () => {
+vi.mock("../../../behavior/governance-api.ts", () => {
   const queryResult = () => ({
     data: undefined,
     isLoading: false,
@@ -82,7 +82,7 @@ vi.mock("../../../behavior/governance-api", () => {
   return { api, governanceApi: api };
 });
 
-import InventoryPage from "../governance-inventory.screen";
+import InventoryPage from "../governance-inventory.screen.tsx";
 
 function renderInventoryAt({
   permissions,

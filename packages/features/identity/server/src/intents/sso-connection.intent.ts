@@ -43,11 +43,11 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
+import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
-import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
+import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent.ts";
 
 /**
  * The connection pipeline's thirteen verbs plus grandfathering, as the queue's STAGED RE-RUN of

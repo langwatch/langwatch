@@ -10,7 +10,7 @@ import {
   localCallErrorSchema,
   localToolCallSchema,
   workspaceInfoSchema,
-} from "./langy.local-control-protocol";
+} from "./langy.local-control-protocol.ts";
 
 /** A control request as the CLI lists it. */
 export const controlRequestSchema = z.object({

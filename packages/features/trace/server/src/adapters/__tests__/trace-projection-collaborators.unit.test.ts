@@ -1,4 +1,4 @@
-import { TraceProjectionLeanService } from "../../services/trace-projection-lean.service";
+import { TraceProjectionLeanService } from "../../services/trace-projection-lean.service.ts";
 import { describe, expect, it } from "vitest";
 import {
   NormalizedSpanKind,
@@ -8,12 +8,12 @@ import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceIoExtractionAdapter } from "../trace-io-extraction.adapter";
-import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter";
-import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter";
-import { SpanCostService } from "../../services/span-cost.service";
-import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../../services/trace-projection-lean.service";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceIoExtractionAdapter } from "../trace-io-extraction.adapter.ts";
+import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter.ts";
+import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter.ts";
+import { SpanCostService } from "../../services/span-cost.service.ts";
+import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../../services/trace-projection-lean.service.ts";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested

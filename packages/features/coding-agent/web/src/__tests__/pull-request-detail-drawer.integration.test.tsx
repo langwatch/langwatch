@@ -27,7 +27,7 @@ const { queryImpls, utils, mockOnClose, mockOpenTrace, mockSetViewModeTransient 
   }),
 );
 
-vi.mock("../coding-agent-api", () => {
+vi.mock("../coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -69,12 +69,12 @@ vi.mock("@langwatch/trace-web/drawer.store", () => ({
   },
 }));
 
-import { PullRequestDetailDrawer } from "../pull-request-detail-drawer";
+import { PullRequestDetailDrawer } from "../pull-request-detail-drawer.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
-} from "../testing";
+} from "../testing.tsx";
 
 function pinDetail(data: unknown) {
   queryImpls["codingAgents.pullRequestDetail"] = () => ({

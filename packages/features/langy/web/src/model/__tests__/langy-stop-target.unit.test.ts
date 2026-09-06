@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLangyStopTarget } from "../langy-stop-target";
+import { resolveLangyStopTarget } from "../langy-stop-target.ts";
 
 const base = {
   projectId: "proj-1",

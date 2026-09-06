@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
-import { RedactedInline } from "../../../../../redacted-field";
-import type { TraceListItem } from "../../../../types/trace";
-import { contentToText } from "../../../../../../../model/explorer/trace-table/chat-content";
-import type { CellDef } from "../../types";
+import { RedactedInline } from "../../../../../redacted-field.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { contentToText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
+import type { CellDef } from "../../types.ts";
 
 export const OutputCell = {
   id: "output",

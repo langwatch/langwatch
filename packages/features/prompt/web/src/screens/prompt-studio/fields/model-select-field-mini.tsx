@@ -6,13 +6,13 @@ import {
   LLMConfigPopover,
   type Output,
   type OutputType,
-} from "../model-selection/llm-config-popover";
-import { LLMModelDisplay } from "../model-selection/llm-model-display";
-import { allModelOptions, useModelSelectionOptions } from "../model-selection/model-selector";
-import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout";
+} from "../model-selection/llm-config-popover.tsx";
+import { LLMModelDisplay } from "../model-selection/llm-model-display.tsx";
+import { allModelOptions, useModelSelectionOptions } from "../model-selection/model-selector.tsx";
+import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout.tsx";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../surfaces/prompt-form/index.ts";
 import type { LlmConfigOutputType } from "@langwatch/prompt-contract";
 
 type ModelSelectFieldMiniProps = {

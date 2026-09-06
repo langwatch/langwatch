@@ -3,8 +3,8 @@ import {
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
   type CodingAgentScopeProject,
-} from "../../ports/coding-agent-caller-scope.port";
-import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service";
+} from "../../ports/coding-agent-caller-scope.port.ts";
+import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";
 
 const caller = { kind: "user", userId: "user-1" } as const;
 

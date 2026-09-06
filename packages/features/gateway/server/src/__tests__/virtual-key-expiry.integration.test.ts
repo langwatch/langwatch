@@ -15,11 +15,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter";
+import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
 import type { ProjectService } from "@langwatch/project-contract";
-import { TestProjectService } from "./support/test-project-service";
+import { TestProjectService } from "./support/test-project-service.ts";
 
-import { PostgresVirtualKeyAdapter } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();

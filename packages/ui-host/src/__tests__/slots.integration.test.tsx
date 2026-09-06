@@ -7,16 +7,16 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider } from "../capabilities";
-import { createUiCapabilitiesFromHost } from "../testing";
-import type { UiSlotsPort } from "../slots";
+import { UiCapabilityContextProvider } from "../capabilities.ts";
+import { createUiCapabilitiesFromHost } from "../testing.ts";
+import type { UiSlotsPort } from "../slots.tsx";
 import {
   CORE_SEAT_TYPE_COPY,
   UiSlot,
   UNFILLED_UI_SLOTS,
   uiSlots,
   useUiSeatTypeCopy,
-} from "../slots";
+} from "../slots.tsx";
 
 function EnterpriseWall() {
   return <p>Talk to sales</p>;

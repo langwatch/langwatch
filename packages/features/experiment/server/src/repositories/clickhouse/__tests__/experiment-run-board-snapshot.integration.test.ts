@@ -24,24 +24,24 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../../../adapters/eventing.experiment-run-processing.adapter";
+} from "../../../adapters/eventing.experiment-run-processing.adapter.ts";
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,
-} from "../../../__tests__/migrated-clickhouse.harness";
+} from "../../../__tests__/migrated-clickhouse.harness.ts";
 import {
   evaluatorResultEventSchema,
   targetResultEventSchema,
   type EvaluatorResultEventData,
   type TargetResultEventData,
-} from "../../../processes/experiment-run-events.process";
+} from "../../../processes/experiment-run-events.process.ts";
 import {
   ExperimentClickHousePort,
   type ExperimentEventingClickHouseClient,
-} from "../../../ports/experiment-clickhouse.port";
-import { ExperimentRunResultStorageMapProjection } from "../../../projections/experiment-run-result-storage.projection";
-import { ExperimentRunItemStore } from "../../../stores/eventing/eventing.experiment-run-item.store";
-import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository";
+} from "../../../ports/experiment-clickhouse.port.ts";
+import { ExperimentRunResultStorageMapProjection } from "../../../projections/experiment-run-result-storage.projection.ts";
+import { ExperimentRunItemStore } from "../../../stores/eventing/eventing.experiment-run-item.store.ts";
+import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 
 const tenantId = `test-run-snapshot-${nanoid()}`;
 const TENANT = createTenantId(tenantId);

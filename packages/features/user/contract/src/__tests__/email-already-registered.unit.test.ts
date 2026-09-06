@@ -5,7 +5,7 @@
  */
 import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import { describe, expect, it } from "vitest";
-import { EmailAlreadyRegisteredError } from "../user.errors";
+import { EmailAlreadyRegisteredError } from "../user.errors.ts";
 
 describe("the sign-up refusal for an address that already has an account", () => {
   describe("given the server refused a sign-up", () => {

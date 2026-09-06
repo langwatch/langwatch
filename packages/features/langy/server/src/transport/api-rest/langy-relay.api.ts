@@ -14,7 +14,7 @@ import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { LangyApp } from "#app/langy.app";
-import { langyInternalPolicy, verifyLangyInternalSecret } from "./langy-internal.api";
+import { langyInternalPolicy, verifyLangyInternalSecret } from "./langy-internal.api.ts";
 
 const logger = createLogger("langwatch:langy:relay");
 

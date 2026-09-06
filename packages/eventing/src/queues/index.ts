@@ -1,4 +1,4 @@
-export { EventSourcedQueueProcessorMemory } from "./memory";
+export { EventSourcedQueueProcessorMemory } from "./memory.ts";
 export type {
   DeduplicationConfig,
   DeduplicationStrategy,
@@ -7,5 +7,5 @@ export type {
   EventSourcedQueueProcessorOptions,
   JobDelivery,
   QueueSendOptions,
-} from "./queue.types";
-export { resolveDeduplicationStrategy } from "./queue.types";
+} from "./queue.types.ts";
+export { resolveDeduplicationStrategy } from "./queue.types.ts";

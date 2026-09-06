@@ -6,22 +6,22 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
   type ChunkedDatasetMeta,
   type ChunkOffset,
   chunkedMeta,
   chunkMetaOf,
   toSingleJsonl,
-} from "../rules/dataset-chunking.rules";
-import { type DatasetStorage } from "../ports/dataset-storage.port";
+} from "../rules/dataset-chunking.rules.ts";
+import { type DatasetStorage } from "../ports/dataset-storage.port.ts";
 import {
   DatasetConflictError,
   DatasetNotReadyError,
   DatasetTooLargeToEditColumnsError,
   DuplicateRecordIdError,
 } from "@langwatch/dataset-contract";
-import { stripNullBytes } from "../rules/dataset-sanitize.rules";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
 import {
   convertRowsToColumnTypes,
   type DatasetColumns,

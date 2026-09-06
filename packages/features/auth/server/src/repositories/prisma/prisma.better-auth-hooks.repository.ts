@@ -4,7 +4,7 @@ import {
   BetterAuthHooksRepository,
   type BetterAuthHookOrganization,
   type BetterAuthHookUser,
-} from "../better-auth-hooks.repository";
+} from "../better-auth-hooks.repository.ts";
 
 /** The Prisma-backed {@link BetterAuthHooksRepository}. */
 export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {

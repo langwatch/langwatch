@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzDatabase } from "../../authz-read.repository";
-import { PrismaAuthzListingRepository } from "../prisma.authz-listing.repository";
+import type { AuthzDatabase } from "../../authz-read.repository.ts";
+import { PrismaAuthzListingRepository } from "../prisma.authz-listing.repository.ts";
 
 /**
  * The legacy reader's queries were moved verbatim from the services'

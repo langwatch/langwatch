@@ -3,9 +3,9 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import {
   createInitState,
   createTestSpan,
-} from "../../projections/__tests__/fixtures/trace-summary-test.fixtures";
-import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
-import { TraceOriginService } from "../trace-origin.service";
+} from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
+import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
+import { TraceOriginService } from "../trace-origin.service.ts";
 
 describe("TraceAttributeAccumulationService", () => {
   describe("given spans marked partial and fully-skipped by PII redaction", () => {

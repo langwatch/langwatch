@@ -4,7 +4,7 @@ import {
   JOIN_REQUEST_EVENT_VERSION_LATEST,
 } from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
-import type { JoinRequestEvent } from "../projections/join-request-state.projection";
+import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
 
 /** The one place a join-request fact becomes a framework event. */
 export function joinRequestEventsFor({

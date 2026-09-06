@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "../rateLimit";
-import { ClickHouseQueryClient } from "../client";
+import { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "../rateLimit.ts";
+import { ClickHouseQueryClient } from "../client.ts";
 
 /** A task whose completion the test controls. */
 const deferred = () => {

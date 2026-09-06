@@ -1,7 +1,7 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { formatDuration } from "../display-formatters";
-import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared";
-import type { SequenceSpanType } from "./types";
+import { formatDuration } from "../display-formatters.ts";
+import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared.ts";
+import type { SequenceSpanType } from "./types.ts";
 
 interface NodeInfo {
   id: string;

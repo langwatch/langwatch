@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { WorkbenchAccessPort } from "../../ports/workbench-access.port";
-import { WorkbenchAwareGraphVisibilityAdapter } from "../graph-visibility-policy.adapter";
+import { WorkbenchAccessPort } from "../../ports/workbench-access.port.ts";
+import { WorkbenchAwareGraphVisibilityAdapter } from "../graph-visibility-policy.adapter.ts";
 
 class FixedWorkbenchAccess extends WorkbenchAccessPort {
   constructor(private readonly enabled: boolean) {

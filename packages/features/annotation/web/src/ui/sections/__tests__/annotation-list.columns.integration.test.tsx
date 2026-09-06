@@ -33,7 +33,7 @@ import {
   AnnotationTestHarness,
   StubAnnotationHost,
   type StubAnnotationHostOptions,
-} from "../../../testing";
+} from "../../../testing.tsx";
 
 /**
  * Every spy is created once, at hoist time, never inside a mock factory's
@@ -63,7 +63,7 @@ const mocks = vi.hoisted(() => ({
   queueReadArgs: null as Record<string, unknown> | null,
 }));
 
-vi.mock("../../../behavior/use-annotation-queues", () => ({
+vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   useAnnotationQueues: (args: Record<string, unknown>) => {
     mocks.queueReadArgs = args;
     return {
@@ -74,9 +74,9 @@ vi.mock("../../../behavior/use-annotation-queues", () => ({
   },
 }));
 
-vi.mock("../../../behavior/download-csv", () => ({ downloadCsv: mocks.downloadCsv }));
+vi.mock("../../../behavior/download-csv.ts", () => ({ downloadCsv: mocks.downloadCsv }));
 
-vi.mock("../../../behavior/annotation-api", () => ({
+vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
     useUtils: () => mocks.utils,
     annotationScore: { getAll: { useQuery: () => ({ data: mocks.scoreTypes }) } },
@@ -108,7 +108,7 @@ vi.mock("../../../behavior/annotation-api", () => ({
 
 // The dataset gate and its dialog have their own suite; here the gate only has
 // to answer so a row action can proceed.
-vi.mock("../../../behavior/use-personal-feature-gate", () => ({
+vi.mock("../../../behavior/use-personal-feature-gate.ts", () => ({
   usePersonalDatasetGate: () => ({
     isGated: false,
     requestEnable: () => Promise.resolve(true),
@@ -120,13 +120,13 @@ vi.mock("../../../behavior/use-personal-feature-gate", () => ({
     },
   }),
 }));
-vi.mock("../../blocks/personal-feature-gate-dialog", () => ({
+vi.mock("../../blocks/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
 // The range popover has its own module and its own unit tests; here it only
 // has to say which window the list is applying and offer the way back.
-vi.mock("../../elements/period-picker", () => ({
+vi.mock("../../elements/period-picker.tsx", () => ({
   PeriodPicker: ({ label, clearPeriod }: { label?: string; clearPeriod?: () => void }) => (
     <div data-testid="period-picker">
       {label ?? "Last 30 days"}
@@ -139,9 +139,9 @@ vi.mock("../../elements/period-picker", () => ({
   ),
 }));
 
-const { AnnotationList } = await import("../annotation-list");
-const { groupedAnnotationsToRows } = await import("../../../model/annotation-row");
-const { csvFileName } = await import("../../../model/annotation-export");
+const { AnnotationList } = await import("../annotation-list.tsx");
+const { groupedAnnotationsToRows } = await import("../../../model/annotation-row.ts");
+const { csvFileName } = await import("../../../model/annotation-export.ts");
 type AnnotationWithUser = import("@langwatch/annotation-contract").AnnotationWithUser;
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({

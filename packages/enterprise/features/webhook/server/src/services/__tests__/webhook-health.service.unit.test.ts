@@ -14,7 +14,7 @@ import {
   WebhookHealthService,
   type WebhookEndpointHealthSource,
   type WebhookHealthDeps,
-} from "../webhook-health.service";
+} from "../webhook-health.service.ts";
 
 const NOW = new Date("2026-08-31T12:00:00.000Z").getTime();
 

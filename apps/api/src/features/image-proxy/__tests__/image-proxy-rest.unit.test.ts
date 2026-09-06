@@ -7,9 +7,9 @@ import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRestSecurity } from "../../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { createImageProxyRestApp } from "../image-proxy-rest";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createImageProxyRestApp } from "../image-proxy-rest.ts";
 
 const egress = vi.hoisted(() => ({ fetchValidatedDestination: vi.fn() }));
 

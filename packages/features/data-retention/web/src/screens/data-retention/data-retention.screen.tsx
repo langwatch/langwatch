@@ -57,21 +57,21 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { dataRetentionApi } from "../../behavior/data-retention-api";
-import { useDataRetentionHost, type DataRetentionHostPort } from "../../model/data-retention-host";
-import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants";
-import { formatDays } from "../../model/retention-format";
+import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
+import { useDataRetentionHost, type DataRetentionHostPort } from "../../model/data-retention-host.ts";
+import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
+import { formatDays } from "../../model/retention-format.ts";
 import {
   groupRulesByScope,
   renderPolicyValue,
   type RetentionScopeGroup,
-} from "../../model/retention-grouping";
-import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview";
-import { AddOverrideDrawer, type RetentionEditTarget } from "../../ui/blocks/add-override-drawer";
-import { ApplyToExistingConfirmDialog } from "../../ui/blocks/apply-to-existing-confirm-dialog";
-import { RemoveScopeConfirmDialog } from "../../ui/blocks/remove-scope-confirm-dialog";
-import { RetentionAndUsageCard } from "../../ui/blocks/retention-and-usage-card";
-import { RetroactiveProgressCard } from "../../ui/blocks/retroactive-progress-card";
+} from "../../model/retention-grouping.ts";
+import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview.ts";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../../ui/blocks/add-override-drawer.tsx";
+import { ApplyToExistingConfirmDialog } from "../../ui/blocks/apply-to-existing-confirm-dialog.tsx";
+import { RemoveScopeConfirmDialog } from "../../ui/blocks/remove-scope-confirm-dialog.tsx";
+import { RetentionAndUsageCard } from "../../ui/blocks/retention-and-usage-card.tsx";
+import { RetroactiveProgressCard } from "../../ui/blocks/retroactive-progress-card.tsx";
 
 /** The query parameter the scope filter lives in. Unchanged from the page. */
 export const RETENTION_SCOPE_QUERY_KEY = "scope";

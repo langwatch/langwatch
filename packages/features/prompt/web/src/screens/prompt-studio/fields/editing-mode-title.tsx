@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { LuChevronDown } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
-import { PropertySectionTitle } from "../../../ui/elements/property-section-title";
+import { PropertySectionTitle } from "../../../ui/elements/property-section-title.tsx";
 
 /**
  * Editing mode for the prompt messages field.

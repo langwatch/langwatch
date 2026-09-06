@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ConnectFromCodeDrawer } from "../connect-from-code-drawer";
+import { ConnectFromCodeDrawer } from "../connect-from-code-drawer.tsx";
 
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({

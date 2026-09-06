@@ -1,7 +1,7 @@
 import { chakra } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import type { ChangeEvent } from "react";
-import { BRIEFING_MOCKS, setBriefingMock, useBriefingMock } from "../mocks/briefing-mocks";
+import { BRIEFING_MOCKS, setBriefingMock, useBriefingMock } from "../mocks/briefing-mocks.ts";
 
 /**
  * Development-only preview control for the Langy briefing's DATA states, a

@@ -6,7 +6,7 @@ import {
 import {
   PrismaGatewayBudgetRepository,
   type GatewayBudgetDatabase,
-} from "../repositories/prisma/prisma.gateway-budget.repository";
+} from "../repositories/prisma/prisma.gateway-budget.repository.ts";
 
 /** The Prisma models the budget resolution read binds to. */
 export type GatewayBudgetResolutionDatabase = GatewayBudgetDatabase;

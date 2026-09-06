@@ -6,8 +6,8 @@ import {
   experimentUpdateSignalSchema,
 } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import type { EvaluationsV3Actions } from "../../model/experiments-v3/types";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import type { EvaluationsV3Actions } from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /** Tab switches within this window share one staleness probe. */
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;

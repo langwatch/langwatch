@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
-} from "../group-queue.object-storage-migration.adapter";
+} from "../group-queue.object-storage-migration.adapter.ts";
 
 class AuditRedis implements QueueAuditRedis {
   readonly sets = new Map<string, string[]>();

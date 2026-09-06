@@ -16,17 +16,17 @@ import {
   useState,
 } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { availableFilters } from "../../model/filters/registry";
-import type { FilterField } from "../../model/filters/types";
+import { availableFilters } from "../../model/filters/registry.ts";
+import type { FilterField } from "../../model/filters/types.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import {
   type DefaultView,
   findMatchingView,
   MAX_VIEW_NAME_LENGTH,
   type SavedView,
-} from "./saved-views-logic";
-import type { FilterParam } from "./use-filter-params";
-import { useFilterParams } from "./use-filter-params";
+} from "./saved-views-logic.ts";
+import type { FilterParam } from "./use-filter-params.ts";
+import { useFilterParams } from "./use-filter-params.ts";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 // Re-export types and constants for consumers
@@ -36,7 +36,7 @@ export {
   MAX_VIEW_NAME_LENGTH,
   SAVED_VIEWS_SCHEMA_VERSION,
   type SavedView,
-} from "./saved-views-logic";
+} from "./saved-views-logic.ts";
 
 // ---------------------------------------------------------------------------
 // localStorage helpers

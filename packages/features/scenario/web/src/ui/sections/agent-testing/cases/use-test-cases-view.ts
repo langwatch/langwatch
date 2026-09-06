@@ -6,14 +6,14 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import type { ExternalCaseRow } from "./cases-panel";
+import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import type { ExternalCaseRow } from "./cases-panel.tsx";
 import {
   filterCasesByLabels,
   type TestCase,
   type TestSuiteEntry,
-} from "../../../../model/agent-testing/cases/test-cases";
-import { useExternalSetCases } from "./use-test-cases-data";
+} from "../../../../model/agent-testing/cases/test-cases.ts";
+import { useExternalSetCases } from "./use-test-cases-data.ts";
 
 export type TestCasesView = {
   /** The suite that is open, or nothing while the project has none. */

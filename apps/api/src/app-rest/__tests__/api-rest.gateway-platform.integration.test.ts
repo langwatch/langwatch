@@ -22,7 +22,7 @@ import {
   clickHouseUrl,
   databaseUrl,
   mountGatewayPlatformRest,
-} from "./support/gateway-platform-rest.harness";
+} from "./support/gateway-platform-rest.harness.ts";
 
 /**
  * Composed at import so the module-level fixture ids below can be seeded

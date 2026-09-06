@@ -13,8 +13,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaSavedViewRepository } from "../prisma.saved-view.repository";
-import { SavedViewService } from "../../../services/saved-view.service";
+import { PrismaSavedViewRepository } from "../prisma.saved-view.repository.ts";
+import { SavedViewService } from "../../../services/saved-view.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import { McpClientAddressPort } from "../ports/hosted-mcp.port";
+import { McpClientAddressPort } from "../ports/hosted-mcp.port.ts";
 
 /**
  * The address the endpoint rate-limits a caller by, read from the forwarding

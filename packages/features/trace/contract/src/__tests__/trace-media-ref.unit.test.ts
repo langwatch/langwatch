@@ -11,7 +11,7 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
   serializeMediaRefList,
   type TraceMediaRef,
-} from "../index";
+} from "../index.ts";
 
 /**
  * The compact media references the trace summary carries, harvested from

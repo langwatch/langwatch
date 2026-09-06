@@ -13,9 +13,9 @@ import { createLogger } from "@langwatch/observability";
 import {
   DroppedBetterAuthSecondaryStorageAdapter,
   RedisBetterAuthSecondaryStorageAdapter,
-} from "../../adapters/better-auth-secondary-storage.adapter";
+} from "../../adapters/better-auth-secondary-storage.adapter.ts";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { UserService } from "@langwatch/user-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
@@ -29,7 +29,7 @@ import type {
   BetterAuthIdentityCeremoniesPort,
   BetterAuthPendingInvitePort,
   BetterAuthStoragePort,
-} from "../../ports/better-auth.port";
+} from "../../ports/better-auth.port.ts";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -39,9 +39,9 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
-} from "./better-auth-hooks.api";
-import { passkeySignUpRegistration, type SignUpVerificationPort } from "./passkey-sign-up.api";
-import { runSignInRouterShadow, type SignInRouterShadowPort } from "./sign-in-router-shadow.api";
+} from "./better-auth-hooks.api.ts";
+import { passkeySignUpRegistration, type SignUpVerificationPort } from "./passkey-sign-up.api.ts";
+import { runSignInRouterShadow, type SignInRouterShadowPort } from "./sign-in-router-shadow.api.ts";
 
 const logger = createLogger("langwatch:better-auth");
 

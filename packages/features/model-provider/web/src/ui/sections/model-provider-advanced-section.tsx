@@ -4,7 +4,7 @@ import { LuChevronDown } from "react-icons/lu";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
 
-import { SmallLabel } from "../elements/small-label";
+import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * The accordion item the Advanced section renders into. Exported so the parent

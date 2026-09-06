@@ -1,8 +1,8 @@
 import { Box, Button, chakra, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { useEffect, useState, type JSX } from "react";
-import { PropsForm } from "./props-form";
-import { prepareMailDocument, WIDTHS, type Rendered, type TemplateSummary } from "./studio-shared";
+import { PropsForm } from "./props-form.tsx";
+import { prepareMailDocument, WIDTHS, type Rendered, type TemplateSummary } from "./studio-shared.ts";
 
 const HtmlButton = chakra("button");
 const HtmlIframe = chakra("iframe");

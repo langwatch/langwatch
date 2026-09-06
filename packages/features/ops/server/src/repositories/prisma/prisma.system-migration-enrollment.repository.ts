@@ -3,7 +3,7 @@ import {
   MigrationEnrollmentAlreadyExistsError,
   MigrationEnrollmentNotFoundError,
 } from "@langwatch/ops-contract";
-import type { MigrationEnrollmentRecord } from "../../services/system-migrations.service";
+import type { MigrationEnrollmentRecord } from "../../services/system-migrations.service.ts";
 
 /**
  * The cloud rollout's enrollment rows (`SystemMigrationEnrollment`): which organizations each registered migration processes,

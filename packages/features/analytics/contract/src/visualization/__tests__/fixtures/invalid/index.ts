@@ -7,7 +7,7 @@
  * `parseVegaLiteSpecText` is exercised from the test instead.
  */
 
-import type { LangWatchQLVegaRuleId } from "../../../visualization-types";
+import type { LangWatchQLVegaRuleId } from "../../../visualization-types.ts";
 
 import schemaInvalidEncodingType from "./schema-invalid-encoding-type.json";
 import unknownDataset from "./unknown-dataset.json";

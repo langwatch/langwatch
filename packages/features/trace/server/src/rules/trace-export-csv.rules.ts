@@ -12,7 +12,7 @@ import type {
   SpanInputOutput,
   Trace,
 } from "@langwatch/trace-contract";
-import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules";
+import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 
 /**

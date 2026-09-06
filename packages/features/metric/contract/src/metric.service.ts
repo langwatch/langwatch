@@ -1,7 +1,7 @@
 import type {
   CanonicalMetricDataPoint,
   MetricTraceCorrelation,
-} from "./schemas/metric-processing/metric-data-point";
+} from "./schemas/metric-processing/metric-data-point.ts";
 
 export type MetricPiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
 

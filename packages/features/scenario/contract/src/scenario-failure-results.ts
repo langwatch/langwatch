@@ -9,14 +9,14 @@
  * bare `error` string on the command).
  */
 
-import { Verdict } from "./scenario-run";
-import { AgentDevTunnelUnreachableError } from "./scenario-dev-tunnel-error";
+import { Verdict } from "./scenario-run.ts";
+import { AgentDevTunnelUnreachableError } from "./scenario-dev-tunnel-error.ts";
 import {
   classifyScenarioInfraError,
   encodeScenarioError,
   isTransportLevelScenarioFailure,
   ScenarioInfraErrorCode,
-} from "./scenario-infra-error";
+} from "./scenario-infra-error.ts";
 
 export interface ScenarioFailureResults {
   verdict: Verdict;

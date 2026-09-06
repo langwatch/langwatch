@@ -1,7 +1,7 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./langy-database.mapper";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
 
-import { LangyCredentialRepository } from "../langy-credential.repository";
+import { LangyCredentialRepository } from "../langy-credential.repository.ts";
 
 export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
   constructor(private readonly prisma: LangyDatabase) {

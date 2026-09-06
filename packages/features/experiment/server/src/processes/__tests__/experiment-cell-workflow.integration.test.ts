@@ -14,7 +14,7 @@ import {
   buildEvaluatorNode,
   buildSignatureNodeFromLocalConfig,
   buildSignatureNodeFromPrompt,
-} from "../experiment-cell-workflow.process";
+} from "../experiment-cell-workflow.process.ts";
 
 describe("WorkflowBuilder", () => {
   const createBasicLocalPromptConfig = (): LocalPromptConfig => ({

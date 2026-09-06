@@ -2,7 +2,7 @@ import { Alert, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { ArrowRight } from "lucide-react";
-import { type RetentionScopeGroup, renderPolicyValue } from "../../model/retention-grouping";
+import { type RetentionScopeGroup, renderPolicyValue } from "../../model/retention-grouping.ts";
 
 /**
  * Confirms removal of a scope's retention policy. Removing a rule is not a

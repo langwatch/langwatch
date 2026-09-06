@@ -1,8 +1,8 @@
 import { IdentityPrimaryMustDemoteFirstError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter";
-import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
-import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
+import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter.ts";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads.ts";
 
 function harness(options?: {
   latched?: boolean;

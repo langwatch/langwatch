@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baseNameFromFilename, batchDedupeNames } from "../batch-name-dedup";
+import { baseNameFromFilename, batchDedupeNames } from "../batch-name-dedup.ts";
 
 describe("baseNameFromFilename", () => {
   describe("when the filename has an extension", () => {

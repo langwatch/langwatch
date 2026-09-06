@@ -15,7 +15,7 @@ async function loadStoreWith(initial: { mode?: string; legacy?: string }) {
   if (initial.legacy != null) {
     window.localStorage.setItem(LEGACY_LIVE_UPDATES_BOOL_KEY, initial.legacy);
   }
-  const mod = await import("../sse-status.store");
+  const mod = await import("../sse-status.store.ts");
   return mod;
 }
 

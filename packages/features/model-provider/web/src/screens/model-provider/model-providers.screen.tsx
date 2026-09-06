@@ -52,22 +52,22 @@ import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { BrainCircuit, Edit, MoreVertical, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { modelProviderApi } from "../../behavior/model-provider-api";
-import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list";
+import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
 import {
   useModelProviderConnectionTest,
   type ConnectionTestState,
-} from "../../behavior/use-model-provider-connection-test";
-import { useModelProviderHost } from "../../model/model-provider-host";
-import { CodexCodingDefaultsAskHost } from "../../ui/sections/codex-coding-defaults-ask";
+} from "../../behavior/use-model-provider-connection-test.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { CodexCodingDefaultsAskHost } from "../../ui/sections/codex-coding-defaults-ask.tsx";
 import {
   addableProviders,
   scopeNamesOf,
   sortProvidersForTable,
-} from "../../model/provider-catalogue";
-import { filterRowsByScope } from "../../model/provider-scope-filter";
-import { DefaultModelsSection } from "../../ui/sections/default-models-section";
-import { modelProviderIcons } from "../../ui/elements/model-provider-icons";
+} from "../../model/provider-catalogue.ts";
+import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
+import { DefaultModelsSection } from "../../ui/sections/default-models-section.tsx";
+import { modelProviderIcons } from "../../ui/elements/model-provider-icons.tsx";
 
 /** The grant that decides whether this page can be written to at all. */
 export const MODEL_PROVIDER_MANAGE_PERMISSION = "project:manage";

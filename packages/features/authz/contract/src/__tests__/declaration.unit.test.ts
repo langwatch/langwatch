@@ -7,7 +7,7 @@ import {
   type DeclarationError,
   type PermissionScopeArg,
   type ValidatePermissionForInput,
-} from "../declaration";
+} from "../declaration.ts";
 
 /** Type-level assertion helper, mirroring packages/api/type-tests. */
 type Equal<Left, Right> =

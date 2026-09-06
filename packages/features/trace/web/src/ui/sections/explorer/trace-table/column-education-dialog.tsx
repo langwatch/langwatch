@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "../../dialog";
-import { useColumnEducationStore } from "../../../../behavior/column-education.store";
+} from "../../dialog.tsx";
+import { useColumnEducationStore } from "../../../../behavior/column-education.store.ts";
 
 /**
  * One-off teaching dialog that fires the first time the operator tries to drag a column

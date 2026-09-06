@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { HandledError, handledErrorFromHerr, NotFoundError, setTraceUrlProvider } from "./index";
+import { HandledError, handledErrorFromHerr, NotFoundError, setTraceUrlProvider } from "./index.ts";
 
 class TestError extends HandledError {
   declare readonly code: "test_error";
@@ -19,7 +19,7 @@ async function duplicatedHandledError(
   httpStatus = 404,
 ): Promise<HandledError> {
   vi.resetModules();
-  const duplicateModule = await import("./handled-error");
+  const duplicateModule = await import("./handled-error.ts");
   class DuplicatedHandledError extends duplicateModule.HandledError {
     constructor() {
       super(code, message, { httpStatus });
@@ -211,7 +211,7 @@ describe("HandledError.isHandled", () => {
 
   it("shares trace URL configuration across duplicated module evaluations", async () => {
     vi.resetModules();
-    const duplicateModule = await import("./handled-error");
+    const duplicateModule = await import("./handled-error.ts");
     duplicateModule.setTraceUrlProvider((traceId) =>
       traceId ? `https://traces.example/${traceId}` : void 0,
     );

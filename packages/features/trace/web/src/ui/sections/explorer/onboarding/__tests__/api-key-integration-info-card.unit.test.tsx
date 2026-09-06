@@ -17,7 +17,7 @@ let capturedCodePreviewProps: Record<string, unknown> | null = null;
 
 // ─── Dependency mocks (true boundaries) ─────────────────────────────────────────
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     apiKey: {
       create: {
@@ -27,7 +27,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../../use-public-env", () => ({
+vi.mock("../../../use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
@@ -40,7 +40,7 @@ vi.mock("@langwatch/onboarding-web/surfaces/code-preview", () => ({
 
 // ─── Module under test ──────────────────────────────────────────────────────────
 
-import { ApiKeyIntegrationInfoCard } from "../api-key-integration-info-card";
+import { ApiKeyIntegrationInfoCard } from "../api-key-integration-info-card.tsx";
 
 const TOKEN = "sk-lw-realtoken1234567890";
 const PROJECT_ID = "project_test123";

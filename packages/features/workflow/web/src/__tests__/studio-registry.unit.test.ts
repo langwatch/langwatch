@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MODULES } from "../model/studio-registry";
+import { MODULES } from "../model/studio-registry.ts";
 
 describe("Optimization Studio Registry", () => {
   describe("signature (Prompt) defaults", () => {

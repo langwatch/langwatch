@@ -1,7 +1,7 @@
 import {
   WebhookDispatchRateLimiterPort,
   type WebhookDispatchRateLimitResult,
-} from "../ports/webhook-dispatch-rate-limiter.port";
+} from "../ports/webhook-dispatch-rate-limiter.port.ts";
 
 /**
  * The dispatch counter a process keeps when it shares none.

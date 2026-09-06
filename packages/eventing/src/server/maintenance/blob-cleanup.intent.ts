@@ -1,6 +1,6 @@
 import type { BlobSweepReport } from "@langwatch/group-queue/operational";
 import { createLogger } from "@langwatch/observability";
-import { BLOB_CLEANUP_PROCESS_NAME, BLOB_CLEANUP_ROW_RETENTION_MS } from "./blob-cleanup.process";
+import { BLOB_CLEANUP_PROCESS_NAME, BLOB_CLEANUP_ROW_RETENTION_MS } from "./blob-cleanup.process.ts";
 
 const logger = createLogger("langwatch:group-queue:blob-cleanup");
 

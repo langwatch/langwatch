@@ -17,8 +17,8 @@ import {
   type SessionWorkingContext,
   workingContextOfFacts,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port";
-import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection";
+import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port.ts";
+import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection.ts";
 
 /**
  * Contributes one log record's facts to its session, stamping row-bearing

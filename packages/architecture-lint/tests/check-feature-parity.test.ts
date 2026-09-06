@@ -32,7 +32,7 @@ import {
   formatUnknownAnnotations,
   isEntryModule,
   isInert,
-} from "../src/check-feature-parity";
+} from "../src/check-feature-parity.ts";
 
 let root = "";
 

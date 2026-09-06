@@ -7,7 +7,7 @@ import {
   type BindingScopeTier,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ScopeLineageRepository } from "../repositories/authz-read.repository";
+import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 
 type PresentScope = Readonly<{ tier: BindingScopeTier; id: string }>;
 

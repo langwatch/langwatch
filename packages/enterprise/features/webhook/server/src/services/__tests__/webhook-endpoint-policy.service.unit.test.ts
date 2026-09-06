@@ -7,7 +7,7 @@ import {
   WEBHOOK_IN_FLIGHT_BOUNDS,
   WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
   WebhookEndpointPolicyService,
-} from "../webhook-endpoint-policy.service";
+} from "../webhook-endpoint-policy.service.ts";
 
 describe("webhook delivery control bounds", () => {
   /** @scenario Out of bounds delivery controls are rejected with the bound in the error */

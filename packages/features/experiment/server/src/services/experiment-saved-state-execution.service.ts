@@ -21,7 +21,7 @@ import {
   type ExecutionDataInputs,
   type ExecutionDataServices,
   ExperimentExecutionDataService,
-} from "./experiment-execution-data.service";
+} from "./experiment-execution-data.service.ts";
 
 type LoadedExecutionData = Extract<
   Awaited<ReturnType<typeof ExperimentExecutionDataService.loadExecutionData>>,

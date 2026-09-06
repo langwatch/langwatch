@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { api } from "../../../behavior/ops-api";
-import type { PausedSchedule } from "../model/paused-schedule";
+import { api } from "../../../behavior/ops-api.ts";
+import type { PausedSchedule } from "../model/paused-schedule.ts";
 
 /** How many switched-off schedules the panel lists before it says so. */
 const PAGE_SIZE = 50;

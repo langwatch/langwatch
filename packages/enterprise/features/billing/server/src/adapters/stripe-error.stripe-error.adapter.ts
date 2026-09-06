@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { BillingProviderUnavailableError } from "@langwatch/enterprise-billing-contract";
-import { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port";
+import { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port.ts";
 
 /**
  * Classify a payment-provider failure, or leave it alone.

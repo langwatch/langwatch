@@ -11,13 +11,13 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { analyticsApi } from "./analytics-api";
+import { analyticsApi } from "./analytics-api.ts";
 
-import { createLangWatchQLExecute } from "./lwql-execute";
+import { createLangWatchQLExecute } from "./lwql-execute.ts";
 import {
   createLangWatchQLRequestController,
   type LangWatchQLRequestController,
-} from "../model/lwql-request-controller";
+} from "../model/lwql-request-controller.ts";
 import {
   isLangWatchQLResultStale,
   type LangWatchQLActionLabel,
@@ -25,7 +25,7 @@ import {
   type LangWatchQLRequestState,
   type LangWatchQLTimeWindowValues,
   lwqlActionLabel,
-} from "../model/lwql-request-state";
+} from "../model/lwql-request-state.ts";
 
 export interface UseLangWatchQLQuery {
   state: LangWatchQLRequestState;

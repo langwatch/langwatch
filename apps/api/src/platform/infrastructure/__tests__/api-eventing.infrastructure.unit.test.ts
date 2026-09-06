@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiEventingAbsenceReportPort,
   ApiEventingInfrastructure,
-} from "../api-eventing.infrastructure";
+} from "../api-eventing.infrastructure.ts";
 
 function stubQueue(): { dependencies: GroupQueueDependencies<Record<string, unknown>> } {
   const redis = new Proxy({}, { get: () => async () => 0 });

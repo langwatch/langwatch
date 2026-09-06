@@ -32,12 +32,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SpanStorageClickHouseRepository } from "../span-storage.repository";
-import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository";
+import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
+import { MAX_EVENT_NAMES_PER_TRACE } from "../../span-storage.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
-} from "./support/clickhouse-endpoint.support";
+} from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 const integration = describe.skipIf(!clickHouseConfigured);

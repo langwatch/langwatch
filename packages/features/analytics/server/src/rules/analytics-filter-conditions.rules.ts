@@ -6,7 +6,7 @@ import type {
   FilterConditionBuilder,
   FilterConditionOptions,
   GenerateFilterConditionsResult,
-} from "../repositories/clickhouse/clickhouse.filter-shapes.mapper";
+} from "../repositories/clickhouse/clickhouse.filter-shapes.mapper.ts";
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;

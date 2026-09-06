@@ -15,15 +15,15 @@ import {
   PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { IdentityLedger } from "../rules/identity-ledger.rules";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { IdentityEventingPort } from "../ports/identity-eventing.port";
+import { IdentityEventingPort } from "../ports/identity-eventing.port.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { IdentityEvent } from "../projections/identity-state.projection";
-import type { IdentityFoldState } from "../projections/identity-state.projection";
-import { MetricsIdentityLedgerAdapter } from "./metrics.identity-ledger.adapter";
-import { identityEventsFor } from "../intents/identity-events.intent";
+import type { IdentityEvent } from "../projections/identity-state.projection.ts";
+import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
+import { MetricsIdentityLedgerAdapter } from "./metrics.identity-ledger.adapter.ts";
+import { identityEventsFor } from "../intents/identity-events.intent.ts";
 
 const logger = createLogger("langwatch:identity:ledger");
 

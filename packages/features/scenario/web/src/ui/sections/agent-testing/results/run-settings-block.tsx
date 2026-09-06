@@ -7,10 +7,10 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { TargetMark } from "../../../elements/agent-testing/shared/target-mark";
-import type { RunSettingParameter, RunSettings } from "./run-settings";
-import type { BatchTarget } from "./use-batch-targets";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
+import type { RunSettingParameter, RunSettings } from "./run-settings.ts";
+import type { BatchTarget } from "./use-batch-targets.ts";
 
 /**
  * What a model row says when the run recorded no model at all.

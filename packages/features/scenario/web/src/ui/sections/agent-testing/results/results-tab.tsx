@@ -7,20 +7,20 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useNewRunPlanFlow } from "../use-agent-testing-page-flows";
-import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import { RunPlanDetail } from "./run-plan-detail";
+import { useNewRunPlanFlow } from "../use-agent-testing-page-flows.ts";
+import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { RunPlanDetail } from "./run-plan-detail.tsx";
 import {
   planScopeNote,
   type RunPlan,
   resolveRunPlan,
-} from "../../../../behavior/agent-testing/results/run-plans";
-import { useRunPlans } from "../../../../behavior/agent-testing/results/use-run-plans";
-import { useWidenWindowForPlan } from "../../../../behavior/agent-testing/results/use-widen-window-for-plan";
-import { useOpenRunPlan } from "../run/run-plan-dialog-host";
-import { AgentTestingTabLayout } from "../../../elements/agent-testing/shared/tab-layout";
-import { ResultsList } from "./results-list";
+} from "../../../../behavior/agent-testing/results/run-plans.ts";
+import { useRunPlans } from "../../../../behavior/agent-testing/results/use-run-plans.ts";
+import { useWidenWindowForPlan } from "../../../../behavior/agent-testing/results/use-widen-window-for-plan.ts";
+import { useOpenRunPlan } from "../run/run-plan-dialog-host.tsx";
+import { AgentTestingTabLayout } from "../../../elements/agent-testing/shared/tab-layout.tsx";
+import { ResultsList } from "./results-list.tsx";
 
 export type ResultsTabProps = {
   /** While the live stream is up the fallback polling stands down. */

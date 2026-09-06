@@ -30,7 +30,7 @@
 export {
   CodexCodingDefaultsAskHost,
   useCodexCodingDefaultsAskStore,
-} from "./codex-coding-defaults-ask";
-export { DefaultModelOverrideDrawer } from "./default-model-override-drawer";
-export { EditModelProviderDrawer } from "./edit-model-provider-drawer";
-export { LLMModelCostDrawer } from "./llm-model-cost-drawer";
+} from "./codex-coding-defaults-ask.tsx";
+export { DefaultModelOverrideDrawer } from "./default-model-override-drawer.tsx";
+export { EditModelProviderDrawer } from "./edit-model-provider-drawer.tsx";
+export { LLMModelCostDrawer } from "./llm-model-cost-drawer.tsx";

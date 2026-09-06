@@ -11,25 +11,25 @@ import type {
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useCan } from "../../../../behavior/use-can";
+import { useCan } from "../../../../behavior/use-can.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer";
-import { AGENT_TYPE_SELECTOR_DRAWER } from "./drawer-keys";
-import { type CaseOpenActions, useCaseOpenActions } from "./use-case-open-actions";
-import { type CaseRunActions, useCaseRunActions } from "./use-case-run-actions";
-import { type SuiteNameDialogModel, useSuiteNameDialog } from "./use-suite-name-dialog";
-import { type TestCasesData, useTestCasesData } from "./use-test-cases-data";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
+import { AGENT_TYPE_SELECTOR_DRAWER } from "./drawer-keys.ts";
+import { type CaseOpenActions, useCaseOpenActions } from "./use-case-open-actions.ts";
+import { type CaseRunActions, useCaseRunActions } from "./use-case-run-actions.ts";
+import { type SuiteNameDialogModel, useSuiteNameDialog } from "./use-suite-name-dialog.ts";
+import { type TestCasesData, useTestCasesData } from "./use-test-cases-data.ts";
 import {
   type CaseMutations,
   type SuiteMutations,
   useCaseMutations,
   useSuiteMutations,
-} from "../../../../behavior/agent-testing/cases/use-test-cases-mutations";
-import { type TestCasesView, useTestCasesView } from "./use-test-cases-view";
+} from "../../../../behavior/agent-testing/cases/use-test-cases-mutations.ts";
+import { type TestCasesView, useTestCasesView } from "./use-test-cases-view.ts";
 
 export type PeriodPicker = {
   period: Period;

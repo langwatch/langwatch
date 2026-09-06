@@ -14,7 +14,7 @@ import {
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { JoinRequestLedger } from "../rules/join-request-ledger.rules";
+import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import {
   type AggregateType,
@@ -23,9 +23,9 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { JOIN_REQUEST_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "../projections/join-request-state.projection";
-import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
-import { joinRequestEventsFor } from "../intents/join-request-events.intent";
+import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
+import { joinRequestEventsFor } from "../intents/join-request-events.intent.ts";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 

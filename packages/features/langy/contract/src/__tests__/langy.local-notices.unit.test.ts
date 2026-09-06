@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isLangyHiddenLocalNotice, LANGY_LOCAL_CONNECT_NOTICE } from "../langy.local-notices";
+import { isLangyHiddenLocalNotice, LANGY_LOCAL_CONNECT_NOTICE } from "../langy.local-notices.ts";
 
 describe("given the platform wrote the connect notice into the conversation", () => {
   describe("when the transcript renders", () => {

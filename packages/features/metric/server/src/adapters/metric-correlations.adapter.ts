@@ -1,7 +1,7 @@
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { MetricKind, MetricTraceCorrelation } from "@langwatch/metric-contract";
-import { MetricNumbersAdapter } from "./metric-numbers.adapter";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+import { MetricNumbersAdapter } from "./metric-numbers.adapter.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { isRecord } = MetricSerializationAdapter;
 
 function validTraceId(value: string): boolean {

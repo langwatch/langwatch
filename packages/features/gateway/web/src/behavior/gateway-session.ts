@@ -21,7 +21,7 @@ import {
   type GatewayPlan,
   type GatewayProject,
   type GatewayTeam,
-} from "../model/gateway-host";
+} from "../model/gateway-host.ts";
 
 export type GatewayScopeReading = {
   organization: GatewayOrganization | undefined;

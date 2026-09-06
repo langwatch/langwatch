@@ -31,24 +31,24 @@ import type { ComponentType } from "react";
 export type AuthScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const authScreens = {
-  signin: () => import("./signin.screen"),
-  signup: () => import("./signup.screen"),
-  forgotPassword: () => import("./forgot-password.screen"),
-  resetPassword: () => import("./reset-password.screen"),
-  verifyEmail: () => import("./verify-email.screen"),
-  signInError: () => import("./sign-in-error.screen"),
-  join: () => import("./join.screen"),
-  inviteAccept: () => import("./invite-accept.screen"),
+  signin: () => import("./signin.screen.tsx"),
+  signup: () => import("./signup.screen.tsx"),
+  forgotPassword: () => import("./forgot-password.screen.tsx"),
+  resetPassword: () => import("./reset-password.screen.tsx"),
+  verifyEmail: () => import("./verify-email.screen.tsx"),
+  signInError: () => import("./sign-in-error.screen.tsx"),
+  join: () => import("./join.screen.tsx"),
+  inviteAccept: () => import("./invite-accept.screen.tsx"),
 } as const satisfies Record<string, AuthScreenLoader>;
 
 export type AuthScreenName = keyof typeof authScreens;
 
-export { authApi } from "../../behavior/auth-api";
+export { authApi } from "../../behavior/auth-api.ts";
 export type {
   AuthApiMap,
   AuthInviteLanding,
   AuthViewerCapabilities,
-} from "../../behavior/auth-api";
+} from "../../behavior/auth-api.ts";
 export {
   AuthHostPort,
   AuthHostProvider,
@@ -56,10 +56,10 @@ export {
   type AuthFailureNotice,
   type AuthPublicEnvironment,
   type AuthRouteReading,
-} from "../../model/auth-host";
+} from "../../model/auth-host.ts";
 export {
   explainErrorCode,
   installAuthErrorExplainer,
   type ExplainErrorCode,
-} from "../../model/error-presentation";
-export { frontDoorThemeConfig } from "../../model/front-door-theme";
+} from "../../model/error-presentation.ts";
+export { frontDoorThemeConfig } from "../../model/front-door-theme.ts";

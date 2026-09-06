@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateLiquidCondition } from "../liquid-condition";
+import { validateLiquidCondition } from "../liquid-condition.ts";
 
 describe("validateLiquidCondition", () => {
   describe("given a valid condition over a declared input", () => {

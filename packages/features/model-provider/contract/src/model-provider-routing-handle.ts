@@ -1,5 +1,5 @@
-import { modelProviders } from "./model-provider-registry";
-import { ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE } from "./model-provider";
+import { modelProviders } from "./model-provider-registry.ts";
+import { ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE } from "./model-provider.ts";
 
 export { ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE };
 

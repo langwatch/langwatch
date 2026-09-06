@@ -41,9 +41,9 @@ import {
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
-import { createProjectRestApp } from "../project.api";
-import { TestApiKeyService } from "./support/test-api-key-service";
-import { TestProjectService } from "./support/test-project-service";
+import { createProjectRestApp } from "../project.api.ts";
+import { TestApiKeyService } from "./support/test-api-key-service.ts";
+import { TestProjectService } from "./support/test-project-service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const USER_ID = "user-1";

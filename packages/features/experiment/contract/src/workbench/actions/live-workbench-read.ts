@@ -1,9 +1,9 @@
-import type { EvaluationsV3State } from "../../experiment-workbench";
+import type { EvaluationsV3State } from "../../experiment-workbench.ts";
 import {
   type ProjectedWorkbenchState,
   projectWorkbenchState,
   type TargetNames,
-} from "./projection";
+} from "./projection.ts";
 
 /**
  * The workbench slice a live read projects. The store's own state satisfies it,

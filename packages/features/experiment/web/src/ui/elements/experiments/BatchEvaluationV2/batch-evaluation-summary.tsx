@@ -13,7 +13,7 @@ import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { HoverableBigText } from "@langwatch/workflow-web/surfaces/hoverable-big-text";
-import { EvaluationProgressBar } from "./evaluation-progress-bar";
+import { EvaluationProgressBar } from "./evaluation-progress-bar.tsx";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,

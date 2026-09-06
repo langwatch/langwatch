@@ -5,8 +5,8 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter";
-import { guardAgainstGlobalFetch } from "./support/global-fetch-guard";
+import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter.ts";
+import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
 vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({

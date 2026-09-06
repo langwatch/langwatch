@@ -18,7 +18,7 @@ const mockSetCurrentSpotlightId = vi.fn((id: string | null) => {
   mockCurrentSpotlightId = id;
 });
 
-vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       spotlightsActive: mockSpotlightsActive,
@@ -34,7 +34,7 @@ import {
   readSpotlightFragment,
   useSpotlightURLSync,
   writeSpotlightFragment,
-} from "../spotlight-overlay";
+} from "../spotlight-overlay.tsx";
 
 // Stub history.replaceState so fragment writes don't throw in jsdom
 const historyReplaceState = vi

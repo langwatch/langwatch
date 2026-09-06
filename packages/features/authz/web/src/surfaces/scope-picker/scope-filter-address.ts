@@ -1,4 +1,4 @@
-import type { AvailableScopes, ScopeFilterValue } from "./scope-filter";
+import type { AvailableScopes, ScopeFilterValue } from "./scope-filter.tsx";
 
 /**
  * The scope filter as an ADDRESS, and as a predicate over rows.

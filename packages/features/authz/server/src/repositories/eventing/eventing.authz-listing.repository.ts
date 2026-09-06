@@ -41,9 +41,9 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/authz-contract";
-import { AuthzListingRepository } from "../authz-listing.repository";
-import type { AuthzDatabase } from "../authz-read.repository";
-import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper";
+import { AuthzListingRepository } from "../authz-listing.repository.ts";
+import type { AuthzDatabase } from "../authz-read.repository.ts";
+import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 
 const USER_CREATED_ROLE_KIND = "custom" as const;
 const ACCESS_LISTING_USER_SELECT = {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
-import { useNavigationHost } from "../model/navigation-host";
-import { PRODUCTS, type ProductId } from "../model/products";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { PRODUCTS, type ProductId } from "../model/products.ts";
 
 /**
  * Which products the current user can open right now: every access gate

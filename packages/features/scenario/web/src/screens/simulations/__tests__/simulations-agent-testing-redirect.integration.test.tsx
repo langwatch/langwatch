@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
-import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host";
+import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host.ts";
 
 const state = vi.hoisted(() => ({
   flagEnabled: false,
@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-feature-flag", () => ({
+vi.mock("../../../behavior/use-feature-flag.ts", () => ({
   useFeatureFlag: (flag: string) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
     isLoading: state.flagLoading,
@@ -27,7 +27,7 @@ vi.mock("../../../behavior/use-feature-flag", () => ({
 }));
 
 // The v1 page itself is not under test: whether it renders at all is.
-vi.mock("../../../ui/sections/suites/simulations-page", () => ({
+vi.mock("../../../ui/sections/suites/simulations-page.tsx", () => ({
   default: () => <div>v1 simulations page</div>,
 }));
 
@@ -83,7 +83,7 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
 }
 
 async function renderRoute() {
-  const { default: SimulationsRoute } = await import("../simulations.screen");
+  const { default: SimulationsRoute } = await import("../simulations.screen.tsx");
   return render(
     <TestScenarioHost>
       <SimulationsRoute />

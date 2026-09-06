@@ -1,4 +1,4 @@
-import type { NavigationProject } from "./navigation-host";
+import type { NavigationProject } from "./navigation-host.ts";
 
 const PROJECT_PLACEHOLDER = "[project]";
 

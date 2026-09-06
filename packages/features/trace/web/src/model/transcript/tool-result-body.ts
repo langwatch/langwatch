@@ -22,4 +22,4 @@ export function toolResultBodyToString(content: unknown): string {
     return String(content);
   }
 }
-import { isRecord } from "./record";
+import { isRecord } from "./record.ts";

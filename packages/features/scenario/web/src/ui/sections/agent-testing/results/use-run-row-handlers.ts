@@ -6,9 +6,9 @@
 
 import { useCallback } from "react";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useTargetNameMap } from "../../../../behavior/use-target-name-map";
+import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys";
+import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
 
 export function useRunRowHandlers({ scenarioSetId }: { scenarioSetId: string }) {
   const { openDrawer } = useDrawer();

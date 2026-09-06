@@ -1,22 +1,22 @@
 import { performance } from "node:perf_hooks";
 import type { createLogger } from "@langwatch/observability";
-import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics";
-import { mapValidationIssues } from "../../utils/errors";
-import type { Command, CommandHandler } from "../../commands/command";
-import { createCommand } from "../../commands/command";
-import type { CommandSchema } from "../../commands/commandSchema";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { CommandType } from "../../domain/commandType";
-import type { TenantId } from "../../domain/tenantId";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import { EventSchema } from "../../domain/types";
-import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types";
-import type { DeduplicationStrategy } from "../../queues";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import { isComponentKilled, type KillSwitchOptions, type KillSwitchPort } from "../../kill-switch";
-import { EventUtils } from "../../utils/event.utils";
-import { ValidationError } from "../errorHandling";
+import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics.ts";
+import { mapValidationIssues } from "../../utils/errors.ts";
+import type { Command, CommandHandler } from "../../commands/command.ts";
+import { createCommand } from "../../commands/command.ts";
+import type { CommandSchema } from "../../commands/commandSchema.ts";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { CommandType } from "../../domain/commandType.ts";
+import type { TenantId } from "../../domain/tenantId.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
+import { EventSchema } from "../../domain/types.ts";
+import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types.ts";
+import type { DeduplicationStrategy } from "../../queues/index.ts";
+import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
+import { isComponentKilled, type KillSwitchOptions, type KillSwitchPort } from "../../kill-switch/index.ts";
+import { EventUtils } from "../../utils/event.utils.ts";
+import { ValidationError } from "../errorHandling.ts";
 
 /**
  * Constraint interface for payloads that support command processing.

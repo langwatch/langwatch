@@ -6,8 +6,8 @@ import {
   type WebhookDispatchRateLimitResult,
 } from "@langwatch/egress";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { WorkerWebhookDeliveryTransportAdapter } from "../features/automation/webhook-delivery.transport.adapter";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import { WorkerWebhookDeliveryTransportAdapter } from "../features/automation/webhook-delivery.transport.adapter.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * The SSRF-fenced outbound sender this process reaches customer-supplied

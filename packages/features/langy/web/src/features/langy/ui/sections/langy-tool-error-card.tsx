@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, BookOpen, ExternalLink, ScrollText } from "lucide-react";
-import { LangyCard } from "../../../../ui/sections/langy-card";
-import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure";
-import { LangyFailureReference } from "../../../../ui/elements/langy-failure-reference";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
+import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
+import { LangyFailureReference } from "../../../../ui/elements/langy-failure-reference.tsx";
 
 /**
  * A failed Langy tool call, separate from both assistant prose and raw JSON.

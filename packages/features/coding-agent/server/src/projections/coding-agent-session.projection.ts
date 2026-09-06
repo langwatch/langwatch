@@ -1,6 +1,6 @@
 import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port";
+import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type LogFactsContributedEvent,
@@ -16,10 +16,10 @@ import {
   type SessionTitleSource,
   CodingAgentSessionStateProjection,
   sessionTitleSourceSchema,
-} from "./coding-agent-session-state.projection";
-import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection";
-import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection";
-import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection";
+} from "./coding-agent-session-state.projection.ts";
+import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
+import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
+import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection.ts";
 
 /**
  * The coding-agent session fold (ADR-056).

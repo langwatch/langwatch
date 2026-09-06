@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const preference = vi.hoisted(() => ({ current: null as "github" | null }));
 const clearPreference = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../behavior/langy-api", () => ({
+vi.mock("../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       getCodeAccessPreference: {
@@ -31,14 +31,14 @@ vi.mock("../../../behavior/langy-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
     project: { id: "p_1", slug: "acme" },
   }),
 }));
 
-import { LangyCodeAccessPreference } from "../langy-code-access-preference";
+import { LangyCodeAccessPreference } from "../langy-code-access-preference.tsx";
 
 afterEach(cleanup);
 beforeEach(() => clearPreference.mockClear());

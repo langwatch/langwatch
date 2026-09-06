@@ -1,5 +1,5 @@
 import type { Registry } from "prom-client";
-import { ApiMetricsPort } from "../../api-process.lifecycle";
+import { ApiMetricsPort } from "../../api-process.lifecycle.ts";
 
 /**
  * Who this process will render its registry to.

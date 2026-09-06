@@ -4,7 +4,7 @@ import {
   type MountableRestApp,
   type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
-import { registerScenarioRoutes, scenarioRestErrorHandler } from "./scenario-v1.api";
+import { registerScenarioRoutes, scenarioRestErrorHandler } from "./scenario-v1.api.ts";
 
 /**
  * REST for the scenarios (test cases) a project defines, and their version

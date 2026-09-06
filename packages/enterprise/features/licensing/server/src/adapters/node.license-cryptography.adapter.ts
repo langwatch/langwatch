@@ -11,7 +11,7 @@ import {
   type SignedLicense,
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
-import { LicenseCryptographyPort } from "../ports/license-cryptography.port";
+import { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
 
 /**
  * PEM normalization for license signing keys.

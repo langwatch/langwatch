@@ -5,8 +5,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
-import { InviteService } from "../invite.service";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { InviteService } from "../invite.service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 

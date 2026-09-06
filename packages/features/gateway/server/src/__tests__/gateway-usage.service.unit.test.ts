@@ -5,7 +5,7 @@ import {
   GatewayUsageService,
   type GatewayUsageProjectsPort,
   type GatewayUsageVirtualKeysPort,
-} from "../services/gateway-usage.service";
+} from "../services/gateway-usage.service.ts";
 import type {
   GatewayTraceRow,
   GatewayUsageBucket,

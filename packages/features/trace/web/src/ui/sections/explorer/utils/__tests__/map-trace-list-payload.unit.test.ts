@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NO_TRACE_EVENTS } from "../../types/trace";
-import { mapTraceListPayload } from "../map-trace-list-payload";
+import { NO_TRACE_EVENTS } from "../../types/trace.ts";
+import { mapTraceListPayload } from "../map-trace-list-payload.ts";
 
 describe("mapTraceListPayload", () => {
   describe("when the payload is undefined", () => {

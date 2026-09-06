@@ -8,7 +8,7 @@
  * registry itself is not imported, to keep this a unit test.
  */
 import { describe, expect, it } from "vitest";
-import { nodeDataToLocalPromptConfig } from "../llm-prompt-config-utils";
+import { nodeDataToLocalPromptConfig } from "../llm-prompt-config-utils.ts";
 
 describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {
   describe("given a scaffolded signature node carrying the registry's default system message", () => {

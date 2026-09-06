@@ -17,34 +17,34 @@ import {
   observeEsReactorDuration,
   observeEsSubscriberDuration,
   withMetrics,
-} from "../metrics";
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event, Projection } from "../domain/types";
-import type { DeduplicationStrategy } from "../queues";
-import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling";
-import type { QueueManager } from "../services/queues/queueManager";
-import type { EventStoreReadContext } from "../stores/eventStore.types";
-import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
-import { isComponentKilled, type KillSwitchPort } from "../kill-switch";
-import { EventUtils } from "../utils/event.utils";
-import { toError } from "../utils/errors";
+} from "../metrics.ts";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event, Projection } from "../domain/types.ts";
+import type { DeduplicationStrategy } from "../queues/index.ts";
+import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling.ts";
+import type { QueueManager } from "../services/queues/queueManager.ts";
+import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import { isComponentKilled, type KillSwitchPort } from "../kill-switch/index.ts";
+import { EventUtils } from "../utils/event.utils.ts";
+import { toError } from "../utils/errors.ts";
 import {
   executionTargetMatches,
   type ExecutionTarget,
   type RetentionPolicy,
   type RetentionPolicyResolver,
-} from "../runtime.types";
-import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
-import type { FoldProjectionDefinition } from "./foldProjection.types";
-import { FoldProjectionExecutor } from "./foldProjectionExecutor";
-import type { MapProjectionDefinition } from "./mapProjection.types";
-import { MapProjectionExecutor } from "./mapProjectionExecutor";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
-import type { ReplayMarkerChecker } from "./replayMarkerCheck";
-import type { StateProjectionDefinition } from "./stateProjection.types";
-import { StateProjectionExecutor } from "./stateProjectionExecutor";
+} from "../runtime.types.ts";
+import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
+import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
+import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
+import type { MapProjectionDefinition } from "./mapProjection.types.ts";
+import { MapProjectionExecutor } from "./mapProjectionExecutor.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
+import type { ReplayMarkerChecker } from "./replayMarkerCheck.ts";
+import type { StateProjectionDefinition } from "./stateProjection.types.ts";
+import { StateProjectionExecutor } from "./stateProjectionExecutor.ts";
 
 /**
  * Default cap on same-aggregate fold events coalesced into one cycle — a pure

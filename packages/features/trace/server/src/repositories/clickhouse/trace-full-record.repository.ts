@@ -8,15 +8,15 @@ import {
 } from "@langwatch/trace-contract";
 import { EventUtils } from "@langwatch/eventing";
 
-import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port";
-import { TraceFullRecordPort } from "../../ports/trace-full-record.port";
-import type { TraceFullIoPort } from "../../ports/trace-full-io.port";
-import type { TracePayloadReaderPort } from "../../ports/trace-payload-reader.port";
+import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port.ts";
+import { TraceFullRecordPort } from "../../ports/trace-full-record.port.ts";
+import type { TraceFullIoPort } from "../../ports/trace-full-io.port.ts";
+import type { TracePayloadReaderPort } from "../../ports/trace-payload-reader.port.ts";
 import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,
-} from "../../repositories/clickhouse/trace-full-protection.mapper";
-import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper";
+} from "../../repositories/clickhouse/trace-full-protection.mapper.ts";
+import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;

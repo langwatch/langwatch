@@ -11,9 +11,9 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ScenarioApp } from "#app/scenario.app";
-import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules";
-import { createScenarioCrudRouter } from "../scenario-crud.api";
-import { createScenarioVersionRouter } from "../scenario-version.api";
+import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules.ts";
+import { createScenarioCrudRouter } from "../scenario-crud.api.ts";
+import { createScenarioVersionRouter } from "../scenario-version.api.ts";
 
 /** What a read-only role holds: the view grain and nothing above it. */
 const VIEWER_PERMISSIONS = new Set(["scenarios:view"]);

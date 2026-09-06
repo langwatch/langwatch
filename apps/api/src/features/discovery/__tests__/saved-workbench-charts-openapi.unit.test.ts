@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import specification from "../openapi-document.json";
+import specification from "../openapi-document.json" with { type: "json" };
 
 const COLLECTION = "/api/v1/projects/{projectId}/analytics/charts";
 const RESOURCE = `${COLLECTION}/{chartId}`;

@@ -2,7 +2,7 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,
-} from "../../adapters/eventing.authz-audit.adapter";
+} from "../../adapters/eventing.authz-audit.adapter.ts";
 
 /**
  * Only what this repository touches: one call, `createMany`.

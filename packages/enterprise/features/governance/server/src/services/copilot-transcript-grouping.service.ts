@@ -17,7 +17,7 @@ import {
   type ConversationGroup,
   type IndexedRow,
   type TranscriptRow,
-} from "../rules/copilot-transcript.rules";
+} from "../rules/copilot-transcript.rules.ts";
 
 export class CopilotTranscriptGroupingService {
   private constructor() {}

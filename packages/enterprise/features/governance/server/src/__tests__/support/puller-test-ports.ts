@@ -19,9 +19,9 @@ import {
   type GovernanceObjectStorageCredentials,
   type GovernanceOcsfEventInput,
 } from "@langwatch/enterprise-governance-server";
-import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port";
-import { PullerRegistryService } from "../../services/puller-registry.service";
-import { TestProjectService as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-service";
+import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
+import { PullerRegistryService } from "../../services/puller-registry.service.ts";
+import { TestProjectService as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-service.ts";
 
 export class TestHttpPort extends GovernanceHttpPort {
   constructor(

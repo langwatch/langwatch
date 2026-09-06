@@ -8,8 +8,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioInputMappingSectionProps } from "../../../elements/suites/scenario-input-mapping-section";
-import { AgentWorkflowEditorDrawer } from "../agent-workflow-editor-drawer";
+import type { ScenarioInputMappingSectionProps } from "../../../elements/suites/scenario-input-mapping-section.tsx";
+import { AgentWorkflowEditorDrawer } from "../agent-workflow-editor-drawer.tsx";
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
     organization: { id: "test-org" },
@@ -44,10 +44,10 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // Partial mock: stub the heavy React component but keep the real
 // isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
 // exercise the actual predicate, not a mock.
-vi.mock("../../../elements/suites/scenario-input-mapping-section", async (importOriginal) => {
+vi.mock("../../../elements/suites/scenario-input-mapping-section.tsx", async (importOriginal) => {
   const mod =
     await importOriginal<
-      typeof import("../../../elements/suites/scenario-input-mapping-section")
+      typeof import("../../../elements/suites/scenario-input-mapping-section.tsx")
     >();
   return {
     ...mod,
@@ -63,7 +63,7 @@ vi.mock("../../../elements/suites/scenario-input-mapping-section", async (import
   };
 });
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {

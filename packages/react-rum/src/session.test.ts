@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
+import { currentSessionId, SESSION_INACTIVITY_MS } from "./session.ts";
 
 describe("currentSessionId", () => {
   beforeEach(() => {

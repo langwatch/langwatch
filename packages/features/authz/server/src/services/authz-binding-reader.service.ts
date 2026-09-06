@@ -11,8 +11,8 @@ import {
   type AuthzListManagedBindingsForUserOutput,
   type OrganizationRole,
 } from "@langwatch/authz-contract";
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository";
-import type { AuthzListingRepository } from "../repositories/authz-listing.repository";
+import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
+import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
 
 export class AuthzBindingReaderService {
   static create(options: {

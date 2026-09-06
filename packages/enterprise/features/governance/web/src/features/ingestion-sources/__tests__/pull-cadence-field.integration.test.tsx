@@ -14,8 +14,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SourceType } from "../model/ingestion-source-catalog";
-import { PullCadenceField } from "../ui/elements/pull-cadence-field";
+import type { SourceType } from "../model/ingestion-source-catalog.ts";
+import { PullCadenceField } from "../ui/elements/pull-cadence-field.tsx";
 
 afterEach(cleanup);
 

@@ -5,8 +5,8 @@ import type {
   IdentityAccountsPort,
   IdentityResolution,
   IdentityResolutionPort,
-} from "../../rules/identity-storage-ports.rules";
-import type { InMemoryHeads } from "./in-memory-heads";
+} from "../../rules/identity-storage-ports.rules.ts";
+import type { InMemoryHeads } from "./in-memory-heads.ts";
 
 interface StoredCredential {
   id: string;

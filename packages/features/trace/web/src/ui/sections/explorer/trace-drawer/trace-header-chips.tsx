@@ -13,23 +13,23 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import type { EvalChipDisplay } from "../../../../model/evaluation-results";
-import { getEvalChipDisplay } from "../../../../model/evaluation-results";
-import { useConversationAnnotations } from "../hooks/use-conversation-annotations";
-import { useConversationTurns } from "../hooks/use-conversation-turns";
-import { useSpanTree } from "../hooks/use-span-tree";
-import type { RichEval } from "../hooks/use-trace-evaluations";
+import type { EvalChipDisplay } from "../../../../model/evaluation-results.ts";
+import { getEvalChipDisplay } from "../../../../model/evaluation-results.ts";
+import { useConversationAnnotations } from "../hooks/use-conversation-annotations.ts";
+import { useConversationTurns } from "../hooks/use-conversation-turns.ts";
+import { useSpanTree } from "../hooks/use-span-tree.ts";
+import type { RichEval } from "../hooks/use-trace-evaluations.ts";
 import {
   type PromptChipState,
   type SdkInfoLike,
   type TraceHeaderChipData,
   useTraceHeaderChips,
-} from "../hooks/use-trace-header-chips";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { TraceCommentList } from "./anchored-comments/trace-comment-list";
-import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar";
-import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar";
-import { buildScenarioChipDef } from "./scenario-chip";
+} from "../hooks/use-trace-header-chips.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { TraceCommentList } from "./anchored-comments/trace-comment-list.tsx";
+import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { buildScenarioChipDef } from "./scenario-chip.tsx";
 
 interface TraceHeaderChipsProps {
   trace: TraceHeader;

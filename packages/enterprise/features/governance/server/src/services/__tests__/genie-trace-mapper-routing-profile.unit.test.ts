@@ -20,8 +20,8 @@ import { spanSchema } from "@langwatch/trace-contract";
 import {
   type ConversationRoutingProfile,
   KNOWN_AGENT_IDENTITIES,
-} from "../conversation-trace-assembly.service";
-import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "../genie-trace-mapper.service";
+} from "../conversation-trace-assembly.service.ts";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "../genie-trace-mapper.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {

@@ -33,7 +33,7 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { z } from "zod";
-import { identityActorSchema } from "./vocabulary";
+import { identityActorSchema } from "./vocabulary.ts";
 
 export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
 

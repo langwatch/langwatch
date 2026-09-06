@@ -6,7 +6,7 @@ import {
 import {
   EventingReportUsageForMonthAdapter,
   type ReportUsageForMonthCommandDeps,
-} from "./eventing.report-usage-for-month.adapter";
+} from "./eventing.report-usage-for-month.adapter.ts";
 
 /**
  * Billing reporting's Eventing graph, and the worker-facing capability that

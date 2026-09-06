@@ -1,10 +1,10 @@
-import type { TraceListCursor } from "../../../../behavior/filter.store";
-import type { TraceListItem } from "../types/trace";
-import { useNewlyArrivedTraceIds } from "./use-newly-arrived-trace-ids";
-import { useTraceListAnnotations } from "./use-trace-list-annotations";
-import { useTraceListEvents } from "./use-trace-list-events";
-import { useTraceListQuery } from "./use-trace-list-query";
-import { useViewSwitchingDim } from "./use-view-switching-dim";
+import type { TraceListCursor } from "../../../../behavior/filter.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
+import { useNewlyArrivedTraceIds } from "./use-newly-arrived-trace-ids.ts";
+import { useTraceListAnnotations } from "./use-trace-list-annotations.ts";
+import { useTraceListEvents } from "./use-trace-list-events.ts";
+import { useTraceListQuery } from "./use-trace-list-query.ts";
+import { useViewSwitchingDim } from "./use-view-switching-dim.ts";
 
 export interface TraceListResult {
   data: TraceListItem[];

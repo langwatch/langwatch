@@ -40,8 +40,8 @@ export abstract class EvaluationExecutionReceiptPort {
 }
 
 export interface ExecuteEvaluationCommandDeps {
-  monitors: import("./evaluation-execution.port").EvaluationMonitorLookupPort;
-  traces: import("./evaluation-execution.port").EvaluationTraceEvidencePort;
+  monitors: import("./evaluation-execution.port.ts").EvaluationMonitorLookupPort;
+  traces: import("./evaluation-execution.port.ts").EvaluationTraceEvidencePort;
   executionReceipt: EvaluationExecutionReceiptPort;
   azureSafetyCredentials: EvaluationAzureSafetyCredentialsPort;
   settingsRecovery: EvaluationSettingsRecoveryPort;

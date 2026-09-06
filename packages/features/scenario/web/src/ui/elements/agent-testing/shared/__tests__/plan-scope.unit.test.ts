@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { storedPlanSubject } from "../../../../sections/agent-testing/run/plan-scope";
+import { storedPlanSubject } from "../../../../sections/agent-testing/run/plan-scope.ts";
 
 const RUN_PLAN = {
   id: "suite_plan",

@@ -6,11 +6,11 @@ import {
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   AdminWorkspaceViewAuditRepository,
   AdminWorkspaceViewOcsfPort,
-} from "../ports/admin-workspace-view-audit.port";
+} from "../ports/admin-workspace-view-audit.port.ts";
 
 const skipped = (): RecordWorkspaceViewResult => ({
   recorded: false,

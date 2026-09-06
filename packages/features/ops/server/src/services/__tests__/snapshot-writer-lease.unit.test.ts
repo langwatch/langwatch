@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
-import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
-import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository";
+import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
+import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 
 /**
  * the lease must return BEFORE scanning, not merely skip the write. A version that scanned and then discarded would still run

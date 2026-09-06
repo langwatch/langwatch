@@ -13,7 +13,7 @@ import {
   splitEnvelope,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
-import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules";
+import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,
@@ -24,8 +24,8 @@ import type {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
-import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port";
-import { QueueRepository } from "../queue.repository";
+import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port.ts";
+import { QueueRepository } from "../queue.repository.ts";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -33,7 +33,7 @@ import type {
   JobEntry,
   ParkedTenantsPage,
   ReconcileResult,
-} from "../queue.repository";
+} from "../queue.repository.ts";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 

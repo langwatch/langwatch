@@ -3,12 +3,12 @@ import type {
   DisableIngestionPullCommand,
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
-} from "./ingestion-pull.commands";
-import type { RecordPulledUsageCommand } from "./pulled-usage.commands";
-import type { TraceDepartmentInput } from "./department";
-import type { AnomalyRule, CreateAnomalyRuleInput, UpdateAnomalyRuleInput } from "./anomaly-rule";
-import type { Department, DepartmentAssignments } from "./department";
-import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost";
+} from "./ingestion-pull.commands.ts";
+import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
+import type { TraceDepartmentInput } from "./department.ts";
+import type { AnomalyRule, CreateAnomalyRuleInput, UpdateAnomalyRuleInput } from "./anomaly-rule.ts";
+import type { Department, DepartmentAssignments } from "./department.ts";
+import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost.ts";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -22,19 +22,19 @@ import type {
   SpendByUserRow,
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
-} from "./ingestion-source-activity.queries";
+} from "./ingestion-source-activity.queries.ts";
 import type {
   IngestionKeyMintCommand,
   IssuedIngestionKey,
   PersonalIngestionKey,
   PersonalIngestionKeyState,
-} from "./ingestion-source-key.commands";
+} from "./ingestion-source-key.commands.ts";
 import type {
   CreatedGovernanceIngestionSource,
   CreateGovernanceIngestionSourceCommand,
   GovernanceIngestionSource,
   UpdateGovernanceIngestionSourceCommand,
-} from "./ingestion-source.commands";
+} from "./ingestion-source.commands.ts";
 import type {
   ArchiveIngestionTemplateInput,
   CloneIngestionTemplateInput,
@@ -42,19 +42,19 @@ import type {
   IngestionTemplate,
   PlatformIngestionTemplateSyncResult,
   UpdateIngestionTemplateOttlInput,
-} from "./ingestion-template";
-import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export";
-import type { OttlTransformInput, OttlTransformResult, OttlValidationResult } from "./ottl";
+} from "./ingestion-template.ts";
+import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
+import type { OttlTransformInput, OttlTransformResult, OttlValidationResult } from "./ottl.ts";
 import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageQueryInput,
   PersonalUsageSummary,
-} from "./personal-usage";
+} from "./personal-usage.ts";
 import type {
   GovernanceBudgetOverviewForUser,
   GovernanceBudgetOverviewInput,
-} from "./personal-budget-overview";
+} from "./personal-budget-overview.ts";
 import type {
   EnsureDefaultPersonalVirtualKeyInput,
   IssuePersonalVirtualKeyInput,
@@ -63,8 +63,8 @@ import type {
   PersonalVirtualKey,
   RevokeAllPersonalVirtualKeysInput,
   RevokePersonalVirtualKeyInput,
-} from "./personal-virtual-key";
-import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill";
+} from "./personal-virtual-key.ts";
+import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill.ts";
 import type {
   CreateRoutingPolicyInput,
   DeleteRoutingPolicyInput,
@@ -74,7 +74,7 @@ import type {
   RoutingPolicy,
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
-} from "./routing-policy";
+} from "./routing-policy.ts";
 import type {
   AiToolCliCatalog,
   AiToolEntry,
@@ -86,19 +86,19 @@ import type {
   ReorderAiToolEntriesInput,
   SeedAiToolStarterPackInput,
   UpdateAiToolEntryInput,
-} from "./ai-tool-catalog";
+} from "./ai-tool-catalog.ts";
 import type {
   RecordWorkspaceViewInput,
   RecordWorkspaceViewResult,
-} from "./admin-workspace-view-audit";
-import type { CliBootstrapInput, CliBootstrapResult } from "./cli-bootstrap";
-import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sessions";
-import type { GovernanceSetupState } from "./governance";
+} from "./admin-workspace-view-audit.ts";
+import type { CliBootstrapInput, CliBootstrapResult } from "./cli-bootstrap.ts";
+import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sessions.ts";
+import type { GovernanceSetupState } from "./governance.ts";
 import type {
   PlatformToolPolicy,
   PlatformToolPolicyMap,
   PlatformToolSlug,
-} from "./platform-tool-policy";
+} from "./platform-tool-policy.ts";
 
 /**
  * The one public Governance capability.  The deliberately explicit operation

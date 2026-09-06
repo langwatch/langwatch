@@ -15,21 +15,21 @@ import {
   renderAuditMarkdown,
   type AuditBaseline,
   type AuditReport,
-} from "../rules/catalog-price-audit.rules";
+} from "../rules/catalog-price-audit.rules.ts";
 import {
   fetchLitellmPrices,
   litellmPricingById,
   mapLitellmAudioModels,
   type LitellmPriceEntry,
   type UnrepresentableModel,
-} from "../rules/litellm-audio-prices.rules";
+} from "../rules/litellm-audio-prices.rules.ts";
 import {
   extractProvider,
   hasVariantSuffix,
   mapModelId,
   mapProviderName,
-} from "../rules/provider-id-mapping.rules";
-import { getReasoningConfig } from "../rules/reasoning-config.rules";
+} from "../rules/provider-id-mapping.rules.ts";
+import { getReasoningConfig } from "../rules/reasoning-config.rules.ts";
 
 const logger = createLogger("langwatch:task:model-registry-sync");
 

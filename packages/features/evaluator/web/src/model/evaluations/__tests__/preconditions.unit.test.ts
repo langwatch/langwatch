@@ -13,7 +13,7 @@ import {
   evaluatePreconditions,
   type PreconditionTraceData,
   preconditionsNeedEvents,
-} from "../preconditions";
+} from "../preconditions.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaPersonalTeamScopeRepository } from "../repositories/prisma/prisma.personal-team-scope.repository";
+import { PrismaPersonalTeamScopeRepository } from "../repositories/prisma/prisma.personal-team-scope.repository.ts";
 import type {
   PersonalTeamScopeReader,
   RoleBindingScope,
-} from "../services/personal-team-scope.service";
+} from "../services/personal-team-scope.service.ts";
 
 /** Binds this deployment's Postgres to the personal-workspace reads. */
 export class PostgresPersonalTeamScopeAdapter implements PersonalTeamScopeReader {

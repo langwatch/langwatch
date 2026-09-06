@@ -3,7 +3,7 @@ import {
   isValidPullSchedule,
   pulledUsageObservationKey,
   pulledUsageObservedEventDataSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("governance contract", () => {
   /** @scenario "A pull schedule is validated portably" */

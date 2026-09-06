@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { graphTriggerActivityGroupKey } from "../graph-trigger-activity.subscriber";
+import { graphTriggerActivityGroupKey } from "../graph-trigger-activity.subscriber.ts";
 
 /**
  * The sweep lane must be tenant-keyed and aggregate-independent: all of a

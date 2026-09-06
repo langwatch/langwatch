@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveErrorCopy } from "../resolve-error-copy";
+import { resolveErrorCopy } from "../resolve-error-copy.ts";
 
 const TRACE_ID = "d2d07d1e4b70c2786e9139ee30a53e2a";
 

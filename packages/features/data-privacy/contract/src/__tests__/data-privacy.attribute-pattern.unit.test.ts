@@ -4,7 +4,7 @@ import {
   compileAttributePattern,
   compileAttributePatterns,
   matchesAnyAttributePattern,
-} from "../data-privacy.attribute-pattern";
+} from "../data-privacy.attribute-pattern.ts";
 
 describe("compileAttributePattern", () => {
   describe("given a pattern without wildcards", () => {

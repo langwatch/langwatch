@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { managedBedrockConfigSchema } from "../index";
+import { managedBedrockConfigSchema } from "../index.ts";
 
 describe("managedBedrockConfigSchema", () => {
   it("defaults the AWS region", () => {

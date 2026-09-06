@@ -4,8 +4,8 @@
  * See specs/home/recent-items-ui.feature.
  */
 import { describe, expect, it } from "vitest";
-import type { RecentItem } from "../../../../behavior/home-api";
-import { groupItemsByType } from "../recent-items-section";
+import type { RecentItem } from "../../../../behavior/home-api.ts";
+import { groupItemsByType } from "../recent-items-section.tsx";
 
 describe("groupItemsByType", () => {
   describe("when items have different types", () => {

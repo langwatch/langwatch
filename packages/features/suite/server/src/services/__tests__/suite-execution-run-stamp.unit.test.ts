@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
 
-import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port";
-import { SuiteExecutionService } from "../suite-execution.service";
+import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
+import { SuiteExecutionService } from "../suite-execution.service.ts";
 
 const noopScenarios = {
   resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>

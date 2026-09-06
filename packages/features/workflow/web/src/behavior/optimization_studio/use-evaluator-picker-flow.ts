@@ -4,7 +4,7 @@ import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
 import {
   useWorkflowEvaluatorPickerFlow,
   type EvaluatorPickerPort,
-} from "../use-workflow-evaluator-picker-flow";
+} from "../use-workflow-evaluator-picker-flow.ts";
 
 /** App composition adapter for the Workflow evaluator-selection state machine. */
 export function useEvaluatorPickerFlow() {

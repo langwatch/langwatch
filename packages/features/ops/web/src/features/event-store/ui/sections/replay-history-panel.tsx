@@ -1,7 +1,7 @@
-import { ReplayHistorySection as ReplayHistorySectionView } from "../blocks/replay-history-section";
-import { useOpsOverlay } from "../../../../behavior/ops-overlays";
-import { api } from "../../../../behavior/ops-api";
-import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link";
+import { ReplayHistorySection as ReplayHistorySectionView } from "../blocks/replay-history-section.tsx";
+import { useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link.tsx";
 
 export function ReplayHistorySection() {
   const replay = useOpsOverlay("replay");

@@ -1,5 +1,5 @@
-import type { LangyToolNarrator } from "../../../../model/langy-thinking-line";
-import { describeToolCall, effectiveToolName } from "../logic/langy-tool-label";
+import type { LangyToolNarrator } from "../../../../model/langy-thinking-line.ts";
+import { describeToolCall, effectiveToolName } from "../logic/langy-tool-label.ts";
 
 export const langyToolNarrator: LangyToolNarrator = {
   describe({ name, toolInput }) {

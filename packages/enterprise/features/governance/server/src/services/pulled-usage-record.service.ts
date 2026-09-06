@@ -23,7 +23,7 @@ import {
   type PulledUsageObservedEventData,
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
-import type { PulledUsagePricingService } from "./pulled-usage-pricing.service";
+import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
 
 /**
  * The dimension-only identity two versions of one bucket share.

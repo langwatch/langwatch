@@ -13,8 +13,8 @@ import {
   groupRunsByTarget,
   groupRunsByTargetKey,
   resolveOriginLabel,
-} from "../run-history-transforms";
-import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
+} from "../run-history-transforms.ts";
+import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 
 describe("groupRunsByTargetKey()", () => {
   describe("when the same agent ran on two sets of parameters", () => {

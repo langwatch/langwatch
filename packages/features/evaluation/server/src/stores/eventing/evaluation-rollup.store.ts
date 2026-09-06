@@ -1,6 +1,6 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { EvaluationAnalyticsRollupRow } from "../../projections/evaluation-analytics-rollup.projection";
+import type { EvaluationAnalyticsRollupRow } from "../../projections/evaluation-analytics-rollup.projection.ts";
 
 /**
  * Thin AppendStore adapter for the `evaluation_analytics_rollup` map

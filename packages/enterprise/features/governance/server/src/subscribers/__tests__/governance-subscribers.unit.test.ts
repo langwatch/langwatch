@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber";
-import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber";
+import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
+import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import {
   GovernanceKpiContributionPort,
   GovernanceOcsfEventPort,
@@ -12,12 +12,12 @@ import {
   type GovernanceKpiContribution,
   type GovernanceOcsfEvent,
   type TraceAlertTrigger,
-} from "../../ports/governance-subscriber.port";
-import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber";
+} from "../../ports/governance-subscriber.port.ts";
+import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {
   governanceTraceContext,
   governanceTraceEvent,
-} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures";
+} from "../../ports/__tests__/subscribers/governance-subscriber.fixtures.ts";
 
 class RecordingKpis extends GovernanceKpiContributionPort {
   readonly rows: GovernanceKpiContribution[] = [];

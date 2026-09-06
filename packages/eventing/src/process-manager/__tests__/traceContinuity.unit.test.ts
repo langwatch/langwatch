@@ -16,16 +16,16 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-tr
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OutboxDispatcherService } from "../outbox/outboxDispatcherService";
-import { ProcessManagerService } from "../processManagerService";
-import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
+import { OutboxDispatcherService } from "../outbox/outboxDispatcherService.ts";
+import { ProcessManagerService } from "../processManagerService.ts";
+import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
 import {
   type PilotState,
   pilotDefinition,
   pilotEvent,
   pilotRef,
   T0,
-} from "./helpers/pilotProcess.fixture";
+} from "./helpers/pilotProcess.fixture.ts";
 
 const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 

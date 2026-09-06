@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { annotationSuggestedOutput, type AnnotationSuggestionSource } from "../index";
+import { annotationSuggestedOutput, type AnnotationSuggestionSource } from "../index.ts";
 
 const traceId = "trace-1";
 

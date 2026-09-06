@@ -8,8 +8,8 @@ import {
 } from "@langwatch/authz-server";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime";
-import { AuthzWorkerFeatureInstaller } from "../authz-worker-feature.installer";
+import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime.ts";
+import { AuthzWorkerFeatureInstaller } from "../authz-worker-feature.installer.ts";
 
 type Registered = StaticPipelineDefinition<any, any, any>;
 

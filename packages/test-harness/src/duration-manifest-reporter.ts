@@ -32,7 +32,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Reporter, TestModule } from "vitest/node";
 
-import type { DurationManifest } from "./shard-weights";
+import type { DurationManifest } from "./shard-weights.ts";
 
 export interface DurationManifestReporterOptions {
   /** Where the manifest lives. Paths inside it are relative to its directory. */

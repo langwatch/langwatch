@@ -8,7 +8,7 @@ import { EventEmitter } from "events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 
-vi.mock("../adapters/child-process-spawn.adapter", () => ({
+vi.mock("../adapters/child-process-spawn.adapter.ts", () => ({
   resolveChildProcessSpawn: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
 }));
 
@@ -29,9 +29,9 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
-import { NodeScenarioChildProcessAdapter } from "../adapters/node-scenario-child-process.adapter";
-import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index";
-import type { ExecutionJobData } from "../services/scenario-execution-pool.service";
+import { NodeScenarioChildProcessAdapter } from "../adapters/node-scenario-child-process.adapter.ts";
+import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */

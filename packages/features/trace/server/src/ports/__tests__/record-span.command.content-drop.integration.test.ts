@@ -21,16 +21,16 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceSummaryFoldProjection } from "../../projections/trace-summary.projection";
-import { createTestRuntime } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures";
+import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceSummaryFoldProjection } from "../../projections/trace-summary.projection.ts";
+import { createTestRuntime } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
 import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-} from "../trace-span-preparation.port";
+} from "../trace-span-preparation.port.ts";
 
 function policy({
   input = "capture" as Disposition,

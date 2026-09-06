@@ -3,9 +3,9 @@ import { Database, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import type { ComponentType } from "@langwatch/workflow-contract";
-import { VariableTypeBadge, VariableTypeIcon } from "./variable-type";
+import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 import { Popover } from "@langwatch/design-system/popover";
-import type { AvailableSource, FieldType, SourceType } from "./variable-mapping-input";
+import type { AvailableSource, FieldType, SourceType } from "./variable-mapping-input.tsx";
 
 // ============================================================================
 // Types

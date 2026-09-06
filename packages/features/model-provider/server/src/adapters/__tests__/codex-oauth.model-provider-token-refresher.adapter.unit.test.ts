@@ -8,7 +8,7 @@ import type { CodexTokenKeys } from "@langwatch/model-provider-contract";
 import {
   CodexAccountService,
   CodexAuthError,
-} from "../codex-oauth.model-provider-token-refresher.adapter";
+} from "../codex-oauth.model-provider-token-refresher.adapter.ts";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
 function fakeIdToken(payload: Record<string, unknown>): string {

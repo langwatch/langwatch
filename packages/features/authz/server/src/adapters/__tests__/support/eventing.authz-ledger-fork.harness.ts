@@ -3,19 +3,19 @@ import { vi } from "vitest";
 import {
   type AuthzLedgerDatabase,
   EventingAuthzLedgerAdapter,
-} from "../../eventing.authz-ledger.adapter";
+} from "../../eventing.authz-ledger.adapter.ts";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
-} from "../../../ports/authz-grants-command-dispatcher.port";
+} from "../../../ports/authz-grants-command-dispatcher.port.ts";
 import {
   AuthzCutoverFailureReporter,
   PostgresAuthzCutoverAdapter,
-} from "../../postgres.authz-cutover.adapter";
-import type { AuthzEpochPort } from "../../../ports/authz-epoch.port";
-import { AuthzRevocationTelemetry } from "../../../ports/authz-revocation-telemetry.port";
-import { PrismaAuthzRevocationRepository } from "../../../repositories/prisma/prisma.authz-revocation.repository";
-import { StubAuthzEpoch } from "../../../ports/__tests__/support/authz-epoch.stub";
+} from "../../postgres.authz-cutover.adapter.ts";
+import type { AuthzEpochPort } from "../../../ports/authz-epoch.port.ts";
+import { AuthzRevocationTelemetry } from "../../../ports/authz-revocation-telemetry.port.ts";
+import { PrismaAuthzRevocationRepository } from "../../../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { StubAuthzEpoch } from "../../../ports/__tests__/support/authz-epoch.stub.ts";
 
 export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };

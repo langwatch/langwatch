@@ -10,15 +10,15 @@ import {
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
 import { nanoid } from "nanoid";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
-import type { OrganizationInviteMailPort } from "../ports/invite.port";
-import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
+import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import {
   INVITE_EXPIRATION_MS,
   type CreatePaymentPendingInviteInput,
   type InviteServiceDependencies,
-} from "../rules/invite-contracts.rules";
-import { InviteCreationService } from "./invite-creation.service";
+} from "../rules/invite-contracts.rules.ts";
+import { InviteCreationService } from "./invite-creation.service.ts";
 
 const logger = createLogger("langwatch:invites:lifecycle");
 

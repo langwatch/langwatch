@@ -1,12 +1,12 @@
-import { DatasetNormalizeQueuePort } from "../ports/dataset.port";
+import { DatasetNormalizeQueuePort } from "../ports/dataset.port.ts";
 import {
   DatasetNormalizationWorkerPort,
   datasetNormalizePayloadSchema,
   type DatasetNormalizePayload,
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import type { DatasetNormalizePort } from "../ports/dataset-normalize.port";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetNormalizePort } from "../ports/dataset-normalize.port.ts";
 import { UploadNotPendingError } from "@langwatch/dataset-contract";
 
 /**

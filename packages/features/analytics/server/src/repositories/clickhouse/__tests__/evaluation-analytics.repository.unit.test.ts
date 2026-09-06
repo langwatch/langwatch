@@ -4,8 +4,8 @@ import {
   type AnalyticsEvaluationRow,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository";
-import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository";
+import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository.ts";
 
 const loggerSpies = vi.hoisted(() => ({ warn: vi.fn() }));
 

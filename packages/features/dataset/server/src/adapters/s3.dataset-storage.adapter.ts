@@ -23,19 +23,19 @@ import {
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
-} from "../rules/dataset-chunking.rules";
+} from "../rules/dataset-chunking.rules.ts";
 import type {
   DatasetStorage,
   PresignedUpload,
   DatasetS3ClientResolver,
   DatasetS3Client,
-} from "../ports/dataset-storage.port";
+} from "../ports/dataset-storage.port.ts";
 import {
   ChunkTooLargeError,
   MissingChunkError,
   StagedUploadNotFoundError,
 } from "@langwatch/dataset-contract";
-import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.rules";
+import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.rules.ts";
 
 export class S3DatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {

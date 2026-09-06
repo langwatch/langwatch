@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   linkPullRequestReferences,
   pullRequestLinksFromToolParts,
-} from "../../../../../model/langy-pull-request-links";
+} from "../../../../../model/langy-pull-request-links.ts";
 
 /** What `gh pr create` prints, as the local shell tool records it. */
 const prCreateOutput = [

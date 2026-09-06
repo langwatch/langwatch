@@ -5,9 +5,9 @@ import type { Protections } from "@langwatch/trace-contract";
  * and a per-trace `project` function. Pure and synchronous; execution lives in the trace service.
  */
 
-import { TraceProjectionCatalogService } from "./trace-projection-catalog.service";
+import { TraceProjectionCatalogService } from "./trace-projection-catalog.service.ts";
 
-import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service";
+import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service.ts";
 import {
   type CompiledProjection,
   type CompileProjectionArgs,

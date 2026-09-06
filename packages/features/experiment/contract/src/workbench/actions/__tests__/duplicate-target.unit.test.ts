@@ -2,8 +2,8 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import { duplicateTarget } from "../transforms";
-import { baseState, evaluator, refusalCode } from "./workbench-fixtures";
+import { duplicateTarget } from "../transforms/index.ts";
+import { baseState, evaluator, refusalCode } from "./workbench-fixtures.ts";
 
 describe("duplicateTarget", () => {
   describe("given a target with mappings and an evaluator wired to it", () => {

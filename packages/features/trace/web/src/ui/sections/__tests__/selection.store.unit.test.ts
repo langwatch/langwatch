@@ -3,7 +3,7 @@
  * See specs/traces-v2/bulk-actions.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { useSelectionStore } from "../../../behavior/selection.store";
+import { useSelectionStore } from "../../../behavior/selection.store.ts";
 
 const selection = () => Array.from(useSelectionStore.getState().traceIds);
 

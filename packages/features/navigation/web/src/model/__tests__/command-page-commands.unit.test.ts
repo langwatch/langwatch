@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
 import { afterEach, describe, expect, it } from "vitest";
-import { getPageCommands, pageCommandRegistry } from "../command-page-commands";
-import type { Command } from "../command-bar-types";
+import { getPageCommands, pageCommandRegistry } from "../command-page-commands.ts";
+import type { Command } from "../command-bar-types.ts";
 
 /**
  * The registry ships empty — the legacy Traces page was the only page that

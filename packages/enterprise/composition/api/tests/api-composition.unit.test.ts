@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnterpriseApiComposition } from "../src";
+import { EnterpriseApiComposition } from "../src/index.ts";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 
 describe("EnterpriseApiComposition", () => {

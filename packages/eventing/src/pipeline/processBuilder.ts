@@ -1,8 +1,8 @@
 import type { ZodTypeAny, z } from "zod";
 
-import type { Event } from "../domain/types";
-import type { ProcessEventEnvelope } from "../process-manager/processManager.types";
-import { ConfigurationError } from "../services/errorHandling";
+import type { Event } from "../domain/types.ts";
+import type { ProcessEventEnvelope } from "../process-manager/processManager.types.ts";
+import { ConfigurationError } from "../services/errorHandling.ts";
 import {
   defineProcessManager,
   type EventHandler,
@@ -12,7 +12,7 @@ import {
   type SignalHandler,
   type SignalSpec,
   type WakeHandler,
-} from "./processManagerDefinition";
+} from "./processManagerDefinition.ts";
 
 type EventTypeOf<E extends Event> = E["type"] & string;
 type EventData<E extends Event, Type extends string> =

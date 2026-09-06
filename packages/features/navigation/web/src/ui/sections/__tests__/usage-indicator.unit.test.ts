@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getUsageDisplay } from "../usage-indicator";
+import { getUsageDisplay } from "../usage-indicator.tsx";
 
 /**
  * Spec: specs/usage-indicator-display.feature

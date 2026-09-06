@@ -1,6 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { ReplayWizardContent } from "./replay-wizard-content";
+import { ReplayWizardContent } from "./replay-wizard-content.tsx";
 
 /**
  * Projection replay as a drawer (URL-routed via the projections page's own `?replay=open`, so

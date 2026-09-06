@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MEMBERS_LITE } from "../index";
-import { type ResolvedPlanLimits, resolvePlanDefaults } from "../index";
-import type { LicensePlanLimits } from "../index";
+import { DEFAULT_MEMBERS_LITE } from "../index.ts";
+import { type ResolvedPlanLimits, resolvePlanDefaults } from "../index.ts";
+import type { LicensePlanLimits } from "../index.ts";
 
 /**
  * Tests for resolvePlanDefaults.

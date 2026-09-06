@@ -1,20 +1,20 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { encodeJobEnvelope, withJobAttempt } from "../jobEnvelope";
-import { GroupQueueProcessor } from "../groupQueue";
-import { gqJobsDroppedTotal } from "../metrics";
-import { JOB_RETRY_CONFIG } from "../retry";
-import { GroupStagingScripts } from "../scripts";
-import { createTenantId } from "../storage";
-import { TieredBlobStore } from "../tieredBlobStore";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { encodeJobEnvelope, withJobAttempt } from "../jobEnvelope.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import { gqJobsDroppedTotal } from "../metrics.ts";
+import { JOB_RETRY_CONFIG } from "../retry.ts";
+import { GroupStagingScripts } from "../scripts.ts";
+import { createTenantId } from "../storage.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
 import {
   FlakyObjectStore,
   InMemoryJobBlobStore,
   InMemoryObjectStore,
   incompressible,
-} from "./blob-test-doubles";
+} from "./blob-test-doubles.ts";
 
 type TestPayload = {
   id: string;

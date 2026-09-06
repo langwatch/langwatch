@@ -16,8 +16,8 @@ import {
   initialSlices,
   type ProviderClients,
   type SliceFor,
-} from "../../../model/provider-registry";
-import { describeCron, isValidCron } from "./report-schedule";
+} from "../../../model/provider-registry.ts";
+import { describeCron, isValidCron } from "./report-schedule.ts";
 
 export type { AutomationFilterValue, AutomationFilters };
 

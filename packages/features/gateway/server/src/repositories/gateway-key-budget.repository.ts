@@ -1,5 +1,5 @@
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
 
 /** The cap fields a key's own drawer sets. */
 export type GatewayKeyBudgetFields = {

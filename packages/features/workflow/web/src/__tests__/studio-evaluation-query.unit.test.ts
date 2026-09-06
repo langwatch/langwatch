@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isExperimentQueryEnabled } from "../model/studio-evaluation-query";
+import { isExperimentQueryEnabled } from "../model/studio-evaluation-query.ts";
 
 describe("isExperimentQueryEnabled()", () => {
   it("enables the query from the persisted workflow id", () => {

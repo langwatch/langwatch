@@ -3,8 +3,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { Field } from "@langwatch/workflow-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import type { TargetConfig } from "../../model/experiments-v3/types";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * The agent row this hook reads, named because the borrowed `agents.getAll`

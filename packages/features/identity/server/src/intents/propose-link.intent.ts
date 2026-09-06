@@ -3,10 +3,10 @@ import {
   type ProposeLinkCommandData,
   proposeLinkCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuardsService } from "../services/identity-guards.service";
+import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { IdentityEvent } from "../projections/identity-state.projection";
-import { identityEventsFor } from "../intents/identity-events.intent";
+import type { IdentityEvent } from "../projections/identity-state.projection.ts";
+import { identityEventsFor } from "../intents/identity-events.intent.ts";
 
 /**
  * The staged re-run of a link proposal (ADR-117 §3): the same guard the calling

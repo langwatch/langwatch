@@ -24,11 +24,11 @@ import {
   discoverCacheKey,
   snapToWindowPreset,
   type DiscoverParams,
-} from "../rules/trace-list-cache-key.rules";
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules";
-import { TtlCache } from "./trace-ttl-cache.service";
-import type { TraceTopicNamingService } from "./trace-topic-naming.service";
-import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service";
+} from "../rules/trace-list-cache-key.rules.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { TtlCache } from "./trace-ttl-cache.service.ts";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
 
 /**
  * Stale-while-revalidate cache for the full discover payload. The table view fires `discover` on

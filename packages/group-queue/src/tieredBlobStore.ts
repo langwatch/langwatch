@@ -3,18 +3,18 @@ import type { Readable } from "node:stream";
 
 import type { Logger } from "@langwatch/observability";
 
-import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
-import { blobNamespaceId } from "./blobKeys";
-import type { JobBlobStore } from "./jobEnvelope";
-import { gqBlobDecodeCapExceededTotal } from "./metrics";
+import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants.ts";
+import { blobNamespaceId } from "./blobKeys.ts";
+import type { JobBlobStore } from "./jobEnvelope.ts";
+import { gqBlobDecodeCapExceededTotal } from "./metrics.ts";
 import {
   mintUriForDestination,
   type ObjectStore,
   type ProjectStorageDestination,
   type TenantId,
-} from "./storage";
+} from "./storage.ts";
 
-export type { ObjectStore } from "./storage";
+export type { ObjectStore } from "./storage.ts";
 
 /**
  * Above this serialized size a blob lives in the durable object store; at or

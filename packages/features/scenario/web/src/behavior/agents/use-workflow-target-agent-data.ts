@@ -3,7 +3,7 @@ import type { Variable } from "@langwatch/prompt-web/surfaces/variables";
 import { linkedWorkflowId } from "@langwatch/agent-contract";
 import type { Field as DSLField, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "../scenario-api";
+import { api } from "../scenario-api.ts";
 import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";
 
 /**

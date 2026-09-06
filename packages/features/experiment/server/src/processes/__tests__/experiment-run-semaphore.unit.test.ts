@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSemaphore } from "../experiment-run-semaphore.process";
+import { createSemaphore } from "../experiment-run-semaphore.process.ts";
 
 describe("semaphore", () => {
   it("allows immediate acquisition when slots available", async () => {

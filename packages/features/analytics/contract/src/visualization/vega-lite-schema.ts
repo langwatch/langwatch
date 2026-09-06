@@ -17,12 +17,12 @@
 
 import type { ErrorObject } from "ajv";
 
-import { lwqlVegaError } from "./vega-lite-policy";
+import { lwqlVegaError } from "./vega-lite-policy.ts";
 import vegaLiteSchemaValidator, {
   type VegaLiteSchemaValidator,
 } from "./vega-lite-schema-validator.generated.js";
-import { isPlainObject, JSON_POINTER_ROOT } from "./vega-lite-structure";
-import type { VegaValidationError } from "./visualization-types";
+import { isPlainObject, JSON_POINTER_ROOT } from "./vega-lite-structure.ts";
+import type { VegaValidationError } from "./visualization-types.ts";
 
 /** The canonical `$schema` for the supported version. */
 export const VEGA_LITE_SCHEMA_URL = "https://vega.github.io/schema/vega-lite/v6.json";

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { Event } from "../domain/types";
-import type { BulkAppendContext, MapProjectionDefinition } from "./mapProjection.types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { Event } from "../domain/types.ts";
+import type { BulkAppendContext, MapProjectionDefinition } from "./mapProjection.types.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 const logger = createLogger("langwatch:event-sourcing:map-executor");
 

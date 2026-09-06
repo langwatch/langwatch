@@ -1,5 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
-import type { Role, RoleCreate, RoleBindingScopeType, RoleUpdate } from "./role";
+import type { Role, RoleCreate, RoleBindingScopeType, RoleUpdate } from "./role.ts";
 
 export abstract class RoleService {
   abstract list(input: { organizationId: string }): Promise<Role[]>;

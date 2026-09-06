@@ -13,7 +13,7 @@
  */
 
 import { useMemo } from "react";
-import { usePromptHost } from "../model/prompt-host";
+import { usePromptHost } from "../model/prompt-host.ts";
 
 export function usePromptProject() {
   const host = usePromptHost();

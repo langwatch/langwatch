@@ -37,27 +37,27 @@ import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useMemo } from "react";
-import { annotationApi } from "../../behavior/annotation-api";
-import { downloadCsv } from "../../behavior/download-csv";
-import { useAnnotationPeriod } from "../../behavior/use-annotation-period";
-import { allAnnotationsExport, csvFileName } from "../../model/annotation-export";
-import { useAnnotationHost } from "../../model/annotation-host";
-import type { AnnotationHostPort } from "../../model/annotation-host";
+import { annotationApi } from "../../behavior/annotation-api.ts";
+import { downloadCsv } from "../../behavior/download-csv.ts";
+import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
+import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
+import { useAnnotationHost } from "../../model/annotation-host.ts";
+import type { AnnotationHostPort } from "../../model/annotation-host.ts";
 import {
   closedQueueEditorAddress,
   queueEditorAddress,
   readQueueEditor,
-} from "../../model/annotation-overlay-address";
+} from "../../model/annotation-overlay-address.ts";
 import {
   groupedAnnotationsToRows,
   type AnnotationRow,
   type AnnotationTrace,
-} from "../../model/annotation-row";
-import type { AnnotationView } from "../../model/annotation-view";
-import { AnnotationList, type PageQueue } from "../../ui/sections/annotation-list";
-import { AnnotationQueueEditor } from "../../ui/sections/annotation-queue-editor";
-import { AnnotationSidebar } from "../../ui/sections/annotation-sidebar";
-import { ReviewerAvatar } from "../../ui/elements/reviewer-avatar";
+} from "../../model/annotation-row.ts";
+import type { AnnotationView } from "../../model/annotation-view.ts";
+import { AnnotationList, type PageQueue } from "../../ui/sections/annotation-list.tsx";
+import { AnnotationQueueEditor } from "../../ui/sections/annotation-queue-editor.tsx";
+import { AnnotationSidebar } from "../../ui/sections/annotation-sidebar.tsx";
+import { ReviewerAvatar } from "../../ui/elements/reviewer-avatar.tsx";
 
 export function AnnotationsScreen({ view }: { view: AnnotationView }) {
   const host = useAnnotationHost();

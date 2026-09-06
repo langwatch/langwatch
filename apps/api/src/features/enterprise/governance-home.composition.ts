@@ -3,12 +3,12 @@
  * one wire name: the five packaged procedures the Enterprise console calls, and this —
  * where a person lands when they open the product with no path.
  */
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import {
   createGovernanceHomeTrpcRouter,
   type GovernanceHomeTrpcPorts,
-} from "./governance-home.mount";
+} from "./governance-home.mount.ts";
 
 /**
  * The rollout gate the governance console and the /me page are both behind. Stated here

@@ -1,6 +1,6 @@
 import { Box, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SimpleSlider } from "./slider";
+import { SimpleSlider } from "./slider.tsx";
 
 const meta = {
   title: "Primitives/Slider",

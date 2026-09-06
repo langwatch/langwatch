@@ -7,10 +7,10 @@
 import { Box, EmptyState, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { RefreshCw } from "lucide-react";
 import type { Period, RelativePresetKey } from "@langwatch/analytics-web/surfaces/period-selector";
-import { HandledErrorAlert } from "../../../../behavior/errors";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import type { PeriodControls } from "./period-controls";
+import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { PeriodControls } from "./period-controls.ts";
 
 const DAY_MS = 86_400_000;
 

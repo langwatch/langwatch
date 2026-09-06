@@ -4,8 +4,8 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PersonalRecentTracesTable } from "../ui/sections/personal-recent-traces-table";
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing";
+import { PersonalRecentTracesTable } from "../ui/sections/personal-recent-traces-table.tsx";
+import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing.tsx";
 
 function renderEmpty(slug = "acme-personal") {
   return renderWithPersonalWorkspaceHost(<PersonalRecentTracesTable projectSlug={slug} />, {

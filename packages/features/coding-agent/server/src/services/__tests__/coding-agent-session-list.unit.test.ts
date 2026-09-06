@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   SESSIONS_LIST_LIMIT,
   SESSIONS_LIST_WINDOW_MS,
-} from "../coding-agent-pull-request-read.service";
-import { CodingAgentFeatureService } from "../coding-agent.service";
+} from "../coding-agent-pull-request-read.service.ts";
+import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -16,7 +16,7 @@ import {
   TestTraceSessions,
   pullRequest,
   session,
-} from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 const PROJECT = "project-1";
 const HOUR_MS = 60 * 60 * 1000;

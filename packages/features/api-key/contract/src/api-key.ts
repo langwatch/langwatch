@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { API_KEY_REVOCATION_CAUSES } from "./api-key.revocation-cause";
+import { API_KEY_REVOCATION_CAUSES } from "./api-key.revocation-cause.ts";
 
 export const apiKeyRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type ApiKeyRole = z.infer<typeof apiKeyRoleSchema>;

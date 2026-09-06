@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { forgetCarriedEmail, readCarriedEmail, signUpHref } from "../carried-email";
+import { forgetCarriedEmail, readCarriedEmail, signUpHref } from "../carried-email.ts";
 
 /**
  * The address is carried between the two doors in the URL FRAGMENT, and the

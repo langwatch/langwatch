@@ -5,7 +5,7 @@
  */
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import { ApiQueueAbsenceReportPort, ApiQueueInfrastructure } from "../api-queue.infrastructure";
+import { ApiQueueAbsenceReportPort, ApiQueueInfrastructure } from "../api-queue.infrastructure.ts";
 
 const { connections } = vi.hoisted(() => ({ connections: [] as FakeConnection[] }));
 

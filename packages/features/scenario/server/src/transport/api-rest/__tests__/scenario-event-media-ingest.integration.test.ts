@@ -24,7 +24,7 @@ vi.mock("@langwatch/observability", () => ({
   logHttpRequest: vi.fn(),
 }));
 
-import { createScenarioEventsRestApp, type InlineMediaExtraction } from "../scenario-event.api";
+import { createScenarioEventsRestApp, type InlineMediaExtraction } from "../scenario-event.api.ts";
 
 const PROJECT = { id: "project-1", slug: "project-one" };
 const RUN_ID = "run-1";

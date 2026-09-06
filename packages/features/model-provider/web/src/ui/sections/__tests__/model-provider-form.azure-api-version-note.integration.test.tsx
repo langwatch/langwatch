@@ -23,7 +23,7 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings", () => ({
+vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     providers: {},
     modelMetadata: {},
@@ -33,7 +33,7 @@ vi.mock("../../../behavior/use-model-providers-settings", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/model-provider-api", () => {
+vi.mock("../../../behavior/model-provider-api.ts", () => {
   const query = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, isSuccess: true, refetch: vi.fn() }),
   });
@@ -59,9 +59,9 @@ vi.mock("../../../behavior/model-provider-api", () => {
   };
 });
 
-import { MODEL_PROVIDER_FIELD_METADATA } from "../../../model/model-provider-field-metadata";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
-import { EditModelProviderForm } from "../model-provider-form";
+import { MODEL_PROVIDER_FIELD_METADATA } from "../../../model/model-provider-field-metadata.ts";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 
 const directNote = MODEL_PROVIDER_FIELD_METADATA.azure?.AZURE_OPENAI_API_VERSION?.description;
 const gatewayNote = MODEL_PROVIDER_FIELD_METADATA.azure?.AZURE_API_GATEWAY_VERSION?.description;

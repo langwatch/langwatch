@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../model-catalog", () => ({
+vi.mock("../model-catalog.ts", () => ({
   llmModels: {
     updatedAt: "2026-05-19",
     modelCount: 0,
@@ -87,7 +87,7 @@ import {
   isLatestAlias,
   parseLatestAlias,
   resolveLatestAlias,
-} from "../latest-aliases";
+} from "../latest-aliases.ts";
 
 describe("given latest-alias model resolution", () => {
   describe("when checking isLatestAlias", () => {

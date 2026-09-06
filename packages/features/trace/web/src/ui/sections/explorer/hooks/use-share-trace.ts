@@ -4,8 +4,8 @@ import {
 } from "@langwatch/share-web/surfaces/share-link-views";
 import { expiryToDate } from "@langwatch/share-web/surfaces/share-links";
 import { useCallback } from "react";
-import { showErrorToast } from "../../errors";
-import { api } from "../../../../behavior/trace-api";
+import { showErrorToast } from "../../errors/index.ts";
+import { api } from "../../../../behavior/trace-api.ts";
 
 /**
  * The share-links list query, scoped to a resource. Split out of

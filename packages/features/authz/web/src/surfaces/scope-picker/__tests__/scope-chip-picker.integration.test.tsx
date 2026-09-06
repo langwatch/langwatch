@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ScopeChipPicker } from "../scope-chip-picker";
+import { ScopeChipPicker } from "../scope-chip-picker.tsx";
 
 function renderPicker(node: ReactNode) {
   return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);

@@ -1,12 +1,12 @@
 import type { Dataset } from "@langwatch/dataset-contract";
 import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
-import { WorkflowRowPort, type WorkflowRowDraft } from "../../ports/workflow.port";
+import { WorkflowRowPort, type WorkflowRowDraft } from "../../ports/workflow.port.ts";
 import {
   WorkflowStudioCopyService,
   type WorkflowStudioCopySource,
-} from "../workflow-studio-copy.service";
-import { TestDatasetService } from "./dataset.service.fake";
+} from "../workflow-studio-copy.service.ts";
+import { TestDatasetService } from "./dataset.service.fake.ts";
 
 class RecordingRowPort extends WorkflowRowPort {
   readonly created: WorkflowRowDraft[] = [];

@@ -15,14 +15,14 @@ import {
 import { GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTimeAgo, getColorForString } from "./presentation";
+import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
 import {
   INTERRUPTED_THRESHOLD_MS,
   isRunFinished,
-} from "../../../model/batch-evaluation-results.run-state";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
-import { RunDisplayName } from "../../elements/batch-results/run-display-name";
+} from "../../../model/batch-evaluation-results.run-state.ts";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
 
 /**
  * Summary data for a single evaluation run

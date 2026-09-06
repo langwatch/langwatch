@@ -4,9 +4,9 @@ import {
   type ApiKeyBindingNames,
   type ApiKeyListEnrichment,
 } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository } from "../repositories/api-key.repository";
-import { ApiKeyCatalogService } from "./api-key-catalog.service";
-import type { ApiKeyDependencies } from "./api-key.service";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 export class ApiKeyEnrichmentService {
   static create(

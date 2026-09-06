@@ -1,13 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import { createTenantId } from "./storage";
+import { createTenantId } from "./storage.ts";
 
-import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys";
-import { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua";
-import { CachedLuaScript } from "./cachedLuaScript";
-import { gqBlobSweepTotal } from "./metrics";
-import { GROUP_QUEUE_REGISTRY_KEY } from "./scripts";
+import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys.ts";
+import { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua.ts";
+import { CachedLuaScript } from "./cachedLuaScript.ts";
+import { gqBlobSweepTotal } from "./metrics.ts";
+import { GROUP_QUEUE_REGISTRY_KEY } from "./scripts.ts";
 
 const logger = createLogger("langwatch:group-queue:blob-sweeper");
 

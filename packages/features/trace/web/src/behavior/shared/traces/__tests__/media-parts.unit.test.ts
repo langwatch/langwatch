@@ -6,7 +6,7 @@ import {
   isSafeMediaUrl,
   mediaPartToMediaData,
   parseNotCapturedMedia,
-} from "../media-parts";
+} from "../media-parts.ts";
 
 describe("parseNotCapturedMedia", () => {
   describe("given the summary an engine leaves in place of an attachment", () => {

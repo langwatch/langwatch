@@ -9,9 +9,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Project } from "../../../../model/prisma-types";
+import type { Project } from "../../../../model/prisma-types.ts";
 import type { Span } from "@langwatch/trace-contract";
-import { SpanDetails } from "../span-details";
+import { SpanDetails } from "../span-details.tsx";
 
 const mockBuildUrl = vi.fn((spanId: string, action?: string) => {
   const url = new URL("http://localhost/test-project/prompts");
@@ -22,7 +22,7 @@ const mockBuildUrl = vi.fn((spanId: string, action?: string) => {
   return url;
 });
 
-vi.mock("../../../../behavior/prompts/use-load-span-into-prompt-playground", () => ({
+vi.mock("../../../../behavior/prompts/use-load-span-into-prompt-playground.ts", () => ({
   useGoToSpanInPlaygroundTabUrlBuilder: () => ({
     buildUrl: mockBuildUrl,
   }),
@@ -37,14 +37,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/auth-session", () => ({
+vi.mock("../../../../behavior/auth-session.ts", () => ({
   useSession: () => ({
     data: { user: { id: "user-1" } },
     status: "authenticated",
   }),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -53,14 +53,14 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../use-field-redaction", () => ({
+vi.mock("../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({
     isRedacted: () => false,
     redact: (v: string) => v,
   }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({}),
   },

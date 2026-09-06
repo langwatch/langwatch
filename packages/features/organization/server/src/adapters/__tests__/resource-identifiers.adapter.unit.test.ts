@@ -3,7 +3,7 @@ import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
-} from "../resource-identifiers.adapter";
+} from "../resource-identifiers.adapter.ts";
 
 /**
  * Every value asserted below is written into a row the customer then owns, so

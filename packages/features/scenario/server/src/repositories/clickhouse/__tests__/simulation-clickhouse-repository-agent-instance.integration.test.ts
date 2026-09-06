@@ -14,10 +14,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunState,
-} from "../../../projections/simulation-run-state.projection";
-import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port";
-import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository";
-import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository";
+} from "../../../projections/simulation-run-state.projection.ts";
+import { SimulationWindowedReadPort } from "../../../ports/simulation-windowed-read.port.ts";
+import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
+import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 /** The repository's own hint window, derived the way production derives it. */
 class HintWindowedRead extends SimulationWindowedReadPort {

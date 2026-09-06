@@ -24,8 +24,8 @@ import {
   type LLMSpan,
   reservedTraceMetadataSchema,
   type Span,
-} from "./trace-format.schemas";
-import { getRAGChunks, getRAGInfo } from "./trace-rag-extraction";
+} from "./trace-format.schemas.ts";
+import { getRAGChunks, getRAGInfo } from "./trace-rag-extraction.ts";
 
 /** The label a span is listed under: its own name, or an LLM span's model. */
 const getSpanNameOrModel = (span: Span) =>

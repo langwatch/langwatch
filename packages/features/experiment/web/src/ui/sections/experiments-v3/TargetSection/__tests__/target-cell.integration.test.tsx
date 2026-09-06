@@ -6,8 +6,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluatorConfig, TargetConfig } from "../../../../../model/experiments-v3/types";
-import { TargetCellContent } from "../target-cell";
+import type { EvaluatorConfig, TargetConfig } from "../../../../../model/experiments-v3/types.ts";
+import { TargetCellContent } from "../target-cell.tsx";
 
 // Drawer + flow-callback mocks must be vi.hoisted so the vi.mock factory can
 // reference them (vi.mock is hoisted above imports).
@@ -64,14 +64,14 @@ const resetStoreMock = () => {
   storeMockState.removeEvaluatorMapping = vi.fn();
 };
 
-vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () => ({
   useEvaluationsV3Store: (selector?: (state: StoreMockState) => unknown) =>
     selector ? selector(storeMockState) : storeMockState,
 }));
 
 // Mock mappingValidation so we control which evaluators flag as
 // hasMissingMappings without touching the real DSL logic.
-vi.mock("../../../../../model/experiments-v3/mapping-validation", () => ({
+vi.mock("../../../../../model/experiments-v3/mapping-validation.ts", () => ({
   evaluatorHasMissingMappings: vi.fn(() => false),
 }));
 
@@ -80,7 +80,7 @@ vi.mock("../../../../../model/experiments-v3/mapping-validation", () => ({
 // gymnastics to open — and the chip has its own test file covering that.
 // Here we only care that TargetCell wires the chip's onEdit to the correct
 // drawer + flowCallbacks payload.
-vi.mock("../evaluator-chip", () => ({
+vi.mock("../evaluator-chip.tsx", () => ({
   EvaluatorChip: ({ evaluator, onEdit }: { evaluator: { id: string }; onEdit: () => void }) => (
     <button type="button" data-testid={`evaluator-chip-stub-${evaluator.id}`} onClick={onEdit}>
       chip:{evaluator.id}
@@ -89,7 +89,7 @@ vi.mock("../evaluator-chip", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
+vi.mock("../../../../../behavior/experiments-v3/use-target-name.ts", () => {
   const useTargetName = (_target: { id: string }) => "Test Target";
   return {
     useTargetName,
@@ -98,7 +98,7 @@ vi.mock("../../../../../behavior/experiments-v3/use-target-name", () => {
       targets.map((target) => (target ? useTargetName(target) : "")),
   };
 });
-vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),

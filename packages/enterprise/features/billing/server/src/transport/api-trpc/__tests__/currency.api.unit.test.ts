@@ -14,7 +14,7 @@ import { Currency } from "@langwatch/enterprise-billing-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { CurrencyTrpcApi, type CurrencyTrpcContext } from "../currency.api";
+import { CurrencyTrpcApi, type CurrencyTrpcContext } from "../currency.api.ts";
 
 type TestContext = CurrencyTrpcContext & {
   session: { user: { id: string } } | null;

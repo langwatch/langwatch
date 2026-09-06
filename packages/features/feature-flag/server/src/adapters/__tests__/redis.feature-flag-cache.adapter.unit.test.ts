@@ -3,7 +3,7 @@ import { KILL_SWITCH_CACHE_TTL_MS } from "@langwatch/feature-flag-contract";
 import {
   RedisFeatureFlagCacheAdapter,
   type FeatureFlagRedisConnection,
-} from "../redis.feature-flag-cache.adapter";
+} from "../redis.feature-flag-cache.adapter.ts";
 
 function redisReturning(value: string | null): FeatureFlagRedisConnection {
   return {

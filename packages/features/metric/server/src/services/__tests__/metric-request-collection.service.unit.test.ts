@@ -5,8 +5,8 @@ import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contra
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
-} from "../metric-request-collection.service";
-import type { MetricRedactionPort } from "../../ports/metric-redaction.port";
+} from "../metric-request-collection.service.ts";
+import type { MetricRedactionPort } from "../../ports/metric-redaction.port.ts";
 
 /** The request context below asks for no redaction, so the port never rewrites. */
 const disabledRedaction: MetricRedactionPort = { redactMetricAttributes: async () => {} };

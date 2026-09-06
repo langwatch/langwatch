@@ -2,7 +2,7 @@ import {
   topicClusteringRunHistoryEntrySchema,
   topicClusteringStatusSchema,
   topicSchema,
-} from "../index";
+} from "../index.ts";
 import { describe, expect, it } from "vitest";
 
 describe("Topic contract", () => {

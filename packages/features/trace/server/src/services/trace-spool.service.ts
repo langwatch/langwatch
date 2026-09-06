@@ -7,14 +7,14 @@ import {
   TraceSpoolLegacyObjectPort,
   TraceSpoolStoragePort,
   type TraceSpoolObjectStore,
-} from "../ports/trace-spool-storage.port";
+} from "../ports/trace-spool-storage.port.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,
   isLegacySpoolRef,
   SPOOL_REF_V2,
-} from "../rules/trace-spool-location.rules";
-import { TraceStreamBufferService } from "./trace-stream-buffer.service";
+} from "../rules/trace-spool-location.rules.ts";
+import { TraceStreamBufferService } from "./trace-stream-buffer.service.ts";
 
 /**
  * Cap on a spool object read. The spool holds one over-threshold command, and

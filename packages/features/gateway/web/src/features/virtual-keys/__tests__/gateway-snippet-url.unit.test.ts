@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { HOSTED_GATEWAY_URL, resolveSnippetGatewayBaseUrl } from "../model/gateway-snippet-url";
+import { HOSTED_GATEWAY_URL, resolveSnippetGatewayBaseUrl } from "../model/gateway-snippet-url.ts";
 
 describe("resolveSnippetGatewayBaseUrl", () => {
   describe("when this deployment exposes its gateway URL via publicEnv", () => {

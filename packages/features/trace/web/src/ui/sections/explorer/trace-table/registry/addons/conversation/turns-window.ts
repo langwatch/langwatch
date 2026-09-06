@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { TraceListItem } from "../../../../types/trace";
+import type { TraceListItem } from "../../../../types/trace.ts";
 
 export const INITIAL_VISIBLE_TURNS = 7;
 export const SHOW_MORE_STEP = 10;

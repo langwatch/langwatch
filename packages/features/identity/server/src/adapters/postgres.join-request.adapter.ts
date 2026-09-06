@@ -1,7 +1,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
-import { newJoinRequestCommandId } from "../rules/join-request-id.rules";
+import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -10,15 +10,15 @@ import {
   TeamUserRole,
 } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
-import type { JoinRequestNotificationMailPort } from "../ports/join-request-notification-mail.port";
+import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestNotificationMailPort } from "../ports/join-request-notification-mail.port.ts";
 import type {
   JoinMembershipPort,
   JoinRequestNotifier,
   JoinSettingPort,
-} from "../services/join-requests.service";
-import { PrismaJoinCandidateRepository } from "../repositories/prisma/prisma.join-request.repository";
-import type { JoinRequestService } from "../services/join-request.service";
+} from "../services/join-requests.service.ts";
+import { PrismaJoinCandidateRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+import type { JoinRequestService } from "../services/join-request.service.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
 

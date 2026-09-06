@@ -1,4 +1,4 @@
-import type { JsonValue } from "./json";
+import type { JsonValue } from "./json.ts";
 
 /**
  * Generic process-manager domain contracts for ADR-049's Langy pilot.

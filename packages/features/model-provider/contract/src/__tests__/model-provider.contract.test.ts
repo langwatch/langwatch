@@ -7,7 +7,7 @@ import {
   modelProviderWriteInputSchema,
   modelProviderScopeSchema,
   translateInputSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("Model Provider contract", () => {
   it("requires an explicit tenant anchor", () => {

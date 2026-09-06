@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { walkFiles } from "./files";
+import { walkFiles } from "./files.ts";
 import { z } from "zod";
-import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
+import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
 const BASELINE_PATH = join(
   "packages",

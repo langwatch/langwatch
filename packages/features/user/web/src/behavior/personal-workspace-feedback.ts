@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { usePersonalWorkspaceHost } from "../model/personal-workspace-host";
+import { usePersonalWorkspaceHost } from "../model/personal-workspace-host.ts";
 
 /** The subset of the application toaster's create options these screens use. */
 export type PersonalToast = {

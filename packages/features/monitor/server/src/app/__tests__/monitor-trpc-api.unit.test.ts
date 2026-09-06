@@ -16,8 +16,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { MonitorTrpcApi } from "../../transport/api-trpc/monitor.api";
-import { MonitorApp } from "../monitor.app";
+import { MonitorTrpcApi } from "../../transport/api-trpc/monitor.api.ts";
+import { MonitorApp } from "../monitor.app.ts";
 
 type TestContext = {
   app: { monitors: MonitorApp };

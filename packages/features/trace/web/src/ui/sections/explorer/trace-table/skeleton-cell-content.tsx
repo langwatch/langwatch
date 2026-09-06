@@ -1,6 +1,6 @@
 import { Flex, Skeleton } from "@chakra-ui/react";
 import type React from "react";
-import type { ColumnMeta } from "./trace-table-shell";
+import type { ColumnMeta } from "./trace-table-shell.tsx";
 
 /**
  * Skeleton bars rendered inside the real table cells while data loads. Uses Chakra's

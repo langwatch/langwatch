@@ -6,8 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
-} from "../services/identity-secret-carry.service";
-import { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
+} from "../services/identity-secret-carry.service.ts";
+import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 
 const USER = "user_olga";
 const T0 = 1_690_000_000_000;

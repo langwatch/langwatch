@@ -16,7 +16,7 @@ import {
   resolveRunModels,
   SIMULATOR_MODEL_FEATURE_KEY,
   withResolvedModels,
-} from "../run-models";
+} from "../run-models.ts";
 
 /** Answers every feature key with a name that says which key was asked. */
 function projectDefaults() {

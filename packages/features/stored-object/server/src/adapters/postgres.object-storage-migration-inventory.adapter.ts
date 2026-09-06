@@ -6,7 +6,7 @@ import type {
   MigrationInventory,
   MigrationPageRequest,
   MigrationProject,
-} from "../services/object-storage-migration.service";
+} from "../services/object-storage-migration.service.ts";
 
 /**
  * The three pages a migration walks: the projects in scope, the live

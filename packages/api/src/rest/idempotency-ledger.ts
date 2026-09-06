@@ -9,8 +9,8 @@ import { randomUUID } from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import { fingerprintJson, sha256 } from "./idempotency-fingerprint.js";
-import type { IdempotentOutcome, IdempotentRunner } from "./idempotency.js";
+import { fingerprintJson, sha256 } from "./idempotency-fingerprint.ts";
+import type { IdempotentOutcome, IdempotentRunner } from "./idempotency.ts";
 
 const logger = createLogger("langwatch:api:idempotency");
 

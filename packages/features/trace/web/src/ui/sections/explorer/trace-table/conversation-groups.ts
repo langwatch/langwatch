@@ -1,4 +1,4 @@
-import type { TraceListItem, TraceStatus } from "../types/trace";
+import type { TraceListItem, TraceStatus } from "../types/trace.ts";
 
 export interface ConversationGroup {
   conversationId: string;

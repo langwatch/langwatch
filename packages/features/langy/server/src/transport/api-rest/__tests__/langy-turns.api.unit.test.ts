@@ -11,7 +11,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "#app/langy.app";
-import { createLangyTurnsRestApp, type LangyTurnsRestPorts } from "../langy-turns.api";
+import { createLangyTurnsRestApp, type LangyTurnsRestPorts } from "../langy-turns.api.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "org-1";

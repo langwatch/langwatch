@@ -4,7 +4,7 @@ import {
   SSO_CONNECTION_EVENT_VERSION_LATEST,
 } from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
 
 /** The one place an SSO connection fact becomes a framework event. */
 export function ssoConnectionEventsFor({

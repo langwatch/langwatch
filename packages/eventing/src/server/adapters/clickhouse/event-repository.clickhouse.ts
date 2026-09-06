@@ -1,14 +1,14 @@
-import { EventNotFoundError } from "../../../services/errorHandling";
+import { EventNotFoundError } from "../../../services/errorHandling.ts";
 import type {
   EventRecord,
   EventRepository,
-} from "../../../stores/repositories/eventRepository.types";
+} from "../../../stores/repositories/eventRepository.types.ts";
 import { createLogger } from "@langwatch/observability";
 import type {
   EventingClickHouseClient,
   EventingClickHouseClientResolver,
-} from "../../clickhouse-client-resolver";
-import type { EventingRetentionConfiguration } from "../../retention";
+} from "../../clickhouse-client-resolver.ts";
+import type { EventingRetentionConfiguration } from "../../retention.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 

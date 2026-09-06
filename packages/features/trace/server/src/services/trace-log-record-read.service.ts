@@ -2,7 +2,7 @@ import type { LogService } from "@langwatch/log-contract";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
-} from "../repositories/log-record-storage.repository";
+} from "../repositories/log-record-storage.repository.ts";
 
 /**
  * The trace-correlated log read, across the canonical cutover. Canonical `log_records` is

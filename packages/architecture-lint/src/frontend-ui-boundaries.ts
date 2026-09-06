@@ -3,8 +3,8 @@ import { builtinModules } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { browserOnlyPackage } from "./browser-packages";
-import { walkFiles } from "./files";
+import { browserOnlyPackage } from "./browser-packages.ts";
+import { walkFiles } from "./files.ts";
 import {
   createWorkspaceModuleResolver,
   moduleImports,
@@ -14,8 +14,8 @@ import {
   walkValueImportGraph,
   type ModuleImport,
   type WorkspaceModuleResolver,
-} from "./module-graph";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+} from "./module-graph.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const UI_FEATURE_CATALOGUE_PATH = join("apps", "ui", "src", "features", "catalogue.json");
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;

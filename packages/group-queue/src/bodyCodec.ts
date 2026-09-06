@@ -3,7 +3,7 @@ import { gunzip, gzip, zstdCompress, zstdDecompress } from "node:zlib";
 
 import { Packr } from "msgpackr";
 
-import { MAX_BLOB_BYTES } from "./blobConstants";
+import { MAX_BLOB_BYTES } from "./blobConstants.ts";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);

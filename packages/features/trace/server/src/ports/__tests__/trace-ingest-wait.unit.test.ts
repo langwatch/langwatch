@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TraceQueryFieldValuesPort } from "../query-field-values.port";
-import { TraceSummaryReaderPort } from "../trace-summary-reader.port";
+import { TraceQueryFieldValuesPort } from "../query-field-values.port.ts";
+import { TraceSummaryReaderPort } from "../trace-summary-reader.port.ts";
 import {
   TraceRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
-} from "../trace.port";
-import { TraceService } from "../../services/trace.service";
-import { TestModelProviderService } from "./support/model-provider.service.fake";
-import { TestTraceQueryClassification } from "./support/query-classification.fake";
-import { traceReadPorts } from "./support/trace-read-ports.fake";
+} from "../trace.port.ts";
+import { TraceService } from "../../services/trace.service.ts";
+import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
+import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
 
 class IngestLagRepository extends TraceRepository {
   readonly calls: string[] = [];

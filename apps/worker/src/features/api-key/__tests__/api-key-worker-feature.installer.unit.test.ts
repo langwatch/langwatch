@@ -15,8 +15,8 @@ import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "@langwatch/api-key-server";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime";
-import { ApiKeyWorkerFeatureInstaller } from "../api-key-worker-feature.installer";
+import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime.ts";
+import { ApiKeyWorkerFeatureInstaller } from "../api-key-worker-feature.installer.ts";
 
 type Registered = StaticPipelineDefinition<any, any, any>;
 

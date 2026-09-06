@@ -23,12 +23,12 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -45,7 +45,7 @@ const POLICIES = [
   },
 ];
 
-vi.mock("../../../behavior/gateway-api", () => {
+vi.mock("../../../behavior/gateway-api.ts", () => {
   const queryResult = (data: unknown) => ({
     data,
     isLoading: false,
@@ -82,7 +82,7 @@ vi.mock("../../../behavior/gateway-api", () => {
   return { api: node([]) };
 });
 
-import RoutingPoliciesPage from "../gateway-routing-policies.screen";
+import RoutingPoliciesPage from "../gateway-routing-policies.screen.tsx";
 
 function renderPage(permissions: readonly string[]) {
   return renderWithGatewayHost(<RoutingPoliciesPage />, {

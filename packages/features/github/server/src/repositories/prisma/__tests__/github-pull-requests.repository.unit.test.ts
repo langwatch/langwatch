@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../github-pull-requests.repository";
+} from "../github-pull-requests.repository.ts";
 
 type Call = { method: string; args: Record<string, unknown> };
 

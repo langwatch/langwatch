@@ -10,7 +10,7 @@
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { downloadCsv } from "../download-csv";
+import { downloadCsv } from "../download-csv.ts";
 
 let lastBlob: Blob | undefined;
 

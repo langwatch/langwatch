@@ -25,9 +25,9 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
-const { openProtections } = await import("./open-protections");
+const { openProtections } = await import("./open-protections.ts");
 
 const PROJECT = "project_joined_cap";
 

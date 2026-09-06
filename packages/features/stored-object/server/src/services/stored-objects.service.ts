@@ -8,11 +8,11 @@ import { createLogger } from "@langwatch/observability";
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectStoragePort } from "../ports/stored-object-storage.port";
+import type { StoredObjectStoragePort } from "../ports/stored-object-storage.port.ts";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port";
-import type { StoredObject } from "../rules/stored-object-row.rules";
-import type { StoredObjectsRepository } from "../repositories/stored-objects.repository";
+import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port.ts";
+import type { StoredObject } from "../rules/stored-object-row.rules.ts";
+import type { StoredObjectsRepository } from "../repositories/stored-objects.repository.ts";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");

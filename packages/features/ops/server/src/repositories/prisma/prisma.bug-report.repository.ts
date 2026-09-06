@@ -7,7 +7,7 @@
 import { generate } from "@langwatch/ksuid";
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { BugReportRepositoryPort } from "../../ports/bug-report.port";
+import { BugReportRepositoryPort } from "../../ports/bug-report.port.ts";
 
 /**
  * The id prefix every report carries.

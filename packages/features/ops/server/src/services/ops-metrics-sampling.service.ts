@@ -13,8 +13,8 @@ import type {
   QueueInfo,
   RedisInfo,
 } from "@langwatch/ops-contract";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
-import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service";
+import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import { JOB_NAME_COUNTER_PREFIX, OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
 const logger = createLogger("langwatch:ops:metrics-sampling");
 

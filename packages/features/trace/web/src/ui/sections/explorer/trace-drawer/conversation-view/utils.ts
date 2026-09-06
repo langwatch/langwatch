@@ -3,15 +3,15 @@ import {
   mediaRefBelongsToSide,
   mediaRoleBelongsToSide,
   type TraceMediaSide,
-} from "../../../../../behavior/shared/traces/media-refs";
+} from "../../../../../behavior/shared/traces/media-refs.ts";
 import {
   collectAnnotatedMediaParts,
   type MediaPartData,
   mediaRefToMediaData,
-} from "../../../../../behavior/shared/traces/media-parts";
-import { formatDuration, formatRelativeTime } from "../../../../../model/display-formatters";
-import { extractSystemText } from "../transcript/parsing";
-import type { ParsedTurn } from "./types";
+} from "../../../../../behavior/shared/traces/media-parts.ts";
+import { formatDuration, formatRelativeTime } from "../../../../../model/display-formatters.ts";
+import { extractSystemText } from "../transcript/parsing.ts";
+import type { ParsedTurn } from "./types.ts";
 
 /** Shared empty list so a media-free turn keeps a stable identity per parse. */
 const NO_MEDIA: MediaPartData[] = [];

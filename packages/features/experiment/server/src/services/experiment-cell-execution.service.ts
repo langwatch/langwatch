@@ -15,21 +15,21 @@ import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
-import { buildCellWorkflow } from "../processes/experiment-cell-workflow.process";
+import { buildCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
 import {
   mapNlpEvent,
   mapThrownErrorEvent,
   type ResultMapperConfig,
-} from "../processes/experiment-result-mapping.process";
+} from "../processes/experiment-result-mapping.process.ts";
 import {
   evaluatorErrorResult,
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
-} from "../processes/experiment-cell-error-events.process";
-import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
-import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
-import type { LoadedEvaluators } from "./experiment-execution-data.service";
+} from "../processes/experiment-cell-error-events.process.ts";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const sandboxKey = ExperimentRunSandboxKeyService.create();
 

@@ -19,16 +19,16 @@ import type {
   ResourceGrantUsageSeed,
   RoleHeadRow,
   ShareLinkFactRow,
-} from "../../repositories/authz-migration.repository";
-import { PRINCIPAL_TO_DB } from "../../repositories/prisma/prisma.authz-grant.mapper";
+} from "../../repositories/authz-migration.repository.ts";
+import { PRINCIPAL_TO_DB } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { describe, expect, it } from "vitest";
 import {
   AUTHZ_ENGINE_ACTOR_ID,
   AUTHZ_ENGINE_MIGRATION_NAME,
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
-} from "../legacy-import.authz-grant.migration";
-import type { AuthzMigrationRepository } from "../../repositories/authz-migration.repository";
+} from "../legacy-import.authz-grant.migration.ts";
+import type { AuthzMigrationRepository } from "../../repositories/authz-migration.repository.ts";
 
 const ORG_ID = "org_acme";
 const NOW = 1_800_000_000_000;

@@ -8,7 +8,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({}) } },
     limits: { getUsage: { useQuery: () => ({}) } },
@@ -23,11 +23,11 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state";
-import { NavigationHostProvider } from "../../../model/navigation-host";
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
-import { StubNavigationHost } from "../../../testing";
-import { MobileShell } from "../mobile-shell";
+import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state.ts";
+import { NavigationHostProvider } from "../../../model/navigation-host.ts";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { StubNavigationHost } from "../../../testing.tsx";
+import { MobileShell } from "../mobile-shell.tsx";
 
 const teamA = {
   id: "team_1",

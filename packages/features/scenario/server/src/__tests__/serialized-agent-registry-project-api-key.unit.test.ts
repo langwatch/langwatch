@@ -6,14 +6,14 @@
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { guardAgainstGlobalFetch } from "./support/global-fetch-guard";
+import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 import type {
   CodeAgentData,
   HttpAgentData,
   LiteLLMParams,
   WorkflowAgentData,
 } from "@langwatch/scenario-contract";
-import { SerializedAgentRegistryAdapter } from "../index";
+import { SerializedAgentRegistryAdapter } from "../index.ts";
 
 // The workflow and code adapters call undici's own fetch, so that export is
 // the interception point. Hoisted, because the vi.mock factory below is

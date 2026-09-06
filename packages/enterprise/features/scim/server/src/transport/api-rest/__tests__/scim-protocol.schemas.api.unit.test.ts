@@ -12,7 +12,7 @@ import { Hono } from "hono";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createScimProtocolRestApp } from "../scim-protocol.api";
+import { createScimProtocolRestApp } from "../scim-protocol.api.ts";
 
 class ScimServiceFake extends ScimService {
   readonly verifyToken = vi.fn(async () => ({ status: "invalid_token" }) as const);

@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const setNode = vi.fn();
 
-vi.mock("../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       deselectAllNodes: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-vi.mock("../../elements/studio-drawer-footer", () => ({
+vi.mock("../../elements/studio-drawer-footer.tsx", () => ({
   useInsideDrawer: () => false,
 }));
 
@@ -39,8 +39,8 @@ vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: (...args: unknown[]) => toast(...args) },
 }));
 
-import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host";
-import { BasePropertiesPanel } from "../optimization_studio/properties/base-properties-panel";
+import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
+import { BasePropertiesPanel } from "../optimization_studio/properties/base-properties-panel.tsx";
 
 /** The host the node renderers read, filled with what this panel touches. */
 const nodeHost = {

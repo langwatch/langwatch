@@ -1,4 +1,4 @@
-import { TaskInfrastructureUnavailableError } from "./task.errors";
+import { TaskInfrastructureUnavailableError } from "./task.errors.ts";
 
 /**
  * What a task may reach: infrastructure handles the composing process built

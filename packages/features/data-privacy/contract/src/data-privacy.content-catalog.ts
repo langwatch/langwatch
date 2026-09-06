@@ -1,4 +1,4 @@
-import type { ContentCategory } from "./data-privacy";
+import type { ContentCategory } from "./data-privacy.ts";
 
 /**
  * The built-in span-attribute keys that carry each content category. When a

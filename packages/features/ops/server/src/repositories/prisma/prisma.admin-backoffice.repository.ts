@@ -12,9 +12,9 @@ import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
-} from "./prisma.admin.repository";
-import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper";
-import { AdminBackofficeRepository } from "../admin-backoffice.repository";
+} from "./prisma.admin.repository.ts";
+import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
+import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
 
 /**
  * Private Prisma/React-Admin adapter for the Ops backoffice surface.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port";
+import { PulledUsageLedgerPort } from "../ports/pulled-usage-ledger.port.ts";
 
 export const writePulledUsageSchema = z.object({
   restatement_key: z.string(),

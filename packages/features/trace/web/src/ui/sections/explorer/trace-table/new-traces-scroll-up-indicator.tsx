@@ -2,8 +2,8 @@ import { Box, Flex, Icon, Text } from "@chakra-ui/react";
 import { ArrowUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useTraceNewCount } from "../hooks/use-trace-new-count";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store";
+import { useTraceNewCount } from "../hooks/use-trace-new-count.ts";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 
 const SCROLL_THRESHOLD_PX = 80;
 

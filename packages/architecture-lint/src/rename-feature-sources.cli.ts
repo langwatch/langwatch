@@ -1,5 +1,5 @@
 import { relative, resolve } from "node:path";
-import { applyFilenameMigration, planFilenameMigration } from "./filename-migration";
+import { applyFilenameMigration, planFilenameMigration } from "./filename-migration.ts";
 
 const USAGE = `Usage:
   pnpm --filter @langwatch/architecture-lint exec tsx src/rename-feature-sources.cli.ts [--root ROOT] [--write]

@@ -1,7 +1,7 @@
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceModelCostCatalogPort } from "../ports/trace-model-cost-catalog.port";
-import { TraceSpanCostEnrichmentPort } from "../ports/trace-span-preparation.port";
-import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service";
+import type { TraceModelCostCatalogPort } from "../ports/trace-model-cost-catalog.port.ts";
+import { TraceSpanCostEnrichmentPort } from "../ports/trace-span-preparation.port.ts";
+import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
 
 /**
  * Renames record-time cost enrichment onto the narrow port `RecordSpanCommand`

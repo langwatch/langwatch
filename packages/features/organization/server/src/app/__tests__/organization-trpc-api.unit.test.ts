@@ -10,8 +10,8 @@ import { z } from "zod";
 import {
   OrganizationTrpcApi,
   type OrganizationTrpcPorts,
-} from "../../transport/api-trpc/organization.api";
-import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app";
+} from "../../transport/api-trpc/organization.api.ts";
+import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app.ts";
 
 type TestContext = {
   app: { organizations: OrganizationApp };

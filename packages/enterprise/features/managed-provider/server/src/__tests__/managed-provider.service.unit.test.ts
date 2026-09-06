@@ -6,7 +6,7 @@ import {
   ManagedProviderService,
   type ManagedProviderCredentials,
   ManagedProviderConfigurationReporter,
-} from "../index";
+} from "../index.ts";
 import { ProjectService } from "@langwatch/project-contract";
 
 class SilentReporter extends ManagedProviderConfigurationReporter {

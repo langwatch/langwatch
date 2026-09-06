@@ -18,8 +18,8 @@ import { DatasetConflictError, DatasetNotFoundError } from "@langwatch/dataset-c
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { DatasetTrpcApi } from "../../transport/api-trpc/dataset.api";
-import { DatasetApp } from "../dataset.app";
+import { DatasetTrpcApi } from "../../transport/api-trpc/dataset.api.ts";
+import { DatasetApp } from "../dataset.app.ts";
 
 type TestContext = { app: { dataset: DatasetApp } };
 

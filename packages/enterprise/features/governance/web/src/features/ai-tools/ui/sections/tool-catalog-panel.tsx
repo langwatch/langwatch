@@ -1,13 +1,13 @@
 import { Tabs, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import { LoadingScreen } from "../../../../ui/elements/loading-screen";
-import type { AiToolEntry } from "../../model/ai-tool-tile";
-import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice";
-import { AiToolEntryDrawer } from "./ai-tool-entry-drawer";
-import { IngestionTemplatesEditor } from "./ingestion-templates-editor";
-import { ToolCatalogEditor } from "./tool-catalog-editor";
-import { useGovernanceScope } from "../../../../behavior/governance-session";
+import { LoadingScreen } from "../../../../ui/elements/loading-screen.tsx";
+import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
+import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice.tsx";
+import { AiToolEntryDrawer } from "./ai-tool-entry-drawer.tsx";
+import { IngestionTemplatesEditor } from "./ingestion-templates-editor.tsx";
+import { ToolCatalogEditor } from "./tool-catalog-editor.tsx";
+import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 /**
  * The two inner tabs of the Catalog pane, per the
  * `ingestion-templates-catalog.feature` @admin-readonly scenario:

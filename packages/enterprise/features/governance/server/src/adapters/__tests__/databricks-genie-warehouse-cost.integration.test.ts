@@ -20,17 +20,17 @@ import http from "http";
 import type { AddressInfo } from "net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service.ts";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../databricks-genie-puller.adapter";
+} from "../databricks-genie-puller.adapter.ts";
 import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
-} from "../../services/puller-databricks-warehouse-cost.service";
+} from "../../services/puller-databricks-warehouse-cost.service.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
-import { FetchHttpPort } from "../../__tests__/support/puller-test-ports";
+import { FetchHttpPort } from "../../__tests__/support/puller-test-ports.ts";
 
 const SPACE_ID = "space-1";
 const CONVERSATION_ID = "conv-1";

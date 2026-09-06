@@ -1,12 +1,12 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { LangyCard } from "../../../../ui/sections/langy-card";
-import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import type {
   LangyErrorPresentation,
   LangySerializedReason,
-} from "../../behavior/logic/langy-error-explainer";
+} from "../../behavior/logic/langy-error-explainer.ts";
 
 // The retry sits behind the same restrained warm hairline the accent cards use
 // (asaplangy CARD.accentBorder) — the accent is present on the action, calm

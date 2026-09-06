@@ -1,6 +1,6 @@
 import { LuCode, LuEye, LuList, LuMessageSquare } from "react-icons/lu";
-import type { ChatLayout } from "./transcript";
-import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state";
+import type { ChatLayout } from "./transcript/index.ts";
+import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 
 /**
  * The format options for a panel, with the inline submode toggles the active format

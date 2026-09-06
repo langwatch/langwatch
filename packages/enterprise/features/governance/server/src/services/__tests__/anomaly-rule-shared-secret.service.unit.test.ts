@@ -11,8 +11,8 @@
 import { SHARED_SECRET_REDACTED, type AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { AnomalyRuleRepository, type AnomalyRuleChanges } from "../../ports/anomaly-rule.port";
-import { AnomalyRuleService } from "../anomaly-rule.service";
+import { AnomalyRuleRepository, type AnomalyRuleChanges } from "../../ports/anomaly-rule.port.ts";
+import { AnomalyRuleService } from "../anomaly-rule.service.ts";
 
 const STORED_SECRET = "TheRealSigningSecret";
 

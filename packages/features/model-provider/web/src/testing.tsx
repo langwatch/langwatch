@@ -23,7 +23,7 @@ import {
   type ModelProviderPlatformDrawer,
   type ModelProviderRouteReading,
   type ModelProviderSuccessNotice,
-} from "./model/model-provider-host";
+} from "./model/model-provider-host.ts";
 
 /** One recorded `openPlatformDrawer` call. */
 export type RecordedDrawerOpen = {

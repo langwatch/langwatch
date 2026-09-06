@@ -1,6 +1,6 @@
 import type { CodingAgentSessionListRow } from "@langwatch/coding-agent-contract";
 
-import { sessionLastUpdateAtMs, sessionTotalTokens } from "./session-sort";
+import { sessionLastUpdateAtMs, sessionTotalTokens } from "./session-sort.ts";
 
 /** One session as the read hands it over. */
 export type SessionPayload = CodingAgentSessionListRow;

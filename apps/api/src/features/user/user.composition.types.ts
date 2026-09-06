@@ -1,8 +1,8 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { UserApp, IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
 /** The two namespaces this feature mounts, and the slices behind them. */
 export type ComposedUserFeature = Readonly<{

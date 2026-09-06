@@ -1,6 +1,6 @@
 import { HStack, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Checkbox, CheckboxGroup } from "./checkbox";
+import { Checkbox, CheckboxGroup } from "./checkbox.tsx";
 
 const meta = {
   title: "Primitives/Checkbox",

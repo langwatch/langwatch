@@ -11,12 +11,12 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CustomQueryMenuLink } from "../../../ui/sections/custom-query-menu-link";
-import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../../model/lwql-failure";
+import { CustomQueryMenuLink } from "../../../ui/sections/custom-query-menu-link.tsx";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../../model/lwql-failure.ts";
 
-import { SCHEMA_RESPONSE } from "../../../__tests__/lwql-fixtures";
-import { readHandledError } from "../../../model/handled-error";
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing";
+import { SCHEMA_RESPONSE } from "../../../__tests__/lwql-fixtures.ts";
+import { readHandledError } from "../../../model/handled-error.ts";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   available: true,
@@ -24,7 +24,7 @@ const harness = vi.hoisted(() => ({
   hasPermission: true,
 }));
 
-vi.mock("../../../behavior/analytics-api", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => ({ client: {} }),
     analytics: {
@@ -93,7 +93,7 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubMonacoEditor };
 });
 
-import CustomQueryPage from "../analytics-query.screen";
+import CustomQueryPage from "../analytics-query.screen.tsx";
 
 const withHost = (children: React.ReactNode) =>
   render(

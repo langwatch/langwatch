@@ -1,4 +1,4 @@
-import { api } from "../../behavior/trace-api";
+import { api } from "../../behavior/trace-api.ts";
 
 // Ops scope reflects the signed-in user's grants on this project — it
 // doesn't change mid-session. Without an explicit staleTime React Query

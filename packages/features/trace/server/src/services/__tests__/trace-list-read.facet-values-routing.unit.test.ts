@@ -5,7 +5,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceListReadPort } from "@langwatch/trace-contract";
-import { TraceListService } from "../trace-list-read.service";
+import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };
 

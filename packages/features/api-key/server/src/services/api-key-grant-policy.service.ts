@@ -1,8 +1,8 @@
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { apiKeyPermissionSchema, type ApiKeyScope } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository } from "../repositories/api-key.repository";
-import type { ApiKeyDependencies } from "./api-key.service";
+import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 type ResolvedScope =
   | { type: "organization"; id: string; organizationId: string }

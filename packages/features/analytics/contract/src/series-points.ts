@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   analyticsTimeseriesBucketSchema,
   type AnalyticsTimeseriesBucket,
-} from "./analytics.timeseries";
+} from "./analytics.timeseries.ts";
 
 const groupedMetricsSchema = z.record(z.string(), z.record(z.string(), z.number()));
 

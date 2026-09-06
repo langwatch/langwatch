@@ -3,8 +3,8 @@ import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatTokens } from "@langwatch/design-system/display-formatters";
-import type { SessionListRow } from "../session-list-row";
-import { MissingValue } from "./missing-value";
+import type { SessionListRow } from "../session-list-row.ts";
+import { MissingValue } from "./missing-value.tsx";
 
 /**
  * How often the session had to throw context away, and how often it had to

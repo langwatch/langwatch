@@ -5,8 +5,8 @@ import {
 } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GithubService } from "@langwatch/github-contract";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 
 export const PULL_REQUEST_MAPPING_BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP = 500;

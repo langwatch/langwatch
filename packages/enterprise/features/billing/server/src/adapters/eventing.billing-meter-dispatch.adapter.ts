@@ -3,8 +3,8 @@
 import type { Event, SubscriberDispatchDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
-import { BillableEventsQueryService } from "../services/billable-events-query.service";
-import type { BillingTenantOrganizationService } from "../services/tenant-organization.service";
+import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
+import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 

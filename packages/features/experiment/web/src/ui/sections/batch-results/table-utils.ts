@@ -2,7 +2,7 @@
  * Shared utilities for batch evaluation result tables
  */
 import type { SystemStyleObject } from "@chakra-ui/react";
-import { getImageUrl } from "./presentation";
+import { getImageUrl } from "./presentation.tsx";
 
 export {
   COLLAPSED_CELL_HEIGHT_PX,
@@ -10,7 +10,7 @@ export {
   ESTIMATED_ROW_HEIGHT_PX,
   type RowHeight,
   ROW_HEIGHT_OPTIONS,
-} from "../../../model/batch-evaluation-results.row-height";
+} from "../../../model/batch-evaluation-results.row-height.ts";
 
 /**
  * Calculate minimum table width based on column counts

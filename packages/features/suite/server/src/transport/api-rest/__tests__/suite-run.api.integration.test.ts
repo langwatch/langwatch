@@ -12,7 +12,7 @@ import type { SuiteRunResult } from "@langwatch/suite-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { SuiteApp } from "#app/suite.app";
-import { createSuiteRestApp } from "../suite.api";
+import { createSuiteRestApp } from "../suite.api.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
   constructor() {

@@ -26,7 +26,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { GatewayProviderLabelAdapter } from "../../adapters/gateway-provider-label.adapter";
+import { GatewayProviderLabelAdapter } from "../../adapters/gateway-provider-label.adapter.ts";
 import type { GatewayApp } from "#app/gateway.app";
 
 /** One stateless label resolver for every budget row this door renders. */

@@ -4,27 +4,27 @@ export type {
   FeatureFlagKey,
   FeatureFlagScope,
   RegisteredFeatureFlagKey,
-} from "./feature-flag";
+} from "./feature-flag.ts";
 export {
   FEATURE_FLAG_FAMILIES,
   FEATURE_FLAGS,
   listFeatureFlagFamilies,
   listFeatureFlags,
   resolveFlagDefinition,
-} from "./feature-flag";
+} from "./feature-flag.ts";
 export {
   deriveFeatureFlagEnvVarName,
   resolveFeatureFlagEnvOverride,
-} from "./feature-flag-environment";
-export type { FeatureFlagConfig } from "./feature-flag.config";
-export { resolveFeatureFlagConfig } from "./feature-flag.config";
-export { FEATURE_FLAG_CACHE_TTL_MS, KILL_SWITCH_CACHE_TTL_MS } from "./feature-flag-constants";
+} from "./feature-flag-environment.ts";
+export type { FeatureFlagConfig } from "./feature-flag.config.ts";
+export { resolveFeatureFlagConfig } from "./feature-flag.config.ts";
+export { FEATURE_FLAG_CACHE_TTL_MS, KILL_SWITCH_CACHE_TTL_MS } from "./feature-flag-constants.ts";
 export type {
   FeatureFlagRule,
   FeatureFlagRuleMatch,
   FeatureFlagRules,
   RuleEvaluationContext,
-} from "./feature-flag-rules";
+} from "./feature-flag-rules.ts";
 export {
   evaluateRules,
   featureFlagRuleSchema,
@@ -33,19 +33,19 @@ export {
   parseRules,
   readNeedsOrganizationAge,
   resolveEffectiveForListing,
-} from "./feature-flag-rules";
+} from "./feature-flag-rules.ts";
 export type {
   AuthenticatedFeatureFlagTargetInput,
   FeatureFlagTarget,
   FeatureFlagTargetInput,
-} from "./feature-flag-target";
-export type { FeatureFlagTargetId, NotTargeted } from "./feature-flag-targeting";
-export { NOT_TARGETED, toRuleContextId } from "./feature-flag-targeting";
+} from "./feature-flag-target.ts";
+export type { FeatureFlagTargetId, NotTargeted } from "./feature-flag-targeting.ts";
+export { NOT_TARGETED, toRuleContextId } from "./feature-flag-targeting.ts";
 export {
   FeatureFlagExperimentUnavailableError,
   UnknownFeatureFlagError,
   UnknownFeatureFlagExperimentError,
-} from "./feature-flag.errors";
+} from "./feature-flag.errors.ts";
 export type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
@@ -54,7 +54,7 @@ export type {
   ExperimentTenantPolicy,
   ExperimentTenantScope,
   FeatureFlagExperiment,
-} from "./feature-flag-experiment";
+} from "./feature-flag-experiment.ts";
 export {
   experimentCatalogueEntrySchema,
   experimentDecisionSchema,
@@ -63,15 +63,15 @@ export {
   isExperimentVisibleToTarget,
   experimentTenantScopeSchema,
   resolveExperimentDecision,
-} from "./feature-flag-experiment";
-export type { FeatureFlagRegistry, RegisteredExperiment } from "./feature-flag-registry";
-export { createFeatureFlagRegistry, FEATURE_FLAG_REGISTRY } from "./feature-flag-registry";
+} from "./feature-flag-experiment.ts";
+export type { FeatureFlagRegistry, RegisteredExperiment } from "./feature-flag-registry.ts";
+export { createFeatureFlagRegistry, FEATURE_FLAG_REGISTRY } from "./feature-flag-registry.ts";
 export {
   BUCKET_COUNT,
   bucketForSubject,
   hashFeatureFlagSubject,
   isWithinRolloutPercentage,
-} from "./feature-flag-bucketing";
+} from "./feature-flag-bucketing.ts";
 export {
   bucketingIdForTarget,
   distinctIdForTarget,
@@ -82,7 +82,7 @@ export {
   projectIdForTarget,
   ruleContextForTarget,
   SYSTEM_DISTINCT_ID,
-} from "./feature-flag-target";
+} from "./feature-flag-target.ts";
 export type {
   FrontendFeatureFlagMap,
   FeatureFlagWrite,
@@ -90,21 +90,21 @@ export type {
   OperatorFeatureFlagCatalogue,
   OperatorFeatureFlagFamily,
   StoredFeatureFlag,
-} from "./feature-flag.service";
+} from "./feature-flag.service.ts";
 export {
   FeatureFlagService,
   operatorFeatureFlagCatalogueSchema,
   operatorFeatureFlagFamilySchema,
   operatorFeatureFlagSchema,
-} from "./feature-flag.service";
-export type { FrontendFeatureFlag } from "./frontend-feature-flags";
-export { frontendFeatureFlagMapSchema, frontendFeatureFlagSchema } from "./frontend-feature-flags";
+} from "./feature-flag.service.ts";
+export type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
+export { frontendFeatureFlagMapSchema, frontendFeatureFlagSchema } from "./frontend-feature-flags.ts";
 export type {
   PublicAnonymousFeatureFlag,
   PublicAnonymousFlagMap,
-} from "./public-anonymous-feature-flags";
+} from "./public-anonymous-feature-flags.ts";
 export {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,
   publicAnonymousFlagMapSchema,
-} from "./public-anonymous-feature-flags";
-export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags";
+} from "./public-anonymous-feature-flags.ts";
+export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";

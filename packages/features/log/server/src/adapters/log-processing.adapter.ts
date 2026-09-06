@@ -25,10 +25,10 @@ import {
   type RecordCanonicalLogCommandData,
   recordCanonicalLogCommandDataSchema,
 } from "@langwatch/log-contract";
-import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection";
-import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository";
-import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store";
-import { CanonicalLogAdapter } from "./canonical-log.adapter";
+import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection.ts";
+import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
+import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store.ts";
+import { CanonicalLogAdapter } from "./canonical-log.adapter.ts";
 
 export interface LogProcessingPipelineDeps {
   canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;

@@ -12,7 +12,7 @@ import {
 import {
   WorkerTraceSpoolLegacyObjectAdapter,
   WorkerTraceSpoolStorageAdapter,
-} from "../platform/infrastructure/worker-trace-spool.adapter";
+} from "../platform/infrastructure/worker-trace-spool.adapter.ts";
 
 /**
  * The ADR-022 claim check this process would resolve an oversized span through.

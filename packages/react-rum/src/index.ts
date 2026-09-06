@@ -12,7 +12,7 @@
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
-export { startBrowserTracing } from "./browserTracing";
+export { startBrowserTracing } from "./browserTracing.ts";
 export {
   ATTR_NAVIGATION_FROM_PATH,
   ATTR_NAVIGATION_SUPERSEDED,
@@ -23,12 +23,12 @@ export {
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
-} from "./constants";
-export type { NavigationSpanHandle, NavigationType } from "./navigation";
-export { startNavigationSpan } from "./navigation";
+} from "./constants.ts";
+export type { NavigationSpanHandle, NavigationType } from "./navigation.ts";
+export { startNavigationSpan } from "./navigation.ts";
 // Exported because the ambient-navigation behaviour is only in effect when
 // this manager is the registered one — an application assembling its own
 // provider, or a test asserting navigation parentage, needs it by name.
-export { NavigationContextManager } from "./navigationContextManager";
-export { currentSessionId, SESSION_INACTIVITY_MS } from "./session";
-export { SessionSpanProcessor } from "./sessionSpanProcessor";
+export { NavigationContextManager } from "./navigationContextManager.ts";
+export { currentSessionId, SESSION_INACTIVITY_MS } from "./session.ts";
+export { SessionSpanProcessor } from "./sessionSpanProcessor.ts";

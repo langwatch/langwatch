@@ -55,9 +55,9 @@ import {
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
-import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port";
-import type { GovernanceIngestKeyProvenancePort } from "../../ports/governance-ingest-key-provenance.port";
-import type { GovernanceProjectPort } from "../../ports/governance-project.port";
+import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
+import type { GovernanceIngestKeyProvenancePort } from "../../ports/governance-ingest-key-provenance.port.ts";
+import type { GovernanceProjectPort } from "../../ports/governance-project.port.ts";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -66,7 +66,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
 
-import { GovernanceIngestRateLimitPort } from "../../ports/governance-ingest-rate-limit.port";
+import { GovernanceIngestRateLimitPort } from "../../ports/governance-ingest-rate-limit.port.ts";
 
 const logger = createLogger("langwatch:ingest");
 

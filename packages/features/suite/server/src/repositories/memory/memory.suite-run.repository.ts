@@ -5,7 +5,7 @@ import type {
   SuiteRunStateData,
   SuiteRunStateInput,
 } from "@langwatch/suite-contract";
-import { SuiteRunReadRepository } from "../suite-run.repository";
+import { SuiteRunReadRepository } from "../suite-run.repository.ts";
 
 /** Eventing's no-ClickHouse store; service reads intentionally remain empty. */
 export class MemorySuiteRunRepository

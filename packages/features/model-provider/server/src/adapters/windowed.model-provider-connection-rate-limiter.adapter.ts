@@ -2,7 +2,7 @@ import { ModelProviderTestRateLimitedError } from "@langwatch/model-provider-con
 import {
   ModelProviderConnectionRateLimiter,
   type ModelProviderRateLimitPort,
-} from "../ports/model-provider.port";
+} from "../ports/model-provider.port.ts";
 
 /**
  * How often one organization may ask a provider whether its key still works.

@@ -8,8 +8,8 @@ import type {
   LogRecordReceivedEventData,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-import { CLAUDE_CODE_SCOPE_NAMES } from "./claude-code-canonicaliser.service";
-import { SPRING_AI_SCOPE_NAMES } from "./spring-ai-canonicaliser.service";
+import { CLAUDE_CODE_SCOPE_NAMES } from "./claude-code-canonicaliser.service.ts";
+import { SPRING_AI_SCOPE_NAMES } from "./spring-ai-canonicaliser.service.ts";
 
 /**
  * Reads a trace's headline input and output out of one log record. The canonicalisation service is

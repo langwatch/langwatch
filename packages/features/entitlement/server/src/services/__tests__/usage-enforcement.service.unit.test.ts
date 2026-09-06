@@ -4,13 +4,13 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import { USAGE_UNKNOWN } from "../../ports/usage-counter.port";
-import { UsageOrganizationPort } from "../../ports/usage-organization.port";
+import { USAGE_UNKNOWN } from "../../ports/usage-counter.port.ts";
+import { UsageOrganizationPort } from "../../ports/usage-organization.port.ts";
 import {
   UsageVolumeCounterPort,
   type ProjectUsageCounts,
-} from "../../ports/usage-volume-counter.port";
-import { UsageService } from "../usage-enforcement.service";
+} from "../../ports/usage-volume-counter.port.ts";
+import { UsageService } from "../usage-enforcement.service.ts";
 
 function plan(maxMessagesPerMonth: number): PlanInfo {
   return {

@@ -6,7 +6,7 @@ import {
   OutboundProxyResolverPort,
   staticCredentialsOrUndefined,
   type AwsClientConfigInput,
-} from "../aws-client";
+} from "../aws-client.ts";
 
 type HandlerOptions = {
   connectionTimeout?: number;

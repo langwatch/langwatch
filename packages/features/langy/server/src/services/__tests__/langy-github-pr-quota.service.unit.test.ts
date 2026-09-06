@@ -9,7 +9,7 @@ import {
   LANGY_GITHUB_PRS_PER_DAY,
   LangyGithubPrCounterPort,
   LangyGithubPrQuotaService,
-} from "../langy-github-pr-quota.service";
+} from "../langy-github-pr-quota.service.ts";
 
 const get = vi.fn();
 const incr = vi.fn();

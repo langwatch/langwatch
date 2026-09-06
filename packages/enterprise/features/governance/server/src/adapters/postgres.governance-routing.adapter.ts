@@ -1,5 +1,5 @@
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository";
-import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service";
+import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
+import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 
 export class PostgresRoutingPolicyAdapter {
   private constructor(private readonly database: object) {}

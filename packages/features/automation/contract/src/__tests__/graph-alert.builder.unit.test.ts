@@ -7,7 +7,7 @@ import {
   GRAPH_ALERT_TIME_PERIODS,
   graphAlertActionParamsSchema,
   TriggerAction,
-} from "../index";
+} from "../index.ts";
 
 describe("buildGraphAlertTriggerData", () => {
   describe("given a Slack-channel graph alert input", () => {

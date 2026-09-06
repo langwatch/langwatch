@@ -16,7 +16,7 @@ import {
   type AppGovernanceOcsfEventsAdapter,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
-} from "./governance-ocsf-events.clickhouse.repository";
+} from "./governance-ocsf-events.clickhouse.repository.ts";
 
 const logger = createLogger("langwatch:governance:admin-workspace-view-audit");
 

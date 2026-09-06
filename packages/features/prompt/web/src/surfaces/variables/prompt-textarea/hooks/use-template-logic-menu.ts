@@ -3,8 +3,8 @@ import type { CaretPosition } from "rich-textarea";
 import {
   TEMPLATE_LOGIC_CONSTRUCTS,
   type TemplateLogicConstruct,
-} from "../template-logic-constructs";
-import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils";
+} from "../template-logic-constructs.ts";
+import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils.ts";
 
 type UseTemplateLogicMenuProps = {
   localValue: string;

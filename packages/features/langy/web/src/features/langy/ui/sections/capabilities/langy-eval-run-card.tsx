@@ -4,14 +4,14 @@
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
-import { useCapabilityData } from "../../../behavior/use-capability-data";
+import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
   summaryLines,
-} from "../../../model/capabilities/capability-registry";
-import { LangyCapabilityCard } from "./langy-capability-card";
+} from "../../../model/capabilities/capability-registry.ts";
+import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 /**
  * A run reports its own state in fields; the rest of the payload is DATA.

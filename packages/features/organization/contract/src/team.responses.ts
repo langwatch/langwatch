@@ -8,7 +8,7 @@
  * own value.
  */
 import { z } from "zod";
-import { organizationTeamWithMembersSchema } from "./team";
+import { organizationTeamWithMembersSchema } from "./team.ts";
 
 /**
  * The project feature's own scalar value, mirrored rather than imported: this

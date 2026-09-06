@@ -7,7 +7,7 @@ import { ConnectCredentialPort, type ResolvedConnectCredential } from "@langwatc
 import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
+import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
 
 export class ApiConnectCredentialAdapter extends ConnectCredentialPort {
   static create(options: {

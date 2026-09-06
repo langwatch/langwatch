@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "../../../types/trace";
-import { NO_TRACE_EVENTS } from "../../../types/trace";
-import type { ParsedTurn } from "../types";
-import { buildConversationMarkdownChunks } from "../utils";
+import type { TraceListItem } from "../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import type { ParsedTurn } from "../types.ts";
+import { buildConversationMarkdownChunks } from "../utils.ts";
 
 /**
  * The conversation Markdown export must emit a `[Redacted]` sentinel for turns the server has nulled — otherwise

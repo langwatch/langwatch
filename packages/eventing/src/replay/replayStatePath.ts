@@ -1,21 +1,21 @@
-import { isAtOrBeforeCutoff } from "./replayConstants";
-import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery";
-import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain";
+import { isAtOrBeforeCutoff } from "./replayConstants.ts";
+import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery.ts";
+import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain.ts";
 import {
   type DiscoveredAggregate,
   type ReplayEventSource,
   maxEventPosition,
-} from "./replayEventSource";
-import { StateAccumulator } from "./replayExecutor";
-import type { ReplayLogWriter } from "./replayLog";
-import { aggregateKey } from "./replayMarkers";
+} from "./replayEventSource.ts";
+import { StateAccumulator } from "./replayExecutor.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
+import { aggregateKey } from "./replayMarkers.ts";
 import type {
   BatchCompleteInfo,
   RegisteredStateProjection,
   ReplayContext,
   ReplayProgress,
   ReplayResult,
-} from "./types";
+} from "./types.ts";
 
 /**
  * Replays a single Postgres operational state projection into its

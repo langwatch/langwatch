@@ -5,8 +5,8 @@ import type { Ref } from "react";
 import { useState } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import "./auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme";
-import { FIELD_FOCUS, FIELD_SURFACE } from "./front-door-field";
+import { SHAPE } from "../../model/front-door-theme.ts";
+import { FIELD_FOCUS, FIELD_SURFACE } from "./front-door-field.tsx";
 
 /**
  * A password box with its own reveal toggle, sitting INSIDE the box.

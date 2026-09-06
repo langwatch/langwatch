@@ -26,13 +26,13 @@ import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "@langwatch/model-provider-web/surfaces/provider-icons";
-import { Link } from "../../../../ui/elements/link";
+import { Link } from "../../../../ui/elements/link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { getModelById } from "@langwatch/model-provider-contract";
-import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy-model-profile";
-import { splitLangyModels } from "../../../../model/langy-model-suggestions";
-import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search";
+import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy-model-profile.ts";
+import { splitLangyModels } from "../../../../model/langy-model-suggestions.ts";
+import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search.tsx";
 
 type ProviderKey = keyof typeof modelProviderIcons;
 

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   SCIM_APPLY_MAX_ATTEMPTS,
   ScimSyncGuardsService,
-} from "../services/scim-sync-guards.service";
+} from "../services/scim-sync-guards.service.ts";
 
 const CONNECTION = "conn_okta_primary";
 const ORGANIZATION = "org_acme";

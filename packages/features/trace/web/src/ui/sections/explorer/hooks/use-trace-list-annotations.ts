@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
-} from "../../use-annotations-by-trace-ids";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useViewStore } from "../../../../behavior/view.store";
-import type { TraceListItem } from "../types/trace";
+} from "../../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
 
 /** A row with nothing said about it, and the shape one carries before its
  *  reviews arrive. */

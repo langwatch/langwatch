@@ -5,8 +5,8 @@
 
 import { ChildProcess } from "child_process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionJobData } from "../index";
-import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index";
+import type { ExecutionJobData } from "../index.ts";
+import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index.ts";
 
 function makeJob(id: string): ExecutionJobData {
   return {

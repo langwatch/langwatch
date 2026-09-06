@@ -1,1 +1,1 @@
-export { BatchEvaluationResults } from "./batch-evaluation-results";
+export { BatchEvaluationResults } from "./batch-evaluation-results.tsx";

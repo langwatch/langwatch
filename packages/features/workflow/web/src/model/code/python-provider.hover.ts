@@ -1,7 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, Position } from "monaco-editor";
-import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib";
-import { ATTR_ACCESS, type ContractRef, scanImports } from "./python-provider.shared";
+import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib.ts";
+import { ATTR_ACCESS, type ContractRef, scanImports } from "./python-provider.shared.ts";
 
 export function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerHoverProvider("python", {

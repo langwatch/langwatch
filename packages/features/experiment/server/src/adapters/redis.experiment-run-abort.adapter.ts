@@ -12,7 +12,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";
-import { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port";
+import { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.ts";
 
 const logger = createLogger("langwatch:experiment:run-abort");
 

@@ -20,8 +20,8 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
-import { createTeamsRestApp } from "../team.api";
-import { TestOrganizationService } from "./support/test-organization-service";
+import { createTeamsRestApp } from "../team.api.ts";
+import { TestOrganizationService } from "./support/test-organization-service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const USER_ID = "user-1";

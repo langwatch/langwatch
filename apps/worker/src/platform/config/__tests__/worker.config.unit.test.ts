@@ -1,6 +1,6 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { resolveWorkerConfig, resolveWorkerTracePrivacyConfig } from "../worker.config";
+import { resolveWorkerConfig, resolveWorkerTracePrivacyConfig } from "../worker.config.ts";
 
 describe("resolveWorkerConfig", () => {
   it("uses the worker-local environment default", () => {

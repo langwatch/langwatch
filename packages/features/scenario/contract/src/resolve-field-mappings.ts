@@ -1,6 +1,6 @@
 /** Portable field mapping shared by scenario authoring and execution. */
 
-import type { FieldMapping } from "./field-mapping";
+import type { FieldMapping } from "./field-mapping.ts";
 
 /** The portable part of a scenario runner turn used by input mapping. */
 export type ScenarioInput = {

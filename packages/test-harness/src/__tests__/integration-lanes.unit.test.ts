@@ -9,7 +9,7 @@ import {
   laneForSource,
   partitionIntegrationFiles,
   toIncludePatterns,
-} from "../integration-lanes";
+} from "../integration-lanes.ts";
 
 /** Binds specs/ci/integration-test-lanes.feature. */
 describe("integration test lanes", () => {

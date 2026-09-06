@@ -23,10 +23,10 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { SuiteExecutionPort } from "../../ports/suite-execution.port";
-import { SuiteRepository } from "../suite.repository";
-import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository";
-import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service";
+import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
+import { SuiteRepository } from "../suite.repository.ts";
+import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
+import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service.ts";
 
 const suite = (overrides: Partial<Suite> = {}): Suite =>
   suiteSchema.parse({

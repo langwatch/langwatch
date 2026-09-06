@@ -9,7 +9,7 @@ import {
   defaultCliKeyPermissions,
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
-} from "../api-key.permissions";
+} from "../api-key.permissions.ts";
 
 /** The registry's manage-implication rule, in the shape the assertions read. */
 const hasPermissionWithHierarchy = (granted: readonly string[], requested: string): boolean =>

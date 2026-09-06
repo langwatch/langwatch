@@ -7,19 +7,19 @@ import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { EnterpriseWorkerCompositionOptions } from "@langwatch/enterprise-worker";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import {
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../platform/lifecycle/worker-runtime.port";
+} from "../platform/lifecycle/worker-runtime.port.ts";
 import {
   createWorkerPrivateInfrastructureComposition,
   type WorkerPrivateInfrastructurePorts,
-} from "./worker-private-infrastructure.composition";
+} from "./worker-private-infrastructure.composition.ts";
 import {
   WorkerProductionComposition,
   type WorkerDatabaseCompositionOptions,
-} from "./worker-production.composition";
+} from "./worker-production.composition.ts";
 
 /**
  * The two persistence engines the durable Eventing graph is built on.

@@ -13,12 +13,12 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ScoreFields } from "../annotation-score-fields";
+import { ScoreFields } from "../annotation-score-fields.tsx";
 import type { ScoreOptions } from "@langwatch/annotation-contract";
 import type {
   AnnotationFormState,
   AnnotationScoreList,
-} from "../../../model/annotation-form-types";
+} from "../../../model/annotation-form-types.ts";
 
 function score(over: Partial<AnnotationScoreList[number]>): AnnotationScoreList[number] {
   return {

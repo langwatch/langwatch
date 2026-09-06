@@ -9,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import { type MappablePrompt, PromptTargetMappingSection } from "../prompt-target-mapping-section";
+import { type MappablePrompt, PromptTargetMappingSection } from "../prompt-target-mapping-section.tsx";
 
 vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
   CodeEditor: () => null,

@@ -12,7 +12,7 @@
 
 import type { Context } from "hono";
 
-import { apiDocumentBytes, apiDocumentETag } from "./openapi-document";
+import { apiDocumentBytes, apiDocumentETag } from "./openapi-document.ts";
 
 /**
  * Public and immutable for the life of a deploy, but not immutable across

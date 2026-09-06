@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { sendEmail } from "../email-sender";
-import type { EmailDeliveryPort } from "../providers/types";
-import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout";
-import { defineTemplate, renderMailTemplate } from "./registry";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDeliveryPort } from "../providers/types.ts";
+import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const resetPasswordEmailProps = z.object({
   email: z.email().describe("The account the reset was requested for"),

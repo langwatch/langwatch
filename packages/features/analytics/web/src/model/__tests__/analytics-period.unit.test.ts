@@ -15,7 +15,7 @@ import {
   computeRelativeWindow,
   presetForRange,
   readAnalyticsPeriod,
-} from "../analytics-period";
+} from "../analytics-period.ts";
 
 const NOW = new Date("2026-06-15T12:00:00.000Z");
 

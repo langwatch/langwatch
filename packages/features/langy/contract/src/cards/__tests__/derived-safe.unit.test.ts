@@ -8,8 +8,8 @@ import {
   langyModelEmittedCardSchema,
   RENDERED_CARD_KINDS,
   type RenderedCardKind,
-} from "../derived-safe.js";
-import { CARD_KINDS, CARD_SHAPE } from "../schemas.js";
+} from "../derived-safe.ts";
+import { CARD_KINDS, CARD_SHAPE } from "../schemas.ts";
 
 const timeseries = {
   kind: "timeseries",

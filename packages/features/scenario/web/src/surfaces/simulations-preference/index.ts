@@ -7,4 +7,4 @@ export {
   isLegacySimulationsPreferred,
   preferLegacySimulations,
   useLegacySimulationsPreference,
-} from "../../behavior/suites/use-legacy-simulations-preference";
+} from "../../behavior/suites/use-legacy-simulations-preference.ts";

@@ -9,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/facet-lens.store", () => ({
+vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
       lens: { sectionOpen: { "trace.cost": true } },
@@ -17,7 +17,7 @@ vi.mock("../../../../../behavior/facet-lens.store", () => ({
     }),
 }));
 
-import { RangeSection } from "../range-section";
+import { RangeSection } from "../range-section.tsx";
 
 const renderRange = ({ min, max }: { min: number; max: number }) =>
   render(

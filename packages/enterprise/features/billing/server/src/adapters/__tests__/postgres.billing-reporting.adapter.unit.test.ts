@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type BillingReportingDatabase,
   PostgresBillingReportingAdapter,
-} from "../postgres.billing-reporting.adapter";
+} from "../postgres.billing-reporting.adapter.ts";
 
 const ORGANIZATION = "organization_acme";
 

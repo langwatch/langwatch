@@ -14,10 +14,10 @@ import {
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
-import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
-import type { AgentRepository } from "../repositories/agent.repository";
-import { AgentCopyService } from "./agent-copy.service";
-import { agentWithResolvedFields, isUniqueConstraintViolation } from "../rules/agent-view.rules";
+import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port.ts";
+import type { AgentRepository } from "../repositories/agent.repository.ts";
+import { AgentCopyService } from "./agent-copy.service.ts";
+import { agentWithResolvedFields, isUniqueConstraintViolation } from "../rules/agent-view.rules.ts";
 
 type AgentServiceOptions = {
   repository: AgentRepository;

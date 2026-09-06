@@ -13,7 +13,7 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 
 const entriesFixture = [
   {
@@ -43,7 +43,7 @@ const starterTilesFixture = [
   { slug: "openai", type: "model_provider", displayName: "OpenAI" },
 ];
 
-vi.mock("../../../behavior/governance-api", () => {
+vi.mock("../../../behavior/governance-api.ts", () => {
   const api = {
     useUtils: () => ({
       aiTools: { adminList: { invalidate: vi.fn(), setData: vi.fn() } },
@@ -72,7 +72,7 @@ vi.mock("../../../behavior/governance-api", () => {
   return { api, governanceApi: api };
 });
 
-import { ToolCatalogEditor } from "../ui/sections/tool-catalog-editor";
+import { ToolCatalogEditor } from "../ui/sections/tool-catalog-editor.tsx";
 
 describe("<ToolCatalogEditor /> starter pack import", () => {
   afterEach(() => {

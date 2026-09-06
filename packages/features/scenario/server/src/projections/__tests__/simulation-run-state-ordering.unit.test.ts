@@ -22,7 +22,7 @@ import type {
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../simulation-run-state.projection";
+} from "../simulation-run-state.projection.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

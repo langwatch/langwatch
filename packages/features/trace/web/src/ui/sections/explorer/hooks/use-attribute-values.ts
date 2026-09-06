@@ -1,4 +1,4 @@
-import { useFacetSearch } from "./use-facet-search";
+import { useFacetSearch } from "./use-facet-search.ts";
 
 /**
  * Lazy-loads top distinct values for a single attribute key (e.g. "langwatch.user_id").

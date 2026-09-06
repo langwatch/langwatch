@@ -15,34 +15,34 @@ import {
   type ApiTrpcFeatureMount,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiRestSecurity } from "../../../api-rest.security";
-import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
-import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import { composeTraceFeature, LoggedApiTraceAbsence } from "../trace.composition";
-import type { ApiTraceReadStackPort } from "../trace-read-stack.port";
-import type { ApiTracePorts } from "../trace.composition.types";
+} from "../../../api.application.ts";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
+import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
+import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import { composeTraceFeature, LoggedApiTraceAbsence } from "../trace.composition.ts";
+import type { ApiTraceReadStackPort } from "../trace-read-stack.port.ts";
+import type { ApiTracePorts } from "../trace.composition.types.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
-import { ApiRateLimitInfrastructure } from "../../../platform/infrastructure/api-rate-limit.infrastructure";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
+import { ApiRateLimitInfrastructure } from "../../../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
-import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition";
-import { composeApiPlanProvider, composeApiUsageStats } from "../../../app/api-usage.composition";
-import { composeSavedViewFeature } from "../../dashboard/saved-view.composition";
+import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition.ts";
+import { composeApiPlanProvider, composeApiUsageStats } from "../../../app/api-usage.composition.ts";
+import { composeSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
 import {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
-} from "../trace-trpc.mount";
-import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount";
-import { ApiUsageStatsPort, composeSpendFeature } from "../../entitlement/spend.composition";
+} from "../trace-trpc.mount.ts";
+import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount.ts";
+import { ApiUsageStatsPort, composeSpendFeature } from "../../entitlement/spend.composition.ts";
 import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
-import type { ComposedTraceFeature } from "../trace.composition.types";
+import type { ComposedTraceFeature } from "../trace.composition.types.ts";
 
 /**
  * The sixteen namespaces this half owns, as the wire names them.

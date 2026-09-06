@@ -1,7 +1,7 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { LangyResourceContext, LangySkillContext } from "@langwatch/langy-contract";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import { trpcClient } from "../../../../behavior/langy-api";
+import { trpcClient } from "../../../../behavior/langy-api.ts";
 
 /**
  * What a tRPC subscription hands back.

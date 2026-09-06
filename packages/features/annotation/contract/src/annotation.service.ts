@@ -18,7 +18,7 @@ import type {
   ToggleAnnotationScoreInput,
   UpdateAnnotationInput,
   UpsertAnnotationScoreInput,
-} from "./annotation";
+} from "./annotation.ts";
 
 export abstract class AnnotationService {
   abstract create(input: CreateAnnotationInput): Promise<Annotation>;

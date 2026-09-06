@@ -7,8 +7,8 @@
  * and the two must stay in sync.
  */
 
-import type { ExecutionScope } from "./execution/types";
-import { isRowEmpty } from "./empty-row-detection";
+import type { ExecutionScope } from "./execution/types.ts";
+import { isRowEmpty } from "./empty-row-detection.ts";
 
 /**
  * A cell identifier - uniquely identifies a cell in the workbench.

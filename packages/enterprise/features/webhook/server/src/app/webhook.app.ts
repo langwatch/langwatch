@@ -3,11 +3,11 @@
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
  * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
-import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter";
-import type { WebhookDispatchResult } from "../services/webhook-delivery.service";
-import type { WebhookDestinationConfig } from "../services/webhook-destination.service";
-import type { WebhookEventsService } from "../services/webhook-events.service";
-import type { WebhookHealthService } from "../services/webhook-health.service";
+import type { WebhookEndpointRuntime } from "../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import type { WebhookDispatchResult } from "../services/webhook-delivery.service.ts";
+import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
+import type { WebhookEventsService } from "../services/webhook-events.service.ts";
+import type { WebhookHealthService } from "../services/webhook-health.service.ts";
 
 /** One endpoint's last hop, as the delivery worker performs it. */
 export type WebhookTestDispatch = (input: {

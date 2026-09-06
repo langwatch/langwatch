@@ -9,7 +9,7 @@ import {
   codeAccessCallId,
   LANGY_CODE_ACCESS_CARD_ANSWER,
   latestCodeAccessCallId,
-} from "../langy-code-access-tool";
+} from "../langy-code-access-tool.ts";
 
 function call(id: string, state = "input-available") {
   return { type: "tool-code_access", state, toolCallId: id, input: {} };

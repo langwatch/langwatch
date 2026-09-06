@@ -6,12 +6,12 @@
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port";
-import { ScenarioChildBootstrapPort } from "../../ports/scenario-child-bootstrap.port";
-import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port";
-import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service";
-import type { ExecutionJobData } from "../scenario-execution-pool.service";
-import { ScenarioProcessorService } from "../scenario-processor.service";
+import { CancellationSubscriberPort } from "../../ports/cancellation-channel.port.ts";
+import { ScenarioChildBootstrapPort } from "../../ports/scenario-child-bootstrap.port.ts";
+import { ScenarioProcessorServiceMetricsPort } from "../../ports/scenario-processor-metrics.port.ts";
+import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
+import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
+import { ScenarioProcessorService } from "../scenario-processor.service.ts";
 
 const JOB: ExecutionJobData = {
   projectId: "proj_123",

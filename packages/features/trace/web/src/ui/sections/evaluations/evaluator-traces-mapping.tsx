@@ -1,6 +1,6 @@
-import { useFilterParams } from "../../../behavior/use-filter-params";
-import { api } from "../../../behavior/trace-api";
-import { TracesMapping } from "../traces/traces-mapping";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { api } from "../../../behavior/trace-api.ts";
+import { TracesMapping } from "../traces/traces-mapping.tsx";
 
 /**
  * The mapping an evaluator is set up with. Evaluations run against the trace as

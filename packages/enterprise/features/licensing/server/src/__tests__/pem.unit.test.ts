@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
-import { NodeLicenseCryptographyAdapter } from "../index";
-import { canonicalPemKey, mangledPemPastes } from "../testing";
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing";
+import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { canonicalPemKey, mangledPemPastes } from "../testing.ts";
+import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
 
 const { isEncryptedPemKey, looksLikePemKey, normalizePemKey } = NodeLicenseCryptographyAdapter;
 

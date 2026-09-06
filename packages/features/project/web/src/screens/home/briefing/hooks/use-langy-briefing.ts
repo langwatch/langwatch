@@ -7,14 +7,14 @@ import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 // app-layer module). Reused — not re-implemented — so this reader can never
 // drift from how the app-layer writes the value. Pure helper; safe client-side.
 import { buildSeriesName } from "@langwatch/analytics-contract";
-import type { RecentItem } from "../../../../behavior/home-api";
-import { homeApi } from "../../../../behavior/home-api";
-import { formatMilliseconds } from "../../../../model/format-milliseconds";
-import { formatMoney } from "../../../../model/format-money";
-import { buildAttentionInbox, type CountedSignal } from "../attention-inbox";
-import { getBriefingMock, useBriefingMock } from "../mocks/briefing-mocks";
-import type { BriefingData, ScenarioBar, StatusCell } from "../types";
-import { useProjectHomeHost } from "../../../../model/project-home-host";
+import type { RecentItem } from "../../../../behavior/home-api.ts";
+import { homeApi } from "../../../../behavior/home-api.ts";
+import { formatMilliseconds } from "../../../../model/format-milliseconds.ts";
+import { formatMoney } from "../../../../model/format-money.ts";
+import { buildAttentionInbox, type CountedSignal } from "../attention-inbox.ts";
+import { getBriefingMock, useBriefingMock } from "../mocks/briefing-mocks.ts";
+import type { BriefingData, ScenarioBar, StatusCell } from "../types.ts";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * Derives Langy's home briefing from the project's REAL signals.

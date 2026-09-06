@@ -1,21 +1,21 @@
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
-import { startWorkerMetricsServer } from "../platform/liveness/worker-metrics.server";
-import { WorkerClickHouseInfrastructure } from "../platform/infrastructure/worker-clickhouse.infrastructure";
-import { WorkerDatabaseInfrastructure } from "../platform/infrastructure/worker-database.infrastructure";
+import { startWorkerMetricsServer } from "../platform/liveness/worker-metrics.server.ts";
+import { WorkerClickHouseInfrastructure } from "../platform/infrastructure/worker-clickhouse.infrastructure.ts";
+import { WorkerDatabaseInfrastructure } from "../platform/infrastructure/worker-database.infrastructure.ts";
 import {
   WorkerHandlePort,
   WorkerLifecyclePort,
   WorkerTransportPort,
-} from "../platform/lifecycle/worker-runtime.port";
-import { WorkerExecutableCompositionPort } from "../worker.executable";
-import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process";
-import { createWorkerPrivateInfrastructureComposition } from "./worker-private-infrastructure.composition";
-import { createWorkerObjectStorage } from "./worker-object-storage.composition";
+} from "../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerExecutableCompositionPort } from "../worker.executable.ts";
+import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process.ts";
+import { createWorkerPrivateInfrastructureComposition } from "./worker-private-infrastructure.composition.ts";
+import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import {
   WorkerProductionComposition,
   type WorkerDatabaseCompositionOptions,
-} from "./worker-production.composition";
+} from "./worker-production.composition.ts";
 
 /**
  * The standalone worker graph: the ONE consumer of `event-sourcing/jobs`.

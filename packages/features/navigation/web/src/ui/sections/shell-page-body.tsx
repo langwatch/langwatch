@@ -38,12 +38,12 @@ import {
 import { KeyRound } from "lucide-react";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { navigationApi } from "../../behavior/navigation-api";
-import { useNavigationHost } from "../../model/navigation-host";
-import { planManagementHref } from "../../model/plan-management-href";
-import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner";
-import { NavigationLink } from "../elements/navigation-link";
-import { PageErrorFallback } from "../elements/page-error-fallback";
+import { navigationApi } from "../../behavior/navigation-api.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { planManagementHref } from "../../model/plan-management-href.ts";
+import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { PageErrorFallback } from "../elements/page-error-fallback.tsx";
 
 export type ShellPageBodyProps = {
   /** Personal-scope routes count the viewer as on their own team. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
-import { convertScenarioMessagesToCopilotKit } from "../convert-scenario-messages";
+import { convertScenarioMessagesToCopilotKit } from "../convert-scenario-messages.ts";
 
 describe("convertScenarioMessagesToCopilotKit", () => {
   describe("text messages", () => {

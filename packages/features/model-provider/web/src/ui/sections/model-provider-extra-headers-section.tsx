@@ -1,13 +1,13 @@
 import { Button, Grid, GridItem, HStack, Input, VStack } from "@chakra-ui/react";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";
-import type { ExtraHeader } from "../../behavior/use-extra-headers";
+import type { ExtraHeader } from "../../behavior/use-extra-headers.ts";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
-} from "../../behavior/use-model-provider-form";
+} from "../../behavior/use-model-provider-form.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { SmallLabel } from "../elements/small-label";
+import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * Renders a section for adding custom HTTP headers to API requests.

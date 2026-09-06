@@ -14,7 +14,7 @@
 import type { Node } from "typescript/unstable/ast";
 import { isCallExpression, isIdentifier } from "typescript/unstable/ast";
 import { describe, expect, it } from "vitest";
-import { parseSourceText } from "../ts-ast";
+import { parseSourceText } from "../ts-ast.ts";
 
 /** Every identifier called as a function, so a walk has something to find. */
 function calledNames({ node }: { node: Node }): string[] {

@@ -11,12 +11,12 @@
  * the gateway to drop its cached bundle.
  */
 import { describe, expect, it } from "vitest";
-import type { GatewayAuditPort } from "../../../ports/gateway-audit.port";
-import type { GatewayChangeEventsPort } from "../../../ports/gateway-change-events.port";
+import type { GatewayAuditPort } from "../../../ports/gateway-audit.port.ts";
+import type { GatewayChangeEventsPort } from "../../../ports/gateway-change-events.port.ts";
 import {
   PrismaGatewayCacheRuleRepository,
   type GatewayCacheRuleDatabase,
-} from "../prisma.gateway-cache-rule.repository";
+} from "../prisma.gateway-cache-rule.repository.ts";
 
 const storedRow = {
   id: "rule_01",

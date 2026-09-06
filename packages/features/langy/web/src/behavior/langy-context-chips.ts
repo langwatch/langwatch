@@ -1,4 +1,4 @@
-import type { LangyContextChip } from "./langy.store";
+import type { LangyContextChip } from "./langy.store.ts";
 
 /**
  * Compose the candidate context-chip list from every source, in priority order.

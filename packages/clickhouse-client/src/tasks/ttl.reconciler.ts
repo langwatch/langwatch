@@ -2,7 +2,7 @@ import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
 import { RETENTION_MANAGED_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-import { parseConnectionUrl } from "./goose.migration-runner";
+import { parseConnectionUrl } from "./goose.migration-runner.ts";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 

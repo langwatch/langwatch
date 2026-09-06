@@ -6,7 +6,7 @@
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
 
-import { useOptionalUiCapabilities } from "./capabilities";
+import { useOptionalUiCapabilities } from "./capabilities.ts";
 
 type LinkProps = {
   href: string | undefined;

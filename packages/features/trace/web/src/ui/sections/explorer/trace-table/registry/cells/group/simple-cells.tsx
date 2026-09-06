@@ -1,10 +1,10 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { formatDuration } from "../../../../../../../model/display-formatters";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import { StatusDot } from "../../../status-row";
-import type { CellDef } from "../../types";
-import { createCostCell, createTokensCell } from "../shared-summary-cells";
-import type { TraceGroup } from "./types";
+import { formatDuration } from "../../../../../../../model/display-formatters.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import { StatusDot } from "../../../status-row.tsx";
+import type { CellDef } from "../../types.ts";
+import { createCostCell, createTokensCell } from "../shared-summary-cells.tsx";
+import type { TraceGroup } from "./types.ts";
 
 export const CountCell: CellDef<TraceGroup> = {
   id: "count",

@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { RedisCliTokenStoreAdapter } from "./cli-token-revocation.adapter";
+import { RedisCliTokenStoreAdapter } from "./cli-token-revocation.adapter.ts";
 
 const logger = createLogger("langwatch:cli-session-inventory");
 type RedisLike = Redis | Cluster;

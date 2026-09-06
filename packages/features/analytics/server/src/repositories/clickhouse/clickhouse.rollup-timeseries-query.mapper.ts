@@ -21,18 +21,18 @@
  *     partitions (clickhouse-queries best-practices).
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import {
   isRollupAvgMetricKey,
   isRollupRollableTraceMetricKey,
   type TraceRollupMetricKey,
-} from "./clickhouse.analytics-route-table.mapper";
+} from "./clickhouse.analytics-route-table.mapper.ts";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
-import { dateTrunc } from "./clickhouse.timeseries-query-shared.mapper";
+import { dateTrunc } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const ROLLUP_TABLE = "trace_analytics_rollup" as const;
 const ra = "ra";

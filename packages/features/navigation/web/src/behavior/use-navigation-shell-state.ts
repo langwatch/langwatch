@@ -8,16 +8,16 @@ import {
   useNavigationHost,
   type NavigationProject,
   type NavigationUser,
-} from "../model/navigation-host";
-import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "../model/shell-layout";
+} from "../model/navigation-host.ts";
+import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "../model/shell-layout.ts";
 import {
   projectNavItemAt,
   toProjectRoutePattern,
   type ProjectNavItem,
-} from "../model/project-nav-items";
-import { resolveShellRoute, type ShellRoute } from "../model/resolve-shell-route";
-import type { ProductId } from "../model/products";
-import { useIsMobileViewport } from "./use-is-mobile-viewport";
+} from "../model/project-nav-items.ts";
+import { resolveShellRoute, type ShellRoute } from "../model/resolve-shell-route.ts";
+import type { ProductId } from "../model/products.ts";
+import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
 
 export interface NavigationShellReadyState {
   status: "ready";

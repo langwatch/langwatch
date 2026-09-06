@@ -4,7 +4,7 @@ import {
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { DatasetRecordRepository } from "../dataset-record.repository";
+import { DatasetRecordRepository } from "../dataset-record.repository.ts";
 
 type Database = Pick<PrismaClient, "datasetRecord">;
 

@@ -15,8 +15,8 @@
  * query; the text of it belongs in the code, where it already is.
  */
 
-import { quietly } from "./observability";
-import type { QueryRequest, QueryResult } from "./query";
+import { quietly } from "./observability.ts";
+import type { QueryRequest, QueryResult } from "./query.ts";
 
 /**
  * A failure, reduced to what is safe to ship.

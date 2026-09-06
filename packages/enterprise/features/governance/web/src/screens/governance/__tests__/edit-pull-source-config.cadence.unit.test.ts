@@ -24,8 +24,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { recordingGovernanceToaster } from "../../../testing";
-import { buildEditSubmission, seedPullSchedule } from "../governance-inventory.screen";
+import { recordingGovernanceToaster } from "../../../testing.tsx";
+import { buildEditSubmission, seedPullSchedule } from "../governance-inventory.screen.tsx";
 
 /**
  * The drifted row, from the drawer opening to the payload it saves.

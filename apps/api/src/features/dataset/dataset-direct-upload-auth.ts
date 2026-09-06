@@ -9,10 +9,10 @@ import type {
 } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { isCrossSiteRequest } from "../../api-rest.cross-site";
+import { isCrossSiteRequest } from "../../api-rest.cross-site.ts";
 
-import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
-import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
+import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential.ts";
+import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
 
 const PERMISSION = "datasets:manage" as const;
 

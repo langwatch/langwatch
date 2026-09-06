@@ -10,7 +10,7 @@ import type { Readable } from "node:stream";
 import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { LocalFilesystemStoredObjectDriverAdapter } from "../local-filesystem.stored-object-driver.adapter";
+import { LocalFilesystemStoredObjectDriverAdapter } from "../local-filesystem.stored-object-driver.adapter.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

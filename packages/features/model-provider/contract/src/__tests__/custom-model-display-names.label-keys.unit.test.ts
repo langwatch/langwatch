@@ -25,7 +25,7 @@ import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
 } from "@langwatch/model-provider-contract";
-import { makeProvider } from "./model-provider.test-helpers";
+import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a custom model row identified by its row id", () => {
   const row = makeProvider({

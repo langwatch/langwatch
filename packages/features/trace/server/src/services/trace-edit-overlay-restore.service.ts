@@ -1,7 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
+import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service.ts";
 
-import { type TraceMetadataEdits } from "./trace-edit-overlay-redaction.service";
+import { type TraceMetadataEdits } from "./trace-edit-overlay-redaction.service.ts";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,

@@ -9,8 +9,8 @@ import {
   LINK_PROPOSED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
-} from "./facts";
-import { reduceIdentifier } from "./identifier-aggregate";
+} from "./facts.ts";
+import { reduceIdentifier } from "./identifier-aggregate.ts";
 
 /**
  * The pure identity reducer (ADR-101 §3). Live dispatch and the replay test

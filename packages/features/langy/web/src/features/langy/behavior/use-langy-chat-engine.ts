@@ -5,8 +5,8 @@ import { useCallback, useRef } from "react";
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
 import type { LangyMessageDto } from "@langwatch/langy-contract";
-import { isLangyTranscriptMessage } from "../../../model/langy-transcript";
-import type { createLangyChatTransport } from "./logic/langy-chat-transport";
+import { isLangyTranscriptMessage } from "../../../model/langy-transcript.ts";
+import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
 
 /**
  * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus the

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
-import type { EndpointRegistration, MountedRoute } from "../types.js";
-import { isDateVersion } from "../types.js";
-import { matchPath } from "../route-mounting.js";
-import { type RegistrationEvent, resolveVersions } from "../versioning.js";
+import { createTestService as createService } from "./test-service.ts";
+import type { EndpointRegistration, MountedRoute } from "../types.ts";
+import { isDateVersion } from "../types.ts";
+import { matchPath } from "../route-mounting.ts";
+import { type RegistrationEvent, resolveVersions } from "../versioning.ts";
 
 // ---------------------------------------------------------------------------
 // resolveVersions: the version catalogue is the union of versions named in

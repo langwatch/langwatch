@@ -24,14 +24,14 @@ import { ColorfulBlockIcon } from "@langwatch/workflow-web/surfaces/workflow-ico
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { useLatestPromptVersion } from "@langwatch/prompt-web/surfaces/latest-prompt-version";
-import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
 
-import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields";
-import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name";
+import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
+import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name.ts";
 import type { AgentTypeEnum } from "@langwatch/experiment-contract";
-import type { TargetConfig } from "../../../../model/experiments-v3/types";
-import { isComparisonEvaluator } from "../../../../model/experiments-v3/types";
+import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
+import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import {
   computeComparisonColumnTargetAggregate,
   computeComparisonTargetAggregate,
@@ -39,11 +39,11 @@ import {
 } from "@langwatch/experiment-contract";
 import { isRowEmpty } from "@langwatch/experiment-contract";
 import { countCellsForTarget } from "@langwatch/experiment-contract";
-import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation";
+import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
-import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard";
-import { TargetSummary } from "./target-summary";
+import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
+import { TargetSummary } from "./target-summary.tsx";
 
 /**
  * The icon a column header shows per agent type.

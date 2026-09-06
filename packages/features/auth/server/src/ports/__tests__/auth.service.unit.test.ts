@@ -3,9 +3,9 @@ import { AuthService } from "@langwatch/auth-server";
 import type { UserProfile } from "@langwatch/user-contract";
 import { UserService } from "@langwatch/user-contract";
 import { IdentityEmailService } from "@langwatch/identity-contract";
-import { AuthClockPort } from "../auth-clock.port";
-import { AuthSecondaryStorePort } from "../auth-secondary-store.port";
-import { AuthSessionRepository } from "../../repositories/auth-session.repository";
+import { AuthClockPort } from "../auth-clock.port.ts";
+import { AuthSecondaryStorePort } from "../auth-secondary-store.port.ts";
+import { AuthSessionRepository } from "../../repositories/auth-session.repository.ts";
 
 class Clock extends AuthClockPort {
   now(): Date {

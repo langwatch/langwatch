@@ -10,9 +10,9 @@ import {
   computeBatchRunSummary,
   groupRunsByBatchId,
 } from "@langwatch/suite-web/surfaces/run-formatters";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/scenario-api";
-import { type PlanIdentity, planOfSet } from "./plan-of-set";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { type PlanIdentity, planOfSet } from "./plan-of-set.ts";
 
 /** How many runs the list holds. It is a way into a run, not a run history. */
 export const RECENT_RUNS_SHOWN = 8;

@@ -18,10 +18,10 @@ import {
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
   type OrganizationRepository,
-} from "../../ports/organization.port";
-import { GroupRepository } from "../group.repository";
-import { TeamRepository } from "../team.repository";
-import { OrganizationService } from "../../services/organization.service";
+} from "../../ports/organization.port.ts";
+import { GroupRepository } from "../group.repository.ts";
+import { TeamRepository } from "../team.repository.ts";
+import { OrganizationService } from "../../services/organization.service.ts";
 
 const team: OrganizationTeam = {
   id: "team_1",

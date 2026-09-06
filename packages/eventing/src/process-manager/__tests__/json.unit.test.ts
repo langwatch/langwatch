@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ensureJsonSafe, JsonSafetyError } from "../json";
+import { ensureJsonSafe, JsonSafetyError } from "../json.ts";
 
 describe("ensureJsonSafe", () => {
   describe("given a JSON-representable value", () => {

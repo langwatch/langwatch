@@ -1,9 +1,9 @@
 import { Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TraceListItem } from "../../../../types/trace";
-import { formatTokens } from "../../../../../../../model/display-formatters";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { formatTokens } from "../../../../../../../model/display-formatters.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
 
 /**
  * How full the context window already was when the trace's first model call ran.

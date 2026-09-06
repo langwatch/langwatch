@@ -22,21 +22,21 @@ import {
 } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service";
+import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
 import { type InstanceNudge } from "@langwatch/agent-contract";
 import {
   callDeliveredKey,
   callKey,
   httpSessionKey,
   pendingKey,
-} from "../rules/connected-agent-keys.rules";
-import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
+} from "../rules/connected-agent-keys.rules.ts";
+import type { InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
 import {
   AgentSessionService,
   type ConnectCredentials,
   type SessionCoreOptions,
   type SessionInfo,
-} from "./connected-agent-session.service";
+} from "./connected-agent-session.service.ts";
 
 /** The most call ids a poll may announce as in flight. */
 const MAX_IN_FLIGHT_IDS = 1000;

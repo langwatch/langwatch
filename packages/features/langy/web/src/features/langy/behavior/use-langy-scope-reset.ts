@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useRequiredSession } from "../../../behavior/auth-session";
-import { useLangyStore } from "../../../behavior/langy.store";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useRequiredSession } from "../../../behavior/auth-session.ts";
+import { useLangyStore } from "../../../behavior/langy.store.ts";
 
 /**
  * Tell Langy which scope it is in, so nothing follows the user out of it.

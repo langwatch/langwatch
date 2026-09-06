@@ -31,7 +31,7 @@ import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
-import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback";
+import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback.ts";
 import {
   GovernanceHostPort,
   GovernanceHostProvider,
@@ -42,7 +42,7 @@ import {
   type GovernanceRouteReading,
   type GovernanceScope,
   type GovernanceSuccessNotice,
-} from "./model/governance-host";
+} from "./model/governance-host.ts";
 
 export type GovernanceQuery = Readonly<Record<string, string | undefined>>;
 

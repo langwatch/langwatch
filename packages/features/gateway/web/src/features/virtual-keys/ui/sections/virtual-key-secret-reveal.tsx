@@ -15,7 +15,7 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { VirtualKeyUsageSnippet } from "./virtual-key-usage-snippet";
+import { VirtualKeyUsageSnippet } from "./virtual-key-usage-snippet.tsx";
 
 type VirtualKeySecretRevealProps = {
   open: boolean;

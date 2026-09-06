@@ -4,8 +4,8 @@ import type {
   StoredObjectService as StoredObjectServiceContract,
 } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
-import { StoredObjectApp, StoredObjectsPublicApi } from "../index";
-import type { StoredObjectFileReadPort } from "../index";
+import { StoredObjectApp, StoredObjectsPublicApi } from "../index.ts";
+import type { StoredObjectFileReadPort } from "../index.ts";
 
 describe("StoredObjectsPublicApi", () => {
   it("registers one rate-limited RPC family with explicit permissions", () => {

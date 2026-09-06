@@ -1,6 +1,6 @@
-import type { renderMailTemplate as RenderMailTemplate } from "../src/templates/registry";
-import type { MailTemplate } from "../src/templates/registry";
-import type { GalleryEntry } from "./studio-shared";
+import type { renderMailTemplate as RenderMailTemplate } from "../src/templates/registry.ts";
+import type { MailTemplate } from "../src/templates/registry.ts";
+import type { GalleryEntry } from "./studio-shared.ts";
 
 /**
  * Every fixture the gallery shows, rendered through the same call the single

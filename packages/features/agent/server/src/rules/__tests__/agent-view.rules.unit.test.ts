@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { agentFixture } from "../../testing";
-import { agentWithResolvedFields } from "../agent-view.rules";
+import { agentFixture } from "../../testing.ts";
+import { agentWithResolvedFields } from "../agent-view.rules.ts";
 
 describe("given a code agent whose config declares its own fields", () => {
   describe("when the agent is read", () => {

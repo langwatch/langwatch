@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { invalidColumnNameKeys } from "../column-validation";
+import { invalidColumnNameKeys } from "../column-validation.ts";
 
 const col = (name: string, sourceHeader: string): DatasetConfirmColumns[number] => ({
   name,

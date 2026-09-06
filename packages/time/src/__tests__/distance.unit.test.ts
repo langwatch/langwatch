@@ -5,7 +5,7 @@ import {
   formatDistanceCompact,
   formatDistanceStrict,
   formatDistanceToNow,
-} from "../distance";
+} from "../distance.ts";
 
 const AMSTERDAM = "Europe/Amsterdam";
 const NOW = new Date("2026-06-15T12:00:00+02:00");

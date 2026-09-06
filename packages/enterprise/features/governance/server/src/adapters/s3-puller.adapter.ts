@@ -26,11 +26,11 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port";
+import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port.ts";
 import {
   NullIngestionPullDiagnosticsPort,
   type IngestionPullDiagnosticsPort,
-} from "../ports/ingestion-pull-worker.port";
+} from "../ports/ingestion-pull-worker.port.ts";
 
 import type {
   GovernancePuller as PullerAdapter,

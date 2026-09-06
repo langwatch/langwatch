@@ -1,6 +1,6 @@
 import { Alert, Link } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
-import NextLink from "../elements/next-link";
+import NextLink from "../elements/next-link.tsx";
 
 /**
  * Banner shown when trace content carries redaction markers.

@@ -12,7 +12,7 @@ import {
   CONTENT_COLUMN_MAX_WIDTH,
   CONTENT_COLUMN_WIDE_MAX_WIDTH,
   ContentColumn,
-} from "../content-column";
+} from "../content-column.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

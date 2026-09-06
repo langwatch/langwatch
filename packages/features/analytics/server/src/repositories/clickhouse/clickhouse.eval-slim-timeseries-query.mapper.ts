@@ -23,7 +23,7 @@
  *     `ReplacingMergeTree(UpdatedAt)`.
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import type {
   AnalyticsTimeseriesBuilderInput,
@@ -37,7 +37,7 @@ import {
   isEvalMetricKey,
   isPercentile,
   percentileFor,
-} from "./clickhouse.timeseries-query-shared.mapper";
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
 const ea = "ea";

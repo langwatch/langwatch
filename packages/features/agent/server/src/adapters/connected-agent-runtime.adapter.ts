@@ -8,10 +8,10 @@ import { nanoid } from "nanoid";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port";
-import { ConnectedAgentStateAdapter } from "./connected-agent-state.adapter";
-import { CallDispatcherAdapter } from "./connected-agent-dispatch.adapter";
-import { ConnectedAgentRegistryAdapter } from "./connected-agent-registry.adapter";
+import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port.ts";
+import { ConnectedAgentStateAdapter } from "./connected-agent-state.adapter.ts";
+import { CallDispatcherAdapter } from "./connected-agent-dispatch.adapter.ts";
+import { ConnectedAgentRegistryAdapter } from "./connected-agent-registry.adapter.ts";
 
 let processRedis: RedisConnection | null = null;
 let processRuntime: ConnectedAgentRuntime | null = null;

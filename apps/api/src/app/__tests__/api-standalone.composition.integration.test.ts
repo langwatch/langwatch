@@ -8,15 +8,15 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
-import { ApiMetricsPort, ApiReadinessPort } from "../../api-process.lifecycle";
-import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../../api.process";
+import { ApiMetricsPort, ApiReadinessPort } from "../../api-process.lifecycle.ts";
+import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../../api.process.ts";
 import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
-} from "../api-auth.composition";
-import type { ApiProductionCompositionOptions } from "../api-production.composition";
-import { ApiStandaloneComposition } from "../api-standalone.composition";
-import { resolveApiConfig, type ApiConfig } from "../../platform/config/api.config";
+} from "../api-auth.composition.ts";
+import type { ApiProductionCompositionOptions } from "../api-production.composition.ts";
+import { ApiStandaloneComposition } from "../api-standalone.composition.ts";
+import { resolveApiConfig, type ApiConfig } from "../../platform/config/api.config.ts";
 
 function ephemeralConfig(source: Readonly<Record<string, unknown>> = {}): ApiConfig {
   return {

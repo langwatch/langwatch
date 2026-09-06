@@ -5,10 +5,10 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run";
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design";
-import { RunResultRow } from "./run-result-row";
+import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
+import { RunResultRow } from "./run-result-row.tsx";
 
 /**
  * The columns of the table. The last one holds the row menu, and grows to fit

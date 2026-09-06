@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useFilterStore } from "../../../../behavior/filter.store";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import type { LangyContextChip } from "@langwatch/langy-web/surfaces/langy-store";
 
 /**

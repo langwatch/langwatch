@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ioContainerChrome } from "../io-viewer";
+import { ioContainerChrome } from "../io-viewer.tsx";
 
 // The IOViewer's outer container chrome decides whether the body sits in a
 // bordered "bg.subtle + border" box (like Pretty's plain-text / JSON view)

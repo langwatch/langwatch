@@ -2,14 +2,14 @@ import { Badge, Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@
 import { Bot, Check, Terminal } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { usePersonalDeployment } from "../../behavior/personal-workspace-session";
-import { usePersonalContext } from "../../behavior/use-personal-context";
-import { Link } from "../elements/personal-link";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { usePersonalDeployment } from "../../behavior/personal-workspace-session.ts";
+import { usePersonalContext } from "../../behavior/use-personal-context.ts";
+import { Link } from "../elements/personal-link.tsx";
 import {
   type IngestionBindingResult,
   IngestionTemplateInstallDrawer,
-} from "./ingestion-template-install-drawer";
+} from "./ingestion-template-install-drawer.tsx";
 
 /**
  * /me Trace Ingest section, the tile-grid for the IngestionTemplate

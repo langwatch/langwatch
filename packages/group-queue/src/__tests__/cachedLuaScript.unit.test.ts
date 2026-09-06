@@ -1,7 +1,7 @@
 import type { Redis as IORedis } from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
-import { CachedLuaScript } from "../cachedLuaScript";
+import { CachedLuaScript } from "../cachedLuaScript.ts";
 
 function makeRedis({ cacheHit }: { cacheHit: boolean }) {
   const evalsha = vi.fn(async (..._args: Array<string | number>) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { IdentityFact } from "../facts";
-import { reduceIdentifier, userErasureFacts } from "../identifier-aggregate";
+import type { IdentityFact } from "../facts.ts";
+import { reduceIdentifier, userErasureFacts } from "../identifier-aggregate.ts";
 import {
   ACTOR,
   T0,
@@ -15,7 +15,7 @@ import {
   primaryChanged,
   proposed,
   verified,
-} from "./support/identifier-facts";
+} from "./support/identifier-facts.ts";
 
 describe("reduceIdentifier", () => {
   describe("given one identifier's own stream", () => {

@@ -10,7 +10,7 @@ import {
   EvaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
-} from "./evaluator-editor-shared";
+} from "./evaluator-editor-shared.tsx";
 
 /**
  * Drawer for creating/editing a built-in evaluator.

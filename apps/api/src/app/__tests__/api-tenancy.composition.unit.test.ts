@@ -6,8 +6,8 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import { PrismaConnection } from "@langwatch/prisma-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
-import { ApiOrganizationSettingsSecretAdapter } from "../api-organization-settings-secret.adapter";
-import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "../api-tenancy.composition";
+import { ApiOrganizationSettingsSecretAdapter } from "../api-organization-settings-secret.adapter.ts";
+import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "../api-tenancy.composition.ts";
 
 const ENCRYPTION_KEY = "0f".repeat(32);
 const PEPPER = "  a-pepper-with-surrounding-space  ";

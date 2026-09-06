@@ -1,6 +1,6 @@
 import dns from "node:dns/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSsrfUrlValidator } from "../url-validator";
+import { createSsrfUrlValidator } from "../url-validator.ts";
 
 /**
  * Spec: specs/security/ssrf-blocking.feature

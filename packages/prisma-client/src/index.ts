@@ -2,7 +2,7 @@ export {
   PrismaConfigService,
   type PrismaConfiguration,
   type PrismaConfigurationInput,
-} from "./config";
+} from "./config.ts";
 export {
   PrismaClientFactory,
   type PrismaClientFactoryInput,
@@ -12,42 +12,42 @@ export {
   PrismaQueryGuard,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
-} from "./connection";
-export { parsePrismaDatamodel, type PrismaDatamodelModel } from "./datamodel";
-export { type GuardMiddleware, type GuardNext, type GuardParams } from "./guard-middleware";
-export { guardEnMasse } from "./mass-delete-guard";
-export { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./multi-tenancy-guard";
+} from "./connection.ts";
+export { parsePrismaDatamodel, type PrismaDatamodelModel } from "./datamodel.ts";
+export { type GuardMiddleware, type GuardNext, type GuardParams } from "./guard-middleware.ts";
+export { guardEnMasse } from "./mass-delete-guard.ts";
+export { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./multi-tenancy-guard.ts";
 export {
   guardOrganizationId,
   ORG_BEARING_MODEL_NAMES,
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
-} from "./organization-guard";
-export { PrismaTenancyGuardService } from "./tenancy-guard";
+} from "./organization-guard.ts";
+export { PrismaTenancyGuardService } from "./tenancy-guard.ts";
 export {
   type PrismaDriverAdapter,
   PrismaDriverAdapterFactory,
   PrismaDriverAdapterService,
   type PrismaPgPoolConfig,
-} from "./driver-adapter";
+} from "./driver-adapter.ts";
 export {
   PrismaMigrationExecutor,
   type PrismaMigrationRequest,
   PrismaMigrationService,
   type PrismaMigrationServiceOptions,
-} from "./migration";
-export { PrismaReadinessService, type PrismaReadinessOptions } from "./readiness";
-export { PrismaSeed, PrismaSeedService } from "./seed";
-export { PrismaShutdownService } from "./shutdown";
+} from "./migration.ts";
+export { PrismaReadinessService, type PrismaReadinessOptions } from "./readiness.ts";
+export { PrismaSeed, PrismaSeedService } from "./seed.ts";
+export { PrismaShutdownService } from "./shutdown.ts";
 export {
   isRecordNotFoundError,
   isUniqueConstraintError,
   uniqueConstraintTargets,
-} from "./prisma-error-codes";
+} from "./prisma-error-codes.ts";
 export {
   reportQueryDuration,
   resetSlowQueryThrottle,
   resolveSlowQueryBudgetMs,
   safeArgKeys,
   withQueryTiming,
-} from "./slow-query-warning";
+} from "./slow-query-warning.ts";

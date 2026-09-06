@@ -3,7 +3,7 @@
  * list shows both: every project the team owns, and everybody bound to the team DIRECTLY.
  */
 
-import { useOrganizationHost } from "../../model/organization-host";
+import { useOrganizationHost } from "../../model/organization-host.ts";
 import {
   Badge,
   Box,
@@ -20,23 +20,23 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
+import { RandomColorAvatar } from "../../ui/elements/random-color-avatar.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Link } from "../../ui/elements/link";
+import { Link } from "../../ui/elements/link.tsx";
 import { Select } from "@langwatch/design-system/select";
-import { OrganizationUserRole } from "../../model/prisma-types";
-import { DepartmentPicker } from "../../ui/sections/department-picker";
-import { type DepartmentOption, useDepartmentColumn } from "../../behavior/use-department-column";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import type { RouterOutputs } from "../../behavior/organization-api";
-import { api } from "../../behavior/organization-api";
+import { OrganizationUserRole } from "../../model/prisma-types.ts";
+import { DepartmentPicker } from "../../ui/sections/department-picker.tsx";
+import { type DepartmentOption, useDepartmentColumn } from "../../behavior/use-department-column.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import type { RouterOutputs } from "../../behavior/organization-api.ts";
+import { api } from "../../behavior/organization-api.ts";
 import {
   isBindingRoleAllowedForOrganizationRole,
   type TeamRoleValue,
-} from "../../model/member-role-constraints";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+} from "../../model/member-role-constraints.ts";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];

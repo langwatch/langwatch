@@ -1,15 +1,15 @@
 import type { z } from "zod";
-import type { AggregateType } from "../domain/aggregateType";
-import type { CommandType } from "../domain/commandType";
-import type { EventType } from "../domain/eventType";
-import { createTenantId } from "../domain/tenantId";
-import type { Event } from "../domain/types";
-import { EventUtils } from "../utils/event.utils";
-import type { Command, CommandHandler, CommandHandlerResult } from "./command";
-import type { CommandEnvelope } from "./commandEnvelope";
-import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope";
-import type { CommandHandlerClass } from "./commandHandlerClass";
-import { defineCommandSchema } from "./commandSchema";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { CommandType } from "../domain/commandType.ts";
+import type { EventType } from "../domain/eventType.ts";
+import { createTenantId } from "../domain/tenantId.ts";
+import type { Event } from "../domain/types.ts";
+import { EventUtils } from "../utils/event.utils.ts";
+import type { Command, CommandHandler, CommandHandlerResult } from "./command.ts";
+import type { CommandEnvelope } from "./commandEnvelope.ts";
+import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope.ts";
+import type { CommandHandlerClass } from "./commandHandlerClass.ts";
+import { defineCommandSchema } from "./commandSchema.ts";
 
 /**
  * Return type of defineCommand() — extends CommandHandlerClass with optional makeJobId.

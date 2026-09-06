@@ -12,8 +12,8 @@ import {
   IngestionTemplateRepository,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
-} from "../ingestion-template.port";
-import { IngestionTemplateService } from "../../services/ingestion-template.service";
+} from "../ingestion-template.port.ts";
+import { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
 
 function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate {
   return {

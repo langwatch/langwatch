@@ -5,7 +5,7 @@
 import { currentUiFeedbackHost, setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import { useEffect } from "react";
 
-import { useWorkflowHost } from "../../../model/workflow-host";
+import { useWorkflowHost } from "../../../model/workflow-host.ts";
 
 export function useStudioHostBinding(): void {
   const host = useWorkflowHost();

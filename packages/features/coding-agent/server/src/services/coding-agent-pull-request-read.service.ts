@@ -19,28 +19,28 @@ import {
   type GithubService,
 } from "@langwatch/github-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
+import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
   CodingAgentPersonalPullRequestValuesService,
   type CodingAgentPersonalRepositoryGroup,
-} from "./coding-agent-personal-pull-request-values.service";
-import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service";
-import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service";
+} from "./coding-agent-personal-pull-request-values.service.ts";
+import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
 import {
   CodingAgentPullRequestUsageService,
   type CodingAgentModelUsage,
   type CodingAgentUsageRow,
-} from "./coding-agent-pull-request-usage.service";
-import { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
-import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service";
-import { CodingAgentSessionCandidatesService } from "./coding-agent-session-candidates.service";
+} from "./coding-agent-pull-request-usage.service.ts";
+import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
+import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import { CodingAgentSessionCandidatesService } from "./coding-agent-session-candidates.service.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
-} from "../rules/coding-agent-pull-request.rules";
+} from "../rules/coding-agent-pull-request.rules.ts";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;

@@ -4,7 +4,7 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_VERSIONS,
-} from "./trace-ingress.constants";
+} from "./trace-ingress.constants.ts";
 
 export {
   RECORD_SPAN_COMMAND_TYPE,

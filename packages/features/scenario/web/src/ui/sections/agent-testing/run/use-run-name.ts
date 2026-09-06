@@ -5,18 +5,18 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { PromptEntry } from "./prompt-picker";
-import type { RunNameOption } from "./run-name-field";
-import type { ScopeScenario, ScopeTestSuite } from "./run-scope-section";
-import type { RunDialogAgent } from "./run-target-picker";
+import type { PromptEntry } from "./prompt-picker.tsx";
+import type { RunNameOption } from "./run-name-field.tsx";
+import type { ScopeScenario, ScopeTestSuite } from "./run-scope-section.tsx";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
 import {
   deriveRunName,
   describeConfigurations,
   type RunConfigurationEntry,
   type RunScope,
   sortedTargetLabels,
-} from "./run-configuration";
-import type { RunDialogSubject, RunTarget } from "./run-dialog-types";
+} from "./run-configuration.ts";
+import type { RunDialogSubject, RunTarget } from "./run-dialog-types.ts";
 
 /** What one target is called, for the derived name and the dropdown rows. */
 export function buildTargetLabels({

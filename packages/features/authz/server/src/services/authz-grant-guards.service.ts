@@ -8,7 +8,7 @@ import {
   type GrantRole,
   type GrantableAuthzScopeRef,
 } from "@langwatch/authz-contract";
-import type { AuthzGrantRepository } from "../repositories/authz-grant.repository";
+import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
 
 export class AuthzGrantGuardsService {
   static create({ repository }: { repository: AuthzGrantRepository }): AuthzGrantGuardsService {

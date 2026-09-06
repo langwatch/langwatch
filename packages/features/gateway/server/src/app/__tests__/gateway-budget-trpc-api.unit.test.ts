@@ -19,8 +19,8 @@ import type { GatewayService } from "@langwatch/gateway-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GatewayBudgetTrpcApi } from "../../transport/api-trpc/gateway-budget.api";
-import { GatewayApp, type GatewayAppDependencies } from "../gateway.app";
+import { GatewayBudgetTrpcApi } from "../../transport/api-trpc/gateway-budget.api.ts";
+import { GatewayApp, type GatewayAppDependencies } from "../gateway.app.ts";
 
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {

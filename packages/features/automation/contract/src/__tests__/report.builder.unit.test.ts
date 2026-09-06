@@ -6,7 +6,7 @@ import {
   reportScheduleSchema,
   reportSourceSchema,
   TriggerAction,
-} from "../index";
+} from "../index.ts";
 
 const traceQueryParams: ReportActionParams = {
   source: {

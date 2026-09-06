@@ -5,7 +5,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { WebhookEventsClickHouseRepository } from "../clickhouse.webhook-events.repository";
+import { WebhookEventsClickHouseRepository } from "../clickhouse.webhook-events.repository.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);

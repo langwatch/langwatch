@@ -29,7 +29,7 @@
  */
 
 import type { Event } from "@langwatch/eventing";
-import { shardIndexFor } from "./trace-command-shard.rules";
+import { shardIndexFor } from "./trace-command-shard.rules.ts";
 
 /**
  * Lanes per tenant. Matches `MAX_SPAN_SHARD_COUNT` on the recordSpan command

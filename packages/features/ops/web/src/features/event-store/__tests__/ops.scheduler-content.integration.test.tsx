@@ -4,8 +4,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { SchedulerContentView } from "../ui/sections/scheduler-content";
-import { UpcomingWorkCard } from "../ui/elements/upcoming-work-card";
+import { SchedulerContentView } from "../ui/sections/scheduler-content.tsx";
+import { UpcomingWorkCard } from "../ui/elements/upcoming-work-card.tsx";
 
 const NOW = 1_755_100_000_000;
 

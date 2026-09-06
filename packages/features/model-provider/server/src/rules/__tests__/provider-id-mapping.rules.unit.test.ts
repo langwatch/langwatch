@@ -6,7 +6,7 @@ import {
   mapModelId,
   mapProviderName,
   normalizeModelName,
-} from "../provider-id-mapping.rules";
+} from "../provider-id-mapping.rules.ts";
 
 describe("extractProvider", () => {
   it("returns the prefix before the first slash", () => {

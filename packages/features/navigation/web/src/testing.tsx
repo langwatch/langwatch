@@ -29,7 +29,7 @@ import {
   type NavigationSupportChat,
   type NavigationTeam,
   type NavigationUser,
-} from "./model/navigation-host";
+} from "./model/navigation-host.ts";
 
 export type StubNavigationReadings = {
   organizations?: NavigationOrganization[];

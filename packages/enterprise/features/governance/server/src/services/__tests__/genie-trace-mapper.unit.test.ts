@@ -18,14 +18,14 @@
 import { TraceSpanCostMatchingService } from "@langwatch/trace-server/testing";
 import { describe, expect, it } from "vitest";
 import { spanSchema } from "@langwatch/trace-contract";
-import { KNOWN_AGENT_IDENTITIES } from "../conversation-trace-assembly.service";
+import { KNOWN_AGENT_IDENTITIES } from "../conversation-trace-assembly.service.ts";
 import {
   GENIE_AGENT_MODEL,
   GENIE_MESSAGE_SPAN_NAME,
   GENIE_QUERY_SPAN_NAME,
   GENIE_ROUTING_PROFILE,
   GenieTraceMapperService,
-} from "../genie-trace-mapper.service";
+} from "../genie-trace-mapper.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {

@@ -9,8 +9,8 @@
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { UserApp } from "../../../app/user.app";
-import { UserTrpcApi, type UserTrpcPorts } from "../user.api";
+import type { UserApp } from "../../../app/user.app.ts";
+import { UserTrpcApi, type UserTrpcPorts } from "../user.api.ts";
 
 function harness({
   emailIsTaken = false,

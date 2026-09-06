@@ -2,11 +2,11 @@
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import "../elements/auth-front-door.css";
-import { useTweenedGround } from "../../behavior/use-tweened-ground";
-import { resolveGroundShift } from "../../model/ground-palette";
-import { useFrontDoorStage } from "../../model/ground-stage";
+import { useTweenedGround } from "../../behavior/use-tweened-ground.ts";
+import { resolveGroundShift } from "../../model/ground-palette.ts";
+import { useFrontDoorStage } from "../../model/ground-stage.ts";
 
 /**
  * The ground the whole front door stands on: one full-viewport field, in

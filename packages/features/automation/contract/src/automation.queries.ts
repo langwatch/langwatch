@@ -1,5 +1,5 @@
-import type { Automation, EmailSuppression } from "./automation";
-import type { TriggerFire } from "./trigger.queries";
+import type { Automation, EmailSuppression } from "./automation.ts";
+import type { TriggerFire } from "./trigger.queries.ts";
 export type AutomationFireStats = {
   triggerId: string;
   lastFiredAt: Date | null;

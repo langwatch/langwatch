@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { Task } from "../task";
-import { TaskCatalogue } from "../task-catalogue";
-import { TaskNotFoundError } from "../task.errors";
+import { Task } from "../task.ts";
+import { TaskCatalogue } from "../task-catalogue.ts";
+import { TaskNotFoundError } from "../task.errors.ts";
 
 class StubTask extends Task {
   readonly name: string;

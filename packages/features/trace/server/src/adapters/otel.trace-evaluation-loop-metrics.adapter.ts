@@ -2,7 +2,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
   TraceEvaluationLoopMetricsPort,
   type TraceEvaluationLoopBlockReason,
-} from "../ports/trace-evaluation-loop-metrics.port";
+} from "../ports/trace-evaluation-loop-metrics.port.ts";
 
 /**
  * The series name, its help text and its one label, pinned because two

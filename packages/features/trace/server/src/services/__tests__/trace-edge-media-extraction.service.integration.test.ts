@@ -3,13 +3,13 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * A fake TraceMediaStorePort content-addresses bytes the same way the real StoredObjectsService does (same bytes -> same id, isDuplicate:true on the second write), so dedup scenarios exercise real behaviour, not a mock returning canned answers. maybeExtractSpanMedia is production code; only its storage and feature-flag boundaries are faked.
  */
-import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service";
+import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service.ts";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
-import { type EdgeMediaExtractionDeps } from "../trace-edge-media-extraction.service";
+import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
+import { type EdgeMediaExtractionDeps } from "../trace-edge-media-extraction.service.ts";
 
 function flags(enabled = true): FeatureFlagService {
   return { isEnabled: async () => enabled } as never;

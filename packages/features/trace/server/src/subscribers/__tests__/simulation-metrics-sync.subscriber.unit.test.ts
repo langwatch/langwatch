@@ -10,7 +10,7 @@ import {
   createSimulationMetricsSyncHandler,
   hasSimulationMetrics,
   type SimulationMetricsSyncSubscriberDeps,
-} from "../simulation-metrics-sync.subscriber";
+} from "../simulation-metrics-sync.subscriber.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

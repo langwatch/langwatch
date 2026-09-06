@@ -2,7 +2,7 @@ import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
-import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository";
+import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
 
 export interface LogClickHouseClient {
   insert(params: {

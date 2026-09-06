@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSeriesIndex } from "../index";
+import { parseSeriesIndex } from "../index.ts";
 
 describe("parseSeriesIndex", () => {
   describe("given a well-formed seriesName", () => {

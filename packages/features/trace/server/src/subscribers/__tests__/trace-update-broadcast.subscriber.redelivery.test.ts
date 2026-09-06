@@ -17,12 +17,12 @@
  * "go and look again", or a redelivery of one would contradict the other.
  */
 import { describe, expect, it, vi } from "vitest";
-import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber";
+import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";
 import {
   createContext,
   createFoldState,
   createTraceEvent,
-} from "./subscribers/support/trace-subscriber.fixtures";
+} from "./subscribers/support/trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

@@ -2,17 +2,17 @@ export {
   SsoConnectionTrpcApi,
   type SsoConnectionTrpcContext,
   type SsoConnectionTrpcPorts,
-} from "./transport/api-trpc/sso-connection.api";
+} from "./transport/api-trpc/sso-connection.api.ts";
 export {
   LicensingSsoAdapter,
   type LicensingSsoAdapterOptions,
-} from "./adapters/licensing.sso.adapter";
+} from "./adapters/licensing.sso.adapter.ts";
 export {
   SsoGateLogger,
   SsoGateService,
   SsoProviderMountInspector,
   type SsoGateServiceOptions,
-} from "./services/sso-gate.service";
+} from "./services/sso-gate.service.ts";
 export {
   BetterAuthSsoAdapter,
   LEGACY_CALLBACK_PROVIDER_IDS,
@@ -25,4 +25,4 @@ export {
   legacyCallbackUrl,
   oidcProviderConfig,
   parseIssuerUrl,
-} from "./adapters/better-auth.better-auth.adapter";
+} from "./adapters/better-auth.better-auth.adapter.ts";

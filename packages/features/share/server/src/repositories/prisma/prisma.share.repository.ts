@@ -1,11 +1,11 @@
 import { shareLinkSchema, shareWithProjectSchema, type ShareLink } from "@langwatch/share-contract";
-import type { ShareDatabase } from "../../ports/share-database.port";
+import type { ShareDatabase } from "../../ports/share-database.port.ts";
 import {
   ShareRepository,
   type CreateShareLinkParams,
   type ShareResourceType,
   type ShareWithProject,
-} from "../share.repository";
+} from "../share.repository.ts";
 
 const projectInclude = {
   project: {

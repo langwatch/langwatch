@@ -17,7 +17,7 @@ import {
 } from "@langwatch/analytics-contract";
 import type { ClickHouseSettings } from "@clickhouse/client";
 import { z } from "zod";
-import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository";
+import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 
 const SLIM_TABLE = "evaluation_analytics";
 const ROLLUP_TABLE = "evaluation_analytics_rollup";

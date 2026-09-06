@@ -18,7 +18,7 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
-import { createCodingAgentLogFactsDispatchSubscriber } from "../coding-agent-log-facts-dispatch.subscriber";
+import { createCodingAgentLogFactsDispatchSubscriber } from "../coding-agent-log-facts-dispatch.subscriber.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const traceCanonicalisation = TraceCanonicalisationService.create();

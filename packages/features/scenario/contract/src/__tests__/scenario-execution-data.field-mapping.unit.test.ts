@@ -9,7 +9,7 @@ import {
   ChildProcessJobDataSchema,
   CodeAgentDataSchema,
   TargetConfigSchema,
-} from "../scenario-execution-data";
+} from "../scenario-execution-data.ts";
 
 describe("CodeAgentDataSchema", () => {
   describe("when scenarioOutputField is provided", () => {

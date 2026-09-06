@@ -5,10 +5,10 @@ import {
   GROUP_ICONS,
   NORMAL_CASE_FIELDS,
   SECTION_ORDER,
-} from "../../../../behavior/facet-constants";
-import { formatBytes } from "../../../../model/display-formatters";
-import { ORIGIN_DISPLAY, originLabel } from "../../../../model/origin-display";
-import type { SectionGroup } from "../../../../behavior/explorer/filter-sidebar/types";
+} from "../../../../behavior/facet-constants.ts";
+import { formatBytes } from "../../../../model/display-formatters.ts";
+import { ORIGIN_DISPLAY, originLabel } from "../../../../model/origin-display.ts";
+import type { SectionGroup } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 
 const TOKEN_K = 1_000;
 const TOKEN_M = 1_000_000;

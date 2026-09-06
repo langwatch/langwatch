@@ -13,8 +13,8 @@ import type {
   ComparisonEvaluatorConfig,
   TargetConfig,
   TargetType,
-} from "../../../model/experiments-v3/types";
-import { COMPARISON_EVALUATOR_TYPE } from "../../../model/experiments-v3/types";
+} from "../../../model/experiments-v3/types.ts";
+import { COMPARISON_EVALUATOR_TYPE } from "../../../model/experiments-v3/types.ts";
 
 // Card identifiers shown in the picker. "comparison" is a UI-only shortcut
 // that creates an evaluator-target pre-configured for the comparison judge —

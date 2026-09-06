@@ -20,16 +20,16 @@ import type { ComponentType } from "react";
 export type LicensingScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const licensingScreens = {
-  license: () => import("./license.screen"),
+  license: () => import("./license.screen.tsx"),
 } as const satisfies Record<string, LicensingScreenLoader>;
 
 export type LicensingScreenName = keyof typeof licensingScreens;
 
-export { LICENSE_PAGE_PERMISSION } from "./license.screen";
-export { licensingApi, type LicensingApiMap } from "../../behavior/licensing-api";
+export { LICENSE_PAGE_PERMISSION } from "./license.screen.tsx";
+export { licensingApi, type LicensingApiMap } from "../../behavior/licensing-api.ts";
 export {
   LicensingHostPort,
   LicensingHostProvider,
   type LicensingFailureNotice,
   type LicensingSuccessNotice,
-} from "../../model/licensing-host";
+} from "../../model/licensing-host.ts";

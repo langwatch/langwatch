@@ -1,8 +1,8 @@
-import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../../experiment-workbench";
-import { type DuplicateTargetPayload, duplicateTargetPayloadSchema } from "../schemas";
-import { attachTarget, newTargetId } from "./add-target";
-import { requireTarget } from "./helpers";
-import type { Transform } from "./types";
+import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../../experiment-workbench.ts";
+import { type DuplicateTargetPayload, duplicateTargetPayloadSchema } from "../schemas.ts";
+import { attachTarget, newTargetId } from "./add-target.ts";
+import { requireTarget } from "./helpers.ts";
+import type { Transform } from "./types.ts";
 
 /**
  * A mapping that reads the source target's output must read the copy's output instead —

@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { AuthzBindingRepository } from "../../authz-binding.repository";
+import { AuthzBindingRepository } from "../../authz-binding.repository.ts";
 
 export class StubAuthzBindingRepository extends AuthzBindingRepository {
   readonly hasBindingsForUser = vi.fn<AuthzBindingRepository["hasBindingsForUser"]>(

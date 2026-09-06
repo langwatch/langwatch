@@ -1,6 +1,6 @@
-import { type Prisma, PrismaClient } from "./generated/client";
-import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter";
-import type { PrismaConfiguration } from "./config";
+import { type Prisma, PrismaClient } from "./generated/client.ts";
+import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter.ts";
+import type { PrismaConfiguration } from "./config.ts";
 import type { Pool } from "pg";
 import type { PrismaPg } from "@prisma/adapter-pg";
 

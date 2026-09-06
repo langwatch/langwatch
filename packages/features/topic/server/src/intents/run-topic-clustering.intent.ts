@@ -1,4 +1,4 @@
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
+import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 
 /** A manual trigger enters Topic through its durable Eventing command. */
 export class RequestTopicClusteringTask {

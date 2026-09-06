@@ -10,8 +10,8 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { BUSY_RETRY_AFTER_MS } from "@langwatch/agent-contract";
 import type { ConnectedAgentData, RunParameterValues } from "@langwatch/scenario-contract";
-import { createChildProcessLogger } from "./child-logger.adapter";
-import { SerializedAgentPort } from "../ports/serialized-agent.port";
+import { createChildProcessLogger } from "./child-logger.adapter.ts";
+import { SerializedAgentPort } from "../ports/serialized-agent.port.ts";
 
 /** How long the adapter keeps retrying a busy agent before it gives up. */
 export const BUSY_RETRY_BUDGET_MS = 60_000;

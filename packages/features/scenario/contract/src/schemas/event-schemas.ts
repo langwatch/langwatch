@@ -4,10 +4,10 @@
  */
 import { EventType } from "@ag-ui/core";
 import { z } from "zod";
-import { runParameterValuesSchema } from "../scenario.parameters";
-import { runActorLabelSchema } from "../run-actor";
-import { scenarioMessageSchema } from "../scenario-message.schema";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run";
+import { runParameterValuesSchema } from "../scenario.parameters.ts";
+import { runActorLabelSchema } from "../run-actor.ts";
+import { scenarioMessageSchema } from "../scenario-message.schema.ts";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run.ts";
 
 /**
  * AG-UI Base Event Schema

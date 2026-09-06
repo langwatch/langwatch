@@ -10,17 +10,17 @@
 
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "../groupQueue";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "../groupQueue.ts";
 import {
   CLAIM_MARKER_TTL_SECONDS,
   GroupStagingScripts,
   WORKER_LIVENESS_REFRESH_MS,
   WORKER_LIVENESS_TTL_SECONDS,
   WORKER_RETIRED_TTL_SECONDS,
-} from "../scripts";
+} from "../scripts.ts";
 
-vi.mock("../dispatcher", () => ({
+vi.mock("../dispatcher.ts", () => ({
   GroupQueueDispatcher: class {
     start(): void {}
     requestShutdown(): void {}
@@ -28,7 +28,7 @@ vi.mock("../dispatcher", () => ({
   },
 }));
 
-vi.mock("../metricsCollector", () => ({
+vi.mock("../metricsCollector.ts", () => ({
   GroupQueueMetricsCollector: class {
     start(): void {}
     stop(): void {}

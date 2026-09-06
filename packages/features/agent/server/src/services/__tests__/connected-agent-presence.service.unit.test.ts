@@ -4,9 +4,9 @@
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LiveInstance } from "../../ports/connected-agent-runtime.port";
-import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port";
-import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service";
+import type { LiveInstance } from "../../ports/connected-agent-runtime.port.ts";
+import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port.ts";
+import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
 
 const listLive = vi.fn();
 

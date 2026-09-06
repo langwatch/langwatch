@@ -7,7 +7,7 @@
  * the process could decide whether to run it, and every process runs it.
  */
 import { migrateDSLVersion, type WorkflowDsl } from "@langwatch/workflow-contract";
-import { WorkflowDslMigrationPort } from "../ports/workflow.port";
+import { WorkflowDslMigrationPort } from "../ports/workflow.port.ts";
 
 export class ContractWorkflowDslMigrationAdapter extends WorkflowDslMigrationPort {
   static create(): ContractWorkflowDslMigrationAdapter {

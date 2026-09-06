@@ -6,8 +6,8 @@ import {
   LicenseStoragePort,
   NodeLicenseCryptographyAdapter,
   type StoredLicense,
-} from "../index";
-import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "../testing";
+} from "../index.ts";
+import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "../testing.ts";
 
 const ORGANIZATION_ID = "org_123";
 const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;

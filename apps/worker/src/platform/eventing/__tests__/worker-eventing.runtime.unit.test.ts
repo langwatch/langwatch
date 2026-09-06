@@ -21,7 +21,7 @@ import {
   WorkerEventingRuntime,
   type WorkerEventingConsumerOptions,
   type WorkerEventingProductionOptions,
-} from "../worker-eventing.runtime";
+} from "../worker-eventing.runtime.ts";
 
 /**
  * A cross-pipeline map projection and the subscriber that follows it, reduced

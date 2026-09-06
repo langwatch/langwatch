@@ -2,7 +2,7 @@
 
 import { renderLiquid } from "@langwatch/automation-contract";
 
-import type { RunParameterValues } from "./scenario.parameters";
+import type { RunParameterValues } from "./scenario.parameters.ts";
 
 export type ScenarioContentField = "situation" | `criteria[${number}]`;
 

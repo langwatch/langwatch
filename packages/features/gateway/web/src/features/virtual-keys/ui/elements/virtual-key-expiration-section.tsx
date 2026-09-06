@@ -8,7 +8,7 @@ import {
   resolveExpiresAt,
   VIRTUAL_KEY_EXPIRATION_OPTIONS,
   type VirtualKeyExpirationPreset,
-} from "../../model/virtual-key-expiration";
+} from "../../model/virtual-key-expiration.ts";
 
 export type VirtualKeyExpirationValue = {
   preset: VirtualKeyExpirationPreset;

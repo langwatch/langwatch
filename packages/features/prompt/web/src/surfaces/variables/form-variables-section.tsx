@@ -1,8 +1,8 @@
 import type { LlmConfigInputType } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import type { AvailableSource, FieldMapping } from "./variable-mapping-input";
-import { type Variable, VariablesSection } from "./variables-section";
+import type { AvailableSource, FieldMapping } from "./variable-mapping-input.tsx";
+import { type Variable, VariablesSection } from "./variables-section.tsx";
 
 /**
  * The slice of the prompt config form this section reads and writes.

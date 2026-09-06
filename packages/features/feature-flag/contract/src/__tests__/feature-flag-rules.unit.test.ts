@@ -4,7 +4,7 @@ import {
   type FeatureFlagRules,
   parseRules,
   resolveEffectiveForListing,
-} from "../feature-flag-rules";
+} from "../feature-flag-rules.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
 

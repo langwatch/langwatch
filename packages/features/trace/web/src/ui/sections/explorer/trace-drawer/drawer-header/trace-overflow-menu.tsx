@@ -18,13 +18,13 @@ import {
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors";
-import { useDrawer } from "../../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api } from "../../../../../behavior/trace-api";
-import { useConversationTurns } from "../../hooks/use-conversation-turns";
-import { isPreviewTraceId } from "../../../../../model/preview-trace-id";
-import { enterTraceEditMode } from "../../utils/trace-edit-mode";
+import { showErrorToast } from "../../../errors/index.ts";
+import { useDrawer } from "../../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../../behavior/trace-api.ts";
+import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
+import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
+import { enterTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 interface TraceOverflowMenuProps {
   traceId: string;

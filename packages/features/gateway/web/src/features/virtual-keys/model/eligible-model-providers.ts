@@ -1,6 +1,6 @@
-import { MODEL_PROVIDER_DEFAULT_MODELS } from "./model-provider-default-models";
+import { MODEL_PROVIDER_DEFAULT_MODELS } from "./model-provider-default-models.ts";
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
-import { SCOPE_BREADTH, scopeBreadthRank } from "./scope-breadth";
+import { SCOPE_BREADTH, scopeBreadthRank } from "./scope-breadth.ts";
 
 /**
  * A scope a VirtualKey is reachable from: the org/team/project triad the

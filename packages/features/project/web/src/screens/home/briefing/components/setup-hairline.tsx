@@ -7,9 +7,9 @@ import {
   calculateCompletionPercentage,
   type OnboardingStepKey,
   STEP_ICON,
-} from "../../components/onboarding-progress";
-import { homeApi } from "../../../../behavior/home-api";
-import { useProjectHomeHost } from "../../../../model/project-home-host";
+} from "../../components/onboarding-progress.tsx";
+import { homeApi } from "../../../../behavior/home-api.ts";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * The setup checklist, receded to a hairline.

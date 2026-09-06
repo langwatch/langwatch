@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { formatShortDate } from "../short-date";
+import { formatShortDate } from "../short-date.ts";
 
 const NOW = new Date("2026-08-07T12:00:00Z").getTime();
 

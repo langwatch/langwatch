@@ -20,13 +20,13 @@ import type { ComponentType } from "react";
 export type DataRetentionScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const dataRetentionScreens = {
-  dataRetention: () => import("./data-retention.screen"),
+  dataRetention: () => import("./data-retention.screen.tsx"),
 } as const satisfies Record<string, DataRetentionScreenLoader>;
 
 export type DataRetentionScreenName = keyof typeof dataRetentionScreens;
 
-export { RETENTION_SCOPE_QUERY_KEY } from "./data-retention.screen";
-export { dataRetentionApi } from "../../behavior/data-retention-api";
+export { RETENTION_SCOPE_QUERY_KEY } from "./data-retention.screen.tsx";
+export { dataRetentionApi } from "../../behavior/data-retention-api.ts";
 export {
   DataRetentionHostPort,
   DataRetentionHostProvider,
@@ -35,4 +35,4 @@ export {
   type RetentionHostScope,
   type RetentionRouteReading,
   type RetentionSuccessNotice,
-} from "../../model/data-retention-host";
+} from "../../model/data-retention-host.ts";

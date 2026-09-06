@@ -1,7 +1,7 @@
 import { Box, Button, Card, Container, HStack, Spacer } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { LogOut } from "react-feather";
-import { useOnboardingHost } from "../../model/onboarding-host";
+import { useOnboardingHost } from "../../model/onboarding-host.ts";
 
 /**
  * The frame the signed-out-ish setup pages sit in.

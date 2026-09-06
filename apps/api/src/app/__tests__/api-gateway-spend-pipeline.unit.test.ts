@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiGatewaySpendPipelineAbsenceReport,
   composeApiGatewaySpendPipeline,
-} from "../api-gateway-spend-pipeline.composition";
+} from "../api-gateway-spend-pipeline.composition.ts";
 
 const PROCESS_NAME = "langwatch-api-test";
 

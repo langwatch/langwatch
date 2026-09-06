@@ -11,12 +11,12 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
-} from "./errors.js";
+} from "./errors.ts";
 
-export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.js";
-export { ConnectUpgradeRouterPort } from "./ports.js";
+export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
+export { ConnectUpgradeRouterPort } from "./ports.ts";
 
-export type { ApiSchema, ApiSchemaOutput } from "./schema.js";
+export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 
 // The access-policy vocabulary: what credential an operation accepts, and what
 // that credential can reach. Read by the REST route registry, the OpenAPI
@@ -39,6 +39,6 @@ export {
   requires,
   requiresOnProject,
   requiresOnTeam,
-} from "./access-policy.js";
+} from "./access-policy.ts";
 
-export { isInternalSecretValid } from "./rest/security/internal-secret";
+export { isInternalSecretValid } from "./rest/security/internal-secret.ts";

@@ -5,12 +5,12 @@
  */
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LANGY_REFERENT_POLICY } from "../langy-conversation-memory.service";
+import { LANGY_REFERENT_POLICY } from "../langy-conversation-memory.service.ts";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
-} from "../langy-turn.service";
+} from "../langy-turn.service.ts";
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);

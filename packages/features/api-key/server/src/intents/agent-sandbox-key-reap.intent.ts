@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
-import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../processes/agent-sandbox-key-reap.process";
+import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../processes/agent-sandbox-key-reap.process.ts";
 
 const logger = createLogger("langwatch:agent-sandbox:key-reap");
 

@@ -23,16 +23,16 @@ import {
 } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
-import { trpcClientAddress } from "../../app/api-client-address";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import { ApiTraceReadStackPort } from "./trace-read-stack.port";
-import type { ApiTracePorts } from "./trace.composition.types";
+import { trpcClientAddress } from "../../app/api-client-address.ts";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import type { ApiTracePorts } from "./trace.composition.types.ts";
 import {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,
   createTracesTrpcRouter,
-} from "./trace-trpc.mount";
-import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount";
+} from "./trace-trpc.mount.ts";
+import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount.ts";
 
 // ---------------------------------------------------------------------------
 // The four named absences
@@ -91,7 +91,7 @@ export type TraceFeatureOptions = Readonly<{
   report?: ApiTraceAbsenceReport;
 }>;
 
-import type { ComposedTraceFeature } from "./trace.composition.types";
+import type { ComposedTraceFeature } from "./trace.composition.types.ts";
 
 // ---------------------------------------------------------------------------
 // The composition

@@ -2,9 +2,9 @@
 
 import type { UserService } from "@langwatch/user-contract";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
-import { ScimCostCenterService } from "./scim-cost-center.service";
-import { ScimDeprovisionService } from "./scim-deprovision.service";
-import { ScimUserProfileService } from "./scim-user-profile.service";
+import { ScimCostCenterService } from "./scim-cost-center.service.ts";
+import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import { ScimUserProfileService } from "./scim-user-profile.service.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

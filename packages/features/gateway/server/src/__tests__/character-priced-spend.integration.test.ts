@@ -14,13 +14,13 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter";
-import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
+import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 
 const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 class AllowTestQueries extends PrismaQueryGuard {

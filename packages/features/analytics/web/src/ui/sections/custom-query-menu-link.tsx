@@ -8,8 +8,8 @@
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { MenuLink } from "../elements/analytics-menu-link";
-import { analyticsApi } from "../../behavior/analytics-api";
+import { MenuLink } from "../elements/analytics-menu-link.tsx";
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 
 export interface CustomQueryMenuLinkProps {
   projectId: string;

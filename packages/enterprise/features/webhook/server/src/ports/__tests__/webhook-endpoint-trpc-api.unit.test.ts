@@ -17,11 +17,11 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/enterprise-webhook-contract";
-import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
-import { WebhookIdPort } from "../webhook-id.port";
-import { WebhookSecretPort } from "../webhook-secret.port";
-import { WebhookApp } from "../../app/webhook.app";
-import { WebhookEndpointTrpcApi } from "../../transport/api-trpc/webhook-endpoint.api";
+import { WebhookEndpointAdapter } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
+import { WebhookIdPort } from "../webhook-id.port.ts";
+import { WebhookSecretPort } from "../webhook-secret.port.ts";
+import { WebhookApp } from "../../app/webhook.app.ts";
+import { WebhookEndpointTrpcApi } from "../../transport/api-trpc/webhook-endpoint.api.ts";
 
 const ORG_ID = "org_1";
 

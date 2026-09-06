@@ -12,7 +12,7 @@ let mockEdges: Array<{ id: string; source: string; target: string; targetHandle?
 let mockWorkflowType = "workflow";
 let currentNode: Node<End>;
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       nodes: [currentNode],
@@ -26,8 +26,8 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-import { EndPropertiesPanel, EVALUATOR_RESULT_FIELDS } from "../workflow-end-properties-panel";
-import type { WorkflowVariablesProps } from "../workflow-properties.ports";
+import { EndPropertiesPanel, EVALUATOR_RESULT_FIELDS } from "../workflow-end-properties-panel.tsx";
+import type { WorkflowVariablesProps } from "../workflow-properties.ports.ts";
 
 const createEndNode = (overrides: Partial<End> = {}): Node<End> => ({
   id: "end",

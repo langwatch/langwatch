@@ -17,7 +17,7 @@ vi.mock("@langwatch/design-system/tooltip", () => ({
   ),
 }));
 
-const { ModeSwitch } = await import("../mode-switch");
+const { ModeSwitch } = await import("../mode-switch.tsx");
 
 const EDITING_REASON = "Finish annotating to switch views";
 

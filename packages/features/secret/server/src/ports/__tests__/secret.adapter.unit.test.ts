@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   PostgresSecretAdapter,
   type PostgresSecretAdapterOptions,
-} from "../../adapters/postgres.secret.adapter";
-import { SecretEncryptionPort } from "../secret.port";
+} from "../../adapters/postgres.secret.adapter.ts";
+import { SecretEncryptionPort } from "../secret.port.ts";
 
 class StubSecretEncryption extends SecretEncryptionPort {
   encrypt(value: string): string {

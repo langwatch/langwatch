@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
-} from "../graph-trigger-sent.repository";
+} from "../graph-trigger-sent.repository.ts";
 import { parseSeriesIndex } from "@langwatch/automation-contract";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */

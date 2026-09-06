@@ -4,8 +4,8 @@ import type { ProjectService } from "@langwatch/project-contract";
 import {
   PrismaAnnotationRepository,
   type AnnotationDatabase,
-} from "../repositories/prisma/prisma.annotation.repository";
-import { AnnotationService } from "../services/annotation.service";
+} from "../repositories/prisma/prisma.annotation.repository.ts";
+import { AnnotationService } from "../services/annotation.service.ts";
 
 export interface PostgresAnnotationAdapterOptions {
   database: AnnotationDatabase;

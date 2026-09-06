@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
-import { BroadcastTenantRateLimiterAdapter } from "./broadcast-tenant-rate-limiter.adapter";
+import { BroadcastTenantRateLimiterAdapter } from "./broadcast-tenant-rate-limiter.adapter.ts";
 
 export type BroadcastEventType =
   | "trace_updated"

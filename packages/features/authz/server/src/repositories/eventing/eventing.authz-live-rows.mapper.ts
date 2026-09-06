@@ -13,7 +13,7 @@
  * Reads that deliberately want history — the migration's inventory of what an
  * organization has held, ended or not — use the client directly and say so.
  */
-import type { AuthzDatabase } from "../authz-read.repository";
+import type { AuthzDatabase } from "../authz-read.repository.ts";
 
 type QueryArgs = Readonly<{
   where?: Readonly<Record<string, unknown>>;

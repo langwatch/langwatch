@@ -6,14 +6,14 @@ import { evaluationCompletedEventSchema } from "@langwatch/evaluation-contract";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection";
+} from "../projections/evaluation-analytics-fold.projection.ts";
 import {
   type EvaluationAnalyticsData,
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
-} from "../projections/evaluation-analytics-row.projection";
-import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port";
-import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store";
+} from "../projections/evaluation-analytics-row.projection.ts";
+import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port.ts";
+import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
 
 /**
  * Read-back round-trip (ADR-066): `fromRow` recovers WORKING state from the

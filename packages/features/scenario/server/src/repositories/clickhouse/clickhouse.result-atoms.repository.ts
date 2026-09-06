@@ -24,9 +24,9 @@ import {
   type RawTotalsRow,
   type RawTrendRow,
   type RunOrdinalRow,
-} from "../../ports/result-atoms-read.port";
-import { mapStatus } from "./simulation-run.mapper";
-import { RUN_NOTE_EXPR, TABLE_NAME } from "./simulation-clickhouse.repository";
+} from "../../ports/result-atoms-read.port.ts";
+import { mapStatus } from "./simulation-run.mapper.ts";
+import { RUN_NOTE_EXPR, TABLE_NAME } from "./simulation-clickhouse.repository.ts";
 
 /**
  * Raw `Status` values read as failure: stalled/cancelled count, and

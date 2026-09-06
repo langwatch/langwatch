@@ -13,21 +13,21 @@ import {
 import { CheckCircle2, Circle, CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
-import GovernanceLayout from "../../ui/sections/governance-layout";
-import { QuarantineFillAlert } from "../../features/overview/ui/sections/quarantine-fill-panel";
-import { SpendByTeamBar } from "../../features/overview/ui/sections/spend-by-team-panel";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
+import { QuarantineFillAlert } from "../../features/overview/ui/sections/quarantine-fill-panel.tsx";
+import { SpendByTeamBar } from "../../features/overview/ui/sections/spend-by-team-panel.tsx";
 import {
   type GroupBy,
   SpendOverTimeChart,
-} from "../../features/overview/ui/blocks/spend-over-time-chart";
-import { InstallCliCard } from "../../ui/elements/install-cli-card";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
-import { Link } from "../../ui/elements/governance-link";
-import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { useGovernanceScope } from "../../behavior/governance-session";
+} from "../../features/overview/ui/blocks/spend-over-time-chart.tsx";
+import { InstallCliCard } from "../../ui/elements/install-cli-card.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
+import { Link } from "../../ui/elements/governance-link.tsx";
+import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useGovernanceScope } from "../../behavior/governance-session.ts";
 import type { AuthzPermission as Permission } from "@langwatch/authz-contract";
-import { api, type RouterOutputs } from "../../behavior/governance-api";
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 /**
  * Governance overview - spend, users, anomalies, IngestionSource health.

@@ -4,10 +4,10 @@ import {
   COMPARISON_COLUMN_REFUSAL,
   type EvaluatorConfig,
   isComparisonEvaluatorType,
-} from "../../../experiment-workbench";
-import { inferAllEvaluatorMappings } from "../../mapping-inference";
-import { type AddEvaluatorPayload, addEvaluatorPayloadSchema } from "../schemas";
-import { type Transform, TransformError, type WorkbenchState } from "./types";
+} from "../../../experiment-workbench.ts";
+import { inferAllEvaluatorMappings } from "../../mapping-inference.ts";
+import { type AddEvaluatorPayload, addEvaluatorPayloadSchema } from "../schemas.ts";
+import { type Transform, TransformError, type WorkbenchState } from "./types.ts";
 
 export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
 

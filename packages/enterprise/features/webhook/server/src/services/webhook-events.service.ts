@@ -4,9 +4,9 @@ import {
   type ListWebhookEventsResult,
   type WebhookEnvelope,
 } from "@langwatch/enterprise-webhook-contract";
-import type { WebhookEventsRepositoryPort } from "../ports/webhook-events.port";
-import { WebhookTenantsRepository } from "../repositories/webhook-tenants.repository";
-import { WebhookEnvelopeService } from "./webhook-envelope.service";
+import type { WebhookEventsRepositoryPort } from "../ports/webhook-events.port.ts";
+import { WebhookTenantsRepository } from "../repositories/webhook-tenants.repository.ts";
+import { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
 export type WebhookEventsServiceOptions = {
   tenants: WebhookTenantsRepository;

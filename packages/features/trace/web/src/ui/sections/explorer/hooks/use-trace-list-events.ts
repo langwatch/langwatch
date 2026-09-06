@@ -1,12 +1,12 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { TraceEventRollup } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
-import type { TraceListItem } from "../types/trace";
-import { NO_TRACE_EVENTS } from "../types/trace";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../types/trace.ts";
 
 /**
  * Attaches each row's events, read once per visible page.

@@ -1,7 +1,7 @@
 import { Button, Kbd, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
-import { useCommandBar } from "../../behavior/command-bar-context";
-import { getCommandBarShortcut } from "../../model/command-platform";
+import { useCommandBar } from "../../behavior/command-bar-context.ts";
+import { getCommandBarShortcut } from "../../model/command-platform.ts";
 
 /**
  * Button to trigger opening the command bar.

@@ -18,7 +18,7 @@ import { RoleApp, type RoleTrpcContext } from "@langwatch/role-server";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createRoleTrpcRouter } from "../role-trpc.mount";
+import { createRoleTrpcRouter } from "../role-trpc.mount.ts";
 
 const ORGANIZATION_ID = "organization_role_mount";
 const USER_ID = "user_role_mount";

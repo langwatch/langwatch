@@ -1,4 +1,4 @@
-import { WorkflowProjectEnvironmentPort } from "../ports/workflow.port";
+import { WorkflowProjectEnvironmentPort } from "../ports/workflow.port.ts";
 
 /**
  * The project credentials and decrypted secrets a Studio run executes with.

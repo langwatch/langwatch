@@ -2,7 +2,7 @@ import {
   modelCostEstimateInputSchema,
   type ModelCostEstimateInput,
   type ModelCostRate,
-} from "./model-provider";
+} from "./model-provider.ts";
 import safe from "safe-regex2";
 
 const ATTR = {

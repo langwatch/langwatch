@@ -1,22 +1,22 @@
 /**
  * Every tRPC surface this package owns, mounted on one process's root.
  */
-import type { ApiTrpcFeatureMount } from "../api.application";
-import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
-import type { ComposedApiFeatures } from "./app-trpc.composed";
+import type { ApiTrpcFeatureMount } from "../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ComposedApiFeatures } from "./app-trpc.composed.ts";
 
-import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
-import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount";
-import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
-import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
-import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount";
-import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount";
-import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount";
-import { composeGithubTrpcRouter } from "../features/github/github.composition";
-import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount";
-import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
-import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
-import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount";
+import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
+import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount.ts";
+import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount.ts";
+import { createExportTrpcRouter } from "../features/export/export-trpc.mount.ts";
+import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount.ts";
+import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount.ts";
+import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount.ts";
+import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
+import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
+import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
+import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
+import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount.ts";
 
 /**
  * Builds every tRPC surface this package owns against one process's mount.

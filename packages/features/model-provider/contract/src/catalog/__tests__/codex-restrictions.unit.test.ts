@@ -13,8 +13,8 @@ import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
   LANGY_CHAT_FEATURE_KEY,
-} from "../codex-restrictions";
-import { allFeatures, featureByKey, featuresByRole } from "../model-feature-registry";
+} from "../codex-restrictions.ts";
+import { allFeatures, featureByKey, featuresByRole } from "../model-feature-registry.ts";
 
 describe("codexRestrictions", () => {
   it("recognises codex model ids by provider prefix", () => {

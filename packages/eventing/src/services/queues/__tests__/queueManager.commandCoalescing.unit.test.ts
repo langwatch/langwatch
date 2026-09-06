@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { Command, CommandHandler } from "../../../commands/command";
-import type { CommandHandlerClass } from "../../../commands/commandHandlerClass";
-import { defineCommandSchema } from "../../../commands/commandSchema";
-import type { CommandType } from "../../../domain/commandType";
-import type { Event } from "../../../domain/types";
-import type { EventSourcedQueueProcessor } from "../../../queues";
-import { createTestAggregateType, TEST_CONSTANTS } from "../../__tests__/testHelpers";
-import type { JobRegistryEntry } from "../queueManager";
-import { QueueManager } from "../queueManager";
+import type { Command, CommandHandler } from "../../../commands/command.ts";
+import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
+import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import type { CommandType } from "../../../domain/commandType.ts";
+import type { Event } from "../../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
+import { createTestAggregateType, TEST_CONSTANTS } from "../../__tests__/testHelpers.ts";
+import type { JobRegistryEntry } from "../queueManager.ts";
+import { QueueManager } from "../queueManager.ts";
 
 /**
  * Which producers get a batch processor installed. Coalescing only engages

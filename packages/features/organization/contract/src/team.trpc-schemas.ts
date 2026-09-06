@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationTeamMemberInputSchema } from "./team";
+import { organizationTeamMemberInputSchema } from "./team.ts";
 
 /**
  * The transport inputs the team surface publishes. A team belongs to exactly

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserService } from "@langwatch/user-contract";
-import { BetterAuthAnnouncementsPort } from "../../../ports/better-auth.port";
+import { BetterAuthAnnouncementsPort } from "../../../ports/better-auth.port.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type SignUpVerificationPort,
-} from "../passkey-sign-up.api";
+} from "../passkey-sign-up.api.ts";
 
 const requestVerification = vi.fn();
 const createPasskeyUser = vi.fn();

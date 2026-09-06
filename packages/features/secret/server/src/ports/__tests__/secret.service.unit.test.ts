@@ -6,9 +6,9 @@ import {
   SecretReservedNameError,
 } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { SecretEncryptionPort } from "../secret.port";
-import { SecretRepository } from "../../repositories/secret.repository";
-import { SecretService } from "../../services/secret.service";
+import { SecretEncryptionPort } from "../secret.port.ts";
+import { SecretRepository } from "../../repositories/secret.repository.ts";
+import { SecretService } from "../../services/secret.service.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

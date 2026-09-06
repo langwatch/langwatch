@@ -21,8 +21,8 @@ import {
   LicensingHostPort,
   LicensingHostProvider,
   type LicensingSuccessNotice,
-} from "../../../model/licensing-host";
-import { useLicenseActions } from "../use-license-actions";
+} from "../../../model/licensing-host.ts";
+import { useLicenseActions } from "../use-license-actions.ts";
 
 const { uploadMutationOptions, removeMutationOptions, publicEnvData, invalidateMock, toaster } =
   vi.hoisted(() => ({
@@ -45,7 +45,7 @@ const { uploadMutationOptions, removeMutationOptions, publicEnvData, invalidateM
 // stays unwired.
 const { reloadPage } = vi.hoisted(() => ({ reloadPage: vi.fn() }));
 
-vi.mock("../../../behavior/licensing-api", () => ({
+vi.mock("../../../behavior/licensing-api.ts", () => ({
   licensingApi: {
     license: {
       upload: {

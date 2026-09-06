@@ -1,7 +1,7 @@
-import { readString } from "./telemetry/coding-agent-span";
+import { readString } from "./telemetry/coding-agent-span.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
 
-export { readString } from "./telemetry/coding-agent-span";
+export { readString } from "./telemetry/coding-agent-span.ts";
 
 export function readUnknown(
   attrs: Record<string, unknown> | null | undefined,

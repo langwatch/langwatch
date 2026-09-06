@@ -28,11 +28,11 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createErrorHandler } from "../../errors.js";
-import { createTrpcErrorFormatter } from "../trpc-error-formatter.js";
-import { trpcFailureTraceIds } from "../trpc-failure-trace.js";
-import { TrpcRootDefinition } from "../trpc-root.js";
-import { createTrpcRuntimePolicy } from "../trpc-runtime-policy.js";
+import { createErrorHandler } from "../../errors.ts";
+import { createTrpcErrorFormatter } from "../trpc-error-formatter.ts";
+import { trpcFailureTraceIds } from "../trpc-failure-trace.ts";
+import { TrpcRootDefinition } from "../trpc-root.ts";
+import { createTrpcRuntimePolicy } from "../trpc-runtime-policy.ts";
 
 type TestContext = {
   readonly req?: { headers: Record<string, string | undefined> };

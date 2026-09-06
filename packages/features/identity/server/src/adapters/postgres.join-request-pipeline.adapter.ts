@@ -1,21 +1,21 @@
-import { JoinRequestGuardsService } from "../services/join-request-guards.service";
-import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
-import { JoinRequestService } from "../services/join-request.service";
-import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter";
+import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
+import type { JoinRequestMailPort } from "../ports/join-request-mail.port.ts";
+import { JoinRequestService } from "../services/join-request.service.ts";
+import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter.ts";
 import type { EventSourcing } from "@langwatch/eventing";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
-} from "./join-request-pipeline-definition.adapter";
+} from "./join-request-pipeline-definition.adapter.ts";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "../projections/join-request-state.projection";
+import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
-} from "./eventing.join-request-ledger.adapter";
-import { EventingJoinRequestLifecycleAdapter } from "./eventing.join-request-lifecycle.adapter";
-import { PrismaJoinRequestProjectionRepository } from "../repositories/prisma/prisma.join-request-projection.repository";
-import { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository";
+} from "./eventing.join-request-ledger.adapter.ts";
+import { EventingJoinRequestLifecycleAdapter } from "./eventing.join-request-lifecycle.adapter.ts";
+import { PrismaJoinRequestProjectionRepository } from "../repositories/prisma/prisma.join-request-projection.repository.ts";
+import { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** Every model the join-request ledger reads or writes, and no other. */

@@ -20,9 +20,9 @@ import {
   mightContainMockCall,
   resolveMockSpecifier,
   scanSourceForMockSpecifiers,
-} from "../mock-specifier-scan";
-import { parseSourceText, parseSourceTexts } from "../ts-ast";
-import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitest-alias-table";
+} from "../mock-specifier-scan.ts";
+import { parseSourceText, parseSourceTexts } from "../ts-ast.ts";
+import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitest-alias-table.ts";
 
 /** packages/test-harness/, from src/__tests__/. */
 const PACKAGE_ROOT = resolve(__dirname, "../..");

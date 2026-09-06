@@ -1,4 +1,4 @@
-import type { SpendUsage } from "../processes/gateway-spend-commands.process";
+import type { SpendUsage } from "../processes/gateway-spend-commands.process.ts";
 
 /**
  * Prices measured quantities.

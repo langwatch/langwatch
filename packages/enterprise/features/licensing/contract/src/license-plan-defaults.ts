@@ -1,5 +1,5 @@
-import { DEFAULT_MEMBERS_LITE } from "./license-constants";
-import type { LicensePlanLimits } from "./license";
+import { DEFAULT_MEMBERS_LITE } from "./license-constants.ts";
+import type { LicensePlanLimits } from "./license.ts";
 
 const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
 

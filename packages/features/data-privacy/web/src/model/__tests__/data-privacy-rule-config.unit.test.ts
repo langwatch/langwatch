@@ -26,7 +26,7 @@ import {
   ruleSummary,
   type SecretsChoice,
   selectionToAudience,
-} from "../data-privacy-rule-config";
+} from "../data-privacy-rule-config.ts";
 
 const inheritDispositions: RuleFormState["dispositions"] = {
   input: "inherit",

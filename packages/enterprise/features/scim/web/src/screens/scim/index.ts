@@ -19,16 +19,16 @@ import type { ComponentType } from "react";
 export type ScimScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const scimScreens = {
-  scim: () => import("./scim.screen"),
+  scim: () => import("./scim.screen.tsx"),
 } as const satisfies Record<string, ScimScreenLoader>;
 
 export type ScimScreenName = keyof typeof scimScreens;
 
-export { SCIM_PAGE_PERMISSION } from "./scim.screen";
-export { scimApi, type ScimApiMap, type ScimTokenRow } from "../../behavior/scim-api";
+export { SCIM_PAGE_PERMISSION } from "./scim.screen.tsx";
+export { scimApi, type ScimApiMap, type ScimTokenRow } from "../../behavior/scim-api.ts";
 export {
   ScimHostPort,
   ScimHostProvider,
   type ScimFailureNotice,
   type ScimSuccessNotice,
-} from "../../model/scim-host";
+} from "../../model/scim-host.ts";

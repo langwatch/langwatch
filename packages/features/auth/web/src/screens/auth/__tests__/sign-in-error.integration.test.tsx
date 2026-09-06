@@ -19,8 +19,8 @@ const { sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
   searchParamsRef: { current: new URLSearchParams("") },
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     useSession: () => sessionRef.current,
@@ -34,22 +34,22 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
 // navigation jsdom does not implement and therefore never records.
 const { hardNavigate } = vi.hoisted(() => ({ hardNavigate: vi.fn() }));
 
-vi.mock("../../../behavior/browser-navigation", () => ({
+vi.mock("../../../behavior/browser-navigation.ts", () => ({
   hardNavigate,
   replaceLocation: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-import Error from "../sign-in-error.screen";
+import Error from "../sign-in-error.screen.tsx";
 
 const setReferrer = (value: string) => {
   Object.defineProperty(document, "referrer", { value, configurable: true });

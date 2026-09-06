@@ -13,10 +13,10 @@ import {
   type GraphTriggerHeartbeatDeps,
   type ClickHouseClient,
   GraphTriggerHeartbeatService,
-} from "../../services/graph-trigger-heartbeat.service";
+} from "../../services/graph-trigger-heartbeat.service.ts";
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository";
-import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes";
+import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
+import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes.ts";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;

@@ -13,8 +13,8 @@ import {
   type ApiTrpcFeatureMount,
   MissingAgentService,
   NoApiTrpcFeatures,
-} from "../api.application";
-import { ApiHttpListener } from "../api-http.listener";
+} from "../api.application.ts";
+import { ApiHttpListener } from "../api-http.listener.ts";
 
 const secret: Secret = {
   id: "secret-1",

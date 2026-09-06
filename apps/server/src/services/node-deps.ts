@@ -84,8 +84,8 @@ export async function ensureLangwatchDeps(
   const hashFile = join(nodeModulesPath, ".install-hash");
 
   // One artifact, not five. The two Node processes are no longer bundled —
-  // apps/api and apps/worker each declare `tsx` as a production dependency and
-  // run their entry point from source, and the ClickHouse migrations are read
+  // apps/api and apps/worker run their entry point from source through Node's
+  // own type stripping, and the ClickHouse migrations are read
   // from the task's own directory rather than a copy under dist/server. What a
   // build still has to produce is the browser bundle the API process serves,
   // and index.html is the file that proves it landed whole: an interrupted
@@ -197,7 +197,7 @@ export async function ensureLangwatchDeps(
     // (Prisma client, langevals evaluator types, the langy skill catalogue),
     // ensure:built (the SDK and mcp-server bundles, which no --filter closure
     // below reaches), then the browser bundle — without dist/client every
-    // browser route 404s. Neither Node process is built; both run under tsx.
+    // browser route 404s. Neither Node process is built; both run from source.
     for (const script of ["start:prepare:files", "ensure:built"]) {
       await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
         ...pnpm.args,
@@ -226,9 +226,9 @@ export async function ensureLangwatchDeps(
   // This is what drops vite, vitest, playwright and the rest of the
   // build tooling from the tree the server actually runs — on the order of a
   // gigabyte — while prisma stays, because migrations run through the prisma
-  // CLI and apps/api declares it as a runtime dependency. tsx stays for the
-  // same reason: apps/api and apps/worker boot their entry point through it,
-  // so it is a production dependency of both rather than build tooling.
+  // CLI and apps/api declares it as a runtime dependency. Nothing equivalent
+  // is needed for TypeScript any more: every application boots its entry point
+  // through Node's own type stripping.
   //
   // A re-install with `--prod` rather than `pnpm prune --prod`: prune has no
   // `--filter`, so in a workspace it reasons about every project rather than

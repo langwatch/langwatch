@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository";
+import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const TENANT = "tenant_1";
 

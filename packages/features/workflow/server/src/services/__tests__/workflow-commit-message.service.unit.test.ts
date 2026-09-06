@@ -5,8 +5,8 @@ import {
   WorkflowAiCallPort,
   WorkflowCommitMessageModelPort,
   type WorkflowAiCallFeature,
-} from "../../ports/workflow-commit-message.port";
-import { WorkflowCommitMessageService } from "../workflow-commit-message.service";
+} from "../../ports/workflow-commit-message.port.ts";
+import { WorkflowCommitMessageService } from "../workflow-commit-message.service.ts";
 
 // Regression: commit-message autogen sent function tools + reasoning_effort
 // to /v1/chat/completions, which the gpt-5 family rejects ("use /v1/responses

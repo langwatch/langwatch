@@ -9,10 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useSelectionStore } from "../../../../../behavior/selection.store";
-import type { TraceListItem } from "../../types/trace";
-import { traceSelectColumnDef } from "../select-column";
-import { buildTracePlaceholderRows } from "../skeleton-placeholders";
+import { useSelectionStore } from "../../../../../behavior/selection.store.ts";
+import type { TraceListItem } from "../../types/trace.ts";
+import { traceSelectColumnDef } from "../select-column.tsx";
+import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 
 const realRows = (): TraceListItem[] =>
   buildTracePlaceholderRows(2).map((row, index) => ({

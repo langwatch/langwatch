@@ -1,9 +1,9 @@
 import process from "node:process";
-import { ApiBootFailurePort, startApiExecutable } from "../api.executable";
-import type { ApiRuntimeBootstrap } from "../api.main";
-import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers";
-import type { ApiProductionCompositionOptions } from "./api-production.composition";
-import { ApiStandaloneComposition } from "./api-standalone.composition";
+import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
+import type { ApiRuntimeBootstrap } from "../api.main.ts";
+import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
+import type { ApiProductionCompositionOptions } from "./api-production.composition.ts";
+import { ApiStandaloneComposition } from "./api-standalone.composition.ts";
 
 /**
  * Everything the standalone executable subscribes to on the process it runs

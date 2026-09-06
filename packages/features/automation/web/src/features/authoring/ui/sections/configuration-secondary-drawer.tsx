@@ -1,10 +1,10 @@
 import type { EmailPreview, SlackPreview, WebhookPreview } from "@langwatch/automation-contract";
 import { TriggerAction } from "@langwatch/automation-contract";
-import type { NotifyPreview } from "./client-providers";
-import type { ConfigFormCtx } from "../../../../model/provider-types";
-import { CLIENT_PROVIDERS } from "./client-providers";
-import { useAutomationStore } from "./automation-store";
-import { SecondaryDrawerShell } from "./secondary-drawer-shell";
+import type { NotifyPreview } from "./client-providers.ts";
+import type { ConfigFormCtx } from "../../../../model/provider-types.ts";
+import { CLIENT_PROVIDERS } from "./client-providers.ts";
+import { useAutomationStore } from "./automation-store.ts";
+import { SecondaryDrawerShell } from "./secondary-drawer-shell.tsx";
 
 /**
  * Configuration secondary drawer. Delegates the type-specific UI to the

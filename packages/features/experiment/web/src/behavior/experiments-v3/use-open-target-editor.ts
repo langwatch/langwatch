@@ -11,22 +11,22 @@ import {
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { DRAWER_WIDTH } from "../../model/experiments-v3/constants";
-import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types";
+import { DRAWER_WIDTH } from "../../model/experiments-v3/constants.ts";
+import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types.ts";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "../../model/experiments-v3/types";
-import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks";
-import { buildTargetAvailableSources } from "./target-available-sources";
-import { useResolveTargetName } from "./use-resolve-target-name";
+} from "../../model/experiments-v3/types.ts";
+import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";
+import { buildTargetAvailableSources } from "./target-available-sources.ts";
+import { useResolveTargetName } from "./use-resolve-target-name.ts";
 import {
   convertFromUIMapping,
   convertToUIMapping,
-} from "../../model/experiments-v3/field-mapping-converters";
+} from "../../model/experiments-v3/field-mapping-converters.ts";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { createPromptEditorCallbacks } from "../../model/experiments-v3/prompt-editor-callbacks";
-import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
+import { createPromptEditorCallbacks } from "../../model/experiments-v3/prompt-editor-callbacks.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
  * Convert target mappings for a specific dataset to UI format.

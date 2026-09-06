@@ -1,6 +1,6 @@
 import { Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Radio, RadioGroup } from "./radio";
+import { Radio, RadioGroup } from "./radio.tsx";
 
 const meta = {
   title: "Primitives/Radio",

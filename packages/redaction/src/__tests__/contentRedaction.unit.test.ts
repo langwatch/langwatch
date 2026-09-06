@@ -9,8 +9,8 @@ import {
   redactAttributeNative,
   type RedactionPolicy,
   redactStringNative,
-} from "../contentRedaction.js";
-import { SECRETS_REDACTION_MARKER } from "../secrets.js";
+} from "../contentRedaction.ts";
+import { SECRETS_REDACTION_MARKER } from "../secrets.ts";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature

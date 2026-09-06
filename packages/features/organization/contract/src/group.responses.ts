@@ -8,7 +8,7 @@
  * own value.
  */
 import { z } from "zod";
-import { organizationGroupBindingSchema, organizationGroupMemberSchema } from "./group";
+import { organizationGroupBindingSchema, organizationGroupMemberSchema } from "./group.ts";
 
 /** One access binding, with the human name of the scope it resolved to. */
 export const groupBindingWithScopeNameSchema = organizationGroupBindingSchema.extend({

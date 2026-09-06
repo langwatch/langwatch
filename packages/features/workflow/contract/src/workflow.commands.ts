@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { workflowDslSchema, workflowRunOriginSchema } from "./workflow";
+import { workflowDslSchema, workflowRunOriginSchema } from "./workflow.ts";
 
 export const createWorkflowCommandSchema = z.object({
   id: z.string().optional(),

@@ -2,10 +2,10 @@ import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { explainAnyError } from "../../errors";
+import { explainAnyError } from "../../errors/index.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 
 /**
  * Error surface for the FloatingAiBar.

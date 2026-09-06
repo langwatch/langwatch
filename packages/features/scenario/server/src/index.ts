@@ -1,14 +1,14 @@
-export { PrismaScenarioAdapter } from "./adapters/prisma.scenario.adapter";
-export * from "./ports/cancellation-channel.port";
-export * from "./ports/scenario-clock.port";
-export * from "./ports/scenario-child-bootstrap.port";
-export * from "./ports/scenario-http.port";
-export * from "./ports/scenario-id.port";
-export * from "./ports/scenario-execution-runner.port";
-export * from "./ports/scenario-execution-pool.port";
-export * from "./ports/scenario-processor-metrics.port";
-export * from "./ports/scenario-secret-cipher.port";
-export * from "./ports/scenario-tab-store.port";
+export { PrismaScenarioAdapter } from "./adapters/prisma.scenario.adapter.ts";
+export * from "./ports/cancellation-channel.port.ts";
+export * from "./ports/scenario-clock.port.ts";
+export * from "./ports/scenario-child-bootstrap.port.ts";
+export * from "./ports/scenario-http.port.ts";
+export * from "./ports/scenario-id.port.ts";
+export * from "./ports/scenario-execution-runner.port.ts";
+export * from "./ports/scenario-execution-pool.port.ts";
+export * from "./ports/scenario-processor-metrics.port.ts";
+export * from "./ports/scenario-secret-cipher.port.ts";
+export * from "./ports/scenario-tab-store.port.ts";
 export {
   ResultAtomsReadPort,
   MAX_ATOM_PAGE,
@@ -23,154 +23,154 @@ export {
   type RawRunTargetRow,
   type RawSeriesRow,
   type RawTotalsRow,
-} from "./ports/result-atoms-read.port";
+} from "./ports/result-atoms-read.port.ts";
 export {
   RunConfigurationsReadPort,
   MAX_RUN_CONFIGURATIONS,
   type RawRunConfigurationRow,
-} from "./ports/run-configurations-read.port";
-export * from "./services/scenario-execution-pool.service";
-export * from "./services/scenario-execution.service";
-export * from "./services/scenario-execution-prefetcher.service";
+} from "./ports/run-configurations-read.port.ts";
+export * from "./services/scenario-execution-pool.service.ts";
+export * from "./services/scenario-execution.service.ts";
+export * from "./services/scenario-execution-prefetcher.service.ts";
 export {
   AgentTestService,
   type AgentTestRunResult,
   type AgentTestServiceOptions,
   type AgentTestTurnResult,
-} from "./services/agent-test.service";
+} from "./services/agent-test.service.ts";
 export {
   AgentTestOwnershipPort,
   type AgentTestOwnershipSubject,
-} from "./ports/agent-test-ownership.port";
+} from "./ports/agent-test-ownership.port.ts";
 export {
   AgentTestConnectedDispatchPort,
   type AgentTestConnectedDispatchResult,
   type AgentTestConnectedInstance,
-} from "./ports/agent-test-connected-dispatch.port";
-export * from "./services/scenario-failure-handler.service";
-export * from "./services/scenario-processor.service";
-export * from "./services/scenario-tab-registry.service";
-export * from "./adapters/child-egress-policy.adapter";
-export * from "./adapters/child-logger.adapter";
-export * from "./adapters/child-process-spawn.adapter";
-export * from "./adapters/child-tls-env.adapter";
-export * from "./adapters/http-auth.adapter";
-export * from "./adapters/litellm-model.adapter";
-export { NlpFetchAdapter, type NlpFetchTimeouts } from "./adapters/nlp-fetch.adapter";
-export * from "./adapters/node-scenario-child-process.adapter";
-export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter";
-export * from "./adapters/prompt-template.adapter";
-export * from "./adapters/remote-trace-run.adapter";
-export * from "./adapters/redis.cancellation-channel.adapter";
-export * from "./adapters/redis.scenario-tab-store.adapter";
-export * from "./adapters/scenario-child-execution.adapter";
-export * from "./adapters/scenario-role-model.adapter";
-export * from "./adapters/scenario-secret-reference.adapter";
-export * from "./adapters/serialized-agent-registry.adapter";
-export * from "./adapters/serialized-code-agent.adapter";
-export * from "./adapters/serialized-http-agent.adapter";
-export * from "./adapters/serialized-prompt-config.adapter";
-export * from "./adapters/serialized-workflow-agent.adapter";
-export * from "./services/scenario-workflow-mapping.service";
-export { SimulationClickHouseAdapter } from "./adapters/simulation.clickhouse.adapter";
-export type { SimulationReadClient } from "./adapters/simulation.clickhouse.adapter";
+} from "./ports/agent-test-connected-dispatch.port.ts";
+export * from "./services/scenario-failure-handler.service.ts";
+export * from "./services/scenario-processor.service.ts";
+export * from "./services/scenario-tab-registry.service.ts";
+export * from "./adapters/child-egress-policy.adapter.ts";
+export * from "./adapters/child-logger.adapter.ts";
+export * from "./adapters/child-process-spawn.adapter.ts";
+export * from "./adapters/child-tls-env.adapter.ts";
+export * from "./adapters/http-auth.adapter.ts";
+export * from "./adapters/litellm-model.adapter.ts";
+export { NlpFetchAdapter, type NlpFetchTimeouts } from "./adapters/nlp-fetch.adapter.ts";
+export * from "./adapters/node-scenario-child-process.adapter.ts";
+export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter.ts";
+export * from "./adapters/prompt-template.adapter.ts";
+export * from "./adapters/remote-trace-run.adapter.ts";
+export * from "./adapters/redis.cancellation-channel.adapter.ts";
+export * from "./adapters/redis.scenario-tab-store.adapter.ts";
+export * from "./adapters/scenario-child-execution.adapter.ts";
+export * from "./adapters/scenario-role-model.adapter.ts";
+export * from "./adapters/scenario-secret-reference.adapter.ts";
+export * from "./adapters/serialized-agent-registry.adapter.ts";
+export * from "./adapters/serialized-code-agent.adapter.ts";
+export * from "./adapters/serialized-http-agent.adapter.ts";
+export * from "./adapters/serialized-prompt-config.adapter.ts";
+export * from "./adapters/serialized-workflow-agent.adapter.ts";
+export * from "./services/scenario-workflow-mapping.service.ts";
+export { SimulationClickHouseAdapter } from "./adapters/simulation.clickhouse.adapter.ts";
+export type { SimulationReadClient } from "./adapters/simulation.clickhouse.adapter.ts";
 export {
   SimulationRunMetricsStoreAdapter,
   SimulationRunStateStoreAdapter,
   SimulationStalledRunAdapter,
   BACKFILL_STALE_THRESHOLD_MS,
   type SimulationStalledRun,
-} from "./adapters/simulation-eventing.adapter";
-export { SimulationExecutionPort } from "./ports/simulation-execution.port";
-export type { SimulationRunStateData } from "./projections/simulation-run-state.projection";
-export * from "./processes/simulation-run-execution.process";
+} from "./adapters/simulation-eventing.adapter.ts";
+export { SimulationExecutionPort } from "./ports/simulation-execution.port.ts";
+export type { SimulationRunStateData } from "./projections/simulation-run-state.projection.ts";
+export * from "./processes/simulation-run-execution.process.ts";
 export {
   SimulationWindowedReadPort,
   type SimulationWindowedReadInput,
-} from "./ports/simulation-windowed-read.port";
-export { SimulationService } from "./services/simulation.service";
-export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process";
-export * from "./adapters/simulation-processing-commands.adapter";
+} from "./ports/simulation-windowed-read.port.ts";
+export { SimulationService } from "./services/simulation.service.ts";
+export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process.ts";
+export * from "./adapters/simulation-processing-commands.adapter.ts";
 export {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsAdapter,
   ComputeRunMetricsCommand,
   scenarioDeferredComputeRunMetricsJob,
-} from "./adapters/compute-run-metrics.adapter";
-export type { ComputeRunMetricsDeps } from "./adapters/compute-run-metrics.adapter";
-export { FinishRunCommand, type FinishRunDeps } from "./adapters/finish-run.adapter";
+} from "./adapters/compute-run-metrics.adapter.ts";
+export type { ComputeRunMetricsDeps } from "./adapters/compute-run-metrics.adapter.ts";
+export { FinishRunCommand, type FinishRunDeps } from "./adapters/finish-run.adapter.ts";
 export {
   CANCELLATION_CHANNEL,
   RedisCancellationPublisherAdapter,
   UnavailableCancellationPublisherAdapter,
   type CancellationPublisher,
-} from "./adapters/redis.cancellation-channel.adapter";
-export { SIMULATION_RUN_EXECUTION_PROCESS_NAME } from "./processes/simulation-run-execution.process";
-export { simulationRunExecutionPM } from "./processes/simulation-run-execution.process";
+} from "./adapters/redis.cancellation-channel.adapter.ts";
+export { SIMULATION_RUN_EXECUTION_PROCESS_NAME } from "./processes/simulation-run-execution.process.ts";
+export { simulationRunExecutionPM } from "./processes/simulation-run-execution.process.ts";
 export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
-} from "./adapters/simulation-processing-pipeline.adapter";
-export { SimulationProcessingProducerAdapter } from "./adapters/simulation-processing-producer.adapter";
+} from "./adapters/simulation-processing-pipeline.adapter.ts";
+export { SimulationProcessingProducerAdapter } from "./adapters/simulation-processing-producer.adapter.ts";
 export {
   StalledRunsBackfillTask,
   backfillStalledRuns,
   type StalledRunFinder,
-} from "./tasks/stalled-runs-backfill.task";
+} from "./tasks/stalled-runs-backfill.task.ts";
 export {
   ScenarioApp,
   type QueueSimulationRunInput,
   type ScenarioAppDependencies,
   type ScenarioBroadcast,
   type ScenarioCaller,
-} from "./app/scenario.app";
-export { ResultAtomsService } from "./services/result-atoms.service";
+} from "./app/scenario.app.ts";
+export { ResultAtomsService } from "./services/result-atoms.service.ts";
 export {
   RunConfigurationsService,
   type RunConfiguration,
   type RunConfigurationEntry,
   type RunConfigurationScope,
-} from "./services/run-configurations.service";
+} from "./services/run-configurations.service.ts";
 export {
   ResultAtomsClickHouseAdapter,
   type ResultAtomsClickHouseClient,
-} from "./adapters/result-atoms.clickhouse.adapter";
-export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter";
-export { ScenarioTrpcApi } from "./transport/api-trpc/scenario.api";
-export { filterRunsByTimestamp } from "./transport/api-trpc/scenario-events.api";
+} from "./adapters/result-atoms.clickhouse.adapter.ts";
+export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter.ts";
+export { ScenarioTrpcApi } from "./transport/api-trpc/scenario.api.ts";
+export { filterRunsByTimestamp } from "./transport/api-trpc/scenario-events.api.ts";
 export {
   simulationTargetSchema,
   type SimulationTarget,
-} from "./transport/api-trpc/simulation-runner.api";
+} from "./transport/api-trpc/simulation-runner.api.ts";
 export type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "./rules/scenario-trpc-context.rules";
+} from "./rules/scenario-trpc-context.rules.ts";
 export {
   archiveScenarioSetRuns,
   createScenarioEventsRestApp,
   type InlineMediaExtraction,
-} from "./transport/api-rest/scenario-event.api";
+} from "./transport/api-rest/scenario-event.api.ts";
 export {
   createScenarioRunExportRestApp,
   type ScenarioRunExportPort,
   type ScenarioRunExportRequestFields,
   type ScenarioRunExportRestPorts,
-} from "./transport/api-rest/scenario-run-export.api";
-export { createScenariosRestApp } from "./transport/api-rest/scenario.api";
+} from "./transport/api-rest/scenario-run-export.api.ts";
+export { createScenariosRestApp } from "./transport/api-rest/scenario.api.ts";
 export {
   createSimulationRunsRestApp,
   type ScenarioRunPlatformUrlBuilder,
-} from "./transport/api-rest/simulation-run.api";
+} from "./transport/api-rest/simulation-run.api.ts";
 
 // --------------------------------------------------------------------------- The run-history
 // download The keyset sweep behind `POST /api/export/scenario-runs/download`, its two CSV row axes,
 // and the two refusals the transport publishes. The request vocabulary is `@langwatch/scenario-
 // contract`'s, shared with the drawer that composes the request.
 // ---------------------------------------------------------------------------
-export { ScenarioRunExportService } from "./services/scenario-run-export.service";
-export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service";
+export { ScenarioRunExportService } from "./services/scenario-run-export.service.ts";
+export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service.ts";
 export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
@@ -181,8 +181,8 @@ export {
   createScenarioGenerateRestApp,
   type ScenarioGenerateRestPorts,
   type ScenarioGenerateRestSession,
-} from "./transport/api-rest/scenario-generate.api";
+} from "./transport/api-rest/scenario-generate.api.ts";
 export {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
-} from "./rules/scenario-generate-nlpgo-error.rules";
+} from "./rules/scenario-generate-nlpgo-error.rules.ts";

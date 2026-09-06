@@ -14,7 +14,7 @@
 
 import { HStack, Link as ChakraLink, Spacer, Text } from "@chakra-ui/react";
 import type { MouseEvent, PropsWithChildren, ReactNode } from "react";
-import { useAnalyticsHost } from "../../model/analytics-host";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 /** A click the browser handles itself: a new tab, a download, a modified click. */
 function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {

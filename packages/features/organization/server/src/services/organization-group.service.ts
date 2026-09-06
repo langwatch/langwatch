@@ -33,9 +33,9 @@ import {
   type RemoveOrganizationGroupBindingInput,
   type RenameOrganizationGroupInput,
 } from "@langwatch/organization-contract";
-import type { GroupIdentityPort } from "../ports/organization.port";
-import type { GroupRepository } from "../repositories/group.repository";
-import type { TeamRepository } from "../repositories/team.repository";
+import type { GroupIdentityPort } from "../ports/organization.port.ts";
+import type { GroupRepository } from "../repositories/group.repository.ts";
+import type { TeamRepository } from "../repositories/team.repository.ts";
 
 /**
  * Groups: the named sets of people an organization binds to scopes, and the bindings
@@ -49,7 +49,7 @@ export type OrganizationGroupDependencies = {
   grants: AuthzGrantsService;
 };
 
-import { OrganizationGroupBindingService } from "./organization-group-binding.service";
+import { OrganizationGroupBindingService } from "./organization-group-binding.service.ts";
 
 export class OrganizationGroupService {
   static create(dependencies: OrganizationGroupDependencies): OrganizationGroupService {

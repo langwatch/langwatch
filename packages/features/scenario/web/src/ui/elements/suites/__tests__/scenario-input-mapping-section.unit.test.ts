@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import { isScenarioMappingValid } from "../scenario-input-mapping-section";
+import { isScenarioMappingValid } from "../scenario-input-mapping-section.tsx";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

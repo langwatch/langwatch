@@ -2,9 +2,9 @@ import { Box, Heading, List, Stack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
+import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
 
-import { ErrorActions } from "../../elements/errors/error-actions";
+import { ErrorActions } from "../../elements/errors/error-actions.tsx";
 
 export interface HandledErrorStateProps {
   /** Any error — handled or not. */

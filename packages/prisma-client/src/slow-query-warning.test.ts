@@ -26,7 +26,7 @@ import {
   resetSlowQueryThrottle,
   resolveSlowQueryBudgetMs,
   withQueryTiming,
-} from "./slow-query-warning";
+} from "./slow-query-warning.ts";
 
 const BUDGET_MS = 500;
 const THROTTLE_MS = 60_000;

@@ -1,24 +1,24 @@
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { GatewayAuditPort } from "../ports/gateway-audit.port";
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import type { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
+import type { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import type { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
 import {
   PrismaGatewayBudgetRepository,
   type GatewayBudgetDatabase,
-} from "../repositories/prisma/prisma.gateway-budget.repository";
+} from "../repositories/prisma/prisma.gateway-budget.repository.ts";
 import {
   PrismaGatewayCacheRuleRepository,
   type GatewayCacheRuleDatabase,
-} from "../repositories/prisma/prisma.gateway-cache-rule.repository";
+} from "../repositories/prisma/prisma.gateway-cache-rule.repository.ts";
 import {
   PrismaGatewayGuardrailRepository,
   type GatewayGuardrailDatabase,
-} from "../repositories/prisma/prisma.gateway-guardrail.repository";
-import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service";
-import { GatewayGuardrailService } from "../services/gateway-guardrail.service";
-import { GatewayService } from "../services/gateway.service";
+} from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
 
 /**
  * Everything Gateway persistence touches, as the three private repositories below declare it — a composed slice rather than the generated client, so a process just hands the one it already holds and this file (and every layer above it) names no generated declaration at all.

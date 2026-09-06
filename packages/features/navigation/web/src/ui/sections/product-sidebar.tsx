@@ -14,37 +14,37 @@
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Search } from "lucide-react";
 import { useRef, useState } from "react";
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug";
-import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position";
-import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count";
-import { useReachableProducts } from "../../behavior/use-reachable-products";
-import { useSettingsMenu } from "../../behavior/use-settings-menu";
-import { useVisibleSectionNavItems } from "../../behavior/use-visible-section-nav-items";
-import { featureIcons } from "../../model/feature-icons";
-import { APP_HEADER_HEIGHT } from "../../model/menu-widths";
-import { useNavigationHost } from "../../model/navigation-host";
-import { readLastVisitedProduct } from "../../model/product-memory";
-import { isPathUnder, type ProductId } from "../../model/products";
-import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style";
-import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target";
+import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
+import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
+import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useSettingsMenu } from "../../behavior/use-settings-menu.ts";
+import { useVisibleSectionNavItems } from "../../behavior/use-visible-section-nav-items.ts";
+import { featureIcons } from "../../model/feature-icons.ts";
+import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { readLastVisitedProduct } from "../../model/product-memory.ts";
+import { isPathUnder, type ProductId } from "../../model/products.ts";
+import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
+import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
   gatewayNavItems,
   governanceNavItems,
   type SectionNavItemData,
-} from "../../model/section-nav-items";
-import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu";
+} from "../../model/section-nav-items.ts";
+import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu.ts";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "../../model/shell-layout";
-import { SideMenuDensityProvider } from "../elements/side-menu-density";
-import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link";
-import { SidebarSection } from "./sidebar-section";
-import { SupportMenu } from "../blocks/support-menu";
-import { ThemeToggle } from "../blocks/theme-toggle";
-import { MainMenuSections } from "./main-menu";
-import { PersonalSidebarLinks } from "./personal-sidebar";
-import { UsageIndicator } from "./usage-indicator";
+} from "../../model/shell-layout.ts";
+import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
+import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
+import { SidebarSection } from "./sidebar-section.tsx";
+import { SupportMenu } from "../blocks/support-menu.tsx";
+import { ThemeToggle } from "../blocks/theme-toggle.tsx";
+import { MainMenuSections } from "./main-menu.tsx";
+import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
+import { UsageIndicator } from "./usage-indicator.tsx";
 
 export type SidebarSurface = ProductId | "settings";
 

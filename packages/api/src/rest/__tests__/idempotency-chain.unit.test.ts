@@ -9,13 +9,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
+import { createTestService as createService } from "./test-service.ts";
 import {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAY_HEADER,
   type IdempotentOutcome,
   type IdempotentRunner,
-} from "../idempotency.js";
+} from "../idempotency.ts";
 
 const output = z.object({ id: z.string() });
 

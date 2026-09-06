@@ -1,6 +1,6 @@
 import { observableGauge } from "@langwatch/observability/metrics";
 
-import { StorageStatsMetricsPort } from "../ports/storage-stats-metrics.port";
+import { StorageStatsMetricsPort } from "../ports/storage-stats-metrics.port.ts";
 
 /**
  * The storage gauges, published on the export interval from the last tick's

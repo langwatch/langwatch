@@ -8,8 +8,8 @@ import {
   HandledError,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
-import { LangyAgentUnavailableError, LangyModelNotConfiguredError } from "./langy.errors";
-import { remediation } from "./langy.error-remediation";
+import { LangyAgentUnavailableError, LangyModelNotConfiguredError } from "./langy.errors.ts";
+import { remediation } from "./langy.error-remediation.ts";
 
 /** How long we give the manager to answer one turn before we give up. */
 export const AGENT_CHAT_TIMEOUT_MS = 120_000;

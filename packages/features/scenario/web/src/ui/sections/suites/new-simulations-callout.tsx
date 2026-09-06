@@ -6,8 +6,8 @@ import { ArrowRight, Sparkles, X } from "lucide-react";
 import {
   preferLegacySimulations,
   useLegacySimulationsPreference,
-} from "../../../behavior/suites/use-legacy-simulations-preference";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+} from "../../../behavior/suites/use-legacy-simulations-preference.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**

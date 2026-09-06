@@ -2,13 +2,13 @@ import { Box, Image } from "@chakra-ui/react";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { modelProviderIcons } from "./model-provider-marks";
+import { modelProviderIcons } from "./model-provider-marks.tsx";
 import {
   ASSISTANT_PRESETS,
   type AssistantKind,
 } from "@langwatch/coding-agent-web/surfaces/agent-identity";
-import type { AiToolType } from "../../model/ai-tool-catalog";
-import { resolveToolPreset, TOOL_PRESETS } from "./tool-presets";
+import type { AiToolType } from "../../model/ai-tool-catalog.ts";
+import { resolveToolPreset, TOOL_PRESETS } from "./tool-presets.tsx";
 
 const FALLBACK_ICONS: Record<AiToolType, ReactNode> = {
   coding_assistant: <Bot size={18} />,

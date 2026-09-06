@@ -12,15 +12,15 @@ import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import { trpcErrorCode, trpcErrorMessage } from "../../model/trpc-error";
-import { PermissionAlert } from "../../ui/elements/permission-alert";
-import type { TeamUserRole } from "../../model/prisma-types";
+import { trpcErrorCode, trpcErrorMessage } from "../../model/trpc-error.ts";
+import { PermissionAlert } from "../../ui/elements/permission-alert.tsx";
+import type { TeamUserRole } from "../../model/prisma-types.ts";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { TeamForm, type TeamFormData } from "../../ui/sections/team-form";
-import { type RoleOption, teamRolesOptions } from "../../ui/sections/team-user-role-field";
-import { useOrganizationHost } from "../../model/organization-host";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api, type RouterOutputs } from "../../behavior/organization-api";
+import { TeamForm, type TeamFormData } from "../../ui/sections/team-form.tsx";
+import { type RoleOption, teamRolesOptions } from "../../ui/sections/team-user-role-field.tsx";
+import { useOrganizationHost } from "../../model/organization-host.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 
 /**
  * One team as this page reads it: whatever `team.getTeamWithMembers` answers.
@@ -28,7 +28,7 @@ import { api, type RouterOutputs } from "../../behavior/organization-api";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {

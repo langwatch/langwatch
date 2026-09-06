@@ -1,4 +1,4 @@
-import type { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
+import type { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 
 /** Its own state-table key, separate from the backfill's on purpose — see

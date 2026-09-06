@@ -5,8 +5,8 @@ import {
   type SortDirection,
   sortRowsByColumn,
   useColumnSort,
-} from "./column-sort";
-import { PULL_REQUEST_STATUS_SORT_RANK, type PullRequestStatus } from "./pull-request-status";
+} from "./column-sort.ts";
+import { PULL_REQUEST_STATUS_SORT_RANK, type PullRequestStatus } from "./pull-request-status.ts";
 
 /**
  * The Pull Requests table's columns, named against the shared column-sort

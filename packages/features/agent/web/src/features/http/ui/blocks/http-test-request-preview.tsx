@@ -1,5 +1,5 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CollapsibleSection, CopyButton } from "../elements/http-test-components";
+import { CollapsibleSection, CopyButton } from "../elements/http-test-components.tsx";
 
 export function HttpTestRequestPreview({
   url,

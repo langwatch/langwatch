@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { FrontDoorDepth, FrontDoorDoor, FrontDoorStage } from "./ground-palette";
+import type { FrontDoorDepth, FrontDoorDoor, FrontDoorStage } from "./ground-palette.ts";
 
 /**
  * Where in the front door somebody currently is, for the one thing that wants

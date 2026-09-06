@@ -3,9 +3,9 @@ import { AlertCircle } from "lucide-react";
 
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
-import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
+import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
 
-import { ErrorActions } from "../../elements/errors/error-actions";
+import { ErrorActions } from "../../elements/errors/error-actions.tsx";
 
 /**
  * The same restrained hairline the toast wears — the tone lives in the border

@@ -3,7 +3,7 @@ import {
   END_USER_SPEND_DESCRIPTION,
   SPEND_EVENTS_PULL_DESCRIPTION,
   SPEND_SUMMARIES_DESCRIPTION,
-} from "../../transport/api-rest/gateway-spend.api";
+} from "../../transport/api-rest/gateway-spend.api.ts";
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   describe("given the published route contract", () => {

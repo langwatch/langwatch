@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service";
-import type { GovernanceEventingPort } from "../ports/governance-eventing.port";
-import type { IngestionKeyService } from "./ingestion-source-key.service";
-import type { IngestionSourceService } from "./ingestion-source.service";
-import type { IngestionTemplateService } from "./ingestion-template.service";
-import type { DefaultGovernanceOcsfExportService } from "./ocsf-export.service";
+import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
+import type { GovernanceEventingPort } from "../ports/governance-eventing.port.ts";
+import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
+import type { IngestionSourceService } from "./ingestion-source.service.ts";
+import type { IngestionTemplateService } from "./ingestion-template.service.ts";
+import type { DefaultGovernanceOcsfExportService } from "./ocsf-export.service.ts";
 import type { GovernanceOttlGateway } from "@langwatch/enterprise-governance-contract";
 
 /** Private cohesive collaborator for the ingestion operation set. */

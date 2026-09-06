@@ -3,7 +3,7 @@ import {
   CancellationPublisherPort,
   CancellationSubscriberPort,
   type CancellationMessage,
-} from "../ports/cancellation-channel.port";
+} from "../ports/cancellation-channel.port.ts";
 
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 

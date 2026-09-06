@@ -1,6 +1,6 @@
 import { Button, Center, EmptyState, HStack } from "@chakra-ui/react";
 import { LuSparkles } from "react-icons/lu";
-import { useCreateDraftPrompt } from "../../../behavior/use-create-draft-prompt";
+import { useCreateDraftPrompt } from "../../../behavior/use-create-draft-prompt.ts";
 
 /**
  * What a project with no prompts at all shows.

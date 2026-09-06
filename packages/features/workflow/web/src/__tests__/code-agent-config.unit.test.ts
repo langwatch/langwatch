@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../model/code-agent-config";
+import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../model/code-agent-config.ts";
 import type { Field } from "@langwatch/workflow-contract";
 
 describe("code-agent-config", () => {

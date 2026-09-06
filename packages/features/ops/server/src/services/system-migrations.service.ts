@@ -9,23 +9,23 @@ import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
 } from "@langwatch/ops-contract";
-import { SystemMigrationEnrollmentService } from "./system-migration-enrollment.service";
-import { SystemMigrationRollbackService } from "./system-migration-rollback.service";
-import { SystemMigrationRunService } from "./system-migration-run.service";
+import { SystemMigrationEnrollmentService } from "./system-migration-enrollment.service.ts";
+import { SystemMigrationRollbackService } from "./system-migration-rollback.service.ts";
+import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 import {
   ATTENTION_LIMIT,
   type MigrationEnrollmentRecord,
   type MigrationOverview,
   type SystemMigrationsServiceDependencies,
-} from "../rules/system-migration-support.rules";
-import { systemMigrationLookup } from "./system-migration-lookup.service";
+} from "../rules/system-migration-support.rules.ts";
+import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
 
 export type {
   MigrationEnrollmentRecord,
   MigrationOverview,
   SystemMigrationEnrollmentStore,
   SystemMigrationStateReader,
-} from "../rules/system-migration-support.rules";
+} from "../rules/system-migration-support.rules.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 

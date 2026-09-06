@@ -12,12 +12,12 @@ import {
   type SetupSurface,
   SetupWithAgentButton,
   setupAgentPrompt,
-} from "../setup-with-agent-button";
+} from "../setup-with-agent-button.tsx";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
-import type { TraceFailureNotice, TraceHostPort } from "../../../behavior/trace-host";
+import type { TraceFailureNotice, TraceHostPort } from "../../../behavior/trace-host.ts";
 
 const canAskMock = vi.fn(() => true);
-vi.mock("../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => canAskMock(),
 }));
 
@@ -34,7 +34,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
     selector({ askLangy: askLangyMock }),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1" },
     organization: { id: "org_1" },
@@ -44,7 +44,7 @@ vi.mock("../../../behavior/use-organization-team-project", () => ({
 /** What the server answers with: the skill on its own, no credentials. */
 let mockSkillBody: string | undefined;
 const getPromptQueryMock = vi.fn(() => ({ data: mockSkillBody }));
-vi.mock("../../../behavior/trace-api", () => ({
+vi.mock("../../../behavior/trace-api.ts", () => ({
   api: {
     setupSkills: {
       getPrompt: {

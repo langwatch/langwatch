@@ -12,15 +12,15 @@ import {
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
-} from "../../metrics";
-import { toSafeFailureDiagnostic } from "../failureDiagnostic";
-import type { JsonValue } from "../json";
+} from "../../metrics.ts";
+import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import type { JsonValue } from "../json.ts";
 import type {
   FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   OutboxMessageIdentity,
   ProcessStore,
-} from "../stores/processStore.types";
+} from "../stores/processStore.types.ts";
 
 /** What an intent handler receives: identity + payload, never store rows. */
 export interface DispatchableMessage {

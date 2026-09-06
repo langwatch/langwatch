@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import { shardModuleTally, shardSawFailure } from "./shard-failure-reporter";
+import { shardModuleTally, shardSawFailure } from "./shard-failure-reporter.ts";
 
 /**
  * The unit shard's hard floor: what it prints and the code it exits with. A

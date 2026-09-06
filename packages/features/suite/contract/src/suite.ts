@@ -6,9 +6,9 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
-import { suiteKindSchema } from "./suite.kind";
-import { MAX_PLAN_NAME_LENGTH } from "./plan-name";
-import { suiteScopeSchema } from "./suite.scope";
+import { suiteKindSchema } from "./suite.kind.ts";
+import { MAX_PLAN_NAME_LENGTH } from "./plan-name.ts";
+import { suiteScopeSchema } from "./suite.scope.ts";
 
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 export const RUN_ALL_SUITE_NAME = "All test cases";

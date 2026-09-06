@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { classifyScenarioInfraError, encodeScenarioError } from "@langwatch/scenario-contract";
-import { ErrorDetails } from "../error-details";
+import { ErrorDetails } from "../error-details.tsx";
 
 function renderError(error: string) {
   return render(

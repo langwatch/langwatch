@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — what a rejection says.
  * @see specs/analytics/lwql-api.feature
  */
-import type { SqlSourcePosition } from "./langwatch-ql-parser.rules";
+import type { SqlSourcePosition } from "./langwatch-ql-parser.rules.ts";
 
 /**
  * Why a query was refused. Each code names a cause the caller can act on differently, which is

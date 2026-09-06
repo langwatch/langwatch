@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { DatasetPreviewTable } from "../dataset-preview-table";
+import { DatasetPreviewTable } from "../dataset-preview-table.tsx";
 
 const SENTINEL = "SENTINEL_PAST_THE_CAP";
 // Far past EditableCell's display cap (5000), marker at the very end so it

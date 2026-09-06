@@ -4,16 +4,16 @@
  * product: the request is metered, the spend row settles, and the amount is zero. 1. Missing.
  */
 import { describe, expect, it } from "vitest";
-import { estimateCost, matchModelCost } from "../../model-cost";
-import type { ModelCostRate } from "../../model-provider";
+import { estimateCost, matchModelCost } from "../../model-cost.ts";
+import type { ModelCostRate } from "../../model-provider.ts";
 import {
   baseModelCatalog,
   llmModels,
   overlayModelCatalog,
   overlayOverriddenModelIds,
-} from "../model-catalog";
-import type { LLMModelEntry } from "../model-catalog.types";
-import { getStaticModelCostRates } from "../static-model-costs";
+} from "../model-catalog.ts";
+import type { LLMModelEntry } from "../model-catalog.types.ts";
+import { getStaticModelCostRates } from "../static-model-costs.ts";
 
 const getStaticModelCosts = getStaticModelCostRates;
 

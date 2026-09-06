@@ -4,15 +4,15 @@ import {
   type AutomationEvaluationSubscriberContext,
   type AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-alert-trigger-match.subscriber";
-import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber";
-import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port";
-import type { AutomationTraceTriggerCataloguePort } from "../ports/automation-trace-trigger-catalogue.port";
+import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-alert-trigger-match.subscriber.ts";
+import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber.ts";
+import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port.ts";
+import type { AutomationTraceTriggerCataloguePort } from "../ports/automation-trace-trigger-catalogue.port.ts";
 import {
   AutomationEvaluationTraceSummaryPort,
   AutomationEvaluationTriggerFilterPort,
   AutomationTriggerMatchRecorderPort,
-} from "../ports/automation-evaluation-subscriber.port";
+} from "../ports/automation-evaluation-subscriber.port.ts";
 
 /**
  * Process-lifetime Automation implementation of Evaluation's two terminal

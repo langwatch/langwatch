@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp, Check } from "lucide-react";
 import type React from "react";
-import { type Density, useDensityStore } from "../../../../behavior/density.store";
+import { type Density, useDensityStore } from "../../../../behavior/density.store.ts";
 
 interface DensityChoice {
   value: Density;

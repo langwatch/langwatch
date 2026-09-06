@@ -60,7 +60,7 @@ import type { EvaluatorApp } from "#app/evaluator.app";
 import {
   EvaluatorReplicationApi,
   type EvaluatorReplicationPorts,
-} from "./evaluator-replication.api";
+} from "./evaluator-replication.api.ts";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.

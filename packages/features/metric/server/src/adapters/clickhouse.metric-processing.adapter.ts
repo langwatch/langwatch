@@ -3,11 +3,11 @@ import type { MetricProcessingEvent } from "@langwatch/metric-contract";
 import {
   ClickHouseMetricDataPointAppendRepository,
   type MetricClickHouseClientResolver,
-} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository";
+} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import {
   MetricProcessingAdapter,
   type MetricProcessingPipeline,
-} from "./metric-processing.adapter";
+} from "./metric-processing.adapter.ts";
 
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed

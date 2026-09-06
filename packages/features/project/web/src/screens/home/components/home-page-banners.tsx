@@ -21,7 +21,7 @@ import { getIsMac } from "@langwatch/navigation-web/surfaces/command-bar";
 import { LangyMark } from "@langwatch/langy-web/surfaces/langy-mark";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 // ---- Timing knobs -------------------------------------------------------
 

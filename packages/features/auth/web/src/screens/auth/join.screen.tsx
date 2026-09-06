@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { LoadingScreen } from "../../ui/sections/loading-screen";
-import { SetupLayout } from "../../ui/sections/setup-layout";
-import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial";
-import { useRequiredSession } from "../../behavior/use-required-session";
-import { hardRedirect } from "../../behavior/hard-redirect";
+import { LoadingScreen } from "../../ui/sections/loading-screen.tsx";
+import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
+import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial.tsx";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { hardRedirect } from "../../behavior/hard-redirect.ts";
 
 /**
  * Join before create (ADR-117 §6): the step a brand-new account passes

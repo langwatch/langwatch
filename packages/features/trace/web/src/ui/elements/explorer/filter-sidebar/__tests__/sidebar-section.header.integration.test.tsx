@@ -10,7 +10,7 @@ import { Activity } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { SidebarSection } from "../sidebar-section";
+import { SidebarSection } from "../sidebar-section.tsx";
 
 afterEach(() => {
   cleanup();

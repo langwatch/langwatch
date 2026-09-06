@@ -13,7 +13,7 @@ import type { HttpAgentData } from "@langwatch/scenario-contract";
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,
-} from "../support/test-scenario-http.port";
+} from "../support/test-scenario-http.port.ts";
 
 vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({

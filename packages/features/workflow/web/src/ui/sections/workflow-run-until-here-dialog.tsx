@@ -7,9 +7,9 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 
-import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store";
-import { useWorkflowStore } from "../../behavior/use-workflow-store";
-import { getNodeDisplayName } from "./workflow-nodes";
+import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store.ts";
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { getNodeDisplayName } from "./workflow-nodes.tsx";
 
 export type WorkflowPartialExecutionInput = {
   untilNodeId: string;

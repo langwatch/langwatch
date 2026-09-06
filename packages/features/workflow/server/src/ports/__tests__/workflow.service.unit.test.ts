@@ -10,19 +10,19 @@ import {
   WorkflowExecutionPort,
   WorkflowIdPort,
   type WorkflowExecutionInput,
-} from "../workflow.port";
+} from "../workflow.port.ts";
 import type {
   StudioEventPreparer,
   StudioEventPreparationInput,
-} from "../../services/studio-event-preparer.service";
-import { WorkflowService as ServerWorkflowService } from "../../services/workflow.service";
+} from "../../services/studio-event-preparer.service.ts";
+import { WorkflowService as ServerWorkflowService } from "../../services/workflow.service.ts";
 import {
   WorkflowRepository,
   type PersistWorkflowInput,
   type PersistWorkflowVersionInput,
   type WorkflowVersionHistoryRecord,
-} from "../../repositories/workflow.repository";
-import { TestDatasetService } from "../../services/__tests__/dataset.service.fake";
+} from "../../repositories/workflow.repository.ts";
+import { TestDatasetService } from "../../services/__tests__/dataset.service.fake.ts";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
   id,

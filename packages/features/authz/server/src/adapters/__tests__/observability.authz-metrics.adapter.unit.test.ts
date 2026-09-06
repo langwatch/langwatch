@@ -3,8 +3,8 @@
  */
 import { Registry } from "prom-client";
 import { describe, expect, it } from "vitest";
-import { ObservabilityAuthzMetricsAdapter } from "../observability.authz-metrics.adapter";
-import { ObservabilityAuthzRevocationAdapter } from "../observability.authz-revocation.adapter";
+import { ObservabilityAuthzMetricsAdapter } from "../observability.authz-metrics.adapter.ts";
+import { ObservabilityAuthzRevocationAdapter } from "../observability.authz-revocation.adapter.ts";
 
 describe("ObservabilityAuthzMetricsAdapter", () => {
   describe("given a process registry", () => {

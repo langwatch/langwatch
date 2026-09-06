@@ -11,9 +11,9 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import safe from "safe-regex2";
-import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository";
-import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service";
-import { DataPrivacyResolutionService } from "./data-privacy-resolution.service";
+import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
+import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
+import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 

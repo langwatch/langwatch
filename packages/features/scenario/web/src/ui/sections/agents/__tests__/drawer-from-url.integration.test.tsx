@@ -24,7 +24,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
     organization: { id: "test-org" },
@@ -51,7 +51,7 @@ vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
   CodeBlockEditor: () => <div data-testid="code-editor" />,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {
@@ -117,7 +117,7 @@ import {
   AgentCodeEditorDrawerFromUrl,
   AgentHttpEditorDrawerFromUrl,
   WorkflowSelectorDrawerFromUrl,
-} from "../drawer-from-url";
+} from "../drawer-from-url.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

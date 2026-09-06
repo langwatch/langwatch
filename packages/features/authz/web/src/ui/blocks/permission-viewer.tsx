@@ -27,7 +27,7 @@ import {
   type AuthzResource,
   ORDERED_RESOURCES,
   permissionsByResource,
-} from "../../model/permission-catalogue";
+} from "../../model/permission-catalogue.ts";
 
 /** What one action is called in the list. */
 function actionText(action: AuthzAction): string {

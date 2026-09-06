@@ -22,209 +22,209 @@ import {
   ApiAuditPort,
   ApiRequestPolicy,
   AuthzApiAuthorizationAdapter,
-} from "../api-request.policy";
+} from "../api-request.policy.ts";
 import {
   ApiFeatureDrainPort,
   ApiProcess,
   ApiProcessGraphPort,
   closeApiProcessResources,
-} from "../api.process";
-import { ApiHttpListener } from "../api-http.listener";
+} from "../api.process.ts";
+import { ApiHttpListener } from "../api-http.listener.ts";
 import {
   CompositeApiRawSurface,
   tryCreateApiStaticSurface,
-} from "../app-static/app-static.surface";
-import { tryCreateHostedMcpSurface } from "../features/mcp/hosted-mcp.mount";
+} from "../app-static/app-static.surface.ts";
+import { tryCreateHostedMcpSurface } from "../features/mcp/hosted-mcp.mount.ts";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
   ApiReadinessPort,
-} from "../api-process.lifecycle";
+} from "../api-process.lifecycle.ts";
 import {
   ApiDatabaseAbsenceReportPort,
   ApiDatabaseInfrastructure,
-} from "../platform/infrastructure/api-database.infrastructure";
+} from "../platform/infrastructure/api-database.infrastructure.ts";
 import {
   ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
-} from "../platform/infrastructure/api-queue.infrastructure";
+} from "../platform/infrastructure/api-queue.infrastructure.ts";
 import {
   ApiEventingAbsenceReportPort,
   ApiEventingInfrastructure,
-} from "../platform/infrastructure/api-eventing.infrastructure";
+} from "../platform/infrastructure/api-eventing.infrastructure.ts";
 import {
   ApiClickHouseAbsenceReportPort,
   ApiClickHouseInfrastructure,
-} from "../platform/infrastructure/api-clickhouse.infrastructure";
+} from "../platform/infrastructure/api-clickhouse.infrastructure.ts";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
 import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
-import { ApiAgentTestAdapter } from "../features/agent/agent-test.adapter";
-import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter";
-import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
+import { ApiAgentTestAdapter } from "../features/agent/agent-test.adapter.ts";
+import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter.ts";
+import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition.ts";
 import {
   ApiConnectedAgentsAbsenceReportPort,
   ApiConnectedAgentsComposition,
-} from "./api-connected-agents.composition";
+} from "./api-connected-agents.composition.ts";
 import { ConnectedAgentPresenceService, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
-import { ApiUpgradeRouter } from "../api-upgrade-router";
+import { ApiUpgradeRouter } from "../api-upgrade-router.ts";
 import {
   composeDatasetFeature,
   composeDatasetService,
   refusingDatasetFeature,
-} from "../features/dataset/dataset.composition";
+} from "../features/dataset/dataset.composition.ts";
 import {
   composeEvaluatorFeature,
   composeEvaluatorService,
   refusingEvaluatorFeature,
-} from "../features/evaluator/evaluator.composition";
-import { composePromptFeature, refusingPromptFeature } from "../features/prompt/prompt.composition";
+} from "../features/evaluator/evaluator.composition.ts";
+import { composePromptFeature, refusingPromptFeature } from "../features/prompt/prompt.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import {
   composeFeatureFlagFeature,
   refusingFeatureFlagFeature,
-} from "../features/feature-flag/feature-flag.composition";
+} from "../features/feature-flag/feature-flag.composition.ts";
 import {
   composeAnalyticsFeature,
   refusingAnalyticsFeature,
-} from "../features/analytics/analytics.composition";
+} from "../features/analytics/analytics.composition.ts";
 import {
   composeAuthFeature,
   refusingAuthFeature,
   resolvePersonDeploymentFacts,
   type ApiPersonDeploymentFacts,
-} from "../features/auth/auth.composition";
-import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition";
+} from "../features/auth/auth.composition.ts";
+import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition.ts";
 import {
   composePresenceFeature,
   refusingPresenceFeature,
-} from "../features/presence/presence.composition";
+} from "../features/presence/presence.composition.ts";
 import {
   composeApiKeyFeature,
   refusingApiKeyFeature,
-} from "../features/api-key/api-key.composition";
-import type { ApiPersonMailPort } from "./api-person-mail.port";
-import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter";
+} from "../features/api-key/api-key.composition.ts";
+import type { ApiPersonMailPort } from "./api-person-mail.port.ts";
+import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter.ts";
 import {
   composeApiIdentityPipelines,
   LoggedApiIdentityPipelinesAbsence,
-} from "./api-identity-pipelines.composition";
+} from "./api-identity-pipelines.composition.ts";
 import {
   composeWorkflowCommitMessages,
   composeWorkflowFeature,
   composeWorkflowRuntime,
   refusingWorkflowFeature,
   type ApiWorkflowRuntime,
-} from "../features/workflow/workflow.composition";
+} from "../features/workflow/workflow.composition.ts";
 import {
   composeExperimentFeature,
   refusingExperimentFeature,
-} from "../features/experiment/experiment.composition";
+} from "../features/experiment/experiment.composition.ts";
 import {
   composeEvaluationFeature,
   ApiEvaluationUnavailableError,
   refusingEvaluationFeature,
-} from "../features/evaluation/evaluation.composition";
+} from "../features/evaluation/evaluation.composition.ts";
 import {
   composeApiEvaluatorExecution,
   LoggedApiEvaluatorExecutionAbsence,
   type ApiEvaluatorExecution,
-} from "./api-evaluator-execution.composition";
+} from "./api-evaluator-execution.composition.ts";
 import {
   composeTraceFeature,
   LoggedApiTraceAbsence,
   refusingTraceFeature,
-} from "../features/trace/trace.composition";
-import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port";
-import { composeShareFeature, refusingShareFeature } from "../features/share/share.composition";
-import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition";
+} from "../features/trace/trace.composition.ts";
+import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
+import { composeShareFeature, refusingShareFeature } from "../features/share/share.composition.ts";
+import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition.ts";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { PrismaUsageMembershipRepository, type UsageService } from "@langwatch/entitlement-server";
 
 import {
   composeApiModelProviders,
   LoggedApiModelProviderAbsence,
-} from "./api-model-provider.composition";
+} from "./api-model-provider.composition.ts";
 import {
   composeScenarioFeature,
   LoggedApiScenarioAbsence,
   refusingScenarioFeature,
-} from "../features/scenario/scenario.composition";
-import { composeRoleFeature, refusingRoleFeature } from "../features/role/role.composition";
-import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition";
+} from "../features/scenario/scenario.composition.ts";
+import { composeRoleFeature, refusingRoleFeature } from "../features/role/role.composition.ts";
+import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition.ts";
 import {
   composeDataRetentionFeature,
   LoggedApiDataRetentionAbsence,
   refusingDataRetentionFeature,
-} from "../features/data-retention/data-retention.composition";
+} from "../features/data-retention/data-retention.composition.ts";
 import {
   composeMonitorFeature,
   composeMonitorService,
   LoggedApiMonitorAbsence,
   refusingMonitorFeature,
-} from "../features/monitor/monitor.composition";
+} from "../features/monitor/monitor.composition.ts";
 import {
   composeStoredObjectFeature,
   DeferredPayloadStagingAdapter,
   LoggedApiStoredObjectAbsence,
   refusingStoredObjectFeature,
-} from "../features/stored-object/stored-object.composition";
+} from "../features/stored-object/stored-object.composition.ts";
 import {
   ApiOrganizationSeatLicense,
   composeOrganizationFeature,
   refusingOrganizationFeature,
   type ApiOrganizationInvitePort,
-} from "../features/organization/organization.composition";
+} from "../features/organization/organization.composition.ts";
 import {
   composeProjectFeature,
   refusingProjectFeature,
-} from "../features/project/project.composition";
+} from "../features/project/project.composition.ts";
 import {
   composeCodingAgentFeature,
   refusingCodingAgentFeature,
-} from "../features/coding-agent/coding-agent.composition";
+} from "../features/coding-agent/coding-agent.composition.ts";
 import {
   composeAutomationFeature,
   refusingAutomationFeature,
-} from "../features/automation/automation.composition";
+} from "../features/automation/automation.composition.ts";
 import {
   composeEnterpriseFeature,
   refusingEnterpriseFeature,
   type ApiEnterpriseApplicationPort,
   type ApiSeatAllowancePort,
-} from "../features/enterprise/enterprise.composition";
-import { ApiEnterpriseSeatAllowance } from "../features/enterprise/enterprise-seat-allowance";
+} from "../features/enterprise/enterprise.composition.ts";
+import { ApiEnterpriseSeatAllowance } from "../features/enterprise/enterprise-seat-allowance.ts";
 import {
   ApiTraceReadViewerProtections,
   type ApiViewerProtectionsPort,
-} from "../features/trace/trace-viewer-protections";
-import { ApiTraceAnnotationContent } from "../features/annotation/annotation-trace-content";
+} from "../features/trace/trace-viewer-protections.ts";
+import { ApiTraceAnnotationContent } from "../features/annotation/annotation-trace-content.ts";
 import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
-} from "./api-organization-invites.composition";
-import { composeGatewayFeature } from "../features/gateway/gateway.composition";
-import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
-import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
+} from "./api-organization-invites.composition.ts";
+import { composeGatewayFeature } from "../features/gateway/gateway.composition.ts";
+import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition.ts";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
 import {
   composeApiIdempotency,
   unavailableIdempotentRunner,
   type ApiIdempotencyComposition,
-} from "./api-idempotency.composition";
+} from "./api-idempotency.composition.ts";
 import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 import { createGatewaySpendRestApp, settlementGraceMs } from "@langwatch/gateway-server";
-import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition";
-import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition";
+import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition.ts";
+import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition.ts";
 import {
   composeApiElevenLabsWebhookRest,
   composeApiGatewayInternalRest,
-} from "./api-gateway-internal-rest.composition";
+} from "./api-gateway-internal-rest.composition.ts";
 import {
   ApiGatewaySpendPipelineAbsenceReport,
   composeApiGatewaySpendPipeline,
   type ApiGatewaySpendPipeline,
-} from "./api-gateway-spend-pipeline.composition";
-import { canonicalErrorFor } from "./api-canonical-error";
+} from "./api-gateway-spend-pipeline.composition.ts";
+import { canonicalErrorFor } from "./api-canonical-error.ts";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
@@ -234,125 +234,129 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
 
-import { createPlatformUrlBuilder } from "./api-rest-ports";
+import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
 import { nanoid } from "nanoid";
 import {
   composeHttpProxyFeature,
   LoggedApiStudioAbsence,
   type ApiStudioHostPort,
-} from "../features/agent/http-proxy.composition";
+} from "../features/agent/http-proxy.composition.ts";
 import {
   composeModelProviderFeature,
   LoggedApiModelProviderAbsence as LoggedApiModelProviderSurfaceAbsence,
   refusingModelProviderFeature,
   type ApiModelProviderHostPort,
-} from "../features/model-provider/model-provider.composition";
+} from "../features/model-provider/model-provider.composition.ts";
 import {
   composeSavedViewFeature,
   refusingSavedViewFeature,
-} from "../features/dashboard/saved-view.composition";
+} from "../features/dashboard/saved-view.composition.ts";
 import {
   composeSpendFeature,
   LoggedApiSpendAbsence,
   refusingSpendFeature,
   type ApiUsageStatsPort,
-} from "../features/entitlement/spend.composition";
+} from "../features/entitlement/spend.composition.ts";
 import {
   composeAnnotationFeature,
   refusingAnnotationFeature,
   type ApiAnnotationTraceContentPort,
-} from "../features/annotation/annotation.composition";
+} from "../features/annotation/annotation.composition.ts";
 import {
   composeApiTraceProducerCommands,
   type ApiTraceProducerCommands,
-} from "../features/trace/trace-producer.composition";
+} from "../features/trace/trace-producer.composition.ts";
 import {
   composeIntegrationsChecksFeature,
   refusingIntegrationsChecksFeature,
   type ApiSimulationEvidencePort,
-} from "../features/project/integrations-checks.composition";
-import { ApiScenarioSimulationEvidence } from "../features/project/scenario-simulation-evidence";
+} from "../features/project/integrations-checks.composition.ts";
+import { ApiScenarioSimulationEvidence } from "../features/project/scenario-simulation-evidence.ts";
 import { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
-} from "./api-trpc-features.composition";
+} from "./api-trpc-features.composition.ts";
 import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
-import { composeApiModelProviderHost } from "./api-model-provider-host.composition";
+import { composeApiModelProviderHost } from "./api-model-provider-host.composition.ts";
 import {
   composeApiStudioHost,
   composeApiWorkflowStudioDispatch,
-} from "./api-studio-host.composition";
+} from "./api-studio-host.composition.ts";
 import {
   composeApiAuthoringRest,
   LoggedApiAuthoringRestAbsence,
-} from "./api-authoring-rest.composition";
-import { ApiExperimentRunAbsenceReport } from "./api-experiment-run.composition";
-import { composeApiExperimentFindOrCreate } from "../features/experiment/experiment-init-rest.mount";
-import { composeApiTraceReadStack } from "./api-trace-read-stack.composition";
-import { composeApiEvaluationReads } from "./api-evaluation-read.composition";
+} from "./api-authoring-rest.composition.ts";
+import { ApiExperimentRunAbsenceReport } from "./api-experiment-run.composition.ts";
+import { composeApiExperimentFindOrCreate } from "../features/experiment/experiment-init-rest.mount.ts";
+import { composeApiTraceReadStack } from "./api-trace-read-stack.composition.ts";
+import { composeApiEvaluationReads } from "./api-evaluation-read.composition.ts";
 import {
   apiEntitlementAbsenceReport,
   composeApiPlanProvider,
   composeApiUsageEnforcement,
   composeApiUsageStats,
   type LoggedApiEntitlementAbsence,
-} from "./api-usage.composition";
-import { tryCreateApiMailComposition, type ApiMailComposition } from "./api-mail.composition";
-import { ApiComposedPasswordResetMail } from "./api-better-auth.composition";
-import { ApiComposedPersonMail } from "./api-person-mail.composition";
-import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
-import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
+} from "./api-usage.composition.ts";
+import { tryCreateApiMailComposition, type ApiMailComposition } from "./api-mail.composition.ts";
+import { ApiComposedPasswordResetMail } from "./api-better-auth.composition.ts";
+import { ApiComposedPersonMail } from "./api-person-mail.composition.ts";
+import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition.ts";
+import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition.ts";
 import {
   ApiMetricsAbsenceReportPort,
   ApiMetricsInfrastructure,
-} from "../platform/infrastructure/api-metrics.infrastructure";
+} from "../platform/infrastructure/api-metrics.infrastructure.ts";
 import {
   ApiSecretEncryptionAbsenceReportPort,
   ApiSecretEncryptionInfrastructure,
-} from "../platform/infrastructure/api-secret-encryption.infrastructure";
+} from "../platform/infrastructure/api-secret-encryption.infrastructure.ts";
 import {
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
-} from "../api.main";
-import { ApiSecretRestFeature } from "../api-secret-rest.feature";
-import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
+} from "../api.main.ts";
+import { ApiSecretRestFeature } from "../api-secret-rest.feature.ts";
+import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
 import { requestTraceIds } from "@langwatch/api/rest";
 import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
-import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure";
+import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import {
   ApiAuthAbsenceReportPort,
   ApiAuthComposition,
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
-} from "./api-auth.composition";
-import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter";
-import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
-import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
-import type { ApiSubscriptionMount } from "../api.application";
-import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
-import { ApiHandlerManagedSession } from "./api-handler-managed-session";
-import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features";
-import type { CronRestPorts } from "../features/cron/cron-rest";
+} from "./api-auth.composition.ts";
+import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter.ts";
+import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter.ts";
+import { ApiRestObservabilityComposition } from "./api-rest-observability.composition.ts";
+import {
+  composeApiBillingWebhook,
+  type ApiBillingWebhookComposition,
+} from "./api-billing-webhook.composition.ts";
+import type { ApiSubscriptionMount } from "../api.application.ts";
+import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse.ts";
+import { ApiHandlerManagedSession } from "./api-handler-managed-session.ts";
+import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features.ts";
+import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 import type { NlpLambdaCleanupService } from "@langwatch/workflow-server";
-import { composeNlpLambdaCleanup } from "../features/cron/cron.composition";
+import { composeNlpLambdaCleanup } from "../features/cron/cron.composition.ts";
 import {
   composeApiPackagedRest,
   LoggedApiPackagedRestAbsence,
-} from "./api-packaged-rest.composition";
+} from "./api-packaged-rest.composition.ts";
 import {
   composeApiOpsExplainRest,
   type ApiOpsExplainRest,
-} from "../features/ops/ops-clickhouse-explain-rest.mount";
-import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
-import { apiClientAddress } from "./api-client-address";
-import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
-import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition";
-import { composeApiTraceSpool } from "./api-trace-spool.composition";
-import { ApiTraceMediaStore } from "./api-packaged-rest.composition";
+} from "../features/ops/ops-clickhouse-explain-rest.mount.ts";
+import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
+import { apiClientAddress } from "./api-client-address.ts";
+import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
+import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition.ts";
+import { composeApiTraceSpool } from "./api-trace-spool.composition.ts";
+import { ApiTraceMediaStore } from "./api-packaged-rest.composition.ts";
 import {
   AdminAccessService,
   PrismaBugReportRepository,
@@ -378,40 +382,40 @@ import {
   composeApiLangyRest,
   type ApiLangyLocalOptions,
   type ApiLangyRestComposition,
-} from "../features/langy/langy-rest.mount";
+} from "../features/langy/langy-rest.mount.ts";
 
-import { composeApiGithubRest } from "../features/github/github-rest.mount";
-import { refusingGithubService } from "../features/github/github.composition";
-import { composeApiAdminRest } from "../features/ops/admin-rest.mount";
+import { composeApiGithubRest } from "../features/github/github-rest.mount.ts";
+import { refusingGithubService } from "../features/github/github.composition.ts";
+import { composeApiAdminRest } from "../features/ops/admin-rest.mount.ts";
 import {
   composeApiAgentPipelines,
   LoggedApiAgentPipelinesAbsence,
   type ApiAgentPipelines,
-} from "./api-agent-pipelines.composition";
-import { composeLangyFeature, refusingLangyFeature } from "../features/langy/langy.composition";
-import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter";
+} from "./api-agent-pipelines.composition.ts";
+import { composeLangyFeature, refusingLangyFeature } from "../features/langy/langy.composition.ts";
+import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter.ts";
 import {
   composeDataPrivacyFeature,
   refusingDataPrivacyFeature,
-} from "../features/data-privacy/data-privacy.composition";
+} from "../features/data-privacy/data-privacy.composition.ts";
 import {
   composeBugReportFeature,
   refusingBugReportFeature,
-} from "../features/bug-report/bug-report.composition";
+} from "../features/bug-report/bug-report.composition.ts";
 import {
   composeOpsFeature,
   LoggedApiOpsAbsence,
   refusingOpsFeature,
-} from "../features/ops/ops.composition";
-import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
-import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
-import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
-import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount";
+} from "../features/ops/ops.composition.ts";
+import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
+import { composeApiAuthRest } from "../features/auth/auth-rest.mount.ts";
+import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount.ts";
+import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount.ts";
 import {
   composeApiScimRest,
   LoggedApiScimAbsence,
   type ApiScimRestPorts,
-} from "./api-scim.composition";
+} from "./api-scim.composition.ts";
 import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
@@ -420,43 +424,43 @@ import type {
 } from "@langwatch/enterprise-governance-server";
 import type { GithubRestPorts } from "@langwatch/github-server";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
-import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types";
-import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types";
-import type { ComposedPromptFeature } from "../features/prompt/prompt.composition.types";
-import type { ComposedFeatureFlagFeature } from "../features/feature-flag/feature-flag.composition.types";
-import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition.types";
-import type { ComposedAuthFeature } from "../features/auth/auth.composition.types";
-import type { ComposedUserFeature } from "../features/user/user.composition.types";
-import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types";
-import type { ComposedApiKeyFeature } from "../features/api-key/api-key.composition.types";
-import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition.types";
-import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition.types";
-import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition.types";
-import type { ComposedTraceFeature } from "../features/trace/trace.composition.types";
-import type { ComposedShareFeature } from "../features/share/share.composition.types";
-import type { ComposedTopicFeature } from "../features/topic/topic.composition.types";
-import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition.types";
-import type { ComposedRoleFeature } from "../features/role/role.composition.types";
-import type { ComposedHomeFeature } from "../features/project/home.composition.types";
-import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition.types";
-import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types";
-import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types";
-import type { ComposedOrganizationFeature } from "../features/organization/organization.composition.types";
-import type { ComposedProjectFeature } from "../features/project/project.composition.types";
-import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types";
-import type { ComposedAutomationFeature } from "../features/automation/automation.composition.types";
-import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types";
-import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition.types";
-import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types";
-import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types";
-import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types";
-import type { ComposedSpendFeature } from "../features/entitlement/spend.composition.types";
-import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types";
-import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types";
-import type { ComposedLangyFeature } from "../features/langy/langy.composition.types";
-import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types";
-import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition.types";
-import type { ComposedOpsFeature } from "../features/ops/ops.composition.types";
+import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types.ts";
+import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types.ts";
+import type { ComposedPromptFeature } from "../features/prompt/prompt.composition.types.ts";
+import type { ComposedFeatureFlagFeature } from "../features/feature-flag/feature-flag.composition.types.ts";
+import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition.types.ts";
+import type { ComposedAuthFeature } from "../features/auth/auth.composition.types.ts";
+import type { ComposedUserFeature } from "../features/user/user.composition.types.ts";
+import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types.ts";
+import type { ComposedApiKeyFeature } from "../features/api-key/api-key.composition.types.ts";
+import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition.types.ts";
+import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition.types.ts";
+import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition.types.ts";
+import type { ComposedTraceFeature } from "../features/trace/trace.composition.types.ts";
+import type { ComposedShareFeature } from "../features/share/share.composition.types.ts";
+import type { ComposedTopicFeature } from "../features/topic/topic.composition.types.ts";
+import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition.types.ts";
+import type { ComposedRoleFeature } from "../features/role/role.composition.types.ts";
+import type { ComposedHomeFeature } from "../features/project/home.composition.types.ts";
+import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition.types.ts";
+import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types.ts";
+import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types.ts";
+import type { ComposedOrganizationFeature } from "../features/organization/organization.composition.types.ts";
+import type { ComposedProjectFeature } from "../features/project/project.composition.types.ts";
+import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.types.ts";
+import type { ComposedAutomationFeature } from "../features/automation/automation.composition.types.ts";
+import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types.ts";
+import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition.types.ts";
+import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types.ts";
+import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types.ts";
+import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types.ts";
+import type { ComposedSpendFeature } from "../features/entitlement/spend.composition.types.ts";
+import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
+import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types.ts";
+import type { ComposedLangyFeature } from "../features/langy/langy.composition.types.ts";
+import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types.ts";
+import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition.types.ts";
+import type { ComposedOpsFeature } from "../features/ops/ops.composition.types.ts";
 
 /**
  * The REST-family capabilities the API process supplies out of its own configuration and its
@@ -711,6 +715,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The process's ONE producer registration of the gateway-spend pipeline, or none.
    */
   private composedGatewaySpendPipeline: ApiGatewaySpendPipeline | undefined;
+  /**
+   * The payment provider's callback and the write path behind it. Always
+   * composed, never conditional: the route is mounted on every deployment and
+   * answers 404 where nothing bills, exactly as it always has.
+   */
+  private composedBillingWebhook!: ApiBillingWebhookComposition;
   /**
    * The stored-secret cipher this process composed, or none.
    */
@@ -1158,6 +1168,24 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // ride inside the agent half, so a process missing any scenario
     // collaborator lost both Langy surfaces with it.
     this.composedLangy = this.composeLangy(options, infrastructure, directory, queueInfrastructure);
+    // The payment provider, composed HERE rather than beside the other REST
+    // families: `subscription.*` reads the same checkout and customer services
+    // off `ctx.app` that the webhook writes through, and this literal is where
+    // that application is assembled. The door itself is opened later, from the
+    // same composition, once the process's credential resolution exists.
+    this.composedBillingWebhook = composeApiBillingWebhook({
+      billing: options.config.billing,
+      prisma: this.composedDatabase?.connection.client,
+      // The organization object the provisioning door writes through, which is
+      // the one that declares the two billing reads: the `ctx.app` slice
+      // deliberately narrows them away.
+      organizations: this.composedOrganization.provisioning,
+      // The SAME retention cascade `/settings/data-retention` writes, so a
+      // first paid seat subscription's default and an operator's override are
+      // one set of rules rather than two.
+      dataRetention: this.composedDataRetention.service,
+      ...(this.composedMail ? { mail: this.composedMail } : {}),
+    });
     const features = ApiTrpcFeaturesComposition.tryCompose({
       // What a feature composes ITSELF out of, built once above and handed to
       // every `compose<Feature>()` the record's literal names.
@@ -1230,6 +1258,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           codingAgentApp: this.composedCodingAgent.app,
           projects: this.composedProject.app,
           ...this.composedEnterprise.application,
+          // The checkout, portal, invoice and seat-change half of
+          // `subscription.*`. Empty off Stripe, which is what makes the
+          // surface report that this deployment does not bill.
+          ...this.composedBillingWebhook.application,
           authzApp: this.composedRole.authzApp,
           dashboard: this.composedAnalytics.dashboard,
           dataset: this.composedDataset.app,
@@ -2171,7 +2203,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // The ElevenLabs post-call webhook. A literal first segment nothing
         // else claims, so its position here is free; it is last because it is
         // the only public gateway door that is not on `/api/gateway/v1`.
-        .route("/", elevenLabsWebhookRest ?? new Hono()),
+        .route("/", elevenLabsWebhookRest ?? new Hono())
+        // The payment provider's callback. A literal path nothing else claims,
+        // and mounted unconditionally so the boot-time route declaration walk
+        // records one endpoint whether or not this deployment holds a Stripe
+        // credential; without one it answers 404 rather than disappearing.
+        .route("/", this.composedBillingWebhook.rest(restSecurity)),
       // The subscription lane declares its access policy on the same security
       // every REST family does, so the one streaming route on this process is
       // a registry entry rather than an unaccounted-for endpoint. It is a

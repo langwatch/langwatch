@@ -4,7 +4,7 @@ import {
   buildWorkflowLlmConfig,
   normalizeWorkflowLlmConfig,
   normalizeWorkflowLlmParameters,
-} from "../workflow-llm-config";
+} from "../workflow-llm-config.ts";
 
 describe("buildWorkflowLlmConfig", () => {
   it("maps the editor shape to the execution shape", () => {

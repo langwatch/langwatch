@@ -17,17 +17,17 @@ import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
   type Variable,
-} from "../../../../../../surfaces/variables";
-import type { PromptConfigFormValues } from "../../../../../../surfaces/prompt-form";
-import { useLayoutMode } from "../../../../../../model/layout-mode";
+} from "../../../../../../surfaces/variables/index.ts";
+import type { PromptConfigFormValues } from "../../../../../../surfaces/prompt-form/index.ts";
+import { useLayoutMode } from "../../../../../../model/layout-mode.ts";
 import {
   EditingModeTitle,
   getDefaultEditingMode,
   type PromptEditingMode,
-} from "./editing-mode-title";
+} from "./editing-mode-title.tsx";
 
 // Re-export for backwards compatibility
-export type { PromptEditingMode } from "./editing-mode-title";
+export type { PromptEditingMode } from "./editing-mode-title.tsx";
 
 /**
  * Type for message field errors

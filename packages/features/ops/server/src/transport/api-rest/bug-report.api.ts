@@ -14,10 +14,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import { z } from "zod";
 
-import type { BugReportNotifierPort } from "../../ports/bug-report-notifier.port";
-import type { BugReportRateLimiterPort } from "../../ports/bug-report-rate-limiter.port";
-import type { BugReportRepositoryPort } from "../../ports/bug-report.port";
-import { BugReportIntakeService } from "../../services/bug-report-intake.service";
+import type { BugReportNotifierPort } from "../../ports/bug-report-notifier.port.ts";
+import type { BugReportRateLimiterPort } from "../../ports/bug-report-rate-limiter.port.ts";
+import type { BugReportRepositoryPort } from "../../ports/bug-report.port.ts";
+import { BugReportIntakeService } from "../../services/bug-report-intake.service.ts";
 
 // Headroom over the 9M-char sessionData cap: JSON escaping can inflate the
 // same characters past 10MB, and the zod 400 is the better error than a 413.

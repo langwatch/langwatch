@@ -10,7 +10,7 @@ import {
   buildConnectedCall,
   connectedCallFailure,
   connectedOutputText,
-} from "../experiment-connected-target.process";
+} from "../experiment-connected-target.process.ts";
 import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 
 const definitions: ScenarioParameterDefinition[] = [

@@ -5,7 +5,7 @@ import {
   type PlanTypes,
 } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import type { BillingSubscriptionRepository } from "../ports/subscription.port";
+import type { BillingSubscriptionRepository } from "../ports/subscription.port.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
 type NumericOverrideField = "maxMembers" | "maxMembersLite" | "maxMessagesPerMonth";

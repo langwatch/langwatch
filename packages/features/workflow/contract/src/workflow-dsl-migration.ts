@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import type { WorkflowDsl } from "./workflow";
-import { parseStudioWorkflow, type StudioWorkflow } from "./studio-workflow";
+import type { WorkflowDsl } from "./workflow.ts";
+import { parseStudioWorkflow, type StudioWorkflow } from "./studio-workflow.ts";
 
 const migrationNodeSchema = z
   .object({

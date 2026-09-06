@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { readHandledError } from "../../errors";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { readHandledError } from "../../errors/index.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { useViewStore } from "../../../../behavior/view.store";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.

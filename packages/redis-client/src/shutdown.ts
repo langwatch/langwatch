@@ -1,4 +1,4 @@
-import type { RedisConnection } from "./types";
+import type { RedisConnection } from "./types.ts";
 
 /**
  * Closes Redis connections owned by a process composition root.

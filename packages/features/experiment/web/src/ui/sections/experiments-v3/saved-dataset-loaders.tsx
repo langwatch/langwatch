@@ -1,5 +1,5 @@
-import { useSavedDatasetRecords } from "../../../behavior/experiments-v3/use-saved-dataset-loader";
-import type { DatasetReference } from "../../../model/experiments-v3/types";
+import { useSavedDatasetRecords } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
+import type { DatasetReference } from "../../../model/experiments-v3/types.ts";
 
 /**
  * Loads records for a single saved dataset.

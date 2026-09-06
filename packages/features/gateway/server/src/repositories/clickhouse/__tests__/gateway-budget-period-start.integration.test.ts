@@ -35,8 +35,8 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support";
-import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository";
+} from "./support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 
 const chUrl = testClickHouseUrl();
 

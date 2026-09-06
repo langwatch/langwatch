@@ -3,7 +3,7 @@ import {
   REHYDRATION_WINDOW_MS,
   rehydrationLowerBoundMs,
   TIME_LOCAL_AGGREGATE_TYPES,
-} from "../rehydrationWindow";
+} from "../rehydrationWindow.ts";
 
 describe("rehydrationLowerBoundMs", () => {
   const anchor = 1_700_000_000_000;

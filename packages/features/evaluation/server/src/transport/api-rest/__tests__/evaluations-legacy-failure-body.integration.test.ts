@@ -6,7 +6,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createEvaluationsLegacyRestApp } from "../evaluations-legacy.api";
+import { createEvaluationsLegacyRestApp } from "../evaluations-legacy.api.ts";
 
 const DRIVER_MESSAGE =
   "Can't reach database server at `clickhouse.internal.langwatch:8443` (P1001)";

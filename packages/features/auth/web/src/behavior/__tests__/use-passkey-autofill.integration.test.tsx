@@ -18,13 +18,13 @@ const { passkeyMock, navigateMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
 }));
 
-vi.mock("../auth-client", () => ({
+vi.mock("../auth-client.tsx", () => ({
   authClient: { signIn: { passkey: passkeyMock } },
   navigate: navigateMock,
   safeRedirectTarget: (url?: string) => url ?? "/",
 }));
 
-import { usePasskeyAutofill } from "../use-passkey-autofill";
+import { usePasskeyAutofill } from "../use-passkey-autofill.ts";
 
 function Door({ enabled }: { enabled: boolean }) {
   usePasskeyAutofill({ enabled });

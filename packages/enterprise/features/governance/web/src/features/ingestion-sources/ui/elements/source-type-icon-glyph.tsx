@@ -1,4 +1,4 @@
-import type { SourceType } from "../../model/ingestion-source-catalog";
+import type { SourceType } from "../../model/ingestion-source-catalog.ts";
 import type { ReactNode } from "react";
 import {
   AnthropicIcon,

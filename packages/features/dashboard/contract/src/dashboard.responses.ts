@@ -4,8 +4,8 @@
  */
 import { z } from "zod";
 
-import { dashboardIdSchema, dashboardNameSchema, dashboardSchema } from "./dashboard";
-import { graphSchema } from "./graph";
+import { dashboardIdSchema, dashboardNameSchema, dashboardSchema } from "./dashboard.ts";
+import { graphSchema } from "./graph.ts";
 
 /**
  * What the `dashboards.*` tRPC transport answers. Unlike the REST responses

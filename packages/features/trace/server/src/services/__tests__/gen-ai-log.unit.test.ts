@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { GenAICanonicaliserService } from "../gen-ai-canonicaliser.service";
-import { createLogExtractorContext } from "./test-helpers";
+import { GenAICanonicaliserService } from "../gen-ai-canonicaliser.service.ts";
+import { createLogExtractorContext } from "./test-helpers.ts";
 
 const SCOPE = "gen_ai";
 

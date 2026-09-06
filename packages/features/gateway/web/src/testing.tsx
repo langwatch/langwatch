@@ -38,7 +38,7 @@ import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
-import type { GatewayToast, GatewayToaster } from "./behavior/gateway-feedback";
+import type { GatewayToast, GatewayToaster } from "./behavior/gateway-feedback.ts";
 import {
   GatewayHostPort,
   GatewayHostProvider,
@@ -53,7 +53,7 @@ import {
   type GatewayScope,
   type GatewaySuccessNotice,
   type GatewayTeam,
-} from "./model/gateway-host";
+} from "./model/gateway-host.ts";
 
 export type GatewayQuery = Readonly<Record<string, string | undefined>>;
 

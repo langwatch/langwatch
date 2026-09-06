@@ -15,7 +15,7 @@ import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
   ShareLinkRow,
-} from "../repositories/authz-read.repository";
+} from "../repositories/authz-read.repository.ts";
 
 export type AuthzCollectorOptions = {
   reader: AuthzReadRepository;

@@ -1,7 +1,7 @@
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { bindingScopeCanGrantPermission, builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { defaultCliKeyScopes } from "../cli-key-scope-defaults";
+import { defaultCliKeyScopes } from "../cli-key-scope-defaults.ts";
 
 describe("defaultCliKeyScopes()", () => {
   const organizationId = "org-1";

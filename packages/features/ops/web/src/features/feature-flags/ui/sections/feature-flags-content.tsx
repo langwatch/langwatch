@@ -1,11 +1,11 @@
 import { Center, Spinner } from "@chakra-ui/react";
 import { OperatorFeatureFlagCatalogueView } from "@langwatch/feature-flag-web/surfaces/experiment-catalogue";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert";
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { useOpsHost } from "../../../../model/ops-host";
-import { api } from "../../../../behavior/ops-api";
+import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useOpsHost } from "../../../../model/ops-host.ts";
+import { api } from "../../../../behavior/ops-api.ts";
 
-import { useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 export function FeatureFlagsContent() {
   const showErrorToast = useShowErrorToast();
   const { scope } = useOpsPermission();

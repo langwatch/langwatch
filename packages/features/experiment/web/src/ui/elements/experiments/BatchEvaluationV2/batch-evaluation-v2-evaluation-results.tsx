@@ -7,8 +7,8 @@ import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result";
-import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils";
+import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result.tsx";
+import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { downloadCsv } from "@langwatch/csv/download";
 
 export const useBatchEvaluationResults = ({

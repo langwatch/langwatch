@@ -6,7 +6,7 @@ import {
   type ManagedProviderCredentials,
 } from "@langwatch/enterprise-managed-provider-server";
 import { ProjectService } from "@langwatch/project-contract";
-import { EnterpriseWorkerComposition } from "../src";
+import { EnterpriseWorkerComposition } from "../src/index.ts";
 
 describe("EnterpriseWorkerComposition", () => {
   it("creates a worker-only shell over the portable catalogue", () => {

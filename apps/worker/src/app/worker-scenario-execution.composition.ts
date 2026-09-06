@@ -59,7 +59,7 @@ import {
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * Reports the composition decision an absent executor would otherwise hide. A worker that composes

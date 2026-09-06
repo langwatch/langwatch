@@ -1,6 +1,6 @@
 import { HStack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { CloseButton } from "./close-button";
+import { CloseButton } from "./close-button.tsx";
 
 const meta = {
   title: "Primitives/Close button",

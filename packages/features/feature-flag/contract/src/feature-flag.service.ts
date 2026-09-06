@@ -1,16 +1,16 @@
 import { z } from "zod";
-import type { FeatureFlagKey } from "./feature-flag";
-import { featureFlagRulesSchema, type FeatureFlagRules } from "./feature-flag-rules";
+import type { FeatureFlagKey } from "./feature-flag.ts";
+import { featureFlagRulesSchema, type FeatureFlagRules } from "./feature-flag-rules.ts";
 import type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
   ExperimentEvaluationTarget,
   ExperimentTenantPolicy,
   ExperimentTenantScope,
-} from "./feature-flag-experiment";
-import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags";
-import type { FrontendFeatureFlag } from "./frontend-feature-flags";
-import type { FeatureFlagTarget } from "./feature-flag-target";
+} from "./feature-flag-experiment.ts";
+import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags.ts";
+import type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
+import type { FeatureFlagTarget } from "./feature-flag-target.ts";
 
 /** One operator-written row, as the operator surfaces read it back. */
 export interface StoredFeatureFlag {

@@ -1,8 +1,8 @@
 import { VStack } from "@chakra-ui/react";
 import React from "react";
-import { QueryStringFieldsFilters } from "./fields-filters";
-import { useFilterToggle } from "../../behavior/use-filter-toggle";
-import { TopicsSelector } from "./topics-selector";
+import { QueryStringFieldsFilters } from "./fields-filters.tsx";
+import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import { TopicsSelector } from "./topics-selector.tsx";
 
 export const FilterSidebar = React.memo(function FilterSidebar({
   defaultShowFilters = false,

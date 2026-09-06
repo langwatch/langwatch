@@ -9,7 +9,7 @@ import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types";
+import type { LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types.ts";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -85,9 +85,9 @@ const subscription = vi.fn((_input: unknown, _options: unknown) => ({
   unsubscribe: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const { createTrpcUtils, idleQuery, withFallback } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
 
   const trpcUtils = createTrpcUtils();
 
@@ -183,14 +183,14 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
-import { useLangyStore } from "../../../../../behavior/langy.store";
+import { LangySidecar } from "../langy-panel.tsx";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostPort,
   LangyHostProvider,
   type LangyRouteReading,
-} from "../../../../../model/langy-host";
+} from "../../../../../model/langy-host.ts";
 
 const PROJECT_ID = "project-demo";
 

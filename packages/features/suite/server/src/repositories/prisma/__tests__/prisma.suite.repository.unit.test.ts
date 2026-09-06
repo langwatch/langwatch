@@ -5,7 +5,7 @@
  * Spec: specs/suites/run-plan-dynamic-scopes.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PrismaSuiteRepository, type SuiteDatabase } from "../prisma.suite.repository";
+import { PrismaSuiteRepository, type SuiteDatabase } from "../prisma.suite.repository.ts";
 
 function build(
   overrides: {

@@ -17,14 +17,14 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useAnalyticsHost } from "../model/analytics-host";
+import { useAnalyticsHost } from "../model/analytics-host.ts";
 import {
   analyticsDaysDifference,
   readAnalyticsPeriod,
   type AnalyticsPeriod,
   type AnalyticsPeriodMode,
   type AnalyticsPresetKey,
-} from "../model/analytics-period";
+} from "../model/analytics-period.ts";
 
 export type AnalyticsPeriodState = {
   period: AnalyticsPeriod;

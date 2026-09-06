@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import type { LangyEffectPorts, LangyTitleGenerator } from "../ports/langy-effect.port";
+import type { LangyEffectPorts, LangyTitleGenerator } from "../ports/langy-effect.port.ts";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-contract";
-import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
-import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
-import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port";
-import type { LangyFailTurnCommandPort } from "../subscribers/langy-conversation.subscriber";
+import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port.ts";
+import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port.ts";
+import type { LangyFailTurnCommandPort } from "../subscribers/langy-conversation.subscriber.ts";
 
 const logger = createLogger("langwatch:langy:process-effects");
 

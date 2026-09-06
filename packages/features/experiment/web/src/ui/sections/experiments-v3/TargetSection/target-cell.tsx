@@ -11,21 +11,21 @@ import {
   LuSquare,
 } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure";
+import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure.ts";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
-import { parseLLMError } from "../../../../model/format-llm-error";
-import { formatTargetOutput } from "../../../../model/format-target-output";
-import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name";
-import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor";
-import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name";
-import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types";
-import { isComparisonEvaluator } from "../../../../model/experiments-v3/types";
+import { parseLLMError } from "../../../../model/format-llm-error.ts";
+import { formatTargetOutput } from "../../../../model/format-target-output.ts";
+import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
+import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
+import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name.ts";
+import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types.ts";
+import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation";
-import { EvaluatorChip } from "./evaluator-chip";
+import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
+import { EvaluatorChip } from "./evaluator-chip.tsx";
 
 // Max characters to display for performance reasons
 const MAX_DISPLAY_CHARS = 10000;

@@ -1,1 +1,1 @@
-export * from "../../ui/elements/studio-drawer-footer";
+export * from "../../ui/elements/studio-drawer-footer.tsx";

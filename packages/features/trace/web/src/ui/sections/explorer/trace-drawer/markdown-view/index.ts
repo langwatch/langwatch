@@ -1,1 +1,1 @@
-export { buildTraceMarkdown, splitTraceMarkdown } from "./build-trace-markdown";
+export { buildTraceMarkdown, splitTraceMarkdown } from "./build-trace-markdown.ts";

@@ -6,11 +6,11 @@ import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/tr
 import {
   TraceLegacyReadClickHouseRepository,
   type TraceLegacyFilterConditions,
-} from "../repositories/clickhouse/trace-legacy-read.repository";
-import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";
-import type { BlobResolutionDeps } from "../services/trace-legacy-read.service";
-import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service";
-import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service";
+} from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import type { BlobResolutionDeps } from "../services/trace-legacy-read.service.ts";
+import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
+import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 
 const logger = createLogger("langwatch:traces:clickhouse-legacy-read");
 

@@ -1,10 +1,10 @@
 import { Box } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { ComponentProps } from "react";
-import { BackofficeTable as OpsBackofficeTable } from "../blocks/backoffice-table";
+import { BackofficeTable as OpsBackofficeTable } from "../blocks/backoffice-table.tsx";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert";
+import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert.tsx";
 
 type BackofficeTableProps = Omit<
   ComponentProps<typeof OpsBackofficeTable>,

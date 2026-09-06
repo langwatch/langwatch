@@ -3,7 +3,7 @@ import {
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,
-} from "../ports/authz-grants-command-dispatcher.port";
+} from "../ports/authz-grants-command-dispatcher.port.ts";
 
 type UntypedSender = { send(data: unknown): Promise<unknown> };
 

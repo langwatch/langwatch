@@ -1,9 +1,9 @@
 import { Text } from "@chakra-ui/react";
 import type React from "react";
-import type { TraceListItem } from "../../../../types/trace";
-import { useVerboseRelativeTime } from "../../../../utils/use-relative-time";
-import type { CellDef } from "../../types";
-import { TimeHoverCard } from "./time-hover-card";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
+import type { CellDef } from "../../types.ts";
+import { TimeHoverCard } from "./time-hover-card.tsx";
 
 /**
  * Verbose relative-time column ("1 minute ago", "3 hours ago", "7 days ago"). Sibling

@@ -4,12 +4,12 @@
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
 import { useDrawer } from "@langwatch/ui-drawer";
-import { AgentCodeEditorDrawer, type AgentCodeEditorDrawerProps } from "./agent-code-editor-drawer";
-import { AgentHttpEditorDrawer, type AgentHttpEditorDrawerProps } from "./agent-http-editor-drawer";
+import { AgentCodeEditorDrawer, type AgentCodeEditorDrawerProps } from "./agent-code-editor-drawer.tsx";
+import { AgentHttpEditorDrawer, type AgentHttpEditorDrawerProps } from "./agent-http-editor-drawer.tsx";
 import {
   WorkflowSelectorDrawer,
   type WorkflowSelectorDrawerProps,
-} from "./workflow-selector-drawer";
+} from "./workflow-selector-drawer.tsx";
 
 export function AgentCodeEditorDrawerFromUrl(
   props: Omit<AgentCodeEditorDrawerProps, "open"> & { open?: boolean },

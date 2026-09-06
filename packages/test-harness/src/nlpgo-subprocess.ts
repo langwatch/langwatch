@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { cachedBinaryIsUsable, digestGoSources, writeStamp } from "./nlpgo-binary-stamp";
+import { cachedBinaryIsUsable, digestGoSources, writeStamp } from "./nlpgo-binary-stamp.ts";
 
 // nlpgo-subprocess.ts lives in packages/test-harness/src →
 // up 6 = repo root.

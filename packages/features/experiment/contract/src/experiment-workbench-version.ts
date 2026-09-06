@@ -4,13 +4,13 @@ import {
   isComparisonEvaluatorType,
   type ComparisonEvaluatorConfig,
   type PairwiseEvaluatorConfig,
-} from "./experiment-workbench";
+} from "./experiment-workbench.ts";
 import {
   persistedEvaluationsV3StateSchema,
   persistedResultsSchema,
   type PersistedEvaluationsV3State,
-} from "./experiment-workbench-persistence";
-import { InvalidWorkbenchStateError } from "./experiment.errors";
+} from "./experiment-workbench-persistence.ts";
+import { InvalidWorkbenchStateError } from "./experiment.errors.ts";
 
 export const WORKBENCH_ACTOR_LABELS = ["user", "langy", "api"] as const;
 

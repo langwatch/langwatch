@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyStore } from "../behavior/langy.store";
+import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * A conversation this tab just minted may not be readable yet: the create command is

@@ -14,8 +14,8 @@
  */
 
 import { Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { useAuthorizeHost } from "../../model/authorize-host";
-import { CopyInput } from "../../ui/elements/copy-input";
+import { useAuthorizeHost } from "../../model/authorize-host.ts";
+import { CopyInput } from "../../ui/elements/copy-input.tsx";
 
 export default function Authorize() {
   const host = useAuthorizeHost();

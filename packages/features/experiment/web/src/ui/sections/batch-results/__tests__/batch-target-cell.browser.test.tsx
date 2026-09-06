@@ -10,8 +10,8 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
-import { BatchTargetCell } from "../batch-target-cell";
-import type { BatchTargetOutput } from "../../batch-evaluation-results.types";
+import { BatchTargetCell } from "../batch-target-cell.tsx";
+import type { BatchTargetOutput } from "../../batch-evaluation-results.types.ts";
 
 const longError =
   "gateway chat/completions: provider_error: the upstream model returned an " +

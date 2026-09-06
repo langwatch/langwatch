@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { AuthzListingRepository } from "../../authz-listing.repository";
+import { AuthzListingRepository } from "../../authz-listing.repository.ts";
 
 /** Empty access read model; tests override only the listing they exercise. */
 export class StubAuthzListingRepository extends AuthzListingRepository {

@@ -7,14 +7,14 @@ import { createLogger } from "@langwatch/observability";
 import {
   EvaluationExecutionIntentPort,
   type ExecuteEvaluationCommandDeps,
-} from "../ports/evaluation.port";
-import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service";
+} from "../ports/evaluation.port.ts";
+import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
 import {
   EvaluationExecutionPreparationService,
   type EvaluationPreparationResult,
-} from "./evaluation-execution-preparation.service";
-import { EvaluationReportedEventService } from "./evaluation-reported-event.service";
-export type { ExecuteEvaluationCommandDeps } from "../ports/evaluation.port";
+} from "./evaluation-execution-preparation.service.ts";
+import { EvaluationReportedEventService } from "./evaluation-reported-event.service.ts";
+export type { ExecuteEvaluationCommandDeps } from "../ports/evaluation.port.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

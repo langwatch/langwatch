@@ -8,7 +8,7 @@
  * transport under the key `limits.getUsage` already occupies.
  */
 
-import { useOrganizationHost } from "../model/organization-host";
+import { useOrganizationHost } from "../model/organization-host.ts";
 
 export type OrganizationActivePlanReading = {
   isEnterprise: boolean;

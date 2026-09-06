@@ -1,7 +1,7 @@
 import type { SpanInsertData } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port";
-import { TraceSpanStoragePort } from "../ports/trace-span-storage.port";
-import { TraceSpanStorageClickHouseRepository } from "../repositories/clickhouse/trace-span-storage.repository";
+import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port.ts";
+import { TraceSpanStoragePort } from "../ports/trace-span-storage.port.ts";
+import { TraceSpanStorageClickHouseRepository } from "../repositories/clickhouse/trace-span-storage.repository.ts";
 
 /**
  * The span-storage write capability, composed from nothing but a tenant-keyed

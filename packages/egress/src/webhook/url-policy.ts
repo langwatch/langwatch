@@ -5,7 +5,7 @@ import {
   createSsrfUrlValidator,
   isPrivateOrLocalhostIP,
   type SsrfUrlValidator,
-} from "../ssrf/url-validator";
+} from "../ssrf/url-validator.ts";
 
 /**
  * The one admission policy for a customer-supplied webhook destination, shared

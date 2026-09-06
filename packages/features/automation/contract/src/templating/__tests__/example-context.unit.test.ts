@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { AlertType } from "../../providers";
-import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../example-context";
+import { AlertType } from "../../providers.ts";
+import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../example-context.ts";
 
 const TEMPLATE_VARIABLE_PATHS = TEMPLATE_VARIABLES.map((v) => v.path);
 
-import { buildTemplateContext } from "../template-context";
+import { buildTemplateContext } from "../template-context.ts";
 
 function resolve(path: string, context: unknown): unknown {
   const segments = path.split(".");

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RequestTopicClusteringTask } from "../run-topic-clustering.intent";
+import { RequestTopicClusteringTask } from "../run-topic-clustering.intent.ts";
 
 describe("RequestTopicClusteringTask", () => {
   it("dispatches one manual request through Topic's Eventing command", async () => {

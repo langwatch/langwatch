@@ -1,4 +1,4 @@
-import type { StudioNode, StudioWorkflow } from "./studio-workflow";
+import type { StudioNode, StudioWorkflow } from "./studio-workflow.ts";
 
 export const clearDsl = (dsl: StudioWorkflow, includeExecutionStates = false) => {
   return {

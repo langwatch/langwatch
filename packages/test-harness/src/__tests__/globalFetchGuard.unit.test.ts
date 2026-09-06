@@ -4,7 +4,7 @@
 
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { guardAgainstGlobalFetch } from "../globalFetchGuard";
+import { guardAgainstGlobalFetch } from "../globalFetchGuard.ts";
 
 const realFetch = globalThis.fetch;
 

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { PRODUCT_FLOW_CONFIG } from "./product-flow";
+import { PRODUCT_FLOW_CONFIG } from "./product-flow.ts";
 import {
   OnboardingFlowDirection,
   type ProductFlowConfig,
   ProductScreenIndex,
   type ProductSelection,
-} from "./types";
-import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow";
+} from "./types.ts";
+import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
 
 const VALID_PRODUCTS: ProductSelection[] = [
   "via-claude-code",

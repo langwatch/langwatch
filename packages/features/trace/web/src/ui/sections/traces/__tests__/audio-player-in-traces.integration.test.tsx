@@ -15,19 +15,19 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack";
-import { parseContentBlocks } from "../../explorer/trace-drawer/transcript/parsing";
-import { RenderInputOutput } from "../render-input-output";
+import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
+import { parseContentBlocks } from "../../explorer/trace-drawer/transcript/parsing.ts";
+import { RenderInputOutput } from "../render-input-output.tsx";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
 }));
 
 // tRPC existence probe — always idle (no data) so url-shape players render
 // their <audio> element instead of transitioning to a missing/error badge.
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     storedObjects: {
       headById: {
@@ -39,7 +39,7 @@ vi.mock("../../../../behavior/trace-api", () => ({
 
 // The legacy view lazy-loads react-json-view; stub the dynamic loader so the
 // JSON pane stays out of jsdom (the audio players render above it regardless).
-vi.mock("../../../../behavior/compat/next-dynamic", () => ({
+vi.mock("../../../../behavior/compat/next-dynamic.ts", () => ({
   default: () =>
     function StubbedDynamic() {
       return null;

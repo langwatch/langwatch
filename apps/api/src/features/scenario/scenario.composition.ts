@@ -65,13 +65,13 @@ import type {
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { ApiAgentPipelines } from "../../app/api-agent-pipelines.composition";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount";
-import { createSuiteTrpcRouter } from "../suite/suite-trpc.mount";
-import { createScenarioTrpcRouter } from "./scenario-trpc.mount";
-import { ApiAgentTestConnectedDispatchAdapter } from "../agent/agent-test-connected-dispatch.adapter";
-import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adapter";
+import type { ApiAgentPipelines } from "../../app/api-agent-pipelines.composition.ts";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount.ts";
+import { createSuiteTrpcRouter } from "../suite/suite-trpc.mount.ts";
+import { createScenarioTrpcRouter } from "./scenario-trpc.mount.ts";
+import { ApiAgentTestConnectedDispatchAdapter } from "../agent/agent-test-connected-dispatch.adapter.ts";
+import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adapter.ts";
 
 /**
  * The ksuid resource prefixes a scenario and a run are persisted under.
@@ -191,7 +191,7 @@ export type ScenarioFeatureCollaborators = Readonly<{
   report?: ApiScenarioAbsenceReport;
 }>;
 
-import type { ComposedScenarioFeature } from "./scenario.composition.types";
+import type { ComposedScenarioFeature } from "./scenario.composition.types.ts";
 
 /** Composes the scenario feature over this process's own graph. */
 export function composeScenarioFeature(

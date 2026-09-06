@@ -4,7 +4,7 @@ import {
   grantableAuthzScopeRefSchema,
   roleBindingScopeTypeSchema,
   teamUserRoleSchema,
-} from "./authz";
+} from "./authz.ts";
 import {
   grantEventSourceSchema,
   grantShapeRefinement,
@@ -13,7 +13,7 @@ import {
   ledgerScopeSchema,
   legacyBindingRoleSchema,
   resourceGrantTermsSchema,
-} from "./authz-grant.events";
+} from "./authz-grant.events.ts";
 
 export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
 export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;

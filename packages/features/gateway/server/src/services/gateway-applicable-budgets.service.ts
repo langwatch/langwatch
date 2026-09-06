@@ -5,7 +5,7 @@
  */
 import type { ProjectService } from "@langwatch/project-contract";
 
-import { type BudgetSpendTarget, GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import { type BudgetSpendTarget, GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
 import {
   budgetPeriodFloorMs,
   scopeTargetKey,
@@ -13,8 +13,8 @@ import {
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
-import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
-import { type ScopeInput } from "../ports/gateway-virtual-key.port";
+import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
+import { type ScopeInput } from "../ports/gateway-virtual-key.port.ts";
 
 export type DraftVirtualKey = {
   organizationId: string;

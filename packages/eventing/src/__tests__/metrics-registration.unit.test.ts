@@ -24,7 +24,7 @@ import {
   observeEsReactorDuration,
   observeEsSubscriberDuration,
   withMetrics,
-} from "../metrics";
+} from "../metrics.ts";
 
 describe("ES pipeline metrics", () => {
   beforeEach(() => {

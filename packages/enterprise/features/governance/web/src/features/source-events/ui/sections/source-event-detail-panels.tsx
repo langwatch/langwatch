@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Box, Code, SimpleGrid, Table, Text } from "@chakra-ui/react";
 
-import type { SourceEventRowData } from "./source-events-table";
+import type { SourceEventRowData } from "./source-events-table.tsx";
 
 /**
  * The expanded detail of one event row: the normalised OCSF record next

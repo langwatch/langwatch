@@ -1,4 +1,4 @@
-import type { FilterDefinition, FilterField } from "./analytics-filter-definition";
+import type { FilterDefinition, FilterField } from "./analytics-filter-definition.ts";
 
 /**
  * UI metadata for every filter field: display name, URL key, and key/subkey

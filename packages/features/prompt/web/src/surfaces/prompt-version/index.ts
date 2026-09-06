@@ -1,1 +1,1 @@
-export { VersionBadge } from "./version-badge";
+export { VersionBadge } from "./version-badge.tsx";

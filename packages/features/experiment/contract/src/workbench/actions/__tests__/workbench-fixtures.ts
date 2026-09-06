@@ -2,8 +2,8 @@ import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
-} from "../../../experiment-workbench";
-import { TransformError, type WorkbenchState } from "../transforms";
+} from "../../../experiment-workbench.ts";
+import { TransformError, type WorkbenchState } from "../transforms/index.ts";
 
 /**
  * The workbench every transform suite starts from: one inline dataset, one

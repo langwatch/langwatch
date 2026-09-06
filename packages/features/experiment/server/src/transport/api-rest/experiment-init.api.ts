@@ -21,12 +21,12 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
-import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service";
+import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
   experimentInitResponseSchema,
-} from "../../rules/experiment-schemas.rules";
+} from "../../rules/experiment-schemas.rules.ts";
 
 const logger = createLogger("langwatch:experiment:init");
 

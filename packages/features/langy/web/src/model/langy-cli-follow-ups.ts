@@ -4,8 +4,8 @@
  * @see specs/langy/langy-followup-suggestions.feature
  */
 
-import type { LangyFeatureMap } from "./langy-feature-map";
-import { countResults } from "./langy-cli-result-document";
+import type { LangyFeatureMap } from "./langy-feature-map.ts";
+import { countResults } from "./langy-cli-result-document.ts";
 
 /** A settled tool call from the turn, as the UI already models it. */
 export interface SettledToolResult {

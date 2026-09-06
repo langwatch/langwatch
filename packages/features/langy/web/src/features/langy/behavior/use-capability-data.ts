@@ -5,13 +5,13 @@
 
 import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy-contract";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../../../behavior/langy-api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/langy-api.ts";
 import {
   CAPABILITY_HYDRATORS,
   type CapabilityHydratedRow,
-} from "./capabilities/capability-hydrators";
-import type { CapabilityCommand } from "../../../model/langy-capability-digest";
+} from "./capabilities/capability-hydrators.ts";
+import type { CapabilityCommand } from "../../../model/langy-capability-digest.ts";
 
 /** How many rows a card draws, and therefore how many this hook hydrates. */
 const DEFAULT_MAX_ROWS = 5;

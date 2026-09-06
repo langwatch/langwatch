@@ -4,11 +4,11 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { impersonateUser } from "../behavior/admin-client";
-import { ImpersonateDialog } from "../ui/sections/users-view";
-import { fakeOpsHost, renderWithOpsHost, type FakeOpsHost } from "../../../testing";
+import { impersonateUser } from "../behavior/admin-client.ts";
+import { ImpersonateDialog } from "../ui/sections/users-view.tsx";
+import { fakeOpsHost, renderWithOpsHost, type FakeOpsHost } from "../../../testing.tsx";
 
-vi.mock("../behavior/admin-client", () => ({
+vi.mock("../behavior/admin-client.ts", () => ({
   impersonateUser: vi.fn().mockResolvedValue(undefined),
 }));
 

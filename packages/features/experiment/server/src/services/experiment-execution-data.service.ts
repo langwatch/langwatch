@@ -10,8 +10,8 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { PromptService, VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
-import { ExperimentTargetLoadingService } from "./experiment-target-loading.service";
+import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
+import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
 // Column types that store JSON and need parsing
 const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contexts"] as const;

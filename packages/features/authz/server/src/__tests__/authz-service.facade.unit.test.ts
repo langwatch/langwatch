@@ -3,10 +3,10 @@ import {
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AuthzService } from "../services/authz.service";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
+import { AuthzService } from "../services/authz.service.ts";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 
 const ORG = "org-1";
 const TEAM = "team-1";

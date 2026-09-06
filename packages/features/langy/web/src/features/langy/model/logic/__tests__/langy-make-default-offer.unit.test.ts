@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { makeDefaultOffer } from "../langy-make-default-offer";
+import { makeDefaultOffer } from "../langy-make-default-offer.ts";
 
 const SCOPE_IDS = {
   organizationId: "org-1",

@@ -13,10 +13,10 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
-import { ApiAuditPort } from "../api-request.policy";
-import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential";
-import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
+import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
+import { ApiAuditPort } from "../api-request.policy.ts";
+import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential.ts";
+import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition.ts";
 
 const currentKey: ResolvedApiKeyToken = {
   type: "apiKey",

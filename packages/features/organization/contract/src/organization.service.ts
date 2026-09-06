@@ -14,7 +14,7 @@ import type {
   OrganizationGroupSummary,
   RemoveOrganizationGroupBindingInput,
   RenameOrganizationGroupInput,
-} from "./group";
+} from "./group.ts";
 import type {
   ClaimOrganizationBillingCustomerInput,
   GetOrganizationIdByTeamIdInput,
@@ -26,7 +26,7 @@ import type {
   OrganizationSettings,
   UpdateOrganizationSettingsInput,
   UpdateOrganizationSettingsResult,
-} from "./organization";
+} from "./organization.ts";
 import type {
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,
@@ -34,7 +34,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceFeaturesInput,
   PersonalWorkspaceInput,
-} from "./personal-workspace";
+} from "./personal-workspace.ts";
 import type {
   AddOrganizationTeamMemberInput,
   CreateOrganizationTeamWithMembersInput,
@@ -53,7 +53,7 @@ import type {
   RemoveOrganizationTeamMemberInput,
   UpdateOrganizationTeamWithMembersInput,
   UpdateOrganizationTeamInput,
-} from "./team";
+} from "./team.ts";
 
 export abstract class OrganizationService {
   abstract getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings>;

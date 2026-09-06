@@ -3,8 +3,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import type { LangyIdentityToken } from "../langy-key-identity.service";
-import { LangyKeyIdentityService } from "../langy-key-identity.service";
+import type { LangyIdentityToken } from "../langy-key-identity.service.ts";
+import { LangyKeyIdentityService } from "../langy-key-identity.service.ts";
 
 /**
  * A resolved project API key, carrying exactly the fields the identity bridge reads. No cast: the

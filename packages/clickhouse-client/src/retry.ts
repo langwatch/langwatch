@@ -10,8 +10,8 @@
  * fresh work.
  */
 
-import type { AbortSignalLike, QueryRequest } from "./query";
-import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience";
+import type { AbortSignalLike, QueryRequest } from "./query.ts";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience.ts";
 
 export interface RetryNotice {
   /**

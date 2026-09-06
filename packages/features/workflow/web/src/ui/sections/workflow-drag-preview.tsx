@@ -2,8 +2,8 @@ import type { XYPosition } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
 
-import { ComponentNode } from "./workflow-nodes";
-import type { WorkflowNodeDragItem } from "./workflow-node-draggable";
+import { ComponentNode } from "./workflow-nodes.tsx";
+import type { WorkflowNodeDragItem } from "./workflow-node-draggable.tsx";
 
 type WorkflowDragPreviewState = {
   isDragging: boolean;

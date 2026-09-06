@@ -12,7 +12,7 @@ import { type GatewayGuardrail, type PrismaClient } from "@langwatch/prisma-clie
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
-} from "../gateway-guardrail.repository";
+} from "../gateway-guardrail.repository.ts";
 
 /**
  * The client slice the guardrail catalogue binds to, named here so the

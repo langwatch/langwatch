@@ -9,7 +9,7 @@ import {
   type AnnotationColumnChoices,
   type AnnotationColumnOption,
   isColumnVisible,
-} from "./annotation-columns";
+} from "./annotation-columns.ts";
 
 /**
  * Show or hide the annotations list's columns, the way the trace explorer's

@@ -1,8 +1,8 @@
 import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatDuration } from "../../../../model/ops-formatters";
-import { replayStateColor } from "../elements/replay-state-badge";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export interface ReplayHistoryEntryView {
   runId: string;

@@ -1,11 +1,11 @@
-import { DEFAULT_WEBHOOK_BODY_TEMPLATE } from "./defaults";
-import { renderLiquid } from "./engine";
-import { errorMessage } from "./render-with-fallback";
+import { DEFAULT_WEBHOOK_BODY_TEMPLATE } from "./defaults.ts";
+import { renderLiquid } from "./engine.ts";
+import { errorMessage } from "./render-with-fallback.ts";
 import type {
   GraphAlertTemplateContext,
   ReportTemplateContext,
   TemplateContext,
-} from "./template-context";
+} from "./template-context.ts";
 
 export interface RenderedWebhookBody {
   /** The JSON string to send — always valid JSON. */

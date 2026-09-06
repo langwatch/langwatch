@@ -12,8 +12,8 @@ export {
   OTEL_ATTR,
   REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
-} from "./constants";
-export type { JobContextMetadata, JobDataWithContext, RequestContext } from "./context/core";
+} from "./constants.ts";
+export type { JobContextMetadata, JobDataWithContext, RequestContext } from "./context/core.ts";
 export {
   configureLogger,
   createLoggerFactory,
@@ -27,18 +27,18 @@ export {
   type Logger,
   type ProcessLoggerInputs,
   type ResolvedLoggerConfiguration,
-} from "./logger";
+} from "./logger.ts";
 export {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
   type RequestLogData,
-} from "./request/requestLogging";
+} from "./request/requestLogging.ts";
 export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
   type ValidationIssueMeta,
   type ValidationMeta,
-} from "./validation/validationMeta";
-export { createWarnThrottle, type WarnThrottle } from "./warn-throttle";
+} from "./validation/validationMeta.ts";
+export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";

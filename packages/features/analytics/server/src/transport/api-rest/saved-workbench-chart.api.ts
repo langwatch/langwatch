@@ -22,7 +22,7 @@ import { z } from "zod";
 import {
   type LangWatchQLRestPorts,
   LangWatchQLRouteGuardsService,
-} from "../../services/langwatch-ql-route-guards.service";
+} from "../../services/langwatch-ql-route-guards.service.ts";
 
 const routeGuards = LangWatchQLRouteGuardsService.create();
 

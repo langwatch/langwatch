@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type IdentityGuardsDatabase,
   PostgresIdentityGuardsAdapter,
-} from "../postgres.identity-guards.adapter";
+} from "../postgres.identity-guards.adapter.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user", id: USER } as const;

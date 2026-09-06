@@ -10,7 +10,7 @@ import {
   ModelProviderCatalog,
   ModelProviderManagedGatewayPort,
   type ModelProviderCredentialProbePort,
-} from "../ports/model-provider.port";
+} from "../ports/model-provider.port.ts";
 
 export type RegistryModelProviderCatalogOptions = {
   /**

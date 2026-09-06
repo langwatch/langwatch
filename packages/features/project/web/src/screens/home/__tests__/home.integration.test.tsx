@@ -24,10 +24,10 @@ const gates = {
   activePlan: undefined as { free?: boolean | null } | undefined,
 };
 
-vi.mock("../components/use-home-composition", () => ({
+vi.mock("../components/use-home-composition.ts", () => ({
   useHomeComposition: () => gates.composition,
 }));
-vi.mock("../components/use-project-reach", () => ({
+vi.mock("../components/use-project-reach.ts", () => ({
   useProjectReach: () => ({
     isLoading: false,
     isNewProject: gates.isNewProject,
@@ -36,56 +36,56 @@ vi.mock("../components/use-project-reach", () => ({
     hasExperiments: false,
   }),
 }));
-vi.mock("../components/dev/home-state-switcher", () => ({ HomeStateSwitcher: () => null }));
-vi.mock("../components/dev/home-dev-state", () => ({
+vi.mock("../components/dev/home-state-switcher.tsx", () => ({ HomeStateSwitcher: () => null }));
+vi.mock("../components/dev/home-dev-state.ts", () => ({
   useHomeDevState: () => null,
   chartVariantFor: () => "strip",
 }));
-vi.mock("../../../behavior/home-api", () => ({
+vi.mock("../../../behavior/home-api.ts", () => ({
   homeApi: {
     plan: {
       getActivePlan: { useQuery: () => ({ data: gates.activePlan }) },
     },
   },
 }));
-vi.mock("../components/langy-home-hero", () => ({
+vi.mock("../components/langy-home-hero.tsx", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
-vi.mock("../briefing", () => ({
+vi.mock("../briefing/index.ts", () => ({
   HomeBriefingSection: () => <div data-testid="briefing-sheet" />,
   SetupHairline: () => <div data-testid="setup-hairline" />,
   BriefingMockSwitcher: () => null,
 }));
-vi.mock("../components/docs-guides", () => ({
+vi.mock("../components/docs-guides.tsx", () => ({
   DocsGuides: () => <div data-testid="docs-guides" />,
 }));
-vi.mock("../components/home-fortune", () => ({ HomeFortune: () => null }));
-vi.mock("../components/home-page-banners", () => ({
+vi.mock("../components/home-fortune.tsx", () => ({ HomeFortune: () => null }));
+vi.mock("../components/home-page-banners.tsx", () => ({
   HomePageBanners: ({ variant, children }: { variant?: string; children?: React.ReactNode }) => (
     <div data-testid="banners" data-variant={variant ?? "default"}>
       {children}
     </div>
   ),
 }));
-vi.mock("../components/learning-resources", () => ({ LearningResources: () => null }));
-vi.mock("../components/onboarding-progress", () => ({
+vi.mock("../components/learning-resources.tsx", () => ({ LearningResources: () => null }));
+vi.mock("../components/onboarding-progress.tsx", () => ({
   OnboardingProgress: () => <div data-testid="onboarding-checklist" />,
 }));
-vi.mock("../components/recent-items-section", () => ({
+vi.mock("../components/recent-items-section.tsx", () => ({
   RecentItemsSection: () => <div data-testid="recent-items" />,
 }));
-vi.mock("../components/traces-overview", () => ({
+vi.mock("../components/traces-overview.tsx", () => ({
   TracesOverview: ({ variant }: { variant?: string }) => (
     <div data-testid="traces-overview" data-variant={variant ?? "full"} />
   ),
 }));
-vi.mock("../components/welcome-header", () => ({
+vi.mock("../components/welcome-header.tsx", () => ({
   WelcomeHeader: () => null,
   useTimeOfDay: () => "morning",
 }));
 
-import { HomePage } from "../home.screen";
+import { HomePage } from "../home.screen.tsx";
 import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
@@ -95,7 +95,7 @@ import {
   type ProjectHomeOrganization,
   type ProjectHomeProject,
   type ProjectHomeUser,
-} from "../../../model/project-home-host";
+} from "../../../model/project-home-host.ts";
 
 /**
  * The narrowest host the page can be drawn against.

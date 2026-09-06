@@ -12,10 +12,10 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { OrganizationUserRole } from "../../../model/prisma-types";
-import { BindingInputRow } from "../../sections/group-binding-input-row";
+import { OrganizationUserRole } from "../../../model/prisma-types.ts";
+import { BindingInputRow } from "../../sections/group-binding-input-row.tsx";
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     team: {
       getTeamsWithMembers: {
@@ -36,12 +36,12 @@ vi.mock("../../../behavior/organization-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/organization-feedback", () => ({
+vi.mock("../../../behavior/organization-feedback.ts", () => ({
   useOrganizationToaster: () => ({ create: vi.fn() }),
   useShowErrorToast: () => vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ organization: { name: "Acme" } }),
 }));
 

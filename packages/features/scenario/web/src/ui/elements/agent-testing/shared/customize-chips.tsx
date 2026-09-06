@@ -6,7 +6,7 @@
 
 import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type CustomizeChip = {
   key: string;

@@ -1,11 +1,11 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";
-import type { DisplayRoleVisuals } from "../../elements/scenario-role";
-import { BlockStack } from "./block-stack";
-import { getRolePalette } from "../../blocks/transcript/role-chip";
-import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron";
-import type { ChatMessage, ContentBlock } from "../../../model/transcript/types";
+import type { DisplayRoleVisuals } from "../../elements/scenario-role.tsx";
+import { BlockStack } from "./block-stack.tsx";
+import { getRolePalette } from "../../blocks/transcript/role-chip.tsx";
+import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";
+import type { ChatMessage, ContentBlock } from "../../../model/transcript/types.ts";
 
 export function AssistantTurnCard({
   blocks,

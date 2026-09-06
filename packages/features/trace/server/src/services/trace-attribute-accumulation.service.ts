@@ -3,11 +3,11 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
-} from "../ports/trace-media-reference.port";
+} from "../ports/trace-media-reference.port.ts";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules";
-import { TraceOriginService } from "./trace-origin.service";
-import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service";
+import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules.ts";
+import { TraceOriginService } from "./trace-origin.service.ts";
+import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service.ts";
 
 /**
  * Trace-level model metadata stamped by the fold from the models its spans (or

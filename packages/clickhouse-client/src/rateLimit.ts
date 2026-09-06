@@ -22,7 +22,7 @@
  *    Refusing immediately is worse for one caller and much better for the rest.
  */
 
-import type { AbortSignalLike } from "./query";
+import type { AbortSignalLike } from "./query.ts";
 
 /** Raised when the wait queue is full. Shed load rather than grow it. */
 export class QueueFullError extends Error {

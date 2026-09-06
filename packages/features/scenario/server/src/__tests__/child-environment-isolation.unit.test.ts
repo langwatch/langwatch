@@ -3,7 +3,7 @@ import {
   buildChildEnvironment,
   type ExecutionJobData,
   type ScenarioChildProcessConfig,
-} from "../index";
+} from "../index.ts";
 
 const parentKeys = [
   "LANGWATCH_API_KEY",

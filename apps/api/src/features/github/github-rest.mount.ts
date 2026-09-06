@@ -7,7 +7,7 @@ import type { CodingAgentApp } from "@langwatch/coding-agent-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { GithubRestPorts, GithubRestSessionPort } from "@langwatch/github-server";
 
-import type { ApiAuditPort } from "../../api-request.policy";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
 
 export type ApiGithubRestOptions = Readonly<{
   /** The SAME service the `github.*` tRPC namespace reads. */

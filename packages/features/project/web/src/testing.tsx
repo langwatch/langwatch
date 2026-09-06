@@ -22,7 +22,7 @@ import {
   type ProjectHostOrganization,
   type ProjectHostProject,
   type ProjectSuccessNotice,
-} from "./model/project-host";
+} from "./model/project-host.ts";
 
 export const anOrganization = (
   overrides: Partial<ProjectHostOrganization> = {},

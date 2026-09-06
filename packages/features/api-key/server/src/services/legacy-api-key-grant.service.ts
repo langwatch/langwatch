@@ -6,7 +6,7 @@ import type {
   LedgerPrincipal,
   LedgerScope,
 } from "@langwatch/authz-contract";
-import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port";
+import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
 
 const MINT_GUARD_TTL_MS = 60_000;
 const MINT_GUARD_MAX_ENTRIES = 10_000;

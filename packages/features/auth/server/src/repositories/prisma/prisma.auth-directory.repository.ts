@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { AuthDirectoryPort, type AuthDirectoryProject } from "../../ports/auth-directory.port";
+import { AuthDirectoryPort, type AuthDirectoryProject } from "../../ports/auth-directory.port.ts";
 
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
 

@@ -17,9 +17,9 @@ import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { WebhookApp, WebhookEndpointAdapter } from "@langwatch/enterprise-webhook-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { composeApiIdempotency } from "../../app/api-idempotency.composition";
-import { RestAuthWorld } from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import { composeApiIdempotency } from "../../app/api-idempotency.composition.ts";
+import { RestAuthWorld } from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /** 32 bytes of hex, which is what the stored-secret cipher refuses anything else for. */
 const CREDENTIALS_SECRET = "d".repeat(64);

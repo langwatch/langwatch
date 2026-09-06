@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rollout = vi.hoisted(() => ({ enabled: true }));
 
-vi.mock("../../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard", () => ({
+vi.mock("../../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts", () => ({
   useShowComparisonLeaderboard: () => rollout.enabled,
 }));
 
@@ -20,8 +20,8 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
 }));
 
-import { ComparisonLeaderboardDrawer } from "../comparison-leaderboard-drawer";
-import type { BatchComparisonColumn, BatchResultRow } from "../../batch-evaluation-results.types";
+import { ComparisonLeaderboardDrawer } from "../comparison-leaderboard-drawer.tsx";
+import type { BatchComparisonColumn, BatchResultRow } from "../../batch-evaluation-results.types.ts";
 
 const VARIANTS = ["target-1", "target-2", "target-3"];
 

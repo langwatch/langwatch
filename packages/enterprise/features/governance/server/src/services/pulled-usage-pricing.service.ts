@@ -4,7 +4,7 @@ import {
   type PulledUsageCostBasis,
   type PulledUsageCostStatus,
 } from "@langwatch/enterprise-governance-contract";
-import type { PulledUsageRatePort } from "../ports/pulled-usage-rate.port";
+import type { PulledUsageRatePort } from "../ports/pulled-usage-rate.port.ts";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
 export type PulledUsageQuantities = {

@@ -12,7 +12,7 @@ import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 const mockSetNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       setNode: mockSetNode,
@@ -28,8 +28,8 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-import { EntryPointPropertiesPanel } from "../workflow-entry-point-properties-panel";
-import type { WorkflowVariablesProps } from "../workflow-properties.ports";
+import { EntryPointPropertiesPanel } from "../workflow-entry-point-properties-panel.tsx";
+import type { WorkflowVariablesProps } from "../workflow-properties.ports.ts";
 
 const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({
   id: "entry",

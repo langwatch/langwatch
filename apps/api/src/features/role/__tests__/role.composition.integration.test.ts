@@ -18,19 +18,19 @@ import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
-import { composeDatasetFeature } from "../../dataset/dataset.composition";
-import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition";
-import { composePromptFeature } from "../../prompt/prompt.composition";
-import { composeHomeFeature } from "../../project/home.composition";
-import { composeRoleFeature } from "../role.composition";
+} from "../../../api.application.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
+import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
+import { composeDatasetFeature } from "../../dataset/dataset.composition.ts";
+import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
+import { composePromptFeature } from "../../prompt/prompt.composition.ts";
+import { composeHomeFeature } from "../../project/home.composition.ts";
+import { composeRoleFeature } from "../role.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";

@@ -24,7 +24,7 @@ import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-c
  */
 const testConnectionMock = vi.fn<() => Promise<ModelProviderCredentialVerdict>>();
 
-vi.mock("../model-provider-api", () => ({
+vi.mock("../model-provider-api.ts", () => ({
   modelProviderApi: {
     modelProvider: {
       testConnection: {
@@ -34,7 +34,7 @@ vi.mock("../model-provider-api", () => ({
   },
 }));
 
-import { useModelProviderConnectionTest } from "../use-model-provider-connection-test";
+import { useModelProviderConnectionTest } from "../use-model-provider-connection-test.ts";
 
 const PROVIDER_ROW = "mp_1";
 

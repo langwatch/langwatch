@@ -5,8 +5,8 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Annotation, AnnotationService } from "@langwatch/annotation-contract";
 
-import { AnnotationApp } from "../../../app/annotation.app";
-import { AnnotationTrpcApi, type AnnotationTrpcPorts } from "../annotation.api";
+import { AnnotationApp } from "../../../app/annotation.app.ts";
+import { AnnotationTrpcApi, type AnnotationTrpcPorts } from "../annotation.api.ts";
 
 type TestContext = {
   app: { annotations: AnnotationApp };

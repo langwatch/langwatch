@@ -4,7 +4,7 @@ import {
   buildEvaluateParameters,
   evaluateCurlSnippet,
   exampleParameterValue,
-} from "../model/evaluate-api-snippet";
+} from "../model/evaluate-api-snippet.ts";
 
 describe("buildEvaluateParameters", () => {
   describe("given entry fields with and without matching dataset columns", () => {

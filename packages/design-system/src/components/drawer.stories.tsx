@@ -1,7 +1,7 @@
 import { Button, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Drawer } from "./drawer";
-import { NoDataInfoBlock } from "./no-data-info-block";
+import { Drawer } from "./drawer.tsx";
+import { NoDataInfoBlock } from "./no-data-info-block.tsx";
 import { Database } from "lucide-react";
 
 const meta = {

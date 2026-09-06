@@ -1,6 +1,6 @@
 import { Box, createListCollection, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Select } from "./select";
+import { Select } from "./select.tsx";
 
 const models = createListCollection({
   items: [

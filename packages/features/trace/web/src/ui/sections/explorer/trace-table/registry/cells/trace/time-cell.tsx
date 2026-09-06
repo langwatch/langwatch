@@ -1,13 +1,13 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store";
-import { formatISOTimestamp } from "../../../../../../../model/display-formatters";
-import type { TraceListItem } from "../../../../types/trace";
-import { useRelativeTime } from "../../../../utils/use-relative-time";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
-import { TimeHoverCard } from "./time-hover-card";
+import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store.ts";
+import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { useRelativeTime } from "../../../../utils/use-relative-time.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
+import { TimeHoverCard } from "./time-hover-card.tsx";
 
 // The pinned Time column renders either compact relative ("3m") or full
 // ISO 8601, per the user's `timeFormatStore` choice (switchable from the

@@ -1,12 +1,12 @@
 import type IORedis from "ioredis";
-import type { RetentionPolicyResolver } from "../runtime.types";
-import { discoverProjectionAggregates } from "./replayDiscovery";
-import { runFoldMapReplay } from "./replayEngine";
-import type { ReplayLogWriter } from "./replayLog";
-import { nullLog } from "./replayLog";
-import { cleanupAll, hasPreviousRun } from "./replayMarkers";
-import { replayStateProjection } from "./replayStatePath";
-import type { ReplayEventSource } from "./replayEventSource";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import { discoverProjectionAggregates } from "./replayDiscovery.ts";
+import { runFoldMapReplay } from "./replayEngine.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
+import { nullLog } from "./replayLog.ts";
+import { cleanupAll, hasPreviousRun } from "./replayMarkers.ts";
+import { replayStateProjection } from "./replayStatePath.ts";
+import type { ReplayEventSource } from "./replayEventSource.ts";
 import type {
   DiscoveryResult,
   RegisteredFoldProjection,
@@ -14,7 +14,7 @@ import type {
   ReplayConfig,
   ReplayContext,
   ReplayResult,
-} from "./types";
+} from "./types.ts";
 
 interface ReplayTotals {
   aggregatesReplayed: number;

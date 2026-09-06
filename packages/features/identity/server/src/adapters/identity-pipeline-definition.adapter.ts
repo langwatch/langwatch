@@ -1,5 +1,5 @@
-import type { IdentityGuardsService } from "../services/identity-guards.service";
-import type { MfaGuardsService } from "../services/mfa-guards.service";
+import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -7,10 +7,10 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES } from "@langwatch/identity-contract";
-import { AttachIdentifierCommand } from "../intents/attach-identifier.intent";
-import { DetachIdentifierCommand } from "../intents/detach-identifier.intent";
-import { EraseUserCommand } from "../intents/erase-user.intent";
-import { MarkPrimaryCommand } from "../intents/mark-primary.intent";
+import { AttachIdentifierCommand } from "../intents/attach-identifier.intent.ts";
+import { DetachIdentifierCommand } from "../intents/detach-identifier.intent.ts";
+import { EraseUserCommand } from "../intents/erase-user.intent.ts";
+import { MarkPrimaryCommand } from "../intents/mark-primary.intent.ts";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -19,19 +19,19 @@ import {
   ExpireMfaEnrollmentCommand,
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
-} from "../intents/mfa.intent";
-import { ProposeLinkCommand } from "../intents/propose-link.intent";
-import { VerifyIdentifierCommand } from "../intents/verify-identifier.intent";
+} from "../intents/mfa.intent.ts";
+import { ProposeLinkCommand } from "../intents/propose-link.intent.ts";
+import { VerifyIdentifierCommand } from "../intents/verify-identifier.intent.ts";
 import {
   type IdentityEvent,
   type IdentityFoldState,
   IdentityStateFoldProjection,
-} from "../projections/identity-state.projection";
+} from "../projections/identity-state.projection.ts";
 import {
   MfaEnrollmentStateFoldProjection,
   type MfaEvent,
   type MfaFoldState,
-} from "../projections/mfa-enrollment-state.projection";
+} from "../projections/mfa-enrollment-state.projection.ts";
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 export interface IdentityPipelineDeps {

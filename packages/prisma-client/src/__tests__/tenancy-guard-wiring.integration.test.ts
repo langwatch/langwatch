@@ -21,7 +21,7 @@ import {
   type PrismaConnection,
   PrismaTenancyGuardService,
 } from "..";
-import type { PrismaClient } from "../generated/client";
+import type { PrismaClient } from "../generated/client.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 

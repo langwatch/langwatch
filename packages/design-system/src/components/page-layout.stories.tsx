@@ -1,6 +1,6 @@
 import { Box, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { PageLayout } from "./page-layout";
+import { PageLayout } from "./page-layout.tsx";
 
 const meta = {
   title: "Patterns/Page layout",

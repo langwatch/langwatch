@@ -15,7 +15,7 @@ import {
   runSignInRouterShadow,
   type SignInRouterMode,
   type SignInRouterShadowPort,
-} from "../sign-in-router-shadow.api";
+} from "../sign-in-router-shadow.api.ts";
 
 const PASSWORD: SignInMethod = {
   id: "password",

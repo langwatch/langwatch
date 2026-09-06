@@ -10,8 +10,8 @@ import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Component } from "@langwatch/workflow-contract";
-import { FieldsDefinition } from "../../ui/sections/workflow-base-properties-panel";
-import { _useWorkflowStore } from "../use-workflow-store";
+import { FieldsDefinition } from "../../ui/sections/workflow-base-properties-panel.tsx";
+import { _useWorkflowStore } from "../use-workflow-store.ts";
 
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),

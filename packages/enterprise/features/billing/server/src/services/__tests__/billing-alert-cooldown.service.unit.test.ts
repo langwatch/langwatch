@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BillingAlertCooldownService } from "../billing-alert-cooldown.service";
+import { BillingAlertCooldownService } from "../billing-alert-cooldown.service.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 const START = Date.UTC(2026, 5, 15, 12, 0, 0);

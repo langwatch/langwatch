@@ -32,4 +32,4 @@ export {
   type ChangeHandleFormValues,
   type PromptConfigFormValues,
   type VersionMetadata,
-} from "../../model/prompt-form";
+} from "../../model/prompt-form/index.ts";

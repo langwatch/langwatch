@@ -17,7 +17,7 @@ import {
   type LangyTurnToolCallStatus,
   type LangyUserWaitKind,
   type LangyUserWaitOutcome,
-} from "../../constants";
+} from "../../constants.ts";
 import type {
   LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
@@ -30,9 +30,9 @@ import type {
   LangyToolCallSucceededEventData,
   LangyUserWaitEndedEventData,
   LangyUserWaitStartedEventData,
-} from "../contracts/langy.events";
-import { langyJsonValueSchema } from "../../json";
-import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json";
+} from "../contracts/langy.events.ts";
+import { langyJsonValueSchema } from "../../json.ts";
+import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json.ts";
 
 /**
  * Composite fold key: one turn document per `(conversationId, turnId)`.

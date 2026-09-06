@@ -17,14 +17,14 @@
  * the shadow comparison depends on this engine matching legacy behaviour,
  * warts and all.
  */
-import { scopeChain, type ScopeChainLink } from "./scope";
+import { scopeChain, type ScopeChainLink } from "./scope.ts";
 import type {
   AuthzDecision,
   AuthzScopeRef,
   CollectedBinding,
   CollectedGrants,
   ResourceGrant,
-} from "./authz";
+} from "./authz.ts";
 import {
   bindingsStep,
   type DecideContext,
@@ -34,7 +34,7 @@ import {
   organizationMembershipGateStep,
   organizationRoleFloorStep,
   resourceGrantStep,
-} from "./walk";
+} from "./walk.ts";
 
 /**
  * The one resolver, as a service class (app-layer idiom). Stateless and

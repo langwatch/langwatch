@@ -10,9 +10,9 @@ import {
   normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
-} from "../plan-config";
-import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key";
-import type { SuiteTarget } from "../suite";
+} from "../plan-config.ts";
+import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key.ts";
+import type { SuiteTarget } from "../suite.ts";
 
 describe("normalizePlanScope", () => {
   describe("when the scope names every active test suite of the project", () => {

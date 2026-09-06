@@ -5,14 +5,14 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { useNow } from "./now-provider";
+import { useNow } from "./now-provider.tsx";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
-import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { computeBatchRunSummary, computeIterationMap } from "./run-history-transforms";
-import { ScenarioRunContent } from "./scenario-run-content";
-import type { ScenarioRunContextRenderer } from "./scenario-target-row";
-import type { ViewMode } from "./use-run-history-store";
+import type { BatchRun, BatchRunSummary } from "./run-history-transforms.ts";
+import { computeBatchRunSummary, computeIterationMap } from "./run-history-transforms.ts";
+import { ScenarioRunContent } from "./scenario-run-content.tsx";
+import type { ScenarioRunContextRenderer } from "./scenario-target-row.tsx";
+import type { ViewMode } from "./use-run-history-store.ts";
 
 type BatchSectionProps = {
   batch: BatchRun;

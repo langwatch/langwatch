@@ -6,7 +6,7 @@
 
 import { useMemo } from "react";
 
-import { useOptionalUiCapabilities } from "./capabilities";
+import { useOptionalUiCapabilities } from "./capabilities.ts";
 
 export type UiRouterValues = Readonly<Record<string, string | undefined>>;
 

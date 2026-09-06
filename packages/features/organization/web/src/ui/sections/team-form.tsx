@@ -22,14 +22,14 @@ import {
   useFieldArray,
   useWatch,
 } from "react-hook-form";
-import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { ProjectAvatar } from "../elements/project-avatar";
-import { Link } from "../elements/link";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
+import { Link } from "../elements/link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDrawer } from "../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api, type RouterOutputs } from "../../behavior/organization-api";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 
 /**
  * One team as this form reads it: whatever `team.getTeamWithMembers` answers.
@@ -37,10 +37,10 @@ import { api, type RouterOutputs } from "../../behavior/organization-api";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import { HorizontalFormControl } from "../elements/horizontal-form-control";
+import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
 import { Select } from "@langwatch/design-system/select";
-import { TeamRoleSelect, type TeamUserRoleForm, teamRolesOptions } from "./team-user-role-field";
-import { useOrganizationToaster } from "../../behavior/organization-feedback";
+import { TeamRoleSelect, type TeamUserRoleForm, teamRolesOptions } from "./team-user-role-field.tsx";
+import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
 
 function TeamProjectsBody({
   team,

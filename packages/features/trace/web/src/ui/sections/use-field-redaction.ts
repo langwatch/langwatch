@@ -1,5 +1,5 @@
-import { api } from "../../behavior/trace-api";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import { api } from "../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {
   if (typeof window !== "undefined" && window.location.pathname.includes("/share/")) {

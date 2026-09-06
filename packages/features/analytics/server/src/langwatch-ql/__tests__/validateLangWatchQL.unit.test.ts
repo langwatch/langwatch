@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules";
-import { validateLangWatchQL } from "./lwql-validate";
-import type { LangWatchQLViolationCode } from "../../rules/langwatch-ql-violations.rules";
+import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
+import type { LangWatchQLViolationCode } from "../../rules/langwatch-ql-violations.rules.ts";
 
 /** A catalog with one restricted field, which is the interesting configuration. */
 const POLICY = {

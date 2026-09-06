@@ -1,7 +1,7 @@
 import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LEGAL_LINKS } from "../../../model/legal-links";
-import { Link } from "../../../ui/elements/app-link";
+import { LEGAL_LINKS } from "../../../model/legal-links.ts";
+import { Link } from "../../../ui/elements/app-link.tsx";
 
 /**
  * LearningResources

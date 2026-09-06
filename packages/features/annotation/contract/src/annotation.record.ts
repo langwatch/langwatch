@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { annotationAnchorColumnsSchema, annotationAnchorScopeSchema } from "./annotation.anchor";
-import { annotationScoreOptionsSchema } from "./annotation.score";
+import { annotationAnchorColumnsSchema, annotationAnchorScopeSchema } from "./annotation.anchor.ts";
+import { annotationScoreOptionsSchema } from "./annotation.score.ts";
 
 const annotationIdSchema = z.string().min(1);
 const annotationProjectIdSchema = z.string().min(1);

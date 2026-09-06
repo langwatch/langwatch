@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_CONVERSATION_STATUS } from "../../../constants";
+import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_CONVERSATION_STATUS } from "../../../constants.ts";
 import {
   foldLangyConversationState,
   initLangyConversationState,
   type LangyConversationStateEvent,
   type LangyConversationStateFoldState,
-} from "../conversation-fold";
+} from "../conversation-fold.ts";
 
 const CONVERSATION_ID = "conv-1";
 

@@ -1,7 +1,7 @@
 import { Card, EmptyState, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
-import { analyticsMetrics } from "../../model/analytics-registry";
-import { TopicsSelector } from "./topics-selector";
-import { CustomGraph, type CustomGraphInput } from "./custom-graph";
+import { analyticsMetrics } from "../../model/analytics-registry.ts";
+import { TopicsSelector } from "./topics-selector.tsx";
+import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

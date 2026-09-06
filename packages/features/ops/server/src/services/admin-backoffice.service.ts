@@ -8,9 +8,9 @@ import {
 import type { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
-import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules";
-import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository";
-import type { AdminAuditSink } from "./impersonation.service";
+import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
+import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
+import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
 

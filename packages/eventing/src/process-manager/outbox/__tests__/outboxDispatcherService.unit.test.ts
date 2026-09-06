@@ -5,16 +5,16 @@ import {
   pilotEvent,
   pilotRef,
   T0,
-} from "../../__tests__/helpers/pilotProcess.fixture";
-import { ProcessManagerService } from "../../processManagerService";
-import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore";
-import { type DispatchableMessage, OutboxDispatcherService } from "../outboxDispatcherService";
+} from "../../__tests__/helpers/pilotProcess.fixture.ts";
+import { ProcessManagerService } from "../../processManagerService.ts";
+import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
+import { type DispatchableMessage, OutboxDispatcherService } from "../outboxDispatcherService.ts";
 
 const { observeDispatchLag } = vi.hoisted(() => ({
   observeDispatchLag: vi.fn(),
 }));
-vi.mock("../../../metrics", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../metrics")>()),
+vi.mock("../../../metrics.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../metrics.ts")>()),
   observeEsProcessOutboxDispatchLag: observeDispatchLag,
 }));
 

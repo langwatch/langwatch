@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
 
-import { TraceFormattingService } from "../trace-formatting.service";
+import { TraceFormattingService } from "../trace-formatting.service.ts";
 
 const NOW = Date.UTC(2026, 5, 15, 12, 0, 0);
 const ONE_HOUR_MS = 60 * 60 * 1000;

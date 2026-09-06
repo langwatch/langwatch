@@ -1,7 +1,7 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port";
+import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
 
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.

@@ -17,15 +17,15 @@ import {
   messagesToJson,
   TestMessagesBuilder,
   type TestMessage,
-} from "../blocks/http-test-messages-builder";
-import { HttpTestRequestPreview } from "../blocks/http-test-request-preview";
-import { HttpTestResponseDisplay } from "../blocks/http-test-response-display";
-import type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types";
+} from "../blocks/http-test-messages-builder.tsx";
+import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
+import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";
+import type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types.ts";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
 const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
 
-export type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types";
+export type { HttpTestErrorExplanationPort, HttpTestResult } from "../../model/http-test.types.ts";
 
 export type HttpTestPanelProps = {
   /** Runs the request with template variables, so the engine renders the body. */
@@ -50,7 +50,7 @@ export function renderTemplate(template: string, variables: Record<string, strin
   return result;
 }
 
-export { formatDuration, getStatusColor } from "../blocks/http-test-response-display";
+export { formatDuration, getStatusColor } from "../blocks/http-test-response-display.tsx";
 
 export function HttpTestPanel({
   onTest,

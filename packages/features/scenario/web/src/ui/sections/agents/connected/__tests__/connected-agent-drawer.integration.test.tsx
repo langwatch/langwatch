@@ -71,7 +71,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "project" },
     organization: { id: "org_1" },
@@ -79,7 +79,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {
@@ -102,7 +102,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 async function renderDrawer() {
-  const { ConnectedAgentDrawer } = await import("../connected-agent-drawer");
+  const { ConnectedAgentDrawer } = await import("../connected-agent-drawer.tsx");
   return render(<ConnectedAgentDrawer />, { wrapper: Wrapper });
 }
 
@@ -215,7 +215,7 @@ describe("<ConnectedAgentDrawer />", () => {
         instance: { hostname: "build-box", label: "eu-pod" },
         durationMs: 120,
       };
-      const { ConnectedAgentDrawer } = await import("../connected-agent-drawer");
+      const { ConnectedAgentDrawer } = await import("../connected-agent-drawer.tsx");
       rerender(
         <ChakraProvider value={defaultSystem}>
           <ConnectedAgentDrawer />

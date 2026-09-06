@@ -17,13 +17,13 @@ import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
   mapStatus,
-} from "./simulation-run.mapper";
+} from "./simulation-run.mapper.ts";
 import {
   type SimulationWindowFragment,
   SimulationWindowedReadPort,
-} from "../../ports/simulation-windowed-read.port";
+} from "../../ports/simulation-windowed-read.port.ts";
 import type { SimulationExportRun } from "@langwatch/scenario-contract";
-import { SimulationRepository } from "../simulation.repository";
+import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";

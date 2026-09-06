@@ -4,7 +4,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository";
+import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const TENANT = "tenant_dedup";
 const TRACE_ID = "trace_dedup_1";

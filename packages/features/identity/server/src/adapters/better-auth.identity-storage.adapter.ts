@@ -12,22 +12,22 @@ import type {
   DBAdapter,
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
-import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
+import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 import {
   type AccountQuery,
   type AccountWhere,
   BetterAuthAccountQueriesAdapter,
   IdentityUnsupportedStorageQueryError,
-} from "./better-auth.account-queries.adapter";
-import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules";
-import { BetterAuthIdentityBirthAdapter } from "./better-auth.identity-birth.adapter";
-import type { IdentityBirthPort } from "../ports/identity-birth.port";
+} from "./better-auth.account-queries.adapter.ts";
+import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
+import { BetterAuthIdentityBirthAdapter } from "./better-auth.identity-birth.adapter.ts";
+import type { IdentityBirthPort } from "../ports/identity-birth.port.ts";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
   IdentityResolutionPort,
-} from "../rules/identity-storage-ports.rules";
+} from "../rules/identity-storage-ports.rules.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 

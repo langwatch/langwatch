@@ -4,7 +4,7 @@ import {
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import { hasUserModifiedAnyCredential, headerSignature } from "../model/model-provider-helpers";
+import { hasUserModifiedAnyCredential, headerSignature } from "../model/model-provider-helpers.ts";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
 // pre-fill the input on open without an extra tRPC round trip.
@@ -14,15 +14,15 @@ function humanizeProviderName(providerKey: string): string {
   return providerKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-import { computeInitialUseApiGateway, useCredentialKeys } from "./use-credential-keys";
-import { useCustomModels } from "./use-custom-models";
-import { useDefaultProviderSelection } from "./use-default-provider-selection";
-import { type ExtraHeader, useExtraHeaders } from "./use-extra-headers";
+import { computeInitialUseApiGateway, useCredentialKeys } from "./use-credential-keys.ts";
+import { useCustomModels } from "./use-custom-models.ts";
+import { useDefaultProviderSelection } from "./use-default-provider-selection.ts";
+import { type ExtraHeader, useExtraHeaders } from "./use-extra-headers.ts";
 import {
   type AdvancedGatewayPayload,
   type FormSnapshot,
   useProviderFormSubmit,
-} from "./use-provider-form-submit";
+} from "./use-provider-form-submit.ts";
 
 export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 

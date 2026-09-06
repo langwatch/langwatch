@@ -1,5 +1,5 @@
-export { ApiApplication } from "./api.application";
-export { ApiSecretRestFeature } from "./api-secret-rest.feature";
+export { ApiApplication } from "./api.application.ts";
+export { ApiSecretRestFeature } from "./api-secret-rest.feature.ts";
 export {
   ApiOrganizationAuthenticationUnavailableError,
   ApiOrganizationCredentialClassMismatchError,
@@ -13,8 +13,8 @@ export {
   ApiRestSecurity,
   ApiRouteProjectNotFoundError,
   type ApiRestSecurityObservability,
-} from "./api-rest.security";
-export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition";
+} from "./api-rest.security.ts";
+export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition.ts";
 export {
   ApiProductionComposition,
   LoggedApiAgentsAbsence,
@@ -28,7 +28,7 @@ export {
   LoggedApiTenancyAbsence,
   type ApiOwnedRestFeaturePorts,
   type ApiProductionCompositionOptions,
-} from "./app/api-production.composition";
+} from "./app/api-production.composition.ts";
 /** A project's captured traffic, and the five surfaces it is read through. */
 export {
   ApiTraceAbsenceReport,
@@ -36,42 +36,42 @@ export {
   LoggedApiTraceAbsence,
   refusingTraceFeature,
   type TraceFeatureOptions,
-} from "./features/trace/trace.composition";
-export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port";
-export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace.composition.types";
+} from "./features/trace/trace.composition.ts";
+export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port.ts";
+export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace.composition.types.ts";
 /** The links a project shares outside itself, and the topics its traces carry. */
-export { composeShareFeature, refusingShareFeature } from "./features/share/share.composition";
-export type { ComposedShareFeature } from "./features/share/share.composition.types";
-export { composeTopicFeature, refusingTopicFeature } from "./features/topic/topic.composition";
-export type { ComposedTopicFeature } from "./features/topic/topic.composition.types";
+export { composeShareFeature, refusingShareFeature } from "./features/share/share.composition.ts";
+export type { ComposedShareFeature } from "./features/share/share.composition.types.ts";
+export { composeTopicFeature, refusingTopicFeature } from "./features/topic/topic.composition.ts";
+export type { ComposedTopicFeature } from "./features/topic/topic.composition.types.ts";
 /** An organization's spend, and the allowance it is taken against. */
 export {
   ApiUsageStatsPort,
   composeSpendFeature,
   refusingSpendFeature,
   type ApiProjectSpendRollup,
-} from "./features/entitlement/spend.composition";
-export type { ComposedSpendFeature } from "./features/entitlement/spend.composition.types";
+} from "./features/entitlement/spend.composition.ts";
+export type { ComposedSpendFeature } from "./features/entitlement/spend.composition.types.ts";
 /** The studio's outbound dispatch and the agent test's own trace write. */
 export {
   ApiStudioHostPort,
   composeHttpProxyFeature,
   refusingHttpProxyFeature,
-} from "./features/agent/http-proxy.composition";
-export type { ComposedHttpProxyFeature } from "./features/agent/http-proxy.composition.types";
+} from "./features/agent/http-proxy.composition.ts";
+export type { ComposedHttpProxyFeature } from "./features/agent/http-proxy.composition.types.ts";
 /** The model providers a tenant attaches, and the cost rules they are priced by. */
 export {
   ApiModelProviderHostPort,
   composeModelProviderFeature,
   refusingModelProviderFeature,
-} from "./features/model-provider/model-provider.composition";
-export type { ComposedModelProviderFeature } from "./features/model-provider/model-provider.composition.types";
+} from "./features/model-provider/model-provider.composition.ts";
+export type { ComposedModelProviderFeature } from "./features/model-provider/model-provider.composition.types.ts";
 /** The stored filter sets the explorer offers. */
 export {
   composeSavedViewFeature,
   refusingSavedViewFeature,
-} from "./features/dashboard/saved-view.composition";
-export type { ComposedSavedViewFeature } from "./features/dashboard/saved-view.composition.types";
+} from "./features/dashboard/saved-view.composition.ts";
+export type { ComposedSavedViewFeature } from "./features/dashboard/saved-view.composition.types.ts";
 /**
  * The AI Gateway, composed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.
@@ -80,40 +80,40 @@ export {
   composeGatewayFeature,
   type GatewayFeatureOptions,
   type GatewayPeers,
-} from "./features/gateway/gateway.composition";
-export type { ComposedGatewayFeature } from "./features/gateway/gateway.composition.types";
+} from "./features/gateway/gateway.composition.ts";
+export type { ComposedGatewayFeature } from "./features/gateway/gateway.composition.types.ts";
 export {
   ApiGatewayIdempotencyPort,
   composeApiGateway,
   type ApiGatewayClickHousePort,
   type ApiGatewayComposition,
   type ApiGatewayCompositionOptions,
-} from "./app/api-gateway.composition";
+} from "./app/api-gateway.composition.ts";
 export {
   ApiAgentsAbsenceReportPort,
   ApiAgentsComposition,
   type ApiAgentsCompositionOptions,
-} from "./app/api-agents.composition";
+} from "./app/api-agents.composition.ts";
 export {
   ApiAuthzAbsenceReportPort,
   ApiAuthzComposition,
   type ApiAuthzCompositionOptions,
   type ApiAuthzEpochRedis,
-} from "./app/api-authz.composition";
+} from "./app/api-authz.composition.ts";
 export {
   ApiTenancyAbsenceReportPort,
   ApiTenancyComposition,
   type ApiTenancyCompositionOptions,
-} from "./app/api-tenancy.composition";
-export { ApiOrganizationSettingsSecretAdapter } from "./app/api-organization-settings-secret.adapter";
+} from "./app/api-tenancy.composition.ts";
+export { ApiOrganizationSettingsSecretAdapter } from "./app/api-organization-settings-secret.adapter.ts";
 export {
   ApiEventingAbsenceReportPort,
   ApiEventingInfrastructure,
   type ApiEventingInfrastructureOptions,
   type ApiEventingQueue,
-} from "./platform/infrastructure/api-eventing.infrastructure";
-export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
-export { ApiStandaloneComposition } from "./app/api-standalone.composition";
+} from "./platform/infrastructure/api-eventing.infrastructure.ts";
+export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter.ts";
+export { ApiStandaloneComposition } from "./app/api-standalone.composition.ts";
 export {
   describeApiFailure,
   startStandaloneApi,
@@ -121,7 +121,7 @@ export {
   type ApiExecutableHost,
   type ApiExecutableHostEvent,
   type ApiStandaloneExecutableOptions,
-} from "./app/api-standalone.executable";
+} from "./app/api-standalone.executable.ts";
 export {
   ApiAuthAbsenceReportPort,
   ApiAuthComposition,
@@ -132,18 +132,18 @@ export {
   type ApiAuthCompositionOptions,
   type ApiAuthSessionDependencies,
   type BetterAuthSessionLookup,
-} from "./app/api-auth.composition";
+} from "./app/api-auth.composition.ts";
 export {
   ApiHttpListener,
   type ApiHttpListenerOptions,
   type ApiListenerAddress,
-} from "./api-http.listener";
+} from "./api-http.listener.ts";
 export {
   ApiFeatureDrainPort,
   ApiProcess,
   ApiProcessGraphPort,
   closeApiProcessResources,
-} from "./api.process";
+} from "./api.process.ts";
 export {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -151,32 +151,32 @@ export {
   ApiRequestFailureCapturePort,
   ObservabilityApiRequestFailureCaptureAdapter,
   type ApiRequestFailure,
-} from "./api-process.lifecycle";
+} from "./api-process.lifecycle.ts";
 export {
   ApiRuntimeBootstrap,
   ApiRuntimeCompositionPort,
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
   type ApiRuntimeBootstrapOptions,
-} from "./api.main";
+} from "./api.main.ts";
 export {
   ApiBootFailurePort,
   startApiExecutable,
   type ApiExecutableOptions,
-} from "./api.executable";
+} from "./api.executable.ts";
 export {
   installApiSignalHandlers,
   type ApiSignalHandlerOptions,
   type ApiShutdownSignal,
-} from "./api.signal-handlers";
+} from "./api.signal-handlers.ts";
 export {
   ApiAuthenticationPort,
   ApiAuditPort,
   ApiAuthorizationPort,
   ApiRequestPolicy,
   AuthzApiAuthorizationAdapter,
-} from "./api-request.policy";
-export { TopicApiFeature } from "./features/topic/topic-api.feature";
+} from "./api-request.policy.ts";
+export { TopicApiFeature } from "./features/topic/topic-api.feature.ts";
 export {
   createDatasetRestApp,
   type DatasetDirectUploadAuthorization,
@@ -233,7 +233,7 @@ export {
   MAX_TTL_SECONDS,
   MAX_VALUE_BYTES,
   MIN_TTL_SECONDS,
-} from "./features/agent-cache/agent-cache-rest";
+} from "./features/agent-cache/agent-cache-rest.ts";
 // The five port and actor types this used to re-export beside the family are
 // gone: `GatewayApp` subsumed them. A process composes that application and
 // hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
@@ -249,7 +249,7 @@ export {
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
-export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest";
+export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest.ts";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {
@@ -307,43 +307,43 @@ export {
   type ApiDatabaseConfigResolution,
   type ApiInfrastructureConfig,
   type ApiShutdownConfig,
-} from "./platform/config/api.config";
+} from "./platform/config/api.config.ts";
 export {
   ApiDatabaseAbsenceReportPort,
   ApiDatabaseInfrastructure,
   type ApiDatabaseInfrastructureOptions,
-} from "./platform/infrastructure/api-database.infrastructure";
-export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter";
+} from "./platform/infrastructure/api-database.infrastructure.ts";
+export { ApiGroupQueueContextAdapter } from "./platform/infrastructure/api-group-queue-context.adapter.ts";
 export {
   ApiQueueAbsenceReportPort,
   ApiQueueInfrastructure,
   type ApiQueueInfrastructureOptions,
-} from "./platform/infrastructure/api-queue.infrastructure";
+} from "./platform/infrastructure/api-queue.infrastructure.ts";
 export {
   ApiMetricsAbsenceReportPort,
   ApiMetricsInfrastructure,
   type ApiMetricsInfrastructureOptions,
-} from "./platform/infrastructure/api-metrics.infrastructure";
+} from "./platform/infrastructure/api-metrics.infrastructure.ts";
 export {
   PrometheusApiMetricsAdapter,
   type ApiMetricsAccess,
   type ApiMetricsRegistry,
-} from "./platform/infrastructure/prometheus.api-metrics.adapter";
+} from "./platform/infrastructure/prometheus.api-metrics.adapter.ts";
 export {
   ApiSecretEncryptionAbsenceReportPort,
   ApiSecretEncryptionInfrastructure,
   type ApiSecretEncryptionInfrastructureOptions,
-} from "./platform/infrastructure/api-secret-encryption.infrastructure";
+} from "./platform/infrastructure/api-secret-encryption.infrastructure.ts";
 export {
   ApiRateLimitInfrastructure,
   type ApiRateLimitConnectionPort,
   type ApiRateLimitRequest,
   type ApiRateLimitResult,
-} from "./platform/infrastructure/api-rate-limit.infrastructure";
+} from "./platform/infrastructure/api-rate-limit.infrastructure.ts";
 export {
   ApiApplicationPort,
   ApiLifecyclePort,
   ApiRuntime,
   type ApiRuntimeOptions,
   type ApiShutdownOptions,
-} from "./api.runtime";
+} from "./api.runtime.ts";

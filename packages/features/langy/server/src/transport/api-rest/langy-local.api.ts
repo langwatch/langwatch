@@ -37,7 +37,7 @@ import { conversationTitle, conversationUrl } from "#rules/langy-local-session-t
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "#services/langy-local-user-wait.service";
-import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api";
+import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api.ts";
 
 const AUTH_REASON =
   "session key resolved in-handler by the API-key service, then bridged to the owning user by " +

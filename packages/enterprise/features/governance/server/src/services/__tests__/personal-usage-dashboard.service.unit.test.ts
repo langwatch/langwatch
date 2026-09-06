@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageDashboardServiceOptions,
-} from "../personal-usage-dashboard.service";
+} from "../personal-usage-dashboard.service.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";

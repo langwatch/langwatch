@@ -64,9 +64,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   RestAuthWorld,
   type RestAuthProject,
-} from "../../../app-rest/__tests__/support/rest-auth.world";
-import { mountLangWatchQLRest } from "../langwatch-ql-rest.mount";
-import { mountQueryRest } from "../query-rest.mount";
+} from "../../../app-rest/__tests__/support/rest-auth.world.ts";
+import { mountLangWatchQLRest } from "../langwatch-ql-rest.mount.ts";
+import { mountQueryRest } from "../query-rest.mount.ts";
 
 /** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */
 const SQL = "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";

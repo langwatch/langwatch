@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository";
+import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 
 describe("ClickHouseExperimentRunRepository", () => {
   const options = {

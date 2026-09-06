@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationGroupBindingInputSchema } from "./group";
+import { organizationGroupBindingInputSchema } from "./group.ts";
 
 /**
  * The transport inputs the group surface publishes. A group belongs to exactly

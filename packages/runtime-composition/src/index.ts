@@ -5,5 +5,5 @@ export {
   type ShutdownPhase,
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
-} from "./graceful-shutdown";
-export { type ResourceCloser, ResourceScope } from "./resource-scope";
+} from "./graceful-shutdown.ts";
+export { type ResourceCloser, ResourceScope } from "./resource-scope.ts";

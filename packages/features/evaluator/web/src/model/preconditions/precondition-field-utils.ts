@@ -1,4 +1,4 @@
-import type { CheckPreconditionFields, CheckPreconditionRule } from "../evaluations/types";
+import type { CheckPreconditionFields, CheckPreconditionRule } from "../evaluations/types.ts";
 import type { PreconditionField } from "@langwatch/analytics-contract";
 import {
   getAvailablePreconditionFields,

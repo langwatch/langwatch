@@ -1,5 +1,5 @@
-import { CADENCE_WINDOW_MS, type NotificationCadence } from "./cadences";
-import type { TriggerAction } from "./trigger";
+import { CADENCE_WINDOW_MS, type NotificationCadence } from "./cadences.ts";
+import type { TriggerAction } from "./trigger.ts";
 
 export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
   "SEND_EMAIL",

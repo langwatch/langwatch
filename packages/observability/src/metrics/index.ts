@@ -8,7 +8,7 @@ export {
   HISTOGRAM_BOUNDARIES,
   metricHistogramViews,
   type HistogramViewDescriptor,
-} from "./histogram-boundaries";
+} from "./histogram-boundaries.ts";
 export {
   METRICS_SCOPE_NAME,
   activateMetrics,
@@ -22,4 +22,4 @@ export {
   type GaugeObserver,
   type HistogramHandle,
   type MetricDefinition,
-} from "./instruments";
+} from "./instruments.ts";

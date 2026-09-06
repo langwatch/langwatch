@@ -3,17 +3,17 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionDisplay } from "./session-display";
+import type { CodingAgentSessionDisplay } from "./session-display.ts";
 import { formatCost } from "@langwatch/design-system/display-formatters";
-import { contextHealthBand, contextWindowCeiling, type ContextHealthTone } from "./context-health";
+import { contextHealthBand, contextWindowCeiling, type ContextHealthTone } from "./context-health.ts";
 import {
   deriveSessionSignals,
   formatCompact,
   formatShortDuration,
   type SessionSignal,
-} from "./session-signals";
-import { TokenTimelineChart } from "./token-timeline-chart";
-import { deriveTokenTimeline, findCacheRebuilds } from "./token-timeline";
+} from "./session-signals.ts";
+import { TokenTimelineChart } from "./token-timeline-chart.tsx";
+import { deriveTokenTimeline, findCacheRebuilds } from "./token-timeline.ts";
 
 /**
  * The session overview for a coding agent.

@@ -7,7 +7,7 @@ import {
   allModelOptions,
   ModelSelector,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
-import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section";
+import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section.tsx";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   buildModelChangeValues,
@@ -20,7 +20,7 @@ import {
   normalizeMaxTokens,
   ParameterRow,
   toFormKey,
-} from "../../../surfaces/llm-parameters";
+} from "../../../surfaces/llm-parameters/index.ts";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };

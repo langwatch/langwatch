@@ -5,7 +5,7 @@ export {
   type ParameterRegistration,
   type SelectParameterDefinition,
   type SliderParameterDefinition,
-} from "./parameter-registry";
+} from "./parameter-registry.ts";
 export {
   CORE_PARAMETERS,
   DEFAULT_SUPPORTED_PARAMETERS,
@@ -27,26 +27,26 @@ export {
   type ParameterIcon,
   type SelectParameterConfig,
   type SliderParameterConfig,
-} from "./parameter-config";
-export type { LLMConfigValues } from "./llm-config-values.types";
-export { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../../model/token-limits";
-export { getParamValue } from "./parameter-value.utils";
+} from "./parameter-config.ts";
+export type { LLMConfigValues } from "./llm-config-values.types.ts";
+export { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../../model/token-limits.ts";
+export { getParamValue } from "./parameter-value.utils.ts";
 export {
   buildModelChangeValues,
   calculateSensibleDefaults,
   getMaxTokenLimit,
   normalizeMaxTokens,
-} from "./max-tokens.utils";
+} from "./max-tokens.utils.ts";
 export {
   alignMaxToStep,
   stepPrecision,
   useSliderControl,
   type UseSliderControlParams,
   type UseSliderControlReturn,
-} from "./use-slider-control";
-export { ParameterField, type ParameterFieldProps } from "./parameter-field";
+} from "./use-slider-control.ts";
+export { ParameterField, type ParameterFieldProps } from "./parameter-field.tsx";
 export {
   ParameterPopoverContent,
   type ParameterPopoverContentProps,
-} from "./parameter-popover-content";
-export { ParameterRow, type ParameterRowProps } from "./parameter-row";
+} from "./parameter-popover-content.tsx";
+export { ParameterRow, type ParameterRowProps } from "./parameter-row.tsx";

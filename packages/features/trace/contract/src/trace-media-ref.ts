@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { collectAnnotatedMediaParts } from "./trace-media-part.collector";
-import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role";
+import { collectAnnotatedMediaParts } from "./trace-media-part.collector.ts";
+import { isMediaPartRole, MEDIA_PART_ROLES, type MediaPartRole } from "./trace-media-role.ts";
 
 /**
  * Compact trace-level media references, letting the trace list and drawer

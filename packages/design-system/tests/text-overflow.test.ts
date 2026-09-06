@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTextLikelyOverflowing } from "../src/text-overflow";
+import { isTextLikelyOverflowing } from "../src/text-overflow.ts";
 
 describe("isTextLikelyOverflowing", () => {
   /** @scenario Collapsed virtualized cells expand only beyond the configured limit */

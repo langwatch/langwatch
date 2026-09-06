@@ -1,7 +1,7 @@
 import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { useCallback, useMemo } from "react";
-import { api } from "./scenario-api";
-import { useOrganizationTeamProject } from "./use-organization-team-project";
+import { api } from "./scenario-api.ts";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * The registry types are shared, so a typo'd permission string fails the build; the hierarchy helper is the same pure function the engine uses.

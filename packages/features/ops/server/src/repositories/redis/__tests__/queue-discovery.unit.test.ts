@@ -1,6 +1,6 @@
 import { GROUP_QUEUE_REGISTRY_KEY, GroupStagingScripts } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
-import { QueueRedisRepository } from "../queue.repository";
+import { QueueRedisRepository } from "../queue.repository.ts";
 
 type ScanPage = [cursor: string, keys: string[]];
 

@@ -4,7 +4,7 @@ import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
   type WorkbenchActionKind,
-} from "../manifest";
+} from "../manifest.ts";
 
 const entries = Object.entries(WORKBENCH_ACTIONS) as [
   WorkbenchActionKind,

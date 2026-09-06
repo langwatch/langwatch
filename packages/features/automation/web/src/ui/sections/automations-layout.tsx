@@ -27,7 +27,7 @@ import { Box, Container, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { Calendar, Eye, TrendingUp, Zap } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "../elements/automation-link";
+import { Link } from "../elements/automation-link.tsx";
 
 const SECTION_LABEL = "Automations";
 

@@ -7,9 +7,9 @@ import {
   type Evaluator,
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { EvaluatorRepository } from "../../repositories/evaluator.repository";
-import { EvaluatorCodeExecutionPort } from "../evaluator.port";
-import { EvaluatorService } from "../../services/evaluator.service";
+import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
+import { EvaluatorCodeExecutionPort } from "../evaluator.port.ts";
+import { EvaluatorService } from "../../services/evaluator.service.ts";
 
 const baseEvaluator: Evaluator = {
   id: "e1",

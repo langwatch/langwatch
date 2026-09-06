@@ -7,17 +7,17 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { LensConfig } from "../../../../behavior/view.store";
-import { useFilterStore } from "../../../../behavior/filter.store";
-import { groupByForGrouping } from "../../../../behavior/view.store";
-import type { TraceListItem } from "../types/trace";
-import { buildGroupColumns } from "./columns";
-import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry";
-import { groupSelectColumnDef } from "./select-column";
-import { buildGroupPlaceholderRows } from "./skeleton-placeholders";
-import { TraceTableShell } from "./trace-table-shell";
-import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer";
-import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { groupByForGrouping } from "../../../../behavior/view.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
+import { buildGroupColumns } from "./columns.ts";
+import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry/index.ts";
+import { groupSelectColumnDef } from "./select-column.tsx";
+import { buildGroupPlaceholderRows } from "./skeleton-placeholders.ts";
+import { TraceTableShell } from "./trace-table-shell.tsx";
+import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer.ts";
+import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 
 const GROUP_MIN_WIDTH = "880px";
 

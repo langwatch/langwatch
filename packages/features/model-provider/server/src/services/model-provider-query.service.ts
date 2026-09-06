@@ -12,8 +12,8 @@ import type {
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
   ModelProviderRepository,
-} from "../ports/model-provider.port";
-import type { ModelProviderScopeService } from "./model-provider-scope.service";
+} from "../ports/model-provider.port.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderQueryOptions = {
   repository: ModelProviderRepository;

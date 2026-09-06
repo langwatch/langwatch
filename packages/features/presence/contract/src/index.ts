@@ -1,3 +1,3 @@
-export * from "./broadcast.errors";
-export * from "./presence";
-export * from "./presence.service";
+export * from "./broadcast.errors.ts";
+export * from "./presence.ts";
+export * from "./presence.service.ts";

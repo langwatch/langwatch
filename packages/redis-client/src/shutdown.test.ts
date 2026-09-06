@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisShutdownService } from "./shutdown";
-import type { RedisConnection } from "./types";
+import { RedisShutdownService } from "./shutdown.ts";
+import type { RedisConnection } from "./types.ts";
 
 function connectionThat(disconnect: () => void): RedisConnection {
   return { disconnect } as unknown as RedisConnection;

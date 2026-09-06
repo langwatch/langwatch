@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
-import { GatewayBudgetDtoAdapter, type GatewayBudgetWithSeats } from "../index";
+import { GatewayBudgetDtoAdapter, type GatewayBudgetWithSeats } from "../index.ts";
 
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetWithSeats {

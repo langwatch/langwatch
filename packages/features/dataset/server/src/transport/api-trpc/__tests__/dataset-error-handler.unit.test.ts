@@ -9,7 +9,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
 } from "@langwatch/dataset-contract";
-import { datasetErrorHandler } from "../dataset.api";
+import { datasetErrorHandler } from "../dataset.api.ts";
 
 /**
  * Assertions are on `code`, never on message prose: the message is server copy

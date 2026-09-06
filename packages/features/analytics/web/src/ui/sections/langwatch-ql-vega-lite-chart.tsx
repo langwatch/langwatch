@@ -14,14 +14,14 @@ import { Box, Stack, Text, VStack } from "@chakra-ui/react";
 import { type RefObject, useId } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-import { useLangWatchQLChartModel } from "../../behavior/use-langwatch-ql-chart-model";
-import type { LangWatchQLVegaViewStatus } from "../../behavior/use-langwatch-ql-vega-view";
+import { useLangWatchQLChartModel } from "../../behavior/use-langwatch-ql-chart-model.ts";
+import type { LangWatchQLVegaViewStatus } from "../../behavior/use-langwatch-ql-vega-view.ts";
 import type {
   LangWatchQLVegaLiteChartProps,
   VegaValidationWarning,
 } from "@langwatch/analytics-contract/visualization";
 
-import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure";
+import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure.tsx";
 
 /** The minimum a chart is given, so a refusal never collapses the pane. */
 const CHART_MIN_HEIGHT = "260px";

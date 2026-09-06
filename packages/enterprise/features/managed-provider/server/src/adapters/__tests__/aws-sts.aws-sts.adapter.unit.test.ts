@@ -1,6 +1,6 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AwsStsManagedProviderCredentialAdapter } from "../aws-sts.aws-sts.adapter";
+import { AwsStsManagedProviderCredentialAdapter } from "../aws-sts.aws-sts.adapter.ts";
 
 const sts = vi.hoisted(() => ({
   clients: [] as Array<{

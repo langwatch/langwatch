@@ -27,7 +27,7 @@ const triggers = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("../../../behavior/automation-api", () => {
+vi.mock("../../../behavior/automation-api.ts", () => {
   const emptyQuery = { data: undefined, isLoading: false, isFetching: false, error: null };
   const node = (): unknown =>
     new Proxy(
@@ -73,16 +73,16 @@ vi.mock("../../../behavior/automation-api", () => {
  * either one" is an assertion about the screen and not about whether a thousand
  * lines of Chakra happened to throw.
  */
-vi.mock("../../../features/authoring/ui/sections/automation-drawer", () => ({
+vi.mock("../../../features/authoring/ui/sections/automation-drawer.tsx", () => ({
   AutomationDrawer: () => <div>the editor</div>,
 }));
 
-vi.mock("../../../features/authoring/ui/sections/view-automation-drawer", () => ({
+vi.mock("../../../features/authoring/ui/sections/view-automation-drawer.tsx", () => ({
   ViewAutomationDrawer: () => <div>the panel</div>,
 }));
 
-import AutomationsPage from "../automations.screen";
-import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing";
+import AutomationsPage from "../automations.screen.tsx";
+import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
 
 const TRACE_AUTOMATION = {
   id: "tr_1",

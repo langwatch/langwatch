@@ -5,7 +5,7 @@ import {
   type EnterpriseFeature,
   EnterprisePlanRequiredError,
   isEnterpriseTier,
-} from "./plan-gate.errors";
+} from "./plan-gate.errors.ts";
 
 /** What the gate needs from the process it is mounted in. */
 export interface EnterprisePlanGatePorts {

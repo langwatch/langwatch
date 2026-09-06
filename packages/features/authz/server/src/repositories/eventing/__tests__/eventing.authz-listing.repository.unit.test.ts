@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzDatabase } from "../../authz-read.repository";
-import { EventingAuthzListingRepository } from "../eventing.authz-listing.repository";
-import { PrismaAuthzListingRepository } from "../../prisma/prisma.authz-listing.repository";
+import type { AuthzDatabase } from "../../authz-read.repository.ts";
+import { EventingAuthzListingRepository } from "../eventing.authz-listing.repository.ts";
+import { PrismaAuthzListingRepository } from "../../prisma/prisma.authz-listing.repository.ts";
 
 /**
  * The grants head speaks the ledger's vocabulary; the Access surface renders

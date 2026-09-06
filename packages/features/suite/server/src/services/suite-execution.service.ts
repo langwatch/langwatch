@@ -16,8 +16,8 @@ import {
   SuiteExecutionPort,
   SuiteRunCommandsPort,
   SuiteRunIdPort,
-} from "../ports/suite-execution.port";
-import type { SuiteRunModelsResolver } from "./suite-run-models.service";
+} from "../ports/suite-execution.port.ts";
+import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 
 const logger = createLogger("langwatch:suite-run:service");
 

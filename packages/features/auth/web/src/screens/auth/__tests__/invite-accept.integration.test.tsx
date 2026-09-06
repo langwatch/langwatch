@@ -18,7 +18,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AcceptInviteStatus } from "../../../behavior/use-accept-invite-once";
+import type { AcceptInviteStatus } from "../../../behavior/use-accept-invite-once.ts";
 
 const { hardRedirectSpy, signOutSpy, mockAcceptState } = vi.hoisted(() => ({
   hardRedirectSpy: vi.fn(),
@@ -29,11 +29,11 @@ const { hardRedirectSpy, signOutSpy, mockAcceptState } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useRouter: () => ({ query: { inviteCode: "invite-abc" } }),
 }));
 
-vi.mock("../../../behavior/use-required-session", () => ({
+vi.mock("../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
@@ -41,24 +41,24 @@ vi.mock("../../../behavior/use-required-session", () => ({
 // identifier-first front door is enforced (ADR-117 §7): accept on arrival,
 // explain the failure, offer the way out. The landing screen that replaces it
 // at the flip has its own tests.
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { IDENTITY_FRONT_DOOR: false } }),
   usePublicEnvWithCapabilities: () => ({ data: { IDENTITY_FRONT_DOOR: false } }),
 }));
 
-vi.mock("../../../behavior/use-accept-invite-once", () => ({
+vi.mock("../../../behavior/use-accept-invite-once.ts", () => ({
   useAcceptInviteOnce: () => mockAcceptState,
 }));
 
-vi.mock("../../../behavior/auth-client", () => ({
+vi.mock("../../../behavior/auth-client.tsx", () => ({
   signOut: signOutSpy,
 }));
 
-vi.mock("../../../behavior/hard-redirect", () => ({
+vi.mock("../../../behavior/hard-redirect.ts", () => ({
   hardRedirect: hardRedirectSpy,
 }));
 
-import Accept from "../invite-accept.screen";
+import Accept from "../invite-accept.screen.tsx";
 
 function renderAccept() {
   return render(

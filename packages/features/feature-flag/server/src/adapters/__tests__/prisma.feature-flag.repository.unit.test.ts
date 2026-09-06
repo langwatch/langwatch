@@ -2,10 +2,10 @@
  * Store-level resolution of a registered flag, with the database as the only faked hop.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PostgresFeatureFlagAdapter } from "../postgres.feature-flag.adapter";
-import type { FeatureFlagService } from "../../services/feature-flag.service";
+import { PostgresFeatureFlagAdapter } from "../postgres.feature-flag.adapter.ts";
+import type { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { MemoryFeatureFlagCache } from "../../testing";
+import { MemoryFeatureFlagCache } from "../../testing.ts";
 
 type FakeRow = {
   key: string;

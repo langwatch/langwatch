@@ -1,5 +1,5 @@
-import { createRestService } from "../builder.js";
-import { RestVersionSelector } from "../rest-version-selector.js";
+import { createRestService } from "../builder.ts";
+import { RestVersionSelector } from "../rest-version-selector.ts";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

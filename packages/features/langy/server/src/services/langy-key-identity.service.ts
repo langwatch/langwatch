@@ -1,5 +1,5 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import { LangyAccessService } from "./langy-access.service";
+import { LangyAccessService } from "./langy-access.service.ts";
 
 /**
  * The two fields this gate reads off a resolved credential. Structural rather than

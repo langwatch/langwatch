@@ -17,13 +17,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getCurrentContext, runWithContext } from "../context/core";
+import { getCurrentContext, runWithContext } from "../context/core.ts";
 import {
   configureLogger,
   createLogger,
   registerLogContextProvider,
   resetLoggerCache,
-} from "../logger";
+} from "../logger.ts";
 
 /** Everything the loggers wrote while `run` executed, parsed. */
 function emitted(run: () => void): Record<string, unknown>[] {

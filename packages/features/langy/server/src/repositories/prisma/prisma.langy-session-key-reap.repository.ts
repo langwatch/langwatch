@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { LangySessionKeyReapRepository } from "../langy-session-key-reap.repository";
+import { LangySessionKeyReapRepository } from "../langy-session-key-reap.repository.ts";
 
 /**
  * The one model the sweep touches, and nothing else in the client.

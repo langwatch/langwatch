@@ -68,14 +68,14 @@ import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
-import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "../src/generated/client";
+import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "../src/generated/client.ts";
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { PrismaDriverAdapterService } from "../src/driver-adapter";
-import { seedDemoPlatform } from "./seed-demo-platform";
+import { PrismaDriverAdapterService } from "../src/driver-adapter.ts";
+import { seedDemoPlatform } from "./seed-demo-platform.ts";
 
 const prisma = new PrismaClient({
   adapter: PrismaDriverAdapterService.create().createOwnedAdapter(process.env.DATABASE_URL ?? ""),

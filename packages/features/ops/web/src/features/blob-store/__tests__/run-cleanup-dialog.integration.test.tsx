@@ -10,7 +10,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RunCleanupDialog } from "../ui/sections/run-cleanup-dialog";
+import { RunCleanupDialog } from "../ui/sections/run-cleanup-dialog.tsx";
 
 const renderDialog = ({
   value,

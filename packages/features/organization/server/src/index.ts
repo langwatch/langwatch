@@ -2,12 +2,12 @@ export {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
-} from "./adapters/resource-identifiers.adapter";
-export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter";
+} from "./adapters/resource-identifiers.adapter.ts";
+export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter.ts";
 export {
   PostgresOrganizationMembershipAdapter,
   type PostgresOrganizationMembershipAdapterOptions,
-} from "./adapters/postgres.organization-membership.adapter";
+} from "./adapters/postgres.organization-membership.adapter.ts";
 export {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
@@ -15,8 +15,8 @@ export {
   OrganizationSessionRevocationPort,
   type OrganizationPlanUser,
   type OrganizationSeatDecision,
-} from "./ports/organization-membership.port";
-export { OrganizationMembershipService } from "./services/organization-membership.service";
+} from "./ports/organization-membership.port.ts";
+export { OrganizationMembershipService } from "./services/organization-membership.service.ts";
 export {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -30,7 +30,7 @@ export {
   OrganizationNotFoundForTeamError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
-export { isCustomRole } from "./rules/custom-role-naming.rules";
+export { isCustomRole } from "./rules/custom-role-naming.rules.ts";
 export {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
@@ -39,18 +39,18 @@ export {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "./rules/member-role-constraints.rules";
+} from "./rules/member-role-constraints.rules.ts";
 export {
   PersonalTeamScopeService,
   type PersonalTeamScopeReader,
   type RoleBindingScope,
-} from "./services/personal-team-scope.service";
-export { PostgresPersonalTeamScopeAdapter } from "./adapters/postgres.personal-team-scope.adapter";
+} from "./services/personal-team-scope.service.ts";
+export { PostgresPersonalTeamScopeAdapter } from "./adapters/postgres.personal-team-scope.adapter.ts";
 export {
   TenantDirectoryService,
   type TenantOwnershipReader,
-} from "./services/tenant-directory.service";
-export { PostgresTenantDirectoryAdapter } from "./adapters/postgres.tenant-directory.adapter";
+} from "./services/tenant-directory.service.ts";
+export { PostgresTenantDirectoryAdapter } from "./adapters/postgres.tenant-directory.adapter.ts";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -61,11 +61,11 @@ export type {
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
-} from "./repositories/organization-membership.repository";
+} from "./repositories/organization-membership.repository.ts";
 export {
   PostgresOrganizationAdapter,
   type PostgresOrganizationAdapterOptions,
-} from "./adapters/postgres.organization.adapter";
+} from "./adapters/postgres.organization.adapter.ts";
 export {
   PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
@@ -74,14 +74,14 @@ export {
   TeamIdentityPort,
   type StoredOrganizationSettings,
   type PersonalWorkspaceResourceIds,
-} from "./ports/organization.port";
+} from "./ports/organization.port.ts";
 export {
   OrganizationApp,
   type FullyLoadedOrganization,
   type OrganizationAppDependencies,
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
-} from "./app/organization.app";
+} from "./app/organization.app.ts";
 export {
   createOrganizationRestApp,
   type OrganizationRestInviteService,
@@ -89,52 +89,52 @@ export {
   type OrganizationRestMemberTeamBinding,
   type OrganizationRestPorts,
   type OrganizationRestService,
-} from "./transport/api-rest/organization.api";
+} from "./transport/api-rest/organization.api.ts";
 export {
   TeamTrpcApi,
   type TeamTrpcContext,
   type TeamTrpcPorts,
-} from "./transport/api-trpc/team.api";
+} from "./transport/api-trpc/team.api.ts";
 export {
   GroupTrpcApi,
   type GroupTrpcContext,
   type GroupTrpcPorts,
-} from "./transport/api-trpc/group.api";
+} from "./transport/api-trpc/group.api.ts";
 export {
   JoinRequestTrpcApi,
   type JoinRequestTrpcContext,
   type JoinRequestTrpcPorts,
-} from "./transport/api-trpc/join-request.api";
+} from "./transport/api-trpc/join-request.api.ts";
 export {
   OnboardingTrpcApi,
   onboardingIntegrationMethodSchema,
   type OnboardingIntegrationMethod,
   type OnboardingTrpcContext,
   type OnboardingTrpcPorts,
-} from "./transport/api-trpc/onboarding.api";
+} from "./transport/api-trpc/onboarding.api.ts";
 export {
   OrganizationTrpcApi,
   type OrganizationTrpcContext,
   type OrganizationTrpcPorts,
-} from "./transport/api-trpc/organization.api";
+} from "./transport/api-trpc/organization.api.ts";
 export {
   PersonalWorkspaceFeaturesTrpcApi,
   type PersonalWorkspaceFeaturesTrpcContext,
-} from "./transport/api-trpc/personal-workspace-features.api";
-export { createGroupRestApp } from "./transport/api-rest/group.api";
+} from "./transport/api-trpc/personal-workspace-features.api.ts";
+export { createGroupRestApp } from "./transport/api-rest/group.api.ts";
 export {
   createOrganizationsRestApp,
   type OrganizationProvisioningPort,
   type OrganizationProvisioningSummary,
   verifyInstanceAdminKey,
-} from "./transport/api-rest/organization-provisioning.api";
-export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules";
-export { createTeamsRestApp } from "./transport/api-rest/team.api";
-export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules";
+} from "./transport/api-rest/organization-provisioning.api.ts";
+export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules.ts";
+export { createTeamsRestApp } from "./transport/api-rest/team.api.ts";
+export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules.ts";
 export {
   resolveInviteDisplayStatus,
   type InviteDisplayStatus,
-} from "./rules/invite-display-status.rules";
+} from "./rules/invite-display-status.rules.ts";
 export {
   LITE_MEMBER_VIEWER_ONLY_ERROR,
   EffectiveTeamRoleUpdatesService,
@@ -142,19 +142,19 @@ export {
   type EffectiveTeamRoleUpdate,
   type TeamRoleUpdate,
   type TeamRoleUpdateOrigin,
-} from "./services/compute-effective-team-role-updates.service";
-export { InviteService } from "./services/invite.service";
+} from "./services/compute-effective-team-role-updates.service.ts";
+export { InviteService } from "./services/invite.service.ts";
 export {
   INVITE_EXPIRATION_MS,
   type InviteServiceDependencies,
-} from "./rules/invite-contracts.rules";
+} from "./rules/invite-contracts.rules.ts";
 export {
   INVITE_SENDS_PER_WINDOW,
   INVITE_SEND_WINDOW_SECONDS,
   InviteSendThrottleService,
-} from "./services/invite-send-throttle.service";
+} from "./services/invite-send-throttle.service.ts";
 export {
   OrganizationInviteMailPort,
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
-} from "./ports/invite.port";
+} from "./ports/invite.port.ts";

@@ -1,7 +1,7 @@
 import { Badge, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { OpsScheduledJob } from "@langwatch/ops-contract";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 const VISIBLE_ROWS = 12;
 

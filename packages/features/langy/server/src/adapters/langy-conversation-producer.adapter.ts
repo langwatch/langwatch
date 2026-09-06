@@ -9,15 +9,15 @@ import type {
   LangyMessageProjectionRecord,
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
-import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection";
-import type { LangyTitleGenerator } from "../ports/langy-effect.port";
-import type { LangySessionKeyService } from "../services/langy-session-key.service";
-import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
-import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
-import type { LangyBroadcastPort } from "../subscribers/langy-conversation.subscriber";
-import { NullLangyWorkerMetricsAdapter } from "./null-langy-worker-metrics.adapter";
-import { UnavailableLangyWorkerAdapter } from "./unavailable-langy-worker.adapter";
-import { EventingLangyConversationAdapter } from "./eventing.langy-conversation-runtime.adapter";
+import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection.ts";
+import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
+import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import type { LangyBroadcastPort } from "../subscribers/langy-conversation.subscriber.ts";
+import { NullLangyWorkerMetricsAdapter } from "./null-langy-worker-metrics.adapter.ts";
+import { UnavailableLangyWorkerAdapter } from "./unavailable-langy-worker.adapter.ts";
+import { EventingLangyConversationAdapter } from "./eventing.langy-conversation-runtime.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

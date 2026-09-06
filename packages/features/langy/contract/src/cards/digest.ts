@@ -25,9 +25,9 @@
  * than a bespoke extractor.
  */
 import * as z from "zod";
-import { parseCliJson } from "./cli-json.js";
-import { resolveTotal, type Pagination } from "./primitives.js";
-import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.js";
+import { parseCliJson } from "./cli-json.ts";
+import { resolveTotal, type Pagination } from "./primitives.ts";
+import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.ts";
 
 /** How many ids a digest carries at most — a reference, not an export. */
 export const MAX_DIGEST_IDS = 25;

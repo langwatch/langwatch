@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { keepPreviousData } from "../../../../model/keep-previous-data";
+import { keepPreviousData } from "../../../../model/keep-previous-data.ts";
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -17,7 +17,7 @@ import {
   api,
   type RouterOutputs,
   type WebhookDeliveryCursor,
-} from "../../../../behavior/gateway-api";
+} from "../../../../behavior/gateway-api.ts";
 
 const DELIVERIES_PAGE_SIZE = 25;
 

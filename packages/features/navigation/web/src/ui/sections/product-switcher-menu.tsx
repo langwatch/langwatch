@@ -2,15 +2,15 @@ import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug";
-import { useReachableProducts } from "../../behavior/use-reachable-products";
-import { useNavigationHost } from "../../model/navigation-host";
+import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   PRODUCTS,
   type ProductDefinition,
   type ProductId,
   productById,
-} from "../../model/products";
+} from "../../model/products.ts";
 
 /** The trigger reads as a raised pill on the top bar's gray. */
 const productPillStyle = {

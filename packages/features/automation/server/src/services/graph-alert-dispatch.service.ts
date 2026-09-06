@@ -7,15 +7,15 @@ import {
   type SlackTemplateType,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import type { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import type { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
 import type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
-} from "../ports/automation-graph.port";
-import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port";
-import type { AutomationEmailCapService } from "./email-cap.service";
-import type { AutomationWebhookProviderPort } from "../ports/automation-provider.port";
+} from "../ports/automation-graph.port.ts";
+import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
+import type { AutomationWebhookProviderPort } from "../ports/automation-provider.port.ts";
 
 function destinationHash(destination: string): string {
   return createHash("sha256").update(destination).digest("hex").slice(0, 16);

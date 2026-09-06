@@ -1,7 +1,7 @@
 import {
   BLOB_RECLAIM_TTL_THRESHOLD_SECONDS,
   BLOB_RELEASE_GRACE_TTL_SECONDS,
-} from "./blobConstants";
+} from "./blobConstants.ts";
 
 /**
  * The verdicts {@link BLOB_SWEEP_LUA} can return for one blob. Every sweep

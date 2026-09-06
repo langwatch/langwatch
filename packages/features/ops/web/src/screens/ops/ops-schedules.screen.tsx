@@ -1,7 +1,7 @@
 import { VStack } from "@chakra-ui/react";
-import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout";
-import { SchedulerContent } from "../../features/event-store/ui/sections/scheduler-panel";
-import { UpcomingWorkCard } from "../../features/event-store/ui/sections/upcoming-work-panel";
+import { EventSourcingLayout } from "../../ui/sections/event-sourcing-layout.tsx";
+import { SchedulerContent } from "../../features/event-store/ui/sections/scheduler-panel.tsx";
+import { UpcomingWorkCard } from "../../features/event-store/ui/sections/upcoming-work-panel.tsx";
 
 /**
  * The calendar, and what it is about to do.

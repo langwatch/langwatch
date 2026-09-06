@@ -12,7 +12,7 @@ import {
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service";
+import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service.ts";
 
 /**
  * How far back the preview looks for spans. Wide enough to catch models that

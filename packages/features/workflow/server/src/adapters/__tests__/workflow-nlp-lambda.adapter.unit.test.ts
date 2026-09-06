@@ -8,13 +8,13 @@ import {
   InvokePayloadTooLargeError,
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
-} from "../workflow-nlp-lambda.adapter";
+} from "../workflow-nlp-lambda.adapter.ts";
 import {
   NlpLambdaInvokePort,
   NlpPayloadStagingPort,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
-} from "../../ports/workflow-nlp-lambda.port";
+} from "../../ports/workflow-nlp-lambda.port.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:nlpgo-project";
 

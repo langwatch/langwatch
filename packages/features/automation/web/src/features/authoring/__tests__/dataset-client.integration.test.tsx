@@ -20,7 +20,7 @@ const { refetchMock, datasets } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     dataset: {
       getAll: {
@@ -35,8 +35,8 @@ vi.mock("../../../behavior/automation-api", () => ({
   },
 }));
 
-const { fakeAutomationHost, renderWithAutomationHost } = await import("../../../testing");
-const { default: client } = await import("../ui/sections/dataset.client");
+const { fakeAutomationHost, renderWithAutomationHost } = await import("../../../testing.tsx");
+const { default: client } = await import("../ui/sections/dataset.client.tsx");
 
 const ConfigForm = client.ConfigForm;
 

@@ -10,11 +10,11 @@
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { createDatasetGenerateRestApp } from "@langwatch/dataset-server";
 
-import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition";
+import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
 import type {
   ApiHandlerManagedSessionPort,
   HandlerManagedSession,
-} from "../../app/api-handler-managed-session";
+} from "../../app/api-handler-managed-session.ts";
 
 /**
  * `/api/dataset/generate`, bound to one process.

@@ -19,10 +19,10 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiRestSecurity } from "../../api-rest.security";
-import { canonicalErrorFor } from "../api-canonical-error";
-import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { canonicalErrorFor } from "../api-canonical-error.ts";
+import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const ORGANIZATION_ID = "organization-1";

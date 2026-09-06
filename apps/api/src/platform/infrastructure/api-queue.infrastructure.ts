@@ -13,8 +13,8 @@ import {
   type RedisLogger,
 } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { ApiReadinessPort } from "../../api-process.lifecycle";
-import { ApiGroupQueueContextAdapter } from "./api-group-queue-context.adapter";
+import { ApiReadinessPort } from "../../api-process.lifecycle.ts";
+import { ApiGroupQueueContextAdapter } from "./api-group-queue-context.adapter.ts";
 
 export type ApiQueueInfrastructureOptions = {
   resources: ResourceScope;

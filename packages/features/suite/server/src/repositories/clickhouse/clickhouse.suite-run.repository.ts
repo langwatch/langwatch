@@ -17,8 +17,8 @@ import {
   type SuiteRunStateData,
   type SuiteRunStateInput,
 } from "@langwatch/suite-contract";
-import { SuiteRunReadRepository } from "../suite-run.repository";
-import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port";
+import { SuiteRunReadRepository } from "../suite-run.repository.ts";
+import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port.ts";
 
 export type SuiteRunClickHouseRepositoryOptions = {
   resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;

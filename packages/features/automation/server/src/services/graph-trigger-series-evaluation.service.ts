@@ -3,13 +3,13 @@ import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contrac
 import {
   GRAPH_TRIGGER_MAX_RESULT_ROWS,
   TriggerEvaluatorService,
-} from "./trigger-evaluator.service";
+} from "./trigger-evaluator.service.ts";
 import type {
   GraphEvaluationPlan,
   GraphSeries,
   GraphSeriesEvaluation,
   TimeseriesResult,
-} from "./trigger-evaluator.service";
+} from "./trigger-evaluator.service.ts";
 
 /** ClickHouse's "too many rows or bytes", however the client spelled it. */
 function isTimeseriesResultTooLarge(error: unknown): boolean {

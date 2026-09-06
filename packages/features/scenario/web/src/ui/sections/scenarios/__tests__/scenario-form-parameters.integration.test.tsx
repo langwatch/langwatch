@@ -12,13 +12,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
-vi.mock("../scenario-editor-sidebar", () => ({
+vi.mock("../scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
-vi.mock("../scenario-run-model-dialog", () => ({
+vi.mock("../scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: () => null,
 }));
-vi.mock("../save-and-run-menu", () => ({
+vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: ({ onSaveWithoutRunning }: { onSaveWithoutRunning?: () => void }) => (
     <button data-testid="save-button" onClick={onSaveWithoutRunning}>
       Save
@@ -26,7 +26,7 @@ vi.mock("../save-and-run-menu", () => ({
   ),
 }));
 
-import { ScenarioFormDrawer } from "../scenario-form-drawer";
+import { ScenarioFormDrawer } from "../scenario-form-drawer.tsx";
 
 const mocks = vi.hoisted(() => ({
   mockCreateMutateAsync: vi.fn(),
@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   mockGetByIdData: null as Record<string, unknown> | null,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       create: {
@@ -84,7 +84,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -102,11 +102,11 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
 
-vi.mock("../../use-scenario-target", () => ({
+vi.mock("../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),

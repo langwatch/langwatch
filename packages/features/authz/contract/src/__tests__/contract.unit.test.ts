@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import * as contract from "../index";
+import * as contract from "../index.ts";
 import {
   ALL_PERMISSIONS,
   type Authorized,
@@ -11,7 +11,7 @@ import {
   authzScopeRefSchema,
   attachGrantCommandDataSchema,
   grantAttachedPayloadSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("the portable AuthZ contract", () => {
   it("validates principals, scopes, and decisions without server types", () => {

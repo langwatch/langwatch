@@ -28,21 +28,21 @@
 
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
-import { navigationApi } from "../../behavior/navigation-api";
-import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity";
-import { featureIcons } from "../../model/feature-icons";
+import { navigationApi } from "../../behavior/navigation-api.ts";
+import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
+import { featureIcons } from "../../model/feature-icons.ts";
 import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
-} from "../../model/navigation-active-state";
-import { useNavigationHost, type NavigationProject } from "../../model/navigation-host";
-import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-items";
-import { projectScopedDestination } from "../../model/project-scoped-nav";
-import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group";
-import { SideMenuLink } from "../blocks/side-menu-link";
-import { SidebarSection } from "./sidebar-section";
+} from "../../model/navigation-active-state.ts";
+import { useNavigationHost, type NavigationProject } from "../../model/navigation-host.ts";
+import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-items.ts";
+import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
+import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group.tsx";
+import { SideMenuLink } from "../blocks/side-menu-link.tsx";
+import { SidebarSection } from "./sidebar-section.tsx";
 
-export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths";
+export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths.ts";
 
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group

@@ -3,7 +3,7 @@ import {
   WorkerSignalHandlers,
   type WorkerShutdownSignal,
   type WorkerSignalSource,
-} from "../worker.signals";
+} from "../worker.signals.ts";
 
 class Signals implements WorkerSignalSource {
   private readonly handlers = new Map<WorkerShutdownSignal, Set<() => void>>();

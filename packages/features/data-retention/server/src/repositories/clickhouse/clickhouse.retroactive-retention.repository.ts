@@ -6,7 +6,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import { RetroactiveRetentionRepository } from "../retroactive-retention.repository";
+import { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
 const mutationRowSchema = z
   .object({

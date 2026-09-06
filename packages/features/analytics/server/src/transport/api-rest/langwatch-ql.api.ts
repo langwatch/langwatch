@@ -23,10 +23,10 @@
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
-import { registerSavedWorkbenchChartRoutes } from "./saved-workbench-chart.api";
-import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
+import { registerSavedWorkbenchChartRoutes } from "./saved-workbench-chart.api.ts";
+import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service.ts";
 
-export type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
+export type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service.ts";
 
 /** `/api/v1/projects/:projectId/analytics/charts/*`, bound to one process's graph. */
 export function createLangWatchQLRestApp(options: {

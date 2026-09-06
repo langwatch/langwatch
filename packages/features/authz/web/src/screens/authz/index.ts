@@ -25,13 +25,13 @@ import type { ComponentType } from "react";
 export type AuthzScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const authzScreens = {
-  roles: () => import("./roles.screen"),
-  roleBindings: () => import("./role-bindings.screen"),
+  roles: () => import("./roles.screen.tsx"),
+  roleBindings: () => import("./role-bindings.screen.tsx"),
 } as const satisfies Record<string, AuthzScreenLoader>;
 
 export type AuthzScreenName = keyof typeof authzScreens;
 
-export { authzApi } from "../../behavior/authz-api";
+export { authzApi } from "../../behavior/authz-api.ts";
 export {
   AUTHZ_MANAGE_PERMISSION,
   AuthzHostPort,
@@ -40,4 +40,4 @@ export {
   type AuthzHostScope,
   type AuthzPlanReading,
   type AuthzSuccessNotice,
-} from "../../model/authz-host";
+} from "../../model/authz-host.ts";

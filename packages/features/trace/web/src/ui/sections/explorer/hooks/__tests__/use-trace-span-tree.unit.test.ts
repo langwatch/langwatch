@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useTraceSpanTree } from "../use-trace-span-tree";
+import { useTraceSpanTree } from "../use-trace-span-tree.ts";
 
 type SpanTreeInput = {
   projectId: string;
@@ -28,13 +28,13 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({}),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: { useUtils: () => ({}) },
 }));
 
 const QUERY_FN_MARKER = () => Promise.resolve([]);
 
-vi.mock("../span-tree-paged-query", () => ({
+vi.mock("../span-tree-paged-query.ts", () => ({
   spanTreeQueryKey: (input: SpanTreeInput) => ["spanTree", input],
   spanTreeQueryFn: ({ input }: { input: SpanTreeInput }) => {
     void input;
@@ -42,12 +42,12 @@ vi.mock("../span-tree-paged-query", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../../../../model/preview-trace-id", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../model/preview-trace-id")>()),
+vi.mock("../../../../../model/preview-trace-id.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../model/preview-trace-id.ts")>()),
   isPreviewTraceId: () => previewTraceId,
 }));
 

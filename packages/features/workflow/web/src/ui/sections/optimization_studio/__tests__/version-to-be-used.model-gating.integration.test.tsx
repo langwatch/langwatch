@@ -15,7 +15,7 @@ const { mockResolvedDefault, mockGenerateMutate } = vi.hoisted(() => ({
   mockGenerateMutate: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,
@@ -28,13 +28,13 @@ vi.mock("../../../../behavior/use-workflow-store", () => ({
       }),
     }),
 }));
-vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../../../model/workflow-api-client", () => ({
+vi.mock("../../../../model/workflow-api-client.ts", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {
@@ -56,7 +56,7 @@ vi.mock("../../../../model/workflow-api-client", () => ({
   },
 }));
 
-vi.mock("../history", () => ({
+vi.mock("../history.tsx", () => ({
   useVersionState: () => ({
     previousVersion: { id: "v-1", version: "1.0" },
     // `useVersionState` parses the stored envelope into the typed Studio
@@ -82,7 +82,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   useModelSelectionOptions: () => ({ modelOption: undefined }),
 }));
 
-const { NewVersionFields } = await import("../version-to-be-used");
+const { NewVersionFields } = await import("../version-to-be-used.tsx");
 
 function Harness() {
   const form = useForm({ defaultValues: { version: "", commitMessage: "" } });

@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline";
+import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
 
 vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
@@ -27,15 +27,15 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p_demo", slug: "demo" },
   }),
 }));
 
-vi.mock("../../../../../behavior/langy-api", async () => {
+vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const { withFallback, idleQuery, noopMutation } =
-    await import("../../../__tests__/support/langy-api-mock");
+    await import("../../../__tests__/support/langy-api-mock.ts");
   return {
     api: withFallback({
       useUtils: () => ({}),
@@ -49,8 +49,8 @@ vi.mock("../../../../../behavior/langy-api", async () => {
   };
 });
 
-import { MessageContent } from "../message-content";
-import { StreamingAnswerWithCards } from "../derived-cards/streaming-answer-with-cards";
+import { MessageContent } from "../message-content.tsx";
+import { StreamingAnswerWithCards } from "../derived-cards/streaming-answer-with-cards.tsx";
 
 afterEach(cleanup);
 

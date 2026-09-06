@@ -4,13 +4,13 @@
  * rich-content shape, mints URLs carrying the owning projectId, and passes the rest through.
  */
 
-import { TraceContentArrayService } from "./trace-content-array.service";
+import { TraceContentArrayService } from "./trace-content-array.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { visitContentPartAsync } from "@langwatch/trace-contract";
 
-import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
+import type { TraceMediaStorePort } from "../ports/trace-media-store.port.ts";
 import {
   extractBareImagePart,
   extractBinaryPart,
@@ -20,7 +20,7 @@ import {
   type ExtractedPart,
   type ExtractedRef,
   type ExtractionContext,
-} from "../rules/content-part-extraction.rules";
+} from "../rules/content-part-extraction.rules.ts";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 

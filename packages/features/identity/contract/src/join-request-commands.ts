@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { joinMatchKindSchema, joinResolverSchema, joinWithdrawalCauseSchema } from "./join-request";
-import { identityActorSchema } from "./vocabulary";
+import { joinMatchKindSchema, joinResolverSchema, joinWithdrawalCauseSchema } from "./join-request.ts";
+import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * The join-request commands (ADR-117, D12). Every verb the lifecycle has, and

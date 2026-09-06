@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PostgresGovernanceAdapter, type GovernanceDatabase } from "../postgres.governance.adapter";
+import { PostgresGovernanceAdapter, type GovernanceDatabase } from "../postgres.governance.adapter.ts";
 
 class PolicyHarness {
   private constructor(

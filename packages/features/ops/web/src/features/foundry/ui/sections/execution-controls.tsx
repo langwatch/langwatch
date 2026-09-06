@@ -1,11 +1,11 @@
 import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
-import { useExecutionStore } from "../../behavior/execution.store";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store";
-import { useFoundryTransport } from "../../behavior/foundry-runtime";
-import { getFoundryExecutor } from "../../behavior/trace-executor";
-import { useTraceStore } from "../../behavior/trace.store";
+import { useExecutionStore } from "../../behavior/execution.store.ts";
+import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
+import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
+import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
+import { useTraceStore } from "../../behavior/trace.store.ts";
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const {

@@ -5,19 +5,19 @@ import type {
   WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AutomationClockPort } from "../ports/automation-clock.port";
-import { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port";
-import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository";
-import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
-import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository";
-import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
-import type { TriggerRepository } from "../repositories/trigger.repository";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
-import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service";
+import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
+import { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
+import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import { ActiveTriggerCacheService } from "../services/active-trigger-cache.service.ts";
 import {
   AutomationPersistCapService,
   type AutomationPersistCapRedisPort,
-} from "../services/persist-cap.service";
+} from "../services/persist-cap.service.ts";
 
 /** The four tables settlement's ledger touches, named here and nowhere above it. */
 export type AutomationSettlementLedgerDatabase = Pick<

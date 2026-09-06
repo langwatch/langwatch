@@ -5,7 +5,7 @@ import {
   handleTrpcCallLogging,
   recordTrpcCall,
   resetSlowCallThrottle,
-} from "./trpc-call-logging.js";
+} from "./trpc-call-logging.ts";
 
 function createMockLog() {
   return {

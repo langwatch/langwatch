@@ -7,7 +7,7 @@ import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import {
   createSuiteRunSyncSubscriber,
   type SuiteRunSyncSubscriberDeps,
-} from "../suite-run-sync.subscriber";
+} from "../suite-run-sync.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

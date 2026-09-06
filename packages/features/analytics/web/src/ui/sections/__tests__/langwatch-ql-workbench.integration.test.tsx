@@ -3,7 +3,7 @@
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,14 +18,14 @@ vi.mock(
   async () => await vi.importActual<object>("~/utils/compat/next-router"),
 );
 
-import { LangWatchQLWorkbench } from "../langwatch-ql-workbench-panel";
+import { LangWatchQLWorkbench } from "../langwatch-ql-workbench-panel.tsx";
 
 import {
   handledErrorEnvelope,
   lwqlResult,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
-} from "../../../__tests__/lwql-fixtures";
+} from "../../../__tests__/lwql-fixtures.ts";
 
 const harness = vi.hoisted(() => ({
   mutation: vi.fn(),
@@ -47,7 +47,7 @@ const harness = vi.hoisted(() => ({
   updateChart: vi.fn(),
 }));
 
-vi.mock("../../../behavior/analytics-api", () => ({
+vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => ({
       client: {
@@ -138,7 +138,7 @@ vi.mock("@monaco-editor/react", () => {
 // observable. It also stands in for the member editing a specification: the text it is given is
 // on screen, and the button writes one back. Chart mode holds none of that state, which is
 // exactly what this suite has to be able to see.
-vi.mock("../lazy-langwatch-ql-chart-mode", () => ({
+vi.mock("../lazy-langwatch-ql-chart-mode.tsx", () => ({
   LazyLangWatchQLChartMode: (props: {
     result: { rows: readonly Record<string, unknown>[] };
     submittedLabel?: string;

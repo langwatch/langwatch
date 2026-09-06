@@ -3,8 +3,8 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import { Database } from "react-feather";
 import type { Component, Entry } from "@langwatch/workflow-contract";
-import { useWorkflowNodeHost } from "../elements/workflow-node.host";
-import { ComponentNode, NodeSectionTitle } from "./workflow-nodes";
+import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
+import { ComponentNode, NodeSectionTitle } from "./workflow-nodes.tsx";
 
 /**
  * The workflow's entry point on the canvas. Renders the entry fields

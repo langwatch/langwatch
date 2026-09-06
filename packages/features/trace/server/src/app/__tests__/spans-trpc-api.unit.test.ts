@@ -6,9 +6,9 @@
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { SpansTrpcApi } from "../../transport/api-trpc/spans.api";
-import { TraceApp, type TraceAppDependencies } from "../trace.app";
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
+import { SpansTrpcApi } from "../../transport/api-trpc/spans.api.ts";
+import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
+import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
 
 type TestContext = { app: { traces: TraceApp } };
 

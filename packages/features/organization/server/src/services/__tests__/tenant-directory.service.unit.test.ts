@@ -6,7 +6,7 @@
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
-import { TenantDirectoryService, type TenantOwnershipReader } from "../tenant-directory.service";
+import { TenantDirectoryService, type TenantOwnershipReader } from "../tenant-directory.service.ts";
 
 function directoryOver(world: {
   projects?: Record<string, string>;

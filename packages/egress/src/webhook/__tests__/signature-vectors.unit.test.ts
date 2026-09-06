@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { serializeVectors, VECTORS_RELATIVE_PATH } from "../signature-vectors";
+import { serializeVectors, VECTORS_RELATIVE_PATH } from "../signature-vectors.ts";
 
 /**
  * The drift check the generator's own documentation has always promised and

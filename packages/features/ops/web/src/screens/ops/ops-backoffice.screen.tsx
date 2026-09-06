@@ -23,12 +23,12 @@
  */
 
 import type { ComponentType } from "react";
-import BugReportsView from "../../features/backoffice/ui/sections/bug-reports-view";
-import OrganizationsView from "../../features/backoffice/ui/sections/organizations-view";
-import ProjectsView from "../../features/backoffice/ui/sections/projects-view";
-import SsoConnectionsView from "../../features/backoffice/ui/sections/sso-connections-view";
-import SubscriptionsView from "../../features/backoffice/ui/sections/subscriptions-view";
-import UsersView from "../../features/backoffice/ui/sections/users-view";
+import BugReportsView from "../../features/backoffice/ui/sections/bug-reports-view.tsx";
+import OrganizationsView from "../../features/backoffice/ui/sections/organizations-view.tsx";
+import ProjectsView from "../../features/backoffice/ui/sections/projects-view.tsx";
+import SsoConnectionsView from "../../features/backoffice/ui/sections/sso-connections-view.tsx";
+import SubscriptionsView from "../../features/backoffice/ui/sections/subscriptions-view.tsx";
+import UsersView from "../../features/backoffice/ui/sections/users-view.tsx";
 
 /** The resources the Backoffice serves, in the order the sidebar lists them. */
 export const BACKOFFICE_RESOURCES = [

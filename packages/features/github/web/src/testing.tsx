@@ -26,7 +26,7 @@ import {
   type GithubFailureNotice,
   type GithubHostScope,
   type GithubRouteReading,
-} from "./model/github-host";
+} from "./model/github-host.ts";
 
 export type QueryWrite = {
   next: Readonly<Record<string, string | undefined>>;

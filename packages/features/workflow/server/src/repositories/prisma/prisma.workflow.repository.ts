@@ -11,7 +11,7 @@ import {
   type PersistWorkflowInput,
   type PersistWorkflowVersionInput,
   type WorkflowVersionHistoryRecord,
-} from "../workflow.repository";
+} from "../workflow.repository.ts";
 
 /** Narrow database shape keeps generated Prisma types inside this directory. */
 export type WorkflowDatabase = {

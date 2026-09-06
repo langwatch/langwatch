@@ -3,8 +3,8 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
 
-import { FormErrorDisplay } from "./form-error-display";
-import { Tooltip } from "./tooltip";
+import { FormErrorDisplay } from "./form-error-display.tsx";
+import { Tooltip } from "./tooltip.tsx";
 
 export interface HorizontalFormControlProps extends SystemStyleObject {
   label: string | ReactNode;

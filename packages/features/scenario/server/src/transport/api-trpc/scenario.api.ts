@@ -4,18 +4,18 @@
  * configuration history.
  */
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
-import { createResultAtomsRouter } from "./result-atoms.api";
-import { createRunConfigurationsRouter } from "./run-configurations.api";
-import { createScenarioCancellationRouter } from "./scenario-cancellation.api";
-import { createScenarioCrudRouter } from "./scenario-crud.api";
-import { createScenarioEventsRouter } from "./scenario-events.api";
-import { createScenarioVersionRouter } from "./scenario-version.api";
+import { createResultAtomsRouter } from "./result-atoms.api.ts";
+import { createRunConfigurationsRouter } from "./run-configurations.api.ts";
+import { createScenarioCancellationRouter } from "./scenario-cancellation.api.ts";
+import { createScenarioCrudRouter } from "./scenario-crud.api.ts";
+import { createScenarioEventsRouter } from "./scenario-events.api.ts";
+import { createScenarioVersionRouter } from "./scenario-version.api.ts";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "../../rules/scenario-trpc-context.rules";
-import { createSimulationRunnerRouter } from "./simulation-runner.api";
+} from "../../rules/scenario-trpc-context.rules.ts";
+import { createSimulationRunnerRouter } from "./simulation-runner.api.ts";
 
 /** Installs the complete `scenarios.*` tRPC surface on a process-owned root. */
 export class ScenarioTrpcApi {

@@ -5,14 +5,14 @@ import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../query-field-values.port";
-import { TraceRepository, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port";
-import { TraceSummaryReaderPort } from "../trace-summary-reader.port";
-import { TraceService } from "../../services/trace.service";
-import { TraceFullRecordPort } from "../trace-full-record.port";
-import { TestModelProviderService } from "./support/model-provider.service.fake";
-import { TestTraceQueryClassification } from "./support/query-classification.fake";
-import { traceReadPorts } from "./support/trace-read-ports.fake";
+} from "../query-field-values.port.ts";
+import { TraceRepository, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port.ts";
+import { TraceSummaryReaderPort } from "../trace-summary-reader.port.ts";
+import { TraceService } from "../../services/trace.service.ts";
+import { TraceFullRecordPort } from "../trace-full-record.port.ts";
+import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
+import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
 
 const node: SpanTreeNode = {
   spanId: "span_1",

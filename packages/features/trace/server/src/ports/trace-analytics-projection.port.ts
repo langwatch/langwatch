@@ -1,4 +1,4 @@
-import type { TraceAnalyticsRow } from "../projections/trace-derived.projection";
+import type { TraceAnalyticsRow } from "../projections/trace-derived.projection.ts";
 
 export type TraceAnalyticsProjectionEntry = {
   row: TraceAnalyticsRow;

@@ -2,8 +2,8 @@
  * @see #4215, ADR-022
  * Integration test for the large-trace blob offload pipeline. In-process stubs only (no testcontainers, no real S3) — the goal is pipeline WIRING, not S3 fidelity or CH SQL correctness (covered separately in trace-blob-store.service.unit.test.ts, trace-offload-resolution.service.unit.test.ts). Exercises: leanForProjection on a synthetic SpanReceived event over IO_PREVIEW_BYTES; the lean event carrying the eventref pointer + preview; feeding lean attributes into resolveOffloadedTraces backed by a fake getFromEventLog returning the full value; and TraceIOExtractionService recomputing trace.output correctly — every production module in the pipeline, with assertions identical to the real read path.
  */
-import { TraceProjectionLeanService } from "../trace-projection-lean.service";
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
+import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
@@ -49,11 +49,11 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { TraceBlobStoreService } from "../trace-blob-store.service";
-import { BlobNotFoundError } from "../trace-blob-store.service";
-import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
-import { type WarnLogger } from "../trace-offload-resolution.service";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../trace-blob-store.service.ts";
+import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
+import { type WarnLogger } from "../trace-offload-resolution.service.ts";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Constants and helpers

@@ -14,8 +14,8 @@
  * (`reconcileLangyDerivedCardPreviews`) — the same server-clock rule the text
  * merge already follows.
  */
-import { salvageLangyDerivedCard } from "./salvage";
-import type { LangyDerivedCard } from "../cards/derived-safe.js";
+import { salvageLangyDerivedCard } from "./salvage.ts";
+import type { LangyDerivedCard } from "../cards/derived-safe.ts";
 
 export interface LangyDerivedCardPreview {
   /** The raw fence buffer last fed. */

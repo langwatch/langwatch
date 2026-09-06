@@ -12,22 +12,22 @@
  * the governed entry `apps/ui` mounts.
  */
 
-export { AnnotationAvatarGroup } from "./ui/elements/annotation-avatar-group";
-export { AnnotationCommentsChip } from "./ui/elements/annotation-comments-chip";
-export { AnnotationHoverChip } from "./ui/elements/annotation-hover-chip";
-export { AnnotationScoresChip } from "./ui/elements/annotation-scores-chip";
-export { AnnotationSuggestionsChip } from "./ui/elements/annotation-suggestions-chip";
-export { AnnotationCard } from "./ui/blocks/annotation-card";
+export { AnnotationAvatarGroup } from "./ui/elements/annotation-avatar-group.tsx";
+export { AnnotationCommentsChip } from "./ui/elements/annotation-comments-chip.tsx";
+export { AnnotationHoverChip } from "./ui/elements/annotation-hover-chip.tsx";
+export { AnnotationScoresChip } from "./ui/elements/annotation-scores-chip.tsx";
+export { AnnotationSuggestionsChip } from "./ui/elements/annotation-suggestions-chip.tsx";
+export { AnnotationCard } from "./ui/blocks/annotation-card.tsx";
 export {
   AnnotationTable,
   AnnotationTableSkeleton,
   type AnnotationTableProps,
   type AnnotationTableTraceField,
-} from "./ui/blocks/annotation-table";
-export { AnnotateBody, FormFooter, SuggestBody } from "./ui/blocks/annotation-form-body";
-export { DiffCounts, DiffPanel, useOutputDiff } from "./ui/blocks/annotation-output-diff";
-export { ScoreFields, ScoreChip } from "./ui/blocks/annotation-score-fields";
-export { readAnnotationScoreOptions } from "./model/annotation-score-options";
+} from "./ui/blocks/annotation-table.tsx";
+export { AnnotateBody, FormFooter, SuggestBody } from "./ui/blocks/annotation-form-body.tsx";
+export { DiffCounts, DiffPanel, useOutputDiff } from "./ui/blocks/annotation-output-diff.tsx";
+export { ScoreFields, ScoreChip } from "./ui/blocks/annotation-score-fields.tsx";
+export { readAnnotationScoreOptions } from "./model/annotation-score-options.ts";
 export {
   AnnotationCommentCard,
   AnnotationCommentEditor,
@@ -35,11 +35,11 @@ export {
   type AnnotationCommentEditorProps,
   type AnnotationCommentScore,
   type AnnotationCommentScoreOptions,
-} from "./ui/blocks/annotation-comment-editor";
+} from "./ui/blocks/annotation-comment-editor.tsx";
 export {
   AnnotationScoreEditor,
   type AnnotationScoreEditorProps,
-} from "./ui/blocks/annotation-score-editor";
+} from "./ui/blocks/annotation-score-editor.tsx";
 export type {
   AnnotationDraftValues,
   AnnotationFormState,
@@ -50,7 +50,7 @@ export type {
   PopoverAnnotationFormInput,
   ScoreChipProps,
   TraceAnnotation,
-} from "./model/annotation-form-types";
+} from "./model/annotation-form-types.ts";
 export {
   annotationAnchorLabel,
   annotationRatingExportLabel,
@@ -68,4 +68,4 @@ export {
   type AnnotationSuggestionValue,
   type AnnotationTrace,
   type AnnotationUser,
-} from "./model/annotation-row";
+} from "./model/annotation-row.ts";

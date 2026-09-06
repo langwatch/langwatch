@@ -3,8 +3,8 @@ import {
   PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP,
   PULL_REQUEST_MAPPING_BACKFILL_SESSIONS_PER_PROJECT,
   PULL_REQUEST_MAPPING_BACKFILL_WINDOW_MS,
-} from "../coding-agent-pull-request-mapping-backfill.service";
-import { CodingAgentFeatureService } from "../coding-agent.service";
+} from "../coding-agent-pull-request-mapping-backfill.service.ts";
+import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 import {
   TEST_NOW_MS,
   TestBillingPolicy,
@@ -16,7 +16,7 @@ import {
   TestSessions,
   TestTraceSessions,
   session,
-} from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function serviceWith(input: {
   sessions: TestSessions;

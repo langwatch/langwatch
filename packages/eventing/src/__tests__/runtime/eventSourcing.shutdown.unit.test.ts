@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "../../domain/types";
-import { EventSourcing } from "../../eventSourcing";
-import { createMockEventStore } from "../../services/__tests__/testHelpers";
+import type { Event } from "../../domain/types.ts";
+import { EventSourcing } from "../../eventSourcing.ts";
+import { createMockEventStore } from "../../services/__tests__/testHelpers.ts";
 
 /**
  * Creates a mock global queue with spied close().

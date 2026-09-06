@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PRODUCTS, productById, productFromPathname } from "../products";
+import { PRODUCTS, productById, productFromPathname } from "../products.ts";
 
 describe("product registry", () => {
   describe("given the four products the registry declares", () => {

@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
-import { useEntranceSettled } from "../model/entrance";
+import { useEntranceSettled } from "../model/entrance.ts";
 
 /**
  * Takes focus once the entrance has finished moving, and immediately when

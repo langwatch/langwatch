@@ -16,8 +16,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { WithTestAuthHost } from "../../../testing";
-import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error.screen";
+import { WithTestAuthHost } from "../../../testing.tsx";
+import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error.screen.tsx";
 
 function renderError(error: string) {
   return render(

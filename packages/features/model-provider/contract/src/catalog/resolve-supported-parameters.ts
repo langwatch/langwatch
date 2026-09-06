@@ -1,5 +1,5 @@
-import type { CustomModelEntry, SupportedParameter } from "../custom-model";
-import { getModelMetadata } from "./model-catalog";
+import type { CustomModelEntry, SupportedParameter } from "../custom-model.ts";
+import { getModelMetadata } from "./model-catalog.ts";
 
 type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;

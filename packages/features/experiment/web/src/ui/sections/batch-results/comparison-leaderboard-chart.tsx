@@ -16,21 +16,21 @@ import {
   YAxis,
 } from "recharts";
 
-import { disambiguateNames } from "./presentation";
+import { disambiguateNames } from "./presentation.tsx";
 import {
   axisLabelProps,
   buildAxisLabels,
-} from "../../../model/batch-evaluation-results.chart-axis";
-import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard";
+} from "../../../model/batch-evaluation-results.chart-axis.ts";
+import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
-} from "../batch-evaluation-results.verdict";
-import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline";
-import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types";
-import { useBTLeaderboard } from "../use-bt-leaderboard";
-import { useVariantMetrics } from "../use-variant-metrics";
-import { VARIANT_COLORS } from "./win-rate-chart";
+} from "../batch-evaluation-results.verdict.ts";
+import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
+import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
+import { useBTLeaderboard } from "../use-bt-leaderboard.ts";
+import { useVariantMetrics } from "../use-variant-metrics.ts";
+import { VARIANT_COLORS } from "./win-rate-chart.tsx";
 
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */
 const MAX_COMPACT_BARS = 4;

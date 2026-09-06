@@ -10,7 +10,7 @@ import {
   cliVerbTone,
   CLI_COLLECTION_VERBS,
   CLI_SUBRESOURCE_VERBS,
-} from "../registry.js";
+} from "../registry.ts";
 
 describe("cardKindFor, given a CLI resource and verb", () => {
   describe("when the command reads traces", () => {

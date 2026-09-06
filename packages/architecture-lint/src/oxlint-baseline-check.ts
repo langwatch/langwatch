@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import type { ArchitectureViolation } from "./types";
+import type { ArchitectureViolation } from "./types.ts";
 
 /**
  * The debt register for the oxlint rules that read `oxlint-baseline.json`

@@ -28,29 +28,29 @@ import {
   Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { resolveTracesHrefForKey } from "../../features/virtual-keys/model/traces-href-for-key";
-import { formatBudgetUsd } from "../../model/format-budget-usd";
-import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel";
+import { resolveTracesHrefForKey } from "../../features/virtual-keys/model/traces-href-for-key.ts";
+import { formatBudgetUsd } from "../../model/format-budget-usd.ts";
+import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel.tsx";
 import {
   VirtualKeyBudgetBar,
   type VirtualKeyBudgetBarValue,
-} from "../../features/virtual-keys/ui/elements/virtual-key-budget-bar";
-import { VirtualKeyCreateDrawer } from "../../features/virtual-keys/ui/sections/virtual-key-create-drawer";
-import { VirtualKeyEditDrawer } from "../../features/virtual-keys/ui/sections/virtual-key-edit-drawer";
-import { VirtualKeySecretReveal } from "../../features/virtual-keys/ui/sections/virtual-key-secret-reveal";
-import { isExpired } from "../../features/virtual-keys/model/virtual-key-expiration";
+} from "../../features/virtual-keys/ui/elements/virtual-key-budget-bar.tsx";
+import { VirtualKeyCreateDrawer } from "../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx";
+import { VirtualKeyEditDrawer } from "../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
+import { VirtualKeySecretReveal } from "../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
+import { isExpired } from "../../features/virtual-keys/model/virtual-key-expiration.ts";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Link } from "../../ui/elements/gateway-link";
+import { Link } from "../../ui/elements/gateway-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
-import { useGatewayRouter } from "../../behavior/gateway-router";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
+import { useGatewayRouter } from "../../behavior/gateway-router.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {

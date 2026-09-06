@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 
 /**
  * Shows a webhook signing secret exactly once, right after create or

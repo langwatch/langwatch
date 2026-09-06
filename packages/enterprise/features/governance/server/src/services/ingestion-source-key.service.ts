@@ -14,7 +14,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
-} from "../ports/ingestion-source-key.port";
+} from "../ports/ingestion-source-key.port.ts";
 
 const logger = createLogger("langwatch:governance:ingestion-key");
 

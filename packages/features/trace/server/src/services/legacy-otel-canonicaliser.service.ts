@@ -6,8 +6,8 @@ import {
   extractErrorInfo,
   inferSpanTypeIfAbsent,
   recordValueType,
-} from "../rules/canonical-extraction.rules";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port";
+} from "../rules/canonical-extraction.rules.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
 
 /** OTel span kinds that name a span type on their own, in the spelling they arrive with. */
 const SPAN_KIND_TYPES: ReadonlyArray<readonly [string, string]> = [

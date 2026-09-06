@@ -7,7 +7,7 @@ import {
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
   type LangyTitleSource,
-} from "../../constants";
+} from "../../constants.ts";
 import type {
   LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
@@ -24,7 +24,7 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
-} from "../contracts/langy.events";
+} from "../contracts/langy.events.ts";
 
 /**
  * Conversation-level operational state, no message content (separate

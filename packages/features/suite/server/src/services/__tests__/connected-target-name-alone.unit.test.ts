@@ -13,7 +13,7 @@ import { AgentEnvironmentUnresolvedError } from "@langwatch/agent-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
-import { ConnectedTargetService, type ConnectedPresenceReader } from "../connected-target.service";
+import { ConnectedTargetService, type ConnectedPresenceReader } from "../connected-target.service.ts";
 
 const PROJECT_ID = "project_1";
 

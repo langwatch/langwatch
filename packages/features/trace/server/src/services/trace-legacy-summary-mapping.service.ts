@@ -8,7 +8,7 @@ import {
   RESERVED_ATTRIBUTE_MAPPINGS,
   tokenMetricsFromAttributes,
   tryParseJsonArray,
-} from "../rules/legacy-summary-attributes.rules";
+} from "../rules/legacy-summary-attributes.rules.ts";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { Event, Span, Trace, TraceMetadata } from "@langwatch/trace-contract";
 

@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 import { describe, expect, it } from "vitest";
-import { classifyPromptText } from "../injected-notice";
+import { classifyPromptText } from "../injected-notice.ts";
 
 describe("classifyPromptText", () => {
   it("keeps human text and inline tags as the prompt", () => {

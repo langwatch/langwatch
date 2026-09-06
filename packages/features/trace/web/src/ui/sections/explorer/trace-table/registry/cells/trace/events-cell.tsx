@@ -1,7 +1,7 @@
 import { HStack, Skeleton, Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace";
-import { EventBadge } from "../../shared-chips";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { EventBadge } from "../../shared-chips.tsx";
+import type { CellDef } from "../../types.ts";
 
 type Density = "compact" | "comfortable";
 

@@ -1,20 +1,20 @@
-import type { CommandHandlerClass } from "../commands/commandHandlerClass";
-import type { AggregateType } from "../domain/aggregateType";
-import type { Event, Projection } from "../domain/types";
-import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types";
-import type { ProjectionRegistry } from "../projections/projectionRegistry";
-import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type { EventSourcedQueueProcessor } from "../queues";
-import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
-import type { EventSourcingService } from "../services/eventSourcingService";
-import type { JobRegistryEntry } from "../services/queues/queueManager";
-import type { EventStore } from "../stores/eventStore.types";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
-import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types";
-import type { KillSwitchPort } from "../kill-switch";
+import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event, Projection } from "../domain/types.ts";
+import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
+import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { EventSourcedQueueProcessor } from "../queues/index.ts";
+import type { CommandHandlerOptions } from "../services/commands/commandDispatcher.ts";
+import type { EventSourcingService } from "../services/eventSourcingService.ts";
+import type { JobRegistryEntry } from "../services/queues/queueManager.ts";
+import type { EventStore } from "../stores/eventStore.types.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
+import type { KillSwitchPort } from "../kill-switch/index.ts";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.

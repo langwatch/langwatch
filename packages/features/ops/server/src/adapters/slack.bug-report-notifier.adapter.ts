@@ -1,5 +1,5 @@
 import type { BugReport } from "@langwatch/ops-contract";
-import { BugReportNotifierPort } from "../ports/bug-report-notifier.port";
+import { BugReportNotifierPort } from "../ports/bug-report-notifier.port.ts";
 
 /**
  * Posts one Block Kit message. The deployment binds its own Slack Web API

@@ -16,23 +16,23 @@
  */
 import { cleanup, screen, within } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // The drawers each open their own queries; the table is what is under test.
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-create-drawer", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx", () => ({
   VirtualKeyCreateDrawer: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx", () => ({
   VirtualKeyEditDrawer: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx", () => ({
   VirtualKeySecretReveal: () => null,
 }));
 
@@ -85,7 +85,7 @@ const SPEND = [
   { virtualKeyId: "vk-policy", spentUsd: "0", requests: 0, budget: null },
 ];
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: { list: { invalidate: vi.fn() } },
@@ -129,7 +129,7 @@ const host = fakeGatewayHost({
   project: null,
 });
 
-import VirtualKeysPage from "../gateway-virtual-keys.screen";
+import VirtualKeysPage from "../gateway-virtual-keys.screen.tsx";
 
 function renderPage() {
   return renderWithGatewayHost(<VirtualKeysPage />, { host });

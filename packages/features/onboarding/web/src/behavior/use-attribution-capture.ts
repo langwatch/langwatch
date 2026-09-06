@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from "react";
-import { type AttributionField, setAttributionIfAbsent, URL_PARAM_TO_FIELD } from "./attribution";
+import { type AttributionField, setAttributionIfAbsent, URL_PARAM_TO_FIELD } from "./attribution.ts";
 
 /**
  * Drops the query and fragment so a referrer's own parameters never travel

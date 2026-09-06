@@ -20,16 +20,16 @@ const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../behavior/auth-client", () => ({
+vi.mock("../../../behavior/auth-client.tsx", () => ({
   authClient: { requestPasswordReset: mockRequestPasswordReset },
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -37,7 +37,7 @@ vi.mock("../../../ui/elements/router-link", () => ({
   ),
 }));
 
-import ForgotPassword from "../forgot-password.screen";
+import ForgotPassword from "../forgot-password.screen.tsx";
 
 const renderPage = () =>
   render(

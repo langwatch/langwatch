@@ -9,7 +9,7 @@ import {
   type SlackBlockKitTemplateKind,
   type SlackBlockKitTemplateOption,
   templateOptionsFor,
-} from "../elements/registry";
+} from "../elements/registry.ts";
 
 /** Note shown on a template a webhook connection can't render in full. */
 const GATED_NOTE = "Needs a Slack app connection";

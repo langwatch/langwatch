@@ -8,7 +8,7 @@ import {
   lintServiceCeilingsFile,
   lintServiceCeilingsBaseline,
   readServiceCeilingsBaselineFile,
-} from "../src";
+} from "../src/index.ts";
 
 const root = resolve(import.meta.dirname, "../../..");
 const apiKeyService = "packages/features/api-key/server/src/services/api-key.service.ts";

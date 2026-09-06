@@ -4,16 +4,16 @@ import {
 } from "@langwatch/scenario-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { BillingReportingWorkerFeatureInstaller } from "../billing/billing-reporting-worker-feature.installer";
-import { CodingAgentWorkerFeatureInstaller } from "../coding-agent/coding-agent-worker-feature.installer";
-import { EvaluationWorkerFeatureInstaller } from "../evaluation/evaluation-worker-feature.installer";
-import { ExperimentWorkerFeatureInstaller } from "../experiment/experiment-worker-feature.installer";
-import { GatewaySpendWorkerFeatureInstaller } from "../gateway/gateway-spend-worker-feature.installer";
-import { GovernanceEventsWorkerFeatureInstaller } from "../governance/governance-events-worker-feature.installer";
-import { GovernanceIngestionWorkerFeatureInstaller } from "../governance/governance-ingestion-worker-feature.installer";
-import { ScenarioWorkerFeatureInstaller } from "../scenario/scenario-worker-feature.installer";
-import { SuiteWorkerFeatureInstaller } from "../suite/suite-worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import { BillingReportingWorkerFeatureInstaller } from "../billing/billing-reporting-worker-feature.installer.ts";
+import { CodingAgentWorkerFeatureInstaller } from "../coding-agent/coding-agent-worker-feature.installer.ts";
+import { EvaluationWorkerFeatureInstaller } from "../evaluation/evaluation-worker-feature.installer.ts";
+import { ExperimentWorkerFeatureInstaller } from "../experiment/experiment-worker-feature.installer.ts";
+import { GatewaySpendWorkerFeatureInstaller } from "../gateway/gateway-spend-worker-feature.installer.ts";
+import { GovernanceEventsWorkerFeatureInstaller } from "../governance/governance-events-worker-feature.installer.ts";
+import { GovernanceIngestionWorkerFeatureInstaller } from "../governance/governance-ingestion-worker-feature.installer.ts";
+import { ScenarioWorkerFeatureInstaller } from "../scenario/scenario-worker-feature.installer.ts";
+import { SuiteWorkerFeatureInstaller } from "../suite/suite-worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
  * A registration surface, not a runtime. These installers do exactly one thing with the Eventing

@@ -15,11 +15,11 @@ import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service";
+import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import {
   TestOrganizationService,
   TestProjectService,
-} from "../services/__tests__/fixtures/github-services.fixture";
+} from "../services/__tests__/fixtures/github-services.fixture.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

@@ -2,8 +2,8 @@
  * Process-composition adapter for the home screen's recent-activity strip.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository";
-import { RecentItemsService } from "../services/recent-items.service";
+import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository.ts";
+import { RecentItemsService } from "../services/recent-items.service.ts";
 
 export class PostgresRecentItemsAdapter {
   static create(options: { database: PrismaClient }): PostgresRecentItemsAdapter {

@@ -3,7 +3,7 @@ import {
   type LangyTurnAccess,
   LangyTurnAccessPort,
   langyTurnAccessSchema,
-} from "../ports/langy-turn-access.port";
+} from "../ports/langy-turn-access.port.ts";
 
 interface LangyAccessRedis {
   get(key: string): Promise<string | null>;

@@ -4,13 +4,13 @@ import {
   buildCsvData,
   buildCsvHeaders,
   generateCsvContent,
-} from "../ui/sections/batch-evaluation-results.csv";
+} from "../ui/sections/batch-evaluation-results.csv.ts";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
   BatchTargetOutput,
-} from "../ui/sections/batch-evaluation-results.types";
-import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types";
+} from "../ui/sections/batch-evaluation-results.types.ts";
+import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
 
 const createMinimalData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",

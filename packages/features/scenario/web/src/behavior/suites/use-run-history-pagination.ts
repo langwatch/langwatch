@@ -5,10 +5,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../use-organization-team-project";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../scenario-api";
-import { useSuiteRunFreshness } from "./use-suite-run-freshness";
+import { api } from "../scenario-api.ts";
+import { useSuiteRunFreshness } from "./use-suite-run-freshness.ts";
 
 type PageData = {
   runs: ScenarioRunData[];

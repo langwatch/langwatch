@@ -37,9 +37,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
-} from "../../projections/authz-grant.projection";
-import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration";
-import { AuthzGrantMapper } from "./prisma.authz-grant.mapper";
+} from "../../projections/authz-grant.projection.ts";
+import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
+import { AuthzGrantMapper } from "./prisma.authz-grant.mapper.ts";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 

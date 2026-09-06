@@ -3,15 +3,15 @@ import type { Cluster, Redis } from "ioredis";
 import {
   ExperimentEventingAdapter,
   type ExperimentRunProcessingPipeline,
-} from "./eventing.experiment-run-processing.adapter";
+} from "./eventing.experiment-run-processing.adapter.ts";
 import {
   ExperimentClickHouseAdapter,
   type ExperimentEventingClickHouseResolver,
-} from "./experiment-clickhouse.adapter";
-import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection";
-import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
-import { ExperimentRunItemStore } from "../stores/eventing/eventing.experiment-run-item.store";
-import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store";
+} from "./experiment-clickhouse.adapter.ts";
+import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection.ts";
+import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository.ts";
+import { ExperimentRunItemStore } from "../stores/eventing/eventing.experiment-run-item.store.ts";
+import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store.ts";
 
 /**
  * The Redis keyspace the experiment-run fold's read-through cache occupies.

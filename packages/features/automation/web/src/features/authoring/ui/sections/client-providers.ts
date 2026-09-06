@@ -1,5 +1,5 @@
 import { TriggerAction } from "@langwatch/automation-contract";
-import { createAutomationDraftModel } from "../../model/draft-reducer";
+import { createAutomationDraftModel } from "../../model/draft-reducer.ts";
 import {
   createClientProviderRegistry,
   initialSlices as initialProviderSlices,
@@ -7,12 +7,12 @@ import {
   type AllSlices as ProviderAllSlices,
   type NotifyPreview as ProviderNotifyPreview,
   type SliceFor as ProviderSliceFor,
-} from "../../../../model/provider-registry";
-import annotationQueueClient, { type AnnotationQueueSlice } from "./annotation-queue.client";
-import datasetClient, { type DatasetSlice } from "./dataset.client";
-import emailClient, { type EmailSlice } from "./email.client";
-import slackClient, { type SlackSlice } from "./slack.client";
-import webhookClient, { type WebhookSlice } from "./webhook.client";
+} from "../../../../model/provider-registry.ts";
+import annotationQueueClient, { type AnnotationQueueSlice } from "./annotation-queue.client.tsx";
+import datasetClient, { type DatasetSlice } from "./dataset.client.tsx";
+import emailClient, { type EmailSlice } from "./email.client.tsx";
+import slackClient, { type SlackSlice } from "./slack.client.tsx";
+import webhookClient, { type WebhookSlice } from "./webhook.client.tsx";
 
 export const CLIENT_PROVIDERS = createClientProviderRegistry({
   [TriggerAction.SEND_EMAIL]: emailClient,

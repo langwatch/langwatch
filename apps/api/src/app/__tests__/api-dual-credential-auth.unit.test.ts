@@ -12,8 +12,8 @@ import {
   ContestedCredentialsError,
   createApiDualCredentialAuth,
   type ApiDualAuthVariables,
-} from "../api-dual-credential-auth";
-import type { ApiHandlerManagedSessionPort } from "../api-handler-managed-session";
+} from "../api-dual-credential-auth.ts";
+import type { ApiHandlerManagedSessionPort } from "../api-handler-managed-session.ts";
 
 const PROJECT_ID = "project-dual";
 

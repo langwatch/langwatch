@@ -7,7 +7,7 @@ import {
   type ExperimentRunWithItems,
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
-import { disambiguateNames } from "./batch-results/presentation";
+import { disambiguateNames } from "./batch-results/presentation.tsx";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 const comparisonCandidateSchema = z.object({ id: z.string().optional() }).passthrough();

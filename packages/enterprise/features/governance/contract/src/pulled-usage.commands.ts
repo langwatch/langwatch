@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pulledUsageObservedEventDataSchema } from "./pulled-usage.events";
+import { pulledUsageObservedEventDataSchema } from "./pulled-usage.events.ts";
 
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",

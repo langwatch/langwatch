@@ -3,10 +3,10 @@
  * address is STILL platform-computed, never agent-authored; anything unknown
  * or failing resolves to null rather than tearing down the relay stream.
  */
-import type { LangyNavigateProjectPort } from "../ports/langy-navigate-project.port";
-import type { LangyNavigateResourcePort } from "../ports/langy-navigate-resource.port";
-import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules";
-import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules";
+import type { LangyNavigateProjectPort } from "../ports/langy-navigate-project.port.ts";
+import type { LangyNavigateResourcePort } from "../ports/langy-navigate-resource.port.ts";
+import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules.ts";
+import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
 
 /** Builds a deep link into the product from a project slug and a path. */
 export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: string }) => string;

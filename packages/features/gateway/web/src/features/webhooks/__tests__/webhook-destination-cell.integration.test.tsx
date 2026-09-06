@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   WebhookDestinationCell,
   type WebhookDestinationSummary,
-} from "../ui/elements/webhook-destination-cell";
+} from "../ui/elements/webhook-destination-cell.tsx";
 
 function renderCells(endpoints: WebhookDestinationSummary[]) {
   render(

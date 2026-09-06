@@ -21,7 +21,7 @@ import type {
   LangyToolCallSucceededEvent,
   LangyUserWaitEndedEvent,
   LangyUserWaitStartedEvent,
-} from "../projections/langy-conversation-state.projection";
+} from "../projections/langy-conversation-state.projection.ts";
 
 /**
  * Which event a `LangyConversationProcessingEvent` actually is. Twenty narrowings of one union,

@@ -5,8 +5,8 @@
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
-import type { UiFailureAction } from "./capabilities";
-import { currentUiFeedbackHost } from "./toaster";
+import type { UiFailureAction } from "./capabilities.ts";
+import { currentUiFeedbackHost } from "./toaster.ts";
 
 /** The generic line, for a failure the registry has nothing specific to say about. */
 export const UNKNOWN_ERROR_DESCRIPTION = "We've been notified. Try again in a moment.";

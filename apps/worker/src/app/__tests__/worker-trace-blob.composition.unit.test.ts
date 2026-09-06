@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerTracePayloadReader,
   createWorkerTraceSpool,
-} from "../worker-trace-blob.composition";
+} from "../worker-trace-blob.composition.ts";
 
 /**
  * Spec: packages/features/trace/specs/trace-payload-claim-check.feature

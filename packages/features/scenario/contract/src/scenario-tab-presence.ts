@@ -1,7 +1,7 @@
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
   type ScenarioTabNavigatePayload,
-} from "./scenario-tab-events";
+} from "./scenario-tab-events.ts";
 
 export const SCENARIO_TAB_REFRESH_MS = 10_000;
 

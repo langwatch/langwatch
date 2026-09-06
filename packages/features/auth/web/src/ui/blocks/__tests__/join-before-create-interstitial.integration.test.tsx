@@ -17,7 +17,7 @@ import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial";
+import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial.tsx";
 
 const renderStep = (
   props: Partial<React.ComponentProps<typeof JoinBeforeCreateInterstitial>> = {},

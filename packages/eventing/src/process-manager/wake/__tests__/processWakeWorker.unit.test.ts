@@ -1,8 +1,8 @@
 import type { Logger } from "@langwatch/observability";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DueWake } from "../../stores/processStore.types";
-import { ProcessWakeWorker } from "../processWakeWorker";
+import type { DueWake } from "../../stores/processStore.types.ts";
+import { ProcessWakeWorker } from "../processWakeWorker.ts";
 
 function makeLogger(): Logger {
   return {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-derived.projection";
-import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+} from "../trace-derived.projection.ts";
+import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * Read-back of a PRE-SPLIT row (migration 00061): before `storageAnchorMs`

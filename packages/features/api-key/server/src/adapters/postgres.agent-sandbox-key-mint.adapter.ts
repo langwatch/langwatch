@@ -1,11 +1,11 @@
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 
-import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port";
+import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
 import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
-} from "../repositories/prisma/prisma.api-key.repository";
-import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.service";
+} from "../repositories/prisma/prisma.api-key.repository.ts";
+import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.service.ts";
 
 /**
  * Postgres composition for the sandbox-key mint: the typed client goes straight

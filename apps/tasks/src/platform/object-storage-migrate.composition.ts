@@ -10,7 +10,7 @@ import {
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
-import type { TasksHost } from "./tasks-host.composition";
+import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
  * This process has no per-project ClickHouse routing — a single `CLICKHOUSE_URL` answers every

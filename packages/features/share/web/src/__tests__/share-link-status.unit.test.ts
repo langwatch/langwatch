@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeShareLink, isShareLinkSpent, type ShareLinkView } from "../share-link-status";
+import { describeShareLink, isShareLinkSpent, type ShareLinkView } from "../share-link-status.ts";
 
 const NOW = new Date("2026-08-27T12:00:00.000Z");
 

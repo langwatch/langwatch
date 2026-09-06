@@ -16,10 +16,10 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
+import type { JoinRequestFoldState } from "../../projections/join-request-state.projection.ts";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEventingPort } from "../../ports/identity-eventing.port";
-import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.adapter";
+import { IdentityEventingPort } from "../../ports/identity-eventing.port.ts";
+import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.adapter.ts";
 
 const ORGANIZATION = "org_acme";
 const REQUEST = "jr_1";

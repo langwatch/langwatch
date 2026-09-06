@@ -2,7 +2,7 @@ import type {
   CreateNotificationCommand,
   Notification,
   NotificationRecentQuery,
-} from "./notification";
+} from "./notification.ts";
 
 /**
  * Canonical notification record capability.

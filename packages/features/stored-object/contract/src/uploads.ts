@@ -3,7 +3,7 @@ import {
   storedObjectIdSchema,
   storedObjectOperationIdSchema,
   storedObjectProjectIdSchema,
-} from "./ids";
+} from "./ids.ts";
 import {
   createStoredObjectByteLengthSchema,
   storedObjectByteLengthSchema,
@@ -11,8 +11,8 @@ import {
   storedObjectMediaTypeSchema,
   storedObjectSha256Schema,
   storedObjectTimestampSchema,
-} from "./metadata";
-import { storedObjectReferenceSchema } from "./references";
+} from "./metadata.ts";
+import { storedObjectReferenceSchema } from "./references.ts";
 
 export const storedObjectUploadTokenSchema = z
   .string()

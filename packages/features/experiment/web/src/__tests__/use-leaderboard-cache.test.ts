@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import type {
   BatchComparisonColumn,
   BatchResultRow,
-} from "../ui/sections/batch-evaluation-results.types";
-import { leaderboardFor } from "../ui/sections/use-bt-leaderboard";
-import { variantMetricsFor } from "../ui/sections/use-variant-metrics";
+} from "../ui/sections/batch-evaluation-results.types.ts";
+import { leaderboardFor } from "../ui/sections/use-bt-leaderboard.ts";
+import { variantMetricsFor } from "../ui/sections/use-variant-metrics.ts";
 
 /**
  * The caches exist so the fit runs once per answer rather than once per render.

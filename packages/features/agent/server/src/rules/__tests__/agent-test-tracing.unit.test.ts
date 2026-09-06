@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tracing.rules";
+import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tracing.rules.ts";
 
 describe("sanitizeHeadersForTrace()", () => {
   describe("when Authorization header contains a bearer token", () => {

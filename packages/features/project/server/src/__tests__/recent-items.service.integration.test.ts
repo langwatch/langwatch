@@ -12,8 +12,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository";
-import { RecentItemsService } from "../services/recent-items.service";
+import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository.ts";
+import { RecentItemsService } from "../services/recent-items.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

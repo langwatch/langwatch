@@ -4,18 +4,18 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automation-contract";
-import type { EgressTlsPolicy } from "../ssrf/fenced-fetch";
-import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port";
+import type { EgressTlsPolicy } from "../ssrf/fenced-fetch.ts";
+import type { WebhookDispatchRateLimiterPort } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 import {
   WEBHOOK_DELIVERY_ATTEMPT_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
   WEBHOOK_TEST_FIRE_HEADER,
   type WebhookSendResult,
-} from "../webhook/delivery-classification";
-import { assertDispatchBudget } from "../webhook/dispatch-budget";
-import { sendHttpDestination } from "../webhook/http-destination";
-import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../webhook/signature";
-import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-policy";
+} from "../webhook/delivery-classification.ts";
+import { assertDispatchBudget } from "../webhook/dispatch-budget.ts";
+import { sendHttpDestination } from "../webhook/http-destination.ts";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../webhook/signature.ts";
+import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-policy.ts";
 
 /**
  * The outbound webhook sender both webhook channels run on: the automations

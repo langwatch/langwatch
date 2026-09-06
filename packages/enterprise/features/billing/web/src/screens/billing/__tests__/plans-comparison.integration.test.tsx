@@ -7,9 +7,9 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PlansComparisonPage } from "../plans-comparison";
+import { PlansComparisonPage } from "../plans-comparison.tsx";
 
-vi.mock("../../../behavior/billing-api", () => ({
+vi.mock("../../../behavior/billing-api.ts", () => ({
   billingApi: {
     currency: {
       detectCurrency: {

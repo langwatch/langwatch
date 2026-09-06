@@ -1,12 +1,12 @@
 import { Box, Button, CodeBlock, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
-import AnnotationsLayout from "../../ui/sections/annotation-queue-layout";
+import AnnotationsLayout from "../../ui/sections/annotation-queue-layout.tsx";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { IsolatedErrorBoundary } from "@langwatch/trace-web/surfaces/isolated-error-boundary";
-import { useShowErrorToast } from "../../behavior/use-error-toast";
+import { useShowErrorToast } from "../../behavior/use-error-toast.ts";
 import { ConversationView } from "@langwatch/trace-web/surfaces/conversation-view";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import {
@@ -16,13 +16,13 @@ import {
 import { useConversationTurns } from "@langwatch/trace-web/surfaces/conversation-turns";
 import { legacyTraceToTurn } from "@langwatch/trace-web/surfaces/legacy-trace-to-turn";
 import { openTraceEditorFromConversation } from "@langwatch/trace-web/surfaces/trace-edit-mode";
-import { useAnnotationQueues } from "../../behavior/use-annotation-queues";
+import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api, type RouterOutputs } from "../../behavior/annotation-api";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { api, type RouterOutputs } from "../../behavior/annotation-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { TasksDone } from "../../ui/elements/tasks-done-icon";
-import { QueueTraceHost } from "../../ui/sections/queue-trace-host";
+import { TasksDone } from "../../ui/elements/tasks-done-icon.tsx";
+import { QueueTraceHost } from "../../ui/sections/queue-trace-host.tsx";
 
 type AssignedQueueItem =
   RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"][number];

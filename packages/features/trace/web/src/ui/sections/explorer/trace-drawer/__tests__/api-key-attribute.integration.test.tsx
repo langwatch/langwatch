@@ -7,14 +7,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     organization: { id: "org-1" },
   }),
 }));
 
-vi.mock("../../../../elements/next-link", () => ({
+vi.mock("../../../../elements/next-link.tsx", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
@@ -22,13 +22,13 @@ vi.mock("../../../../elements/next-link", () => ({
 
 const mockNameById = vi.fn();
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     apiKey: { nameById: { useQuery: () => mockNameById() } },
   },
 }));
 
-import { AttributeTable } from "../attribute-table";
+import { AttributeTable } from "../attribute-table.tsx";
 
 function renderWithApiKeyAttribute() {
   return render(

@@ -1,5 +1,5 @@
-import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository";
-import { LOCAL_METHOD_SET } from "../services/signin-method-policy.service";
+import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
+import { LOCAL_METHOD_SET } from "../services/signin-method-policy.service.ts";
 
 /**
  * Activation's break-glass precondition, before break-glass BINDINGS exist.

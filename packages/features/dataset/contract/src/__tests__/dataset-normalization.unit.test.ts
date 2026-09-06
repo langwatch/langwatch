@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { datasetNormalizePayloadSchema } from "../dataset-normalization";
+import { datasetNormalizePayloadSchema } from "../dataset-normalization.ts";
 
 describe("datasetNormalizePayloadSchema", () => {
   it("rejects malformed durable worker payloads before Dataset normalization", () => {

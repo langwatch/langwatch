@@ -16,8 +16,8 @@ import { createLogger } from "@langwatch/observability";
 import type {
   SimulationRunState,
   SimulationRunStateData,
-} from "../../projections/simulation-run-state.projection";
-import type { SimulationRunStateRepository } from "../simulation-run-state.repository";
+} from "../../projections/simulation-run-state.projection.ts";
+import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
 

@@ -18,8 +18,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition";
-import { composeApiGatewayWebhooks } from "../api-gateway-webhooks.composition";
+import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition.ts";
+import { composeApiGatewayWebhooks } from "../api-gateway-webhooks.composition.ts";
 
 /**
  * The connection, as the two stores under it read it.

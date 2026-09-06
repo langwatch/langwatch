@@ -47,8 +47,8 @@ import {
 import {
   SsoConnectionGuardChecksService,
   type SsoConnectionGuardsDeps,
-} from "./sso-connection-guard-checks.service";
-import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfather-facts.rules";
+} from "./sso-connection-guard-checks.service.ts";
+import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfather-facts.rules.ts";
 
 /**
  * The SSO connection guards (ADR-117 §5, D04): what runs BEFORE any fact

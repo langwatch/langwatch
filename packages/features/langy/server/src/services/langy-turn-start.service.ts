@@ -8,15 +8,15 @@ import {
   extractLangyTextFromParts,
 } from "@langwatch/langy-contract";
 import { trace } from "@opentelemetry/api";
-import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
-import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
-import { LangyTurnPreparationService } from "./langy-turn-preparation.service";
+import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
+import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
+import { LangyTurnPreparationService } from "./langy-turn-preparation.service.ts";
 import {
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
-} from "./langy-turn-shared.service";
-import { LangyTurnSharedService } from "./langy-turn-shared.service";
-import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
+} from "./langy-turn-shared.service.ts";
+import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
+import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port.ts";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();

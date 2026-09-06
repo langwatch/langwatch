@@ -26,7 +26,7 @@ import type { ComponentType } from "react";
 export type EvaluationEditScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const evaluationEditScreens = {
-  evaluationEdit: () => import("./evaluation-edit.screen"),
+  evaluationEdit: () => import("./evaluation-edit.screen.tsx"),
 } as const satisfies Record<string, EvaluationEditScreenLoader>;
 
 export type EvaluationEditScreenName = keyof typeof evaluationEditScreens;

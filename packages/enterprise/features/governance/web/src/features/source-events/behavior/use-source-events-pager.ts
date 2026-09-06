@@ -8,7 +8,7 @@ import {
   type PagerRow,
   paginationView,
   stallSkipRequest,
-} from "../model/governance-events-pager";
+} from "../model/governance-events-pager.ts";
 
 /**
  * Cursor walk over `eventsForSource`, shaped for the pagination bar.

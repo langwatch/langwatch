@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ChartErrorState } from "../chart-error-state";
+import { ChartErrorState } from "../chart-error-state.tsx";
 
 afterEach(cleanup);
 

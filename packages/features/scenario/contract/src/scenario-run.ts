@@ -1,4 +1,4 @@
-import { SimulationRunStatus, SimulationVerdict } from "./simulation";
+import { SimulationRunStatus, SimulationVerdict } from "./simulation.ts";
 
 export const ScenarioRunStatus = SimulationRunStatus;
 export type ScenarioRunStatus = SimulationRunStatus;

@@ -5,7 +5,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { CONVERSATION_TURN_CAP } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { useSessionScrollback } from "../use-session-scrollback";
+import { useSessionScrollback } from "../use-session-scrollback.ts";
 
 const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(() => {
   const fetchTranscript = vi.fn();
@@ -35,9 +35,9 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
   };
 });
 
-vi.mock("../../../../../../behavior/trace-api", () => ({ api: { useUtils: () => utils } }));
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({ api: { useUtils: () => utils } }));
 
-vi.mock("../../../hooks/use-conversation-context", () => ({
+vi.mock("../../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     turns: conversation.turns,
     isLoading: conversation.isLoading,

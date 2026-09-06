@@ -2,11 +2,11 @@
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ProductId } from "../products";
+import type { ProductId } from "../products.ts";
 import {
   type LandingDestinationInput,
   resolveLandingDestination,
-} from "../resolve-landing-destination";
+} from "../resolve-landing-destination.ts";
 
 const ALL_PRODUCTS: readonly ProductId[] = ["me", "llm-ops", "gateway", "governance"];
 

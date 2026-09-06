@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service";
+import type { DatasetStorageResolver } from "../ports/dataset-storage.port.ts";
+import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
-} from "../repositories/prisma/prisma.dataset-content.repository";
+} from "../repositories/prisma/prisma.dataset-content.repository.ts";
 
 const logger = createLogger("langwatch:dataset:migration");
 const DATASET_PAGE_SIZE = 50;

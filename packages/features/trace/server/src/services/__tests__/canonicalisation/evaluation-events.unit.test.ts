@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CanonicalEvent } from "@langwatch/trace-contract";
-import { canonicalisation, makeStubSpan } from "./test-helpers";
+import { canonicalisation, makeStubSpan } from "./test-helpers.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 const stubSpan = makeStubSpan({

@@ -6,10 +6,10 @@
 
 import type { LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { useEffect, useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/langy-api";
-import { CAPABILITY_HYDRATORS } from "../capabilities/capability-hydrators";
-import type { CapabilityHydrator, CapabilityTrpcUtils } from "../capabilities/capability-hydrators";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
+import { CAPABILITY_HYDRATORS } from "../capabilities/capability-hydrators.ts";
+import type { CapabilityHydrator, CapabilityTrpcUtils } from "../capabilities/capability-hydrators.ts";
 
 export type ChoicesRefRow =
   | { state: "pending" }

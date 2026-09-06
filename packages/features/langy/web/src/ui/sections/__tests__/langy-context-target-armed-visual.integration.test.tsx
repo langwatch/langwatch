@@ -6,10 +6,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LangyContextTarget } from "../langy-context-target";
-import { LangyContextTargetLayer } from "../langy-context-target-layer";
-import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store";
-import { useLangyStore } from "../../../behavior/langy.store";
+import { LangyContextTarget } from "../langy-context-target.tsx";
+import { LangyContextTargetLayer } from "../langy-context-target-layer.tsx";
+import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store.ts";
+import { useLangyStore } from "../../../behavior/langy.store.ts";
 
 function press(key: string, target: EventTarget = document.body) {
   act(() => {

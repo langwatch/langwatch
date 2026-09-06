@@ -1,4 +1,4 @@
-import type { DSPyRunsSummary } from "./experiment-legacy";
+import type { DSPyRunsSummary } from "./experiment-legacy.ts";
 import type {
   Experiment,
   ExperimentLookup,
@@ -8,7 +8,7 @@ import type {
   ExperimentType,
   FindOrCreateWorkflowExperimentInput,
   SaveExperimentInput,
-} from "./experiment";
+} from "./experiment.ts";
 import type {
   CompleteExperimentRunInput,
   ExperimentRun,
@@ -21,13 +21,13 @@ import type {
   RecordEvaluatorResultInput,
   RecordTargetResultInput,
   StartExperimentRunInput,
-} from "./experiment-run";
+} from "./experiment-run.ts";
 import type {
   ExperimentDspyStep,
   ExperimentDspyStepLookup,
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
-} from "./experiment-dspy";
+} from "./experiment-dspy.ts";
 import type {
   CommitWorkbenchVersionInput,
   CreateEvaluationsV3Input,
@@ -39,7 +39,7 @@ import type {
   WorkbenchSaveResult,
   WorkbenchStateView,
   WorkbenchVersionsPage,
-} from "./experiment-workbench-version";
+} from "./experiment-workbench-version.ts";
 
 export abstract class ExperimentService {
   abstract getById(input: ExperimentLookup): Promise<Experiment>;

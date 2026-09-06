@@ -3,7 +3,7 @@
  */
 
 import { create } from "zustand";
-import type { TargetValue } from "../../../model/scenario-target";
+import type { TargetValue } from "../../../model/scenario-target.ts";
 
 export const AGENT_TESTING_RAIL_COLLAPSED_KEY = "agent-testing-rail-collapsed" as const;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MailerConfiguration } from "../../ports/email-delivery.port";
-import { EmailProviderService } from "../email-provider.service";
+import type { MailerConfiguration } from "../../ports/email-delivery.port.ts";
+import { EmailProviderService } from "../email-provider.service.ts";
 
 /**
  * Spec: packages/features/notification/specs/packaged-mail-delivery.feature

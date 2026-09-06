@@ -3,14 +3,14 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
-} from "./evaluation-event.constants";
+} from "./evaluation-event.constants.ts";
 import type {
   EvaluationCompletedEvent,
   EvaluationProcessingEvent,
   EvaluationReportedEvent,
   EvaluationScheduledEvent,
   EvaluationStartedEvent,
-} from "./evaluation.events";
+} from "./evaluation.events.ts";
 
 /**
  * Type guard for EvaluationScheduledEvent.

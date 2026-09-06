@@ -7,9 +7,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunModelDialog } from "../scenario-run-model-dialog";
+import { ScenarioRunModelDialog } from "../scenario-run-model-dialog.tsx";
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -24,7 +24,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },

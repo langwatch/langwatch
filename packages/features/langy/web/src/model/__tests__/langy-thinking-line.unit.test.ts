@@ -3,7 +3,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { LANGY_THINKING_VERBS } from "../values/langy-thinking-verbs";
+import { LANGY_THINKING_VERBS } from "../values/langy-thinking-verbs.ts";
 import {
   LANGY_AWAITING_ANSWER_LINE,
   langyThinkingLine,
@@ -11,7 +11,7 @@ import {
   THINKING_SLOW_MS,
   THINKING_STILL_STARTING_MS,
   THINKING_STUCK_MS,
-} from "../langy-thinking-line";
+} from "../langy-thinking-line.ts";
 
 const assistant = (parts: unknown[]) => ({
   role: "assistant",

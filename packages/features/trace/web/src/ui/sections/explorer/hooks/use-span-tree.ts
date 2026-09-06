@@ -1,19 +1,19 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../../../behavior/trace-api";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store";
-import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
+import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import {
   mergeSpanTreeDelta,
   spanTreeDeltaSinceMs,
   spanTreeQueryFn,
   spanTreeQueryKey,
-} from "./span-tree-paged-query";
-import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
-import { useTraceQueryArgs } from "./use-trace-query-args";
+} from "./span-tree-paged-query.ts";
+import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
+import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
  * The span tree exactly as captured, before any correction. Read it when the

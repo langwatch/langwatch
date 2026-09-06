@@ -5,8 +5,8 @@
  */
 import type { DataPrivacyScope, DataPrivacyScopeType } from "@langwatch/data-privacy-contract";
 import { TRPCError } from "@trpc/server";
-import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port";
-import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port";
+import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
+import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port.ts";
 
 export class DataPrivacyScopeAuthorizationService {
   /** The permission a rule write at one tier demands. */

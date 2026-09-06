@@ -1,4 +1,4 @@
-export { AwsClientProcessRuntime } from "./process-runtime";
+export { AwsClientProcessRuntime } from "./process-runtime.ts";
 export {
   AwsClientConfiguration,
   OutboundProxyResolverPort,
@@ -9,4 +9,4 @@ export {
   type AwsClientRequestHandler,
   type AwsStaticCredentialIdentity,
   type StaticAwsCredentials,
-} from "./aws-client";
+} from "./aws-client.ts";

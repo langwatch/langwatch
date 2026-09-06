@@ -9,12 +9,12 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "@langwatch/enterprise-scim-contract";
-import { ScimGrantsService } from "./scim-grants.service";
+import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimGroupMembershipService,
   type ScimGroupMembershipRepository,
-} from "./scim-group-membership.service";
-import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port";
+} from "./scim-group-membership.service.ts";
+import type { ScimGroupRecord, ScimRepositoryPort } from "../ports/scim-repository.port.ts";
 
 /**
  * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.

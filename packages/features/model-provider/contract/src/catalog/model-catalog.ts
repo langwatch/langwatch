@@ -4,9 +4,9 @@
  * rule: the overlay wins on key collision.
  */
 import { z } from "zod";
-import llmModelsRaw from "./model-catalog.json";
-import llmModelsOverlayRaw from "./model-catalog.overlay.json";
-import type { LLMModelEntry, LLMModelRegistry } from "./model-catalog.types";
+import llmModelsRaw from "./model-catalog.json" with { type: "json" };
+import llmModelsOverlayRaw from "./model-catalog.overlay.json" with { type: "json" };
+import type { LLMModelEntry, LLMModelRegistry } from "./model-catalog.types.ts";
 
 export const modelPricingSchema = z
   .object({

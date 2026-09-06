@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime";
+import { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime.ts";
 import {
   AutomationWorkerFeatureInstaller,
   type AutomationReportSchedule,
-} from "../automation-worker-feature.installer";
+} from "../automation-worker-feature.installer.ts";
 
 /**
  * The one registration this installer makes, stubbed.

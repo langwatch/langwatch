@@ -11,10 +11,10 @@ import type {
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../ports/agent.port";
-import type { AgentCopyRecord, PersistAgentInput } from "../../repositories/agent.repository";
-import { AgentRepository } from "../../repositories/agent.repository";
-import { AgentService } from "../agent.service";
+import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../ports/agent.port.ts";
+import type { AgentCopyRecord, PersistAgentInput } from "../../repositories/agent.repository.ts";
+import { AgentRepository } from "../../repositories/agent.repository.ts";
+import { AgentService } from "../agent.service.ts";
 
 function config(overrides: Partial<ConnectedAgentConfig> = {}): ConnectedAgentConfig {
   return {

@@ -4,7 +4,7 @@ import {
   TenantBroadcastPublisherPort,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
-} from "../ports/tenant-broadcast.port";
+} from "../ports/tenant-broadcast.port.ts";
 
 /**
  * One publish onto the tenant's channel, and nothing else. The application's `BroadcastAdapter`

@@ -13,10 +13,10 @@ import {
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter";
-import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository";
-import { PrismaOrganizationRepository } from "../prisma.organization.repository";
-import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port";
+import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter.ts";
+import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
+import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
+import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

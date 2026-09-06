@@ -15,14 +15,14 @@ import {
   normalizeMetricName,
   normalizeTokenType,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
-import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
+import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
+import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
 import {
   SessionMetricSeriesRepository,
   type SessionMetricTotal,
-} from "../repositories/session-metric-series.repository";
+} from "../repositories/session-metric-series.repository.ts";
 
 export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

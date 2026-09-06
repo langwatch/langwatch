@@ -14,11 +14,11 @@ export {
   type AutomationActivityEntry,
   type AutomationActivityFire,
   type AutomationActivityTrigger,
-} from "./ui/elements/automation-history";
+} from "./ui/elements/automation-history.tsx";
 export {
   AutomationUseCaseStrip,
   type AutomationUseCaseKind,
   type AutomationUseCasePrefill,
-} from "./ui/elements/automation-use-case-strip";
-export * from "./ui/elements/automation-table-cells";
-export type * from "./model/trigger-action-params";
+} from "./ui/elements/automation-use-case-strip.tsx";
+export * from "./ui/elements/automation-table-cells.tsx";
+export type * from "./model/trigger-action-params.ts";

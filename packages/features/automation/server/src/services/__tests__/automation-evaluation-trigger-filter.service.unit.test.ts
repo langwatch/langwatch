@@ -1,6 +1,6 @@
 import { TraceService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service";
+import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service.ts";
 
 class TestTraceService extends TraceService {
   // `TraceService` grew these and the fakes did not follow. A member left

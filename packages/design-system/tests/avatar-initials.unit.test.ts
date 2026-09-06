@@ -8,7 +8,7 @@
  * differ only where the old one returned half a character.
  */
 import { describe, expect, it } from "vitest";
-import { initialsFromName } from "../src/components/avatar";
+import { initialsFromName } from "../src/components/avatar.tsx";
 
 /** What the component library did, kept here as the thing to agree with. */
 function chakraInitials(name: string): string {

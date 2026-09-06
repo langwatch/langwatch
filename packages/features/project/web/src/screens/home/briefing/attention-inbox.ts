@@ -1,5 +1,5 @@
-import { formatMilliseconds } from "../../../model/format-milliseconds";
-import type { BriefingReceipt } from "./types";
+import { formatMilliseconds } from "../../../model/format-milliseconds.ts";
+import type { BriefingReceipt } from "./types.ts";
 
 const MAX_RECEIPTS = 4;
 const MAX_ERROR_SHAPES = 2;

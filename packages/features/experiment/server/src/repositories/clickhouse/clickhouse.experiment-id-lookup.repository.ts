@@ -1,5 +1,5 @@
-import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
-import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository";
+import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port.ts";
+import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
 
 const TABLE_NAME = "experiment_runs" as const;
 

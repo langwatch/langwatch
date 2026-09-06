@@ -13,7 +13,7 @@ import {
   JUDGE_PROMPT_GOLDEN_NO_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
-} from "../comparison-config-form";
+} from "../comparison-config-form.tsx";
 
 /** Walk up from this package until the workspace root (the one holding the
  * evaluator source) is found, so the test resolves the same from any worktree. */

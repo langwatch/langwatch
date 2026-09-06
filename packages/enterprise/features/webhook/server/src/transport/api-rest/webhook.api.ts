@@ -34,7 +34,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
 import type { WebhookApp } from "#app/webhook.app";
-import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter";
+import type { WebhookEndpointRuntime } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
 
 // ── Wire enums ──────────────────────────────────────────────────────────
 // Every enum this surface publishes and accepts is lower_snake_case, input

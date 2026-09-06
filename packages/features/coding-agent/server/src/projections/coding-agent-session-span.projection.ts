@@ -4,12 +4,12 @@ import {
   LOGS_ONLY_AGENT_IDS,
   detectCodingAgent,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port";
+import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-estimator.port.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type CodingAgentSessionData,
   CodingAgentSessionStateProjection,
-} from "./coding-agent-session-state.projection";
+} from "./coding-agent-session-state.projection.ts";
 
 const SPAN_STATUS_ERROR = 2;
 const CLAUDE = {

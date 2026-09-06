@@ -1,12 +1,12 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Crosshair, Lightbulb } from "lucide-react";
-import { UserAvatar } from "../../../../elements/user-avatar";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
+import { UserAvatar } from "../../../../elements/user-avatar.tsx";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
-} from "../../hooks/use-jump-to-annotation-anchor";
+} from "../../hooks/use-jump-to-annotation-anchor.ts";
 
 /** What a comment reads as when the part it was left on is gone. */
 const ORPHANED_ANCHOR = "On a part of the trace that is no longer there";

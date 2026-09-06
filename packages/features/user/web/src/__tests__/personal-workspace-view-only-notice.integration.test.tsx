@@ -6,8 +6,8 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { PersonalWorkspaceViewOnlyNotice } from "../ui/sections/personal-workspace-view-only-notice";
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing";
+import { PersonalWorkspaceViewOnlyNotice } from "../ui/sections/personal-workspace-view-only-notice.tsx";
+import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing.tsx";
 
 /**
  * The organization roles this notice branches on, named as the wire names

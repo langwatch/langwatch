@@ -9,8 +9,8 @@ import { type ResultsFilter } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MAX_RUN_TARGETS, MAX_TREND_POINTS } from "../../../ports/result-atoms-read.port";
-import { ResultAtomsClickHouseRepository } from "../clickhouse.result-atoms.repository";
+import { MAX_RUN_TARGETS, MAX_TREND_POINTS } from "../../../ports/result-atoms-read.port.ts";
+import { ResultAtomsClickHouseRepository } from "../clickhouse.result-atoms.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

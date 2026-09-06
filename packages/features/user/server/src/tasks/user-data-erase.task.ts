@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { GdprUserDataEraseRepository } from "../repositories/prisma/prisma.user-data-erase.repository";
+import type { GdprUserDataEraseRepository } from "../repositories/prisma/prisma.user-data-erase.repository.ts";
 
 const logger = createLogger("langwatch:task:user-data-erase");
 

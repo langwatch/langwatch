@@ -3,10 +3,10 @@
  */
 
 import { useEffect } from "react";
-import SimulationsPage from "../../ui/sections/suites/simulations-page";
-import { resolveSimulationsRedirect } from "../../behavior/suites/use-suite-routing";
+import SimulationsPage from "../../ui/sections/suites/simulations-page.tsx";
+import { resolveSimulationsRedirect } from "../../behavior/suites/use-suite-routing.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
+import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect.ts";
 
 function SimulationsRoutePage() {
   const router = useRouter();

@@ -1,7 +1,7 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 
 import { resolveScenarioError, scenarioErrorTitle } from "@langwatch/scenario-contract";
-import { CONSOLE_COLORS } from "../../../model/simulation-console/constants";
+import { CONSOLE_COLORS } from "../../../model/simulation-console/constants.ts";
 
 interface ErrorDetailsProps {
   error: string;

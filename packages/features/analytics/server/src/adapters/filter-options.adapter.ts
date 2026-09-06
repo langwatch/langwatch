@@ -2,8 +2,8 @@
  * Process composition binds the one filter-option repository to its service.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository";
-import { FilterService } from "../services/filter.service";
+import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
+import { FilterService } from "../services/filter.service.ts";
 
 export class FilterOptionsAdapter {
   static create(options: {

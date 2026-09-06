@@ -5,7 +5,7 @@
 
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing";
+import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing.tsx";
 
 type MutationOptions = {
   onSuccess?: () => void;
@@ -65,9 +65,9 @@ const { api, state } = vi.hoisted(() => {
   return { api, state };
 });
 
-vi.mock("../../../behavior/authz-api", () => ({ authzApi: api }));
+vi.mock("../../../behavior/authz-api.ts", () => ({ authzApi: api }));
 
-const { default: RolesScreen } = await import("../roles.screen");
+const { default: RolesScreen } = await import("../roles.screen.tsx");
 
 const ANALYST_ROLE = {
   id: "role-1",

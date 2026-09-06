@@ -1,7 +1,7 @@
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
-import { useDensityStore } from "../../../../behavior/density.store";
-import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context";
+import { useDensityStore } from "../../../../behavior/density.store.ts";
+import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 
 /** Px estimate per row before measureElement runs. */
 const ESTIMATE_PER_DENSITY: Record<"compact" | "comfortable", number> = {

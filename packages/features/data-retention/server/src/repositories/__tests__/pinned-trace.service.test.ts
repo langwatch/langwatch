@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { DataRetentionRepository } from "../data-retention.repository";
-import { PinnedTraceRepository } from "../pinned-trace.repository";
-import { RetroactiveRetentionRepository } from "../retroactive-retention.repository";
-import { DataRetentionService } from "../../services/data-retention.service";
+import type { DataRetentionRepository } from "../data-retention.repository.ts";
+import { PinnedTraceRepository } from "../pinned-trace.repository.ts";
+import { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
+import { DataRetentionService } from "../../services/data-retention.service.ts";
 
 class Pins extends PinnedTraceRepository {
   private row: any = null;

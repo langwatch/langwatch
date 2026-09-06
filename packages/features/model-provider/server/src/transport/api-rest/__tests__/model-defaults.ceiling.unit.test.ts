@@ -12,7 +12,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createModelDefaultsRestApp } from "../model-defaults.api";
+import { createModelDefaultsRestApp } from "../model-defaults.api.ts";
 
 class ApiKeyPermissionDeniedTestError extends HandledError {
   constructor() {

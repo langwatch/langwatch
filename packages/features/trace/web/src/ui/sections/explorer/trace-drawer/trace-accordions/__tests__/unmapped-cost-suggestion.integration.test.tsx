@@ -8,20 +8,20 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
-import { SpanAccordions } from "../span-accordions";
+import { SpanAccordions } from "../span-accordions.tsx";
 
 const { mockDetailState } = vi.hoisted(() => ({
   mockDetailState: { current: null as SpanDetail | null },
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../hooks/use-span-detail", () => ({
+vi.mock("../../../hooks/use-span-detail.ts", () => ({
   useSpanDetail: () => ({
     data: mockDetailState.current,
     isLoading: false,
@@ -34,18 +34,18 @@ vi.mock("../../../hooks/use-span-detail", () => ({
 
 // SpanAccordions marks the fields a stored correction changed; this test
 // renders without a tRPC provider and no correction is in play here.
-vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
+vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: null }),
   useAppliedTraceEditPatch: () => null,
 }));
 
-vi.mock("../../../hooks/use-trace-resources", () => ({
+vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
 }));
 
 // SpanAccordions reads the trace's comments to count them on each section;
 // this test renders without a tRPC provider and no comment is in play here.
-vi.mock("../../../hooks/use-anchored-annotations", () => ({
+vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
   useAnchoredAnnotations: () => ({
     commentsAt: () => [],
     all: [],
@@ -56,14 +56,14 @@ vi.mock("../../../hooks/use-anchored-annotations", () => ({
 // SpanAccordions joins log content onto spans via a tRPC query; this test
 // renders without that provider, so stub the hook to the no-logs state.
 // Log enrichment is out of scope for the cost suggestion.
-vi.mock("../../../hooks/use-span-logs", () => ({
+vi.mock("../../../hooks/use-span-logs.ts", () => ({
   useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
 }));
 
 // RedactedField (wrapping the IO viewers) reads field-redaction status via a
 // tRPC query; this test renders without that provider, so stub the hook to the
 // not-redacted passthrough — redaction is out of scope for the cost suggestion.
-vi.mock("../../../../use-field-redaction", () => ({
+vi.mock("../../../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({
     isRedacted: false,
     isLoading: false,

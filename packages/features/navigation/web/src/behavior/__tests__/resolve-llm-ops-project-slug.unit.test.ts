@@ -12,8 +12,8 @@
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
 import { describe, expect, it } from "vitest";
-import type { NavigationTeam } from "../../model/navigation-host";
-import { resolveLlmOpsProjectSlug } from "../use-llm-ops-project-slug";
+import type { NavigationTeam } from "../../model/navigation-host.ts";
+import { resolveLlmOpsProjectSlug } from "../use-llm-ops-project-slug.ts";
 
 function team(
   id: string,

@@ -4,7 +4,7 @@ import {
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
-import { api } from "../../behavior/trace-api";
+import { api } from "../../behavior/trace-api.ts";
 
 export type { ModelMetadataForFrontend };
 

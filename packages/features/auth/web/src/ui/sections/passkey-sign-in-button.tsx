@@ -1,11 +1,11 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client";
-import { rememberLastUsedMethod } from "../../model/last-used-method";
-import { signInMethodActionLabel } from "../../model/method-labels";
-import { MethodButton } from "../elements/method-button";
-import { SignInMethodIcon } from "../elements/sign-in-method-icon";
+import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { signInMethodActionLabel } from "../../model/method-labels.ts";
+import { MethodButton } from "../elements/method-button.tsx";
+import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
 /** The client's name for the ceremony, so the mark and the words are drawn by
  *  the same two functions every other method on the rail is drawn by. */

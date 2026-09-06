@@ -7,8 +7,8 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { EditModelProviderForm } from "@langwatch/model-provider-web/surfaces/edit-model-provider-form";
 import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provider-icons";
 import { useCallback, useRef, useState } from "react";
-import { langyModelProviders, LANGY_RECOMMENDED_PROVIDER } from "../../model/langy-model-providers";
-import { useLangyHost } from "../../model/langy-host";
+import { langyModelProviders, LANGY_RECOMMENDED_PROVIDER } from "../../model/langy-model-providers.ts";
+import { useLangyHost } from "../../model/langy-host.ts";
 
 export type ModelProviderKey = string;
 

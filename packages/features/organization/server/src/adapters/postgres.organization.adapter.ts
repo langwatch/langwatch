@@ -7,11 +7,11 @@ import type {
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
   OrganizationSettingsSecretPort,
-} from "../ports/organization.port";
-import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository";
-import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository";
-import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository";
-import { OrganizationService } from "../services/organization.service";
+} from "../ports/organization.port.ts";
+import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
+import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
+import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
+import { OrganizationService } from "../services/organization.service.ts";
 
 export interface PostgresOrganizationAdapterOptions {
   /** The composition root's own guarded client, typed — every process composing this adapter

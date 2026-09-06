@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { PrismaGatewayVirtualKeyRepository } from "../prisma.virtual-key.repository";
+import { PrismaGatewayVirtualKeyRepository } from "../prisma.virtual-key.repository.ts";
 
 type Call = { method: string; args: Record<string, unknown> };
 

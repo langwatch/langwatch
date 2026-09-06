@@ -13,15 +13,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 
-import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise";
-import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell";
-import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv";
+import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise.ts";
+import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell.tsx";
+import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv.ts";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
-} from "../../batch-evaluation-results.types";
-import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
-import { WinRateChart } from "../win-rate-chart";
+} from "../../batch-evaluation-results.types.ts";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { WinRateChart } from "../win-rate-chart.tsx";
 
 /** What select_best_compare stores when its two passes disagree. */
 const DISAGREEMENT_DETAILS =

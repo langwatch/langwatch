@@ -6,14 +6,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../../../use-score-names-by-id", () => ({
+vi.mock("../../../../../../use-score-names-by-id.ts", () => ({
   useScoreNamesById: () => new Map([["score-abc123", "goodness"]]),
 }));
 
-import type { AnnotationByTrace } from "../../../../../../use-annotations-by-trace-ids";
-import type { TraceListItem } from "../../../../../types/trace";
-import { NO_TRACE_EVENTS } from "../../../../../types/trace";
-import { AnnotationsCell } from "../annotations-cell";
+import type { AnnotationByTrace } from "../../../../../../use-annotations-by-trace-ids.ts";
+import type { TraceListItem } from "../../../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
+import { AnnotationsCell } from "../annotations-cell.tsx";
 
 afterEach(cleanup);
 

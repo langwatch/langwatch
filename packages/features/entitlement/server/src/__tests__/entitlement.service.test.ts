@@ -1,6 +1,6 @@
 import type { Plan } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
-import { EntitlementService } from "../index";
+import { EntitlementService } from "../index.ts";
 
 const free: Plan = {
   planSource: "free",

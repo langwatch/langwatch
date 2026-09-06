@@ -11,8 +11,8 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-import { modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons";
-import { usePromptProject } from "../../../behavior/use-prompt-project";
+import { modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons.tsx";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
@@ -22,12 +22,12 @@ import {
   allLitellmModels,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
-import { promptApi } from "../../../behavior/prompt-api";
-import { titleCase } from "../../../model/string-casing";
-import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../../../model/model-selection-constants";
-import { NoModelsConfiguredCallout } from "./no-models-configured-callout";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { titleCase } from "../../../model/string-casing.ts";
+import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../../../model/model-selection-constants.ts";
+import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Link } from "../../../ui/elements/prompt-link";
+import { Link } from "../../../ui/elements/prompt-link.tsx";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

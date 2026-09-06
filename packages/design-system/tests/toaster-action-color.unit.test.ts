@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toastActionColor } from "../src/components/toaster";
+import { toastActionColor } from "../src/components/toaster.tsx";
 
 /**
  * A toast's action carries the accent. On a toast that already reads as good

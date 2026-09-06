@@ -5,9 +5,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { WorkspaceNudge } from "../services/langy-local-call-dispatcher.service";
-import { workspaceChannel } from "./langy-local-control-keys.rules";
-import type { LocalControlRuntime } from "../adapters/langy-local-control-runtime.adapter";
+import type { WorkspaceNudge } from "../services/langy-local-call-dispatcher.service.ts";
+import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
+import type { LocalControlRuntime } from "../adapters/langy-local-control-runtime.adapter.ts";
 
 const logger = createLogger("langwatch:langy:local-control:skip-policy");
 

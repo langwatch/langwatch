@@ -16,10 +16,10 @@ import {
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
-import { apiKeyCeilingRefusal } from "./app/api-key-ceiling-refusal";
-import { extractApiKeyRequestCredentials } from "./app/api-key-request-credentials";
-import { legacyErrorBody } from "./app/api-rest-observability.composition";
-import type { ApiAuditPort } from "./api-request.policy";
+import { apiKeyCeilingRefusal } from "./app/api-key-ceiling-refusal.ts";
+import { extractApiKeyRequestCredentials } from "./app/api-key-request-credentials.ts";
+import { legacyErrorBody } from "./app/api-rest-observability.composition.ts";
+import type { ApiAuditPort } from "./api-request.policy.ts";
 
 /**
  * The credential refusals this process publishes, one class per code. They were two

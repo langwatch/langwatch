@@ -10,7 +10,7 @@ import {
   type FeatureFlagExperiment,
 } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
-import { createInMemoryFeatureFlagService } from "../testing";
+import { createInMemoryFeatureFlagService } from "../testing.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
 const NOT_AN_EXPERIMENT = "release_ui_ai_gateway_menu_enabled";

@@ -16,18 +16,19 @@
     }
   },
   "scripts": {
-    "lint": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
-    "lint:declarations": "tsx src/cli.ts --root ../.. --no-legacy-application-migration",
-    "lint:migration": "tsx src/cli.ts --root ../.. --no-declarations",
-    "review:comment-blocks": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
-    "review:test-quality": "tsx src/cli.ts --root ../.. --review-test-quality",
-    "rename-package": "tsx src/rename-workspace-package.cli.ts",
-    "rename-feature-sources": "tsx src/rename-feature-sources.cli.ts",
+    "lint": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
+    "lint:declarations": "node --experimental-transform-types src/cli.ts --root ../.. --no-legacy-application-migration",
+    "lint:migration": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations",
+    "review:comment-blocks": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
+    "review:test-quality": "node --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
+    "rename-package": "node --experimental-transform-types src/rename-workspace-package.cli.ts",
+    "rename-feature-sources": "node --experimental-transform-types src/rename-feature-sources.cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "colocate-tests": "tsx src/colocate-tests.cli.ts",
-    "check:feature-parity": "tsx src/check-feature-parity.ts",
+    "colocate-tests": "node --experimental-transform-types src/colocate-tests.cli.ts",
+    "check:ts-budget": "node --experimental-transform-types src/declaration-budget.cli.ts --root ../..",
+    "check:feature-parity": "node --experimental-transform-types src/check-feature-parity.ts",
     "docs": "node src/lint-rules-doc.mjs"
   },
   "dependencies": {
@@ -40,7 +41,6 @@
     "@types/node": "^26.0.1",
     "js-yaml": "^5.2.0",
     "oxlint": "^1.78.0",
-    "tsx": "^4.22.4",
     "vitest": "^5.0.0"
   }
 }

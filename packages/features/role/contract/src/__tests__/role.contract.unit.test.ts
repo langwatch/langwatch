@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { roleCreateSchema, roleSchema, roleUpdateSchema } from "../index";
+import { roleCreateSchema, roleSchema, roleUpdateSchema } from "../index.ts";
 
 describe("role contract", () => {
   it("accepts the wire-safe custom role value", () => {

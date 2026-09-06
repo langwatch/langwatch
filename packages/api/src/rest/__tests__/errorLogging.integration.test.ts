@@ -31,8 +31,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
-const { createErrorHandler } = await import("../../errors.js");
-const { loggerMiddleware } = await import("../middleware.js");
+const { createErrorHandler } = await import("../../errors.ts");
+const { loggerMiddleware } = await import("../middleware.ts");
 
 function appThatThrows(err: unknown) {
   const app = new Hono();

@@ -5,11 +5,11 @@
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-fold.projection";
-import type { EvaluationAnalyticsRollupRow } from "../projections/evaluation-analytics-rollup.projection";
-import { EvaluationExecutionIntentPort } from "../ports/evaluation.port";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent";
-import { EvaluationProcessingAdapter } from "./evaluation-processing.adapter";
+import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsRollupRow } from "../projections/evaluation-analytics-rollup.projection.ts";
+import { EvaluationExecutionIntentPort } from "../ports/evaluation.port.ts";
+import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
+import { EvaluationProcessingAdapter } from "./evaluation-processing.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

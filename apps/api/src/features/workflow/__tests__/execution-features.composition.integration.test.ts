@@ -15,29 +15,29 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it, vi } from "vitest";
-import { ApiAuditPort } from "../../../api-request.policy";
+import { ApiAuditPort } from "../../../api-request.policy.ts";
 import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
-} from "../../../api.application";
+} from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { composeApiModelProviders } from "../../../app/api-model-provider.composition";
-import { composeDatasetService } from "../../dataset/dataset.composition";
-import { composeEvaluatorService } from "../../evaluator/evaluator.composition";
-import { composeMonitorService } from "../../monitor/monitor.composition";
-import { composeEvaluationFeature } from "../../evaluation/evaluation.composition";
-import { composeExperimentFeature } from "../../experiment/experiment.composition";
-import { composeWorkflowFeature, composeWorkflowRuntime } from "../workflow.composition";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
+import { composeApiModelProviders } from "../../../app/api-model-provider.composition.ts";
+import { composeDatasetService } from "../../dataset/dataset.composition.ts";
+import { composeEvaluatorService } from "../../evaluator/evaluator.composition.ts";
+import { composeMonitorService } from "../../monitor/monitor.composition.ts";
+import { composeEvaluationFeature } from "../../evaluation/evaluation.composition.ts";
+import { composeExperimentFeature } from "../../experiment/experiment.composition.ts";
+import { composeWorkflowFeature, composeWorkflowRuntime } from "../workflow.composition.ts";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stub,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles";
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 
 const workflowRow = {
   id: "workflow-1",

@@ -8,18 +8,18 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../../rules/experiment-run-event-types.rules";
+} from "../../rules/experiment-run-event-types.rules.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
   ExperimentRunProcessingEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
-} from "../../processes/experiment-run-events.process";
+} from "../../processes/experiment-run-events.process.ts";
 import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
-} from "../../projections/experiment-run-state.projection";
+} from "../../projections/experiment-run-state.projection.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

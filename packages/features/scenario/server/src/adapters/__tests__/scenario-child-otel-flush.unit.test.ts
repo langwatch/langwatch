@@ -10,7 +10,7 @@ import type { Logger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import type { TracerProvider } from "@opentelemetry/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { flushScenarioOtelTraces } from "../scenario-child-execution.adapter";
+import { flushScenarioOtelTraces } from "../scenario-child-execution.adapter.ts";
 
 function silentLogger(): Logger {
   const warnings: unknown[] = [];

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExperimentWorkflowDslPort } from "../../ports/experiment-workflow-dsl.port";
-import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port";
+import type { ExperimentWorkflowDslPort } from "../../ports/experiment-workflow-dsl.port.ts";
+import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port.ts";
 import {
   WorkflowEvaluationService,
   type WorkflowEvaluationDependencies,
-} from "../experiment-workflow-evaluation.service";
+} from "../experiment-workflow-evaluation.service.ts";
 
 const PROJECT_ID = "project-1";
 const PROJECT_SLUG = "project-one";

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { RoutableConnection } from "./signin-routing";
-import { identityActorSchema } from "./vocabulary";
+import type { RoutableConnection } from "./signin-routing.ts";
+import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * The SSO connection vocabulary (ADR-117 §5, D04): what a connection is, the

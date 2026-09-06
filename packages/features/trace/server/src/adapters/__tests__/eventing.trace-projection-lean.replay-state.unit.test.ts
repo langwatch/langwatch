@@ -1,4 +1,4 @@
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter";
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter.ts";
 import {
   nullLog,
   type ProjectionStoreContext,

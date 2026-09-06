@@ -1,4 +1,4 @@
-import { splitLeadingContextBlocks } from "./leading-context";
+import { splitLeadingContextBlocks } from "./leading-context.ts";
 
 /** Blocks an agent injects into a user message that the human never typed. */
 const SYSTEM_NOTIFICATION_MARKER = "[SYSTEM NOTIFICATION";

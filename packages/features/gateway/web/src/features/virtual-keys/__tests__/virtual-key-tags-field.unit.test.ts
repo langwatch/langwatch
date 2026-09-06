@@ -13,7 +13,7 @@ import {
   TAGS_CSV_MAX_LENGTH,
   tagsBeyondLimitsNotice,
   VK_TAGS_FIELD_DESCRIPTION,
-} from "../model/virtual-key-tags-field";
+} from "../model/virtual-key-tags-field.ts";
 
 describe("given the Tags field description", () => {
   it("quotes the limits the server enforces", () => {

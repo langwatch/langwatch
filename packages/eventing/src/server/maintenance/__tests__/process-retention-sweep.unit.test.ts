@@ -10,12 +10,12 @@ import {
   RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
   retentionSweepBatchBudget,
-} from "../process-retention-sweep.process";
+} from "../process-retention-sweep.process.ts";
 import {
   type ProcessRetentionSweepDeps,
   runProcessRetentionSweep,
-} from "../process-retention-sweep.intent";
-import { ProcessRetentionMetricsPort, type RetentionFamily } from "../retention-metrics.port";
+} from "../process-retention-sweep.intent.ts";
+import { ProcessRetentionMetricsPort, type RetentionFamily } from "../retention-metrics.port.ts";
 
 /** Records what the sweep reported, family by family, as the counters do. */
 class RecordingRetentionMetrics extends ProcessRetentionMetricsPort {

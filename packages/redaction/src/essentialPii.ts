@@ -1,4 +1,4 @@
-import { formatPiiMarker } from "./markers.js";
+import { formatPiiMarker } from "./markers.ts";
 import { findPhoneNumbersInText } from "libphonenumber-js";
 
 /**
@@ -24,7 +24,7 @@ import { findPhoneNumbersInText } from "libphonenumber-js";
 const MAX_SCAN_LENGTH = 250_000;
 const CONTEXT_WINDOW = 50;
 
-export { ESSENTIAL_PII_ENTITIES } from "./piiEntities.js";
+export { ESSENTIAL_PII_ENTITIES } from "./piiEntities.ts";
 
 interface Recognizer {
   entity: string;

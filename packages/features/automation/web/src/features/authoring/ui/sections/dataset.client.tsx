@@ -3,12 +3,12 @@ import type { DatasetActionParams } from "@langwatch/automation-contract";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
-import { DatasetSelector } from "../blocks/dataset-selector";
+import { DatasetSelector } from "../blocks/dataset-selector.tsx";
 import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
-import { api } from "../../../../behavior/automation-api";
-import { useAutomationHost } from "../../../../model/automation-host";
-import { keepDraftOnSubFlowReturn, announceSubFlowDeparture } from "../../behavior/sub-flow";
-import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../../../../model/provider-types";
+import { api } from "../../../../behavior/automation-api.ts";
+import { useAutomationHost } from "../../../../model/automation-host.ts";
+import { keepDraftOnSubFlowReturn, announceSubFlowDeparture } from "../../behavior/sub-flow.ts";
+import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../../../../model/provider-types.ts";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a

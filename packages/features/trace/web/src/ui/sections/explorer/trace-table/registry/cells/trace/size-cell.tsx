@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace";
-import { formatBytes } from "../../../../../../../model/display-formatters";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { formatBytes } from "../../../../../../../model/display-formatters.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
 
 /**
  * Stored payload size of the trace (`_size_bytes` on trace_summaries), humanised into

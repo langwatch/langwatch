@@ -1,14 +1,14 @@
 import type { ProjectService } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
-} from "../ports/ingestion-source.port";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository";
-import type { IngestionCredentialsService } from "../services/ingestion-credentials.service";
-import type { IngestionSecretService } from "../services/ingestion-source-secret.service";
-import { IngestionSourceService } from "../services/ingestion-source.service";
-import type { PullDestinationService } from "../services/pull-destination.service";
+} from "../ports/ingestion-source.port.ts";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import type { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
+import type { IngestionSecretService } from "../services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../services/ingestion-source.service.ts";
+import type { PullDestinationService } from "../services/pull-destination.service.ts";
 
 /** Binds Postgres persistence to the canonical ingestion-source service. */
 export class PostgresIngestionSourceAdapter {

@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from "react";
-import { useOrganizationHost, type OrganizationActor } from "../model/organization-host";
+import { useOrganizationHost, type OrganizationActor } from "../model/organization-host.ts";
 
 export type OrganizationSessionReading = {
   data: { user: OrganizationActor } | undefined;

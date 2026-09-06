@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPersistedEvaluatorType } from "../persisted-evaluator-type";
+import { isPersistedEvaluatorType } from "../persisted-evaluator-type.ts";
 
 describe("isPersistedEvaluatorType", () => {
   describe("when the evaluator already exists with its own editor", () => {

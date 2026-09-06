@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { useCommandBar } from "../../behavior/command-bar-context";
-import { CommandPalette } from "./command-palette";
-import { COMMAND_BAR_MAX_WIDTH, COMMAND_BAR_TOP_MARGIN } from "../../model/command-bar-constants";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { useCommandBar } from "../../behavior/command-bar-context.ts";
+import { CommandPalette } from "./command-palette.tsx";
+import { COMMAND_BAR_MAX_WIDTH, COMMAND_BAR_TOP_MARGIN } from "../../model/command-bar-constants.ts";
 
 /**
  * The palette raised over the page by Cmd+K.

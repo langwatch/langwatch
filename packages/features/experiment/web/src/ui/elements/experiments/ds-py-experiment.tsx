@@ -51,7 +51,7 @@ import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
@@ -64,10 +64,10 @@ type DSPyStepQuery = UseTRPCQueryResult<
   DSPyStep | undefined,
   TRPCClientErrorLike<WorkflowApiRouter>
 >;
-import { ChartTooltip } from "../analytics/chart-tooltip";
-import { FeedbackLink } from "../feedback-link";
+import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
+import { FeedbackLink } from "../feedback-link.tsx";
 import { LLMIcon } from "@langwatch/design-system/icons";
-import { MetadataTag } from "../metadata-tag";
+import { MetadataTag } from "../metadata-tag.tsx";
 import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Switch } from "@langwatch/design-system/switch";

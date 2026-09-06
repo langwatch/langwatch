@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnimatedConversationTitle } from "../animated-conversation-title";
+import { AnimatedConversationTitle } from "../animated-conversation-title.tsx";
 
 function renderTitle(title: string) {
   return render(

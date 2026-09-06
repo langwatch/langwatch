@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/langy-api";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
 
 export interface LangyFeedbackInput {
   conversationId?: string;

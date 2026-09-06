@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PerOrganizationCachedGateStore,
   type PerOrganizationCachedGateStoreOptions,
-} from "../memory.per-organization-cached-gate.store";
+} from "../memory.per-organization-cached-gate.store.ts";
 
 // The module under test calls `createLogger` once, at import time (the
 // module-scope `const logger = createLogger(...)` every gate in this

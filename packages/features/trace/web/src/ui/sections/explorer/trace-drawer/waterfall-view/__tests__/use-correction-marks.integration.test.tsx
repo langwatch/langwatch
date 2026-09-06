@@ -11,21 +11,21 @@ const harness = vi.hoisted(() => ({
   patch: null as unknown,
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
+vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: { patch: harness.patch } }),
 }));
 
-vi.mock("../../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: (selector: (s: unknown) => unknown) => selector({ isEditing: harness.isEditing }),
 }));
 
-vi.mock("../../../../../../behavior/trace-edit.store", () => ({
+vi.mock("../../../../../../behavior/trace-edit.store.ts", () => ({
   useTraceEditStore: (selector: (s: unknown) => unknown) =>
     selector({ overlayView: harness.overlayView, basePatch: null }),
 }));
 
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { useCorrectionMarks } from "../use-correction-marks";
+import { useCorrectionMarks } from "../use-correction-marks.ts";
 
 const SPANS = [
   { spanId: "root", parentSpanId: null },

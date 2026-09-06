@@ -1,12 +1,12 @@
 import { Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
-import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog";
+import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 
-import { useOpsPermission } from "../../../../behavior/ops-session";
-import { api } from "../../../../behavior/ops-api";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { api } from "../../../../behavior/ops-api.ts";
 
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 const BLOCKED_VIEWPORT_HEIGHT = 360;
 const BLOCKED_ROW_HEIGHT = 36;
 

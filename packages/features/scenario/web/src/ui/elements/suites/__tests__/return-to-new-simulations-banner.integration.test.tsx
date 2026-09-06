@@ -15,7 +15,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "project-1", slug: "demo" },
     organization: { id: "org-1" },
@@ -23,7 +23,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
 }));
 
 const featureFlagState = { enabled: true };
-vi.mock("../../../../behavior/use-feature-flag", () => ({
+vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
   useFeatureFlag: vi.fn(() => ({
     enabled: featureFlagState.enabled,
     isLoading: false,
@@ -32,8 +32,8 @@ vi.mock("../../../../behavior/use-feature-flag", () => ({
 
 import posthog from "posthog-js";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
-import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
-import { ReturnToNewSimulationsBanner } from "../../../sections/suites/return-to-new-simulations-banner";
+import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
+import { ReturnToNewSimulationsBanner } from "../../../sections/suites/return-to-new-simulations-banner.tsx";
 
 const PREFERENCE_KEY = "langwatch:prefer-legacy-simulations:v1:project-1";
 const SNOOZE_KEY = "langwatch:new-simulations-callout-dismissed:v1:project-1";

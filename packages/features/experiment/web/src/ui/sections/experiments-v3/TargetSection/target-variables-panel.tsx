@@ -18,14 +18,14 @@ import {
 } from "@langwatch/prompt-web/surfaces/variables";
 import { useMemo } from "react";
 
-import { useResolveTargetName } from "../../../../behavior/experiments-v3/use-resolve-target-name";
-import { getUsedFields } from "../../../../model/experiments-v3/mapping-validation";
-import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources";
+import { useResolveTargetName } from "../../../../behavior/experiments-v3/use-resolve-target-name.ts";
+import { getUsedFields } from "../../../../model/experiments-v3/mapping-validation.ts";
+import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources.ts";
 import type {
   DatasetReference,
   FieldMapping,
   TargetConfig,
-} from "../../../../model/experiments-v3/types";
+} from "../../../../model/experiments-v3/types.ts";
 
 interface TargetVariablesPanelProps {
   target: TargetConfig;

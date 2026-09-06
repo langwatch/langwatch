@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ProcessAuditSinkPort,
   type ProcessControlAction,
-} from "../../ports/process-audit-sink.port";
+} from "../../ports/process-audit-sink.port.ts";
 
 const TARGET_KIND = "process_instance";
 

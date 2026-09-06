@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "./log.constants";
-import { canonicalLogRecordSchema } from "./log-record";
+import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "./log.constants.ts";
+import { canonicalLogRecordSchema } from "./log-record.ts";
 
 export const logEventEnvelopeSchema = z.object({
   id: z.string(),

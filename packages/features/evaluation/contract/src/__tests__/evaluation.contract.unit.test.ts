@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluationRunDataSchema, traceEvaluationDataSchema } from "../evaluation";
+import { evaluationRunDataSchema, traceEvaluationDataSchema } from "../evaluation.ts";
 
 describe("Evaluation contract", () => {
   it("accepts a portable evaluation run", () => {

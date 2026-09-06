@@ -15,7 +15,7 @@ import {
   type StubEndpoint,
   startEndpoint,
   surfacedRejection,
-} from "./support/chat-completions-stub-endpoint";
+} from "./support/chat-completions-stub-endpoint.ts";
 
 const JUDGE_PARAMS: LiteLLMParams = {
   api_key: "test-key",

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const buildConfigSchema = z
   .object({

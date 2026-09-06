@@ -10,7 +10,7 @@ import { RenderCode } from "@langwatch/workflow-web/surfaces/render-code";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { CheckConfigFormData } from "./check-config-form";
+import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 export function EvaluationManualIntegration({
   slug,

@@ -1,8 +1,8 @@
-import type { TraceClickHouseWriteClient } from "../../clickhouse.port";
+import type { TraceClickHouseWriteClient } from "../../clickhouse.port.ts";
 import {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
-} from "../../trace-windowed-read-metrics.port";
+} from "../../trace-windowed-read-metrics.port.ts";
 
 export class TestWindowedReadMetrics extends TraceWindowedReadMetricsPort {
   private readonly counts = new Map<string, number>();

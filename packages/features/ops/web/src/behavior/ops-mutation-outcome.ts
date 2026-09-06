@@ -18,7 +18,7 @@
  */
 
 import { useCallback } from "react";
-import { useOpsToaster, useShowErrorToast } from "./ops-feedback";
+import { useOpsToaster, useShowErrorToast } from "./ops-feedback.ts";
 
 export type MutationOutcomeHandlers = {
   onSuccess: (data: Record<string, unknown>) => void;

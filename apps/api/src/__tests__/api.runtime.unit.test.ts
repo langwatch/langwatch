@@ -5,7 +5,7 @@ import {
   ApiLifecyclePort,
   ApiRuntime,
   type ApiShutdownOptions,
-} from "../api.runtime";
+} from "../api.runtime.ts";
 
 class TestApplication extends ApiApplicationPort<{ name: string }> {
   readonly application = { name: "langwatch" };

@@ -5,16 +5,16 @@
  */
 import { S3Client } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import { AzureDatasetStorageAdapter } from "./azure.dataset-storage.adapter";
-import { LocalDatasetStorageAdapter } from "./local.dataset-storage.adapter";
-import { S3DatasetStorageAdapter } from "./s3.dataset-storage.adapter";
+import { AzureDatasetStorageAdapter } from "./azure.dataset-storage.adapter.ts";
+import { LocalDatasetStorageAdapter } from "./local.dataset-storage.adapter.ts";
+import { S3DatasetStorageAdapter } from "./s3.dataset-storage.adapter.ts";
 import {
   DatasetAzureConfigResolver,
   DatasetS3ClientResolver,
   DatasetStorageResolver,
   type DatasetS3ClientLease,
   type DatasetStorage,
-} from "../ports/dataset-storage.port";
+} from "../ports/dataset-storage.port.ts";
 
 /** One S3-compatible target: a bucket, and how to reach and authenticate to it. */
 export type DatasetS3Target = Readonly<{

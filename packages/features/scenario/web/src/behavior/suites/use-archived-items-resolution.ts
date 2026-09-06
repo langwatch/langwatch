@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from "react";
-import { api } from "../scenario-api";
+import { api } from "../scenario-api.ts";
 
 interface ArchivedScenarioRef {
   id: string;

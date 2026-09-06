@@ -13,7 +13,7 @@ import {
   getAllFlowCallbacks,
   getFlowCallbacks,
   setFlowCallbacks,
-} from "../use-drawer";
+} from "../use-drawer.ts";
 
 beforeEach(() => {
   clearFlowCallbacks();

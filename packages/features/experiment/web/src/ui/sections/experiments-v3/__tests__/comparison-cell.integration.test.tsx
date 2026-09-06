@@ -7,9 +7,9 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TargetConfig } from "../../../../model/experiments-v3/types";
-import { MISSING_MODEL_API_KEY_EXPLANATION } from "../../../../model/experiments-v3/explain-evaluator-domain-error";
-import { ComparisonCell } from "../comparison-cell";
+import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
+import { MISSING_MODEL_API_KEY_EXPLANATION } from "../../../../model/experiments-v3/explain-evaluator-domain-error.ts";
+import { ComparisonCell } from "../comparison-cell.tsx";
 
 // useTargetName reaches through to tRPC; mock it to resolve each target to a
 // stable handle so WinnerLabel can match a verdict label against it.
@@ -17,21 +17,21 @@ const HANDLE_BY_ID: Record<string, string> = {
   "target-a": "concise-support",
   "target-b": "friendly-support",
 };
-vi.mock("../../../../behavior/experiments-v3/use-target-name", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-target-name.ts", () => ({
   useTargetName: (target: { id: string }) => HANDLE_BY_ID[target.id] ?? target.id,
 }));
 
 // scrollToTargetColumn touches the DOM/layout; spy on it to assert the
 // click wiring without needing a real scroll container.
 const scrollSpy = vi.fn();
-vi.mock("../../../../behavior/experiments-v3/use-open-target-editor", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-open-target-editor.ts", () => ({
   scrollToTargetColumn: (id: string) => scrollSpy(id),
 }));
 vi.mock("@langwatch/workflow-web/surfaces/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <div>{children}</div>,
 }));
 
-import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
+import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 const wrap = (node: ReactNode) =>
   render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);

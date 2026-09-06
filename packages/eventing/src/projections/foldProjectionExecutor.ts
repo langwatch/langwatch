@@ -6,11 +6,11 @@ import {
   incrementEsFoldRefoldOnMissTotal,
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
-} from "../metrics";
-import type { Event } from "../domain/types";
-import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
-import type { FoldProjectionDefinition } from "./foldProjection.types";
-import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext";
+} from "../metrics.ts";
+import type { Event } from "../domain/types.ts";
+import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
+import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
+import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 

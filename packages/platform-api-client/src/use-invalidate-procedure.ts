@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { trpcQueryFilter } from "./trpc-query-key";
+import { trpcQueryFilter } from "./trpc-query-key.ts";
 
 /**
  * Invalidates a procedure this feature's map does not declare.

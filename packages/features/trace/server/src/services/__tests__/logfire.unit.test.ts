@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { CanonicalSpanStore } from "../../ports/canonical-attributes.port";
+import { CanonicalSpanStore } from "../../ports/canonical-attributes.port.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../../ports/canonical-attributes.port";
-import { LogfireCanonicaliserService } from "../logfire-canonicaliser.service";
-import { createExtractorContext, parseJsonStringAttrs } from "./test-helpers";
+import type { ExtractorContext } from "../../ports/canonical-attributes.port.ts";
+import { LogfireCanonicaliserService } from "../logfire-canonicaliser.service.ts";
+import { createExtractorContext, parseJsonStringAttrs } from "./test-helpers.ts";
 
 function createLogfireContext(
   attrs: Record<string, unknown>,

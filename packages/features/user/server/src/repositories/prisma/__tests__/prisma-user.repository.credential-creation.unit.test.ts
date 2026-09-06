@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository";
+import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
 
 /**
  * Every scalar column on `model User`. Prisma returns all of them from a

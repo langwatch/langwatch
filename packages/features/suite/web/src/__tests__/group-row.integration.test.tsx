@@ -10,10 +10,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cssRulesForElement } from "./emotion-test-css";
-import { GroupRow } from "../group-row";
-import type { RunGroup } from "../run-history-transforms";
-import { makeScenarioRunData, makeSummary } from "./test-helpers";
+import { cssRulesForElement } from "./emotion-test-css.ts";
+import { GroupRow } from "../group-row.tsx";
+import type { RunGroup } from "../run-history-transforms.ts";
+import { makeScenarioRunData, makeSummary } from "./test-helpers.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -27,10 +27,10 @@ import {
 import numeral from "numeral";
 import { type ReactNode, useCallback, useState } from "react";
 
-import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface";
-import GovernanceLayout from "../../ui/sections/governance-layout";
-import { NotFoundScene } from "../../ui/elements/not-found-scene";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
+import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
+import GovernanceLayout from "../../ui/sections/governance-layout.tsx";
+import { NotFoundScene } from "../../ui/elements/not-found-scene.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -40,28 +40,28 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
-import { Link } from "../../ui/elements/governance-link";
+import { Link } from "../../ui/elements/governance-link.tsx";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { readHandledError } from "../../model/handled-error";
-import { useGovernanceScope } from "../../behavior/governance-session";
-import { api, type RouterOutputs } from "../../behavior/governance-api";
-import { useGovernanceRouter } from "../../behavior/governance-router";
+import { useGovernanceToaster, useShowErrorToast } from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { readHandledError } from "../../model/handled-error.ts";
+import { useGovernanceScope } from "../../behavior/governance-session.ts";
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
+import { useGovernanceRouter } from "../../behavior/governance-router.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   needsIngestSecret,
   type SourceType,
-} from "../../features/ingestion-sources/model/ingestion-source-catalog";
+} from "../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   type SourceEventsPager,
   useSourceEventsPager,
-} from "../../features/source-events/behavior/use-source-events-pager";
-import { type PageRequest } from "../../features/source-events/model/governance-events-pager";
-import { SourceEventsTable } from "../../features/source-events/ui/sections/source-events-table";
-import { useDestinationContext } from "./ingestion-source-forms";
-import { SourceEditDrawer } from "./governance-inventory.screen";
+} from "../../features/source-events/behavior/use-source-events-pager.ts";
+import { type PageRequest } from "../../features/source-events/model/governance-events-pager.ts";
+import { SourceEventsTable } from "../../features/source-events/ui/sections/source-events-table.tsx";
+import { useDestinationContext } from "./ingestion-source-forms.ts";
+import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

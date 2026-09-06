@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
   RedisTopicClusteringBootstrapAdapter,
-} from "../redis.topic-clustering-bootstrap.adapter";
+} from "../redis.topic-clustering-bootstrap.adapter.ts";
 
 /** Minimal SET NX EX stand-in with real claim semantics. */
 function fakeRedis() {

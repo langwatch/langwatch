@@ -1,4 +1,4 @@
-import type { FilterField } from "./analytics.filter-field";
+import type { FilterField } from "./analytics.filter-field.ts";
 
 /**
  * How a filter field is READ off a trace held in memory.

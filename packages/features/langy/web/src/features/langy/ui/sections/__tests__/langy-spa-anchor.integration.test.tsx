@@ -13,7 +13,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push }),
 }));
 
-const { LangySpaAnchor } = await import("../langy-spa-anchor");
+const { LangySpaAnchor } = await import("../langy-spa-anchor.tsx");
 
 const renderAnchor = (href: string) =>
   render(

@@ -1,13 +1,13 @@
 import {
   GovernanceDiagnosticsPort,
   NullGovernanceDiagnosticsPort,
-} from "../ports/governance-diagnostics.port";
+} from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionPullLifecycleCommandPort,
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
   IngestionPullTenantPort,
-} from "../ports/ingestion-pull-lifecycle.port";
+} from "../ports/ingestion-pull-lifecycle.port.ts";
 
 export class IngestionPullLifecycleService {
   private constructor(

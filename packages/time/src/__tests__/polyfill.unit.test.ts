@@ -14,7 +14,7 @@ describe("the polyfill module", () => {
       delete scope.Temporal;
       vi.resetModules();
 
-      await import("../polyfill");
+      await import("../polyfill.ts");
 
       expect(scope.Temporal).toBeDefined();
     });
@@ -27,7 +27,7 @@ describe("the polyfill module", () => {
       scope.Temporal = native;
       vi.resetModules();
 
-      await import("../polyfill");
+      await import("../polyfill.ts");
 
       expect(scope.Temporal).toBe(native);
     });

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { modelOverrideSchema } from "../model-override-schema";
+import { modelOverrideSchema } from "../model-override-schema.ts";
 
 describe("modelOverrideSchema", () => {
   describe("when the value is a provider-prefixed id", () => {

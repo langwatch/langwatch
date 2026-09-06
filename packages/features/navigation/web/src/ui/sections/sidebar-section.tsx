@@ -2,10 +2,10 @@ import { Box, HStack, VStack } from "@chakra-ui/react";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 
-import { SideMenuSectionLabel } from "../elements/side-menu-section-label";
-import { useSidebarSectionState } from "../../behavior/use-sidebar-section-state";
+import { SideMenuSectionLabel } from "../elements/side-menu-section-label.tsx";
+import { useSidebarSectionState } from "../../behavior/use-sidebar-section-state.ts";
 
-export { getSidebarSectionStorageKey } from "../../behavior/use-sidebar-section-state";
+export { getSidebarSectionStorageKey } from "../../behavior/use-sidebar-section-state.ts";
 
 type SidebarSectionProps = {
   id: string;

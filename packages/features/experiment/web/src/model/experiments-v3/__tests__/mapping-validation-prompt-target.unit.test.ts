@@ -4,7 +4,7 @@ import {
   getTargetMissingMappings,
   getUsedFields,
   targetHasMissingMappings,
-} from "../mapping-validation";
+} from "../mapping-validation.ts";
 
 describe("mappingValidation", () => {
   describe("prompt target validation", () => {

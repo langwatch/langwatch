@@ -3,14 +3,14 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type";
+import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
   VariableMappingInput,
-} from "./variable-mapping-input";
+} from "./variable-mapping-input.tsx";
 
 // ============================================================================
 // Types
@@ -458,4 +458,4 @@ const VariableRow = ({
   );
 };
 
-export { type AvailableSource, type FieldMapping } from "./variable-mapping-input";
+export { type AvailableSource, type FieldMapping } from "./variable-mapping-input.tsx";

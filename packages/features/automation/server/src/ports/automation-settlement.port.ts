@@ -6,7 +6,7 @@ import type {
   LogOverflowIntent,
   NotifyDigestIntent,
   PersistMatchIntent,
-} from "../intents/trigger-settlement.intent";
+} from "../intents/trigger-settlement.intent.ts";
 
 export abstract class AutomationSettlementExecutorPort {
   abstract notifyDigest(payload: NotifyDigestIntent, context: IntentContext): Promise<void>;

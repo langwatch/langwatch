@@ -3,8 +3,8 @@ import {
   type FeatureFlagRules,
   type StoredFeatureFlag,
 } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagRow } from "../ports/feature-flag-cache.port";
-import { FeatureFlagRepository } from "../repositories/feature-flag.repository";
+import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
+import { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
 
 type DelegateCall<TResult> = {
   bivariant(input: object): Promise<TResult>;

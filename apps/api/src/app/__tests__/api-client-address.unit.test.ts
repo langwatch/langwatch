@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getConnInfo } = vi.hoisted(() => ({ getConnInfo: vi.fn() }));
 vi.mock("@hono/node-server/conninfo", () => ({ getConnInfo }));
 
-import { apiClientAddress, trpcClientAddress } from "../api-client-address";
+import { apiClientAddress, trpcClientAddress } from "../api-client-address.ts";
 
 beforeEach(() => {
   vi.clearAllMocks();

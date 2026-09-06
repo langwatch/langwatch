@@ -2,7 +2,7 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
-import { PostgresAutomationGraphActivityAdapter } from "../../adapters/postgres.automation-graph-activity.adapter";
+import { PostgresAutomationGraphActivityAdapter } from "../../adapters/postgres.automation-graph-activity.adapter.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -12,10 +12,10 @@ import {
   RecordingDelivery,
   SilentLogger,
   TestDispatchErrors,
-} from "../../fixtures/graph-activity.fixture";
-import { AutomationEmailCapService } from "../../services/email-cap.service";
-import { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port";
-import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber";
+} from "../../fixtures/graph-activity.fixture.ts";
+import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port.ts";
+import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
  * Spec: packages/features/automation/specs/graph-alert-worker-composition.feature

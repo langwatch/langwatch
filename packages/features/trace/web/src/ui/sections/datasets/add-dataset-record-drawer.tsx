@@ -9,16 +9,16 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
-import { useAnnotationQueueSessionStore } from "../../../behavior/annotation-queue-session.store";
-import { useDrawer } from "../../../behavior/use-drawer";
-import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import NextLink from "../../elements/next-link";
-import { Drawer } from "../drawer";
-import { showErrorToast } from "../errors";
-import { api } from "../../../behavior/trace-api";
-import { DatasetMappingPreview } from "./dataset-mapping-preview";
-import { DatasetSelector } from "./dataset-selector";
+import { useAnnotationQueueSessionStore } from "../../../behavior/annotation-queue-session.store.ts";
+import { useDrawer } from "../../../behavior/use-drawer.ts";
+import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import NextLink from "../../elements/next-link.tsx";
+import { Drawer } from "../drawer.tsx";
+import { showErrorToast } from "../errors/index.ts";
+import { api } from "../../../behavior/trace-api.ts";
+import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
+import { DatasetSelector } from "./dataset-selector.tsx";
 
 const logger = createLogger("AddDatasetRecordDrawer");
 

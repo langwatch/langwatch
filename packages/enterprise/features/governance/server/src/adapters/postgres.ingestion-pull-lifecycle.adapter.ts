@@ -1,11 +1,11 @@
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
+import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionPullLifecycleCommandPort,
   IngestionPullLifecycleDatabase,
   IngestionPullTenantPort,
-} from "../ports/ingestion-pull-lifecycle.port";
-import { PrismaIngestionPullLifecycleRepository } from "../repositories/prisma/prisma.ingestion-pull-lifecycle.repository";
-import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service";
+} from "../ports/ingestion-pull-lifecycle.port.ts";
+import { PrismaIngestionPullLifecycleRepository } from "../repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
+import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 
 export type PostgresIngestionPullLifecycleAdapterOptions = {
   database: IngestionPullLifecycleDatabase;

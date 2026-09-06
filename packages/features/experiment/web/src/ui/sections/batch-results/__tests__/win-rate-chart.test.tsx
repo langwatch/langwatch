@@ -8,8 +8,8 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BatchComparisonColumn } from "../../batch-evaluation-results.types";
-import { WinRateChart } from "../win-rate-chart";
+import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
+import { WinRateChart } from "../win-rate-chart.tsx";
 
 vi.mock("recharts", () => {
   const MockComponent = ({ children }: { children?: React.ReactNode }) => children ?? null;

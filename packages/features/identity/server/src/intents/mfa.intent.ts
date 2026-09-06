@@ -15,11 +15,11 @@ import {
   recordMfaVerificationFailureCommandDataSchema,
   regenerateBackupCodesCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { MfaGuardsService } from "../services/mfa-guards.service";
+import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
-import { mfaEventsFor } from "../intents/mfa-events.intent";
+import type { MfaEvent } from "../projections/mfa-enrollment-state.projection.ts";
+import { mfaEventsFor } from "../intents/mfa-events.intent.ts";
 
 /**
  * The seven two-step verification verbs, as the queue's STAGED RE-RUN of each: the same guard the

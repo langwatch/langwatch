@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage";
-import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec";
-import { decodeJobEnvelope, encodeJobEnvelope, splitEnvelope } from "../jobEnvelope";
-import { TieredBlobStore } from "../tieredBlobStore";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
+import { createTenantId } from "../storage.ts";
+import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec.ts";
+import { decodeJobEnvelope, encodeJobEnvelope, splitEnvelope } from "../jobEnvelope.ts";
+import { TieredBlobStore } from "../tieredBlobStore.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-codec");
 

@@ -9,12 +9,12 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { useEffect, useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ResultsList } from "../../../../sections/agent-testing/results/results-list";
+import { ResultsList } from "../../../../sections/agent-testing/results/results-list.tsx";
 import {
   buildRunPlans,
   type RunPlanSuite,
-} from "../../../../../behavior/agent-testing/results/run-plans";
-import type { AgentTestingRoutingState } from "../../../../../behavior/agent-testing/use-agent-testing-routing";
+} from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import type { AgentTestingRoutingState } from "../../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 
 const PROJECT_ID = "proj_1";
 const NOW = 1_700_000_000_000;
@@ -58,7 +58,7 @@ const atomState = vi.hoisted(() => ({
   lastInput: null as Record<string, unknown> | null,
 }));
 
-vi.mock("../../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -145,7 +145,7 @@ vi.mock("../../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: PROJECT_ID, slug: "test-project" },
   }),

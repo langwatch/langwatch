@@ -30,7 +30,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawerParams: () => drawerParams,
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1" },
     organization: { id: "org_1" },
@@ -101,7 +101,7 @@ const codeAgent = {
   outputs: [{ identifier: "output", type: "str" }],
 };
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {
@@ -150,7 +150,7 @@ describe("the Test agent panel of the editor drawers", () => {
     it("shows the panel below the form and sends one turn from it", async () => {
       const user = userEvent.setup();
       drawerParams = { agentId: "agent_http" };
-      const { AgentHttpEditorDrawer } = await import("../agent-http-editor-drawer");
+      const { AgentHttpEditorDrawer } = await import("../agent-http-editor-drawer.tsx");
       render(<AgentHttpEditorDrawer open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
@@ -171,7 +171,7 @@ describe("the Test agent panel of the editor drawers", () => {
   describe("given a saved code agent", () => {
     it("shows the panel below the form", async () => {
       drawerParams = { agentId: "agent_code" };
-      const { AgentCodeEditorDrawer } = await import("../agent-code-editor-drawer");
+      const { AgentCodeEditorDrawer } = await import("../agent-code-editor-drawer.tsx");
       render(<AgentCodeEditorDrawer open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
@@ -183,7 +183,7 @@ describe("the Test agent panel of the editor drawers", () => {
   describe("given the HTTP agent editor drawer open for a new agent", () => {
     /** @scenario "A draft has no test panel" */
     it("shows no panel: a draft has nothing to call", async () => {
-      const { AgentHttpEditorDrawer } = await import("../agent-http-editor-drawer");
+      const { AgentHttpEditorDrawer } = await import("../agent-http-editor-drawer.tsx");
       render(<AgentHttpEditorDrawer open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });

@@ -23,13 +23,13 @@ import {
 import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import type { UserService } from "@langwatch/user-contract";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiTraceProducerCommands } from "../trace/trace-producer.composition";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiTraceProducerCommands } from "../trace/trace-producer.composition.ts";
 import {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,
-} from "./annotation-trpc.mount";
+} from "./annotation-trpc.mount.ts";
 
 /**
  * The reviewer's trace content, as the annotation queue asks for it. Declared here rather
@@ -60,7 +60,7 @@ export type AnnotationPeers = Readonly<{
   traceCommands: ApiTraceProducerCommands;
 }>;
 
-import type { ComposedAnnotationFeature } from "./annotation.composition.types";
+import type { ComposedAnnotationFeature } from "./annotation.composition.types.ts";
 
 /** Composes the annotation surfaces over this process's own graph. */
 export function composeAnnotationFeature(options: {

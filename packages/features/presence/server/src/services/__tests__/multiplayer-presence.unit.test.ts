@@ -10,9 +10,9 @@ import {
 } from "@langwatch/presence-contract";
 import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceBroadcastPort } from "../../ports/presence.port";
-import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository";
-import { PRESENCE_TTL_SECONDS, PresenceService } from "../presence.service";
+import { PresenceBroadcastPort } from "../../ports/presence.port.ts";
+import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository.ts";
+import { PRESENCE_TTL_SECONDS, PresenceService } from "../presence.service.ts";
 
 const PROJECT = "project-a";
 

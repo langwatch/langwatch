@@ -9,10 +9,10 @@
  * storage and its logger as arguments.
  */
 
-import type { DraggableTabsBrowserState } from "../model/prompt-tabs-store";
-import { usePromptTabsStore } from "../model/prompt-tabs-store";
-import { usePromptHost } from "../model/prompt-host";
-import { usePromptProject } from "./use-prompt-project";
+import type { DraggableTabsBrowserState } from "../model/prompt-tabs-store.ts";
+import { usePromptTabsStore } from "../model/prompt-tabs-store.ts";
+import { usePromptHost } from "../model/prompt-host.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
 
 export function useDraggableTabsBrowserStore<T>(
   selector: (state: DraggableTabsBrowserState) => T,

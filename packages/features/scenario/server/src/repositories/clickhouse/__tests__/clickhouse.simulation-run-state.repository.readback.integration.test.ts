@@ -8,8 +8,8 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { SimulationRunState } from "../../../projections/simulation-run-state.projection";
-import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository";
+import type { SimulationRunState } from "../../../projections/simulation-run-state.projection.ts";
+import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

@@ -1,12 +1,12 @@
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { RecordSpanCommand, type TraceSpanSpoolPort } from "@langwatch/trace-server";
-import type { WorkerConfig } from "../platform/config/worker.config";
-import { createWorkerTraceContentDrop } from "./worker-trace-content-drop.composition";
-import { createWorkerTraceCostEnrichment } from "./worker-trace-cost-enrichment.composition";
-import { createWorkerTraceModelCostCatalogPort } from "./worker-trace-narrow-ports.composition";
-import { createWorkerTracePrivacy } from "./worker-trace-privacy.composition";
-import { createWorkerTraceTokenEstimation } from "./worker-trace-token-estimation.composition";
-import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { createWorkerTraceContentDrop } from "./worker-trace-content-drop.composition.ts";
+import { createWorkerTraceCostEnrichment } from "./worker-trace-cost-enrichment.composition.ts";
+import { createWorkerTraceModelCostCatalogPort } from "./worker-trace-narrow-ports.composition.ts";
+import { createWorkerTracePrivacy } from "./worker-trace-privacy.composition.ts";
+import { createWorkerTraceTokenEstimation } from "./worker-trace-token-estimation.composition.ts";
+import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition.ts";
 
 /**
  * `command:recordSpan`, whole, from a database and this process's own

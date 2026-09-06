@@ -35,16 +35,16 @@ import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-co
 import { Activity, Plus, Shield } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { monitorApi } from "../../behavior/monitor-api";
-import { useMonitorHost } from "../../model/monitor-host";
-import { FullWidthListPageContent } from "../../ui/elements/full-width-list-page-content";
-import { MonitorLink } from "../../ui/elements/monitor-link";
-import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block";
+import { monitorApi } from "../../behavior/monitor-api.ts";
+import { useMonitorHost } from "../../model/monitor-host.ts";
+import { FullWidthListPageContent } from "../../ui/elements/full-width-list-page-content.tsx";
+import { MonitorLink } from "../../ui/elements/monitor-link.tsx";
+import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block.tsx";
 import {
   OnlineEvaluationsTable,
   type OnlineEvaluationRow,
-} from "../../ui/blocks/online-evaluations-table";
-import { MonitorReplicateDialog } from "../../ui/sections/monitor-replicate-dialog";
+} from "../../ui/blocks/online-evaluations-table.tsx";
+import { MonitorReplicateDialog } from "../../ui/sections/monitor-replicate-dialog.tsx";
 
 /** The grant the platform page carried, unchanged. */
 export const ONLINE_EVALUATIONS_PAGE_PERMISSION = "evaluations:view";

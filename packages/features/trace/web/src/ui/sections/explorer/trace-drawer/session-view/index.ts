@@ -1,1 +1,1 @@
-export { SessionTab } from "./session-tab";
+export { SessionTab } from "./session-tab.tsx";

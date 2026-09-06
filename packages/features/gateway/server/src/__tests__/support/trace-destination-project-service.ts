@@ -8,7 +8,7 @@ import {
   type TraceDestinationInput,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
-import { TestProjectService } from "./test-project-service";
+import { TestProjectService } from "./test-project-service.ts";
 
 const DESTINATION_SELECT = {
   id: true,

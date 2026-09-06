@@ -12,8 +12,8 @@ import {
   LLMS_TXT_PATH,
   WELL_KNOWN_OPENAPI_PATH,
   WHY_DISCOVERY_IS_PUBLIC,
-} from "./discovery-locations";
-import { respondWithApiDocument } from "./openapi-serve";
+} from "./discovery-locations.ts";
+import { respondWithApiDocument } from "./openapi-serve.ts";
 
 /**
  * Links are relative: a proxied self-hosted instance has no origin this

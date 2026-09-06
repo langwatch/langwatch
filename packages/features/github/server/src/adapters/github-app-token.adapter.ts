@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import type { GithubApiPort } from "../ports/github-api.port";
+import type { GithubApiPort } from "../ports/github-api.port.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
@@ -12,12 +12,12 @@ import {
   type GithubPullRequestSummary,
   type GithubRedisPort,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port";
-import type { GithubHostPort } from "../ports/github-host.port";
-import type { GithubTokenCachePort } from "../ports/github-token-cache.port";
-import { GithubApiAdapter } from "./github-api.adapter";
-import { GithubHostAdapter } from "./github-host.adapter";
-import { GithubTokenCacheAdapter } from "./github-token-cache.adapter";
+} from "../ports/github-app-token.port.ts";
+import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubTokenCachePort } from "../ports/github-token-cache.port.ts";
+import { GithubApiAdapter } from "./github-api.adapter.ts";
+import { GithubHostAdapter } from "./github-host.adapter.ts";
+import { GithubTokenCacheAdapter } from "./github-token-cache.adapter.ts";
 
 export {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -29,7 +29,7 @@ export {
   type GithubPullRequestSummary,
   type GithubRedisPort,
   type MintInstallationTokenInput,
-} from "../ports/github-app-token.port";
+} from "../ports/github-app-token.port.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;

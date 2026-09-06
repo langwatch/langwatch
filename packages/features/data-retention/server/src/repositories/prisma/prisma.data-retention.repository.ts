@@ -6,8 +6,8 @@ import {
   type RetentionRow,
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
-import { DataRetentionRepository } from "../data-retention.repository";
-import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port";
+import { DataRetentionRepository } from "../data-retention.repository.ts";
+import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port.ts";
 
 export class PrismaDataRetentionRepository extends DataRetentionRepository {
   static create(options: { database: DataRetentionDatabasePort }): PrismaDataRetentionRepository {

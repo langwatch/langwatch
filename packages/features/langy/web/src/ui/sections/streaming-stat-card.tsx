@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { LangyTurnMetric } from "../../model/values/langy-turn";
-import { NumberTicker } from "./number-ticker";
+import type { LangyTurnMetric } from "../../model/values/langy-turn.ts";
+import { NumberTicker } from "./number-ticker.tsx";
 
 const formatStatNumber = (value: number): string => {
   const reading = value === 0 ? 0 : value;

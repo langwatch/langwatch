@@ -36,9 +36,9 @@ vi.mock("langwatch", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { StoredObjectsClickHousePort } from "../../../ports/stored-objects-clickhouse.port";
-import type { StoredObject } from "../../../rules/stored-object-row.rules";
-import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository";
+import { StoredObjectsClickHousePort } from "../../../ports/stored-objects-clickhouse.port.ts";
+import type { StoredObject } from "../../../rules/stored-object-row.rules.ts";
+import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.ts";
 
 /** The routed connection, as this suite's one project resolves it. */
 class FakeStoredObjectsClickHouse extends StoredObjectsClickHousePort {

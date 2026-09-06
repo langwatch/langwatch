@@ -12,7 +12,7 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -23,20 +23,20 @@ const TEAM_ID = "team-platform";
 const PROJECT_ID = "project-web-app";
 const VK_ID = "vk-detail";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx", () => ({
   VirtualKeyEditDrawer: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx", () => ({
   VirtualKeySecretReveal: () => null,
 }));
-vi.mock("../../../features/guardrails/ui/sections/guardrail-attachments-section", () => ({
+vi.mock("../../../features/guardrails/ui/sections/guardrail-attachments-section.tsx", () => ({
   GuardrailAttachmentsSection: () => null,
 }));
-vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet", () => ({
+vi.mock("../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx", () => ({
   VirtualKeyUsageSnippet: () => null,
 }));
 
@@ -94,7 +94,7 @@ const usageSummary = {
   ],
 };
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: { get: { invalidate: vi.fn() } },
@@ -155,7 +155,7 @@ const host = fakeGatewayHost({
   },
 });
 
-import VirtualKeyDetailPage from "../gateway-virtual-key.screen";
+import VirtualKeyDetailPage from "../gateway-virtual-key.screen.tsx";
 
 function baseKey(overrides: Record<string, unknown> = {}) {
   return {

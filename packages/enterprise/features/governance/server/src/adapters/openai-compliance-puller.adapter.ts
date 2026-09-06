@@ -25,9 +25,9 @@
  */
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
-import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.adapter";
-import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port";
-import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port";
+import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.adapter.ts";
+import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port.ts";
+import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.

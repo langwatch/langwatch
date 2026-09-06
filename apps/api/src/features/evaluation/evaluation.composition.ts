@@ -20,10 +20,10 @@ import { createLogger } from "@langwatch/observability";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { permissiveMappingsSchema } from "../trace/trace-mappings";
-import type { ApiWorkflowRuntime } from "../workflow/workflow.composition";
-import { createEvaluationTrpcRouter, type EvaluationMountPorts } from "./evaluation-trpc.mount";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { permissiveMappingsSchema } from "../trace/trace-mappings.ts";
+import type { ApiWorkflowRuntime } from "../workflow/workflow.composition.ts";
+import { createEvaluationTrpcRouter, type EvaluationMountPorts } from "./evaluation-trpc.mount.ts";
 
 /** What the evaluation surface reaches that this feature does not own. */
 export type EvaluationPeers = Readonly<{
@@ -33,7 +33,7 @@ export type EvaluationPeers = Readonly<{
   workflowRuntime: ApiWorkflowRuntime;
 }>;
 
-import type { ComposedEvaluationFeature } from "./evaluation.composition.types";
+import type { ComposedEvaluationFeature } from "./evaluation.composition.types.ts";
 
 /** Composes the evaluation surface over this process's own graph. */
 export function composeEvaluationFeature(options: {

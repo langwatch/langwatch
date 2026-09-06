@@ -1,7 +1,7 @@
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
-import type { LangySessionKeyReapRepository } from "../repositories/langy-session-key-reap.repository";
+import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port.ts";
+import type { LangySessionKeyReapRepository } from "../repositories/langy-session-key-reap.repository.ts";
 
 const logger = createLogger("langwatch:langy:session-key-reap");
 

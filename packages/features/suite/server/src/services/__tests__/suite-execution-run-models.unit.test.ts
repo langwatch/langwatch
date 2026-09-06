@@ -10,9 +10,9 @@
 import { describe, expect, it } from "vitest";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 
-import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port";
-import { SuiteExecutionService } from "../suite-execution.service";
-import type { SuiteRunModelsResolver } from "../suite-run-models.service";
+import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
+import { SuiteExecutionService } from "../suite-execution.service.ts";
+import type { SuiteRunModelsResolver } from "../suite-run-models.service.ts";
 
 const scenarioId = "scenario_refund";
 

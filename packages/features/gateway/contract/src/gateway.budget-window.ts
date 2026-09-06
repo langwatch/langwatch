@@ -2,7 +2,7 @@
  * Budget window math. Pure functions — no DB, no I/O. Given a window type and an anchor time,
  * compute the next reset instant. For now windows are computed in UTC.
  */
-import type { GatewayBudgetWindow } from "./gateway.budget";
+import type { GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /**
  * The windows that roll on their own. TOTAL and MANUAL are the two that do

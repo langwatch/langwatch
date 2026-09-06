@@ -20,7 +20,7 @@ import {
   type OrganizationReading,
   type OrganizationRouteReading,
   type OrganizationScope,
-} from "./model/organization-host";
+} from "./model/organization-host.ts";
 
 const DEFAULT_ACTOR: OrganizationActor = {
   id: "user-1",

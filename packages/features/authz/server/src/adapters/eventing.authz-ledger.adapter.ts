@@ -13,23 +13,23 @@ import {
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { AuthzGrantsCommandDispatcher } from "../ports/authz-grants-command-dispatcher.port";
+import { AuthzGrantsCommandDispatcher } from "../ports/authz-grants-command-dispatcher.port.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
-import type { AuthzEpochPort } from "../ports/authz-epoch.port";
+import { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port.ts";
+import type { AuthzEpochPort } from "../ports/authz-epoch.port.ts";
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type RoleBindingWrite,
-} from "../repositories/authz-grant.repository";
-import type { AuthzDatabase } from "../repositories/authz-read.repository";
-import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper";
-import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper";
-import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository";
-import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter";
-import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter";
+} from "../repositories/authz-grant.repository.ts";
+import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
+import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
+import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter.ts";
+import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
 

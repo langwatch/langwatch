@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   FailAgentResponseCommand,
   RecordAgentResponseCommand,
-} from "../../intents/langy-conversation.intent";
+} from "../../intents/langy-conversation.intent.ts";
 
 const TENANT = "project-1";
 const CONVERSATION = "conv-1";

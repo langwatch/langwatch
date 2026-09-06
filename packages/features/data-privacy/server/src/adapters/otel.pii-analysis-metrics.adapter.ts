@@ -7,7 +7,7 @@ import {
 import {
   PiiAnalysisMetricsPort,
   type PiiAnalysisOutcome,
-} from "../ports/pii-analysis-metrics.port";
+} from "../ports/pii-analysis-metrics.port.ts";
 
 /**
  * The three series names, and the evaluator label the two duration/status

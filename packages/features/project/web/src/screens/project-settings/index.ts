@@ -25,13 +25,13 @@ import type { ComponentType } from "react";
 export type ProjectScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const projectScreens = {
-  projectSettings: () => import("./project-settings.screen"),
+  projectSettings: () => import("./project-settings.screen.tsx"),
 } as const satisfies Record<string, ProjectScreenLoader>;
 
 export type ProjectScreenName = keyof typeof projectScreens;
 
-export { PROJECT_SETTINGS_PAGE_PERMISSION } from "./project-settings.screen";
-export { projectApi, type ProjectApiMap } from "../../behavior/project-api";
+export { PROJECT_SETTINGS_PAGE_PERMISSION } from "./project-settings.screen.tsx";
+export { projectApi, type ProjectApiMap } from "../../behavior/project-api.ts";
 export {
   ProjectHostPort,
   ProjectHostProvider,
@@ -39,4 +39,4 @@ export {
   type ProjectHostOrganization,
   type ProjectHostProject,
   type ProjectSuccessNotice,
-} from "../../model/project-host";
+} from "../../model/project-host.ts";

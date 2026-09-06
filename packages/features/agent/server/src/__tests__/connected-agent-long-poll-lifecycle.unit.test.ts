@@ -11,12 +11,12 @@ import {
   type AgentService,
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port";
-import type { AgentLastSeenWriter } from "../projections/connected-agent-presence.projection";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";
-import { AgentSessionService } from "../services/connected-agent-session.service";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service";
+import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
+import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
+import type { AgentLastSeenWriter } from "../projections/connected-agent-presence.projection.ts";
+import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import { AgentSessionService } from "../services/connected-agent-session.service.ts";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 
 const projectId = "project_poll_lifecycle";
 const instanceId = "inst_poll_lifecycle";

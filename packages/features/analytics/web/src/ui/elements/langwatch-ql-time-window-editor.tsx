@@ -30,7 +30,7 @@ import {
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state";
+import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state.ts";
 
 /** What a member may type, as UTC: a date, or a date and a time. */
 const TYPED_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;

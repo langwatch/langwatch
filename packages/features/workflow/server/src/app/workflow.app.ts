@@ -42,12 +42,12 @@ import type {
   WorkflowAgentMappingPort,
   WorkflowRowPort,
   WorkflowStudioDslPort,
-} from "../ports/workflow.port";
+} from "../ports/workflow.port.ts";
 import {
   WorkflowStudioCopyService,
   type CopyStudioWorkflowInput,
-} from "../services/workflow-studio-copy.service";
-import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service";
+} from "../services/workflow-studio-copy.service.ts";
+import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 
 /** Who a write is attributed to. */
 export interface WorkflowCaller {

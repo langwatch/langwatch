@@ -4,9 +4,9 @@ import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import {
   type CodexSignInPhase,
   useCodexDeviceSignIn,
-} from "../../behavior/use-codex-device-sign-in";
-import { langyFirstPartyLinkProps } from "../../model/langy-first-party-link";
-import type { ScopeAssignment } from "../../model/scope-assignment";
+} from "../../behavior/use-codex-device-sign-in.ts";
+import { langyFirstPartyLinkProps } from "../../model/langy-first-party-link.ts";
+import type { ScopeAssignment } from "../../model/scope-assignment.ts";
 
 /**
  * Sign in with your OpenAI account — the Codex provider's whole credential

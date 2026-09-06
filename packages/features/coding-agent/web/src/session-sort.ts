@@ -4,7 +4,7 @@ import {
   nextColumnSort,
   sortRowsByColumn,
   useColumnSort,
-} from "./column-sort";
+} from "./column-sort.ts";
 
 /**
  * The Sessions table's columns, named against the shared column-sort shape in

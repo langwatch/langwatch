@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizedSpanSchema, NormalizedSpanKind, NormalizedStatusCode } from "../trace.spans";
+import { normalizedSpanSchema, NormalizedSpanKind, NormalizedStatusCode } from "../trace.spans.ts";
 
 describe("normalized span contract", () => {
   it("accepts the complete projected span shape", () => {

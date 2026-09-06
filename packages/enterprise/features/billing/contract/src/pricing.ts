@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { stripePricesFile } from "./stripe-price-catalog";
-import type { StripePriceMap, StripePriceName } from "./stripe-prices";
+import { stripePricesFile } from "./stripe-price-catalog.ts";
+import type { StripePriceMap, StripePriceName } from "./stripe-prices.ts";
 
 export const Currency = { USD: "USD", EUR: "EUR" } as const;
 export type Currency = (typeof Currency)[keyof typeof Currency];

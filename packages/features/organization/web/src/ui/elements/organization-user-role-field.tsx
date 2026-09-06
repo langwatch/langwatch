@@ -1,6 +1,6 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { OrganizationUserRole } from "../../model/prisma-types";
+import { OrganizationUserRole } from "../../model/prisma-types.ts";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { Select } from "@langwatch/design-system/select";

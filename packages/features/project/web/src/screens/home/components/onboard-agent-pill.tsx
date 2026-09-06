@@ -5,8 +5,8 @@ import {
   AgentActionsMenu,
   setupAgentPrompt,
 } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
-import { selfHostedEndpoint } from "../../../model/self-hosted-endpoint";
-import { useProjectHomeHost } from "../../../model/project-home-host";
+import { selfHostedEndpoint } from "../../../model/self-hosted-endpoint.ts";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 const INTEGRATION_DOCS = "https://docs.langwatch.ai/integration/overview";
 

@@ -1,9 +1,9 @@
-import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter";
+import { ClickHouseFacetQueryAdapter } from "./trace-facet-query.clickhouse.adapter.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
-} from "./trace-facet-registry.clickhouse.adapter";
+} from "./trace-facet-registry.clickhouse.adapter.ts";
 
 export class ClickHouseLabelFacetAdapter {
   static create(): ClickHouseLabelFacetAdapter {

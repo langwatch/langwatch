@@ -9,7 +9,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { EventSourcedQueueProcessorMemory } from "../memory";
+import { EventSourcedQueueProcessorMemory } from "../memory.ts";
 
 type Payload = { id: string; value: string };
 

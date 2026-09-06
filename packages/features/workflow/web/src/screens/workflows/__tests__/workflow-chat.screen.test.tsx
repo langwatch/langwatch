@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   blankTemplate,
   entryNode as blankTemplateEntryNode,
-} from "../../../model/templates/blank.template";
-import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../testing";
-import WorkflowChatScreen from "../workflow-chat.screen";
+} from "../../../model/templates/blank.template.ts";
+import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../testing.tsx";
+import WorkflowChatScreen from "../workflow-chat.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -24,7 +24,7 @@ const { state } = vi.hoisted(() => ({
 
 const calls = vi.hoisted(() => ({ chat: vi.fn() }));
 
-vi.mock("../../../model/workflow-api", () => ({
+vi.mock("../../../model/workflow-api.ts", () => ({
   workflowApi: {
     useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
     optimization: {

@@ -10,9 +10,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
 import { PostgresShareAdapter } from "@langwatch/share-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount.ts";
 
 /** The other features' services a share link is bounded and authorized by. */
 export type SharePeers = Readonly<{
@@ -24,7 +24,7 @@ export type SharePeers = Readonly<{
   grants: AuthzGrantsService;
 }>;
 
-import type { ComposedShareFeature } from "./share.composition.types";
+import type { ComposedShareFeature } from "./share.composition.types.ts";
 
 /** Composes the share ledger over this process's own graph. */
 export function composeShareFeature(options: {

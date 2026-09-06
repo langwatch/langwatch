@@ -5,18 +5,18 @@ import type {
   MetricKind,
   MetricTraceCorrelation,
 } from "@langwatch/metric-contract";
-import { MetricAttributesAdapter } from "./metric-attributes.adapter";
+import { MetricAttributesAdapter } from "./metric-attributes.adapter.ts";
 const { canonicalAttributes } = MetricAttributesAdapter;
-import { MetricCorrelationsAdapter } from "./metric-correlations.adapter";
+import { MetricCorrelationsAdapter } from "./metric-correlations.adapter.ts";
 const { correlations } = MetricCorrelationsAdapter;
-import { MetricKindsAdapter } from "./metric-kinds.adapter";
+import { MetricKindsAdapter } from "./metric-kinds.adapter.ts";
 const { aggregation } = MetricKindsAdapter;
-import { MetricNumbersAdapter } from "./metric-numbers.adapter";
-import { type UnknownRecord } from "./metric-serialization.adapter";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+import { MetricNumbersAdapter } from "./metric-numbers.adapter.ts";
+import { type UnknownRecord } from "./metric-serialization.adapter.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { isRecord, sha256, stableStringify } = MetricSerializationAdapter;
-import { MetricValidationAdapter } from "./metric-validation.adapter";
-import { MetricValuesAdapter } from "./metric-values.adapter";
+import { MetricValidationAdapter } from "./metric-validation.adapter.ts";
+import { MetricValuesAdapter } from "./metric-values.adapter.ts";
 const { canonicalPointValues, canonicalValueSection } = MetricValuesAdapter;
 
 export interface PreparedMetricPoint {

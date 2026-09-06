@@ -1,6 +1,6 @@
 import type { ChainableCommander } from "ioredis";
 import { describe, expect, it } from "vitest";
-import { QueueRedisRepository } from "../queue.repository";
+import { QueueRedisRepository } from "../queue.repository.ts";
 
 /**
  * A pipeline whose queued commands all come back NOSCRIPT — what Redis returns

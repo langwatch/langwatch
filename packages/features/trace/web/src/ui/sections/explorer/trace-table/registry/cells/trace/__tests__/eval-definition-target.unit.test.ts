@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evalDefinitionTarget } from "../evaluations-cell";
+import { evalDefinitionTarget } from "../evaluations-cell.tsx";
 
 describe("evalDefinitionTarget", () => {
   describe("given a langevals built-in evaluator type", () => {

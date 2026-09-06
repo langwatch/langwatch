@@ -1,4 +1,4 @@
-import type { PlanInfo } from "./license-plan";
+import type { PlanInfo } from "./license-plan.ts";
 
 export const LICENSING_FEATURE_ID = "licensing" as const;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExecutionScope } from "../execution/types";
+import type { ExecutionScope } from "../execution/types.ts";
 import {
   computeExecutionCells,
   createExecutionCellSet,
@@ -7,7 +7,7 @@ import {
   getExecutionRowIndices,
   getExecutionTargetIds,
   isCellInExecution,
-} from "../execution-scope";
+} from "../execution-scope.ts";
 
 describe("executionScope utilities", () => {
   // Sample data for tests

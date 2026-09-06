@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../../../behavior/trace-api";
-import { isPreviewTraceId } from "../../../../model/preview-trace-id";
-import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query.ts";
 
 /**
  * Span tree for a specific trace. Used by table-row peek expansions and other surfaces

@@ -1,5 +1,5 @@
-import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository";
-import { DepartmentService } from "../services/department.service";
+import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
+import { DepartmentService } from "../services/department.service.ts";
 
 export class PostgresDepartmentAdapter {
   private constructor(private readonly database: object) {}

@@ -2,10 +2,10 @@ import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { describe, expect, it } from "vitest";
-import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition";
-import { resolveWorkerConfig } from "../../../platform/config/worker.config";
+import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition.ts";
+import { resolveWorkerConfig } from "../../../platform/config/worker.config.ts";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter";
+import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter.ts";
 
 /**
  * Spec: packages/features/automation/specs/graph-alert-delivery-envelope.feature

@@ -3,8 +3,8 @@ import { ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { findSkill } from "../../../../model/shared/langy/langy-skills";
-import type { LangyContextChip, LangySkillChip } from "../../../../behavior/langy.store";
+import { findSkill } from "../../../../model/shared/langy/langy-skills.ts";
+import type { LangyContextChip, LangySkillChip } from "../../../../behavior/langy.store.ts";
 
 /**
  * A skill chip: "do THIS", optionally "…on THAT".

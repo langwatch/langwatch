@@ -11,7 +11,7 @@ import {
   outputSchema,
   resultErrorSchema,
   sessionSchema,
-} from "./connected-agent.protocol";
+} from "./connected-agent.protocol.ts";
 
 /** The value under `agent_call:v1:<callId>`. */
 export const storedCallSchema = z.object({

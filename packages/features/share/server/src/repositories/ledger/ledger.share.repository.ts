@@ -12,13 +12,13 @@ import {
 } from "@langwatch/authz-contract";
 import { nanoid } from "nanoid";
 import type { ShareLink } from "@langwatch/share-contract";
-import type { ShareDatabase, ShareTransactionDatabase } from "../../ports/share-database.port";
+import type { ShareDatabase, ShareTransactionDatabase } from "../../ports/share-database.port.ts";
 import {
   ShareRepository,
   type CreateShareLinkParams,
   type ShareResourceType,
   type ShareWithProject,
-} from "../share.repository";
+} from "../share.repository.ts";
 
 /** Revocations are system actions; link authorship remains on the mint fact. */
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };

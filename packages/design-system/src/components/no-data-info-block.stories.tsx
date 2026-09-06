@@ -1,7 +1,7 @@
 import { Box, Button, Link } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Database } from "lucide-react";
-import { NoDataInfoBlock } from "./no-data-info-block";
+import { NoDataInfoBlock } from "./no-data-info-block.tsx";
 
 const meta = {
   title: "Components/No data info block",

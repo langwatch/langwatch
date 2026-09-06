@@ -16,20 +16,20 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port";
-import { TraceMediaReferencePort } from "../ports/trace-media-reference.port";
-import { TraceModelCostPort } from "../ports/trace-model-cost.port";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port";
+import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port.ts";
+import { TraceMediaReferencePort } from "../ports/trace-media-reference.port.ts";
+import { TraceModelCostPort } from "../ports/trace-model-cost.port.ts";
+import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
 import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-} from "../ports/trace-span-preparation.port";
-import type { TraceAnalyticsData } from "../projections/trace-derived.projection";
-import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection";
-import { EventingRecordSpanAdapter } from "./eventing.record-span.adapter";
-import { EventingTracePipelineAdapter } from "./eventing.trace-pipeline.adapter";
+} from "../ports/trace-span-preparation.port.ts";
+import type { TraceAnalyticsData } from "../projections/trace-derived.projection.ts";
+import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection.ts";
+import { EventingRecordSpanAdapter } from "./eventing.record-span.adapter.ts";
+import { EventingTracePipelineAdapter } from "./eventing.trace-pipeline.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

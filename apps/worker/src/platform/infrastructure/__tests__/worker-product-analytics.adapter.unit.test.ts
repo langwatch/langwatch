@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   WorkerPostHogProductAnalyticsAdapter,
   type ProductAnalyticsClient,
-} from "../worker-product-analytics.adapter";
+} from "../worker-product-analytics.adapter.ts";
 
 /**
  * Spec: packages/features/trace/specs/trace-product-analytics-worker-composition.feature

@@ -5,7 +5,7 @@ import {
   triggerActionSchema,
   triggerKindSchema,
   updateTriggerCommandSchema,
-} from "../index";
+} from "../index.ts";
 describe("automation contract", () => {
   it("uses the deployed trigger vocabulary", () => {
     // A deployed member is accepted and an undeployed one is refused. Echoing

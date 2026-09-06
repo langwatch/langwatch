@@ -12,7 +12,7 @@ import {
   organizationGroupBindingSchema,
   organizationGroupMemberSchema,
   organizationGroupSchema,
-} from "./group";
+} from "./group.ts";
 
 export const organizationGroupRestMemberSchema = organizationGroupMemberSchema.omit({
   image: true,

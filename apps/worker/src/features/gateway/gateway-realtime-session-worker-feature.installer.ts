@@ -1,5 +1,5 @@
 import type { GatewayRealtimeSessionReconciliationService } from "@langwatch/gateway-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
 
 /**
  * Worker registration for the brokered voice-session reconciler. A loop rather than a pipeline: it

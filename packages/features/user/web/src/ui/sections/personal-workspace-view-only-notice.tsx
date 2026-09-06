@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Eye } from "lucide-react";
 
-import { useLiteMemberGuard } from "../../behavior/personal-workspace-session";
+import { useLiteMemberGuard } from "../../behavior/personal-workspace-session.ts";
 
 /**
  * Why a Lite Member's own workspace does not keep anything they add to it.

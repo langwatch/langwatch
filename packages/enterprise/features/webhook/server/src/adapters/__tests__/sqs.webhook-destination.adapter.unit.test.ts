@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
 import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiterPort } from "@langwatch/egress";
-import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules";
+import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
   type SqsDestinationConfig,
   SqsWebhookDestinationAdapter,
-} from "../sqs.webhook-destination.adapter";
-import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port";
+} from "../sqs.webhook-destination.adapter.ts";
+import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port.ts";
 
 // The queue client and the rate limiter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real

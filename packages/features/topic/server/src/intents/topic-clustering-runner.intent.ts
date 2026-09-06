@@ -15,18 +15,18 @@ import { z } from "zod";
 import type {
   TopicClusteringClickHousePort,
   TopicClusteringClickHouseResolver,
-} from "../ports/topic-clustering-clickhouse.port";
-import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port";
+} from "../ports/topic-clustering-clickhouse.port.ts";
+import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
 import type {
   TopicClusteringLangevalsKind,
   TopicClusteringLangevalsPort,
-} from "../ports/topic-clustering-langevals.port";
-import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository";
+} from "../ports/topic-clustering-langevals.port.ts";
+import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
   type TopicClusteringRunPort,
-} from "./topic-clustering.intent";
+} from "./topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:topicClustering");
 

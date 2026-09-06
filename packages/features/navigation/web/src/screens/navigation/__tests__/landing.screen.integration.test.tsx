@@ -22,14 +22,14 @@ let mockResolveHome: {
   isError: boolean;
 } = { isError: false };
 
-vi.mock("../../../behavior/use-reachable-products", () => ({
+vi.mock("../../../behavior/use-reachable-products.ts", () => ({
   useReachableProducts: () => ({
     reachableProducts: ["me", "llm-ops", "gateway", "governance"],
     isLoading: false,
   }),
 }));
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     governance: {
       resolveHome: { useQuery: () => mockResolveHome },
@@ -37,9 +37,9 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { writeLastVisitedProduct } from "../../../model/product-memory";
-import { WithStubNavigationHost } from "../../../testing";
-import LandingScreen from "../landing.screen";
+import { writeLastVisitedProduct } from "../../../model/product-memory.ts";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import LandingScreen from "../landing.screen.tsx";
 
 const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };

@@ -1,5 +1,5 @@
-import { ApiVersionConflictError, InvalidApiVersionError } from "../errors.js";
-import { API_VERSION_HEADER } from "./types.js";
+import { ApiVersionConflictError, InvalidApiVersionError } from "../errors.ts";
+import { API_VERSION_HEADER } from "./types.ts";
 import type { MiddlewareHandler } from "hono";
 
 export type RestVersionSource = "path" | "header" | "latest";

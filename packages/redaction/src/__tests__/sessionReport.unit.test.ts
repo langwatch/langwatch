@@ -4,7 +4,7 @@ import {
   redactReportText,
   redactSessionJsonl,
   truncateJsonlToByteBudget,
-} from "../sessionReport.js";
+} from "../sessionReport.ts";
 
 describe("collectSensitiveEnvValues", () => {
   describe("given an environment with secret-named and ordinary variables", () => {

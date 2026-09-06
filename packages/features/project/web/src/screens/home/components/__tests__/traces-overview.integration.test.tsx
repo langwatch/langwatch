@@ -34,8 +34,8 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHostPort,
   type ProjectHomeProject,
-} from "../../../../model/project-home-host";
-import { TracesOverview } from "../traces-overview";
+} from "../../../../model/project-home-host.ts";
+import { TracesOverview } from "../traces-overview.tsx";
 
 class StubProjectHomeHost extends ProjectHomeHostPort {
   project(): ProjectHomeProject | undefined {

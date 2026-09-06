@@ -32,10 +32,10 @@
     }
   },
   "scripts": {
-    "start": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
+    "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
     "predev": "node ../../dev/scripts/ensure-built.mjs",
-    "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "build": "node scripts/build-server.mjs",
     "build:server": "node scripts/build-server.mjs",
     "test": "vitest run",
@@ -119,6 +119,7 @@
     "@langwatch/scenario-server": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secret-server": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
@@ -148,7 +149,6 @@
     "pino-pretty": "^13.1.3",
     "posthog-node": "^5.39.4",
     "tiktoken": "^1.0.22",
-    "tsx": "^4.20.6",
     "zod": "^4.3.6"
   },
   "devDependencies": {

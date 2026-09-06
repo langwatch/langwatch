@@ -11,10 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 import { EvaluationCommandAdapter } from "@langwatch/evaluation-server/internal";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createEvaluationProcessingPipeline } from "@langwatch/evaluation-server/internal";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent";
-import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection";
-import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection";
-import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
+import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
+import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection.ts";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection.ts";
 import { EVALUATION_PROCESSING_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import type {
   EvaluationCompletedEvent,

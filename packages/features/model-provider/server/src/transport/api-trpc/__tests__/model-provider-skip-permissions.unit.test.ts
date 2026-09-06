@@ -12,7 +12,7 @@
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import { ModelProviderTrpcApi, type ModelProviderTrpcContext } from "../model-provider.api";
+import { ModelProviderTrpcApi, type ModelProviderTrpcContext } from "../model-provider.api.ts";
 
 const PROJECT_A = "project_a";
 

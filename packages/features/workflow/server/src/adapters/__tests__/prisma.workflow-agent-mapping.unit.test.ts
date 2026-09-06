@@ -7,7 +7,7 @@ import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   PrismaWorkflowAgentMappingAdapter,
   type WorkflowAgentMappingDatabase,
-} from "../prisma.workflow-agent-mapping.adapter";
+} from "../prisma.workflow-agent-mapping.adapter.ts";
 
 /** The adapter under test, over the fake rows one case supplies. */
 const recompute = (input: {

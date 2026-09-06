@@ -27,12 +27,12 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service";
+import type { GovernanceHttpPort } from "../ports/governance-http.port.ts";
+import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service.ts";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   DataverseEnvironmentService,
-} from "../services/dataverse-environment.service";
+} from "../services/dataverse-environment.service.ts";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,

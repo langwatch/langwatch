@@ -17,7 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { Archive, Pencil, Plus, Shield } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import AiGatewayLayout from "../../ui/sections/gateway-layout";
+import AiGatewayLayout from "../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -25,9 +25,9 @@ import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
 } from "@langwatch/gateway-contract";
-import { useOrganizationTeamProject } from "../../behavior/gateway-session";
-import { api } from "../../behavior/gateway-api";
-import { useShowErrorToast } from "../../behavior/gateway-feedback";
+import { useOrganizationTeamProject } from "../../behavior/gateway-session.ts";
+import { api } from "../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../behavior/gateway-feedback.ts";
 
 type GuardrailRow = {
   id: string;

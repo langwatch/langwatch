@@ -25,8 +25,8 @@ import {
 } from "react-hook-form";
 import { scenarioParameterDefinitionsSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
-import { ScenarioCriteriaInput } from "./scenario-criteria-input";
-import { ScenarioSectionHeader } from "./scenario-section-header";
+import { ScenarioCriteriaInput } from "./scenario-criteria-input.tsx";
+import { ScenarioSectionHeader } from "./scenario-section-header.tsx";
 
 /** Parameters reuse the saved definition schema, so form and service agree. */
 export const scenarioFormSchema = z.object({

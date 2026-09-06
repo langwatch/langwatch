@@ -11,9 +11,9 @@ import type { ExperimentApp } from "@langwatch/experiment-server";
 import { ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount";
-import { REST_AUTH_PROJECT, RestAuthWorld, type RestAuthKey } from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+import type { ApiExperimentV3RestCollaborators } from "../../features/experiment/experiment-v3-rest.mount.ts";
+import { REST_AUTH_PROJECT, RestAuthWorld, type RestAuthKey } from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 const PROJECT_KEY = "sk-lw-alpha-experiments";
 const KEYS: readonly RestAuthKey[] = [

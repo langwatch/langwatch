@@ -6,8 +6,8 @@ import {
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
-import { composeApiStudioHost } from "../../../app/api-studio-host.composition";
-import { composeHttpProxyFeature } from "../http-proxy.composition";
+import { composeApiStudioHost } from "../../../app/api-studio-host.composition.ts";
+import { composeHttpProxyFeature } from "../http-proxy.composition.ts";
 
 const noop = () => undefined;
 

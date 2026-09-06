@@ -11,7 +11,7 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeUsePreload } from "../drawer-preloader";
+import { makeUsePreload } from "../drawer-preloader.ts";
 
 const preloadDrawer = vi.fn((_drawer: string) => Promise.resolve());
 const usePreloadDrawer = makeUsePreload(preloadDrawer);

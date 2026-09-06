@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useState } from "react";
 import { LuArrowRight, LuZap } from "react-icons/lu";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useProjectHomeHost } from "../../../../model/project-home-host";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * The sheet's empty-state invitation: a prominent "send your first trace"

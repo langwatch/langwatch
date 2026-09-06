@@ -1,6 +1,6 @@
-export * from "../../model/dataset-table-context";
-export * from "../../model/dataset-table-styles";
-export * from "../../ui/blocks/virtualized-table-body";
-export * from "../../behavior/use-table-keyboard-navigation";
-export * from "../../ui/elements/save-status-chip";
-export { TableCell, type ColumnType as DatasetTableColumnType } from "../../ui/elements/table-cell";
+export * from "../../model/dataset-table-context.tsx";
+export * from "../../model/dataset-table-styles.ts";
+export * from "../../ui/blocks/virtualized-table-body.tsx";
+export * from "../../behavior/use-table-keyboard-navigation.ts";
+export * from "../../ui/elements/save-status-chip.tsx";
+export { TableCell, type ColumnType as DatasetTableColumnType } from "../../ui/elements/table-cell.tsx";

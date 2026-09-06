@@ -1,5 +1,5 @@
-import { VisibilityWindowService } from "./trace-visibility-window.service";
-import { TraceSessionGroupsCursorService } from "./trace-session-groups-cursor.service";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { TraceSessionGroupsCursorService } from "./trace-session-groups-cursor.service.ts";
 import type {
   SessionGroupCodingAgentDto,
   SessionGroupDto,
@@ -9,7 +9,7 @@ import type {
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsRepository,
-} from "../repositories/session-groups.repository";
+} from "../repositories/session-groups.repository.ts";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 
 /**

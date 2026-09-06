@@ -3,7 +3,7 @@ import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createHash } from "node:crypto";
-import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port";
+import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
 
 const TABLE_NAME = "evaluation_runs" as const;
 const PROJECTION_VERSION = "2025-01-14" as const;

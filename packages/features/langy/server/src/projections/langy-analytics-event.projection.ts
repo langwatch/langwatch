@@ -47,7 +47,7 @@ import {
   LangyUserWaitEndedEventSchema,
   type LangyUserWaitStartedEvent,
   LangyUserWaitStartedEventSchema,
-} from "./langy-conversation-state.projection";
+} from "./langy-conversation-state.projection.ts";
 
 /**
  * How the event ended, for the analytics column. Only the three events that

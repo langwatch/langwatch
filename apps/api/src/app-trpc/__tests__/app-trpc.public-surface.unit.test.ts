@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildAppTrpcFeatures, buildAppTrpcMount } from "./support/app-trpc-features";
+import { buildAppTrpcFeatures, buildAppTrpcMount } from "./support/app-trpc-features.ts";
 
 /**
  * Before adding an entry, ask: does this endpoint leak tenant data to an

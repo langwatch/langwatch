@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { Config, RuntimeConfig, type ConfigValue } from "./index";
-import { publicAppConfigSchema, type PublicAppConfig } from "./public-app-config";
+import { Config, RuntimeConfig, type ConfigValue } from "./index.ts";
+import { publicAppConfigSchema, type PublicAppConfig } from "./public-app-config.ts";
 
 /**
  * The deployment's private inputs, projected to the exact browser-safe

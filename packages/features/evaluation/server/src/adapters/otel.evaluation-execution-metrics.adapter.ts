@@ -5,7 +5,7 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import { EvaluationExecutionTelemetryPort } from "../ports/evaluation-execution.port";
+import { EvaluationExecutionTelemetryPort } from "../ports/evaluation-execution.port.ts";
 
 /**
  * The two series an evaluation run reports, and the label that tells one

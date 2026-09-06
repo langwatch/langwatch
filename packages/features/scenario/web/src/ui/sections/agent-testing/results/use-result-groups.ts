@@ -5,8 +5,8 @@
 
 import { useMemo } from "react";
 import type { Period, PeriodMode } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
 import type {
   CodeScenario,
   ResultAtom,
@@ -17,10 +17,10 @@ import type {
   RunParameterValues,
 } from "@langwatch/scenario-contract";
 import { splitTargetKey } from "@langwatch/suite-contract";
-import { api } from "../../../../behavior/scenario-api";
-import type { TargetKind } from "../../../../model/target-kind";
-import type { PlanRowModel } from "./plan-rows-table";
-import type { ResultsFilterOption } from "./results-filter-menu";
+import { api } from "../../../../behavior/scenario-api.ts";
+import type { TargetKind } from "../../../../model/target-kind.ts";
+import type { PlanRowModel } from "./plan-rows-table.tsx";
+import type { ResultsFilterOption } from "./results-filter-menu.tsx";
 import {
   codeTargetNames,
   filterOutcome,
@@ -32,8 +32,8 @@ import {
   targetNameOf,
   targetParametersOf,
   toResultRows,
-} from "./result-atoms";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+} from "./result-atoms.ts";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /**
  * How often the reads refresh while the live stream is down.

@@ -6,12 +6,12 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
-import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition";
-import { WorkerTraceProcessingPipeline } from "../worker-trace-processing-pipeline.composition";
-import { createWorkerGovernanceRollups } from "../worker-governance-rollups.composition";
-import { createWorkerTrackedEvents } from "../worker-tracked-event.composition";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
+import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition.ts";
+import { WorkerTraceProcessingPipeline } from "../worker-trace-processing-pipeline.composition.ts";
+import { createWorkerGovernanceRollups } from "../worker-governance-rollups.composition.ts";
+import { createWorkerTrackedEvents } from "../worker-tracked-event.composition.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 /**
  * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature

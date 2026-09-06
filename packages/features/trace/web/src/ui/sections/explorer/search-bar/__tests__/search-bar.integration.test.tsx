@@ -25,10 +25,10 @@ const langyMock = {
     langyMock.draft = draft;
   }),
 };
-vi.mock("../../../langy/hooks/use-show-langy", () => ({
+vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => langyMock.enabled,
 }));
-vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
+vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => langyMock.enabled,
 }));
 vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
@@ -52,7 +52,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
 // SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
 // (used by the global AI shortcut). These tests don't wrap with withTRPC, so
 // stub them out to keep the smoke render free of provider boilerplate.
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,
     organization: undefined,
@@ -61,7 +61,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../use-model-providers-settings", () => ({
+vi.mock("../../../use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     modelProviders: [],
     customDefaultModel: null,
@@ -69,7 +69,7 @@ vi.mock("../../../use-model-providers-settings", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-facets", () => ({
+vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
@@ -77,7 +77,7 @@ vi.mock("../../hooks/use-trace-facets", () => ({
 // top level. These smoke tests don't wrap with a tRPC provider, so stub the
 // hook out — its server search is covered by
 // TokenValuePicker.serverSearch.integration.test.tsx.
-vi.mock("../../hooks/use-facet-search", () => ({
+vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
@@ -88,9 +88,9 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "../../../../../behavior/filter.store";
-import { SearchBar } from "../search-bar";
-import { SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff";
+import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { SearchBar } from "../search-bar.tsx";
+import { SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff.ts";
 
 afterEach(() => {
   cleanup();

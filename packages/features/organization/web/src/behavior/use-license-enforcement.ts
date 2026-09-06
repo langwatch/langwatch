@@ -8,8 +8,8 @@
 // mounting it elsewhere is one modal, not a copy.
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import { useCallback } from "react";
-import { api } from "./organization-api";
-import { useOrganizationTeamProject } from "./use-organization-team-project";
+import { api } from "./organization-api.ts";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * The seat levers a licence caps, written out here rather than imported from

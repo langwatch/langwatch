@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { DefaultGovernanceRoutingPolicyService } from "./governance-routing.service";
-import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service";
-import type { DefaultGovernanceCliBootstrapService } from "./governance-cli-tool-bootstrap.service";
-import type { DefaultGovernanceCliSessionInventoryService } from "./cli-session-inventory.service";
-import type { DefaultGovernanceCliTokenRevocationService } from "./cli-token-revocation.service";
-import type { DefaultGovernanceAdminWorkspaceViewAuditService } from "./admin-workspace-view-audit.service";
-import type { QuarantineFillEvaluatorService } from "./quarantine-fill.service";
-import type { DefaultGovernanceSetupStateService } from "./governance-setup-state.service";
+import type { DefaultGovernanceRoutingPolicyService } from "./governance-routing.service.ts";
+import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service.ts";
+import type { DefaultGovernanceCliBootstrapService } from "./governance-cli-tool-bootstrap.service.ts";
+import type { DefaultGovernanceCliSessionInventoryService } from "./cli-session-inventory.service.ts";
+import type { DefaultGovernanceCliTokenRevocationService } from "./cli-token-revocation.service.ts";
+import type { DefaultGovernanceAdminWorkspaceViewAuditService } from "./admin-workspace-view-audit.service.ts";
+import type { QuarantineFillEvaluatorService } from "./quarantine-fill.service.ts";
+import type { DefaultGovernanceSetupStateService } from "./governance-setup-state.service.ts";
 
 /** Private cohesive collaborator for the lifecycle operation set. */
 export class GovernanceLifecycleOperationsService {

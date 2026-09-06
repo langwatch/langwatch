@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRangeFormatter } from "../utils";
+import { getRangeFormatter } from "../utils.ts";
 
 /**
  * Range facet endpoints render a bare slider with min/max numbers and no per-endpoint

@@ -3,8 +3,8 @@ import {
   ManagedProviderService as ManagedProviderServiceContract,
 } from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port";
-import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port";
+import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port.ts";
+import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port.ts";
 
 export class ManagedProviderService extends ManagedProviderServiceContract {
   private readonly projectOrganizations = new Map<string, string>();

@@ -13,8 +13,8 @@ import {
   REST_AUTH_USER,
   RestAuthWorld,
   type RestAuthProject,
-} from "./support/rest-auth.world";
-import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness";
+} from "./support/rest-auth.world.ts";
+import { mountRestFamily, type MountedRestFamily } from "./support/rest-family.harness.ts";
 
 /** The workspace device login mints, owned by the person the key names. */
 const PERSONAL_PROJECT: RestAuthProject = {

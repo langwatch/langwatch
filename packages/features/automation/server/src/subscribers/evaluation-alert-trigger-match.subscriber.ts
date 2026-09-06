@@ -4,7 +4,7 @@ import type {
   AutomationEvaluationTraceSummaryPort,
   AutomationEvaluationTriggerFilterPort,
   AutomationTriggerMatchRecorderPort,
-} from "../ports/automation-evaluation-subscriber.port";
+} from "../ports/automation-evaluation-subscriber.port.ts";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
 

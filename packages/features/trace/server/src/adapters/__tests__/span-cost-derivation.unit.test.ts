@@ -4,9 +4,9 @@ import {
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { SpanCostService } from "../../services/span-cost.service";
-import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { SpanCostService } from "../../services/span-cost.service.ts";
+import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter.ts";
 
 /**
  * SpanCostService.deriveStorageCost computes the per-span cost persisted on stored_spans. Pins it matches extractTokenMetrics().cost (what the trace-summary fold accumulates) and splits the non-billable portion the same way the fold derives NonBilledCost.

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ApiHttpListener } from "../api-http.listener";
+import { ApiHttpListener } from "../api-http.listener.ts";
 
 describe("ApiHttpListener", () => {
   it("serves the composed Hono graph then stops accepting requests on close", async () => {

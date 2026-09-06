@@ -11,7 +11,7 @@ import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Calendar, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { AUDIT_PERIOD_PRESETS, type AuditPeriodPresetKey } from "../../model/audit-period";
+import { AUDIT_PERIOD_PRESETS, type AuditPeriodPresetKey } from "../../model/audit-period.ts";
 
 export function AuditPeriodPicker({
   label,

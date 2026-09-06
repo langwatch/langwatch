@@ -1,15 +1,15 @@
 import { Card, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { HealthLine } from "../elements/dashboard-health-line";
-import { LatencyWindowsCard } from "../elements/latency-windows-card";
-import { ThroughputChart } from "../elements/throughput-chart";
-import { TopErrorsCard } from "../elements/top-errors-card";
+import { HealthLine } from "../elements/dashboard-health-line.tsx";
+import { LatencyWindowsCard } from "../elements/latency-windows-card.tsx";
+import { ThroughputChart } from "../elements/throughput-chart.tsx";
+import { TopErrorsCard } from "../elements/top-errors-card.tsx";
 import { useMemo } from "react";
-import { AnomaliesCard, BlockedCard, DlqCard, GroupsCard, PipelineTreeCard } from "../../../queue";
-import { api } from "../../../../behavior/ops-api";
-import { ActiveOperationsSection } from "./active-operations-panel";
-import { PausedCard } from "./paused-panel";
-import { StatStrip } from "./stat-strip";
+import { AnomaliesCard, BlockedCard, DlqCard, GroupsCard, PipelineTreeCard } from "../../../queue/index.ts";
+import { api } from "../../../../behavior/ops-api.ts";
+import { ActiveOperationsSection } from "./active-operations-panel.tsx";
+import { PausedCard } from "./paused-panel.tsx";
+import { StatStrip } from "./stat-strip.tsx";
 
 /**
  * The ops landing page, read top to bottom as strip → health → chart →

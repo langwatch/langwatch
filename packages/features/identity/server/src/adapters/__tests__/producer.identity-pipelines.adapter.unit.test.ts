@@ -4,9 +4,9 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { IdentityProducerPipelinesAdapter } from "../producer.identity-pipelines.adapter";
-import { PostgresIdentityPipelineAdapter } from "../postgres.identity-pipeline.adapter";
-import { PostgresScimSyncPipelineAdapter } from "../postgres.scim-sync-pipeline.adapter";
+import { IdentityProducerPipelinesAdapter } from "../producer.identity-pipelines.adapter.ts";
+import { PostgresIdentityPipelineAdapter } from "../postgres.identity-pipeline.adapter.ts";
+import { PostgresScimSyncPipelineAdapter } from "../postgres.scim-sync-pipeline.adapter.ts";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,

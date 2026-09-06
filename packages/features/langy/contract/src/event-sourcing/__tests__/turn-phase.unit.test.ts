@@ -10,7 +10,7 @@ import {
   settleTurn,
   stopDispatched,
   type TurnPhaseState,
-} from "../turn-phase";
+} from "../turn-phase.ts";
 
 const active = (turnId = "t1"): TurnPhaseState => beginTurn(initialTurnPhaseState, turnId);
 

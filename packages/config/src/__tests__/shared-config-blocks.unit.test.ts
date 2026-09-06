@@ -4,21 +4,21 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { authzConfigDefinition } from "../authz.config";
-import { clickhouseConfigDefinition } from "../clickhouse.config";
-import { egressConfigDefinition } from "../egress.config";
-import { githubAppConfigDefinition } from "../github.config";
-import { licensingConfigDefinition } from "../licensing.config";
-import { loggerConfigDefinition } from "../logger.config";
-import { mailConfigDefinition } from "../mail.config";
-import { objectStorageConfigDefinition } from "../object-storage.config";
-import { observabilityConfigDefinition } from "../observability.config";
-import { postgresConfigDefinition } from "../postgres.config";
-import { groupQueueConfigDefinition } from "../queue.config";
-import { redisConfigDefinition } from "../redis.config";
-import { runtimeIdentityConfigDefinition } from "../runtime-identity.config";
-import { trustedProxyConfigDefinition } from "../trusted-proxy.config";
-import { InvalidRuntimeConfigError, RuntimeConfig } from "../runtime-config";
+import { authzConfigDefinition } from "../authz.config.ts";
+import { clickhouseConfigDefinition } from "../clickhouse.config.ts";
+import { egressConfigDefinition } from "../egress.config.ts";
+import { githubAppConfigDefinition } from "../github.config.ts";
+import { licensingConfigDefinition } from "../licensing.config.ts";
+import { loggerConfigDefinition } from "../logger.config.ts";
+import { mailConfigDefinition } from "../mail.config.ts";
+import { objectStorageConfigDefinition } from "../object-storage.config.ts";
+import { observabilityConfigDefinition } from "../observability.config.ts";
+import { postgresConfigDefinition } from "../postgres.config.ts";
+import { groupQueueConfigDefinition } from "../queue.config.ts";
+import { redisConfigDefinition } from "../redis.config.ts";
+import { runtimeIdentityConfigDefinition } from "../runtime-identity.config.ts";
+import { trustedProxyConfigDefinition } from "../trusted-proxy.config.ts";
+import { InvalidRuntimeConfigError, RuntimeConfig } from "../runtime-config.ts";
 
 describe("shared configuration blocks", () => {
   it("resolves the shared Postgres connection from DATABASE_URL", () => {

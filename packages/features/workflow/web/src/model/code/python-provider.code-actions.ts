@@ -9,7 +9,7 @@ import {
   MISSING_CLASS_CODE,
   MISSING_OUTPUT_KEY,
   MIXED_INDENT,
-} from "./python-provider.shared";
+} from "./python-provider.shared.ts";
 
 /**
  * Quick fixes for the scaffold-missing diagnostics. Monaco renders the

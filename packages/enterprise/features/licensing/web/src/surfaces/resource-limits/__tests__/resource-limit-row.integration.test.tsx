@@ -5,7 +5,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ResourceLimitRow } from "../resource-limit-row";
+import { ResourceLimitRow } from "../resource-limit-row.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -1,7 +1,7 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { CodingAgentProcessingPipeline } from "@langwatch/coding-agent-server";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
-import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
  * The three contribution senders the source pipelines dispatch into (ADR-056).

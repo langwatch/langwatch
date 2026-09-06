@@ -3,7 +3,7 @@ import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowUp, Bot, Copy, Edit, type LucideIcon, RefreshCw, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AgentBrowserPort } from "../../../../model/agent-browser.port";
+import type { AgentBrowserPort } from "../../../../model/agent-browser.port.ts";
 
 const ACTION_META = {
   "agents.create": { label: "Created", icon: Bot },

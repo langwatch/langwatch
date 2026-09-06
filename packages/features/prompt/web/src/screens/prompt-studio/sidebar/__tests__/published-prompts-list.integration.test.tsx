@@ -7,20 +7,20 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PromptBrowserStorage } from "../../../../model/browser-capabilities";
-import { clearStoreInstances, getStoreForTesting } from "../../../../model/prompt-tabs-store";
-import { PublishedPromptsList } from "../published-prompts-list";
+import type { PromptBrowserStorage } from "../../../../model/browser-capabilities.ts";
+import { clearStoreInstances, getStoreForTesting } from "../../../../model/prompt-tabs-store.ts";
+import { PublishedPromptsList } from "../published-prompts-list.tsx";
 
 const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));
 
-vi.mock("../published-prompt-content", () => ({
+vi.mock("../published-prompt-content.tsx", () => ({
   PublishedPromptContent: ({ promptHandle }: { promptHandle: string | null }) => {
     renderCount.value += 1;
     return <span>{promptHandle}</span>;
   },
 }));
 
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 
@@ -29,7 +29,7 @@ const { mockGetAllPrompts, mockGetResolvedDefault } = vi.hoisted(() => ({
   mockGetResolvedDefault: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/prompt-api", () => ({
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
   promptApi: {
     prompts: { getAllPromptsForProject: { useQuery: mockGetAllPrompts } },
     modelProvider: { getResolvedDefault: { useQuery: mockGetResolvedDefault } },
@@ -58,7 +58,7 @@ const capabilities = {
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 };
 
-vi.mock("../../../../model/prompt-host", () => ({
+vi.mock("../../../../model/prompt-host.ts", () => ({
   usePromptHost: () => ({ tabCapabilities: () => capabilities }),
 }));
 

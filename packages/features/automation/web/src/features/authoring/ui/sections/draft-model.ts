@@ -11,13 +11,13 @@ import {
   type ReportDraft,
   type ReportSourceKind,
   type SetSliceAction as WebSetSliceAction,
-} from "../../model/draft-reducer";
-import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "../../model/draft-reducer";
+} from "../../model/draft-reducer.ts";
+import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "../../model/draft-reducer.ts";
 import {
   AUTOMATION_DRAFT_MODEL,
   type AllSlices,
   type AutomationProviderClients,
-} from "./client-providers";
+} from "./client-providers.ts";
 
 const model = AUTOMATION_DRAFT_MODEL;
 

@@ -10,8 +10,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing";
-import { GraphCardHeader } from "../graph-card-header";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
+import { GraphCardHeader } from "../graph-card-header.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <AnalyticsTestHarness host={new StubAnalyticsHost()}>{children}</AnalyticsTestHarness>

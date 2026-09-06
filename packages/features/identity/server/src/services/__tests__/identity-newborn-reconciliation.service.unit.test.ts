@@ -3,16 +3,16 @@
  * @vitest-environment node
  * The sweep ADR-116 §3 calls a required companion to the born-finalized
  */
-import type { IdentityReservationRepository } from "../../repositories/identity-reservations.repository";
+import type { IdentityReservationRepository } from "../../repositories/identity-reservations.repository.ts";
 import { describe, expect, it, vi } from "vitest";
 import {
   IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
   IdentityNewbornReconciliationService,
-} from "../identity-newborn-reconciliation.service";
+} from "../identity-newborn-reconciliation.service.ts";
 import type {
   AbandonedNewborn,
   IdentityNewbornRepository,
-} from "../../repositories/identity-newborn.repository";
+} from "../../repositories/identity-newborn.repository.ts";
 
 const NOW = 1_690_000_000_000;
 

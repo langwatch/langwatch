@@ -4,7 +4,7 @@ import { type SpanTypes, spanTypesSchema } from "@langwatch/trace-contract";
 import {
   selectSpanEditBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
+} from "../../../../../behavior/trace-edit.store.ts";
 
 const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map((option) => option.value);
 

@@ -29,30 +29,30 @@ import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { downloadCsv } from "@langwatch/csv/download";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
-import { datasetApi } from "../../behavior/dataset-api";
-import { useDatasetRecordSync } from "../../behavior/use-dataset-record-sync";
+import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetRecordSync } from "../../behavior/use-dataset-record-sync.ts";
 import {
   createDatasetEditorStore,
   type EditorColumn,
   type EditorRecord,
-} from "../../behavior/use-dataset-editor-store";
-import { useTableKeyboardNavigation } from "../../behavior/use-table-keyboard-navigation";
-import { formatRecordCount } from "../../model/dataset-editor-copy";
-import { datasetImageUrl } from "../../model/dataset-image-url";
+} from "../../behavior/use-dataset-editor-store.ts";
+import { useTableKeyboardNavigation } from "../../behavior/use-table-keyboard-navigation.ts";
+import { formatRecordCount } from "../../model/dataset-editor-copy.ts";
+import { datasetImageUrl } from "../../model/dataset-image-url.ts";
 import {
   type AutosaveState,
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
-} from "../../model/dataset-table-context";
-import { datasetTableCss } from "../../model/dataset-table-styles";
-import { useDatasetHost } from "../../model/dataset-host";
-import { DatasetCellImage } from "../elements/dataset-cell-image";
-import { SaveStatusChip } from "../elements/save-status-chip";
-import { SelectionActionBar } from "../elements/selection-action-bar";
-import { VirtualizedTableBody } from "../blocks/virtualized-table-body";
-import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer";
-import { AddRowsFromCSVModal } from "./add-rows-from-csv-modal";
+} from "../../model/dataset-table-context.tsx";
+import { datasetTableCss } from "../../model/dataset-table-styles.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
+import { DatasetCellImage } from "../elements/dataset-cell-image.tsx";
+import { SaveStatusChip } from "../elements/save-status-chip.tsx";
+import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
+import { VirtualizedTableBody } from "../blocks/virtualized-table-body.tsx";
+import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
+import { AddRowsFromCSVModal } from "./add-rows-from-csv-modal.tsx";
 
 const CHECKBOX_WIDTH_PX = 36;
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;

@@ -12,7 +12,7 @@ type FlagQueryInput = { flag: string; organizationIds: string[] };
 
 let orgFlags: Record<string, Record<string, boolean>> = {};
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     featureFlag: {
       isEnabledForEachOrganization: {
@@ -33,9 +33,9 @@ vi.mock("../../../behavior/navigation-api", () => ({
   },
 }));
 
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing";
-import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
-import { NavigationShell } from "../navigation-shell";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { NavigationShell } from "../navigation-shell.tsx";
 
 const teamA = {
   id: "team_1",

@@ -26,7 +26,7 @@ vi.mock("@clickhouse/client", () => ({
   },
 }));
 
-import { ApiClickHouseInfrastructure } from "../api-clickhouse.infrastructure";
+import { ApiClickHouseInfrastructure } from "../api-clickhouse.infrastructure.ts";
 
 const SHARED_URL = "http://clickhouse.shared.test:8123";
 const PRIVATE_URL = "http://clickhouse.acme.test:8123";

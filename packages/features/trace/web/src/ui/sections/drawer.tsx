@@ -8,8 +8,8 @@ import {
   SIDEBAR_PANEL_WIDTH,
 } from "@langwatch/langy-web/surfaces/langy-panel-layout";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { CloseButton } from "../elements/close-button";
-import { IsolatedErrorBoundary } from "./isolated-error-boundary";
+import { CloseButton } from "../elements/close-button.tsx";
+import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants. Used by

@@ -5,35 +5,35 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "..";
-import type { CommandHandler } from "../commands/command";
+import type { CommandHandler } from "../commands/command.ts";
 import type {
   CommandHandlerClass,
   CommandHandlerClassStatic,
   ExtractCommandHandlerPayload,
-} from "../commands/commandHandlerClass";
-import type { AggregateDefinition } from "../domain/definitions";
-import type { Event, Projection } from "../domain/types";
+} from "../commands/commandHandlerClass.ts";
+import type { AggregateDefinition } from "../domain/definitions.ts";
+import type { Event, Projection } from "../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
-} from "../projections/foldProjection.types";
+} from "../projections/foldProjection.types.ts";
 import type {
   MapProjectionDefinition,
   MapProjectionOptions,
-} from "../projections/mapProjection.types";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import { ConfigurationError } from "../services/errorHandling";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+} from "../projections/mapProjection.types.ts";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import { ConfigurationError } from "../services/errorHandling.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type {
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
-} from "../subscribers/subscriber.types";
-import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder";
+} from "../subscribers/subscriber.types.ts";
+import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
   ProcessManagerDefinition,
   SubscriberSpec,
   TriggerContext,
-} from "./processManagerDefinition";
+} from "./processManagerDefinition.ts";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }

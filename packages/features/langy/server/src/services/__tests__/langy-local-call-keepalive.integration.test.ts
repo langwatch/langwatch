@@ -20,18 +20,18 @@ import {
 } from "@langwatch/langy-contract";
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules";
-import { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter";
-import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber";
+import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
+import { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
+import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
 import { DispatchError } from "@langwatch/eventing";
 import type { EventSubscriberContext } from "@langwatch/eventing";
-import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 import { CALL_POLL_HOLD_MS } from "@langwatch/langy-contract";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter";
-import { testRedisUrl } from "../../__tests__/support/test-redis-url";
+import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
+import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 
 /** How long the subscriber lets a turn go quiet before it ends it. */
 const STALL_WINDOW_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;

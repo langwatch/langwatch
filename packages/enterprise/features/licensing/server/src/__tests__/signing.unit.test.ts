@@ -5,10 +5,10 @@ import {
   LicenseSigningKeyEncryptedError,
   LicenseSigningKeyNotPemError,
 } from "@langwatch/enterprise-licensing-contract";
-import { NodeLicenseCryptographyAdapter } from "../index";
+import { NodeLicenseCryptographyAdapter } from "../index.ts";
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
-import { canonicalPemKey, mangledPemPastes } from "../testing";
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing";
+import { canonicalPemKey, mangledPemPastes } from "../testing.ts";
+import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
 
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const encodeLicenseKey = cryptography.encodeLicenseKey.bind(cryptography);

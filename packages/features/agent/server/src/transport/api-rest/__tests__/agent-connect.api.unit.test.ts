@@ -10,12 +10,12 @@ import {
 import type { AgentService } from "@langwatch/agent-contract";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
-import type { AgentRepository } from "../../../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
-import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
-import { LongPollTransportService } from "../../../services/connected-agent-long-poll.service";
-import { registerConnectEndpoints } from "../agent-connect.api";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter.ts";
+import type { AgentRepository } from "../../../repositories/agent.repository.ts";
+import type { ConnectCredentialPort } from "../../../ports/connect-credential.port.ts";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter.ts";
+import { LongPollTransportService } from "../../../services/connected-agent-long-poll.service.ts";
+import { registerConnectEndpoints } from "../agent-connect.api.ts";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   const handled = error as Error & { code?: string; httpStatus?: number };

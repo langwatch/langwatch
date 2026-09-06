@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 // tolerance, JSON round-trip) with a reversible stand-in for the shared
 // AES helper — the real crypto is covered by the encryption util's own
 // callers and is not what this module owns.
-import { GovernanceEncryptionPort } from "../../ports/governance-encryption.port";
-import { IngestionCredentialsService } from "../ingestion-credentials.service";
+import { GovernanceEncryptionPort } from "../../ports/governance-encryption.port.ts";
+import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 
 class ReversibleEncryption extends GovernanceEncryptionPort {
   encrypt(text: string): string {

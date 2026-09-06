@@ -1,4 +1,4 @@
-import { CostAttributionPolicyRepository } from "../cost-attribution-policy.repository";
+import { CostAttributionPolicyRepository } from "../cost-attribution-policy.repository.ts";
 
 type CostAttributionPrismaClient = {
   aiToolEntry: {

@@ -23,13 +23,13 @@ import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityStack } from "./support/storage-adapter-stack";
+import type { IdentityStack } from "./support/storage-adapter-stack.ts";
 import {
   flaggedSignUp,
   flaggedSignUpOrThrow,
   identityStack,
   signUp,
-} from "./support/storage-adapter-stack";
+} from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "newborn@acme.com";
 

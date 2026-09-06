@@ -5,8 +5,8 @@ import {
   DONE_MARKER_TTL_SECONDS,
   doneMarkerKey,
   MARKER_TTL_SECONDS,
-} from "./replayConstants";
-import type { ReplayLogWriter } from "./replayLog";
+} from "./replayConstants.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(

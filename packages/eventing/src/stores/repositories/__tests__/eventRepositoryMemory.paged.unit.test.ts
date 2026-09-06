@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { EventRecord } from "../eventRepository.types";
-import { EventRepositoryMemory } from "../eventRepositoryMemory";
+import type { EventRecord } from "../eventRepository.types.ts";
+import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
 /**
  * `getEventRecordsUpToPaged` is the cursor-paginated read the streaming

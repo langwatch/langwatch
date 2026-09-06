@@ -9,16 +9,16 @@ import { createLogger } from "@langwatch/observability";
 
 import { parseConnectionUrl } from "@langwatch/clickhouse-client";
 import { Task } from "@langwatch/task";
-import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service";
+import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   type LwqlKeyMapBackfillPlan,
-} from "../services/langwatch-ql-production-provisioning.service";
+} from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
-} from "../services/langwatch-ql-access-model.service";
-import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
+} from "../services/langwatch-ql-access-model.service.ts";
+import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const lwqlExecutors = LangWatchQLExecutorService.create();

@@ -16,28 +16,28 @@ import {
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
-import { formatDurationSeconds } from "../duration";
-import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline";
-import { toolResultBodyToString } from "./tool-result-body";
-import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
-import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code";
-import type { SessionBanner } from "./terminal-session-banner";
-import type { TurnDivider } from "./terminal-session-scrollback";
-import { TerminalDiff } from "./terminal-diff";
-import { TerminalOutput } from "./terminal-output";
-import { TerminalPatch } from "./terminal-patch";
+import { formatDurationSeconds } from "../duration.ts";
+import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline.ts";
+import { toolResultBodyToString } from "./tool-result-body.ts";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
+import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code.tsx";
+import type { SessionBanner } from "./terminal-session-banner.ts";
+import type { TurnDivider } from "./terminal-session-scrollback.ts";
+import { TerminalDiff } from "./terminal-diff.tsx";
+import { TerminalOutput } from "./terminal-output.tsx";
+import { TerminalPatch } from "./terminal-patch.tsx";
 import {
   buildEntryTimeline,
   extractDiffFromToolInput,
   isDiffTool,
   toolPrimaryArg,
-} from "./terminal-session";
-import { parsePatchHunks, type TerminalToolSpan } from "./terminal-tool-spans";
+} from "./terminal-session.ts";
+import { parsePatchHunks, type TerminalToolSpan } from "./terminal-tool-spans.ts";
 import {
   CONVERSATION_TURN_CAP,
   type EarlierTotals,
   type ScrollbackStatus,
-} from "./terminal-session-scrollback";
+} from "./terminal-session-scrollback.ts";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;

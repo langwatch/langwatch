@@ -7,9 +7,9 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules";
-import { callActivityLine } from "../rules/langy-local-call-activity.rules";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
+import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
+import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   CALL_ENVELOPE_SLACK_MS,
@@ -27,8 +27,8 @@ import {
   callKey,
   pendingCallsKey,
   workspaceChannel,
-} from "../rules/langy-local-control-keys.rules";
-import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port";
+} from "../rules/langy-local-control-keys.rules.ts";
+import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port.ts";
 import {
   bashOutputSchema,
   type CallEnvelope,

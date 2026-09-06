@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStorageConnectSrc } from "../app-static.storage-connect-src";
+import { buildStorageConnectSrc } from "../app-static.storage-connect-src.ts";
 
 describe("buildStorageConnectSrc", () => {
   describe("when an explicit S3_ENDPOINT is set (prod / R2 / MinIO)", () => {

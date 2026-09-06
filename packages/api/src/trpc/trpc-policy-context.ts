@@ -1,4 +1,4 @@
-import type { TrpcRequestLike, TrpcResponseLike } from "./trpc-policy-ports.js";
+import type { TrpcRequestLike, TrpcResponseLike } from "./trpc-policy-ports.ts";
 
 /**
  * The part of a process's tRPC context the policy spine reads directly.

@@ -2,8 +2,8 @@ import { Box, Button, HStack, NativeSelect, Spinner, Text, VStack } from "@chakr
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { useMemo } from "react";
 
-import { Link } from "../../../../ui/elements/gateway-link";
-import type { ProviderCredentialOption } from "../../model/provider-credential-option";
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
+import type { ProviderCredentialOption } from "../../model/provider-credential-option.ts";
 
 /** Provider names read the same everywhere they appear. */
 function formatLabel(option: ProviderCredentialOption): string {

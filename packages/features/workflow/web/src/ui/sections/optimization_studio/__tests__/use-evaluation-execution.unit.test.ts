@@ -16,7 +16,7 @@ let mockWorkflowState: any = {
 
 const mockGetWorkflow = vi.fn(() => mockWorkflowState);
 
-vi.mock("../../../../behavior/use-workflow-store", () => ({
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: any) =>
     selector({
       getWorkflow: mockGetWorkflow,
@@ -24,7 +24,7 @@ vi.mock("../../../../behavior/use-workflow-store", () => ({
       setOpenResultsPanelRequest: mockSetOpenResultsPanelRequest,
     }),
 }));
-vi.mock("../use-post-event", () => ({
+vi.mock("../use-post-event.tsx", () => ({
   usePostEvent: () => ({
     postEvent: mockPostEvent,
     socketStatus: "connected",
@@ -35,7 +35,7 @@ vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { useEvaluationExecution } from "../use-evaluation-execution";
+import { useEvaluationExecution } from "../use-evaluation-execution.ts";
 
 describe("useEvaluationExecution", () => {
   beforeEach(() => {

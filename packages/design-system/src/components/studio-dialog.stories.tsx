@@ -1,6 +1,6 @@
 import { Button, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Dialog } from "./studio-dialog";
+import { Dialog } from "./studio-dialog.tsx";
 
 /** Renders during a story so the boundary catches it, as it would in the studio. */
 function Crashing(): never {

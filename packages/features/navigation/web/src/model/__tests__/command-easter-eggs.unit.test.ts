@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { easterEggs, findEasterEgg } from "../command-easter-eggs";
+import { easterEggs, findEasterEgg } from "../command-easter-eggs.ts";
 
 describe("easterEggs", () => {
   describe("findEasterEgg", () => {

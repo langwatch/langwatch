@@ -27,10 +27,10 @@ import {
   StoredObjectStoragePort,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
-} from "../ports/stored-object.port";
-import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
-import { storedObjectMetadataOf } from "../rules/stored-object-view.rules";
-import { StoredObjectUploadService } from "./stored-object-upload.service";
+} from "../ports/stored-object.port.ts";
+import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
+import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
+import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
 
 export type StoredObjectServiceOptions = Readonly<{
   store: StoredObjectStore;

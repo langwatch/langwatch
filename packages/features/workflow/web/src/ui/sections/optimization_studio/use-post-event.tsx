@@ -2,19 +2,19 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
-import { fetchSSE } from "../../../model/sse/fetch-sse";
+import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 import { toaster } from "@langwatch/ui-host/toaster";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import type { BaseComponent } from "@langwatch/workflow-contract";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,
   reportableExecutionFailure,
-} from "./execution-state-error";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
-import { type WorkflowStore } from "../../../behavior/workflow-store";
+} from "./execution-state-error.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;

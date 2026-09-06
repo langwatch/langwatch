@@ -8,30 +8,30 @@ export {
   type IssuedScimToken,
   type ScimAppDependencies,
   type ScimPlanProvider,
-} from "./app/scim.app";
+} from "./app/scim.app.ts";
 export {
   ScimTokenTrpcApi,
   type ScimTokenTrpcContext,
   type ScimTokenTrpcPorts,
-} from "./transport/api-trpc/scim-token.api";
-export { createScimTokensRestApp } from "./transport/api-rest/scim.api";
+} from "./transport/api-trpc/scim-token.api.ts";
+export { createScimTokensRestApp } from "./transport/api-rest/scim.api.ts";
 // The SCIM 2.0 protocol family itself, and the Auth0 webhook intake beside it.
 // Both take the application as a provider rather than a request context, so a
 // process that composed no Enterprise SCIM cannot mount either by accident.
-export { createScimProtocolRestApp } from "./transport/api-rest/scim-protocol.api";
+export { createScimProtocolRestApp } from "./transport/api-rest/scim-protocol.api.ts";
 export {
   createScimWebhookRestApp,
   type ScimWebhookRestPorts,
-} from "./transport/api-rest/scim-webhook-intake.api";
-export * from "./transport/api-rest/scim-openapi.api";
-export { ScimWebhookApi } from "./transport/api-rest/scim-webhook.api";
-export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter";
+} from "./transport/api-rest/scim-webhook-intake.api.ts";
+export * from "./transport/api-rest/scim-openapi.api.ts";
+export { ScimWebhookApi } from "./transport/api-rest/scim-webhook.api.ts";
+export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter.ts";
 export {
   ScimSyncLifecyclePort,
   type ScimRemovalOperation,
   type ScimUserPushOperation,
-} from "./ports/scim-sync-lifecycle.port";
-export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service";
+} from "./ports/scim-sync-lifecycle.port.ts";
+export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service.ts";
 
 /**
  * The durable directory-sync history: the SCIM boundary's own implementation of
@@ -41,4 +41,4 @@ export { ScimDirectoryIdentityService } from "./services/scim-directory-identity
 export {
   ScimSyncLifecycleAdapter,
   type ScimSyncLifecycleAdapterDeps,
-} from "./adapters/identity.scim-sync-lifecycle.adapter";
+} from "./adapters/identity.scim-sync-lifecycle.adapter.ts";

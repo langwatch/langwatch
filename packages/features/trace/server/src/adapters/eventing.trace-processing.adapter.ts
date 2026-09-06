@@ -15,9 +15,9 @@ import {
   annotationRemovedEventDataSchema,
   annotationsBulkSyncedEventDataSchema,
 } from "@langwatch/trace-contract";
-import { recordLogContributionCommand } from "./eventing.trace-log-contribution.adapter";
-import { recordMetricCorrelationCommand } from "./eventing.trace-metric-correlation.adapter";
-import { changeTraceNameCommand } from "./eventing.change-trace-name.adapter";
+import { recordLogContributionCommand } from "./eventing.trace-log-contribution.adapter.ts";
+import { recordMetricCorrelationCommand } from "./eventing.trace-metric-correlation.adapter.ts";
+import { changeTraceNameCommand } from "./eventing.change-trace-name.adapter.ts";
 
 const addAnnotationCommand = defineCommand({
   commandType: ADD_ANNOTATION_COMMAND_TYPE,

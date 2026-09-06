@@ -2,12 +2,12 @@ import type { Logger } from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import { buildProcessManager } from "../../pipeline/processBuilder";
-import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime";
-import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
-import type { ProcessStore } from "../stores/processStore.types";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event } from "../../domain/types.ts";
+import { buildProcessManager } from "../../pipeline/processBuilder.ts";
+import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime.ts";
+import { InMemoryProcessStore } from "../stores/inMemoryProcessStore.ts";
+import type { ProcessStore } from "../stores/processStore.types.ts";
 
 const tenantId = createTenantId("project-1");
 const TEST_PROCESS_EVENT_TYPE = "test.process.triggered";

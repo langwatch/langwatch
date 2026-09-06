@@ -7,8 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
-import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter";
-import { SavedWorkbenchChartErrorsAdapter } from "../saved-workbench-chart-errors.adapter";
+import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter.ts";
+import { SavedWorkbenchChartErrorsAdapter } from "../saved-workbench-chart-errors.adapter.ts";
 const { mapDashboardSavedWorkbenchChartError } = SavedWorkbenchChartErrorsAdapter;
 import { LangWatchQLService } from "@langwatch/analytics-server/testing";
 

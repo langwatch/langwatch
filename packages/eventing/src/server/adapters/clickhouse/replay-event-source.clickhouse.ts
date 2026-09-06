@@ -4,12 +4,12 @@ import type {
   OccurredAtBounds,
   ReplayEvent,
   ReplayEventSource,
-} from "../../../replay/replayEventSource";
+} from "../../../replay/replayEventSource.ts";
 import type {
   EventingClickHouseReplayClient,
   EventingClickHouseReplayClientResolver,
   EventingClickHouseRow,
-} from "../../clickhouse-client-resolver";
+} from "../../clickhouse-client-resolver.ts";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {

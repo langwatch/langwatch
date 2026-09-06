@@ -6,13 +6,13 @@
 
 import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { Folder, FolderCode, Play, Plus } from "lucide-react";
-import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import type { CasesPanelProps } from "./cases-panel";
-import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge";
-import { RecentRunsMenu } from "./recent-runs-menu";
-import { SuiteNameHeading } from "./suite-name-heading";
+import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { CasesPanelProps } from "./cases-panel.tsx";
+import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
+import { RecentRunsMenu } from "./recent-runs-menu.tsx";
+import { SuiteNameHeading } from "./suite-name-heading.tsx";
 
 export type CasesPanelHeaderProps = Pick<
   CasesPanelProps,

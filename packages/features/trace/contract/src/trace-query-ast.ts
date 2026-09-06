@@ -5,7 +5,7 @@
  */
 
 import type { LiqeQuery } from "liqe";
-import { EMPTY_AST, isEmptyAST } from "./trace-query-parser";
+import { EMPTY_AST, isEmptyAST } from "./trace-query-parser.ts";
 
 /** Walk all nodes in the AST, tracking negation context. */
 export function walkAST(

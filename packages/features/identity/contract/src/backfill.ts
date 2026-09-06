@@ -1,5 +1,5 @@
-import type { IdentifierArrivalState, IdentifierProvider } from "./vocabulary";
-import { isLiveIdentifierState } from "./vocabulary";
+import type { IdentifierArrivalState, IdentifierProvider } from "./vocabulary.ts";
+import { isLiveIdentifierState } from "./vocabulary.ts";
 
 /**
  * The backfill's parity policy (ADR-101 §6): what the fold-built rows must

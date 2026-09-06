@@ -3,12 +3,12 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NurturingSignupIdentificationService } from "../nurturing-signup-identification.service";
+import { NurturingSignupIdentificationService } from "../nurturing-signup-identification.service.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
   settle,
-} from "./support/nurturing-harness";
+} from "./support/nurturing-harness.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),

@@ -2,9 +2,9 @@
  * CAPABILITY_HYDRATORS — how each CLI resource's card fetches CURRENT data.
  */
 
-import type { api } from "../../../../behavior/langy-api";
-import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link";
-import { traceMetaLine, truncateRowText } from "../../../../model/langy-row-format";
+import type { api } from "../../../../behavior/langy-api.ts";
+import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link.ts";
+import { traceMetaLine, truncateRowText } from "../../../../model/langy-row-format.ts";
 
 /**
  * The trace row a card hydrates fresh, as this file reads it.

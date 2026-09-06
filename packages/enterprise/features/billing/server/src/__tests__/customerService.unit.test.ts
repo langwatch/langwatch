@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CustomerService } from "../index";
+import { CustomerService } from "../index.ts";
 
 const createMockStripe = () => ({
   customers: {

@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port";
+import { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
 
 /**
  * Where an API-key grant warning goes.

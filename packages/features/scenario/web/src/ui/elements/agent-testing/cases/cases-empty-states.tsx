@@ -6,7 +6,7 @@
 
 import { Box, Button, EmptyState } from "@chakra-ui/react";
 import { FlaskConical, FolderCode, Plus, FolderPlus, Plug } from "lucide-react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type EmptyStateActionProps = {
   canManage: boolean;

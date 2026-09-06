@@ -1,9 +1,9 @@
 /// <reference path="../../model/ambient.d.ts" />
 import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { FullLogo } from "./full-logo";
+import { FullLogo } from "./full-logo.tsx";
 import "./auth-front-door.css";
-import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../../model/front-door-theme";
+import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../../model/front-door-theme.ts";
 
 /**
  * The case the hosted product makes, next to the door rather than inside it.

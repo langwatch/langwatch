@@ -22,8 +22,8 @@ import type { EventSubscriberContext, StateProjectionStore } from "@langwatch/ev
 import {
   LangyConversationStateFoldProjection,
   type LangyConversationProcessingEvent,
-} from "../../projections/langy-conversation-state.projection";
-import { createLangyConversationUpdateBroadcastSubscriber } from "../../subscribers/langy-conversation.subscriber";
+} from "../../projections/langy-conversation-state.projection.ts";
+import { createLangyConversationUpdateBroadcastSubscriber } from "../../subscribers/langy-conversation.subscriber.ts";
 
 const PROJECT = "project_1";
 const CONVERSATION = "conv_1";

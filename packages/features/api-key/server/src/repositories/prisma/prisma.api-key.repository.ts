@@ -5,7 +5,7 @@ import {
   type ApiKeyCreateRecord,
   type ApiKeyUpdateRecord,
   type StoredApiKey,
-} from "../api-key.repository";
+} from "../api-key.repository.ts";
 
 export type PrismaApiKeyDatabase = Pick<PrismaClient, "apiKey" | "team" | "project">;
 

@@ -13,9 +13,9 @@ import type {
   ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderIdService,
-} from "../ports/model-provider.port";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service";
-import type { ModelProviderScopeService } from "./model-provider-scope.service";
+} from "../ports/model-provider.port.ts";
+import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderDefaultsWriteOptions = {
   defaults: ModelDefaultRepository;

@@ -9,9 +9,9 @@ import type {
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
 import type { GithubPullRequest, GithubService } from "@langwatch/github-contract";
-import { CodingAgentBillingPolicyPort } from "../coding-agent-billing.port";
-import { CodingAgentFeatureService } from "../../services/coding-agent.service";
-import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository";
+import { CodingAgentBillingPolicyPort } from "../coding-agent-billing.port.ts";
+import { CodingAgentFeatureService } from "../../services/coding-agent.service.ts";
+import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
 import {
   TestClock,
   TestEvents,
@@ -23,7 +23,7 @@ import {
   branchSession,
   pullRequest,
   session,
-} from "../../__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);

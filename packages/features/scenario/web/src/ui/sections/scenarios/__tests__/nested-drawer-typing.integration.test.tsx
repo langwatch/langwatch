@@ -12,14 +12,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
-vi.mock("../save-and-run-menu", () => ({
+vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: () => <div data-testid="save-and-run-menu" />,
 }));
-vi.mock("../scenario-editor-sidebar", () => ({
+vi.mock("../scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
 
-import { ScenarioFormDrawerFromUrl } from "../scenario-form-drawer";
+import { ScenarioFormDrawerFromUrl } from "../scenario-form-drawer.tsx";
 
 const mocks = vi.hoisted(() => ({
   mockDrawerOpen: vi.fn(() => true),
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
   mockRunScenario: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       create: {
@@ -75,7 +75,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -93,14 +93,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({
     runScenario: mocks.mockRunScenario,
     isRunning: false,
   }),
 }));
 
-vi.mock("../../use-scenario-target", () => ({
+vi.mock("../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),

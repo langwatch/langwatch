@@ -1,4 +1,4 @@
-import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection";
+import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 
 /** Idempotent shutdown for the endpoints constructed by one process graph. */
 export class ClickHouseShutdownService {

@@ -15,11 +15,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { z } from "zod";
-import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group";
-import { AnnotationCommentsChip } from "../elements/annotation-comments-chip";
-import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip";
+import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group.tsx";
+import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx";
+import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row";
+import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row.ts";
 
 const ChakraButton = chakra("button");
 

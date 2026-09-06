@@ -17,13 +17,13 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
-import { EvaluationService } from "../../services/evaluation.service";
-import { EvaluationExecutionPort, EvaluationInputsResolutionPort } from "../evaluation.port";
-import { EvaluationRunRepository } from "../../repositories/evaluation.repository";
+import { EvaluationService } from "../../services/evaluation.service.ts";
+import { EvaluationExecutionPort, EvaluationInputsResolutionPort } from "../evaluation.port.ts";
+import { EvaluationRunRepository } from "../../repositories/evaluation.repository.ts";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
-} from "../../repositories/monitor-performance.repository";
+} from "../../repositories/monitor-performance.repository.ts";
 import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
 
 const run: EvaluationRunData = {

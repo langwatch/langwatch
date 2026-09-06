@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../../domain/tenantId";
-import { TEST_COMMAND_TYPES } from "../../services/__tests__/testHelpers";
-import { createCommand } from "../command";
+import { createTenantId } from "../../domain/tenantId.ts";
+import { TEST_COMMAND_TYPES } from "../../services/__tests__/testHelpers.ts";
+import { createCommand } from "../command.ts";
 
 describe("createCommand", () => {
   describe("when creating a command with all required fields", () => {

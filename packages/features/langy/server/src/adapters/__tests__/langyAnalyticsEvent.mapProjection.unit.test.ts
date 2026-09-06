@@ -4,13 +4,13 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
 import {
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../../projections/langy-conversation-state.projection";
-import { LangyAnalyticsEventMapProjection } from "../../projections/langy-analytics-event.projection";
+} from "../../projections/langy-conversation-state.projection.ts";
+import { LangyAnalyticsEventMapProjection } from "../../projections/langy-analytics-event.projection.ts";
 
 const base = {
   aggregateId: "conversation_1",

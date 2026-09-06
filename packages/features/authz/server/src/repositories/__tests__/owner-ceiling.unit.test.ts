@@ -1,10 +1,10 @@
 import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzReadRepository } from "../authz-read.repository";
-import { AuthzService } from "../../services/authz.service";
-import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
-import { StubAuthzListingRepository } from "./support/authz-listing.stub";
-import { makeReader } from "./support/authz-read.stub";
+import type { AuthzReadRepository } from "../authz-read.repository.ts";
+import { AuthzService } from "../../services/authz.service.ts";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub.ts";
+import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";
+import { makeReader } from "./support/authz-read.stub.ts";
 
 const ORG = "org-1";
 const TEAM = "team-1";

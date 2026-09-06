@@ -1,7 +1,7 @@
 import { Liquid } from "liquidjs";
 import { describe, expect, it } from "vitest";
-import { getLiquidEngine, renderLiquid } from "../engine";
-import { createSandboxedLiquid } from "../sandboxed-liquid";
+import { getLiquidEngine, renderLiquid } from "../engine.ts";
+import { createSandboxedLiquid } from "../sandboxed-liquid.ts";
 
 /**
  * Spec: specs/security/template-file-inclusion.feature

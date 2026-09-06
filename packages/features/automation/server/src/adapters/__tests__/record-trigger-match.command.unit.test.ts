@@ -10,7 +10,7 @@ import {
   type TriggerMatchRecordedEventData,
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { RecordTriggerMatchCommand } from "../eventing.automation.adapter";
+import { RecordTriggerMatchCommand } from "../eventing.automation.adapter.ts";
 
 const TENANT_ID = "project_1";
 const OCCURRED_AT = 1_800_000_000_000;

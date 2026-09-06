@@ -8,15 +8,15 @@ import {
   projectWithTeamSchema,
   type ProjectService,
 } from "@langwatch/project-contract";
-import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service";
+import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,
   type ApiKeyUpdateRecord,
   type StoredApiKey,
-} from "../api-key.repository";
-import { ApiKeyTokenAdapter } from "../../adapters/api-key-token.api-key-token.adapter";
-import { ApiKeyBindingIdPort } from "../../ports/api-key-binding-id.port";
+} from "../api-key.repository.ts";
+import { ApiKeyTokenAdapter } from "../../adapters/api-key-token.api-key-token.adapter.ts";
+import { ApiKeyBindingIdPort } from "../../ports/api-key-binding-id.port.ts";
 
 class TestApiKeyBindingIdPort extends ApiKeyBindingIdPort {
   static create(): TestApiKeyBindingIdPort {

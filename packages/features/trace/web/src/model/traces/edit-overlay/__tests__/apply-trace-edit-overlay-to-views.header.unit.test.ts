@@ -7,7 +7,7 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import {
   applyOverlayToTraceHeader,
   changedTraceMetadataKeys,
-} from "../apply-trace-edit-overlay-to-views";
+} from "../apply-trace-edit-overlay-to-views.ts";
 
 const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPatch => ({
   version: 1,

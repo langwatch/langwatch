@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   SlackWebApiDeliveryAdapter,
   type SlackApiTransport,
-} from "../slack-web-api.delivery.adapter";
+} from "../slack-web-api.delivery.adapter.ts";
 
 const PAYLOAD = {
   text: "A trace matched",

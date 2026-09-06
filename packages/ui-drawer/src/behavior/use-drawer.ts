@@ -16,14 +16,14 @@ import { createLogger } from "@langwatch/observability";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
-import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options";
+import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import type {
   DrawerCallbacksOf,
   DrawerPropsOf,
   DrawerTypeOf,
   UiDrawerRegistry,
-} from "../model/drawer-registry";
-import { drawerRouterRef, useDrawerRouter } from "./drawer-router";
+} from "../model/drawer-registry.ts";
+import { drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
 
 const logger = createLogger("useDrawer");
 

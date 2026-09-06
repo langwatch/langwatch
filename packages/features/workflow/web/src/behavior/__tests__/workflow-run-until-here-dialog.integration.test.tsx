@@ -13,9 +13,9 @@ import {
   type WorkflowDatasetPreviewProps,
   type WorkflowPartialExecutionInput,
   WorkflowRunUntilHereDialog,
-} from "../../ui/sections/workflow-run-until-here-dialog";
-import { useRunUntilHereDialogStore } from "../use-run-until-here-dialog-store";
-import { _useWorkflowStore } from "../use-workflow-store";
+} from "../../ui/sections/workflow-run-until-here-dialog.tsx";
+import { useRunUntilHereDialogStore } from "../use-run-until-here-dialog-store.ts";
+import { _useWorkflowStore } from "../use-workflow-store.ts";
 
 const datasetRows: DatasetRecordEntry[] = [
   { id: "r1", question: "What is up?", context: "ctx-1" },

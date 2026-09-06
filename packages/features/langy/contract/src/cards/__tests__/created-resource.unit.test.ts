@@ -7,9 +7,9 @@
  *      "A write card never claims success on a result that names nothing"
  */
 import { describe, expect, it } from "vitest";
-import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "../schemas.js";
-import { parseCliResult } from "../registry.js";
-import { parseCliToolResult, toCliToolResult } from "../tool-result.js";
+import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "../schemas.ts";
+import { parseCliResult } from "../registry.ts";
+import { parseCliToolResult, toCliToolResult } from "../tool-result.ts";
 
 describe("namesCreatedResource", () => {
   describe("given a payload that names nothing", () => {

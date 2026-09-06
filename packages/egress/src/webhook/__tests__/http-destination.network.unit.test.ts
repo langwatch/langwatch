@@ -2,9 +2,9 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { DispatchError } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { fetchValidatedDestination, RedirectRefusedError } from "../../ssrf/fenced-fetch";
-import { createSsrfUrlValidator } from "../../ssrf/url-validator";
-import { sendHttpDestination } from "../http-destination";
+import { fetchValidatedDestination, RedirectRefusedError } from "../../ssrf/fenced-fetch.ts";
+import { createSsrfUrlValidator } from "../../ssrf/url-validator.ts";
+import { sendHttpDestination } from "../http-destination.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type { ActivityMonitorService } from "./ingestion-source-activity.service";
-import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service";
-import type { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overview.port";
+import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
+import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
+import type { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overview.port.ts";
 
 /** Private cohesive collaborator for the activity operation set. */
 export class GovernanceActivityOperationsService {

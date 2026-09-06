@@ -34,7 +34,7 @@ import type {
   ModelProviderWriteInput,
   TranslateInput,
   TranslateOutput,
-} from "./model-provider";
+} from "./model-provider.ts";
 
 export abstract class ModelProviderService {
   abstract listForProject(input: ModelProviderListProjectInput): Promise<ModelProviderSummary[]>;
@@ -88,7 +88,7 @@ export abstract class ModelProviderService {
   }): Promise<ModelDefaultInheritedValues>;
   abstract tryGetResolvedDefault(
     input: ModelDefaultResolveInput,
-  ): Promise<import("./model-provider").ModelDefaultEffective | null>;
+  ): Promise<import("./model-provider.ts").ModelDefaultEffective | null>;
   abstract resolveModelForFeature(
     input: ModelDefaultResolveInput,
   ): Promise<ModelProviderResolution>;

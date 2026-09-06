@@ -1,4 +1,4 @@
-import { TraceReadableSpanService } from "../trace-readable-span.service";
+import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
 import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,

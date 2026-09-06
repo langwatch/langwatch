@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { addDays, isSameCalendarDay, isToday, isYesterday, startOfDay, subDays } from "../calendar";
+import { addDays, isSameCalendarDay, isToday, isYesterday, startOfDay, subDays } from "../calendar.ts";
 import {
   differenceInCalendarDays,
   differenceInDays,
@@ -9,7 +9,7 @@ import {
   differenceInMonths,
   differenceInSeconds,
   differenceInWeeks,
-} from "../difference";
+} from "../difference.ts";
 
 const AMSTERDAM = { timeZone: "Europe/Amsterdam" } as const;
 

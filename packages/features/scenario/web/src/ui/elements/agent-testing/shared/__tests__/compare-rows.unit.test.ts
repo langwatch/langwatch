@@ -11,8 +11,8 @@ import {
   hasDuplicateCompareRows,
   initialCompareRows,
   MAX_COMPARE_ROWS,
-} from "../../../../sections/agent-testing/run/compare-rows";
-import { TARGET_COLORS, targetColor } from "../target-colors";
+} from "../../../../sections/agent-testing/run/compare-rows.ts";
+import { TARGET_COLORS, targetColor } from "../target-colors.ts";
 
 /** A scope that declares no parameter, so every typed value is an override. */
 const NO_DEFAULTS = new Map<string, string>();

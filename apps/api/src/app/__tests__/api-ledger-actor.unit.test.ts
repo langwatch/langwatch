@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { describe, expect, it } from "vitest";
-import { orgRequestLedgerActor } from "../api-ledger-actor";
+import { orgRequestLedgerActor } from "../api-ledger-actor.ts";
 
 const contextWith = (values: Record<string, string | null | undefined>) =>
   ({

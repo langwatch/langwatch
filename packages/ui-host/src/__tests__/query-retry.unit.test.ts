@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_QUERY_RETRIES, shouldRetryQuery } from "../query-retry";
+import { MAX_QUERY_RETRIES, shouldRetryQuery } from "../query-retry.ts";
 
 /** A bare tRPC failure, carrying only the status. */
 const withStatus = (httpStatus: number) => ({ data: { httpStatus } });

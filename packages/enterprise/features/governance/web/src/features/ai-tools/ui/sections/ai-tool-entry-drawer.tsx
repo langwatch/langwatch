@@ -21,23 +21,23 @@ import {
   ASSISTANT_PRESETS,
   type AssistantKind,
 } from "@langwatch/coding-agent-web/surfaces/agent-identity";
-import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile";
+import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile.ts";
 import {
   isToolPresetAsset,
   TOOL_KINDS,
   TOOL_PRESETS,
   toolPresetAsset,
-} from "../elements/tool-icons";
+} from "../elements/tool-icons.tsx";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
 } from "@langwatch/authz-web/surfaces/scope-picker";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../../../ui/elements/governance-link";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
 import { Switch } from "@langwatch/design-system/switch";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback";
-import { useGovernanceScope } from "../../../../behavior/governance-session";
-import { api } from "../../../../behavior/governance-api";
+import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
+import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
+import { api } from "../../../../behavior/governance-api.ts";
 const TILE_TYPE_OPTIONS: Array<{ value: AiToolTileType; label: string }> = [
   { value: "coding_assistant", label: "Coding assistant" },
   { value: "model_provider", label: "Model provider" },

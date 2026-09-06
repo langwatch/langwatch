@@ -30,46 +30,46 @@ import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { annotationApi } from "../../behavior/annotation-api";
-import { useAnnotationPeriod } from "../../behavior/use-annotation-period";
-import { useAnnotationQueues } from "../../behavior/use-annotation-queues";
-import { useFieldRedaction } from "../../behavior/use-field-redaction";
-import { usePersonalDatasetGate } from "../../behavior/use-personal-feature-gate";
+import { annotationApi } from "../../behavior/annotation-api.ts";
+import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
+import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
+import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
+import { usePersonalDatasetGate } from "../../behavior/use-personal-feature-gate.ts";
 import {
   annotationListExport,
   csvFileName,
   type ActiveScoreType,
-} from "../../model/annotation-export";
-import type { AnnotationHostPort } from "../../model/annotation-host";
+} from "../../model/annotation-export.ts";
+import type { AnnotationHostPort } from "../../model/annotation-host.ts";
 import {
   pageAddress,
   pageSizeAddress,
   readAnnotationListPaging,
-} from "../../model/annotation-list-paging";
+} from "../../model/annotation-list-paging.ts";
 import {
   addDatasetRecordAddress,
   queueEditorAddress,
   queueItemHref,
   traceDetailsAddress,
-} from "../../model/annotation-overlay-address";
+} from "../../model/annotation-overlay-address.ts";
 import {
   absolutePeriodAddress,
   clearedPeriodAddress,
   relativePeriodAddress,
-} from "../../model/annotation-period";
-import { queueItemsToRows, type AnnotationRow } from "../../model/annotation-row";
-import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotation-view";
-import type { AnnotationView } from "../../model/annotation-view";
-import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-table";
-import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog";
-import { Link } from "../elements/annotation-link";
-import { NoDataInfoBlock } from "../elements/no-data-info-block";
-import { PeriodPicker } from "../elements/period-picker";
-import { RedactedField } from "../elements/redacted-field";
-import { ReviewerAvatar } from "../elements/reviewer-avatar";
-import { SelectionActionBar } from "../elements/selection-action-bar";
-import { SendToQueueDialog } from "./send-to-queue-dialog";
-import { downloadCsv } from "../../behavior/download-csv";
+} from "../../model/annotation-period.ts";
+import { queueItemsToRows, type AnnotationRow } from "../../model/annotation-row.ts";
+import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotation-view.ts";
+import type { AnnotationView } from "../../model/annotation-view.ts";
+import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-table.tsx";
+import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
+import { Link } from "../elements/annotation-link.tsx";
+import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
+import { PeriodPicker } from "../elements/period-picker.tsx";
+import { RedactedField } from "../elements/redacted-field.tsx";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
+import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
+import { SendToQueueDialog } from "./send-to-queue-dialog.tsx";
+import { downloadCsv } from "../../behavior/download-csv.ts";
 
 /**
  * The list this page IS, named the way the queue reads name participants

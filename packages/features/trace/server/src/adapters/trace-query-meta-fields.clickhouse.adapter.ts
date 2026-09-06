@@ -1,4 +1,4 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter";
+import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter.ts";
 import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
 import {
   type FieldDef,
@@ -10,7 +10,7 @@ import {
 import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   TraceQueryValuesAdapter,
-} from "./trace-query-values.clickhouse.adapter";
+} from "./trace-query-values.clickhouse.adapter.ts";
 
 /**
  * Built-in existence categories for `has:` and `none:`.

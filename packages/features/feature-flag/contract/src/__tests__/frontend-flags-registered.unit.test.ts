@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FEATURE_FLAG_REGISTRY } from "../feature-flag-registry";
-import { FRONTEND_FEATURE_FLAGS } from "../frontend-feature-flags";
+import { FEATURE_FLAG_REGISTRY } from "../feature-flag-registry.ts";
+import { FRONTEND_FEATURE_FLAGS } from "../frontend-feature-flags.ts";
 
 /**
  * Frontend-exposed flags that are SYSTEM on purpose: internal levers

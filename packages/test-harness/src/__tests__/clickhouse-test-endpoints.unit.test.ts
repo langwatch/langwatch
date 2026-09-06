@@ -2,7 +2,7 @@
  * Spec: specs/ops/group-queue-dispatcher-resilience.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { migrateTestClickHouseOnce } from "../clickhouse-test-endpoints";
+import { migrateTestClickHouseOnce } from "../clickhouse-test-endpoints.ts";
 
 describe("migrateTestClickHouseOnce", () => {
   describe("given the same ClickHouse URL is asked to migrate twice", () => {

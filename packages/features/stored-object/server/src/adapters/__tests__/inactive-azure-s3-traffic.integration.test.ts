@@ -16,11 +16,11 @@ import {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
   type StoredObjectStorageSelection,
-} from "../stored-object-destination-policy.adapter";
+} from "../stored-object-destination-policy.adapter.ts";
 import {
   StoredObjectStorageRegistryAdapter,
   type StoredObjectStorageDriver,
-} from "../stored-object-storage-registry.adapter";
+} from "../stored-object-storage-registry.adapter.ts";
 
 const INCOMPLETE_AZURE = "Azure Blob is configured with sharedKey auth and no account key";
 

@@ -2,14 +2,14 @@
  * The cells a run produced, in the shape the workbench persists.
  */
 
-import type { TargetRowMetadata } from "../../experiment-workbench";
-import type { PersistedResults } from "../../experiment-workbench-persistence";
+import type { TargetRowMetadata } from "../../experiment-workbench.ts";
+import type { PersistedResults } from "../../experiment-workbench-persistence.ts";
 import {
   type CarriedOverCell,
   type EvaluationV3Event,
   type ExecutionScope,
   UNNAMED_FAILURE,
-} from "./types";
+} from "./types.ts";
 
 /** Cells the run covered, and what each one produced. */
 export interface RunResultsDraft {

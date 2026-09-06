@@ -1,6 +1,6 @@
-import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gateway-budget.repository";
-import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service";
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gateway-budget.repository.ts";
+import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 
 /**
  * The composition seam for end-user caps.

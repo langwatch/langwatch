@@ -1,4 +1,4 @@
-import type { Component, Field, StudioEdge, StudioNode, StudioPosition } from "./studio-workflow";
+import type { Component, Field, StudioEdge, StudioNode, StudioPosition } from "./studio-workflow.ts";
 
 const camelCaseToSnakeCase = (value: string) =>
   value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();

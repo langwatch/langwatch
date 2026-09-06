@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { UserService } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import type { BetterAuthAnnouncementsPort } from "../../ports/better-auth.port";
+import type { BetterAuthAnnouncementsPort } from "../../ports/better-auth.port.ts";
 
 /**
  * What passkey sign-up needs from sign-up's address confirmation.

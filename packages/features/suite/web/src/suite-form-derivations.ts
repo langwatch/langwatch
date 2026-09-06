@@ -6,7 +6,7 @@ import type {
   SuiteFormAvailableTarget,
   SuiteFormPrompt,
   SuiteFormScenario,
-} from "./suite-form.types";
+} from "./suite-form.types.ts";
 
 export function getAvailableTargets(
   agents: SuiteFormAgent[] | undefined,

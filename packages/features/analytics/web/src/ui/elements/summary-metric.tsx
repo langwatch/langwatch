@@ -1,7 +1,7 @@
 import { Box, Heading, Skeleton, type SystemStyleObject, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { HelpCircle } from "react-feather";
-import { Delayed } from "./delayed";
+import { Delayed } from "./delayed.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function SummaryMetric({

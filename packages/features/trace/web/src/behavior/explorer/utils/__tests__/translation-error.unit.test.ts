@@ -4,7 +4,7 @@ import {
   extractMissingModelInfo,
   extractProviderDisabledInfo,
 } from "@langwatch/model-provider-web/surfaces/model-error";
-import { shouldShowGenericTranslateError } from "../translation-error";
+import { shouldShowGenericTranslateError } from "../translation-error.ts";
 
 // The gating logic is what we own here; the extractors are a boundary (tested in
 // utils/trpcError). Mock them so we can prove the fallback fires only when none

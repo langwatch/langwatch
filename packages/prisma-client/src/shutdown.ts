@@ -1,4 +1,4 @@
-import type { PrismaConnection } from "./connection";
+import type { PrismaConnection } from "./connection.ts";
 
 /** Idempotent shutdown of the Prisma client followed by its explicit pg pool. */
 export class PrismaShutdownService {

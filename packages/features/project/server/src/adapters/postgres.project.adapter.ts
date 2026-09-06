@@ -6,9 +6,9 @@ import type {
   ProjectDiagnosticsPort,
   ProjectKeyMapPort,
   ProjectStoredObjectsPort,
-} from "../ports/project.port";
-import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository";
-import { ProjectService } from "../services/project.service";
+} from "../ports/project.port.ts";
+import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
+import { ProjectService } from "../services/project.service.ts";
 
 export interface PostgresProjectAdapterOptions {
   /**

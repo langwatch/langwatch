@@ -5,9 +5,9 @@ import {
   evaluatorResultEventSchema,
   type TargetResultEvent,
   targetResultEventSchema,
-} from "../processes/experiment-run-events.process";
-import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
-import { ExperimentRunIds } from "../processes/experiment-run-id.process";
+} from "../processes/experiment-run-events.process.ts";
+import { normalizeDurationMs } from "../processes/experiment-run-duration.process.ts";
+import { ExperimentRunIds } from "../processes/experiment-run-id.process.ts";
 
 /**
  * Record type matching the experiment_run_items ClickHouse table schema.

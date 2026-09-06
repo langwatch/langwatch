@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useConversationPrefetch } from "../use-conversation-prefetch";
+import { useConversationPrefetch } from "../use-conversation-prefetch.ts";
 
 const prefetchMock = vi.fn();
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { header: { prefetch: prefetchMock } },
@@ -17,7 +17,7 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../use-conversation-context", () => ({
+vi.mock("../use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     turns: [
       { traceId: "trace-0", timestamp: 1_700_000_000_000 },

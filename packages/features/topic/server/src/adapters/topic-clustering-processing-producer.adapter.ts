@@ -14,13 +14,13 @@ import {
   type TopicClusteringOutcomeCommands,
   type TopicClusteringPageOutcome,
   type TopicClusteringRunPort,
-} from "../intents/topic-clustering.intent";
+} from "../intents/topic-clustering.intent.ts";
 import {
   TopicClusteringEventingAdapter,
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunStatusData,
   type TopicModelData,
-} from "./eventing.topic-clustering.adapter";
+} from "./eventing.topic-clustering.adapter.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

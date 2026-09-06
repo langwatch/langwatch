@@ -1,7 +1,7 @@
-import type { ChatMessage } from "../../model/transcript/types";
-import { parseContentBlocks } from "./content-parser";
-import { tryParseJSON } from "../../model/transcript/content-format";
-import { isRecord } from "../../model/transcript/record";
+import type { ChatMessage } from "../../model/transcript/types.ts";
+import { parseContentBlocks } from "./content-parser.ts";
+import { tryParseJSON } from "../../model/transcript/content-format.ts";
+import { isRecord } from "../../model/transcript/record.ts";
 
 const VALID_CHAT_ROLES = new Set(["system", "user", "assistant", "tool", "developer", "function"]);
 

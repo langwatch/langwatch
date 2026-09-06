@@ -11,9 +11,9 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
 
-import { lwqlEnabled } from "../rules/lwql-access.rules";
+import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { LangWatchQLNotEnabledError } from "@langwatch/analytics-contract";
-import type { LangWatchQLService } from "./langwatch-ql.service";
+import type { LangWatchQLService } from "./langwatch-ql.service.ts";
 
 /**
  * The two checks every LangWatchQL analytics SQL route runs before it does

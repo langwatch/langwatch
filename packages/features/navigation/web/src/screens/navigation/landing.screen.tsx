@@ -1,5 +1,5 @@
-import { useLandingRedirect } from "../../behavior/use-landing-redirect";
-import { useNavigationHost } from "../../model/navigation-host";
+import { useLandingRedirect } from "../../behavior/use-landing-redirect.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 
 /**
  * `/` picks the right home for the user and replaces the address with it.

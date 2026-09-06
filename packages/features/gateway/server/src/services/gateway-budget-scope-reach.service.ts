@@ -4,7 +4,7 @@ import type {
   GatewayBudgetScopeReach,
   GatewayKeyReachCandidate,
   ScopeReach,
-} from "../repositories/gateway-budget.repository";
+} from "../repositories/gateway-budget.repository.ts";
 
 type KeyReach = GatewayKeyReachCandidate & {
   projectId: string | null;

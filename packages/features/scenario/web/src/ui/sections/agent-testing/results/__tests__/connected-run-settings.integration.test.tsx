@@ -8,12 +8,12 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TargetIdentity } from "../../../../../behavior/use-target-name-map";
+import type { TargetIdentity } from "../../../../../behavior/use-target-name-map.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { RunSettingsBlock } from "../run-settings-block";
-import { readRunSettings } from "../run-settings";
-import { batchTargetsOf } from "../use-batch-targets";
+import { RunSettingsBlock } from "../run-settings-block.tsx";
+import { readRunSettings } from "../run-settings.ts";
+import { batchTargetsOf } from "../use-batch-targets.ts";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

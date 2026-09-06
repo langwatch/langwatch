@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { VirtualKeyAuthorizationRepository } from "../virtual-key-authorization.repository";
+import { VirtualKeyAuthorizationRepository } from "../virtual-key-authorization.repository.ts";
 
 /** The client slice a virtual-key authorization decision reads. */
 export type VirtualKeyAuthorizationDatabase = Pick<

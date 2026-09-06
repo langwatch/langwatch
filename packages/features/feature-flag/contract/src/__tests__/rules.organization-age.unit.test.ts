@@ -17,7 +17,7 @@ import {
   featureFlagRulesWriteSchema,
   parseRules,
   readNeedsOrganizationAge,
-} from "../feature-flag-rules";
+} from "../feature-flag-rules.ts";
 
 const ROLLOUT_START = "2026-06-01";
 const NEW_USERS_RULE: FeatureFlagRules = [

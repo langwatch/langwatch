@@ -29,9 +29,9 @@ import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
-import { composeApiElevenLabsWebhookRest } from "../api-gateway-internal-rest.composition";
-import { ApiRestSecurity } from "../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { composeApiElevenLabsWebhookRest } from "../api-gateway-internal-rest.composition.ts";
+import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 
 /** 32 bytes of hex, which is what the stored-secret cipher refuses anything else for. */
 const CREDENTIALS_SECRET = "b".repeat(64);

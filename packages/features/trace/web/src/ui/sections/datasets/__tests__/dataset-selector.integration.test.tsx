@@ -9,7 +9,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { DatasetSelector } from "../dataset-selector";
+import { DatasetSelector } from "../dataset-selector.tsx";
 
 const buildDataset = ({ name, id }: { name: string; id: string }): DatasetSummary =>
   ({

@@ -1,4 +1,4 @@
-import { otlpKeyValueSchema, type OtlpAnyValue } from "./any-value";
+import { otlpKeyValueSchema, type OtlpAnyValue } from "./any-value.ts";
 
 /**
  * The one value an `AnyValue` carries, read in the order OTLP declares its

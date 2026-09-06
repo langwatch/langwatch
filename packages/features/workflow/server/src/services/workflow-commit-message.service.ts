@@ -15,13 +15,13 @@ import { createPatch } from "diff";
 import type {
   WorkflowAiCallPort,
   WorkflowCommitMessageModelPort,
-} from "../ports/workflow-commit-message.port";
+} from "../ports/workflow-commit-message.port.ts";
 import {
   WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY,
   WORKFLOW_COMMIT_MESSAGE_PATCH_FILE,
   WORKFLOW_COMMIT_MESSAGE_PATCH_LABELS,
   workflowCommitMessagePrompt,
-} from "../rules/workflow-commit-message.rules";
+} from "../rules/workflow-commit-message.rules.ts";
 
 export class WorkflowCommitMessageService {
   static create(options: {

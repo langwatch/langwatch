@@ -12,9 +12,9 @@ import {
   targetKeyOf,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import type { ScenarioPlanRecord } from "../../repositories/scenario.repository";
-import type { RawRunConfigurationRow } from "../../ports/run-configurations-read.port";
-import { __testing } from "../run-configurations.service";
+import type { ScenarioPlanRecord } from "../../repositories/scenario.repository.ts";
+import type { RawRunConfigurationRow } from "../../ports/run-configurations-read.port.ts";
+import { __testing } from "../run-configurations.service.ts";
 
 const { toEntry, toTarget, collapse } = __testing;
 

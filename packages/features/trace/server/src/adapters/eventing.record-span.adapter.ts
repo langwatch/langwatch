@@ -24,10 +24,10 @@ import type {
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
-} from "../ports/trace-span-preparation.port";
-import type { TraceSpanSpoolPort } from "../ports/trace-span-spool.port";
-import { clonePayload } from "../rules/payload-clone.rules";
-import { TraceAttributeCapService } from "../services/trace-attribute-cap.service";
+} from "../ports/trace-span-preparation.port.ts";
+import type { TraceSpanSpoolPort } from "../ports/trace-span-spool.port.ts";
+import { clonePayload } from "../rules/payload-clone.rules.ts";
+import { TraceAttributeCapService } from "../services/trace-attribute-cap.service.ts";
 
 const traceAttributeCapService = TraceAttributeCapService.create();
 

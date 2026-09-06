@@ -12,7 +12,7 @@ import {
   UiScopeHostProvider,
 } from "@langwatch/ui-host/use-organization-team-project";
 
-import { TraceIdPeek, TracePreviewHoverCard } from "../trace-id-peek";
+import { TraceIdPeek, TracePreviewHoverCard } from "../trace-id-peek.tsx";
 
 type HeaderInput = {
   projectId: string;
@@ -25,7 +25,7 @@ const { openDrawerMock, capturedHeaderInputs } = vi.hoisted(() => ({
   capturedHeaderInputs: [] as HeaderInput[],
 }));
 
-vi.mock("../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
@@ -34,7 +34,7 @@ vi.mock("../../../../behavior/use-drawer", () => ({
 // partition-pruning hint, so capture what the hover hands the summary; that the
 // summary forwards it to the header query is asserted in the package, beside
 // the query.
-vi.mock("../../trace-peek-summary", () => ({
+vi.mock("../../trace-peek-summary.tsx", () => ({
   TracePeekSummary: (input: HeaderInput) => {
     capturedHeaderInputs.push(input);
     return null;

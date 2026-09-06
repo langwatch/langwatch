@@ -1,4 +1,4 @@
-import { createService as createRawService } from "../builder.js";
+import { createService as createRawService } from "../builder.ts";
 
 export const createTestService: typeof createRawService = ((
   config: Parameters<typeof createRawService>[0],

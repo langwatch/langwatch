@@ -6,8 +6,8 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FeatureFlagTrpcApi, type FeatureFlagTrpcContext } from "../feature-flag.api";
-import { MemoryFeatureFlagService } from "../../../testing";
+import { FeatureFlagTrpcApi, type FeatureFlagTrpcContext } from "../feature-flag.api.ts";
+import { MemoryFeatureFlagService } from "../../../testing.ts";
 
 const USER_ID = "user_1";
 const OWN_ORG_A = "org_own_a";

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { collectFilenameMigrationMappings, planFilenameMigration } from "../src/filename-migration";
+import { collectFilenameMigrationMappings, planFilenameMigration } from "../src/filename-migration.ts";
 
 let root = "";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveWelcomeRedirect } from "./welcome-redirect";
+import { resolveWelcomeRedirect } from "./welcome-redirect.ts";
 
 /**
  * ADR-038 v6: the welcome screen's redirect decision. Belonging to an

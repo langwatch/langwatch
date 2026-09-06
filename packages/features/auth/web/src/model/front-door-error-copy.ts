@@ -2,7 +2,7 @@
  * The words a customer reads for the codes the FRONT DOOR raises.
  */
 
-import { safeProse, type AuthHandledError } from "./read-handled-error";
+import { safeProse, type AuthHandledError } from "./read-handled-error.ts";
 
 /** One entry, exactly as the registry writes one. */
 type FrontDoorErrorEntry = {

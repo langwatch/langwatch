@@ -1,6 +1,6 @@
 import { defineConfig } from "@chakra-ui/react";
 import { describe, expect, it } from "vitest";
-import { createDesignSystem, system } from "../src/system";
+import { createDesignSystem, system } from "../src/system/index.ts";
 
 type TokenLayer = Record<string, Record<string, string>>;
 

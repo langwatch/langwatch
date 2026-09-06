@@ -3,8 +3,8 @@ import {
   annotationAnchorColumnsSchema,
   annotationAnchorScopeSchema,
   refineAnnotationAnchorColumns,
-} from "./annotation.anchor";
-import { annotationScoreOptionSchema } from "./annotation.score";
+} from "./annotation.anchor.ts";
+import { annotationScoreOptionSchema } from "./annotation.score.ts";
 
 /**
  * The transport inputs the annotation surface publishes.

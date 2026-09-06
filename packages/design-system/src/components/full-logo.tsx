@@ -1,5 +1,5 @@
 /** The product mark: two inline SVGs and a colour-mode read. */
-import { useColorMode } from "../color-mode";
+import { useColorMode } from "../color-mode/index.tsx";
 
 export function FullLogo({
   width = 155,

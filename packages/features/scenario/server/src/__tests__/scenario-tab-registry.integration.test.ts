@@ -19,7 +19,7 @@ import {
   SCENARIO_TAB_TTL_SECONDS,
   ScenarioClockPort,
   ScenarioTabRegistryService,
-} from "../index";
+} from "../index.ts";
 
 const projectId = `proj-${randomUUID()}`;
 const otherProjectId = `proj-${randomUUID()}`;

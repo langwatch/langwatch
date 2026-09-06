@@ -2,8 +2,8 @@ import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback";
-import { api } from "../../../../behavior/governance-api";
+import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
+import { api } from "../../../../behavior/governance-api.ts";
 type DepartmentRow = { id: string; name: string };
 
 export function DepartmentEditDrawer({

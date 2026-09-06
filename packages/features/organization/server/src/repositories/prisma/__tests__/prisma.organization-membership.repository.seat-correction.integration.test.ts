@@ -23,7 +23,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository";
+import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

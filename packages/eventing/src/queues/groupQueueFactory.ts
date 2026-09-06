@@ -6,7 +6,7 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
-import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types";
+import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
 
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;

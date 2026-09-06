@@ -1,12 +1,12 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuUser } from "react-icons/lu";
-import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown";
-import type { DisplayRoleVisuals } from "../../elements/scenario-role";
-import { BlockStack } from "./block-stack";
-import { asMarkdownBody } from "../../../behavior/transcript/parsing";
-import { getRolePalette } from "../../blocks/transcript/role-chip";
-import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron";
-import type { ChatMessage, ContentBlock } from "../../../model/transcript/types";
+import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+import type { DisplayRoleVisuals } from "../../elements/scenario-role.tsx";
+import { BlockStack } from "./block-stack.tsx";
+import { asMarkdownBody } from "../../../behavior/transcript/parsing.ts";
+import { getRolePalette } from "../../blocks/transcript/role-chip.tsx";
+import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";
+import type { ChatMessage, ContentBlock } from "../../../model/transcript/types.ts";
 
 /**
  * User turn — renders every block the user message had.

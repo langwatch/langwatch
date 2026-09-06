@@ -4,7 +4,7 @@ import type {
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceProjectPort } from "../ports/governance-project.port";
+import type { GovernanceProjectPort } from "../ports/governance-project.port.ts";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSinkPort,
@@ -14,19 +14,19 @@ import type {
   IngestionPullSourcePort,
   PulledUsageDispatcherPort,
   PulledUsageEntitlementPort,
-} from "../ports/ingestion-pull-worker.port";
+} from "../ports/ingestion-pull-worker.port.ts";
 import {
   COPILOT_ROUTING_PROFILE,
   CopilotStudioTraceMapperService,
-} from "./copilot-studio-trace-mapper.service";
-import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "./genie-trace-mapper.service";
+} from "./copilot-studio-trace-mapper.service.ts";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "./genie-trace-mapper.service.ts";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
-} from "./conversation-trace-assembly.service";
-import type { IngestionCredentialsService } from "./ingestion-credentials.service";
-import type { PulledUsageRecordService } from "./pulled-usage-record.service";
-import type { PullerRegistryService } from "./puller-registry.service";
+} from "./conversation-trace-assembly.service.ts";
+import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
+import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
+import type { PullerRegistryService } from "./puller-registry.service.ts";
 
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;

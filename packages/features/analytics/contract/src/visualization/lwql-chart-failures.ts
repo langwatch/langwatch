@@ -7,9 +7,9 @@
  * so the chart has exactly one way of telling a member what happened.
  */
 
-import { lwqlVegaError } from "./vega-lite-policy";
-import { JSON_POINTER_ROOT } from "./vega-lite-structure";
-import type { VegaValidationError } from "./visualization-types";
+import { lwqlVegaError } from "./vega-lite-policy.ts";
+import { JSON_POINTER_ROOT } from "./vega-lite-structure.ts";
+import type { VegaValidationError } from "./visualization-types.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);

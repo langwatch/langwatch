@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
-import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
-import type { SavedViewRepository } from "../repositories/saved-view.repository";
+import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port.ts";
+import type { SavedViewRepository } from "../repositories/saved-view.repository.ts";
 
 /**
  * Seed views auto-populated on first access for a project.

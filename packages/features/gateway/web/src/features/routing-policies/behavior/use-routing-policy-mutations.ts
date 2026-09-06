@@ -3,17 +3,17 @@
  * the page and the drawer cannot drift about what a successful save looks like. Returns state
  * and callbacks only, never JSX.
  */
-import { useGatewayToaster, useShowErrorToast } from "../../../behavior/gateway-feedback";
+import { useGatewayToaster, useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useCallback, useState } from "react";
 
-import { describeError } from "../../../model/describe-error";
-import { api } from "../../../behavior/gateway-api";
+import { describeError } from "../../../model/describe-error.ts";
+import { api } from "../../../behavior/gateway-api.ts";
 
 import {
   modelAliasesFromForm,
   type RoutingPolicyFormValues,
   restrictionsToPayload,
-} from "../model/routing-policy-form";
+} from "../model/routing-policy-form.ts";
 
 export interface UseRoutingPolicyMutationsInput {
   organizationId: string;

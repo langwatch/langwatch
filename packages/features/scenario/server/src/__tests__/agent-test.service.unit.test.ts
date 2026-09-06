@@ -8,13 +8,13 @@ import {
   type AgentService,
   type AgentWithFields,
 } from "@langwatch/agent-contract";
-import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port";
+import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port.ts";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTestService } from "../services/agent-test.service";
+import { AgentTestService } from "../services/agent-test.service.ts";
 
 const prefetchAgentTestData = vi.fn();
-vi.mock("../services/agent-test-prefetch.service", () => ({
+vi.mock("../services/agent-test-prefetch.service.ts", () => ({
   AgentTestPrefetchService: {
     create: () => ({ prefetch: (...args: unknown[]) => prefetchAgentTestData(...args) }),
   },

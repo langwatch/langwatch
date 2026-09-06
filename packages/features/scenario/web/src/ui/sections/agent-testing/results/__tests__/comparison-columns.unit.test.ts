@@ -10,7 +10,7 @@ import {
   TARGET_COLUMN_MAX_WIDTH,
   TARGET_COLUMN_MIN_WIDTH,
   targetColumnWidth,
-} from "../comparison-columns";
+} from "../comparison-columns.ts";
 
 describe("targetColumnWidth", () => {
   describe("given short target names", () => {

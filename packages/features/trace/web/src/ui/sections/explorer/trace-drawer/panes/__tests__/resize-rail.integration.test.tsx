@@ -8,8 +8,8 @@ import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../../../../../behavior/drawer.store";
-import { ResizeRail } from "../resize-rail";
+} from "../../../../../../behavior/drawer.store.ts";
+import { ResizeRail } from "../resize-rail.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

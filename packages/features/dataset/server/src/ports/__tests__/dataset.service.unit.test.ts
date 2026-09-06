@@ -1,5 +1,5 @@
-import { DatasetRepository } from "../../repositories/dataset.repository";
-import { DatasetRecordRepository } from "../../repositories/dataset-record.repository";
+import { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import {
   datasetSchema,
   type Dataset,
@@ -8,8 +8,8 @@ import {
   type DatasetWithRecords,
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
-import { DatasetService } from "../../services/dataset.service";
-import { DatasetContentPort, DatasetNormalizeQueuePort, DatasetUploadPort } from "../dataset.port";
+import { DatasetService } from "../../services/dataset.service.ts";
+import { DatasetContentPort, DatasetNormalizeQueuePort, DatasetUploadPort } from "../dataset.port.ts";
 import type { FinalizeUploadInput, RetryNormalizeInput } from "@langwatch/dataset-contract";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>

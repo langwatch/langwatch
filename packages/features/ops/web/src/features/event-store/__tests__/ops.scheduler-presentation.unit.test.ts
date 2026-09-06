@@ -10,7 +10,7 @@ import {
   needsAttention,
   type SchedulerJobLike,
   summarize,
-} from "../model/scheduler-presentation";
+} from "../model/scheduler-presentation.ts";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z").getTime();
 const at = (offsetMs: number) => new Date(NOW + offsetMs).toISOString();

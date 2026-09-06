@@ -8,8 +8,8 @@ import {
   type ModelProviderCodexStatus,
   type ModelProviderCodexStatusInput,
 } from "@langwatch/model-provider-contract";
-import type { CodexTokenRefresher, ModelProviderRepository } from "../ports/model-provider.port";
-import type { ModelProviderQueryService } from "./model-provider-query.service";
+import type { CodexTokenRefresher, ModelProviderRepository } from "../ports/model-provider.port.ts";
+import type { ModelProviderQueryService } from "./model-provider-query.service.ts";
 
 type ModelProviderCodexOptions = {
   repository: ModelProviderRepository;

@@ -1,6 +1,6 @@
-import { type SetCellValuePayload, setCellValuePayloadSchema } from "../schemas";
-import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
-import { type Transform, TransformError } from "./types";
+import { type SetCellValuePayload, setCellValuePayloadSchema } from "../schemas.ts";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import { type Transform, TransformError } from "./types.ts";
 
 /**
  * Write one cell of an inline dataset.

@@ -16,7 +16,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository";
+import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
 
 /** This suite writes the rows it then reads; no project owns any of them. */
 class AllowTestQueries extends PrismaQueryGuard {

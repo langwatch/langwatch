@@ -1,13 +1,13 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuGitCompare } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay";
-import type { TraceOverlayView } from "../../../../../behavior/trace-edit.store";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
-import { formatAbsoluteTime } from "../../../../../model/display-formatters";
-import { SegmentedToggle } from "../../../../elements/explorer/trace-drawer/segmented-toggle";
-import { TraceEditDiffDialog } from "../trace-edit-diff-dialog";
+import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay.ts";
+import type { TraceOverlayView } from "../../../../../behavior/trace-edit.store.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { formatAbsoluteTime } from "../../../../../model/display-formatters.ts";
+import { SegmentedToggle } from "../../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
+import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
 
 const VIEW_OPTIONS = [
   { value: "edited", label: "Edited" },

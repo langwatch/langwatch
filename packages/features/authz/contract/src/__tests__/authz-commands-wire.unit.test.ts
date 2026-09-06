@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { GRANT_EVENT_SOURCES } from "../authz-grant.events";
+import { GRANT_EVENT_SOURCES } from "../authz-grant.events.ts";
 import {
   attachGrantCommandDataSchema,
   defineRoleCommandDataSchema,
   revokeGrantCommandDataSchema,
-} from "../authz.commands";
+} from "../authz.commands.ts";
 
 /**
  * The wire boundary's job is to make unrepresentable grants unrepresentable.

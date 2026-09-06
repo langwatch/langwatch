@@ -4,11 +4,11 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
-import type { DatasetContentRepository } from "../../repositories/dataset-content.repository";
-import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository";
-import type { DatasetStorageResolver } from "../../ports/dataset-storage.port";
-import { DatasetUploadAdapter } from "../dataset-upload.adapter";
-import { LocalDatasetStorage } from "../local.dataset-storage.adapter";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
+import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
+import type { DatasetStorageResolver } from "../../ports/dataset-storage.port.ts";
+import { DatasetUploadAdapter } from "../dataset-upload.adapter.ts";
+import { LocalDatasetStorage } from "../local.dataset-storage.adapter.ts";
 
 /** A no-S3 (single-replica self-host) resolver: every project's storage is the
  * real LocalDatasetStorage on a temp filesystem root — no S3 configured. */

@@ -1,7 +1,7 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { createEvaluationTrpcRouter } from "./evaluation-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createEvaluationTrpcRouter } from "./evaluation-trpc.mount.ts";
 
 /** The namespace, the `ctx.app.evaluations` slice and the pipeline sender. */
 export type ComposedEvaluationFeature = Readonly<{

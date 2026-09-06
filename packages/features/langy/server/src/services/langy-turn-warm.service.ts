@@ -1,9 +1,9 @@
 import { stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
-import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service";
-import { LangyTurnSharedService } from "./langy-turn-shared.service";
-import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
+import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
+import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service.ts";
+import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
+import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port.ts";
 
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();

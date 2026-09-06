@@ -4,7 +4,7 @@ import {
   NON_BILLABLE_ATTR,
   resolveNonBilledCost,
   splitTraceCost,
-} from "../index";
+} from "../index.ts";
 
 describe("isNonBillableTrace", () => {
   describe("when the non-billable marker is 'true'", () => {

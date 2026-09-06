@@ -8,14 +8,14 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../behavior/navigation-api", () => ({
+vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({ data: 0 }) } },
   },
 }));
 
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing";
-import { MainMenuSections } from "../main-menu";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
+import { MainMenuSections } from "../main-menu.tsx";
 
 const PROJECT = { id: "project-1", slug: "demo", name: "Demo" };
 

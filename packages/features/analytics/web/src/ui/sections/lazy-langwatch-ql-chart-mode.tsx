@@ -14,17 +14,17 @@
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";
 
-import { lazyBoundary } from "../elements/lazy-boundary";
+import { lazyBoundary } from "../elements/lazy-boundary.tsx";
 
-import type { LangWatchQLChartModeProps } from "./themed-langwatch-ql-chart-mode";
+import type { LangWatchQLChartModeProps } from "./themed-langwatch-ql-chart-mode.tsx";
 
 export type {
   LangWatchQLChartModeProps,
   LangWatchQLChartResult,
-} from "./themed-langwatch-ql-chart-mode";
+} from "./themed-langwatch-ql-chart-mode.tsx";
 
 export const LazyLangWatchQLChartMode = lazyBoundary<LangWatchQLChartModeProps>(
-  () => import("./themed-langwatch-ql-chart-mode"),
+  () => import("./themed-langwatch-ql-chart-mode.tsx"),
   () => (
     <HStack gap={2} color="fg.muted" padding={4}>
       <Spinner size="sm" />

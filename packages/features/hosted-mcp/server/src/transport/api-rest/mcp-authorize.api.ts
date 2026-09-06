@@ -12,8 +12,8 @@ import {
 } from "@langwatch/api/rest";
 import { randomUUID } from "node:crypto";
 
-import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
-import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service";
+import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
+import { McpOAuthClientRegistryService } from "../../services/mcp-oauth-client-registry.service.ts";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;

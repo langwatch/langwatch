@@ -16,8 +16,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types";
-import type { PendingBinding } from "../group-binding-input-row";
+import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
+import type { PendingBinding } from "../group-binding-input-row.tsx";
 
 const {
   mockUpdateMemberRole,
@@ -55,7 +55,7 @@ const {
   },
 }));
 
-vi.mock("../../../behavior/organization-api", () => ({
+vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
       roleBinding: {
@@ -100,7 +100,7 @@ vi.mock("../../../behavior/organization-api", () => ({
 // The toaster and the error toast are the host port's `succeeded`/`failed` in
 // this package, so what the dialog says is asserted where it is composed. The
 // two call SHAPES are what these tests are about, and they did not change.
-vi.mock("../../../behavior/organization-feedback", () => ({
+vi.mock("../../../behavior/organization-feedback.ts", () => ({
   useOrganizationToaster: () => ({
     create: (...args: unknown[]) => mockToasterCreate(...args),
   }),
@@ -110,7 +110,7 @@ vi.mock("../../../behavior/organization-feedback", () => ({
       mockToasterCreate({ title: fallbackTitle, type: "error" }),
 }));
 
-vi.mock("../../elements/organization-user-role-field", () => ({
+vi.mock("../../elements/organization-user-role-field.tsx", () => ({
   OrganizationUserRoleField: ({
     value,
     onChange,
@@ -129,8 +129,8 @@ vi.mock("../../elements/organization-user-role-field", () => ({
   ),
 }));
 
-vi.mock("../group-binding-input-row", async () => {
-  const actual = await vi.importActual<typeof import("../group-binding-input-row")>(
+vi.mock("../group-binding-input-row.tsx", async () => {
+  const actual = await vi.importActual<typeof import("../group-binding-input-row.tsx")>(
     "../group-binding-input-row",
   );
   const React = await vi.importActual<typeof import("react")>("react");
@@ -213,7 +213,7 @@ vi.mock("../group-binding-input-row", async () => {
   };
 });
 
-const { MemberDetailDialog } = await import("../member-detail-dialog");
+const { MemberDetailDialog } = await import("../member-detail-dialog.tsx");
 
 const Wrapper = ({ children }: { children?: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

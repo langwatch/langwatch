@@ -42,12 +42,12 @@ const {
   searchParamsRef: { current: new URLSearchParams("") },
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
   usePublicEnvWithCapabilities: () => ({ data: publicEnvRef.current }),
 }));
 
-vi.mock("../../../behavior/auth-api", () => ({
+vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
     frontDoor: {
       route: {
@@ -92,8 +92,8 @@ vi.mock("../../../behavior/auth-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     signIn: signInMock,
@@ -102,17 +102,17 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../behavior/browser-navigation", () => ({
+vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: vi.fn(),
   hardNavigate: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../ui/elements/router-link", () => ({
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -120,9 +120,9 @@ vi.mock("../../../ui/elements/router-link", () => ({
   ),
 }));
 
-import ForgotPassword from "../forgot-password.screen";
-import SignIn from "../signin.screen";
-import SignUp from "../signup.screen";
+import ForgotPassword from "../forgot-password.screen.tsx";
+import SignIn from "../signin.screen.tsx";
+import SignUp from "../signup.screen.tsx";
 
 const federatedPicker: RoutingDecision = {
   outcome: "method_picker",

@@ -4,7 +4,7 @@
  * @see specs/experiments-v3/connected-agent-target.feature
  */
 import { describe, expect, it } from "vitest";
-import { connectedTargetFields } from "../connected-agent-target";
+import { connectedTargetFields } from "../connected-agent-target.ts";
 
 const agent = {
   parameters: [

@@ -11,10 +11,10 @@ import {
   PromptPlaygroundChatProvider,
   TabIdProvider,
   type TabData,
-} from "../../studio-internals";
-import { SyncedChatInput } from "../synced-chat-input";
-import { PromptHostProvider } from "../../../../model/prompt-host";
-import { FakePromptHost } from "../../../../testing";
+} from "../../studio-internals.ts";
+import { SyncedChatInput } from "../synced-chat-input.tsx";
+import { PromptHostProvider } from "../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked
@@ -58,7 +58,7 @@ const capabilities: PromptTabsCapabilities = {
 };
 
 // Mock useOrganizationTeamProject
-vi.mock("../../../../behavior/use-prompt-project", () => ({
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
     project: { id: TEST_PROJECT_ID },
     projectId: TEST_PROJECT_ID,

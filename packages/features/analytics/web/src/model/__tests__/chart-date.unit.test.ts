@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChartDate } from "../chart-date";
+import { formatChartDate } from "../chart-date.ts";
 
 describe("formatChartDate()", () => {
   describe("when date is falsy", () => {

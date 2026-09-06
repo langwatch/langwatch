@@ -5,10 +5,10 @@ import {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
   BILLING_METER_DISPATCH_SUPPRESS_MS,
   EventingBillingMeterDispatchAdapter,
-} from "../eventing.billing-meter-dispatch.adapter";
-import { RedisBillingTenantOrganizationCacheAdapter } from "../redis.tenant-organization-cache.adapter";
-import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter";
-import { BillingTenantOrganizationService } from "../../services/tenant-organization.service";
+} from "../eventing.billing-meter-dispatch.adapter.ts";
+import { RedisBillingTenantOrganizationCacheAdapter } from "../redis.tenant-organization-cache.adapter.ts";
+import { PostgresBillingTenantOrganizationAdapter } from "../postgres.tenant-organization.adapter.ts";
+import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
 function compose(
   options: {

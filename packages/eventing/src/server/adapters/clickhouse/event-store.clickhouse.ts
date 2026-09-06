@@ -1,15 +1,15 @@
-import type { Event } from "../../../domain/types";
-import type { EventStoreReadContext } from "../../../stores/eventStore.types";
+import type { Event } from "../../../domain/types.ts";
+import type { EventStoreReadContext } from "../../../stores/eventStore.types.ts";
 import type {
   EventRecord,
   EventRepository,
-} from "../../../stores/repositories/eventRepository.types";
-import type { RetentionPolicyResolver } from "../../../runtime.types";
-import { AbstractEventStore } from "../../../stores/abstractEventStore";
+} from "../../../stores/repositories/eventRepository.types.ts";
+import type { RetentionPolicyResolver } from "../../../runtime.types.ts";
+import { AbstractEventStore } from "../../../stores/abstractEventStore.ts";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { EventingRetentionConfiguration } from "../../retention";
+import type { EventingRetentionConfiguration } from "../../retention.ts";
 
 /**
  * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.

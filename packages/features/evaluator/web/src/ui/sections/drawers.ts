@@ -16,9 +16,9 @@
  * mounts it beside this family's own two.
  */
 
-export { EvaluatorHistoryPanel } from "./evaluator-history-panel";
+export { EvaluatorHistoryPanel } from "./evaluator-history-panel.tsx";
 export {
   GuardrailsDrawer,
   type GuardrailsDrawerProps,
-} from "../elements/evaluations/guardrails-drawer";
-export { EvaluatorListDrawer, type EvaluatorListDrawerProps } from "./evaluator-list-drawer";
+} from "../elements/evaluations/guardrails-drawer.tsx";
+export { EvaluatorListDrawer, type EvaluatorListDrawerProps } from "./evaluator-list-drawer.tsx";

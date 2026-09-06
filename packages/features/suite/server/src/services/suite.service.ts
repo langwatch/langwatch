@@ -1,4 +1,4 @@
-import type { ConnectedPresenceReader } from "./connected-target.service";
+import type { ConnectedPresenceReader } from "./connected-target.service.ts";
 import {
   createSuiteCommandSchema,
   suiteArchivedNamesInputSchema,
@@ -33,11 +33,11 @@ import {
   type ScenarioTestSuite,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
-import type { SuiteExecutionPort } from "../ports/suite-execution.port";
-import type { SuiteRepository } from "../repositories/suite.repository";
-import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
-import { SuiteRunService } from "./suite-run.service";
-import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules";
+import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import type { SuiteRepository } from "../repositories/suite.repository.ts";
+import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
+import { SuiteRunService } from "./suite-run.service.ts";
+import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
 
 const archivedSlugSuffix = "--archived";
 

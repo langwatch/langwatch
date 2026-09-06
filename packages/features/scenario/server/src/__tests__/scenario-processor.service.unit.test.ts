@@ -16,7 +16,7 @@ import {
   parseChildProcessResult,
   type CancellationMessage,
   type ExecutionJobData,
-} from "../index";
+} from "../index.ts";
 
 const job = (id: string): ExecutionJobData => ({
   projectId: "project-1",

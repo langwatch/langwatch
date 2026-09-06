@@ -94,9 +94,9 @@ import type {
   PersonalWorkspaceFeatureProject,
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
-} from "../ports/organization.port";
-import type { GroupRepository } from "../repositories/group.repository";
-import type { TeamRepository } from "../repositories/team.repository";
+} from "../ports/organization.port.ts";
+import type { GroupRepository } from "../repositories/group.repository.ts";
+import type { TeamRepository } from "../repositories/team.repository.ts";
 
 const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
   evaluations: false,
@@ -245,7 +245,7 @@ function compareNullableText(left: string | null, right: string | null): number 
   return left.localeCompare(right);
 }
 
-import { OrganizationGroupService } from "./organization-group.service";
+import { OrganizationGroupService } from "./organization-group.service.ts";
 
 export class OrganizationService extends OrganizationServiceContract {
   private constructor(

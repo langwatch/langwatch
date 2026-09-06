@@ -4,7 +4,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 
-import { Link } from "../link";
+import { Link } from "../link.tsx";
 
 /**
  * Upgrade treatment for visibility-window-redacted content (ADR-028 §7).

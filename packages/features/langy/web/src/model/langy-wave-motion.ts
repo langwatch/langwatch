@@ -3,7 +3,7 @@ import {
   hasTokens,
   runningTool,
   type ThinkingMessage,
-} from "./langy-thinking-line";
+} from "./langy-thinking-line.ts";
 
 /**
  * Maps observable Langy activity to low-amplitude fold motion. The fold never follows

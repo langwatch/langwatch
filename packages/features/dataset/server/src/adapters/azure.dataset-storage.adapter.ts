@@ -13,19 +13,19 @@ import {
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
-} from "../rules/dataset-chunking.rules";
+} from "../rules/dataset-chunking.rules.ts";
 import type {
   DatasetStorage,
   PresignedUpload,
   DatasetAzureConfigResolver,
-} from "../ports/dataset-storage.port";
+} from "../ports/dataset-storage.port.ts";
 import {
   ChunkTooLargeError,
   MissingChunkError,
   StagedUploadNotFoundError,
   UploadTooLargeError,
 } from "@langwatch/dataset-contract";
-import { localStagingUploadPath, stagingUploadKey } from "../rules/presigned-upload.rules";
+import { localStagingUploadPath, stagingUploadKey } from "../rules/presigned-upload.rules.ts";
 
 /**
  * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text). Capped at

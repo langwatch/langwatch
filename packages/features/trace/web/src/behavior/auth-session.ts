@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import { useOptionalTraceHost } from "./trace-host";
+import { useOptionalTraceHost } from "./trace-host.ts";
 
 export type TraceSessionReading = {
   data: {

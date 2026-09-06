@@ -41,7 +41,7 @@ import {
 } from "@langwatch/annotation-contract";
 import { OrganizationService, UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, ProjectService } from "@langwatch/project-contract";
-import { AnnotationRepository } from "../ports/annotation.port";
+import { AnnotationRepository } from "../ports/annotation.port.ts";
 
 export class AnnotationService extends AnnotationServiceContract {
   private constructor(

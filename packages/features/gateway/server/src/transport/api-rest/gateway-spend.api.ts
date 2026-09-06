@@ -8,25 +8,25 @@ import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { GatewaySpendCursorAdapter } from "../../adapters/gateway-spend-cursor.adapter";
+import { GatewaySpendCursorAdapter } from "../../adapters/gateway-spend-cursor.adapter.ts";
 import {
   GatewaySpendFiltersAdapter,
   SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
   spendSummaryStatusFilter,
-} from "../../adapters/gateway-spend-filters.adapter";
+} from "../../adapters/gateway-spend-filters.adapter.ts";
 import {
   GatewaySpendGroupingAdapter,
   MAX_GROUP_BY_KEYS,
-} from "../../adapters/gateway-spend-grouping.adapter";
+} from "../../adapters/gateway-spend-grouping.adapter.ts";
 import {
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
-} from "../../ports/gateway-spend-events.port";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
-import type { GatewaySettlementPolicyPort } from "../../ports/gateway-settlement-policy.port";
-import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service";
+} from "../../ports/gateway-spend-events.port.ts";
+import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port.ts";
+import type { GatewaySettlementPolicyPort } from "../../ports/gateway-settlement-policy.port.ts";
+import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { requires } from "@langwatch/api";
 import {

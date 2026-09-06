@@ -20,7 +20,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { analyzeTransform } from "../vega-lite-transforms";
+import { analyzeTransform } from "../vega-lite-transforms.ts";
 
 describe("bin outputs", () => {
   it("takes both names from a two-name `as` and appends nothing", () => {

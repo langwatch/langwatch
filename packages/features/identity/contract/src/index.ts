@@ -10,7 +10,7 @@ export {
   type ExpectedIdentifier,
   identifierStateSatisfies,
   orphanedIdentifierRows,
-} from "./backfill";
+} from "./backfill.ts";
 export {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
@@ -70,7 +70,7 @@ export {
   teardownRequestedPayloadSchema,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   verificationRequestedPayloadSchema,
-} from "./connection";
+} from "./connection.ts";
 export {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -117,7 +117,7 @@ export {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
-} from "./connection-commands";
+} from "./connection-commands.ts";
 export {
   IdentityCommandRefusedError,
   IdentityDetachStrandsUserError,
@@ -155,8 +155,8 @@ export {
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
-} from "./identity.errors";
-export { IdentityEmailService } from "./identity-email.service";
+} from "./identity.errors.ts";
+export { IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -174,7 +174,7 @@ export {
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   resolveJoinLookup,
-} from "./join-matching";
+} from "./join-matching.ts";
 export {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   emptyJoinRequest,
@@ -216,7 +216,7 @@ export {
   joinWithdrawalCauseSchema,
   joinWithdrawnPayloadSchema,
   reduceJoinRequest,
-} from "./join-request";
+} from "./join-request.ts";
 export {
   APPROVE_JOIN_COMMAND_TYPE,
   type ApproveJoinCommandData,
@@ -236,7 +236,7 @@ export {
   WITHDRAW_JOIN_COMMAND_TYPE,
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
-} from "./join-request-commands";
+} from "./join-request-commands.ts";
 export {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   type AttachIdentifierCommandData,
@@ -286,8 +286,8 @@ export {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
-} from "./facts";
-export { identifierDomain, normalizeDomain, normalizeIdentifierValue } from "./identifier";
+} from "./facts.ts";
+export { identifierDomain, normalizeDomain, normalizeIdentifierValue } from "./identifier.ts";
 export {
   type IdentifierHead,
   type IdentityStream,
@@ -295,8 +295,8 @@ export {
   primaryChangeFacts,
   reduceIdentifier,
   userErasureFacts,
-} from "./identifier-aggregate";
-export { type MatchableEmail, matchableEmailsOf } from "./matchable-emails";
+} from "./identifier-aggregate.ts";
+export { type MatchableEmail, matchableEmailsOf } from "./matchable-emails.ts";
 export {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,
@@ -354,7 +354,7 @@ export {
   regenerateBackupCodesCommandDataSchema,
   reduceMfaEnrollment,
   remainingBackupCodes,
-} from "./mfa";
+} from "./mfa.ts";
 export {
   AMR_VALUES,
   type Amr,
@@ -375,15 +375,15 @@ export {
   secondFactorsIn,
   signInProvedSecondFactor,
   TOTP_AMR,
-} from "./mfa-condition";
+} from "./mfa-condition.ts";
 export {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,
   PASSWORD_REQUIREMENTS_HINT,
   passwordProblem,
-} from "./password-policy";
-export { primaryEmailOf } from "./primary-email";
-export { reduceIdentity } from "./reduce";
+} from "./password-policy.ts";
+export { primaryEmailOf } from "./primary-email.ts";
+export { reduceIdentity } from "./reduce.ts";
 export {
   emptyScimSync,
   reduceScimSync,
@@ -422,7 +422,7 @@ export {
   scimTokenRevokedPayloadSchema,
   scimUserOpSchema,
   scimUserPushedPayloadSchema,
-} from "./scim-sync";
+} from "./scim-sync.ts";
 export {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   type IssueScimTokenCommandData,
@@ -442,7 +442,7 @@ export {
   SCIM_SYNC_COMMAND_TYPES,
   type ScimSyncCommand,
   type ScimSyncCommandType,
-} from "./scim-sync-commands";
+} from "./scim-sync-commands.ts";
 
 export {
   compareToLegacy,
@@ -467,7 +467,7 @@ export {
   type SignInRoutingOutcome,
   type SignInRoutingReasonCode,
   type SsoConnectionRoutingState,
-} from "./signin-routing";
+} from "./signin-routing.ts";
 export {
   arrivalStateForProvider,
   IDENTIFIER_LIFECYCLE_STATES,
@@ -484,17 +484,17 @@ export {
   isLiveIdentifierState,
   type VerificationMethod,
   verificationMethodSchema,
-} from "./vocabulary";
+} from "./vocabulary.ts";
 /**
  * The four pipelines' framework identity (ADR-101, ADR-115, ADR-117): the
  * pipeline name and aggregate type every event stamps. Wire schemas that
  * extend these with the eventing envelope stay in `@langwatch/identity-server`.
  */
-export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events";
-export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events";
-export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events";
+export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events.ts";
+export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events.ts";
+export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events.ts";
 export {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
-} from "./sso-connection-events";
-export * from "./signin-callback.errors";
+} from "./sso-connection-events.ts";
+export * from "./signin-callback.errors.ts";

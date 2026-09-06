@@ -4,11 +4,11 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService as ShareServiceContract } from "@langwatch/share-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { ShareDatabase } from "../ports/share-database.port";
-import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repository";
-import { PrismaShareRepository } from "../repositories/prisma/prisma.share.repository";
-import { RedisShareCacheRepository } from "../repositories/redis/redis.share-cache.repository";
-import { ShareService } from "../services/share.service";
+import type { ShareDatabase } from "../ports/share-database.port.ts";
+import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repository.ts";
+import { PrismaShareRepository } from "../repositories/prisma/prisma.share.repository.ts";
+import { RedisShareCacheRepository } from "../repositories/redis/redis.share-cache.repository.ts";
+import { ShareService } from "../services/share.service.ts";
 
 export class PostgresShareAdapter {
   static create(options: {

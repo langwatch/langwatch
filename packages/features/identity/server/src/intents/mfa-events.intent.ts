@@ -4,7 +4,7 @@ import {
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
 import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
-import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
+import type { MfaEvent } from "../projections/mfa-enrollment-state.projection.ts";
 
 /** The one place an MFA enrollment fact becomes a framework event. */
 export function mfaEventsFor({

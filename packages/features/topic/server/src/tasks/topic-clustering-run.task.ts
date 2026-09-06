@@ -3,7 +3,7 @@ import { Task } from "@langwatch/task";
 import type {
   TopicClusteringPageOutcome,
   TopicClusteringRunPort,
-} from "../intents/topic-clustering.intent";
+} from "../intents/topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:tasks:topic-clustering-run");
 

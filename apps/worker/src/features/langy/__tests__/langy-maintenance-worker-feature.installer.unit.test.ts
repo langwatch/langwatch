@@ -15,8 +15,8 @@ import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { LANGY_SESSION_KEY_REAP_PROCESS_NAME } from "@langwatch/langy-server";
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime";
-import { LangyMaintenanceWorkerFeatureInstaller } from "../langy-maintenance-worker-feature.installer";
+import type { WorkerEventingRuntime } from "../../../platform/eventing/worker-eventing.runtime.ts";
+import { LangyMaintenanceWorkerFeatureInstaller } from "../langy-maintenance-worker-feature.installer.ts";
 
 type Registered = StaticPipelineDefinition<any, any, any>;
 

@@ -15,7 +15,7 @@ import {
   shouldExcludeSpan,
   type SpanTreeNode,
   stringifyForText,
-} from "../rules/trace-io-text.rules";
+} from "../rules/trace-io-text.rules.ts";
 
 /**
  * Service for extracting input/output text from spans using tree traversal and

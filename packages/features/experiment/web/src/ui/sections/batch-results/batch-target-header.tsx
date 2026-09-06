@@ -23,9 +23,9 @@ import {
   MetricStatsTooltip,
   PassRateCircle,
   useInteractiveTooltip,
-} from "./presentation";
-import type { BatchTargetColumn } from "../batch-evaluation-results.types";
-import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates";
+} from "./presentation.tsx";
+import type { BatchTargetColumn } from "../batch-evaluation-results.types.ts";
+import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
 
 type BatchTargetHeaderProps = {
   target: BatchTargetColumn;

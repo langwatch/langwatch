@@ -13,7 +13,7 @@ import { initTRPC } from "@trpc/server";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createPromptTagTrpcRouter, createPromptTrpcRouter } from "../prompt-trpc.mount";
+import { createPromptTagTrpcRouter, createPromptTrpcRouter } from "../prompt-trpc.mount.ts";
 
 /** The names the browser calls; a rename here breaks every caller of them. */
 const PROMPT_PROCEDURES = [

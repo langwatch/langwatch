@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaOrganizationSessionPolicyRepository } from "../repositories/prisma/prisma.organization-session-policy.repository";
-import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service";
+import { PrismaOrganizationSessionPolicyRepository } from "../repositories/prisma/prisma.organization-session-policy.repository.ts";
+import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
 
 /**
  * The Postgres composition of the session-policy service.

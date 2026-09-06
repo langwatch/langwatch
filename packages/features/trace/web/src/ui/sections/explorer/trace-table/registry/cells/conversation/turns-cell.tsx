@@ -1,7 +1,7 @@
 import { Text } from "@chakra-ui/react";
-import type { ConversationGroup } from "../../../conversation-groups";
-import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
-import type { CellDef } from "../../types";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
 
 /**
  * True per-session trace count from the server rollup. `traces` only holds

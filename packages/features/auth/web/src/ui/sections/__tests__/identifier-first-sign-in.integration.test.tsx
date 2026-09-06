@@ -32,7 +32,7 @@ const {
   searchParamsRef: { current: new URLSearchParams("") },
 }));
 
-vi.mock("../../../behavior/auth-api", () => ({
+vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
     frontDoor: {
       route: {
@@ -53,12 +53,12 @@ vi.mock("../../../behavior/auth-api", () => ({
   },
 }));
 
-vi.mock("../../../behavior/use-public-env", () => ({
+vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { IS_SAAS: true } }),
 }));
 
-vi.mock("../../../behavior/auth-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
+vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
   return {
     ...actual,
     signIn: signInMock,
@@ -66,17 +66,17 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../behavior/browser-navigation", () => ({
+vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replaceMock,
   hardNavigate: vi.fn(),
   reloadPage: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-route", () => ({
+vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../elements/router-link", () => ({
+vi.mock("../../elements/router-link.tsx", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
@@ -84,8 +84,8 @@ vi.mock("../../elements/router-link", () => ({
   ),
 }));
 
-import { LAST_USED_METHOD_STORAGE_KEY } from "../../../model/last-used-method";
-import { IdentifierFirstSignIn } from "../identifier-first-sign-in";
+import { LAST_USED_METHOD_STORAGE_KEY } from "../../../model/last-used-method.ts";
+import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
 const passwordMethod: SignInMethod = {
   id: "password",

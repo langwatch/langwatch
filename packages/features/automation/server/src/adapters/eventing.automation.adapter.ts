@@ -16,30 +16,30 @@ import {
   type GraphAlertSweepState,
   graphAlertSweepWake,
   sweepSchema,
-} from "../processes/graph-alert-sweep.process";
-import { runGraphAlertSweep } from "../intents/graph-alert-sweep.intent";
+} from "../processes/graph-alert-sweep.process.ts";
+import { runGraphAlertSweep } from "../intents/graph-alert-sweep.intent.ts";
 import {
   INITIAL_SETTLEMENT_STATE,
   type SettlementState,
   TriggerSettlement,
-} from "../processes/trigger-settlement.process";
+} from "../processes/trigger-settlement.process.ts";
 import {
   logOverflowIntentSchema,
   notifyDigestIntentSchema,
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
-} from "../intents/trigger-settlement.intent";
+} from "../intents/trigger-settlement.intent.ts";
 import {
   pruneSchema,
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
   type WebhookDeliveryPruneState,
   webhookDeliveryPruneWake,
-} from "../processes/webhook-delivery-prune.process";
-import { runWebhookDeliveryPrune } from "../intents/webhook-delivery-prune.intent";
+} from "../processes/webhook-delivery-prune.process.ts";
+import { runWebhookDeliveryPrune } from "../intents/webhook-delivery-prune.intent.ts";
 import { z } from "zod";
-import type { AutomationIntentRetentionPort } from "../ports/automation-intent-retention.port";
-import type { AutomationScheduledIntentPort } from "../ports/automation-scheduled-intent.port";
-import type { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port";
+import type { AutomationIntentRetentionPort } from "../ports/automation-intent-retention.port.ts";
+import type { AutomationScheduledIntentPort } from "../ports/automation-scheduled-intent.port.ts";
+import type { AutomationSettlementExecutorPort } from "../ports/automation-settlement.port.ts";
 
 const AUTOMATIONS_EVENT_TYPES = [TRIGGER_MATCH_RECORDED_EVENT_TYPE] as const;
 

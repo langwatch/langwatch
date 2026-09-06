@@ -8,9 +8,9 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
-import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper";
-import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../clickhouse.field-mappings.mapper";
-import { resetParamCounter } from "../clickhouse.filter-translator.mapper";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
+import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../clickhouse.field-mappings.mapper.ts";
+import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
  * Splits a SELECT list into its items. Commas inside a call cannot split an

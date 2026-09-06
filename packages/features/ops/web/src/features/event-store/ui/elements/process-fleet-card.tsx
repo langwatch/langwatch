@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Card, HStack, Spacer, Table, Text } from "@chakra-ui/react";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
-import { hasFleetTrouble } from "../../model/process-presentation";
+import { hasFleetTrouble } from "../../model/process-presentation.ts";
 
 function CountCell({ value, color }: { value: number; color?: string }) {
   return (

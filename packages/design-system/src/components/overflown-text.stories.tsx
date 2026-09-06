@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { OverflownTextWithTooltip } from "./overflown-text";
+import { OverflownTextWithTooltip } from "./overflown-text.tsx";
 
 const LONG =
   "You are a careful assistant. Answer only from the retrieved context and say so plainly when the context does not cover the question.";

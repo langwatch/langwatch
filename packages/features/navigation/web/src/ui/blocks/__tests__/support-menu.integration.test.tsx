@@ -7,8 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WithStubNavigationHost } from "../../../testing";
-import { SupportMenu } from "../support-menu";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { SupportMenu } from "../support-menu.tsx";
 
 function renderMenu({ withChat = true }: { withChat?: boolean } = {}) {
   const openSupportChat = vi.fn();

@@ -3,10 +3,10 @@
  * root is meant to reach it: repositories stay private, the caller receives
  * only the canonical service.
  */
-import { ResultAtomsService } from "../services/result-atoms.service";
-import { ResultAtomsClickHouseRepository } from "../repositories/clickhouse/clickhouse.result-atoms.repository";
-import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository";
-import { ResultAtomsReadPort } from "../ports/result-atoms-read.port";
+import { ResultAtomsService } from "../services/result-atoms.service.ts";
+import { ResultAtomsClickHouseRepository } from "../repositories/clickhouse/clickhouse.result-atoms.repository.ts";
+import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
+import { ResultAtomsReadPort } from "../ports/result-atoms-read.port.ts";
 
 /**
  * The narrow slice of `@clickhouse/client`'s `ClickHouseClient` this feature reads through. Duck-

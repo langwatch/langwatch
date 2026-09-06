@@ -6,11 +6,11 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PromptTabSummary } from "../tab/use-prompt-tab-summary";
-import { usePromptTabSummary } from "../tab/use-prompt-tab-summary";
-import { PromptTabSwitcher } from "../prompt-tab-switcher-panel";
+import type { PromptTabSummary } from "../tab/use-prompt-tab-summary.ts";
+import { usePromptTabSummary } from "../tab/use-prompt-tab-summary.ts";
+import { PromptTabSwitcher } from "../prompt-tab-switcher-panel.tsx";
 
-vi.mock("../tab/use-prompt-tab-summary", () => ({
+vi.mock("../tab/use-prompt-tab-summary.ts", () => ({
   usePromptTabSummary: vi.fn(),
 }));
 

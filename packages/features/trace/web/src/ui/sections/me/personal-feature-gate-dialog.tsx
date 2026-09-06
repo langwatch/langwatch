@@ -1,8 +1,8 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 
-import { Dialog } from "../dialog";
+import { Dialog } from "../dialog.tsx";
 
-import type { PersonalFeatureKey } from "./use-personal-feature-gate";
+import type { PersonalFeatureKey } from "./use-personal-feature-gate.ts";
 
 const FEATURE_LABEL: Record<PersonalFeatureKey, string> = {
   evaluations: "Evaluations",

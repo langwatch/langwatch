@@ -29,10 +29,10 @@ import {
 import type {
   ExperimentSubject,
   FeatureFlagExperimentRepository,
-} from "../repositories/feature-flag-experiment-setting.repository";
-import type { FeatureFlagRepository } from "../repositories/feature-flag.repository";
-import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store";
-import { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service";
+} from "../repositories/feature-flag-experiment-setting.repository.ts";
+import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
+import { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
 
 export class FeatureFlagService extends FeatureFlagServiceContract {
   private readonly organizationAges: OrganizationCreatedAtCacheService;

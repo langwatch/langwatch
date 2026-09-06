@@ -23,7 +23,7 @@
  */
 
 import { useCallback } from "react";
-import { useOptionalAuthHost } from "../model/auth-host";
+import { useOptionalAuthHost } from "../model/auth-host.ts";
 
 export type AuthErrorToastOptions = {
   /** The failure itself. The composition resolves the words from its code. */

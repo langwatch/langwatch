@@ -13,12 +13,12 @@ import {
   MissingAgentService,
   MissingSecretService,
   NoApiTrpcFeatures,
-} from "../../../api.application";
-import { ApiHttpListener } from "../../../api-http.listener";
-import { ApiRestSecurity } from "../../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
-import { isRootDiscoveryPath } from "../discovery-locations";
+} from "../../../api.application.ts";
+import { ApiHttpListener } from "../../../api-http.listener.ts";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { isRootDiscoveryPath } from "../discovery-locations.ts";
 import { Hono } from "hono";
 
 const running: ApiHttpListener[] = [];

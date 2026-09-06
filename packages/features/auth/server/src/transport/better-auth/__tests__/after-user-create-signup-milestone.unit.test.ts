@@ -26,13 +26,13 @@ import {
   type AuthzUpdateGrantInput,
 } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { afterUserCreate } from "../better-auth-hooks.api";
-import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
+import { afterUserCreate } from "../better-auth-hooks.api.ts";
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../../ports/better-auth.port";
+} from "../../../ports/better-auth.port.ts";
 
 /** Minimal grants ledger double: nothing in these scenarios reads its output. */
 class StubAuthzGrantsService extends AuthzGrantsService {

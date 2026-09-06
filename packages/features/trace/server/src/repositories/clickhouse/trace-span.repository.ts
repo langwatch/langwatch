@@ -6,13 +6,13 @@ import type {
 } from "@langwatch/trace-contract";
 import { EventUtils } from "@langwatch/eventing";
 
-import type { TraceClickHousePort } from "../../ports/clickhouse.port";
+import type { TraceClickHousePort } from "../../ports/clickhouse.port.ts";
 import {
   TraceRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
-} from "../../ports/trace.port";
+} from "../../ports/trace.port.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
 const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;

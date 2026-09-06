@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WorkflowCodeEditorModalHost } from "../workflow-code-editor.transport";
+import { WorkflowCodeEditorModalHost } from "../workflow-code-editor.transport.tsx";
 
 // An explicit return type: a function whose body only throws infers `never`,
 // and TypeScript refuses a `never`-returning function as a JSX component.

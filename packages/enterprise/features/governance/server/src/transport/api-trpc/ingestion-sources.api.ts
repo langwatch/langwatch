@@ -18,7 +18,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { IngestionSourceService } from "../../services/ingestion-source.service";
+import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
 
 export type IngestionSourcesTrpcContext = Readonly<{
   app: Readonly<{ governance: GovernanceService }>;

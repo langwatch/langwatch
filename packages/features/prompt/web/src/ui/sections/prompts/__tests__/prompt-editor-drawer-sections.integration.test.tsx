@@ -75,11 +75,11 @@ vi.mock("@langwatch/workflow-web/surfaces/studio-drawer-footer", () => ({
 // The model control the sticky header carries, stubbed to something nameable:
 // what the header scenario is about is where the control sits, not which models
 // the project has configured.
-vi.mock("../../../elements/prompts/forms/fields/model-select-field-mini", () => ({
+vi.mock("../../../elements/prompts/forms/fields/model-select-field-mini.tsx", () => ({
   ModelSelectFieldMini: () => <button data-testid="model-select">gpt-5-mini</button>,
 }));
 
-vi.mock("../../../../behavior/prompts/use-latest-prompt-version", () => ({
+vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
   useLatestPromptVersion: () => ({ data: void 0, isLoading: false }),
 }));
 
@@ -104,7 +104,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-const { PromptEditorDrawer } = await import("../prompt-editor-drawer");
+const { PromptEditorDrawer } = await import("../prompt-editor-drawer.tsx");
 
 function renderEditor(props: Partial<ComponentProps<typeof PromptEditorDrawer>> = {}) {
   return render(

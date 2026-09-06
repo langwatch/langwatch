@@ -24,7 +24,7 @@
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 
-import type { ApiBrowserSessionTransportPort } from "./api-auth.composition";
+import type { ApiBrowserSessionTransportPort } from "./api-auth.composition.ts";
 
 /** The signed-in person a handler reads, or nothing. */
 export type HandlerManagedSession = Readonly<{ user: Readonly<{ id: string }> }>;

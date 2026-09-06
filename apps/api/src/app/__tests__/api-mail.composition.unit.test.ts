@@ -1,9 +1,9 @@
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
-import { ApiComposedPasswordResetMail } from "../api-better-auth.composition";
-import { tryCreateApiMailComposition, type ApiMailComposition } from "../api-mail.composition";
-import { resolveApiConfig } from "../../platform/config/api.config";
+import { ApiComposedPasswordResetMail } from "../api-better-auth.composition.ts";
+import { tryCreateApiMailComposition, type ApiMailComposition } from "../api-mail.composition.ts";
+import { resolveApiConfig } from "../../platform/config/api.config.ts";
 
 /**
  * The password-reset mail, driven to a gateway that records what it was given.

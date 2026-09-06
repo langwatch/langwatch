@@ -1,4 +1,4 @@
-import { ScenarioTabStorePort } from "../ports/scenario-tab-store.port";
+import { ScenarioTabStorePort } from "../ports/scenario-tab-store.port.ts";
 
 export interface ScenarioTabRedisMulti {
   zadd(key: string, score: number, member: string): ScenarioTabRedisMulti;

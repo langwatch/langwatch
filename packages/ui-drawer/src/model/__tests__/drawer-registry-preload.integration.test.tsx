@@ -13,7 +13,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { lazyDrawer, preloadDrawer, type UiDrawerRegistry } from "../drawer-registry";
+import { lazyDrawer, preloadDrawer, type UiDrawerRegistry } from "../drawer-registry.ts";
 
 const { secondLoads } = vi.hoisted(() => ({
   secondLoads: { count: 0 },

@@ -5,7 +5,7 @@
 
 import { useCallback } from "react";
 import { isCancellableStatus } from "@langwatch/scenario-contract";
-import { api } from "../scenario-api";
+import { api } from "../scenario-api.ts";
 
 export { isCancellableStatus };
 

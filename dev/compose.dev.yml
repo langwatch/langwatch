@@ -375,7 +375,7 @@ services:
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
       - goose_bin:/opt/goose-bin:ro
-    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/worker.entrypoint.ts; sleep 1; done"
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do node --experimental-transform-types src/worker.entrypoint.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post

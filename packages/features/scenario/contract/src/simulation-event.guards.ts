@@ -1,7 +1,7 @@
 import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
-} from "./simulation-event.constants";
+} from "./simulation-event.constants.ts";
 import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,
@@ -15,7 +15,7 @@ import type {
   SimulationSetArchivedEvent,
   SimulationTextMessageEndEvent,
   SimulationTextMessageStartEvent,
-} from "./simulation.events";
+} from "./simulation.events.ts";
 
 export function isSimulationRunQueuedEvent(
   event: SimulationProcessingEvent,

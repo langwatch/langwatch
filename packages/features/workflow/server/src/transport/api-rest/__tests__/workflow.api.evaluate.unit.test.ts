@@ -15,7 +15,7 @@ import {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,
   type WorkflowRestPorts,
-} from "../workflow.api";
+} from "../workflow.api.ts";
 
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

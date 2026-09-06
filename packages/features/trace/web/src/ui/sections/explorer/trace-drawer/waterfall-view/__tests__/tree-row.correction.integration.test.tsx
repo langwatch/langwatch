@@ -5,8 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { TreeRow } from "../tree-row";
-import type { WaterfallTreeNode } from "../types";
+import { TreeRow } from "../tree-row.tsx";
+import type { WaterfallTreeNode } from "../types.ts";
 
 const span = {
   spanId: "span-1",

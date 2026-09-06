@@ -3,7 +3,7 @@ import { createContext, useContext } from "react";
 import type {
   MinimalOrganization,
   MinimalProject,
-} from "../../behavior/use-project-by-slug-or-latest";
+} from "../../behavior/use-project-by-slug-or-latest.ts";
 
 export interface ActiveProjectContextValue {
   project?: MinimalProject;

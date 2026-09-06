@@ -17,7 +17,7 @@ import {
   type AuthFailureNotice,
   type AuthPublicEnvironment,
   type AuthRouteReading,
-} from "./model/auth-host";
+} from "./model/auth-host.ts";
 
 /** The deployment a test runs against unless it says otherwise. */
 export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {

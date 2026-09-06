@@ -1,7 +1,7 @@
-import { PYTHON_BUILTINS } from "./python-builtins.catalogue";
-import { PYTHON_STDLIB_MODULES } from "./python-stdlib.catalogue";
+import { PYTHON_BUILTINS } from "./python-builtins.catalogue.ts";
+import { PYTHON_STDLIB_MODULES } from "./python-stdlib.catalogue.ts";
 
-export type { PyMember, PyModule } from "./python-api.types";
+export type { PyMember, PyModule } from "./python-api.types.ts";
 export { PYTHON_BUILTINS, PYTHON_STDLIB_MODULES };
 
 export const PYTHON_STDLIB_MODULE_NAMES: string[] = PYTHON_STDLIB_MODULES.map(

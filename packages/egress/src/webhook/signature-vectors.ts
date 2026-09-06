@@ -1,9 +1,9 @@
-import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_EVENT_ID_HEADER } from "./delivery-classification";
+import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_EVENT_ID_HEADER } from "./delivery-classification.ts";
 import {
   signWebhookPayload,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "./signature";
+} from "./signature.ts";
 
 /**
  * Emits the cross-language signature test vectors from the sender's own

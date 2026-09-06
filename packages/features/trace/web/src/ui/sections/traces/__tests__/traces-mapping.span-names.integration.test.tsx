@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { Trace } from "@langwatch/trace-contract";
-import { TracesMapping } from "../traces-mapping";
+import { TracesMapping } from "../traces-mapping.tsx";
 
 // Project-wide span names returned for the last 30 days — note that
 // "Research.aexecute_stream" is NOT present on the loaded trace below.
@@ -21,13 +21,13 @@ const PROJECT_SPAN_NAMES = [
   },
 ];
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),
 }));
 
-vi.mock("../../use-project-span-names", () => ({
+vi.mock("../../use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: PROJECT_SPAN_NAMES,
     metadataKeys: [],
@@ -36,7 +36,7 @@ vi.mock("../../use-project-span-names", () => ({
   }),
 }));
 
-vi.mock("../../use-project-event-types", () => ({
+vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({
     eventTypes: [],
     isLoading: false,
@@ -44,11 +44,11 @@ vi.mock("../../use-project-event-types", () => ({
   }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids", () => ({
+vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/trace-api", () => ({
+vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     annotationScore: {
       getAllActive: { useQuery: () => ({ data: [] }) },

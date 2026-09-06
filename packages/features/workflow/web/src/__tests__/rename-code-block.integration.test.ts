@@ -7,7 +7,7 @@ import {
   serializeWorkflow,
   store as storeCreator,
   type WorkflowStore,
-} from "../behavior/workflow-store";
+} from "../behavior/workflow-store.ts";
 
 function makeCodeNode({
   id,

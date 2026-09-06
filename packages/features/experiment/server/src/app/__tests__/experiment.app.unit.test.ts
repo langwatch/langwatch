@@ -7,7 +7,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ExperimentApp } from "../experiment.app";
+import { ExperimentApp } from "../experiment.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 

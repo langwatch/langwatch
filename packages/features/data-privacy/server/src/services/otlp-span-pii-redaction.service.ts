@@ -11,11 +11,11 @@ import {
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   type OtlpSpanPiiRedactionServiceDependencies,
   PiiRedactionPolicyService,
-} from "./pii-redaction-policy.service";
+} from "./pii-redaction-policy.service.ts";
 
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service";
+import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
 import type { OtlpAnyValue, OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 

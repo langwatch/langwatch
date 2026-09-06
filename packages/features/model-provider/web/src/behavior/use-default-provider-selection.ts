@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { shouldAutoEnableAsDefault } from "../model/model-provider-helpers";
+import { shouldAutoEnableAsDefault } from "../model/model-provider-helpers.ts";
 
 export type UseDefaultProviderSelectionState = {
   useAsDefaultProvider: boolean;

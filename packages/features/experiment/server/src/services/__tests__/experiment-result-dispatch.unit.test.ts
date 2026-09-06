@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { TypedAgent } from "@langwatch/agent-contract";
-import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service";
+import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service.ts";
 
 const dispatches = ExperimentResultDispatchService.create();
 const buildTargetMetadata = dispatches.buildTargetMetadata.bind(dispatches);

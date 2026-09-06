@@ -4,7 +4,7 @@ import {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
-import { toError } from "./clickhouse.to-error.mapper";
+import { toError } from "./clickhouse.to-error.mapper.ts";
 
 /** Errno codes for connection-level failures (shared with the retry loop). */
 export const TRANSIENT_NETWORK_CODES = new Set([

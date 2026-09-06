@@ -5,7 +5,7 @@ import {
   PlanTypes,
   STRIPE_PRICE_NAMES,
 } from "@langwatch/enterprise-billing-contract";
-import { SubscriptionItemCalculatorService } from "../index";
+import { SubscriptionItemCalculatorService } from "../index.ts";
 
 const prices = BillingPriceCatalogue.create("test").prices;
 const calculator = SubscriptionItemCalculatorService.create(prices);

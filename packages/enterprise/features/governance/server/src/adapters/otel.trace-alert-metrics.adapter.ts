@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { TraceAlertMetricsPort } from "../ports/governance-subscriber.port";
+import { TraceAlertMetricsPort } from "../ports/governance-subscriber.port.ts";
 
 /**
  * The series name and its help text, pinned because two processes write them.

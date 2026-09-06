@@ -5,8 +5,8 @@
  * @see specs/members/update-pending-invitation.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { OrganizationInviteRepository } from "../../repositories/organization-invite.repository";
-import { InviteCreationService } from "../invite-creation.service";
+import type { OrganizationInviteRepository } from "../../repositories/organization-invite.repository.ts";
+import { InviteCreationService } from "../invite-creation.service.ts";
 
 const ORGANIZATION = { id: "organization-1", name: "Acme", members: [] };
 

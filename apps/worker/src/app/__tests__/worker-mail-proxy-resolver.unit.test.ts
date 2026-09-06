@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { WorkerMailProxyResolver } from "../worker-mail.composition";
+import { WorkerMailProxyResolver } from "../worker-mail.composition.ts";
 
 describe("WorkerMailProxyResolver", () => {
   describe("given an outbound proxy", () => {

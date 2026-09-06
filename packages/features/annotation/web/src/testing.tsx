@@ -29,7 +29,7 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
-} from "./model/annotation-host";
+} from "./model/annotation-host.ts";
 
 export type StubAnnotationHostOptions = {
   project?: AnnotationHostProject | undefined;

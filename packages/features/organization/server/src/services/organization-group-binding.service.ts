@@ -13,7 +13,7 @@ import {
   type OrganizationGroupBindingInput,
 } from "@langwatch/organization-contract";
 
-import type { OrganizationGroupDependencies } from "./organization-group.service";
+import type { OrganizationGroupDependencies } from "./organization-group.service.ts";
 
 type GroupBindingWrite = {
   bindingId: string;

@@ -15,14 +15,14 @@ import {
 } from "@langwatch/agent-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { resultCapViolation } from "../../../rules/connected-agent-caps.rules";
-import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
-import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
-import { AgentSessionService } from "../../../services/connected-agent-session.service";
-import type { AgentRepository } from "../../../repositories/agent.repository";
-import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
+import { resultCapViolation } from "../../../rules/connected-agent-caps.rules.ts";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter.ts";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter.ts";
+import { AgentSessionService } from "../../../services/connected-agent-session.service.ts";
+import type { AgentRepository } from "../../../repositories/agent.repository.ts";
+import type { ConnectCredentialPort } from "../../../ports/connect-credential.port.ts";
 import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
-import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api";
+import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api.ts";
 
 /** The minimal router a standalone `http.Server` needs, main's shape. */
 function createUpgradeRouter(server: Server): ConnectUpgradeRouterPort {

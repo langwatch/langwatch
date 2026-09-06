@@ -4,7 +4,7 @@ import {
   parseLangyCardFailedPart,
   parseLangyCardPart,
   parseLangyChoiceSelectionPart,
-} from "../parts";
+} from "../parts.ts";
 
 const stampedPart = {
   type: "langy-card",

@@ -3,7 +3,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import type { FieldMapping as StoreFieldMapping } from "./types";
+import type { FieldMapping as StoreFieldMapping } from "./types.ts";
 
 /**
  * Convert store FieldMapping to UI FieldMapping format.

@@ -3,14 +3,14 @@ import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../ports/langy-effect.port";
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../ports/langy-effect.port.ts";
 import type {
   LangyDispatchOutcome,
   LangyWorkerMetricsPort,
   LangyWorkerPort,
-} from "../ports/langy-turn-runtime.port";
+} from "../ports/langy-turn-runtime.port.ts";
 
-export type { LangyDispatchOutcome } from "../ports/langy-turn-runtime.port";
+export type { LangyDispatchOutcome } from "../ports/langy-turn-runtime.port.ts";
 
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 const AGENT_PROBE_TIMEOUT_MS = 1_000;

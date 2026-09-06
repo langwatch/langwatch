@@ -21,7 +21,7 @@ import userEvent from "@testing-library/user-event";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import UnsubscribeScreen from "../unsubscribe.screen";
+import UnsubscribeScreen from "../unsubscribe.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -36,7 +36,7 @@ const calls = vi.hoisted(() => ({
   confirm: vi.fn(),
 }));
 
-vi.mock("../../../behavior/automation-api", () => ({
+vi.mock("../../../behavior/automation-api.ts", () => ({
   automationApi: {
     emailSuppression: {
       resolveUnsubscribeToken: {

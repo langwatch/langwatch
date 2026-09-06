@@ -23,8 +23,8 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import { AnalyticsRepository } from "../repositories/analytics.repository";
-import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository";
+import { AnalyticsRepository } from "../repositories/analytics.repository.ts";
+import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { ShareCacheRepository } from "../share-cache.repository";
+import { ShareCacheRepository } from "../share-cache.repository.ts";
 
 const logger = createLogger("langwatch:share-cache");
 const VIEW_KEY_PREFIX = "share_view:";

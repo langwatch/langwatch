@@ -3,7 +3,7 @@ import type {
   StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectStore, type StoredObjectRecord } from "./stores/stored-object.store";
+import { StoredObjectStore, type StoredObjectRecord } from "./stores/stored-object.store.ts";
 
 export class InMemoryStoredObjectStore extends StoredObjectStore {
   static create(values: readonly StoredObjectRecord[] = []): InMemoryStoredObjectStore {

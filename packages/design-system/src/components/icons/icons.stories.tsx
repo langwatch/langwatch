@@ -14,7 +14,7 @@ import {
   OpenTelemetryIcon,
   WeaviateIcon,
   WorkatoIcon,
-} from "./index";
+} from "./index.ts";
 
 /**
  * The vendor marks, all drawn through `IconGlyph` so they sit at one size and

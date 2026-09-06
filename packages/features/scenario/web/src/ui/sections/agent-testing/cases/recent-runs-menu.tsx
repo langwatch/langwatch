@@ -10,17 +10,17 @@ import { useState } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useNow } from "../../../../behavior/use-now";
+import { useNow } from "../../../../behavior/use-now.ts";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   formatPassRate,
   passRateColor,
-} from "../../../elements/agent-testing/shared/pass-rate-color";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
-import { MENU_ACTION_ICONS, MenuActionLabel } from "./menu-action-label";
-import { useOpenPlanRun } from "./use-open-plan-run";
-import { type RecentRun, useSuiteRecentRuns } from "./use-suite-recent-runs";
+} from "../../../elements/agent-testing/shared/pass-rate-color.ts";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { MENU_ACTION_ICONS, MenuActionLabel } from "./menu-action-label.tsx";
+import { useOpenPlanRun } from "./use-open-plan-run.ts";
+import { type RecentRun, useSuiteRecentRuns } from "./use-suite-recent-runs.ts";
 
 /** What the button reads. */
 export const OPEN_RECENT_RUN_LABEL = "Open recent run";

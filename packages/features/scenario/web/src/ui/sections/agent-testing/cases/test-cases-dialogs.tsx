@@ -4,10 +4,10 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { ScenarioArchiveDialog } from "../../../elements/scenario-archive-dialog";
-import { RunDialog } from "../run/run-dialog";
-import type { TestCasesTabModel } from "./use-test-cases-tab";
-import { SuiteNameDialog } from "./suite-name-dialog";
+import { ScenarioArchiveDialog } from "../../../elements/scenario-archive-dialog.tsx";
+import { RunDialog } from "../run/run-dialog.tsx";
+import type { TestCasesTabModel } from "./use-test-cases-tab.ts";
+import { SuiteNameDialog } from "./suite-name-dialog.tsx";
 
 export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {
   const { run, caseMutations, suiteDialog } = model;

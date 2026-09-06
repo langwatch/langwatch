@@ -14,13 +14,13 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing";
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../ui/sections/gateway-layout", () => ({
+vi.mock("../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -34,7 +34,7 @@ const emptySummary = {
   byDay: [],
 };
 
-vi.mock("../../../behavior/gateway-api", () => ({
+vi.mock("../../../behavior/gateway-api.ts", () => ({
   api: {
     gatewayUsage: {
       summary: {
@@ -77,7 +77,7 @@ function hostAt(url: string) {
   });
 }
 
-import GatewayUsagePage from "../gateway-usage.screen";
+import GatewayUsagePage from "../gateway-usage.screen.tsx";
 
 function renderUsagePage(initialUrl: string) {
   const host = hostAt(initialUrl);

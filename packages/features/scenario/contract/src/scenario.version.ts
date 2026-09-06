@@ -5,10 +5,10 @@ import {
   scenarioIdInputSchema,
   type Scenario,
   type ScenarioUpdateInput,
-} from "./scenario";
-import { scenarioParameterDefinitionsSchema } from "./scenario.parameters";
+} from "./scenario.ts";
+import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 
-export type { ScenarioActor, ScenarioAuthorLabel } from "./scenario";
+export type { ScenarioActor, ScenarioAuthorLabel } from "./scenario.ts";
 
 export const scenarioVersionedFields = [
   "name",

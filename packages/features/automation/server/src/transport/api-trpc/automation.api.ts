@@ -60,7 +60,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { AutomationWebhookStoredParams } from "../../ports/automation-provider.port";
+import type { AutomationWebhookStoredParams } from "../../ports/automation-provider.port.ts";
 import {
   AutomationFiltersUnsupportedError,
   AutomationTraceFilterInvalidError,
@@ -73,7 +73,7 @@ import {
   TestFireRateLimitedError,
   type AutomationApp,
 } from "#app/automation.app";
-import { buildRetryAfterMessage } from "../../rules/retry-after-message.rules";
+import { buildRetryAfterMessage } from "../../rules/retry-after-message.rules.ts";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The

@@ -4,8 +4,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GroupRow } from "../group-row";
-import type { SiblingGroup } from "../types";
+import { GroupRow } from "../group-row.tsx";
+import type { SiblingGroup } from "../types.ts";
 
 afterEach(cleanup);
 

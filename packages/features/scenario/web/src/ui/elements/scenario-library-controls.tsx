@@ -2,7 +2,7 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Archive, Plus, Tag } from "lucide-react";
-import { SmallButton } from "./agent-testing/shared/small-button";
+import { SmallButton } from "./agent-testing/shared/small-button.tsx";
 
 export function ScenarioLabelFilter({
   allLabels,

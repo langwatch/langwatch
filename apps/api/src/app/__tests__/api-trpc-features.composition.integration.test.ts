@@ -22,26 +22,26 @@ import {
   MissingAgentService,
   MissingSecretService,
   NoApiTrpcFeatures,
-} from "../../api.application";
-import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
+} from "../../api.application.ts";
+import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
 import type { UserService } from "@langwatch/user-contract";
-import { composeAuthFeature } from "../../features/auth/auth.composition";
-import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition";
-import { composeOrganizationFeature } from "../../features/organization/organization.composition";
-import { composeWorkflowFeature } from "../../features/workflow/workflow.composition";
+import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
+import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
+import { composeOrganizationFeature } from "../../features/organization/organization.composition.ts";
+import { composeWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
 import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
-} from "../api-auth.composition";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
+} from "../api-auth.composition.ts";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
-} from "../api-trpc-features.composition";
+} from "../api-trpc-features.composition.ts";
 import {
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "./api-trpc-record.test-doubles";
+} from "./api-trpc-record.test-doubles.ts";
 
 /**
  * The namespaces `createAppTrpcFeatures` mounts, as the wire names them.

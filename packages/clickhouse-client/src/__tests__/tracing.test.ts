@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "../query";
-import { SPAN_ATTRIBUTES, type SpanPort, type TracerPort, QueryTracer } from "../tracing";
+import type { QueryRequest } from "../query.ts";
+import { SPAN_ATTRIBUTES, type SpanPort, type TracerPort, QueryTracer } from "../tracing.ts";
 
 const recordingTracer = () => {
   const attributes: Record<string, string | number | boolean> = {};

@@ -1,7 +1,7 @@
-import type { ConversationGroup } from "../../../conversation-groups";
-import type { AddonDef } from "../../types";
-import { ChatTurns } from "./chat-turns";
-import { CompactTurns } from "./compact-turns";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import type { AddonDef } from "../../types.ts";
+import { ChatTurns } from "./chat-turns.tsx";
+import { CompactTurns } from "./compact-turns.tsx";
 
 export const ConversationTurnsAddon: AddonDef<ConversationGroup> = {
   id: "conversation-turns",

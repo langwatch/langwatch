@@ -1,6 +1,6 @@
-import { authFailureMessage, isCredentialRejection } from "../model/auth-failure-message";
-import { signIn } from "./auth-client";
-import { credentialSignInFailure } from "../model/credential-sign-in";
+import { authFailureMessage, isCredentialRejection } from "../model/auth-failure-message.ts";
+import { signIn } from "./auth-client.tsx";
+import { credentialSignInFailure } from "../model/credential-sign-in.ts";
 
 /**
  * One attempt at a password, and the three things it can turn out to be.

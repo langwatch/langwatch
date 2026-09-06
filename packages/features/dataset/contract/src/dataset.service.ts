@@ -27,7 +27,7 @@ import type {
   FinalizeUploadInput,
   RetryNormalizeInput,
   UpsertDatasetInput,
-} from "./dataset";
+} from "./dataset.ts";
 
 export abstract class DatasetService {
   abstract upsertDataset(input: UpsertDatasetInput): Promise<Dataset>;

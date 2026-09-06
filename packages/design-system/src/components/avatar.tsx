@@ -1,6 +1,6 @@
 import { type AvatarFallbackProps, Avatar as ChakraAvatar } from "@chakra-ui/react";
 import * as React from "react";
-import { firstGrapheme } from "../first-grapheme";
+import { firstGrapheme } from "../first-grapheme.ts";
 
 /**
  * Chakra v3 Avatar wrapper. **Import the avatar from here, never from

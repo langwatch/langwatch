@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
-import { DEFAULT_MODEL } from "../../model/prompt-constants";
+import { DEFAULT_MODEL } from "../../model/prompt-constants.ts";
 import {
   coerceToNumber,
   coerceToString,
   createDefaultPromptFormValues,
-} from "../use-load-span-into-prompt-studio";
+} from "../use-load-span-into-prompt-studio.ts";
 
 type SpanData = PromptStudioSpanResult;
 

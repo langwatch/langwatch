@@ -2,8 +2,8 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MeterBar } from "../src/components/meter-bar";
-import { renderWithDesignSystem } from "../src/testing";
+import { MeterBar } from "../src/components/meter-bar.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());
 

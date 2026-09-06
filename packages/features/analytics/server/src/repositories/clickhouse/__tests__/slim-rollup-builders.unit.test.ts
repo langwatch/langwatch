@@ -13,9 +13,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules";
-import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper";
-import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules.ts";
+import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
+import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
 const baseDates = {
   startDate: new Date("2026-06-15T00:00:00.000Z"),

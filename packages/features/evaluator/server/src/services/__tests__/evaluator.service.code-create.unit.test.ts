@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { EvaluatorService } from "../evaluator.service";
+import { EvaluatorService } from "../evaluator.service.ts";
 import type {
   EvaluatorRepository,
   PersistEvaluatorInput,
-} from "../../repositories/evaluator.repository";
-import type { EvaluatorCodeExecutionPort } from "../../ports/evaluator.port";
+} from "../../repositories/evaluator.repository.ts";
+import type { EvaluatorCodeExecutionPort } from "../../ports/evaluator.port.ts";
 
 /** The wire form of a config: what the repository row holds once persisted. */
 function persistedConfig(config: PersistEvaluatorInput["config"]): Evaluator["config"] {

@@ -1,12 +1,12 @@
-import type { GatewayClickHouseClient } from "../../ports/gateway-clickhouse.port";
+import type { GatewayClickHouseClient } from "../../ports/gateway-clickhouse.port.ts";
 import {
   GatewayOpenAdmissionsPort,
   type OpenAdmission,
   type OpenAdmissionQuery,
-} from "../../ports/gateway-open-admissions.port";
+} from "../../ports/gateway-open-admissions.port.ts";
 // The cap belongs to the sweep that reports on it, not to the query it
 // bounds. One-way edge: the intent imports nothing from here.
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../intents/gateway-spend-settlement.intent";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../intents/gateway-spend-settlement.intent.ts";
 
 const TABLE_NAME = "gateway_spend" as const;
 

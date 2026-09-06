@@ -28,11 +28,11 @@
  * usable in a test without standing up four dependencies to assert on one.
  */
 
-import type { ConcurrencyLimiter } from "./rateLimit";
-import type { QueryDriver, QueryRequest, QueryResult } from "./query";
-import type { RetryPolicy } from "./retry";
-import type { QueryTracer } from "./tracing";
-import type { TenantGuard } from "./tenantGuard";
+import type { ConcurrencyLimiter } from "./rateLimit.ts";
+import type { QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import type { RetryPolicy } from "./retry.ts";
+import type { QueryTracer } from "./tracing.ts";
+import type { TenantGuard } from "./tenantGuard.ts";
 
 export interface ClickHouseQueryClientOptions {
   /** The only collaborator that talks to a server. */

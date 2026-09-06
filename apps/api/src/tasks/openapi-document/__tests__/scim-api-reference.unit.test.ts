@@ -9,11 +9,11 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { UNSERVED_AT_BASELINE } from "../openapi-document.checker";
+import { UNSERVED_AT_BASELINE } from "../openapi-document.checker.ts";
 import {
   generateOpenApiDocument,
   type GeneratedOpenApiDocument,
-} from "../openapi-document.generator";
+} from "../openapi-document.generator.ts";
 
 const SCIM_PREFIX = "/api/scim/v2";
 

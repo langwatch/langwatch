@@ -1,7 +1,7 @@
 import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
-import { Dialog } from "../dialog";
+import { Dialog } from "../dialog.tsx";
 
 type ConfirmDialogProps = {
   open: boolean;

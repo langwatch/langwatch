@@ -6,4 +6,4 @@
  * than a path per component.
  */
 
-export { PromptListDrawer, type PromptListDrawerProps } from "./prompt-list-drawer";
+export { PromptListDrawer, type PromptListDrawerProps } from "./prompt-list-drawer.tsx";

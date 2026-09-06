@@ -19,7 +19,7 @@
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
-import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error";
+import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error.ts";
 
 const HAIRLINE =
   "color-mix(in srgb, var(--chakra-colors-red-solid) 26%, var(--chakra-colors-border-muted))";

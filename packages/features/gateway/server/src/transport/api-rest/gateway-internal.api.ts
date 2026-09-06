@@ -26,29 +26,29 @@ import {
 import {
   VirtualKeyCryptoAdapter,
   VirtualKeyCryptoError,
-} from "../../adapters/virtual-key-crypto.adapter";
-import type { GatewayJwtAdapter } from "../../adapters/jwt.gateway-token.adapter";
-import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
-import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port";
-import type { GatewayInternalStorePort } from "../../ports/gateway-internal-store.port";
-import type { GatewaySpendRatingPort } from "../../ports/gateway-spend-rating.port";
+} from "../../adapters/virtual-key-crypto.adapter.ts";
+import type { GatewayJwtAdapter } from "../../adapters/jwt.gateway-token.adapter.ts";
+import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port.ts";
+import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port.ts";
+import type { GatewayInternalStorePort } from "../../ports/gateway-internal-store.port.ts";
+import type { GatewaySpendRatingPort } from "../../ports/gateway-spend-rating.port.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
   type SpendUsage,
   spendUsageSchema,
-} from "../../processes/gateway-spend-commands.process";
-import type { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service";
+} from "../../processes/gateway-spend-commands.process.ts";
+import type { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
-} from "../../services/gateway-guardrail-evaluation.service";
+} from "../../services/gateway-guardrail-evaluation.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
-} from "../../services/gateway-realtime-session.service";
-import type { VirtualKeyService } from "../../services/virtual-key.service";
+} from "../../services/gateway-realtime-session.service.ts";
+import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();

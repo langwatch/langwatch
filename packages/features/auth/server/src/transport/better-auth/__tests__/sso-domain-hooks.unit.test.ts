@@ -6,13 +6,13 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository";
+import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../../ports/better-auth.port";
-import { afterUserCreate, tryBeforeAccountCreate } from "../better-auth-hooks.api";
+} from "../../../ports/better-auth.port.ts";
+import { afterUserCreate, tryBeforeAccountCreate } from "../better-auth-hooks.api.ts";
 
 class LicensedFederationPort implements BetterAuthFederationPort {
   federationCapable(): boolean {

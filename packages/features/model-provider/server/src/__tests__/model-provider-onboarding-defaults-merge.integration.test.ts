@@ -6,14 +6,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
-import { ModelProviderOnboardingDefaultsService } from "../services/model-provider-onboarding-defaults.service";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service";
-import { ModelProviderCommandService } from "../services/model-provider-command.service";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service";
-import { ModelProviderKeysService } from "../services/model-provider-keys.service";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
+import { ModelProviderOnboardingDefaultsService } from "../services/model-provider-onboarding-defaults.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,
@@ -26,7 +26,7 @@ import {
   noopConnectionRateLimiter,
   testNamespace,
   type TenancyFixture,
-} from "./support/model-provider-integration.support";
+} from "./support/model-provider-integration.support.ts";
 
 const alwaysPermitAuthz = {
   getDecision: async () => ({ permitted: true }),

@@ -7,7 +7,7 @@
 import { Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { ScenarioVersionList } from "./scenario-version-list";
+import { ScenarioVersionList } from "./scenario-version-list.tsx";
 
 export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {
   const { closeDrawer, goBack, canGoBack } = useDrawer();

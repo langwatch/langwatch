@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "../genie-trace-mapper.service";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "../genie-trace-mapper.service.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {

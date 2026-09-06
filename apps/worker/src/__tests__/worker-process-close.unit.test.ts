@@ -32,7 +32,7 @@ vi.mock("@langwatch/observability/node", () => ({
 }));
 
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import { bootWorker } from "../worker.process";
+import { bootWorker } from "../worker.process.ts";
 
 /** The drain budget the process gives its application, read off the timeout it reports. */
 const DRAIN_BUDGET_MS = 60_000;

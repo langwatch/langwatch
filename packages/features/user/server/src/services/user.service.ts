@@ -34,9 +34,9 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
-import type { UserAvatarStoragePort } from "../ports/user.port";
-import type { UserRepository } from "../repositories/user.repository";
-import { UserAvatarCodecService } from "./user-avatar.service";
+import type { UserAvatarStoragePort } from "../ports/user.port.ts";
+import type { UserRepository } from "../repositories/user.repository.ts";
+import { UserAvatarCodecService } from "./user-avatar.service.ts";
 
 export class UserService extends UserServiceContract {
   private readonly avatars = UserAvatarCodecService.create();

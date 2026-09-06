@@ -20,7 +20,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { noOrgBouncerRoutes } from "../use-required-session";
+import { noOrgBouncerRoutes } from "../use-required-session.ts";
 
 describe("the no-organization bouncer exemption list", () => {
   describe("when a session with no organization sits on an inventory-family address", () => {

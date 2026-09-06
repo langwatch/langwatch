@@ -1,10 +1,10 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { AnnotationApp } from "@langwatch/annotation-server";
-import type { ApiTrpcFeatureMount } from "../../api.application";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,
-} from "./annotation-trpc.mount";
+} from "./annotation-trpc.mount.ts";
 
 /** The two namespaces and the `ctx.app.annotations` slice. */
 export type ComposedAnnotationFeature = Readonly<{

@@ -1,8 +1,8 @@
 /// <reference path="../../model/ambient.d.ts" />
 import { useEffect } from "react";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import "../elements/auth-front-door.css";
-import { beginEntrance, endEntrance } from "../../model/entrance";
+import { beginEntrance, endEntrance } from "../../model/entrance.ts";
 
 /**
  * The entrance: the card settles into place once, on arrival.

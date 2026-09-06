@@ -6,8 +6,8 @@ import {
   type RequestContext,
   runWithContext,
   updateCurrentContext,
-} from "../context/core";
-import { getLogContext } from "../context/logging";
+} from "../context/core.ts";
+import { getLogContext } from "../context/logging.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: {

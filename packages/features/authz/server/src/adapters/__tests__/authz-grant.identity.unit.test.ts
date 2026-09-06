@@ -1,6 +1,6 @@
 import { getEnvironment, setEnvironment } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { EventingAuthzGrantAdapter } from "../eventing.authz-grant.adapter";
+import { EventingAuthzGrantAdapter } from "../eventing.authz-grant.adapter.ts";
 
 const ORG = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;

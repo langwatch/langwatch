@@ -7,7 +7,7 @@ import {
   CodingAgentSessionRowMapper,
   type CodingAgentSessionState,
   CodingAgentSessionStateMapper,
-} from "../projections/coding-agent-session.projection";
+} from "../projections/coding-agent-session.projection.ts";
 
 /**
  * Whether a committed row's read-back columns can be trusted.

@@ -18,19 +18,19 @@
  * at the dot.
  */
 
-import { lwqlVegaError } from "./vega-lite-policy";
+import { lwqlVegaError } from "./vega-lite-policy.ts";
 import {
   collectViewNodes,
   isPlainObject,
   joinPointer,
   type VegaViewNode,
-} from "./vega-lite-structure";
-import { analyzeTransform } from "./vega-lite-transforms";
+} from "./vega-lite-structure.ts";
+import { analyzeTransform } from "./vega-lite-transforms.ts";
 import type {
   LangWatchQLDatasetColumn,
   VegaValidationError,
   VegaValidationWarning,
-} from "./visualization-types";
+} from "./visualization-types.ts";
 
 export type ColumnsByDataset = Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
 

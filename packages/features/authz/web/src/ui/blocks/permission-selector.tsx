@@ -21,12 +21,12 @@ import {
   type AuthzResource,
   ORDERED_RESOURCES,
   permissionsByResource,
-} from "../../model/permission-catalogue";
+} from "../../model/permission-catalogue.ts";
 import {
   isPermissionImplied,
   isPermissionSelected,
   togglePermission,
-} from "../../model/permission-matrix";
+} from "../../model/permission-matrix.ts";
 
 export function PermissionSelector({
   selectedPermissions,

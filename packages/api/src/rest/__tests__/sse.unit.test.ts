@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ZodError, z } from "zod";
 
-import { createTestService as createService } from "./test-service.js";
-import { getSSECompletion } from "../sse.js";
-import type { MountedRoute } from "../types.js";
+import { createTestService as createService } from "./test-service.ts";
+import { getSSECompletion } from "../sse.ts";
+import type { MountedRoute } from "../types.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

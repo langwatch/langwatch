@@ -2,8 +2,8 @@ import { Box, HStack, Link, Spinner, Text } from "@chakra-ui/react";
 import { ChevronDown, ExternalLink, Plus } from "lucide-react";
 import { useState } from "react";
 
-import { createInitialState } from "../../../model/experiments-v3/types";
-import { extractPersistedState } from "../../../model/experiments-v3/types/persistence";
+import { createInitialState } from "../../../model/experiments-v3/types.ts";
+import { extractPersistedState } from "../../../model/experiments-v3/types/persistence.ts";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";

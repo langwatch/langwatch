@@ -4,12 +4,12 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
-import { relayPayloadCaps } from "../connected-agent.constants";
+import { relayPayloadCaps } from "../connected-agent.constants.ts";
 import {
   PROTOCOL_VERSION,
   registerFrameSchema,
   resultFrameSchema,
-} from "../connected-agent.protocol";
+} from "../connected-agent.protocol.ts";
 
 describe("the frame contract", () => {
   describe("when a frame carries no protocol version", () => {

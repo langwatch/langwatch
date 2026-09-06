@@ -13,15 +13,15 @@ const mocks = vi.hoisted(() => ({
   annotations: [] as unknown[],
 }));
 
-vi.mock("../../hooks/use-trace-header-chips", () => ({
+vi.mock("../../hooks/use-trace-header-chips.ts", () => ({
   useTraceHeaderChips: () => ({ chips: [] }),
 }));
 
-vi.mock("../../hooks/use-conversation-turns", () => ({
+vi.mock("../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: [{ traceId: "trace-2" }] } }),
 }));
 
-vi.mock("../../hooks/use-conversation-annotations", () => ({
+vi.mock("../../hooks/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -33,17 +33,17 @@ vi.mock("../../hooks/use-conversation-annotations", () => ({
 
 // The trace as the reader sees it, which is what tells a comment left on a
 // span the trace still has from one left on a span a correction removed.
-vi.mock("../../hooks/use-span-tree", () => ({
+vi.mock("../../hooks/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [{ spanId: "span-7", name: "web_search" }] }),
 }));
 
-vi.mock("../../../../../behavior/drawer.store", () => ({
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
   useDrawerStore: (selector: (state: unknown) => unknown) =>
     selector({ setViewMode: mocks.setViewMode }),
 }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { TraceHeaderChips } from "../trace-header-chips";
+import { TraceHeaderChips } from "../trace-header-chips.tsx";
 
 function annotation(over: Record<string, unknown> = {}) {
   return {

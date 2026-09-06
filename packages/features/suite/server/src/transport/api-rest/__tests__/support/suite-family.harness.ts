@@ -32,18 +32,18 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
-import { SuiteApp } from "../../../../app/suite.app";
+import { SuiteApp } from "../../../../app/suite.app.ts";
 import {
   SuiteRunCommandsPort,
   SuiteRunIdPort,
   type QueueSimulationRunCommandData,
-} from "../../../../ports/suite-execution.port";
-import { SuiteRepository } from "../../../../repositories/suite.repository";
-import { SuiteExecutionService } from "../../../../services/suite-execution.service";
-import { SuiteService } from "../../../../services/suite.service";
-import { createRunPlansV1RestApp } from "../../run-plans-v1.api";
-import { createSuiteRestApp } from "../../suite.api";
-import { createTestSuitesV1RestApp } from "../../test-suites-v1.api";
+} from "../../../../ports/suite-execution.port.ts";
+import { SuiteRepository } from "../../../../repositories/suite.repository.ts";
+import { SuiteExecutionService } from "../../../../services/suite-execution.service.ts";
+import { SuiteService } from "../../../../services/suite.service.ts";
+import { createRunPlansV1RestApp } from "../../run-plans-v1.api.ts";
+import { createSuiteRestApp } from "../../suite.api.ts";
+import { createTestSuitesV1RestApp } from "../../test-suites-v1.api.ts";
 
 /** The project every request in these suites is authenticated for. */
 export const TEST_PROJECT = {

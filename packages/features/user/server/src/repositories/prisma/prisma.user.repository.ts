@@ -25,7 +25,7 @@ import {
   type SetFirstUserPasswordResult,
 } from "@langwatch/user-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import { UserRepository } from "../user.repository";
+import { UserRepository } from "../user.repository.ts";
 
 export type UserDatabase = {
   user: {

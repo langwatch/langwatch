@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import { LangyTitleModelPort } from "@langwatch/langy-server";
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import { describe, expect, it } from "vitest";
-import { resolveWorkerConfig } from "../../platform/config/worker.config";
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReportPort,
-} from "../worker-langy-conversation.composition";
-import { createWorkerProcessDatabase } from "./support/worker-database.double";
+} from "../worker-langy-conversation.composition.ts";
+import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 /**
  * Spec: specs/langy/worker-langy-conversation-conversion.feature
@@ -27,10 +31,14 @@ const RECORDED: {
   absences: string[];
 } = { published: [], inserted: [], absences: [] };
 
+/** What this process's Redis is holding, by the key the adapter under test computes. */
+const STASHED = new Map<string, string>();
+
 function reset(): void {
   RECORDED.published.length = 0;
   RECORDED.inserted.length = 0;
   RECORDED.absences.length = 0;
+  STASHED.clear();
 }
 
 class RecordingAbsence extends WorkerLangyAbsenceReportPort {
@@ -52,7 +60,7 @@ function redisDouble() {
       RECORDED.published.push({ channel, message });
       return 1;
     },
-    get: async () => null,
+    get: async (key: string) => STASHED.get(key) ?? null,
     set: async () => "OK",
     del: async () => 0,
     xadd: async () => "0-0",
@@ -91,10 +99,14 @@ class FakeTitleModel extends LangyTitleModelPort {
   }
 }
 
-function compose(source: Record<string, unknown> = {}, titleModels?: LangyTitleModelPort) {
+function compose(
+  source: Record<string, unknown> = {},
+  titleModels?: LangyTitleModelPort,
+  database: object = createWorkerProcessDatabase(),
+) {
   return createWorkerLangyConversation({
     config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
-    database: createWorkerProcessDatabase() as never,
+    database: database as never,
     redis: redisDouble() as never,
     resolveClickHouseClient: clickHouseDouble(),
     defaultRetentionDays: 90,
@@ -303,6 +315,85 @@ describe("given the langy conversation pipeline this process composes for itself
       const without = compose().buildProcessing() as never;
 
       expect([...registeredKeys(withGateway)].sort()).toEqual([...registeredKeys(without)].sort());
+    });
+  });
+});
+
+describe("given the dispatch counter every Langy panel reads", () => {
+  describe("when a stalled turn is re-driven through the composed worker port", () => {
+    /** @scenario "The worker publishes the Langy dispatch series" */
+    it("publishes the dispatch series under the outcome the port answered with", async () => {
+      reset();
+      const metrics: RecordingMeterProvider = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        const now = Date.now();
+        const event = {
+          id: "evt-liveness-1",
+          createdAt: now,
+          tenantId: "project-1",
+          aggregateId: "conversation-1",
+          type: "lw.langy_conversation.agent_turn_accepted",
+          data: { turnId: "turn-1" },
+        };
+        STASHED.set(
+          "langy:handoff:{conversation-1}:turn-1",
+          JSON.stringify({
+            projectId: "project-1",
+            conversationId: "conversation-1",
+            turnId: "turn-1",
+            actorUserId: "user-1",
+            prompt: "hello",
+            system: "system",
+            credentials: {
+              langwatchApiKey: "lw-key",
+              llmVirtualKey: "vk-1",
+              langwatchEndpoint: "https://app.langwatch.test",
+              gatewayBaseUrl: "https://gateway.langwatch.test",
+              organizationId: "organization-1",
+            },
+            runToken: "run-token",
+            permitReserved: true,
+          }),
+        );
+        const definition = compose(
+          {},
+          undefined,
+          createWorkerProcessDatabase({
+            langyConversationProjection: {
+              findUnique: async () => ({
+                id: "row-1",
+                projectId: "project-1",
+                ConversationId: "conversation-1",
+                Status: "running",
+                CurrentTurnId: "turn-1",
+                LastActivityAt: now,
+                UserId: "user-1",
+                IsShared: false,
+                CreatedAt: now,
+                UpdatedAt: now,
+                OccurredAt: now,
+                AcceptedAt: now,
+                LastEventId: event.id,
+                ProjectionVersion: 1,
+              }),
+            },
+          }),
+        ).buildProcessing() as unknown as {
+          eventSubscribers: Map<string, { handle(event: unknown): Promise<void> }>;
+        };
+        const liveness = definition.eventSubscribers.get("agentTurnLiveness");
+        if (!liveness) throw new Error("the pipeline registered no agentTurnLiveness subscriber");
+
+        // The re-drive always ends in a retryable DispatchError: the turn is
+        // handed back to the worker and the subscriber waits for the next
+        // heartbeat. The dispatch it made on the way through is the assertion.
+        await expect(liveness.handle(event)).rejects.toThrow(/re-driven/);
+
+        expect(metrics.valueOf("langwatch_langy_dispatch_total")).toBe(1);
+      } finally {
+        metrics.uninstall();
+      }
     });
   });
 });

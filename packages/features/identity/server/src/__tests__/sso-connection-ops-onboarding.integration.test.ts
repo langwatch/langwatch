@@ -1,14 +1,14 @@
 import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
-import { SsoConnectionService } from "../services/sso-connection.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
-} from "./support/in-memory-connections";
+} from "./support/in-memory-connections.ts";
 
 /**
  * D05 tier 1 end to end at the write surface: an operator takes a customer from nothing to a

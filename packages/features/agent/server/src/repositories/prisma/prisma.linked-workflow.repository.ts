@@ -1,6 +1,6 @@
 import type { AgentFields, RelatedAgentEntities } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { linkedWorkflowFields } from "./prisma.linked-workflow.mapper";
+import { linkedWorkflowFields } from "./prisma.linked-workflow.mapper.ts";
 
 /**
  * The workflow row an agent points at, read and written directly.

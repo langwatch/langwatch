@@ -26,8 +26,8 @@ import {
   type OrganizationService,
 } from "@langwatch/organization-contract";
 
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import { ApiRestSecurity } from "../../../api-rest.security";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import { ApiRestSecurity } from "../../../api-rest.security.ts";
 
 /** A project the world serves, in the shape a resolved credential names it by. */
 export type RestAuthProject = Readonly<{

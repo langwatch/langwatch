@@ -3,8 +3,8 @@
  * as an observation rather than a forecast.
  */
 
-import type { BTLeaderboard } from "./batch-evaluation-results.bt-leaderboard";
-import { areDistinguishable } from "./batch-evaluation-results.score-separation";
+import type { BTLeaderboard } from "./batch-evaluation-results.bt-leaderboard.ts";
+import { areDistinguishable } from "./batch-evaluation-results.score-separation.ts";
 
 export type SampleAdequacy = {
   /** Head-to-head comparisons the judge resolved. */

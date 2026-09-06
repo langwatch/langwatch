@@ -1,5 +1,5 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-import { ManagerCard, type DejaViewProcessManager } from "./deja-view-manager-card";
+import { ManagerCard, type DejaViewProcessManager } from "./deja-view-manager-card.tsx";
 
 export function DejaViewManagerPanel({
   managers,

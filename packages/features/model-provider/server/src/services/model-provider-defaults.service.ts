@@ -15,9 +15,9 @@ import type {
   ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderRepository,
-} from "../ports/model-provider.port";
-import { ModelProviderAuthorizationService } from "./model-provider-authorization.service";
-import type { ModelProviderScopeService } from "./model-provider-scope.service";
+} from "../ports/model-provider.port.ts";
+import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type DefaultScope = { id: string; name: string };
 type DefaultProjectScope = DefaultScope & { teamId: string };

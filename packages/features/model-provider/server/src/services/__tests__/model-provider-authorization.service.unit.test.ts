@@ -24,7 +24,7 @@
 import { describe, expect, it } from "vitest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import { ModelProviderAuthorizationService } from "../model-provider-authorization.service";
+import { ModelProviderAuthorizationService } from "../model-provider-authorization.service.ts";
 
 /** Records what was asked of authz, and answers however the test wants. */
 function recordingAuthz(permitted: boolean) {

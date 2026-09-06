@@ -27,8 +27,8 @@
  * Spec: specs/navigation/ops-navigation-v2.feature
  */
 
-import { useNavigationHost } from "../model/navigation-host";
-import { navigationApi } from "./navigation-api";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { navigationApi } from "./navigation-api.ts";
 
 /** How often the badge re-asks. One minute, as the legacy sidebar did. */
 export const OPS_ATTENTION_POLL_INTERVAL_MS = 60_000;

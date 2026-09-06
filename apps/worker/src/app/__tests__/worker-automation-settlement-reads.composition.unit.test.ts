@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { AutomationTraceRecordUnavailableError } from "@langwatch/automation-server";
 import { TraceNotFoundError } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { WorkerAutomationSettlementAbsenceReportPort } from "../worker-automation-settlement.composition";
+import { WorkerAutomationSettlementAbsenceReportPort } from "../worker-automation-settlement.composition.ts";
 import {
   WorkerAutomationSettlementEvaluationReader,
   WorkerAutomationSettlementTraceReader,
   WorkerTraceRecordReader,
-} from "../worker-automation-settlement-reads.composition";
+} from "../worker-automation-settlement-reads.composition.ts";
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature

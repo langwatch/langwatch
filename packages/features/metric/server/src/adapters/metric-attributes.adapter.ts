@@ -2,9 +2,9 @@ import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
-import { MetricNumbersAdapter } from "./metric-numbers.adapter";
-import { type UnknownRecord } from "./metric-serialization.adapter";
-import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+import { MetricNumbersAdapter } from "./metric-numbers.adapter.ts";
+import { type UnknownRecord } from "./metric-serialization.adapter.ts";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter.ts";
 const { isRecord, stableStringify } = MetricSerializationAdapter;
 
 function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {

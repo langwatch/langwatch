@@ -4,21 +4,21 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-derived.projection";
-import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store";
-import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port";
+} from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
+import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,
   msToUnixNano,
-} from "./fixtures/trace-summary-test.fixtures";
+} from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00061).

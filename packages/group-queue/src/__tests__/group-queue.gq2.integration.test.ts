@@ -1,10 +1,10 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { GroupQueueProcessor } from "../groupQueue";
-import type { ObjectStore } from "../tieredBlobStore";
-import { FlakyObjectStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
+import type { ObjectStore } from "../tieredBlobStore.ts";
+import { FlakyObjectStore, InMemoryObjectStore, incompressible } from "./blob-test-doubles.ts";
 
 type TestPayload = {
   id: string;

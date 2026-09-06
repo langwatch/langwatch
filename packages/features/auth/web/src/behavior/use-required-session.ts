@@ -1,5 +1,5 @@
-import { useSession } from "./auth-client";
-import { useRouter } from "./use-route";
+import { useSession } from "./auth-client.tsx";
+import { useRouter } from "./use-route.ts";
 
 export const publicRoutes = [
   "/share/[id]",

@@ -17,18 +17,18 @@ const mockSetDismissedAt = vi.fn();
 
 // ─── Dependency mocks ─────────────────────────────────────────────────────────
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-cta-test" },
     organization: { id: "org-1" },
   }),
 }));
 
-vi.mock("../../../../../behavior/explorer/use-project-has-traces", () => ({
+vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: mockHasAnyTraces }),
 }));
 
-vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", () => ({
+vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store.ts", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
       integrationCtaDismissedAtByProject: mockIntegrationCtaDismissedAtByProject,
@@ -37,14 +37,14 @@ vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store", ()
 }));
 
 // Stub the IntegrateDrawer so it doesn't pull in heavy deps
-vi.mock("../integrate-drawer", () => ({
+vi.mock("../integrate-drawer.tsx", () => ({
   IntegrateDrawer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="integrate-drawer">Drawer</div> : null,
 }));
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
-import { IntegrationCTACard } from "../integration-cta-card";
+import { IntegrationCTACard } from "../integration-cta-card.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

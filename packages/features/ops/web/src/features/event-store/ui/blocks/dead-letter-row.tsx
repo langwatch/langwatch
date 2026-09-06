@@ -1,12 +1,12 @@
 import { Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { RotateCcw, XCircle } from "lucide-react";
-import { formatTimeAgo } from "../../../../model/ops-formatters";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import {
   type DeadLetterAttemptHistoryRenderer,
   type DeadLetterMessage,
-} from "../../model/dead-letter-types";
+} from "../../model/dead-letter-types.ts";
 
 export function DeadLetterRow({
   message,

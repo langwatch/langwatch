@@ -26,13 +26,13 @@ import {
 } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
-import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason";
+import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import {
   CodeEvaluatorEditor,
   type CodeEvaluatorField,
   validCodeEvaluatorFields,
-} from "../../blocks/code-evaluator-editor";
-import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared";
+} from "../../blocks/code-evaluator-editor.tsx";
+import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
 
 type EditableField = CodeEvaluatorField;
 

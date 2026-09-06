@@ -3,15 +3,15 @@
  * @vitest-environment node
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
  */
-import { IdentityGuardsService } from "../identity-guards.service";
-import { IdentityEngineUnavailableError } from "../../ports/identity-birth.port";
+import { IdentityGuardsService } from "../identity-guards.service.ts";
+import { IdentityEngineUnavailableError } from "../../ports/identity-birth.port.ts";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../projections/identity-state.projection";
-import { IdentityBirthService } from "../identity-birth.service";
-import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port";
-import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
-import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter";
+import type { IdentityEvent } from "../../projections/identity-state.projection.ts";
+import { IdentityBirthService } from "../identity-birth.service.ts";
+import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port.ts";
+import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
+import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter.ts";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;

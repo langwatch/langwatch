@@ -10,7 +10,7 @@ import {
   SPEND_STATUS_FILTERS,
   spendFilterQueryShape,
   spendFiltersSchema,
-} from "../index";
+} from "../index.ts";
 
 const spendFilters = GatewaySpendFiltersAdapter.create();
 

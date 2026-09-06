@@ -14,7 +14,7 @@ import {
   type RoleUpdate,
 } from "@langwatch/role-contract";
 import { nanoid } from "nanoid";
-import { RoleRepository } from "../role.repository";
+import { RoleRepository } from "../role.repository.ts";
 
 type StoredRole = {
   id: string;

@@ -28,9 +28,9 @@ import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
-import { createApiKeysRestApp } from "../api-key.api";
-import { TestApiKeyService } from "./support/test-api-key-service";
-import { TestAuthzService } from "./support/test-authz-service";
+import { createApiKeysRestApp } from "../api-key.api.ts";
+import { TestApiKeyService } from "./support/test-api-key-service.ts";
+import { TestAuthzService } from "./support/test-authz-service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const CALLER_USER_ID = "user-caller";

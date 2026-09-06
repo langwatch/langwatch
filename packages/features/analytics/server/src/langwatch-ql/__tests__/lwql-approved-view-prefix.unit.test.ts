@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 

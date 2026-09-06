@@ -29,12 +29,12 @@ import {
   ATTR_NAVIGATION_SUPERSEDED,
   ATTR_NAVIGATION_TYPE,
   RUM_INSTRUMENTATION_NAME,
-} from "./constants";
+} from "./constants.ts";
 import {
   clearAmbientContext,
   resetAmbientContextForTesting,
   setAmbientContext,
-} from "./navigationContextManager";
+} from "./navigationContextManager.ts";
 
 /** How the navigation was resolved, for telling a lazy route from an instant one. */
 export type NavigationType = "resolved" | "instant";

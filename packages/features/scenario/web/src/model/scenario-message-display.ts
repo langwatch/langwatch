@@ -1,8 +1,8 @@
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { visitContentPart } from "@langwatch/trace-contract";
-import { coerceContentToArray } from "./coerce-content-to-array";
-import type { MediaPartData } from "./media-parts";
-import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback";
+import { coerceContentToArray } from "./coerce-content-to-array.ts";
+import type { MediaPartData } from "./media-parts.ts";
+import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback.ts";
 
 type RawMessage = SimulationMessage;
 

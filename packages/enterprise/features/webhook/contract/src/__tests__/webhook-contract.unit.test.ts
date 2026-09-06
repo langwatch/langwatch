@@ -4,7 +4,7 @@ import {
   eventMatches,
   isValidEventSelector,
   webhookEndpointViewSchema,
-} from "../index";
+} from "../index.ts";
 
 describe("webhook contract", () => {
   it("validates exact, family, and global selectors", () => {

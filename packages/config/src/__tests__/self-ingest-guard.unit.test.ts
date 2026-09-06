@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertObservabilityDoesNotSelfIngest,
   SelfIngestingObservabilityError,
-} from "../self-ingest-guard";
+} from "../self-ingest-guard.ts";
 
 const guard = (
   overrides: Partial<Parameters<typeof assertObservabilityDoesNotSelfIngest>[0]> = {},

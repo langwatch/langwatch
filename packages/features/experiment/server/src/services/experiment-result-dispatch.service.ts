@@ -18,7 +18,7 @@ import {
   ExperimentExecutionDataService,
   type LoadedEvaluators,
   type LoadedWorkflow,
-} from "./experiment-execution-data.service";
+} from "./experiment-execution-data.service.ts";
 
 export class ExperimentResultDispatchService {
   static create(): ExperimentResultDispatchService {

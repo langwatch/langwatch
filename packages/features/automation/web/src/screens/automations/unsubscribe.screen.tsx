@@ -30,7 +30,7 @@
 
 import { Box, Button, Heading, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { automationApi } from "../../behavior/automation-api";
+import { automationApi } from "../../behavior/automation-api.ts";
 
 /** Which of the two promises in the footer link the recipient took. */
 export type UnsubscribeScope = "trigger" | "project";

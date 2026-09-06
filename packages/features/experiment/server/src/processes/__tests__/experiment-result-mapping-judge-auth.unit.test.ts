@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapEvaluatorResult } from "../experiment-result-mapping.process";
+import { mapEvaluatorResult } from "../experiment-result-mapping.process.ts";
 
 describe("mapEvaluatorResult", () => {
   describe("given the evaluator failed with provider auth", () => {

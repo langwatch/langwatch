@@ -9,7 +9,7 @@ import {
   ConnectedAgentPresenceService,
   type AgentOwnerView,
   type AgentPresence,
-} from "../connected-agent-presence.service";
+} from "../connected-agent-presence.service.ts";
 
 const NO_OWNERS = new Map<string, AgentOwnerView>();
 const NO_PRESENCE_MAP = new Map<string, AgentPresence>();

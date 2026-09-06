@@ -10,8 +10,8 @@ import {
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
   StoredObjectService,
-} from "../index";
-import { InMemoryStoredObjectStore } from "../testing";
+} from "../index.ts";
+import { InMemoryStoredObjectStore } from "../testing.ts";
 
 const sha256 = "a".repeat(64);
 const address: StoredObjectStorageAddress = {

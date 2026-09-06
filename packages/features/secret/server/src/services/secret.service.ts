@@ -16,8 +16,8 @@ import {
   type Secret,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
-import type { SecretEncryptionPort } from "../ports/secret.port";
-import type { SecretRepository } from "../repositories/secret.repository";
+import type { SecretEncryptionPort } from "../ports/secret.port.ts";
+import type { SecretRepository } from "../repositories/secret.repository.ts";
 
 export interface SecretServiceOptions {
   repository: SecretRepository;

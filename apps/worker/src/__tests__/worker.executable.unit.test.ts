@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkerExecutableHost, WorkerExecutableOptions } from "../worker.executable";
-import { WorkerExecutable, WorkerExecutableCompositionPort } from "../worker.executable";
-import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process";
+import type { WorkerExecutableHost, WorkerExecutableOptions } from "../worker.executable.ts";
+import { WorkerExecutable, WorkerExecutableCompositionPort } from "../worker.executable.ts";
+import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process.ts";
 
 const mocks = vi.hoisted(() => ({
   configureLogger: vi.fn(),

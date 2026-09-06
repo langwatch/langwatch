@@ -6,8 +6,8 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GroupQueueRuntimeDefinition } from "../contracts";
-import { GroupQueueProcessor } from "../groupQueue";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { GroupQueueProcessor } from "../groupQueue.ts";
 
 type TestPayload = { id: string; groupId: string };
 

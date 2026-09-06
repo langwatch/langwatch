@@ -1,4 +1,4 @@
-import type { IdentifierFact, IdentityHeads } from "./facts";
+import type { IdentifierFact, IdentityHeads } from "./facts.ts";
 
 /**
  * A proven address an invitation may be accepted through (D11,

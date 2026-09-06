@@ -1,6 +1,6 @@
-import { QuarantineFillAlert as EnterpriseQuarantineFillAlert } from "../elements/quarantine-fill-alert";
-import { Link } from "../../../../ui/elements/governance-link";
-import { api } from "../../../../behavior/governance-api";
+import { QuarantineFillAlert as EnterpriseQuarantineFillAlert } from "../elements/quarantine-fill-alert.tsx";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
+import { api } from "../../../../behavior/governance-api.ts";
 /** Application data adapter for the portable Enterprise warning surface. */
 export function QuarantineFillAlert({ organizationId }: { organizationId: string }) {
   const { data } = api.governance.quarantineFillStats.useQuery(

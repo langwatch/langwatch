@@ -1,11 +1,11 @@
-import type { Event } from "../domain/types";
-import { compareOrdinal } from "../utils/compareOrdinal";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { Event } from "../domain/types.ts";
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type {
   ProjectionCursor,
   StateProjectionDefinition,
   StoredProjection,
-} from "./stateProjection.types";
+} from "./stateProjection.types.ts";
 
 /**
  * The canonical cursor of an event: the log-accept time (`createdAt`) with the

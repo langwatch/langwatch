@@ -5,15 +5,15 @@
  */
 
 import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { RunDetailSection } from "../../../elements/run-detail-section";
-import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer";
-import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer";
+import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
+import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
+import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer.tsx";
 import { ConversationExpandContext } from "@langwatch/trace-web/surfaces/conversation-expand-context";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel";
-import { nextSpeakerOf } from "../../../elements/next-speaker";
-import { TypingBubble } from "../../../elements/typing-bubble";
-import { hasVerdict, type RunDetail, type RunScenarioState } from "./use-run-drawer-state";
+import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
+import { nextSpeakerOf } from "../../../elements/next-speaker.ts";
+import { TypingBubble } from "../../../elements/typing-bubble.tsx";
+import { hasVerdict, type RunDetail, type RunScenarioState } from "./use-run-drawer-state.ts";
 
 /** How wide the results read beside the conversation. */
 const RESULTS_COLUMN_WIDTH = "310px";

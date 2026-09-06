@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { format } from "../format";
+import { format } from "../format.ts";
 
 const AMSTERDAM = { timeZone: "Europe/Amsterdam" } as const;
 

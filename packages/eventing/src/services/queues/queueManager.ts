@@ -1,27 +1,27 @@
 import { createLogger } from "@langwatch/observability";
-import { mapValidationIssues } from "../../utils/errors";
-import type { Command, CommandHandler } from "../../commands/command";
-import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
-import type { CommandSchema } from "../../commands/commandSchema";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { CommandType } from "../../domain/commandType";
-import type { Event } from "../../domain/types";
+import { mapValidationIssues } from "../../utils/errors.ts";
+import type { Command, CommandHandler } from "../../commands/command.ts";
+import type { CommandHandlerClass } from "../../commands/commandHandlerClass.ts";
+import type { CommandSchema } from "../../commands/commandSchema.ts";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { CommandType } from "../../domain/commandType.ts";
+import type { Event } from "../../domain/types.ts";
 import type {
   DeduplicationConfig,
   DeduplicationStrategy,
   EventSourcedQueueProcessor,
   QueueSendOptions,
-} from "../../queues";
-import { type KillSwitchPort } from "../../kill-switch";
-import { resolveDeduplicationStrategy } from "../../queues";
-import type { JobDelivery } from "../../queues/queue.types";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
+} from "../../queues/index.ts";
+import { type KillSwitchPort } from "../../kill-switch/index.ts";
+import { resolveDeduplicationStrategy } from "../../queues/index.ts";
+import type { JobDelivery } from "../../queues/queue.types.ts";
+import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import {
   type CommandHandlerOptions,
   processCommand,
   processCommandBatch,
-} from "../commands/commandDispatcher";
-import { ConfigurationError, ValidationError } from "../errorHandling";
+} from "../commands/commandDispatcher.ts";
+import { ConfigurationError, ValidationError } from "../errorHandling.ts";
 
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 

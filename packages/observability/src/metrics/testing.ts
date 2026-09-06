@@ -17,7 +17,7 @@
  * ```
  */
 import { metrics as metricsApi, type Attributes } from "@opentelemetry/api";
-import { activateMetrics, resetMetricsForTests } from "./instruments";
+import { activateMetrics, resetMetricsForTests } from "./instruments.ts";
 
 /** One value written to one instrument. */
 export interface RecordedMetric {

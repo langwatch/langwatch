@@ -3,17 +3,17 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { StubAnalyticsHost, AnalyticsTestHarness } from "../../../testing";
+import { StubAnalyticsHost, AnalyticsTestHarness } from "../../../testing.tsx";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
-vi.mock("../custom-graph", () => ({
+vi.mock("../custom-graph.tsx", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
 }));
 
-vi.mock("../langwatch-ql-dashboard-widget", () => ({
+vi.mock("../langwatch-ql-dashboard-widget.tsx", () => ({
   LangWatchQLDashboardWidget: ({
     chartId,
     granularitySeconds,
@@ -29,9 +29,9 @@ vi.mock("../langwatch-ql-dashboard-widget", () => ({
   ),
 }));
 
-import { WORKBENCH_SQL_CHART_KIND } from "../../../model/chart-kinds";
+import { WORKBENCH_SQL_CHART_KIND } from "../../../model/chart-kinds.ts";
 
-import { DraggableGraphCard } from "../draggable-graph-card";
+import { DraggableGraphCard } from "../draggable-graph-card.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <AnalyticsTestHarness host={new StubAnalyticsHost()}>{children}</AnalyticsTestHarness>

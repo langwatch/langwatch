@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { GuardMiddleware, GuardParams } from "./guard-middleware";
-import { ORG_BEARING_MODEL_NAMES } from "./organization-guard";
+import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
+import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
 // the SQL string. The legacy outbox drainer carries an explicit

@@ -5,8 +5,8 @@ import {
   type ProjectWithTeam,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import type { ProjectDiagnosticsPort } from "../ports/project.port";
-import type { ProjectRepository } from "../repositories/project.repository";
+import type { ProjectDiagnosticsPort } from "../ports/project.port.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
  * The project reads and the one project write that ingestion performs.

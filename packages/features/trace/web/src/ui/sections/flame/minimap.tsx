@@ -1,15 +1,15 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { useCallback, useRef } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "../../../model/display-formatters";
+import { formatDuration } from "../../../model/display-formatters.ts";
 import {
   MIN_VIEWPORT_MS,
   MINIMAP_HANDLE_PX,
   MINIMAP_HEIGHT,
   MINIMAP_WIDTH,
-} from "../../../model/flame/constants";
-import { getSpanColor } from "../../../model/flame/colors";
-import type { FlameNode, Viewport } from "../../../behavior/flame/types";
+} from "../../../model/flame/constants.ts";
+import { getSpanColor } from "../../../model/flame/colors.ts";
+import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
 
 export function Minimap({
   allNodes,

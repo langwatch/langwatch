@@ -9,17 +9,17 @@ import {
   type PersistedEvaluationsV3State,
   persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
-import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository";
-import { ExperimentRunRepository } from "../experiment-run.repository";
-import { ExperimentDspyRepository } from "../experiment-dspy.repository";
-import { ExperimentService } from "../../services/experiment.service";
-import { ExperimentExecutionPort } from "../../ports/experiment-execution.port";
+import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository.ts";
+import { ExperimentRunRepository } from "../experiment-run.repository.ts";
+import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
+import { ExperimentService } from "../../services/experiment.service.ts";
+import { ExperimentExecutionPort } from "../../ports/experiment-execution.port.ts";
 import { AgentService } from "@langwatch/agent-contract";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 
 const prompts: PromptService = Object.create(PromptService.prototype);
 prompts.getAllPrompts = async () => [];

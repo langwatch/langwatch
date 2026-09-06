@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzDatabase } from "../../authz-read.repository";
-import { PrismaAuthzReadRepository } from "../prisma.authz-read.repository";
+import type { AuthzDatabase } from "../../authz-read.repository.ts";
+import { PrismaAuthzReadRepository } from "../prisma.authz-read.repository.ts";
 
 /**
  * The adapter's contract with Prisma: exact query shapes. The POLICIES over

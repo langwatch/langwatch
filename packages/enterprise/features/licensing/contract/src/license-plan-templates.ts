@@ -1,5 +1,5 @@
-import { DEFAULT_LIMIT } from "./license-constants";
-import type { LicensePlanLimits } from "./license";
+import { DEFAULT_LIMIT } from "./license-constants.ts";
+import type { LicensePlanLimits } from "./license.ts";
 
 /**
  * Plan templates only carry the limits that licenses actually encode now:

@@ -21,8 +21,8 @@ import {
   TraceIngressCommandPort,
   TraceIngestionService,
   TraceSpanDedupPort,
-} from "../trace-ingestion.service";
-import { TestCodingAgentService } from "./support/coding-agent.service.fake";
+} from "../trace-ingestion.service.ts";
+import { TestCodingAgentService } from "./support/coding-agent.service.fake.ts";
 
 class TestTraceIngressCommand extends TraceIngressCommandPort {
   readonly record = vi.fn(async (_data: RecordSpanCommandData) => void 0);

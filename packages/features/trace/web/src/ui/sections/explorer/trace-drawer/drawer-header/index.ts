@@ -1,1 +1,1 @@
-export { DrawerHeader } from "./drawer-header";
+export { DrawerHeader } from "./drawer-header.tsx";

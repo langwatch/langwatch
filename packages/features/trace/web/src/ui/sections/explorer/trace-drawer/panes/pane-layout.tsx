@@ -6,14 +6,14 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from "react-resizable-panels";
-import { IsolatedErrorBoundary } from "../../../isolated-error-boundary";
+import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useConversationContext } from "../../hooks/use-conversation-context";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import { ConversationContext } from "../conversation-context";
-import { VizPlaceholder } from "../viz-placeholder";
-import { SpanDetailPane } from "./span-detail-pane";
-import type { DrawerLayout } from "./use-pane-layout";
+import { useConversationContext } from "../../hooks/use-conversation-context.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { ConversationContext } from "../conversation-context.tsx";
+import { VizPlaceholder } from "../viz-placeholder.tsx";
+import { SpanDetailPane } from "./span-detail-pane.tsx";
+import type { DrawerLayout } from "./use-pane-layout.ts";
 
 interface PaneLayoutProps {
   trace: TraceHeader;

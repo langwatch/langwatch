@@ -2,10 +2,10 @@ import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";
-import { api } from "../../../behavior/onboarding-api";
+import { api } from "../../../behavior/onboarding-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { useActiveProject } from "../active-project-context";
+import { useActiveProject } from "../active-project-context.tsx";
 
 export function WaitingForTracesChip(): React.ReactElement {
   const accent = useColorRawValue("orange.400");

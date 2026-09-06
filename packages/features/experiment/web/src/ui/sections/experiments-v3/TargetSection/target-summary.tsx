@@ -4,17 +4,17 @@ import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu"
 import {
   CostStatsTooltip,
   LatencyStatsTooltip,
-} from "../../../elements/batch-results/metric-stats-tooltip";
+} from "../../../elements/batch-results/metric-stats-tooltip.tsx";
 import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "@langwatch/design-system/pass-rate-indicator";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PassRateCoverageChip } from "../../../elements/shared/pass-rate-coverage-chip";
-import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage";
+import { PassRateCoverageChip } from "../../../elements/shared/pass-rate-coverage-chip.tsx";
+import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage.ts";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
-import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name";
-import type { EvaluatorConfig } from "../../../../model/experiments-v3/types";
+import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
+import type { EvaluatorConfig } from "../../../../model/experiments-v3/types.ts";
 import type { TargetAggregate } from "@langwatch/experiment-contract";
 import { formatPassRate } from "@langwatch/experiment-contract";
 import {

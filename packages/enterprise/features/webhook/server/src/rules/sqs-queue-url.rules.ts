@@ -1,4 +1,4 @@
-import type { ParsedSqsQueueUrl } from "../services/webhook-destination.service";
+import type { ParsedSqsQueueUrl } from "../services/webhook-destination.service.ts";
 
 /**
  * Queue URL admission, and everything that is read off a queue URL.

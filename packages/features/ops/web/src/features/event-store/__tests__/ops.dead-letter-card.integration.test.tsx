@@ -10,7 +10,7 @@ import {
   DeadLetterSummary,
   DeadLettersEmpty,
   DeadLettersTable,
-} from "../ui/sections/dead-letter-card";
+} from "../ui/sections/dead-letter-card.tsx";
 
 // The expanded row's attempt history reads through the tRPC client; the
 // fixtures here stand in for the ops.listOutboxAttempts read.

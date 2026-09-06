@@ -7,7 +7,7 @@ describe("static model cost ordering", () => {
   });
 
   it("orders by matched model suffix rather than vendor-prefixed key length", async () => {
-    vi.doMock("../model-catalog", () => ({
+    vi.doMock("../model-catalog.ts", () => ({
       llmModels: {
         updatedAt: "test",
         modelCount: 2,
@@ -28,7 +28,7 @@ describe("static model cost ordering", () => {
       },
     }));
 
-    const { getStaticModelCostRates } = await import("../static-model-costs");
+    const { getStaticModelCostRates } = await import("../static-model-costs.ts");
     const rates = getStaticModelCostRates();
 
     expect(rates.map((rate) => rate.model)).toEqual(["x/abc-def", "verylongvendor/abc"]);

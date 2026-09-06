@@ -17,7 +17,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-const { usePeriodSelector } = await import("../period-selector");
+const { usePeriodSelector } = await import("../period-selector.tsx");
 
 describe("usePeriodSelector()", () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { FeatureFlagsContent } from "../../features/feature-flags/ui/sections/feature-flags-content";
+import { FeatureFlagsContent } from "../../features/feature-flags/ui/sections/feature-flags-content.tsx";
 
 export default function OpsFeatureFlagsScreen() {
   return (

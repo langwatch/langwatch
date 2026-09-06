@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { AggregateType } from "../../domain/aggregateType";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event, EventMetadataBase } from "../../domain/types";
-import { TEST_COMMAND_TYPES, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
-import type { Command } from "../command";
-import { defineCommandSchema } from "../commandSchema";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
+import type { Event, EventMetadataBase } from "../../domain/types.ts";
+import { TEST_COMMAND_TYPES, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";
+import type { Command } from "../command.ts";
+import { defineCommandSchema } from "../commandSchema.ts";
 
 interface TestPayload {
   id: string;

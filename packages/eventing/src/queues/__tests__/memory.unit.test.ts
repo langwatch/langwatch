@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EventSourcedQueueDefinition } from "../../queues";
+import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
 
 const mockLogger = {
   info: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 
-import { EventSourcedQueueProcessorMemory } from "../memory";
+import { EventSourcedQueueProcessorMemory } from "../memory.ts";
 
 describe("EventSourcedQueueProcessorMemory", () => {
   beforeEach(() => {

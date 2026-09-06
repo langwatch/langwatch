@@ -13,8 +13,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { permissionSatisfiedBy } from "../registry";
-import { type BuiltinRoleKey, builtinRoleGrants, builtinRolePermissions } from "../roles";
+import { permissionSatisfiedBy } from "../registry.ts";
+import { type BuiltinRoleKey, builtinRoleGrants, builtinRolePermissions } from "../roles.ts";
 
 const ALL_ROLE_KEYS: readonly BuiltinRoleKey[] = [
   "admin",

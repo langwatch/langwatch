@@ -6,11 +6,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EvaluatorCategorySelectorDrawer } from "../evaluator-category-selector-drawer";
+import { EvaluatorCategorySelectorDrawer } from "../evaluator-category-selector-drawer.tsx";
 
 // Stub the inline type-selector content so this test suite stays focused on
 // category-step behavior without pulling in tRPC-backed dependencies.
-vi.mock("../evaluator-type-selector-content", () => ({
+vi.mock("../evaluator-type-selector-content.tsx", () => ({
   categoryNames: {
     expected_answer: "Expected Answer",
     llm_judge: "LLM as Judge",
@@ -37,7 +37,7 @@ vi.mock("../evaluator-type-selector-content", () => ({
 // The unified drawer now hosts the editor step in the same AnimatePresence as
 // the picker steps, so the shared controller/body/footer are imported at parent
 // level. Mock them here so the test environment doesn't need tRPC plumbing.
-vi.mock("../evaluator-editor-shared", () => ({
+vi.mock("../evaluator-editor-shared.tsx", () => ({
   useEvaluatorEditorController: () => ({
     title: "Mock Editor",
     hasUnsavedChanges: false,

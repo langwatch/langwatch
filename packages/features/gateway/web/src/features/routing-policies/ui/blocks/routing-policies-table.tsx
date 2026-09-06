@@ -3,9 +3,9 @@ import { Plus } from "lucide-react";
 
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { isModelTier } from "../../model/model-tier-presets";
+import { isModelTier } from "../../model/model-tier-presets.ts";
 
-import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions";
+import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
 
 export type RoutingPolicyScopeLevel = "organization" | "team" | "project";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEnvSnippet } from "../ui/sections/ingestion-template-install-drawer";
+import { buildEnvSnippet } from "../ui/sections/ingestion-template-install-drawer.tsx";
 
 const ENDPOINT = "https://app.langwatch.ai/api/otel";
 const TOKEN = "sk-lw-TEST_TOKEN";

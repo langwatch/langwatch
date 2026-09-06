@@ -17,7 +17,7 @@ import {
   errorCodeOf,
   mountRestFamily,
   type MountedRestFamily,
-} from "./support/rest-family.harness";
+} from "./support/rest-family.harness.ts";
 
 const INSTANCE_KEY = "instance-key";
 const instanceHeaders = { authorization: `Bearer ${INSTANCE_KEY}` };

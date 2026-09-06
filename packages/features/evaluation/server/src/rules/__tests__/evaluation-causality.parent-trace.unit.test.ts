@@ -6,7 +6,7 @@
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { tryExtractParentTraceForNlpgo } from "../evaluation-causality.rules";
+import { tryExtractParentTraceForNlpgo } from "../evaluation-causality.rules.ts";
 
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 const ROOT_SPAN_ID = "b7ad6b7169203331";

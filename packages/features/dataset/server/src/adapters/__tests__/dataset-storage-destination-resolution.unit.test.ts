@@ -3,15 +3,15 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { once } from "node:events";
 import { PassThrough, Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter";
-import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter";
+import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter.ts";
+import { S3DatasetStorageAdapter } from "../s3.dataset-storage.adapter.ts";
 import {
   DatasetAzureConfigResolver,
   DatasetS3ClientResolver,
   type DatasetAzureConfig,
   type DatasetBlobDriver,
   type DatasetS3Client,
-} from "../../ports/dataset-storage.port";
+} from "../../ports/dataset-storage.port.ts";
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: vi.fn(),

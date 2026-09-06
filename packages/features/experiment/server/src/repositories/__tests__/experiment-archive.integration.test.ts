@@ -16,12 +16,12 @@ import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ExperimentDspyRepository } from "../experiment-dspy.repository";
-import { ExperimentRunRepository } from "../experiment-run.repository";
-import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository";
-import { ExperimentService } from "../../services/experiment.service";
-import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
+import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
+import { ExperimentRunRepository } from "../experiment-run.repository.ts";
+import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
+import { ExperimentService } from "../../services/experiment.service.ts";
+import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter.ts";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 
 /**
  * The Postgres half of archiving: what `archiveActive` actually leaves behind. The cascade into a backing workflow and monitor is covered by

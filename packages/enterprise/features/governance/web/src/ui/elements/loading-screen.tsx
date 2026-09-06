@@ -5,8 +5,8 @@
 import { Box } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useReducedMotion } from "../../model/use-reduced-motion";
-import { FullLogo } from "./full-logo";
+import { useReducedMotion } from "../../model/use-reduced-motion.ts";
+import { FullLogo } from "./full-logo.tsx";
 
 let logoVisibleOnce = false;
 

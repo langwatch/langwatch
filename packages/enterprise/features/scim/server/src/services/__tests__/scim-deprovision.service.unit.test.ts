@@ -2,9 +2,9 @@
 
 import { OffboardIncompleteError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port";
-import { ScimDeprovisionService } from "../scim-deprovision.service";
-import { GrantsFake } from "../../__tests__/support/grants-fake";
+import { ScimSyncLifecyclePort } from "../../ports/scim-sync-lifecycle.port.ts";
+import { ScimDeprovisionService } from "../scim-deprovision.service.ts";
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 
 class LifecycleFake extends ScimSyncLifecyclePort {
   readonly tokenIssued = vi.fn(async () => undefined);

@@ -10,7 +10,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { OrganizationIntent } from "./prisma-types";
+import type { OrganizationIntent } from "./prisma-types.ts";
 
 /**
  * The organization this page edits.

@@ -1,15 +1,15 @@
 import { Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown";
-import { ShikiCodeBlock } from "../../../elements/markdown/shiki-highlight";
+import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown.tsx";
+import { ShikiCodeBlock } from "../../../elements/markdown/shiki-highlight.tsx";
 import {
   AssistantTurnCard,
   type ChatLayout,
   type ContentBlock,
   type ConversationTurn,
   ConversationTurnsList,
-} from "./transcript";
-import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state";
+} from "./transcript/index.ts";
+import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 
 const COMPACT_MAX_HEIGHT_PX = 300;
 const EXPANDED_MAX_HEIGHT_PX = 500;

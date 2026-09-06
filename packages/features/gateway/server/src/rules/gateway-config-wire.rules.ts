@@ -19,9 +19,9 @@ import {
 } from "@langwatch/gateway-contract";
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
-import type { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
-import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
-import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
+import type { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port.ts";
+import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
+import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
 
 export type GuardrailWire = {
   id: string;

@@ -8,7 +8,7 @@ import {
   isSessionMarked,
   sessionTraceIds,
   useAnnotationQueueSessionStore,
-} from "../../../behavior/annotation-queue-session.store";
+} from "../../../behavior/annotation-queue-session.store.ts";
 
 const state = () => useAnnotationQueueSessionStore.getState();
 

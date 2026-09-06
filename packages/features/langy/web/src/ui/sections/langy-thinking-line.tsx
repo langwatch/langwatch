@@ -5,13 +5,13 @@ import type {
   LangyThinkingTone,
   LangyToolNarrator,
   ThinkingMessage,
-} from "../../model/langy-thinking-line";
-import { langyThinkingLine } from "../../model/langy-thinking-line";
-import { useCyclingVerb } from "../../behavior/use-cycling-verb";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer";
-import { LANGY_THINKING_VERBS } from "../../model/values/langy-thinking-verbs";
-import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line";
+} from "../../model/langy-thinking-line.ts";
+import { langyThinkingLine } from "../../model/langy-thinking-line.ts";
+import { useCyclingVerb } from "../../behavior/use-cycling-verb.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
+import { LANGY_THINKING_VERBS } from "../../model/values/langy-thinking-verbs.ts";
+import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line.tsx";
 
 const MotionText = motion.create(Box);
 

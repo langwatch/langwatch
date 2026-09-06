@@ -14,14 +14,14 @@ import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { formatBudgetUsd } from "@langwatch/gateway-web/surfaces/budget-overview";
 
-import { api } from "../../behavior/personal-workspace-api";
-import { useShowErrorToast } from "../../behavior/personal-workspace-feedback";
-import { usePersonalRouter } from "../../behavior/personal-workspace-router";
+import { api } from "../../behavior/personal-workspace-api.ts";
+import { useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import { usePersonalRouter } from "../../behavior/personal-workspace-router.ts";
 import {
   useCurrentUser,
   useOrganizationTeamProject,
-} from "../../behavior/personal-workspace-session";
-import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout";
+} from "../../behavior/personal-workspace-session.ts";
+import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
 
 const fmtUsd = (n: number) => formatBudgetUsd(n);
 

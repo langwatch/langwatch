@@ -2,8 +2,8 @@ import { Box, Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/rea
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuArrowRight, LuRocket } from "react-icons/lu";
 
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { Link } from "../elements/personal-link";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { Link } from "../elements/personal-link.tsx";
 
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 

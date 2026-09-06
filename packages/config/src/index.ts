@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Config, RuntimeConfig, type ConfigValue } from "./runtime-config";
+import { Config, RuntimeConfig, type ConfigValue } from "./runtime-config.ts";
 
 export {
   nodeEnvironmentSchema,
@@ -21,22 +21,22 @@ export {
   RuntimeConfig,
   compileRuntimeConfig,
   Config,
-} from "./runtime-config";
+} from "./runtime-config.ts";
 
-export { postgresConfigDefinition } from "./postgres.config";
-export { redisConfigDefinition } from "./redis.config";
-export { clickhouseConfigDefinition } from "./clickhouse.config";
-export { objectStorageConfigDefinition } from "./object-storage.config";
-export { mailConfigDefinition } from "./mail.config";
-export { groupQueueConfigDefinition } from "./queue.config";
-export { egressConfigDefinition } from "./egress.config";
-export { observabilityConfigDefinition } from "./observability.config";
-export { loggerConfigDefinition } from "./logger.config";
-export { authzConfigDefinition } from "./authz.config";
-export { runtimeIdentityConfigDefinition } from "./runtime-identity.config";
-export { licensingConfigDefinition } from "./licensing.config";
-export { githubAppConfigDefinition } from "./github.config";
-export { trustedProxyConfigDefinition } from "./trusted-proxy.config";
+export { postgresConfigDefinition } from "./postgres.config.ts";
+export { redisConfigDefinition } from "./redis.config.ts";
+export { clickhouseConfigDefinition } from "./clickhouse.config.ts";
+export { objectStorageConfigDefinition } from "./object-storage.config.ts";
+export { mailConfigDefinition } from "./mail.config.ts";
+export { groupQueueConfigDefinition } from "./queue.config.ts";
+export { egressConfigDefinition } from "./egress.config.ts";
+export { observabilityConfigDefinition } from "./observability.config.ts";
+export { loggerConfigDefinition } from "./logger.config.ts";
+export { authzConfigDefinition } from "./authz.config.ts";
+export { runtimeIdentityConfigDefinition } from "./runtime-identity.config.ts";
+export { licensingConfigDefinition } from "./licensing.config.ts";
+export { githubAppConfigDefinition } from "./github.config.ts";
+export { trustedProxyConfigDefinition } from "./trusted-proxy.config.ts";
 
 // These switches intentionally retain the old instrumentation policy: only
 // the literal string "true" enables them. In particular, accepting "1" here
@@ -191,7 +191,7 @@ export {
   type DataplaneS3RoutingTable,
   parseDataplaneS3RoutingTable,
   type SkippedDataplaneS3Route,
-} from "./dataplane-s3";
+} from "./dataplane-s3.ts";
 export {
   assertGatewaySecretsAllOrNone,
   GATEWAY_SECRET_ENVS,
@@ -199,19 +199,19 @@ export {
   GATEWAY_SECRET_MIN_LENGTH,
   type GatewaySecretEnv,
   GatewaySecretsConfigurationError,
-} from "./gateway-secrets";
+} from "./gateway-secrets.ts";
 export {
   assertObservabilityDoesNotSelfIngest,
   DEFAULT_LANGWATCH_ENDPOINT,
   type DeploymentAddress,
   type SelfIngestGuardInput,
   SelfIngestingObservabilityError,
-} from "./self-ingest-guard";
+} from "./self-ingest-guard.ts";
 export {
   getZodIssueMessage,
   mapZodIssuesToLogContext,
   parseZodFieldErrors,
   type ZodErrorStructure,
   type ZodIssue,
-} from "./zod-issues";
-export { zodErrorMessage } from "./zod-error-message";
+} from "./zod-issues.ts";
+export { zodErrorMessage } from "./zod-error-message.ts";

@@ -2,7 +2,7 @@ import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { customModelEntrySchema } from "@langwatch/model-provider-contract";
-import { SmallLabel } from "../elements/small-label";
+import { SmallLabel } from "../elements/small-label.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,

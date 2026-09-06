@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
-} from "../../ports/trace-analytics-projection.port";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store";
-import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection";
-import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures";
+} from "../../ports/trace-analytics-projection.port.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
+import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection.ts";
+import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
 /**
  * The applied-event-id watermark (ADR-066). The executor dedups a redelivered

@@ -1,18 +1,18 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { useDrawer } from "../../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api";
+import { api } from "../../../../behavior/trace-api.ts";
 import {
   buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
   RICH_ARRIVAL_TRACE_ID,
-} from "../onboarding/data/sample-preview-traces";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { isPreviewTraceId } from "../../../../model/preview-trace-id";
-import type { TraceListItem } from "../types/trace";
-import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query";
+} from "../onboarding/data/sample-preview-traces.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import type { TraceListItem } from "../types/trace.ts";
+import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query.ts";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {
   return {

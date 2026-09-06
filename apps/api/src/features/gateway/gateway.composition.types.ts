@@ -1,8 +1,8 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiGatewayComposition } from "../../app/api-gateway.composition";
-import type { createGatewayTrpcRouters } from "./gateway-trpc.mount";
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type { ApiGatewayComposition } from "../../app/api-gateway.composition.ts";
+import type { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 
 /** What the gateway's three kinds of door are given. */
 export type ComposedGatewayFeature = Readonly<{

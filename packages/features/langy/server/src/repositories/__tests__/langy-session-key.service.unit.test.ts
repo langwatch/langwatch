@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
-} from "../langy-session-key.repository";
+} from "../langy-session-key.repository.ts";
 
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;

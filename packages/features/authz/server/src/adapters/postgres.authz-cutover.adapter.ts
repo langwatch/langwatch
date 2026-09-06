@@ -1,6 +1,6 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migrations/legacy-import.authz-grant.migration";
-import { PerOrganizationCachedGateStore } from "../stores/memory/memory.per-organization-cached-gate.store";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../migrations/legacy-import.authz-grant.migration.ts";
+import { PerOrganizationCachedGateStore } from "../stores/memory/memory.per-organization-cached-gate.store.ts";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
 

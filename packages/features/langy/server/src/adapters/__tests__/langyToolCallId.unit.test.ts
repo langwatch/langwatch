@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InitiateToolCallCommand } from "../../intents/langy-conversation.intent";
-import { langyRelayFrameSchema } from "../../rules/langy-relay-frame.rules";
+import { InitiateToolCallCommand } from "../../intents/langy-conversation.intent.ts";
+import { langyRelayFrameSchema } from "../../rules/langy-relay-frame.rules.ts";
 
 /**
  * The real shape: an 8-character tool id with a provider's round-trip blob

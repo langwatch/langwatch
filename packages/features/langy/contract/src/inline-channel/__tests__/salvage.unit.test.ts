@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { salvageJsonText, salvageLangyDerivedCard } from "../salvage";
+import { salvageJsonText, salvageLangyDerivedCard } from "../salvage.ts";
 
 describe("salvageJsonText", () => {
   describe("given an undamaged document", () => {

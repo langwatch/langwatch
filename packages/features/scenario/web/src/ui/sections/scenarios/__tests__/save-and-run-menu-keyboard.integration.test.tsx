@@ -8,15 +8,15 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../../behavior/prompts/use-all-prompts-for-project", () => ({
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
   useAllPromptsForProject: () => ({ data: [] }),
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
   },
@@ -26,7 +26,7 @@ vi.mock("@langwatch/agent-contract", () => ({
   ownerOnlyCopy: () => "Only the owner of this agent can run it.",
 }));
 
-vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets", () => ({
+vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets.ts", () => ({
   isAgentTarget: () => false,
   useFilteredAgents: () => [
     {
@@ -41,7 +41,7 @@ vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets", () => ({
   ],
 }));
 
-import { SaveAndRunMenu } from "../save-and-run-menu";
+import { SaveAndRunMenu } from "../save-and-run-menu.tsx";
 
 beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();

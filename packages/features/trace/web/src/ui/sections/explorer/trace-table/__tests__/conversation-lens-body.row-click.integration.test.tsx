@@ -9,23 +9,23 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { LensConfig } from "../../../../../behavior/view.store";
-import { useDrawerStore } from "../../../../../behavior/drawer.store";
-import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
-import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload";
-import { ConversationLensBody } from "../conversation-lens-body";
-import type { ConversationGroup } from "../conversation-groups";
-import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context";
+import type { LensConfig } from "../../../../../behavior/view.store.ts";
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
+import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
+import { ConversationLensBody } from "../conversation-lens-body.tsx";
+import type { ConversationGroup } from "../conversation-groups.ts";
+import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
 
 const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
 
-vi.mock("../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
 // The expanded row's turns come from their own conversation-scoped query;
 // nothing here needs them to land, only whether the row asked to expand.
-vi.mock("../../hooks/use-conversation-turns", () => ({
+vi.mock("../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 

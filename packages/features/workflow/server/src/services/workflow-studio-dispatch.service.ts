@@ -9,8 +9,8 @@ import type {
   StudioWorkflow,
   WorkflowRunOrigin,
 } from "@langwatch/workflow-contract";
-import type { WorkflowStudioStreamPort } from "../ports/workflow.port";
-import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service";
+import type { WorkflowStudioStreamPort } from "../ports/workflow.port.ts";
+import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 

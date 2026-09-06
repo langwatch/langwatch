@@ -3,7 +3,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "./types";
+import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "./types.ts";
 
 /**
  * Parameters to create evaluator editor callbacks.

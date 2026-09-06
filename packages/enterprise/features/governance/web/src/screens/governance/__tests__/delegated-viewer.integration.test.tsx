@@ -38,14 +38,14 @@ import {
   fakeGovernanceHost,
   renderWithGovernanceHost,
   type GovernanceQuery,
-} from "../../../testing";
+} from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   /** Every procedure path whose `useQuery` was NOT disabled. */
   requested: [] as string[],
 }));
 
-vi.mock("../../../behavior/governance-api", () => {
+vi.mock("../../../behavior/governance-api.ts", () => {
   const queryResult = () => ({
     data: undefined,
     isLoading: false,
@@ -88,16 +88,16 @@ vi.mock("../../../behavior/governance-api", () => {
   return { api, governanceApi: api };
 });
 
-import AnomalyRulesPage from "../governance-anomaly-rules.screen";
-import IngestionSourceDetailPage from "../governance-ingestion-source.screen";
-import InventoryPage from "../governance-inventory.screen";
+import AnomalyRulesPage from "../governance-anomaly-rules.screen.tsx";
+import IngestionSourceDetailPage from "../governance-ingestion-source.screen.tsx";
+import InventoryPage from "../governance-inventory.screen.tsx";
 
-import GovernanceOverviewPage from "../governance-overview.screen";
-import PeoplePage from "../governance-people.screen";
-import TeamDetailPage from "../governance-team.screen";
-import TeamsListPage from "../governance-teams.screen";
-import UserDetailPage from "../governance-user.screen";
-import UsersListPage from "../governance-users.screen";
+import GovernanceOverviewPage from "../governance-overview.screen.tsx";
+import PeoplePage from "../governance-people.screen.tsx";
+import TeamDetailPage from "../governance-team.screen.tsx";
+import TeamsListPage from "../governance-teams.screen.tsx";
+import UserDetailPage from "../governance-user.screen.tsx";
+import UsersListPage from "../governance-users.screen.tsx";
 
 /** Every page the Governance section navigation lists, plus its drill-ins. */
 const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [

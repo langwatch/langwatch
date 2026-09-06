@@ -7,9 +7,9 @@
  */
 import { monitorSchema } from "@langwatch/monitor-contract";
 import { z } from "zod";
-import { automationPersistCapCountSchema } from "./persist-cap";
-import { customGraphNameRefSchema } from "./custom-graph";
-import { triggerSchema } from "./trigger";
+import { automationPersistCapCountSchema } from "./persist-cap.ts";
+import { customGraphNameRefSchema } from "./custom-graph.ts";
+import { triggerSchema } from "./trigger.ts";
 
 /**
  * One automation as the list renders it: the row, the monitors its conditions

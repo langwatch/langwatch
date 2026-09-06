@@ -1,4 +1,4 @@
-import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection";
+import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection.ts";
 
 /**
  * @see ADR-034 Phase 1

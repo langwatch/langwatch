@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { traceRecordValueSchema } from "./trace-record";
+import { traceRecordValueSchema } from "./trace-record.ts";
 
 /**
  * Captured input and output values in a full Trace read.

@@ -23,9 +23,9 @@
  */
 
 import type { LiqeQuery, TagToken } from "liqe";
-import { filterAST, walkAST } from "./trace-query-ast";
-import { escapeValue } from "./trace-query-mutations";
-import { isEmptyAST, parse, serialize } from "./trace-query-parser";
+import { filterAST, walkAST } from "./trace-query-ast.ts";
+import { escapeValue } from "./trace-query-mutations.ts";
+import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 export const EVALUATOR_FIELD = "evaluator";
 export const EVALUATOR_VERDICT_FIELD = "evaluatorVerdict";

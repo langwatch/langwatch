@@ -1,4 +1,4 @@
-import { ApiRuntimeBootstrap, type ApiRuntimeBootstrapOptions } from "./api.main";
+import { ApiRuntimeBootstrap, type ApiRuntimeBootstrapOptions } from "./api.main.ts";
 
 /** Reports a fatal boot failure at the process boundary without coupling boot to Node globals. */
 export abstract class ApiBootFailurePort {

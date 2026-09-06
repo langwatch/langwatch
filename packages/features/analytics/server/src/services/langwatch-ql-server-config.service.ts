@@ -3,7 +3,7 @@
  * SQL and ship as ClickHouse XML.
  * @see ./langwatch-ql-access-model.service.ts — the model these make possible
  */
-import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service";
+import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 
 const sqlText = LangWatchQLSqlTextService.create();
 

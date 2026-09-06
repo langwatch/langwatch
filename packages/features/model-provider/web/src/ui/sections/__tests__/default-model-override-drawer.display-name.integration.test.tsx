@@ -6,8 +6,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DefaultModelOverrideDrawer } from "../default-model-override-drawer";
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
+import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const mockCloseDrawer = vi.fn();
 const mockGetDefaultModels = vi.fn();
@@ -39,7 +39,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
   };
 });
 
-vi.mock("../../../behavior/model-provider-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {

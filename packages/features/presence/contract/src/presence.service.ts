@@ -4,7 +4,7 @@ import type {
   PresenceProjectInput,
   PresenceSession,
   PresenceUpdateInput,
-} from "./presence";
+} from "./presence.ts";
 
 export abstract class PresenceService {
   abstract isEnabledForProject(input: PresenceProjectInput): Promise<boolean>;

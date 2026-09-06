@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { PersonaHomeResolverService, type PersonaResolverInput } from "../persona-home";
+import { PersonaHomeResolverService, type PersonaResolverInput } from "../persona-home.ts";
 
 const personaHomes = PersonaHomeResolverService.create();
 const resolvePersonaHome = personaHomes.resolve.bind(personaHomes);

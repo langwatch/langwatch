@@ -32,9 +32,9 @@ import {
   Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CapabilityIconName, CapabilitySurface } from "../../model/langy-capability-catalog";
-import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer";
+import type { CapabilityIconName, CapabilitySurface } from "../../model/langy-capability-catalog.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
 
 export type LangyCapabilityTone = "read" | "created" | "updated" | "removed";
 

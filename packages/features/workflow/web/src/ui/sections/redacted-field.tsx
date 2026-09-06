@@ -1,9 +1,9 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { Lock } from "react-feather";
-import { useFieldRedaction } from "../../behavior/use-field-redaction";
-import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project";
-import NextLink from "../elements/compat/next-link";
+import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
+import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
+import NextLink from "../elements/compat/next-link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface RedactedFieldProps {

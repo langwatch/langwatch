@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { builtinRoleGrants, roleKeyForTeamRole } from "../roles";
+import { builtinRoleGrants, roleKeyForTeamRole } from "../roles.ts";
 
 describe("given a team role binding's effective permission grants", () => {
   describe.each([

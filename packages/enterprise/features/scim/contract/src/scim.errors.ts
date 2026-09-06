@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { ScimError } from "./scim.contract";
+import type { ScimError } from "./scim.contract.ts";
 
 /** A SCIM protocol failure; transports render its stable SCIM Error resource. */
 export class ScimProtocolError extends Error {

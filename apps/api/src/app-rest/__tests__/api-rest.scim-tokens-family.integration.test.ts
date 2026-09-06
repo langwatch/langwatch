@@ -9,7 +9,7 @@ import { ScimApp, type ScimService } from "@langwatch/enterprise-api";
 import { NotFoundError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { errorCodeOf, mountRestFamily, TEST_ORGANIZATION_ID } from "./support/rest-family.harness";
+import { errorCodeOf, mountRestFamily, TEST_ORGANIZATION_ID } from "./support/rest-family.harness.ts";
 
 const CONNECTION_ID = "ssoconn_acme";
 

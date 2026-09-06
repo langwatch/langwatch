@@ -6,7 +6,7 @@
  * either owning the other.
  */
 
-import type { RoutingOrigin } from "../services/conversation-trace-assembly.service";
+import type { RoutingOrigin } from "../services/conversation-trace-assembly.service.ts";
 
 /**
  * The wire shape (verified against the 35-message capture,

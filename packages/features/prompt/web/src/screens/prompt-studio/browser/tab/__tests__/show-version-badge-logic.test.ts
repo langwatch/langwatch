@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-import { shouldShowVersionBadge } from "../../../studio-internals";
+import { shouldShowVersionBadge } from "../../../studio-internals.ts";
 
 describe("showVersionBadge logic", () => {
   describe("when prompt is outdated (behind DB version)", () => {

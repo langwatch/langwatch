@@ -17,7 +17,7 @@ import { Box, Button, chakra, HStack, Input, Stack, Text, VStack } from "@chakra
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import type { LangWatchQLParameterValue } from "../../model/lwql-request-state";
+import type { LangWatchQLParameterValue } from "../../model/lwql-request-state.ts";
 
 /** What a row's text means. The four shapes the API accepts. */
 type ParameterKind = "text" | "number" | "boolean" | "null";

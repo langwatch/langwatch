@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
 
-import { usePersonalToaster } from "../../behavior/personal-workspace-feedback";
-import { HandledErrorAlert } from "../elements/handled-error-alert";
+import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 
 const SECRET_MASK = "•".repeat(48);
 

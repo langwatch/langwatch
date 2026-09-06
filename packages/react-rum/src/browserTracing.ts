@@ -27,11 +27,11 @@ import {
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
-} from "./constants";
-import { NavigationContextManager } from "./navigationContextManager";
-import { createBrowserSampler } from "./sampling";
-import { currentSessionId } from "./session";
-import { SessionSpanProcessor } from "./sessionSpanProcessor";
+} from "./constants.ts";
+import { NavigationContextManager } from "./navigationContextManager.ts";
+import { createBrowserSampler } from "./sampling.ts";
+import { currentSessionId } from "./session.ts";
+import { SessionSpanProcessor } from "./sessionSpanProcessor.ts";
 
 let started = false;
 

@@ -10,12 +10,12 @@ import type { Duplex } from "node:stream";
 import { type Agent, type AgentService, PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
-import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
-import type { AgentLastSeenWriter } from "../../../projections/connected-agent-presence.projection";
-import { ConnectCredentialPort } from "../../../ports/connect-credential.port";
+import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter.ts";
+import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter.ts";
+import type { AgentLastSeenWriter } from "../../../projections/connected-agent-presence.projection.ts";
+import { ConnectCredentialPort } from "../../../ports/connect-credential.port.ts";
 import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/api";
-import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api";
+import { CONNECT_PATH, ConnectGateway } from "../connected-agent-connect.api.ts";
 
 function createUpgradeRouter(server: Server): ConnectUpgradeRouterPort {
   const handlers = new Map<string, UpgradeHandler>();

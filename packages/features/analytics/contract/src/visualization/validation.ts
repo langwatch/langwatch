@@ -5,7 +5,7 @@
  * loading the generated validator is valid while a chart is saved, but must
  * not make an ordinary browser import of theme/policy helpers eager.
  */
-export * from "./lwql-dataset-names";
-export * from "./validate-vega-lite-spec";
-export * from "./vega-lite-schema";
-export type { VegaValidationError } from "./visualization-types";
+export * from "./lwql-dataset-names.ts";
+export * from "./validate-vega-lite-spec.ts";
+export * from "./vega-lite-schema.ts";
+export type { VegaValidationError } from "./visualization-types.ts";

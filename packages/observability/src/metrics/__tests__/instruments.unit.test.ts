@@ -8,7 +8,7 @@
  */
 import { metrics, type Attributes } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { HISTOGRAM_BOUNDARIES } from "../histogram-boundaries";
+import { HISTOGRAM_BOUNDARIES } from "../histogram-boundaries.ts";
 import {
   activateMetrics,
   counter,
@@ -16,7 +16,7 @@ import {
   histogram,
   observableGauge,
   resetMetricsForTests,
-} from "../instruments";
+} from "../instruments.ts";
 
 interface Recorded {
   readonly instrument: string;

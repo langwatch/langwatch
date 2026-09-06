@@ -2,13 +2,13 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { RoleService } from "@langwatch/role-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type {
   OrganizationInviteMailPort,
   OrganizationInviteSeatCensusPort,
   OrganizationInviteWorkspaceCensusPort,
-} from "../ports/invite.port";
-import type { InviteSendThrottleService } from "../services/invite-send-throttle.service";
+} from "../ports/invite.port.ts";
+import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 
 /**
  * The KSUID resource prefix a role binding is minted under, restated next to every writer that

@@ -4,7 +4,7 @@
  * disconnected fields make between-group magnitudes unidentifiable.
  */
 
-import type { WinMatrix } from "./batch-evaluation-results.bt-leaderboard";
+import type { WinMatrix } from "./batch-evaluation-results.bt-leaderboard.ts";
 
 export type Comparability = {
   /**

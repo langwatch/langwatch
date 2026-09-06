@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 import type {
   BatchResultRow,
   BatchTargetOutput,
-} from "../ui/sections/batch-evaluation-results.types";
+} from "../ui/sections/batch-evaluation-results.types.ts";
 
 const target = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
   targetId: "variant-a",

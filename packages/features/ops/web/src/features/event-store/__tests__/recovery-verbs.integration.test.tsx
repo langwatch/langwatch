@@ -13,10 +13,10 @@
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DeadLettersTable } from "../ui/blocks/dead-letter-table";
-import { DlqRow } from "../../queue/ui/sections/dlq-card";
+import { DeadLettersTable } from "../ui/blocks/dead-letter-table.tsx";
+import { DlqRow } from "../../queue/ui/sections/dlq-card.tsx";
 
-vi.mock("../../../behavior/ops-api", () => ({
+vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     ops: {
       listOutboxAttempts: { useQuery: () => ({ isPending: false, data: [] }) },

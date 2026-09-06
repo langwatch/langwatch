@@ -6,9 +6,9 @@
 
 import { Box, HStack, Text, VStack, Button } from "@chakra-ui/react";
 import { CircleCheck, CircleX, ChevronDown, ChevronRight, XCircle } from "lucide-react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { useState } from "react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import {
   ScenarioRunStatus,
   resolveScenarioError,

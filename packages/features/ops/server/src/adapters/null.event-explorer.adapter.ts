@@ -3,7 +3,7 @@ import type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
-} from "../repositories/event-explorer.repository";
+} from "../repositories/event-explorer.repository.ts";
 
 export class NullEventExplorerAdapter implements EventExplorerRepository {
   static create(): NullEventExplorerAdapter {

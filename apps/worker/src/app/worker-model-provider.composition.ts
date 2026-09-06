@@ -32,7 +32,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import type { WorkerConfig } from "../platform/config/worker.config";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
  * Reports the two composition decisions the model gateway would otherwise hide.

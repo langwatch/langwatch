@@ -11,15 +11,15 @@ import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { PostgresUserAdapter, type UserAvatarStoragePort } from "@langwatch/user-server";
 import type { UserService } from "@langwatch/user-contract";
-import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter";
-import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
-import { ApiAuthenticationPort } from "../api-request.policy";
-import type { ApiTrpcSession } from "../app-trpc/app-trpc.context";
+import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter.ts";
+import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
+import { ApiAuthenticationPort } from "../api-request.policy.ts";
+import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
 import {
   announceApiBetterAuthAbsences,
   composeApiBetterAuth,
   type ApiPasswordResetMailPort,
-} from "./api-better-auth.composition";
+} from "./api-better-auth.composition.ts";
 
 const logger = createLogger("langwatch:api:auth");
 

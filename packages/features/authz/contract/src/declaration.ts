@@ -14,14 +14,14 @@
  * so the assignability failure the author reads names the problem in words
  * rather than a wall of conditional types.
  */
-import { AUTHZ_RESOURCES, type AuthzPermission, type AuthzResource } from "./registry";
+import { AUTHZ_RESOURCES, type AuthzPermission, type AuthzResource } from "./registry.ts";
 import {
   BINDING_SCOPE_TIERS,
   type BindingScopeTier,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
-} from "./vocabulary";
+} from "./vocabulary.ts";
 
 export type { BindingScopeTier, ScopeTierField };
 export { SCOPE_TIER_BY_FIELD, SCOPE_TIER_FIELDS };

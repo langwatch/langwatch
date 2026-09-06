@@ -7,8 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "../../../../model/prisma-types";
-import { SuiteFormDrawer } from "../suite-form-drawer";
+import type { SimulationSuite } from "../../../../model/prisma-types.ts";
+import { SuiteFormDrawer } from "../suite-form-drawer.tsx";
 
 // -- Mock data --
 
@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
   mockGetByIdData: null as SimulationSuite | null,
 }));
 
-vi.mock("../../../../behavior/scenario-api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       getAll: {
@@ -122,7 +122,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -157,7 +157,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("../../scenarios/scenario-form-drawer", () => ({
+vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
     open ? (
       <div data-testid="scenario-editor-child-drawer">
@@ -167,7 +167,7 @@ vi.mock("../../scenarios/scenario-form-drawer", () => ({
     ) : null,
 }));
 
-vi.mock("../../agents/agent-http-editor-drawer", () => ({
+vi.mock("../../agents/agent-http-editor-drawer.tsx", () => ({
   AgentHttpEditorDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
     open ? (
       <div data-testid="agent-http-editor-child-drawer">

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository";
+import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository.ts";
 
 /**
  * The dead-letter reads, executed against a stubbed Prisma.

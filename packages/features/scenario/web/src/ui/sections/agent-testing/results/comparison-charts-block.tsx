@@ -10,10 +10,10 @@ import type { BatchRun, RunGroupSummary } from "@langwatch/suite-web/surfaces/ru
 import {
   MiniBarCard,
   type MiniBarGroup,
-} from "../../../elements/agent-testing/shared/mini-bar-card";
-import { formatPassRate } from "../../../elements/agent-testing/shared/pass-rate-color";
-import { runTitle } from "../../../../behavior/agent-testing/results/run-titles";
-import { type BatchTarget, summaryOfTarget } from "./use-batch-targets";
+} from "../../../elements/agent-testing/shared/mini-bar-card.tsx";
+import { formatPassRate } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
+import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
+import { type BatchTarget, summaryOfTarget } from "./use-batch-targets.ts";
 
 export type ComparisonChartsBlockProps = {
   targets: BatchTarget[];

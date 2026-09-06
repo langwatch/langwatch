@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { automationFilterValueSchema, automationFiltersSchema } from "./automation-filters";
-import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "./cadences";
-import { graphAlertActionParamsSchema } from "./graph-alert";
-import { reportActionParamsSchema } from "./report";
+import { automationFilterValueSchema, automationFiltersSchema } from "./automation-filters.ts";
+import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "./cadences.ts";
+import { graphAlertActionParamsSchema } from "./graph-alert.ts";
+import { reportActionParamsSchema } from "./report.ts";
 import {
   alertTypeSchema,
   notificationCadenceSchema,
   triggerActionSchema,
   triggerTemplateDraftSchema,
-} from "./trigger";
+} from "./trigger.ts";
 
 /**
  * The transport inputs the automation authoring and activity surface

@@ -10,9 +10,9 @@
  * forwards the delivery itself. This test pins the wrapper.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventSourcing } from "../../eventSourcing";
-import type { EventSourcedQueueDefinition } from "../../queues";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
+import { EventSourcing } from "../../eventSourcing.ts";
+import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const captured: {
   definition?: EventSourcedQueueDefinition<Record<string, unknown>>;

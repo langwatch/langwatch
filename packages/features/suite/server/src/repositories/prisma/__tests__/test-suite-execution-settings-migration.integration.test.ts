@@ -12,7 +12,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrationStatements } from "./replay-migration";
+import { migrationStatements } from "./replay-migration.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

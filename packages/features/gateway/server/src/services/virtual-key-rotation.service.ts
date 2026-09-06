@@ -5,18 +5,18 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { GatewayAuditPort } from "../ports/gateway-audit.port";
-import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
-import type { GatewayTransactionPort } from "../ports/gateway-transaction.port";
-import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";
-import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port";
-import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port";
+import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
+import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
+import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
+import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
+import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port.ts";
+import type { GatewayVirtualKeysPort } from "../ports/gateway-virtual-key.port.ts";
 import {
   ROTATION_GRACE_MS,
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type RotateVirtualKeyInput,
-} from "./virtual-key-validation.service";
+} from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyRotationService {
   private constructor(

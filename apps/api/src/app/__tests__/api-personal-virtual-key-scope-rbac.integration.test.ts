@@ -49,7 +49,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { composeApiGateway } from "../api-gateway.composition";
+import { composeApiGateway } from "../api-gateway.composition.ts";
 
 /** The tenancy middleware fences production reads; a fixture seeds across it. */
 class AllowTestQueries extends PrismaQueryGuard {

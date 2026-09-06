@@ -5,7 +5,7 @@
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { describe, expect, it } from "vitest";
-import { type RunInputsBody, runsSavedDataset } from "../types";
+import { type RunInputsBody, runsSavedDataset } from "../types.ts";
 
 describe("runsSavedDataset", () => {
   describe("given run inputs that replace or override the dataset", () => {

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useDrawer } from "../../../../../behavior/use-drawer";
+import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 
 /**
  * Closes any open trace drawer the moment onboarding mounts.

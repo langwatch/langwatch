@@ -1,12 +1,12 @@
 import type { AgentService as AgentServiceContract } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AgentsWorkflowPort } from "../ports/agent.port";
-import type { LinkedWorkflowCopyPort } from "../ports/linked-workflow-copy.port";
-import { PrismaAgentHistoryRepository } from "../repositories/prisma/prisma.agent-history.repository";
-import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository";
-import { PrismaLinkedWorkflowRepository } from "../repositories/prisma/prisma.linked-workflow.repository";
-import { AgentService } from "../services/agent.service";
-import { UnavailableLinkedWorkflowCopyAdapter } from "./unavailable.linked-workflow-copy.adapter";
+import type { AgentsWorkflowPort } from "../ports/agent.port.ts";
+import type { LinkedWorkflowCopyPort } from "../ports/linked-workflow-copy.port.ts";
+import { PrismaAgentHistoryRepository } from "../repositories/prisma/prisma.agent-history.repository.ts";
+import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";
+import { PrismaLinkedWorkflowRepository } from "../repositories/prisma/prisma.linked-workflow.repository.ts";
+import { AgentService } from "../services/agent.service.ts";
+import { UnavailableLinkedWorkflowCopyAdapter } from "./unavailable.linked-workflow-copy.adapter.ts";
 
 export type PostgresAgentAdapterOptions = {
   /**

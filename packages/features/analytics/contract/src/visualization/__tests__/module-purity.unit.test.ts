@@ -20,23 +20,23 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { createNoNetworkVegaLoader } from "../no-network-vega-loader";
-import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validate-vega-lite-spec";
-import { screenVegaExpression } from "../vega-lite-expressions";
-import { validateFieldReferences } from "../vega-lite-fields";
+import { createNoNetworkVegaLoader } from "../no-network-vega-loader.ts";
+import { parseVegaLiteSpecText, validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
+import { screenVegaExpression } from "../vega-lite-expressions.ts";
+import { validateFieldReferences } from "../vega-lite-fields.ts";
 import {
   ALLOWED_VEGA_LITE_TRANSFORMS,
   applyLangWatchQLVegaPolicy,
   LWQL_VEGA_LIMITS,
   LWQL_VEGA_RULES,
-} from "../vega-lite-policy";
+} from "../vega-lite-policy.ts";
 import {
   getVegaLiteSchemaValidator,
   VEGA_LITE_SCHEMA_URL,
   validateAgainstVegaLiteSchema,
-} from "../vega-lite-schema";
-import { collectViewNodes, measureSpecBytes } from "../vega-lite-structure";
-import { LWQL_VEGA_RULE_IDS, VEGA_VALIDATION_ERROR_CODES } from "../visualization-types";
+} from "../vega-lite-schema.ts";
+import { collectViewNodes, measureSpecBytes } from "../vega-lite-structure.ts";
+import { LWQL_VEGA_RULE_IDS, VEGA_VALIDATION_ERROR_CODES } from "../visualization-types.ts";
 
 /** `…/visualization/__tests__` → `…/visualization` */
 const MODULE_DIR = fileURLToPath(new URL("..", import.meta.url));

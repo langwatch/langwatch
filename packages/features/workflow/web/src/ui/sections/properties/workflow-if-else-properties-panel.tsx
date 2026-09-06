@@ -4,20 +4,20 @@ import { useCallback, useMemo } from "react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Switch } from "@langwatch/design-system/switch";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../model/edge-mapping";
+} from "../../../model/edge-mapping.ts";
 import type {
   WorkflowPanelFieldMapping,
   WorkflowBasePropertiesPanelProps,
   WorkflowCodeEditorProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports";
+} from "./workflow-properties.ports.ts";
 
 const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";
 

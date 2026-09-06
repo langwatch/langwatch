@@ -5,7 +5,7 @@ import {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
 } from "@langwatch/stored-object-server";
-import type { TasksConfig } from "../config/tasks.config";
+import type { TasksConfig } from "../config/tasks.config.ts";
 
 /** Matches the worker's own default (`worker.config.ts`); no shared constant exists for it. */
 const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
-import { ActiveSearchEditor } from "../active-search-editor";
+import { ActiveSearchEditor } from "../active-search-editor.tsx";
 
 interface AppliedQuery {
   text: string;

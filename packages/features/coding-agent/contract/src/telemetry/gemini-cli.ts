@@ -1,4 +1,4 @@
-import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition";
+import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
  * Gemini CLI. Matches on `gemini_cli` and bare `gemini`. Its `tool` token

@@ -5,7 +5,7 @@
  */
 
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type RailSectionHeadingProps = {
   label: string;

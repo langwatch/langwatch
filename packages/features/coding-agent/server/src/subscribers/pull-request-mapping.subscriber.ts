@@ -1,7 +1,7 @@
 import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@langwatch/eventing";
-import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port";
+import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port.ts";
 import { createLogger } from "@langwatch/observability";
-import type { CodingAgentSessionState } from "../projections/coding-agent-session.projection";
+import type { CodingAgentSessionState } from "../projections/coding-agent-session.projection.ts";
 import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
 import { z } from "zod";
 

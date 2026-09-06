@@ -7,11 +7,11 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { ApiKeyApp } from "@langwatch/api-key-server";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ApiAuditPort } from "../../api-request.policy";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
 
-import { createApiKeyTrpcRouter, type ApiKeyAuditSink } from "./api-key-trpc.mount";
+import { createApiKeyTrpcRouter, type ApiKeyAuditSink } from "./api-key-trpc.mount.ts";
 
-import type { ComposedApiKeyFeature } from "./api-key.composition.types";
+import type { ComposedApiKeyFeature } from "./api-key.composition.types.ts";
 
 /** Composes `apiKey.*` over this process's own credential service and trail. */
 export function composeApiKeyFeature(options: {

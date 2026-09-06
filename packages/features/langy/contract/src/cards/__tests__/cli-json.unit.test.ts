@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCliJson } from "../cli-json.js";
+import { parseCliJson } from "../cli-json.ts";
 
 describe("parseCliJson", () => {
   describe("given stdout that is exactly the JSON document", () => {

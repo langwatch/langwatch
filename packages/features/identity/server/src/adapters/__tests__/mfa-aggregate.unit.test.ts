@@ -6,8 +6,8 @@ import {
   type MfaFact,
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
-import type { MfaEnrollmentRepository } from "../../repositories/mfa-enrollment.repository";
-import { MfaGuardsService } from "../../services/mfa-guards.service";
+import type { MfaEnrollmentRepository } from "../../repositories/mfa-enrollment.repository.ts";
+import { MfaGuardsService } from "../../services/mfa-guards.service.ts";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
@@ -18,8 +18,8 @@ import {
   ExpireMfaEnrollmentCommand,
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
-} from "../../intents/mfa.intent";
-import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
+} from "../../intents/mfa.intent.ts";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter.ts";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 const USER = "user_sam";

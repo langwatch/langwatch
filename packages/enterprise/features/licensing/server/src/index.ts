@@ -1,44 +1,44 @@
-export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter";
+export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter.ts";
 export {
   LicensingApp,
   type LicensingAppDependencies,
   type LicensingCaller,
   type MintLicenseInput,
   type SsoGateStatus,
-} from "./app/licensing.app";
-export { LicenseTrpcApi, type LicenseTrpcContext } from "./transport/api-trpc/license.api";
+} from "./app/licensing.app.ts";
+export { LicenseTrpcApi, type LicenseTrpcContext } from "./transport/api-trpc/license.api.ts";
 export {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
-} from "./transport/api-trpc/license-enforcement.api";
+} from "./transport/api-trpc/license-enforcement.api.ts";
 export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,
   type LicensingEntitlementSourceAdapterMode,
-} from "./adapters/licensing.entitlement-source.adapter";
-export { PostgresOrganizationLicenseAdapter } from "./adapters/postgres.organization-license.adapter";
-export { LicenseCryptographyPort } from "./ports/license-cryptography.port";
-export { OrganizationLicensePort } from "./ports/organization-license.port";
-export { LicenseLoggerPort } from "./ports/license-logger.port";
-export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port";
-export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port";
+} from "./adapters/licensing.entitlement-source.adapter.ts";
+export { PostgresOrganizationLicenseAdapter } from "./adapters/postgres.organization-license.adapter.ts";
+export { LicenseCryptographyPort } from "./ports/license-cryptography.port.ts";
+export { OrganizationLicensePort } from "./ports/organization-license.port.ts";
+export { LicenseLoggerPort } from "./ports/license-logger.port.ts";
+export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port.ts";
+export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port.ts";
 export {
   LicenseStoragePort,
   type OrganizationLicenseCandidate,
   type StoredLicense,
-} from "./ports/license-storage.port";
-export { LicenseGenerationService } from "./services/license-generation.service";
+} from "./ports/license-storage.port.ts";
+export { LicenseGenerationService } from "./services/license-generation.service.ts";
 export {
   LicensePlanSourceService,
   type LicensePlanSourceOptions,
-} from "./services/license-plan-source.service";
+} from "./services/license-plan-source.service.ts";
 export {
   LicenseService,
   LicenseServiceConfiguration,
   type LicenseRetentionConfiguration,
   type LicenseServiceConfigurationInput,
   type LicenseServiceOptions,
-} from "./services/license.service";
+} from "./services/license.service.ts";
 
 /**
  * The one point every resolved plan passes through, so a tier's entitlements
@@ -50,4 +50,4 @@ export {
   type PlanProvider,
   type PlanProviderUser,
   type PlanResolver,
-} from "./services/plan-provider.service";
+} from "./services/plan-provider.service.ts";

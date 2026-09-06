@@ -29,10 +29,10 @@ import type {
   AuthzTeamMemberBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
-import { AuthzListingRepository } from "../authz-listing.repository";
-import type { AuthzDatabase, AuthzReadHeadSelector } from "../authz-read.repository";
-import { EventingAuthzListingRepository } from "../eventing/eventing.authz-listing.repository";
-import { PrismaAuthzListingRepository } from "../prisma/prisma.authz-listing.repository";
+import { AuthzListingRepository } from "../authz-listing.repository.ts";
+import type { AuthzDatabase, AuthzReadHeadSelector } from "../authz-read.repository.ts";
+import { EventingAuthzListingRepository } from "../eventing/eventing.authz-listing.repository.ts";
+import { PrismaAuthzListingRepository } from "../prisma/prisma.authz-listing.repository.ts";
 
 type AuthzListingHeads = Readonly<{
   legacy: AuthzListingRepository;

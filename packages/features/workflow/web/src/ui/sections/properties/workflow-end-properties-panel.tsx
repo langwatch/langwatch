@@ -2,13 +2,13 @@ import { Alert, Box, HStack, Text } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { End, Field } from "@langwatch/workflow-contract";
 import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports";
+} from "./workflow-properties.ports.ts";
 
 /**
  * The full vocabulary an evaluator can return. When the workflow

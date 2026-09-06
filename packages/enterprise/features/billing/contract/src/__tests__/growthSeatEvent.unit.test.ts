@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StripePriceMap } from "../index";
+import type { StripePriceMap } from "../index.ts";
 
 const prices = {
   GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",
@@ -22,7 +22,7 @@ import {
   isGrowthSeatPrice,
   resolveGrowthEventsPriceId,
   resolveGrowthSeatPriceId,
-} from "../index";
+} from "../index.ts";
 
 describe("growthSeatEvent", () => {
   describe("isGrowthSeatPrice()", () => {

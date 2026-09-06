@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSesClientConfig, type SesAwsClientConfiguration } from "../ses";
+import { buildSesClientConfig, type SesAwsClientConfiguration } from "../ses.ts";
 
 function fakeAws(): SesAwsClientConfiguration & {
   calls: Array<{ region?: string; targetHost: string; endpoint?: string }>;

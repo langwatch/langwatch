@@ -29,7 +29,7 @@ import {
   type AnalyticsHostProject,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
-} from "./model/analytics-host";
+} from "./model/analytics-host.ts";
 
 export type StubAnalyticsHostOptions = {
   project?: AnalyticsHostProject | undefined;

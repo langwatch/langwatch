@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "../../../../../types/trace";
+import type { TraceListItem } from "../../../../../types/trace.ts";
 import {
   ioPreviewContentBoundary,
   ioPreviewWillRenderFor,
   __splitColumnsAroundForTest as splitColumnsAround,
-} from "../io-preview-addon";
+} from "../io-preview-addon.tsx";
 
 function row(
   partial: Partial<TraceListItem> & {

@@ -1,12 +1,12 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port";
+import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
 import {
   extractModelToBoth,
   extractUsageTokens,
   normaliseModelFromAiModelObject,
-} from "./canonical-extraction.rules";
-import { asNumber } from "./canonical-guard.rules";
-import { AI_SDK_SPAN_TYPE_MAP, canonicaliseVercelToolCall } from "./vercel-tool-call.rules";
+} from "./canonical-extraction.rules.ts";
+import { asNumber } from "./canonical-guard.rules.ts";
+import { AI_SDK_SPAN_TYPE_MAP, canonicaliseVercelToolCall } from "./vercel-tool-call.rules.ts";
 
 const VERCEL_RULE_PREFIX = "vercel";
 

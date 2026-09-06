@@ -21,7 +21,7 @@ import {
   WAREHOUSE_COST_CHUNK_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
   type WarehousePricedStatement,
-} from "../puller-databricks-warehouse-cost.service";
+} from "../puller-databricks-warehouse-cost.service.ts";
 
 const warehouseCosts = DatabricksWarehouseCostService.create();
 

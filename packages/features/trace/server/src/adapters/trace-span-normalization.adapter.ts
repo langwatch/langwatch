@@ -5,8 +5,8 @@ import type {
   OtlpSpan,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port";
-import { SpanNormalizationPipelineService } from "../services/span-normalization.service";
+import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
+import { SpanNormalizationPipelineService } from "../services/span-normalization.service.ts";
 
 /**
  * Span normalization for the projections, over this package's own pipeline service. Frozen twin

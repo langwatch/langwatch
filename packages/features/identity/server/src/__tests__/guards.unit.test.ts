@@ -6,7 +6,7 @@ import {
   IdentityCommandRefusedError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuardsService } from "../services/identity-guards.service";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import {
   ACTOR,
   attachData,
@@ -15,10 +15,10 @@ import {
   InMemoryHeads,
   T0,
   USER,
-} from "./support/in-memory-heads";
-import { InMemoryReservations } from "./support/in-memory-reservations";
-import { InMemoryUsers } from "./support/in-memory-users";
-import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
+} from "./support/in-memory-heads.ts";
+import { InMemoryReservations } from "./support/in-memory-reservations.ts";
+import { InMemoryUsers } from "./support/in-memory-users.ts";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
 
 /** No legacy user holds anything, which is what every test below assumes
  *  unless it says otherwise — the cross-population collision guard has its

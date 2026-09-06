@@ -7,7 +7,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card";
+import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card.tsx";
 import { ownerOnlyCopy, type ConnectedAgentView } from "@langwatch/agent-contract";
 import {
   environmentTone,
@@ -16,7 +16,7 @@ import {
   scopeOf,
   sdkLabel,
   sortConnectedAgents,
-} from "../../../../model/connected-agent-rows";
+} from "../../../../model/connected-agent-rows.ts";
 
 /**
  * The connected agents as cards.

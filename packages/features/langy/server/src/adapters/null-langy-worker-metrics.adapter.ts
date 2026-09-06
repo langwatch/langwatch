@@ -1,4 +1,4 @@
-import { LangyWorkerMetricsPort } from "../ports/langy-turn-runtime.port";
+import { LangyWorkerMetricsPort } from "../ports/langy-turn-runtime.port.ts";
 
 export class NullLangyWorkerMetricsAdapter extends LangyWorkerMetricsPort {
   private constructor() {

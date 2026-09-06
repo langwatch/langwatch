@@ -13,7 +13,7 @@ import {
   TestProjectService,
   session,
   sessionEventRecord,
-} from "./fixtures/coding-agent.fixture";
+} from "./fixtures/coding-agent.fixture.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];
 

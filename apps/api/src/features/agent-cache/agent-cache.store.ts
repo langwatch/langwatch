@@ -10,7 +10,7 @@
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { AgentCacheEntryStorePort } from "./agent-cache.repository";
+import { AgentCacheEntryStorePort } from "./agent-cache.repository.ts";
 
 /** The entry keyspace, shared across every pod of one deployment. */
 export class RedisAgentCacheEntryStore extends AgentCacheEntryStorePort {

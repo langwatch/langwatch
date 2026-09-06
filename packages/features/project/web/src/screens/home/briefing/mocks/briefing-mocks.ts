@@ -1,6 +1,6 @@
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useEffect, useState } from "react";
-import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types";
+import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types.ts";
 
 /**
  * DEV-ONLY briefing fixtures, gated on the deployment like the home-view

@@ -2,8 +2,8 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanParamsBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store";
-import type { AttributeEditing } from "../attribute-table";
+} from "../../../../../behavior/trace-edit.store.ts";
+import type { AttributeEditing } from "../attribute-table.tsx";
 
 /**
  * Connects the attributes table to the draft: the values it starts from and

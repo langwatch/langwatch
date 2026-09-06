@@ -1,5 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { SkeletonHeader } from "../../elements/sequence/skeleton-header";
+import { SkeletonHeader } from "../../elements/sequence/skeleton-header.tsx";
 
 /**
  * Minimal placeholder for the sequence diagram while its chunk + Mermaid are loading.

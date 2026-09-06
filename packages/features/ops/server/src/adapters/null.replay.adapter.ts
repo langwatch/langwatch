@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
 import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contract";
-import type { ReplayRepository } from "../repositories/replay.repository";
+import type { ReplayRepository } from "../repositories/replay.repository.ts";
 
 export class NullReplayAdapter implements ReplayRepository {
   static create(): NullReplayAdapter {

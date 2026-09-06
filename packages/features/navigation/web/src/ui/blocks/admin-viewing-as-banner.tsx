@@ -2,7 +2,7 @@ import { Alert, Box, Button, HStack, IconButton, Spacer, Text } from "@chakra-ui
 import { Eye, LogOut, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { NavigationLink } from "../elements/navigation-link";
+import { NavigationLink } from "../elements/navigation-link.tsx";
 
 /**
  * Persistent "Viewing as admin" banner rendered in DashboardLayout when

@@ -22,8 +22,8 @@ import type {
   WorkflowExecutionInput,
   WorkflowIdPort,
   WorkflowNlpRuntimePort,
-} from "../ports/workflow.port";
-import type { StudioEventPreparer } from "./studio-event-preparer.service";
+} from "../ports/workflow.port.ts";
+import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
 
 const logger = createLogger("langwatch:workflows:execution");
 

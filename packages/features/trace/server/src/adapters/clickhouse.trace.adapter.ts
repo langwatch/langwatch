@@ -7,24 +7,24 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
-import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port";
-import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository";
-import { TraceQueryFieldValuesPort } from "../ports/query-field-values.port";
-import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port";
-import { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port";
-import { TraceRecordPort } from "../ports/trace-record.port";
-import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port";
-import { TraceFullRecordPort } from "../ports/trace-full-record.port";
-import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port";
-import { TraceFullIoPort } from "../ports/trace-full-io.port";
-import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository";
-import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter";
+import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
+import { TraceQueryFieldValuesPort } from "../ports/query-field-values.port.ts";
+import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
+import { TraceSummaryReaderPort } from "../ports/trace-summary-reader.port.ts";
+import { TraceRecordPort } from "../ports/trace-record.port.ts";
+import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
+import { TraceFullRecordPort } from "../ports/trace-full-record.port.ts";
+import { TracePayloadReaderPort } from "../ports/trace-payload-reader.port.ts";
+import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
+import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
+import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter.ts";
 import {
   TraceRepository,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
-} from "../ports/trace.port";
-import { TraceService } from "../services/trace.service";
+} from "../ports/trace.port.ts";
+import { TraceService } from "../services/trace.service.ts";
 
 export type ClickHouseTraceAdapterOptions = {
   resolveClient: TraceClickHouseResolver;

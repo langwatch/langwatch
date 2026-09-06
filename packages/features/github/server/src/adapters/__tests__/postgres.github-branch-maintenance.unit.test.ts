@@ -13,7 +13,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PostgresGithubBranchMaintenanceAdapter } from "../postgres.github-branch-maintenance.adapter";
+import { PostgresGithubBranchMaintenanceAdapter } from "../postgres.github-branch-maintenance.adapter.ts";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,

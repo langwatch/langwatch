@@ -5,8 +5,8 @@
  */
 import { HStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { LangySpaAnchor } from "../langy-spa-anchor";
-import type { FollowUpChip } from "../../../model/capabilities/follow-up-chips";
+import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
+import type { FollowUpChip } from "../../../model/capabilities/follow-up-chips.ts";
 
 export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
   if (chips.length === 0) return null;

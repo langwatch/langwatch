@@ -19,7 +19,7 @@ import {
   ScimHostProvider,
   type ScimFailureNotice,
   type ScimSuccessNotice,
-} from "./model/scim-host";
+} from "./model/scim-host.ts";
 
 export class FakeScimHost extends ScimHostPort {
   readonly successes: ScimSuccessNotice[] = [];

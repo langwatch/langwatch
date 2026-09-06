@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing";
+import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing.tsx";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
 
 const conversationProps = () => mocks.conversationProps as ConversationViewProps;
 
-vi.mock("../../../behavior/use-annotation-queues", () => ({
+vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   useAnnotationQueues: () => ({
     assignedQueueItems: mocks.items,
     totalCount: mocks.items.length,
@@ -43,7 +43,7 @@ vi.mock("../../../behavior/use-annotation-queues", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: () => true,
@@ -61,11 +61,11 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("../../../ui/sections/annotation-queue-layout", () => ({
+vi.mock("../../../ui/sections/annotation-queue-layout.tsx", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../ui/elements/tasks-done-icon", () => ({
+vi.mock("../../../ui/elements/tasks-done-icon.tsx", () => ({
   TasksDone: () => <div data-testid="tasks-done" />,
 }));
 
@@ -104,11 +104,11 @@ vi.mock("@langwatch/trace-web/surfaces/conversation-turns", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/use-error-toast", () => ({
+vi.mock("../../../behavior/use-error-toast.ts", () => ({
   useShowErrorToast: () => vi.fn(),
 }));
 
-vi.mock("../../../behavior/annotation-api", () => ({
+vi.mock("../../../behavior/annotation-api.ts", () => ({
   api: {
     useUtils: () => ({
       annotation: {
@@ -140,7 +140,7 @@ vi.mock("../../../behavior/annotation-api", () => ({
   },
 }));
 
-const { default: MyQueuePage } = await import("../my-queue.screen");
+const { default: MyQueuePage } = await import("../my-queue.screen.tsx");
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
 
