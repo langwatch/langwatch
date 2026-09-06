@@ -214,10 +214,12 @@ function registerTools(server: McpServer): void {
           "Text search query. Matches captured input/output, the trace name and span names ONLY. It does not match trace IDs — to fetch a known trace ID use get_trace, or pass traceIds here for several at once."
         ),
       traceIds: z
-        .array(z.string())
+        .array(z.string().min(1))
+        .min(1)
+        .max(1000)
         .optional()
         .describe(
-          "Exact trace IDs to fetch. Use instead of query when you already know the IDs. When set and no startDate is given, the window defaults to the last 90 days rather than 24 hours."
+          "Exact trace IDs to fetch (1–1000). Use instead of query when you already know the IDs. When set and no startDate is given, the window defaults to the last 90 days rather than 24 hours."
         ),
       filters: z
         .record(z.string(), z.array(z.string()))
@@ -261,7 +263,7 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "get_trace",
-    "Get full details of a single trace by ID. This is the right tool whenever you have a trace ID — search_traces does not match IDs. Applies no time window, so it finds a trace of any age. Returns AI-readable trace digest by default. Use format: 'json' for full raw data including all spans.",
+    "Get full details of a single trace by ID. This is the right tool whenever you have a trace ID — search_traces does not match IDs. A full ID resolves at any age; a unique 8–31 character hex prefix resolves within the last 90 days. Returns AI-readable trace digest by default. Use format: 'json' for full raw data including all spans.",
     {
       traceId: z
         .string()

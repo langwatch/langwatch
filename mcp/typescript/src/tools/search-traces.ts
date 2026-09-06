@@ -81,7 +81,7 @@ function buildEmptyResult({
   }
 
   lines.push(
-    "- Looking up a known trace id? `get_trace` takes a traceId and applies no time window.",
+    "- Looking up a known trace id? `get_trace` takes a traceId. A full id has no time window; a unique 8–31 character hex prefix searches the last 90 days.",
     "- To fetch several known trace ids at once, pass `traceIds` instead of `query`.",
   );
 
@@ -109,10 +109,16 @@ export async function handleSearchTraces(params: {
   const namesTraceIds = (params.traceIds?.length ?? 0) > 0;
   const defaultSpanMs = namesTraceIds ? ID_LOOKUP_WINDOW_MS : TEXT_SEARCH_WINDOW_MS;
 
+  const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
   const startDate = params.startDate
     ? parseRelativeDate(params.startDate)
-    : now - defaultSpanMs;
-  const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
+    : endDate - defaultSpanMs;
+
+  if (startDate >= endDate) {
+    throw new Error(
+      `Invalid trace search window: startDate (${new Date(startDate).toISOString()}) must be before endDate (${new Date(endDate).toISOString()}).`,
+    );
+  }
   const format = params.format ?? "digest";
 
   const result = await apiSearchTraces({

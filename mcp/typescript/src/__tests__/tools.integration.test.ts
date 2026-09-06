@@ -216,6 +216,40 @@ describe("handleSearchTraces()", () => {
       expect(call.endDate).toBeTypeOf("number");
       expect(call.startDate).toBeLessThan(call.endDate);
     });
+
+    it("anchors a default 24-hour window to an explicit end date", async () => {
+      mockSearchTraces.mockResolvedValue({ traces: [] });
+
+      await handleSearchTraces({ endDate: "2026-08-01T12:00:00Z" });
+
+      const call = mockSearchTraces.mock.calls[0]![0] as {
+        startDate: number;
+        endDate: number;
+      };
+      expect(call.endDate).toBe(Date.parse("2026-08-01T12:00:00Z"));
+      expect(call.endDate - call.startDate).toBe(24 * 60 * 60 * 1000);
+    });
+
+    /** @scenario An inverted search window fails before the API call */
+    it("rejects an inverted window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-02T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("startDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty window before calling the API", async () => {
+      await expect(
+        handleSearchTraces({
+          startDate: "2026-08-01T12:00:00Z",
+          endDate: "2026-08-01T12:00:00Z",
+        }),
+      ).rejects.toThrow("must be before endDate");
+      expect(mockSearchTraces).not.toHaveBeenCalled();
+    });
   });
 
   describe("when pageSize is specified", () => {

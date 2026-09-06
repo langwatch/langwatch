@@ -14,7 +14,7 @@ Feature: MCP Trace Tools
   Scenario: Agent searches traces with a text query
     When the agent calls search_traces with query "login error"
     Then the response contains matching traces with summaries
-    And each trace summary includes trace_id, input preview, timestamps, and status
+    And each trace summary includes trace_id, input preview, output preview, and timestamp
     And the response defaults to the last 24 hours
 
   Scenario: Agent searches traces filtered by user_id
@@ -69,6 +69,15 @@ Feature: MCP Trace Tools
     When the agent calls search_traces with a query that matches no trace
     Then the response suggests a wider startDate the caller can pass
     And the response lists the units the window accepts
+
+  Scenario: An end-only search anchors its default window to that end
+    When the agent calls search_traces with endDate "2026-08-01T12:00:00Z" and no startDate
+    Then the search covers the 24 hours ending at "2026-08-01T12:00:00Z"
+
+  Scenario: An inverted search window fails before the API call
+    When the agent calls search_traces with startDate after endDate
+    Then the response explains that startDate must be before endDate
+    And the server receives no trace search request
 
   Scenario: Agent pastes a trace id into the search query
     When the agent calls search_traces with query "63dc535cea6335c506bc81ef3543a07d"

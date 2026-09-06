@@ -1,5 +1,6 @@
 import { createServer, type Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
+import { z } from "zod";
 import { initConfig } from "../config.js";
 import {
   fetchDocumentation,
@@ -18,9 +19,9 @@ const CANNED_TRACES_SEARCH = {
     {
       trace_id: "trace-001",
       formatted_trace:
-        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
-      input: { value: "Hello, how are you?" },
-      output: { value: "I am fine, thank you!" },
+        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Login error while authenticating\n    Output: Please try again",
+      input: { value: "Login error while authenticating" },
+      output: { value: "Please try again" },
       timestamps: { started_at: 1700000000000 },
       metadata: { user_id: "user-42", thread_id: "thread-1" },
       evaluations: [
@@ -383,6 +384,13 @@ const CANNED_MODEL_PROVIDER_SET = {
 
 /** Track last request for each route so tests can assert on request body/params. */
 const lastRequests: Record<string, { method: string; url: string; body: string }> = {};
+
+const traceSearchRequestSchema = z.object({
+  query: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
+  startDate: z.number(),
+  endDate: z.number(),
+});
 
 /**
  * Mutable prompt detail so the mock is stateful: a PUT updates it and the
@@ -935,13 +943,20 @@ describe("All MCP tools integration", () => {
           "../tools/search-traces.js"
         );
         const result = await handleSearchTraces({
-          startDate: "24h",
-          endDate: "now",
+          query: "login error",
         });
 
         expect(result).toContain("trace-001");
         expect(result).toContain("LLM Call [llm] 500ms");
+        expect(result).toContain("Input: Login error while authenticating");
+        expect(result).toContain("Output: Please try again");
+        expect(result).toContain("**Time**: 1700000000000");
         expect(result).toContain("1 trace");
+
+        const req = lastRequests["POST /api/traces/search"];
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
+        expect(parsed.query).toBe("login error");
+        expect(parsed.endDate - parsed.startDate).toBe(24 * 60 * 60 * 1000);
       });
     });
 
@@ -958,6 +973,8 @@ describe("All MCP tools integration", () => {
         expect(result).toContain("No traces found matching your query.");
         expect(result).toContain("Searched the last 24 hours");
         expect(result).toContain("get_trace");
+        expect(result).toContain("8–31 character hex prefix");
+        expect(result).toContain("last 90 days");
       });
 
       /** @scenario An empty search offers a wider window */
@@ -971,6 +988,23 @@ describe("All MCP tools integration", () => {
 
         expect(result).toContain('startDate: "7d"');
         expect(result).toContain("w (weeks)");
+      });
+
+      /** @scenario An end-only search anchors its default window to that end */
+      it("anchors the default start to an explicit end", async () => {
+        const { handleSearchTraces } = await import(
+          "../tools/search-traces.js"
+        );
+
+        await handleSearchTraces({
+          endDate: "2026-08-01T12:00:00Z",
+        });
+
+        const req = lastRequests["POST /api/traces/search"];
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
+
+        expect(parsed.endDate).toBe(Date.parse("2026-08-01T12:00:00Z"));
+        expect(parsed.endDate - parsed.startDate).toBe(24 * 60 * 60 * 1000);
       });
 
       /** @scenario A trace id in a format the shape check cannot recognise still gets guidance */
@@ -1030,9 +1064,10 @@ describe("All MCP tools integration", () => {
 
         const search = lastRequests["POST /api/traces/search"];
         expect(search).toBeDefined();
-        expect(JSON.parse(search!.body).query).toBe(
-          "63dc535cea6335c506bc81ef3543a07d"
+        const requestBody = traceSearchRequestSchema.parse(
+          JSON.parse(search!.body)
         );
+        expect(requestBody.query).toBe("63dc535cea6335c506bc81ef3543a07d");
         expect(
           lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"]
         ).toBeUndefined();
@@ -1067,7 +1102,7 @@ describe("All MCP tools integration", () => {
         });
 
         const req = lastRequests["POST /api/traces/search"];
-        const parsed = JSON.parse(req!.body);
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
         const spanDays =
           (parsed.endDate - parsed.startDate) / (24 * 60 * 60 * 1000);
 
