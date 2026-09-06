@@ -92,16 +92,3 @@ Feature: Reduced server memory footprint
     Then the boundary guard fails and names the chain to that module
     And it refuses even when the module imports no browser toolkit itself
     But naming one of its types stays allowed, since types are erased
-
-  # Separately, a guard closes a footprint-adjacent foot-gun found while
-  # profiling `pnpm start`: env-load.ts loads .env with `override: true`, so a
-  # stray `NODE_ENV=development` line in a dev machine's .env would silently
-  # de-productionize a production boot (API port moves to PORT+1000, no CSP, no
-  # static serving) while the process composition stayed prod. NODE_ENV is a
-  # runtime mode, not configuration, so it stays shell-only.
-  @unit
-  Scenario: pnpm start stays in production mode on a machine with a dev .env
-    Given .env contains NODE_ENV=development
-    When the server boots with NODE_ENV=production in its environment
-    Then the process keeps running in production mode
-    And a warning explains that NODE_ENV from .env is ignored

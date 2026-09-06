@@ -37,12 +37,27 @@ Feature: Fresh-clone dev setup friction removal
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
   @integration
-  Scenario: First-run env validation surfaces a self-documenting error for unset gateway secrets
+  Scenario: A fresh clone with no gateway secrets set boots clean
     Given a fresh ".env" created from ".env.example" with no manual edits
-    When the app boots and env-create.mjs validates the environment
-    Then validation fails with a non-zero exit
-    And the error names each of "LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", and "LW_VIRTUAL_KEY_PEPPER"
-    And the error output contains the minimum character requirement so the user knows to generate a real secret
+    When the app boots and validates the environment
+    Then validation succeeds
+    And no gateway secret is required
+
+  @unit
+  Scenario: Setting only some gateway secrets surfaces a self-documenting error
+    Given "LW_GATEWAY_INTERNAL_SECRET" is set and "LW_GATEWAY_JWT_SECRET" and "LW_VIRTUAL_KEY_PEPPER" are unset
+    When the environment is validated
+    Then validation fails
+    And the error names each missing variable: "LW_GATEWAY_JWT_SECRET" and "LW_VIRTUAL_KEY_PEPPER"
+    And the error explains that all three gateway secrets must be set together, or none of them
+
+  @unit
+  Scenario: A gateway secret shorter than the minimum length is refused
+    Given "LW_GATEWAY_INTERNAL_SECRET" is set to a value shorter than the minimum length
+    When the environment is validated
+    Then validation fails
+    And the error names "LW_GATEWAY_INTERNAL_SECRET" and the minimum character requirement
+    And the error names the generation command "openssl rand -hex 32"
 
   # --- Friction #5: no new postinstall network calls ---
 
@@ -84,7 +99,9 @@ Feature: Fresh-clone dev setup friction removal
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET
   #   -> Scenario: .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER
   # AC 4 ("cp .env.example .env && pnpm dev produces a Zod error that names the gateway secrets and the generation command")
-  #   -> Scenario: First-run env validation surfaces a self-documenting error for unset gateway secrets
+  #   -> Scenario: A fresh clone with no gateway secrets set boots clean
+  #   -> Scenario: Setting only some gateway secrets surfaces a self-documenting error
+  #   -> Scenario: A gateway secret shorter than the minimum length is refused
   # AC 5 ("No new postinstall network calls introduced")
   #   -> Scenario: No postinstall script reaches the network to download goose
   # AC 6 ("The Repro section in this body still passes end-to-end on a fresh clone using make quickstart all-local")

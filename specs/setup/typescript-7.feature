@@ -51,21 +51,24 @@ Feature: TypeScript 7 is the compiler
     # several snippets would otherwise judge every one of them by the first.
 
   @unit
-  Scenario: The whole repository is typechecked as one program
-    Given every test file imports the application code it tests
-    When a contributor typechecks everything
-    Then the application files are checked once, not once for each project
-    # Two projects run back to back checked the app's files twice, which cost
-    # 35.1M type instantiations against 18.9M for the single program.
+  Scenario: Every package tsconfig extends the shared root base
+    Given the workspace declares one root tsconfig with the compiler options every package shares
+    When a package's own tsconfig.json is read
+    Then its "extends" field points at the shared root base
+    And the package layers only its own paths and overrides on top
 
   @unit
-  Scenario: The combined project checks every file the split projects checked
-    Given an application project and a tests project that each cover part of the repository
-    When one project replaces both
-    Then no file that was checked before is left unchecked
+  Scenario: Every package sets incremental with its own build info file
+    Given a package tsconfig extends the shared root base
+    When the package is typechecked
+    Then its tsconfig declares "incremental": true
+    And its "tsBuildInfoFile" is scoped to that package under node_modules/.cache/tsbuildinfo
+    # A shared or missing path lets packages clobber each other's cache, or
+    # forces every typecheck to start cold.
 
   @unit
-  Scenario: Checking one project does not cool another
-    Given a contributor checks more than one of the projects
-    Then each keeps what it learned
-    And no run makes another start from cold again
+  Scenario: Checking one package does not invalidate another's cache
+    Given two packages each declare their own tsBuildInfoFile
+    When one package is typechecked
+    Then the other package's cached build info file is untouched
+    And that other package's next typecheck starts warm, not cold
