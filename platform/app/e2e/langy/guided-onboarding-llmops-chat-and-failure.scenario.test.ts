@@ -241,12 +241,22 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
         expect(suites.length).toBeGreaterThanOrEqual(1);
         expect(commands.some((c) => /scenario run/.test(c))).toBe(true);
         expect(commands.some((c) => /test-suite run/.test(c))).toBe(true);
-        // The first run really failed: the run command's own output says so.
+        // The first run really failed on the judge: the run is scheduled and
+        // read back, so the verdict is in the run command's output or in the
+        // simulation-run read that follows it, before the suite runs.
         const firstRunAt = commands.findIndex((c) => /scenario run/.test(c));
         expect(firstRunAt).toBeGreaterThanOrEqual(0);
-        expect(outputs[firstRunAt] ?? "").toMatch(
-          /fail|FAILED|"status":\s*"(failed|error)"/i,
-        );
+        const suiteRunAt = commands.findIndex((c) => /test-suite run/.test(c));
+        const firstRunOutputs = outputs
+          .slice(firstRunAt, suiteRunAt === -1 ? undefined : suiteRunAt)
+          .filter((_, index) =>
+            /scenario run|simulation-run get|simulation-runs? /.test(
+              commands[firstRunAt + index] ?? "",
+            ),
+          )
+          .join("\n");
+        expect(firstRunOutputs).toMatch(/"verdict":\s*"failure"|FAILED/i);
+        expect(firstRunOutputs).not.toMatch(/"status":\s*"ERROR"/);
         expect(watcher.navigateHrefs.length).toBeGreaterThanOrEqual(2);
         expect(
           commands.some((c) =>
