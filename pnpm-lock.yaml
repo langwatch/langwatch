@@ -2218,6 +2218,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/gateway-server':
+        specifier: workspace:*
+        version: link:../../../../features/gateway/server
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
@@ -7063,6 +7066,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../system-migrations
@@ -7103,6 +7109,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
