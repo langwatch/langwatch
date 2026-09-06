@@ -1,4 +1,4 @@
-import type { Monitor } from "@prisma/client";
+import type { Monitor } from "~/generated/prisma/client";
 
 export interface MonitorSummary {
   id: string;

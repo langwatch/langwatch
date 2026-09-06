@@ -1,3 +1,4 @@
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
 
 export type TraceStatus = "ok" | "error" | "warning";
@@ -8,16 +9,20 @@ export type TraceStatus = "ok" | "error" | "warning";
  */
 export interface EvalSummary {
   name: string;
-  score: number | boolean;
+  /** `null` when the evaluator produced neither a score nor a verdict —
+   *  never substitute a fabricated 0, it renders as a real "0.00". */
+  score: number | boolean | null;
   scoreType: "numeric" | "boolean" | "categorical";
   /**
    * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
+   * - `processed` — the evaluator ran to completion but produced no pass/fail
+   *   verdict (score-only or verdict-less runs). Neutral: not a pass.
    * - `skipped` — the evaluator wasn't run (e.g. provider not configured,
    *   preconditions not met). The score is meaningless; don't show it.
    * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
    *   verdict — the evaluator never produced a real score.
    */
-  status: "pass" | "warning" | "fail" | "skipped" | "error";
+  status: "pass" | "warning" | "fail" | "processed" | "skipped" | "error";
 }
 
 /**
@@ -159,4 +164,24 @@ export interface TraceListItem {
    * having none.
    */
   eventsUnavailable?: boolean;
+  /**
+   * What reviewers left on the trace: their comments, ratings, scores and
+   * suggested outputs. Annotations live in their own store rather than on the
+   * trace summary, so the list reads them separately and lays them over the
+   * row (`useTraceListAnnotations`). Undefined until the Annotations column
+   * asks for them.
+   */
+  annotations?: AnnotationByTrace[];
+  /**
+   * True while the page's annotations read is still in flight. The column
+   * holds the space rather than showing its empty marker, which would claim
+   * nobody has reviewed the trace.
+   */
+  annotationsLoading?: boolean;
+  /**
+   * True when the page's annotations could not be read, whether the read
+   * failed or the reader may not see them. The column says so instead of
+   * reporting a reviewed trace as unreviewed.
+   */
+  annotationsUnavailable?: boolean;
 }

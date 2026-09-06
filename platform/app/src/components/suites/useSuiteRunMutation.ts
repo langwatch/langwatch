@@ -42,7 +42,6 @@ export function useSuiteRunMutation({
           title: `Run scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
-          meta: { closable: true },
           action: {
             label: "Edit Run Plan",
             onClick: () => onEditSuite(variables.id),
@@ -52,7 +51,6 @@ export function useSuiteRunMutation({
         toaster.create({
           title: `Run scheduled (${result.jobCount} jobs)`,
           type: "success",
-          meta: { closable: true },
         });
       }
     },

@@ -72,7 +72,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const evaluatorId =
     props.evaluatorId ??
@@ -158,7 +158,6 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     toaster.create({
       title: isEditing ? "Code evaluator saved" : "Code evaluator created",
       type: "success",
-      meta: { closable: true },
     });
     const onSave =
       getFlowCallbacks("codeEvaluatorEditor")?.onSave ??

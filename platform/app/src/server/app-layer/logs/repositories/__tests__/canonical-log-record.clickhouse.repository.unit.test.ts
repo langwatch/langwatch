@@ -97,7 +97,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
 
       await repository.ensureLogRecord(record(), 49);
 
-      // A claude_code record once expired after a day, because a reactor
+      // A claude_code record once expired after a day, because a subscriber
       // copied it into spans and the row was disposable once converted. That
       // converter is retired (ADR-056): the record IS the Terminal
       // transcript's content, so nothing here shortens its retention — it

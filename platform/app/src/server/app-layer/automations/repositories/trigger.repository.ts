@@ -5,7 +5,7 @@ import type {
   Trigger,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {
@@ -70,7 +70,7 @@ export interface TriggerRepository {
    * TriggerSent row using the unique (triggerId, traceId) constraint.
    * Returns true iff this caller is the first to claim the pair —
    * at-most-once dispatch is built on top of this guarantee. Concurrent
-   * reactors (trace-processing + evaluation-processing) racing on the
+   * subscribers (trace-processing + evaluation-processing) racing on the
    * same trigger/trace will each see exactly one `true`.
    */
   claimSend(params: {
@@ -91,6 +91,17 @@ export interface TriggerRepository {
     traceId: string;
     projectId: string;
   }): Promise<boolean>;
+
+  /**
+   * Batched form of `isSendClaimed`: the subset of `traceIds` already
+   * claimed for this trigger, in one read. A paged persist dispatch checks
+   * a whole page at once instead of one query per trace.
+   */
+  findClaimedTraceIds(params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>>;
 
   /** Updates the trigger's lastRunAt timestamp. */
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
@@ -277,6 +288,14 @@ export class NullTriggerRepository implements TriggerRepository {
     projectId: string;
   }): Promise<boolean> {
     return false;
+  }
+
+  async findClaimedTraceIds(_params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    return new Set();
   }
 
   async updateLastRunAt(_triggerId: string, _projectId: string): Promise<void> {

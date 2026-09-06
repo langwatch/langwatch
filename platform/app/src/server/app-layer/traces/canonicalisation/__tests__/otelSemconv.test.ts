@@ -115,6 +115,237 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Inference Span — v1.41 reasoning / streaming attributes (Go SDK)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("given an inference span carrying v1.41 reasoning and streaming attributes", () => {
+    describe("when the span carries gen_ai.usage.reasoning.output_tokens", () => {
+      /** @scenario "Reasoning output tokens use the current usage convention" */
+      it("canonicalises it to gen_ai.usage.reasoning_tokens", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": 64,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(64);
+      });
+    });
+
+    describe("when the span carries the legacy gen_ai.usage.reasoning_tokens", () => {
+      /** @scenario "A legacy reasoning token attribute still counts" */
+      it("keeps reading it as a fallback", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning_tokens": 32,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(32);
+      });
+    });
+
+    describe("when both reasoning token attributes are present", () => {
+      /** @scenario "A legacy reasoning token attribute still counts" */
+      it("lets the current convention win", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": 64,
+            "gen_ai.usage.reasoning_tokens": 32,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(64);
+      });
+    });
+
+    describe("when the span carries gen_ai.response.time_to_first_chunk in seconds", () => {
+      /** @scenario "Time to first chunk populates the trace time to first token" */
+      it("canonicalises it to gen_ai.server.time_to_first_token in milliseconds", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
+    });
+
+    describe("when an existing time_to_first_token is already present", () => {
+      it("does not overwrite it with the chunk-derived value", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.server.time_to_first_token": 500,
+            "gen_ai.response.time_to_first_chunk": 0.8,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBe(
+          500,
+        );
+      });
+    });
+
+    describe("when the span carries gen_ai.request.stream", () => {
+      /** @scenario "A streaming request is flagged on the span" */
+      it("records the boolean stream flag", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": true,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe(true);
+      });
+
+      it("coerces a stringified stream flag to a boolean", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": "true",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe(true);
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Inference Span — values the GenAI extractor cannot interpret
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("given a gen_ai attribute the extractor cannot coerce", () => {
+    describe("when gen_ai.request.stream is not a boolean", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": "yes",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe("yes");
+      });
+    });
+
+    describe("when gen_ai.usage.cached_input_tokens is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.cached_input_tokens": "lots",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.cached_input_tokens"]).toBe(
+          "lots",
+        );
+        expect(
+          result.attributes["gen_ai.usage.cache_read.input_tokens"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when gen_ai.usage.reasoning.output_tokens is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": "many",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning.output_tokens"]).toBe(
+          "many",
+        );
+        expect(
+          result.attributes["gen_ai.usage.reasoning_tokens"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when gen_ai.response.time_to_first_chunk is not a number", () => {
+      it("keeps the raw value on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": "fast",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          "fast",
+        );
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeUndefined();
+      });
+    });
+
+    describe("when the coerced value is rejected by a guard", () => {
+      it("keeps a negative time_to_first_chunk on the span", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": -1,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.response.time_to_first_chunk"]).toBe(
+          -1,
+        );
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Input messages (parts-based format, v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with parts-based input messages", () => {

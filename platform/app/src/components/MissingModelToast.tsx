@@ -81,7 +81,7 @@ export function showMissingModelToast(info: MissingModelInfo): void {
               window.location.assign(href);
             },
           },
-    meta: { closable: true, type: "missing-model" },
+    meta: { type: "missing-model" },
   });
 }
 
@@ -135,7 +135,7 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
         window.location.assign(href);
       },
     },
-    meta: { closable: true, type: "ai-call-failed" },
+    meta: { type: "ai-call-failed" },
   });
 }
 
@@ -216,6 +216,6 @@ export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
             window.location.assign(href);
           },
         },
-    meta: { closable: true, type: "provider-disabled" },
+    meta: { type: "provider-disabled" },
   });
 }

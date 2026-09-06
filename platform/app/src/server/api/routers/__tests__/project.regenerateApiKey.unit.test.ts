@@ -1,6 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
 
@@ -14,6 +14,14 @@ import { projectRouter } from "../project";
  */
 
 // Mock nanoid to control API key generation
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
   customAlphabet: vi.fn(
@@ -21,30 +29,19 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-// Mock the permission check to always allow; use importOriginal so other rbac exports (e.g. checkPermissionOrPubliclyShared) are available to transitive imports
+// Mock the permission resolver to always allow; use importOriginal so other rbac exports stay available to transitive imports
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    resolveTeamPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
     skipPermissionCheck: ({ ctx, next }: any) => {
       ctx.permissionChecked = true;
       return next();

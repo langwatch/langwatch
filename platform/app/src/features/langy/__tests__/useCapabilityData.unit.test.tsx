@@ -19,7 +19,7 @@ const listFetch = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       tracesV2: {
         header: { fetch: headerFetch },
         list: { fetch: listFetch },

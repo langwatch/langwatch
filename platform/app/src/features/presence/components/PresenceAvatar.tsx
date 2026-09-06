@@ -1,5 +1,6 @@
-import { Avatar, type AvatarRootProps, Box } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { useState } from "react";
+import { Avatar, type AvatarRootProps } from "~/components/ui/avatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "~/server/app-layer/presence/types";
 import {

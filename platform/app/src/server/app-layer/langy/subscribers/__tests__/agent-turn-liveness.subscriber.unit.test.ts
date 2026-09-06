@@ -247,6 +247,22 @@ describe("agent turn liveness subscriber", () => {
     });
     const subscriber = createAgentTurnLivenessSubscriber(deps);
 
+    await expect(
+      subscriber.handle(makeEvent(), context),
+    ).rejects.toBeInstanceOf(DispatchError);
+
+    expect(deps.worker.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("fails a stalled turn rather than dispatching a handoff from another tenant", async () => {
+    const deps = makeDeps({
+      conversation: makeRecord({
+        lastActivityAtMs: NOW - LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3 - 1,
+      }),
+      handoff: makeHandoff({ projectId: "project_other" }),
+    });
+    const subscriber = createAgentTurnLivenessSubscriber(deps);
+
     await subscriber.handle(makeEvent(), context);
 
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
@@ -256,5 +272,46 @@ describe("agent turn liveness subscriber", () => {
         conversationId: "conv_1",
       }),
     );
+  });
+
+  describe("when the heartbeat lapsed and there is nothing to revive the turn with", () => {
+    /** @scenario A turn still doing work is not failed because its heartbeat lapsed */
+    it("leaves a turn that is still recording activity running, and re-arms", async () => {
+      const deps = makeDeps({ handoff: null });
+      const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+      const error = await subscriber
+        .handle(makeEvent(), context)
+        .then(() => null)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(DispatchError);
+      expect((error as DispatchError).retryable).toBe(true);
+      expect((error as DispatchError).retryAfterMs).toBe(
+        LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+      );
+      expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
+      expect(deps.buffer.markError).not.toHaveBeenCalled();
+      expect(deps.worker.dispatch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A turn that really stalled with nothing to revive it is failed */
+    it("fails a turn that has recorded no activity past the stall window", async () => {
+      const deps = makeDeps({
+        conversation: makeRecord({
+          lastActivityAtMs: NOW - LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3 - 1,
+        }),
+        handoff: null,
+      });
+      const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+      await subscriber.handle(makeEvent(), context);
+
+      expect(deps.worker.dispatch).not.toHaveBeenCalled();
+      const [failure] = deps.failTurn.failTurn.mock.calls[0] ?? [];
+      expect(JSON.parse((failure as { error: string }).error).code).toBe(
+        "langy_worker_stopped",
+      );
+    });
   });
 });

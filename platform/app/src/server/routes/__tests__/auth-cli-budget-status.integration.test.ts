@@ -20,17 +20,22 @@
  *       docs/ai-gateway/governance/cli-reference.mdx
  *         "Budget pre-check (graceful degradation)"
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
 
 import { app } from "../auth-cli";
+
+/** The container's connection, handed to the test App the route reads. */
+let redisConnection: Redis | null = null;
 
 const suffix = nanoid(8);
 const ORG_ID = `org-budget-status-${suffix}`;
@@ -50,7 +55,10 @@ async function callBudgetStatus(authHeader: string | null) {
 
 describe("GET /api/auth/cli/budget/status", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
+    // The route reads its connection off the App (ADR-093).
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
 
     await prisma.organization.create({
       data: {
@@ -105,6 +113,7 @@ describe("GET /api/auth/cli/budget/status", () => {
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

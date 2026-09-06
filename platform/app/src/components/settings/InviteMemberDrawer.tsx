@@ -29,7 +29,7 @@ export function InviteMemberDrawer({
 }): React.ReactElement | null {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY ?? false;
 
@@ -46,7 +46,6 @@ export function InviteMemberDrawer({
 
   const { onSubmit, isSubmitting } = useInviteActions({
     organizationId: organization?.id ?? "",
-    isAdmin,
     hasEmailProvider,
     // Created invite links stay reachable via the invites table's row actions;
     // the drawer's job is to create and close, not to host the link list.

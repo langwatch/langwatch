@@ -15,6 +15,21 @@ const {
   hasEvalMixedWithTraceMetrics,
 } = __testOnly__;
 
+/**
+ * The SELECT list of every `stored_spans` subquery in a built statement, in
+ * order, as column arrays.
+ *
+ * Asserting on the list rather than on `sql.toContain("SomeColumn")` is what
+ * makes a pruning test discriminate. The outer query names the same columns on
+ * the join alias, so a substring check is satisfied by the outer reference
+ * alone and stays green when the subquery selects the whole analytics set, or
+ * drops a column the ARRAY JOIN needs.
+ */
+const storedSpansSelectLists = (sql: string): string[][] =>
+  Array.from(sql.matchAll(/JOIN \(SELECT (.+?) FROM stored_spans/g)).map(
+    ([, columns]) => (columns ?? "").split(",").map((column) => column.trim()),
+  );
+
 describe("aggregation-builder", () => {
   beforeEach(() => {
     resetParamCounter();
@@ -1531,10 +1546,27 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("includes JOIN with stored_spans", () => {
+    it("joins a column-pruned stored_spans subquery", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
-      expect(result.sql).toContain("JOIN stored_spans");
+      // The stored_spans join is a column-pruned subquery (identity columns +
+      // the SpanAttributes the ARRAY JOIN reads), not the raw table with its
+      // full analytics column set.
+      expect(result.sql).toMatch(/JOIN \(SELECT [^)]*FROM stored_spans/);
+      expect(result.sql).not.toContain("JOIN stored_spans ");
+      expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/);
+
+      // The exact list, not `toContain("SpanAttributes")`. The outer ARRAY JOIN
+      // and the rag.contexts predicate both name SpanAttributes on the `ss`
+      // alias, so a substring check passes even when the subquery does not
+      // select it, and it also cannot see a regression that widens the list.
+      // Both of them: the top-10 part and the total-count part each carry their
+      // own subquery, and pruning one while leaving the other wide would halve
+      // the benefit while every substring assertion stayed green.
+      expect(storedSpansSelectLists(result.sql)).toEqual([
+        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
+        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
+      ]);
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
@@ -1542,15 +1574,18 @@ describe("aggregation-builder", () => {
 
       // stored_spans is partitioned by toYearWeek(StartTime); without a
       // StartTime bound the join scans every weekly partition (incl. cold S3).
-      // Both the top-10 and the total-count parts must carry the predicate.
+      // The bound is pushed into the pruned subquery (partition prune before
+      // the join) rather than left on the outer ss alias, for both the top-10
+      // and the total-count parts.
+      expect(result.sql).not.toContain("ss.StartTime");
       expect(
         result.sql.match(
-          /ss\.StartTime >= \{startDate:DateTime64\(3\)\} - INTERVAL 2 DAY/g,
+          /StartTime >= \{startDate:DateTime64\(3\)\} - INTERVAL 2 DAY/g,
         ) ?? [],
       ).toHaveLength(2);
       expect(
         result.sql.match(
-          /ss\.StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g,
+          /StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g,
         ) ?? [],
       ).toHaveLength(2);
     });
@@ -1651,13 +1686,30 @@ describe("aggregation-builder", () => {
     it("prunes the stored_spans join to the StartTime partition window", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
-      // Same partition-pruning rationale as the documents query: bound the
-      // stored_spans scan to the date window instead of every weekly partition.
+      // Same partition-pruning rationale as the documents query, now pushed
+      // into the pruned subquery instead of the outer ss alias. The subquery
+      // selects only the Events.* arrays the ARRAY JOIN reads, not the wide
+      // SpanAttributes map.
+      expect(result.sql).toMatch(/JOIN \(SELECT [^)]*FROM stored_spans/);
+      expect(result.sql).not.toContain("ss.StartTime");
+      expect(result.sql).not.toContain("SpanAttributes");
+      // Exactly the three Events arrays the ARRAY JOIN reads, plus identity.
+      // Omitting one of them would still satisfy the regex above.
+      expect(storedSpansSelectLists(result.sql)).toEqual([
+        [
+          "TenantId",
+          "TraceId",
+          "SpanId",
+          '"Events.Timestamp"',
+          '"Events.Name"',
+          '"Events.Attributes"',
+        ],
+      ]);
       expect(result.sql).toContain(
-        "ss.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY",
+        "StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY",
       );
       expect(result.sql).toContain(
-        "ss.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY",
+        "StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY",
       );
     });
 

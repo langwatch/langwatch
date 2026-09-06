@@ -28,9 +28,6 @@ export const useEvaluationExecution = () => {
         title: "Studio is not connected yet",
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
       return false;
     }
@@ -73,9 +70,6 @@ export const useEvaluationExecution = () => {
             } evaluation execution`,
             type: "error",
             duration: 5000,
-            meta: {
-              closable: true,
-            },
           });
         }
       }, delayMs);

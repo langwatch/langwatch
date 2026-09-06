@@ -27,7 +27,7 @@
  *   - .monitor-logs/lane-b-jane-storyboard-ui-delta.md §2 (decision rationale)
  */
 
-import type { OrganizationIntent } from "@prisma/client";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 
 export type Persona =
   | "personal_only"

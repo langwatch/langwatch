@@ -18,14 +18,15 @@
  * workspace itself is missing, so the no-workspace describe below
  * already exercises the same branch from the user's perspective.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+} from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -33,6 +34,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("user.personalBudget integration", () => {
   const ns = `pbudget-${nanoid(8)}`;
@@ -116,7 +119,7 @@ describe("user.personalBudget integration", () => {
     it("rejects with UNAUTHORIZED via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.personalBudget({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

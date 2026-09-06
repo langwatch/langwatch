@@ -23,7 +23,9 @@ Most endpoints take a project API key:
 X-Auth-Token: sk-lw-...
 ```
 
-`Authorization: Bearer sk-lw-...` works too. Two families need an **organization** API key instead, because they carry signing secrets and organization-wide data: [webhook endpoints](/features/webhooks) and [gateway spend](/ai-gateway/billing-events). Create either kind under **Settings > API Keys**.
+`Authorization: Bearer sk-lw-...` works too. Some families need an **organization** API key instead, because they carry signing secrets and organization-wide data: [webhook endpoints](/features/webhooks), [gateway spend](/ai-gateway/billing-events), and everything that provisions the organization itself, from the [organization profile](/api-reference/organization/overview) and its [members](/api-reference/members/overview) through [roles](/api-reference/roles/overview) and [role bindings](/api-reference/role-bindings/overview). Create either kind under **Settings > API Keys**.
+
+Two surfaces authenticate differently again. The [SCIM 2.0 endpoints](/api-reference/scim/overview) take a SCIM bearer token, because the caller is your identity provider. [Creating organizations on a self-hosted instance](/api-reference/organizations/overview) takes the instance administrator credential, because it runs before any organization exists.
 
 The AI Gateway's own inference endpoints (`/v1/chat/completions` and friends) authenticate with a [virtual key](/ai-gateway/virtual-keys) rather than an API key, and live on the gateway host.
 

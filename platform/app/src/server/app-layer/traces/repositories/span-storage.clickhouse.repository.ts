@@ -260,12 +260,18 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
   SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
   SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
+  SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'] AS CacheCreation1hTokens,
   SpanAttributes['gen_ai.usage.input_chars'] AS InputChars,
   SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
+  SpanAttributes['gen_ai.usage.input_audio_tokens'] AS InputAudioTokens,
+  SpanAttributes['gen_ai.usage.output_audio_tokens'] AS OutputAudioTokens,
+  SpanAttributes['gen_ai.usage.input_image_tokens'] AS InputImageTokens,
+  SpanAttributes['gen_ai.usage.output_image_tokens'] AS OutputImageTokens,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
+  SpanAttributes['langwatch.model.cacheCreation1hCostPerToken'] AS CustomCacheCreation1hRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
@@ -301,6 +307,7 @@ interface ModelSpanSampleQueryRow {
   CompletionTokensRaw: string;
   CacheReadTokensRaw: string;
   CacheCreationTokensRaw: string;
+  CacheCreation1hTokensRaw: string;
   StartTimeMs: number | string;
 }
 
@@ -328,6 +335,7 @@ function mapModelSpanSampleRow(
     outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
     cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
     cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
+    cacheCreation1hTokens: tokenCount(row.CacheCreation1hTokensRaw),
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -493,12 +501,18 @@ export interface SpanSummaryQueryRow {
   OutputTokens: string;
   CacheReadTokens: string;
   CacheCreationTokens: string;
+  CacheCreation1hTokens: string;
   InputChars: string;
   AudioSeconds: string;
+  InputAudioTokens: string;
+  OutputAudioTokens: string;
+  InputImageTokens: string;
+  OutputImageTokens: string;
   CustomInputRate: string;
   CustomOutputRate: string;
   CustomCacheReadRate: string;
   CustomCacheCreationRate: string;
+  CustomCacheCreation1hRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
   UpdatedAtMs: number;
@@ -522,6 +536,74 @@ function nullableFloat(raw: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * An empty ClickHouse column means the span never reported the quantity, and
+ * the cost cascade must not read it as a zero it can price.
+ */
+function set(value: string | null | undefined): string | undefined {
+  return value || undefined;
+}
+
+/**
+ * The span's cost from its own tokens and rates.
+ *
+ * Most ingest paths emit token counts but no `gen_ai.usage.cost`: trace-level
+ * cost is computed at fold time from tokens times pricing. This mirrors that
+ * for one span, feeding computeSpanCost's priority cascade (custom enrichment
+ * rates, then the SDK's own span cost, then the static model registry) with
+ * the attributes the summary query already selects.
+ */
+function computeSummaryRowCost({
+  row,
+  inputTokens,
+  outputTokens,
+}: {
+  row: SpanSummaryQueryRow;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}): number {
+  return computeSpanCost({
+    attrs: {
+      [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: set(row.ResponseModel),
+      [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: set(row.Model),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: set(
+        row.CacheReadTokens,
+      ),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: set(
+        row.CacheCreationTokens,
+      ),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]: set(
+        row.CacheCreation1hTokens,
+      ),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: set(row.InputChars),
+      [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: set(row.AudioSeconds),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: set(row.InputAudioTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: set(row.OutputAudioTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]: set(row.InputImageTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]: set(row.OutputImageTokens),
+      [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: set(
+        row.CustomInputRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: set(
+        row.CustomOutputRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: set(
+        row.CustomCacheReadRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]: set(
+        row.CustomCacheCreationRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]: set(
+        row.CustomCacheCreation1hRate,
+      ),
+      [ATTR_KEYS.LANGWATCH_SPAN_COST]: set(row.LwSpanCost),
+    } as NormalizedAttributes,
+    model: row.ResponseModel || set(row.Model),
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
+}
+
 export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   const explicitCost = attrNumber(row.Cost);
   const inputTokens = attrNumber(row.InputTokens);
@@ -529,40 +611,11 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   const cacheReadTokens = attrNumber(row.CacheReadTokens);
   const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
 
-  // Most ingest paths emit token counts but no `gen_ai.usage.cost` —
-  // trace-level cost is computed at fold time from tokens × pricing.
-  // Mirror that here so the waterfall can show a per-span cost: feed
-  // the same priority cascade (custom enrichment rates → static model
-  // registry → SDK span cost) with the attributes this summary query
-  // already selects.
-  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown" — treat any
-  // non-positive explicit cost as absent so the computed fallback runs.
+  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown", so any
+  // non-positive explicit cost counts as absent and the computed cost runs.
   let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
   if (cost === null) {
-    const computed = computeSpanCost({
-      attrs: {
-        [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: row.ResponseModel || undefined,
-        [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: row.Model || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
-          row.CacheReadTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
-          row.CacheCreationTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
-          row.CustomInputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
-          row.CustomOutputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
-          row.CustomCacheReadRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
-          row.CustomCacheCreationRate || undefined,
-        [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
-      } as NormalizedAttributes,
-      model: row.ResponseModel || row.Model || undefined,
-      promptTokens: inputTokens,
-      completionTokens: outputTokens,
-    });
+    const computed = computeSummaryRowCost({ row, inputTokens, outputTokens });
     cost = computed > 0 ? computed : null;
   }
 
@@ -962,7 +1015,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: span.tenantId,
           spanId: span.spanId,
@@ -1011,7 +1064,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           count: spans.length,
           error: error instanceof Error ? error.message : String(error),
@@ -1074,7 +1127,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1140,7 +1193,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1184,7 +1237,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1256,7 +1309,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           }),
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1618,7 +1671,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1668,7 +1721,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         (await result.json()) as TraceEventRollupRow[],
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceCount: traceIds.length,
@@ -1739,7 +1792,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -1819,7 +1872,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         },
       );
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           traceId,
@@ -2354,6 +2407,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'], UpdatedAt) AS CacheCreation1hTokensRaw,
           argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
           (InputTokensRaw != '' OR PromptTokensRaw != ''
             OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens

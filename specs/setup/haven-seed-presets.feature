@@ -5,7 +5,9 @@ Feature: Seed presets — a database that is ready to look at
   (an idempotent upsert, nothing dropped); `haven db reset [preset]` is the
   destructive sibling that starts from a fresh database. Presets are
   positional and shared by both: demo, traces, onboarding, post-onboarding,
-  bare (ADR-064).
+  bare, mass (ADR-064). One registry serves the whole CLI — `haven play --seed
+  <preset>` seeds a throwaway PR sandbox from the same list
+  (haven-play.feature).
 
   # Behavior lives in tools/thuishaven `app/db.go` (the seedPresets registry,
   # DBSeed, DBReset, the live-stack ingest steps) plus the seed scripts they
@@ -51,6 +53,17 @@ Feature: Seed presets — a database that is ready to look at
     When I run "haven db seed demo"
     Then the identity is seeded past onboarding
     And the command fails explaining the stack must be up for the sample traces
+
+  # The demo content includes a prompt and an HTTP agent pointed at a public
+  # echo service (httpbin.org), so prompt management and HTTP-agent scenario
+  # targets both have something real to open — the agent completes a live
+  # round-trip with no API key. Both are seeded as raw JSON that the app
+  # re-validates on every read; the binding test runs those exact validators.
+  @unit
+  Scenario: The demo preset ships a working prompt and HTTP agent
+    Given the demo preset has been seeded
+    When the prompt and the HTTP agent are opened
+    Then both load the way the product reads them, ready to use
 
   # Cheap variants composed from switches the seed scripts already understand:
   #   traces          — sample traces on top of the identity, no demo content

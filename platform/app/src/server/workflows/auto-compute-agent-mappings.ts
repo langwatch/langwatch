@@ -5,8 +5,8 @@
  * so that the workflow save is never blocked.
  */
 
-import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Edge, Node } from "@xyflow/react";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { getMappingSurfaceInputs } from "../../optimization_studio/utils/nodeUtils";
 import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
 

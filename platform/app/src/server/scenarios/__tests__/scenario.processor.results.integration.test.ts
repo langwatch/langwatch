@@ -53,6 +53,7 @@ describe.skipIf(process.env.CI)(
           url: "http://localhost:1/nonexistent",
           method: "POST",
           headers: [],
+          secrets: {},
         },
       });
 
@@ -74,6 +75,7 @@ describe.skipIf(process.env.CI)(
           url: "http://localhost:1/nonexistent",
           method: "POST",
           headers: [],
+          secrets: {},
         },
       });
 

@@ -27,15 +27,11 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
   return { mockRedisStore, mockRedis };
 });
 
-let mockIsBuildOrNoRedis = false;
+/** Drives whether the App this cache reads from carries a connection. */
+let mockRedisConfigured = true;
 
-vi.mock("~/server/redis", () => ({
-  get isBuildOrNoRedis() {
-    return mockIsBuildOrNoRedis;
-  },
-  get connection() {
-    return mockRedis;
-  },
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => (mockRedisConfigured ? { redis: mockRedis } : null),
 }));
 
 import { TtlCache } from "../ttlCache";
@@ -44,7 +40,7 @@ describe("TtlCache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedisStore.clear();
-    mockIsBuildOrNoRedis = false;
+    mockRedisConfigured = true;
   });
 
   describe("when Redis is available", () => {
@@ -148,20 +144,40 @@ describe("TtlCache", () => {
         "NX",
       );
     });
+
+    it("carries the lifetime the caller named, not the cache's own", async () => {
+      const cache = new TtlCache<boolean>(60_000, "test:");
+
+      await cache.claim("lock1", true, 30_000);
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "test:lock1",
+        JSON.stringify(true),
+        "EX",
+        30,
+        "NX",
+      );
+    });
   });
 
   describe("when Redis fails on claim", () => {
-    it("falls back to in-memory claim", async () => {
+    /** @scenario "A claim the store cannot answer raises rather than naming a winner" */
+    it("raises rather than naming this caller the winner", async () => {
       const cache = new TtlCache<boolean>(30_000, "test:");
       mockRedis.set.mockRejectedValueOnce(new Error("connection reset"));
 
-      const result = await cache.claim("lock1", true);
+      // A read and a write fall back to memory here, and the worst that
+      // costs is a stale answer. A claim that fell back the same way would
+      // name one winner per process, which is the one outcome it exists to
+      // prevent, so it refuses instead and the caller decides.
+      await expect(cache.claim("lock1", true)).rejects.toThrow(
+        "connection reset",
+      );
 
-      expect(result).toBe(true);
-
-      // Redis also fails on get, so memory fallback is used
+      // Nothing was recorded, so no later read finds a key this process
+      // alone believes it holds.
       mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
-      expect(await cache.get("lock1")).toBe(true);
+      expect(await cache.get("lock1")).toBeUndefined();
     });
   });
 
@@ -200,7 +216,7 @@ describe("TtlCache", () => {
 
   describe("when Redis is not configured", () => {
     beforeEach(() => {
-      mockIsBuildOrNoRedis = true;
+      mockRedisConfigured = false;
     });
 
     it("uses in-memory cache only", async () => {
@@ -231,6 +247,25 @@ describe("TtlCache", () => {
       await cache.delete("key1");
 
       expect(await cache.get("key1")).toBeUndefined();
+    });
+
+    // With no connection the memory map is the whole cache, so a claim
+    // inside the one process is atomic and answers rather than refusing.
+    it("claims in memory, and takes a key only once", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+
+      expect(await cache.claim("lock1", true)).toBe(true);
+      expect(await cache.claim("lock1", true)).toBe(false);
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it("frees a claimed key once its lifetime passes", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+
+      expect(await cache.claim("lock1", true, 50)).toBe(true);
+      await new Promise((r) => setTimeout(r, 60));
+
+      expect(await cache.claim("lock1", true)).toBe(true);
     });
   });
 });

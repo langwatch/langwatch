@@ -5,7 +5,7 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import { linkedWorkflowId } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
 /**
@@ -49,15 +49,10 @@ export function useWorkflowTargetAgentData({
     { enabled: !!agentId && !!projectId && isOpen },
   );
 
-  const workflowId = useMemo(() => {
-    if (!agentQuery.data) return undefined;
-    const agent = agentQuery.data as TypedAgent & {
-      workflowId?: string | null;
-    };
-    if (agent.workflowId) return agent.workflowId;
-    const config = agent.config as { workflow_id?: string };
-    return config.workflow_id;
-  }, [agentQuery.data]);
+  const workflowId = useMemo(
+    () => (agentQuery.data ? linkedWorkflowId(agentQuery.data) : undefined),
+    [agentQuery.data],
+  );
 
   const workflowQuery = api.workflow.getById.useQuery(
     { projectId: projectId ?? "", workflowId: workflowId ?? "" },

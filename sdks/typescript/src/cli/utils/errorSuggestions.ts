@@ -46,6 +46,16 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
       "Ask a workspace admin to grant you access to this project or resource",
     ],
   },
+  // The management APIs (organization, members, invites, roles, role bindings,
+  // groups, SCIM tokens) answer 402 below an Enterprise plan. Nothing the
+  // caller changes about the request fixes that, so the advice is the upgrade
+  // path rather than a retry.
+  enterprise_plan_required: {
+    suggestions: [
+      "This capability is part of the Enterprise plan; upgrade the organization's plan to use it",
+    ],
+    docUrl: `${DOCS}/pricing`,
+  },
   not_found: {
     suggestions: [
       "Check the id or handle you passed",
@@ -63,6 +73,16 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
       "Check the details above for the exact validation failure",
       "Compare your arguments against the command's `--help` output",
     ],
+  },
+  // Enabling a provider does not choose a model for a role. The default lives
+  // on the Default Models settings page, and is almost always written at the
+  // organization scope, so the advice names both.
+  model_not_configured: {
+    suggestions: [
+      "Open Settings, then Default Models in the LangWatch dashboard, and set a model for the role named in this error",
+      "Set it at the organization scope so every team and project inherits it",
+    ],
+    docUrl: `${DOCS}/platform/model-providers`,
   },
   budget_exceeded: {
     suggestions: [

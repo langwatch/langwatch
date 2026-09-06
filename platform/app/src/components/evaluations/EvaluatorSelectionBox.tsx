@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
 import { CheckCircle, ChevronRight } from "lucide-react";
+import type { Evaluator } from "~/generated/prisma/client";
 
 export type EvaluatorSelectionBoxProps = {
   /** The currently selected evaluator, or null if none selected */

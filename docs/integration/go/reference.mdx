@@ -6,7 +6,7 @@ icon: terminal
 keywords: go, golang, sdk, api, reference, documentation, langwatch, opentelemetry, tracer, span
 ---
 
-This reference provides detailed documentation for all public APIs in the LangWatch Go SDK and its associated instrumentation packages.
+The LangWatch Go SDK and its instrumentation packages expose the public APIs below.
 
 ## Installation
 
@@ -176,7 +176,7 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   
   request := ChatRequest{
       Messages: []Message{{Role: "user", Content: "Hello"}},
-      Model: "gpt-4o-mini",
+      Model: "gpt-5-mini",
       Temperature: 0.7,
   }
   span.RecordInput(request)
@@ -207,7 +207,7 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   response := ChatResponse{
       Content: "The capital of France is Paris.",
       Tokens: 8,
-      Model: "gpt-4o-mini",
+      Model: "gpt-5-mini",
   }
   span.RecordOutput(response)
   ```
@@ -218,8 +218,8 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   
   **Example:**
   ```go
-  span.SetRequestModel("gpt-4o-mini")
-  span.SetRequestModel("claude-3-sonnet")
+  span.SetRequestModel("gpt-5-mini")
+  span.SetRequestModel("claude-sonnet-5")
   span.SetRequestModel("llama-3.1-8b")
   ```
 </ParamField>
@@ -229,12 +229,13 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   
   **Example:**
   ```go
+  // Providers answer with the dated build they actually served, so this is
+  // normally a longer identifier than the one you requested above.
   span.SetResponseModel("gpt-4o-mini-2024-07-18")
-  span.SetResponseModel("claude-3-sonnet-20240229")
   ```
   
   <Note>
-  The response model may differ from the request model, especially with OpenAI's model updates.
+  The response model may differ from the request model, especially with OpenAI's model updates. Setting both is what lets you see, later, which build produced a given output.
   </Note>
 </ParamField>
 
@@ -661,7 +662,7 @@ func generateResponse(ctx context.Context, client *openai.Client, query string, 
 	defer span.End()
 
 	span.SetType(langwatch.SpanTypeLLM)
-	span.SetRequestModel("gpt-4o-mini")
+	span.SetRequestModel("gpt-5-mini")
 
 	// Prepare context for LLM
 	ragContext := "Context:\n" + documents[0] + "\n" + documents[1]

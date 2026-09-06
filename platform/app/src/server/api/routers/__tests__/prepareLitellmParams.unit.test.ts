@@ -4,10 +4,6 @@ vi.mock("~/server/db", () => ({
   prisma: {},
 }));
 
-vi.mock("~/injection/dependencies.server", () => ({
-  dependencies: {},
-}));
-
 vi.mock("~/server/modelProviders/modelProvider.service", () => ({
   ModelProviderService: {
     create: vi.fn(() => ({

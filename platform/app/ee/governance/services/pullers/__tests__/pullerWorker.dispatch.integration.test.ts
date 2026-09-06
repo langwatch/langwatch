@@ -22,6 +22,19 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 
+import { vi } from "vitest";
+
+// The dev `.env` sets IS_SAAS + BLOCK_LOCAL_HTTP_CALLS, and `ssrfProtection`
+// reads both ONCE at module load to build its validator. The fixture server
+// below is on loopback, so without this the suite fails with an SSRF rejection
+// on a developer machine while passing in CI, where the vars are unset —
+// which reads as a bug in the adapter and is really one in the fixture.
+// Hoisted because a `beforeAll` would run long after that module was evaluated.
+vi.hoisted(() => {
+  process.env.IS_SAAS = "false";
+  process.env.BLOCK_LOCAL_HTTP_CALLS = "false";
+});
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import http from "http";
 import { nanoid } from "nanoid";
@@ -243,7 +256,11 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
 
     // The effect reports its outcome; the event-sourced completion command
     // and projection own durable cursor/status updates.
-    expect(outcome).toEqual({ nextCursor: null, eventCount: 3 });
+    expect(outcome).toEqual({
+      nextCursor: null,
+      eventCount: 3,
+      errorCount: 0,
+    });
     const updated = await prisma.ingestionSource.findUnique({
       where: { id: ingestionSourceId },
     });

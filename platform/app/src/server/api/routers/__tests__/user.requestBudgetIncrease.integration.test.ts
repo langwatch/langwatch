@@ -14,11 +14,7 @@
  * lookup, RoleBinding permission check, email-template rendering,
  * tRPC error mapping) runs against a real Postgres test container.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -29,6 +25,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 
 import { prisma } from "../../../db";
 import {
@@ -42,7 +43,10 @@ vi.mock("../../../mailer/emailSender", () => ({
   sendEmail: vi.fn(),
 }));
 
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { sendEmail } from "../../../mailer/emailSender";
+
+wireDefaultTestApp();
 
 describe("user.requestBudgetIncrease integration", () => {
   const ns = `bri-${nanoid(8)}`;

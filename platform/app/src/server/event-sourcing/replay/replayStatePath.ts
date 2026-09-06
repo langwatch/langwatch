@@ -42,7 +42,7 @@ import type {
  *   memory is bounded by the tenant's projection-key cardinality, not events.
  *
  * Reads canonical events from ClickHouse only. It never touches subscribers,
- * reactors, process managers, or the outbox — there is no seam here that could.
+ * subscribers, process managers, or the outbox — there is no seam here that could.
  */
 export async function replayStateProjection({
   ctx,

@@ -32,12 +32,18 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "fast-uri": ">=3.1.2",
-    "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.0",
-    "uuid": ">=11.1.1 <12",
-    "shell-quote": ">=1.8.4",
     "@grpc/grpc-js": ">=1.14.4",
+    "@hono/node-server": ">=2.0.10 <3",
+    "@opentelemetry/core": ">=2.8.0 <3",
+    "brace-expansion@<1.1.18": ">=1.1.18 <2",
+    "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4 <3",
     "esbuild": ">=0.28.1",
-    "js-yaml": ">=3.15.0 <4"
+    "fast-uri": ">=4.1.2 <5",
+    "hono": ">=4.12.34 <5",
+    "ip-address": ">=10.3.1 <11",
+    "js-yaml": ">=3.15.1 <4",
+    "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.6",
+    "shell-quote": ">=1.9.0 <2",
+    "uuid": ">=11.1.1 <12"
   }
 }

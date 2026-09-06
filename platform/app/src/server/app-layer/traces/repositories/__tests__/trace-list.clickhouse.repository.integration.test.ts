@@ -18,6 +18,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { FACET_REGISTRY } from "../../facet-registry";
+import { translateFilterToClickHouse } from "../../filter-to-clickhouse";
 import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListQuery } from "../trace-list.repository";
@@ -486,5 +488,125 @@ describe("TraceListClickHouseRepository.findCount (integration)", () => {
     const count = await repo.findCount(countParams);
     // fc-recent + fc-edge are newer than since; fc-old is not.
     expect(count).toBe(2);
+  });
+});
+
+/**
+ * `trace_summaries` keeps every version of a trace's row until the merge
+ * collapses them, so a filter evaluated before the version dedup reads a stale
+ * version as if it were current.
+ */
+describe("TraceListClickHouseRepository filtering across row versions", () => {
+  const versionTenant = `test-version-leak-${nanoid()}`;
+  const versionedTraceId = "vl-annotated";
+  const timeRange = { from: base - 60_000, to: base + 60_000 };
+
+  const annotationFacetExpression = (() => {
+    const def = FACET_REGISTRY.find((facet) => facet.key === "annotation");
+    if (!def || !("expression" in def)) {
+      throw new Error("the annotation facet no longer carries an expression");
+    }
+    return def.expression;
+  })();
+
+  /** The filter the sidebar compiles, so the test reads the production SQL. */
+  const filterFor = (queryText: string) => {
+    const compiled = translateFilterToClickHouse(
+      queryText,
+      versionTenant,
+      timeRange,
+    );
+    if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
+    return compiled;
+  };
+
+  const listWith = (queryText: string) =>
+    repo.findAll({
+      tenantId: versionTenant,
+      timeRange,
+      sort: { column: "OccurredAt", direction: "desc" },
+      limit: 50,
+      offset: 0,
+      filterWhere: filterFor(queryText),
+    });
+
+  beforeAll(async () => {
+    // Two versions of one trace, written as two parts so no merge collapses
+    // them: the older one was never annotated, the newer one carries the
+    // comment a reviewer just left.
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: versionTenant,
+        TraceId: versionedTraceId,
+        OccurredAt: new Date(base),
+        CreatedAt: new Date(base),
+        UpdatedAt: new Date(base),
+        LastEventOccurredAt: new Date(base),
+        HasAnnotation: null,
+        AnnotationIds: [],
+      }),
+    ]);
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: versionTenant,
+        TraceId: versionedTraceId,
+        OccurredAt: new Date(base),
+        CreatedAt: new Date(base),
+        UpdatedAt: new Date(base + 5_000),
+        LastEventOccurredAt: new Date(base),
+        HasAnnotation: true,
+        AnnotationIds: ["annotation-1"],
+      }),
+    ]);
+  }, 120_000);
+
+  afterAll(async () => {
+    if (!ch) return;
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId: versionTenant },
+    });
+  });
+
+  describe("given a trace whose older stored version does not match the filter", () => {
+    /** @scenario "A filter reads only the latest version of each trace" */
+    it("finds the trace by what its newest version says", async () => {
+      const page = await listWith("annotation:annotated");
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([versionedTraceId]);
+      expect(page.totalHits).toBe(1);
+    });
+
+    /** @scenario "A filter reads only the latest version of each trace" */
+    it("does not find it by what its older version said", async () => {
+      const page = await listWith("annotation:unannotated");
+
+      expect(page.rows).toHaveLength(0);
+      expect(page.totalHits).toBe(0);
+    });
+
+    /** @scenario "A filter reads only the latest version of each trace" */
+    it("counts the trace exactly once, in the bucket its newest version is in", async () => {
+      const counts = await repo.findFacetCounts({
+        tenantId: versionTenant,
+        timeRange,
+        facetExpression: annotationFacetExpression,
+      });
+
+      expect(counts.values).toEqual({ annotated: 1 });
+    });
+
+    /** @scenario "A filter reads only the latest version of each trace" */
+    it("counts nothing for the bucket only its older version is in", async () => {
+      const counts = await repo.findFacetCounts({
+        tenantId: versionTenant,
+        timeRange,
+        facetExpression: annotationFacetExpression,
+        filterWhere: filterFor("annotation:unannotated"),
+      });
+
+      expect(counts.values).toEqual({});
+    });
   });
 });

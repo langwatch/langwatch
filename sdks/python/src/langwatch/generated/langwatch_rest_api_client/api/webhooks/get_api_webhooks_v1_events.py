@@ -15,8 +15,8 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     *,
     type_: str | Unset = UNSET,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    from_: int,
+    to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
 ) -> dict[str, Any]:
@@ -107,10 +107,10 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     type_: str | Unset = UNSET,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    from_: int,
+    to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
 ) -> Response[
@@ -123,16 +123,19 @@ def sync_detailed(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
-    `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
-    (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
-    queryable log, so they cannot be listed or replayed here; any other type returns an empty page
+    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
+    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    with an empty page. They are required because the log is a ranged read over the 13-month spend table
+    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
+    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
+    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
+    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
     rather than an error, so a client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
-        from_ (int | Unset):
-        to (int | Unset):
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
 
@@ -161,10 +164,10 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     type_: str | Unset = UNSET,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    from_: int,
+    to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
 ) -> (
@@ -178,16 +181,19 @@ def sync(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
-    `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
-    (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
-    queryable log, so they cannot be listed or replayed here; any other type returns an empty page
+    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
+    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    with an empty page. They are required because the log is a ranged read over the 13-month spend table
+    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
+    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
+    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
+    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
     rather than an error, so a client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
-        from_ (int | Unset):
-        to (int | Unset):
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
 
@@ -211,10 +217,10 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     type_: str | Unset = UNSET,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    from_: int,
+    to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
 ) -> Response[
@@ -227,16 +233,19 @@ async def asyncio_detailed(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
-    `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
-    (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
-    queryable log, so they cannot be listed or replayed here; any other type returns an empty page
+    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
+    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    with an empty page. They are required because the log is a ranged read over the 13-month spend table
+    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
+    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
+    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
+    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
     rather than an error, so a client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
-        from_ (int | Unset):
-        to (int | Unset):
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
 
@@ -263,10 +272,10 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     type_: str | Unset = UNSET,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    from_: int,
+    to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
 ) -> (
@@ -280,16 +289,19 @@ async def asyncio(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type and created range. Webhooks are push over this log, never the only copy of it. SERVES
-    `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families
-    (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a
-    queryable log, so they cannot be listed or replayed here; any other type returns an empty page
+    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
+    must not be later than `to` — a range that ends before it starts is rejected rather than answered
+    with an empty page. They are required because the log is a ranged read over the 13-month spend table
+    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
+    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
+    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
+    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
     rather than an error, so a client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
-        from_ (int | Unset):
-        to (int | Unset):
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
 

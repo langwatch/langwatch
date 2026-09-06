@@ -30,6 +30,7 @@ export type CodingAgentEvent =
   | "api_error"
   | "api_refusal"
   | "retries_exhausted"
+  | "rate_limit"
   | "tool_result"
   | "tool_decision"
   | "compaction"
@@ -40,10 +41,21 @@ export type CodingAgentEvent =
   | "at_mention"
   | "internal_error"
   | "session_created"
+  /**
+   * The LangWatch companion event: the session's repository, branch and
+   * worktree identity, which no agent exports on its own telemetry.
+   */
+  | "session_context"
   | "session_idle"
   | "session_error"
   | "subtask_invoked"
-  | "commit";
+  | "commit"
+  /**
+   * Time to first token, reported as its own event. Codex is the only agent
+   * that spells TTFT this way (`codex.turn_ttft` with a `duration_ms`);
+   * Claude Code carries it as an attribute on its llm_request span instead.
+   */
+  | "turn_ttft";
 
 /** The canonical metric kinds, same idea as the event kinds. */
 export type CodingAgentMetric =
@@ -127,6 +139,59 @@ export interface CodingAgentDefinition {
    * attribute, this resolves it; return null when the span is not a tool span.
    */
   toolNameFromSpanName?(spanName: string): string | null;
+
+  /**
+   * Span names this agent's session facts fold from, joined into the span
+   * dispatcher's gate. Names here need not carry the agent's namespace
+   * (codex's turn span is a bare `session_task.turn`), so the gate demands
+   * agent DETECTION on top of membership for them — a foreign span that
+   * happens to reuse the name is declined, where Claude's self-namespaced
+   * names are admitted on the name alone.
+   */
+  sessionSpanNames?: readonly string[];
+
+  /**
+   * The session key off one of this agent's spans, when the SHARED candidate
+   * order reads the wrong attribute for it. Codex is the reason this exists:
+   * its turn span carries the per-turn id under `gen_ai.conversation.id` and
+   * the SESSION's id under `thread.id`, so the shared order would split every
+   * turn into its own session. Return null to fall back to the shared
+   * resolution; never return a value that is not this agent's session id.
+   */
+  sessionKeyFromSpan?(params: {
+    name: string;
+    attrs: Record<string, unknown>;
+  }): string | null;
+
+  /**
+   * True when the agent's tool runs are reported only on its LOG events
+   * (there is no tool span to fold from), so the session fold counts them
+   * from `tool_result`. Implied by `logsOnly`. Codex is the non-logsOnly
+   * case: its spans carry the turn and token story, its events the tools.
+   */
+  foldsToolRunsFromEvents?: boolean;
+
+  /**
+   * Tool names that are this agent's dispatch plumbing rather than actions
+   * of their own: every tool the model invokes THROUGH one of these
+   * re-enters the agent's tool registry and reports its own `tool_result`,
+   * so folding the wrapper too would count each carried action twice.
+   * Codex's code-mode `exec` tool is the reason this exists — the model
+   * sends it a script, and each `tools.exec_command(...)` call inside the
+   * script dispatches (and reports) on its own.
+   */
+  wrapperToolNames?: readonly string[];
+
+  /**
+   * True when this agent stamps its provider session id on every
+   * session-relevant log event, so a log record WITHOUT one is ambient
+   * process telemetry (an auth refresh, a crash report) rather than session
+   * activity — the log dispatcher then declines the contribution instead of
+   * minting a session keyed on the record's trace. Codex stamps
+   * `conversation.id` on every session event through its telemetry macro;
+   * the records from its `log_only` scope carry none and describe none.
+   */
+  logsRequireSessionKey?: boolean;
 
   /**
    * True when the agent's telemetry is events-only (no spans): the session

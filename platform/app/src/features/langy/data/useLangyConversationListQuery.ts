@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useLangyStore } from "../stores/langyStore";
@@ -22,7 +23,7 @@ export interface LangyConversationListQueryResult {
   items: LangyConversationListItemDto[];
   isLoading: boolean;
   isFetching: boolean;
-  isPreviousData: boolean;
+  isPlaceholderData: boolean;
   isFetched: boolean;
   isError: boolean;
   error: unknown;
@@ -56,20 +57,20 @@ export function useLangyConversationListQuery(
       enabled: !!project?.id && isOpen,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     },
   );
 
   return {
     items: query.data?.pages.flatMap((page) => page.items) ?? [],
-    // isInitialLoading, not isLoading: React Query v4 reports a DISABLED
+    // isLoading, not isLoading: React Query v4 reports a DISABLED
     // query as status "loading" forever, and this query is deliberately
     // disabled while the panel is closed — a permanent spinner for a fetch
-    // that will never run. isInitialLoading is loading AND actually fetching.
-    isLoading: query.isInitialLoading,
+    // that will never run. isLoading is loading AND actually fetching.
+    isLoading: query.isLoading,
     isFetching: query.isFetching,
-    isPreviousData: query.isPreviousData,
+    isPlaceholderData: query.isPlaceholderData,
     isFetched: query.isFetched,
     isError: query.isError,
     error: query.error,

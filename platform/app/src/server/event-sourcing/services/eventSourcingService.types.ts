@@ -11,9 +11,9 @@ import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventStore } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
 
@@ -86,18 +86,18 @@ export interface EventSourcingServiceOptions<
     options?: CommandHandlerOptions<unknown>;
   }>;
   /**
-   * Reactors (post-fold side-effect handlers) for this pipeline.
+   * Subscribers (post-fold side-effect handlers) for this pipeline.
    */
-  reactors?: Array<{
+  foldSubscribers?: Array<{
     foldName: string;
-    definition: ReactorDefinition<EventType>;
+    definition: SubscriberDispatchDefinition<EventType>;
   }>;
   /**
-   * Reactors (post-map side-effect handlers) for this pipeline.
+   * Subscribers (post-map side-effect handlers) for this pipeline.
    */
-  mapReactors?: Array<{
+  mapSubscribers?: Array<{
     mapName: string;
-    definition: ReactorDefinition<EventType>;
+    definition: SubscriberDispatchDefinition<EventType>;
   }>;
   /** Live event-only consumers, independent of projection state. */
   subscribers?: EventSubscriberDefinition<EventType>[];

@@ -15,14 +15,15 @@
  *
  * Spec: specs/ai-gateway/governance/vk-scope-rbac.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+} from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -31,6 +32,8 @@ import {
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
@@ -208,10 +211,11 @@ describe("virtualKeys — scope-aware RBAC", () => {
         },
       });
     }
-    // ORG/TEAM-scoped creates need a resolvable trace project
-    // (trace_project_required otherwise); the governance project is that
-    // destination, the same shape provisioned orgs have. RBAC stays the
-    // only thing under test here.
+    // The governance project every provisioned org has, so this fixture
+    // matches the real shape. Creates above a project still name their own
+    // destination, because an organization with projects to choose from is
+    // refused for leaving it to the fallback. RBAC stays the only thing
+    // under test here.
     await prisma.project.create({
       data: {
         id: `proj-gov-${ns}`,
@@ -261,6 +265,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
         organizationId: ORG_ID,
         name: "alice-org",
         scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        traceProjectId: PROJECT_DEMO,
       });
       expect(res.virtualKey.scopes).toEqual([
         expect.objectContaining({ scopeType: "ORGANIZATION", scopeId: ORG_ID }),
@@ -296,6 +301,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
         organizationId: ORG_ID,
         name: "carol-team",
         scopes: [{ scopeType: "TEAM", scopeId: TEAM_PLATFORM }],
+        traceProjectId: PROJECT_DEMO,
       });
       expect(res.virtualKey.id).toBeTruthy();
     });
@@ -346,6 +352,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
           organizationId: ORG_ID,
           name: `eve-${scope.scopeType}`,
           scopes: [scope],
+          traceProjectId: PROJECT_DEMO,
         });
         expect(res.virtualKey.id).toBeTruthy();
       }
@@ -412,6 +419,7 @@ describe("virtualKeys — scope-aware RBAC", () => {
           { scopeType: "TEAM", scopeId: TEAM_PLATFORM },
           { scopeType: "TEAM", scopeId: TEAM_DATA_SCI },
         ],
+        traceProjectId: PROJECT_DEMO,
       });
       expect(res.virtualKey.scopes).toHaveLength(2);
     });

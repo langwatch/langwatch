@@ -25,6 +25,10 @@ function buildStatusTone(
 
 export const STATUS = {
   pass: buildStatusTone("passed", "PASS"),
+  // The evaluator ran to completion but produced no pass/fail verdict
+  // (score-only or verdict-less runs). Neutral blue, matching the shared
+  // `processed` tone — a run that judged nothing must not read as a pass.
+  processed: buildStatusTone("processed", "PROCESSED"),
   // "Warning" is a legacy trace-summary status with no v3 equivalent;
   // it reads as a not-quite-pass, so route it through the `failed` tone
   // so the chip still turns red rather than picking up a bespoke yellow.
@@ -75,7 +79,7 @@ export function isCategoryOnly(eval_: EvalEntry): boolean {
 }
 
 export interface EvalRunHistoryEntry {
-  score: number | boolean;
+  score: number | boolean | null;
   timestamp: number;
   status: string;
 }

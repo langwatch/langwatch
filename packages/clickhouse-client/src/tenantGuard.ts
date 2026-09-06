@@ -39,7 +39,8 @@
  * the caller claims to be acting for.
  */
 
-import type { QueryMiddleware, QueryRequest } from "./pipeline";
+import { quietly } from "./observability";
+import type { QueryRequest } from "./query";
 
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }
@@ -267,17 +268,38 @@ export interface TenantGuardOptions {
 }
 
 /**
- * Middleware form. Place it outermost: refusing costs nothing, and it should
- * happen before a rate-limit slot or a retry budget is spent on a statement
- * that must not run.
+ * Refuses a statement that cannot name its tenant.
+ *
+ * Placed outermost by {@link ClickHouseQueryClient}: refusing costs nothing,
+ * and it should happen before a rate-limit slot or a retry budget is spent on a
+ * statement that must not run.
  */
-export function tenantGuard({
-  onUnscoped,
-}: TenantGuardOptions = {}): QueryMiddleware {
-  return (next) => async (request) => {
+export class TenantGuard {
+  private readonly onUnscoped:
+    | ((request: QueryRequest) => void)
+    | undefined;
+
+  constructor({ onUnscoped }: TenantGuardOptions = {}) {
+    this.onUnscoped = onUnscoped;
+  }
+
+  /**
+   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or
+   * declares a written reason for not being.
+   *
+   * Returns nothing on success rather than the request: it is a check, and a
+   * caller that had to remember to use a returned value could forget to.
+   */
+  assert(request: QueryRequest): void {
     if (request.unscoped !== undefined) {
-      onUnscoped?.(request);
-      return next(request);
+      // Guarded because `onUnscoped` is host code - an audit log, a counter -
+      // and this branch is the one where the guard has already decided to
+      // allow. An exception from it would propagate out of `assert` and refuse
+      // a statement the guard just approved, which is a reporting hook
+      // deciding policy. Observability must not change what it observes; see
+      // ./observability.ts.
+      quietly(() => this.onUnscoped?.(request));
+      return;
     }
 
     const violation = checkTenantScope({
@@ -288,7 +310,5 @@ export function tenantGuard({
     if (violation !== null) {
       throw new TenantScopeError(violation, request.tenantId);
     }
-
-    return next(request);
-  };
+  }
 }

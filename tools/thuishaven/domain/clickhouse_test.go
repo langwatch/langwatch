@@ -110,6 +110,43 @@ func TestRenderClickHouseConfig(t *testing.T) {
 	})
 }
 
+// @scenario "The managed ClickHouse bounds its background work"
+func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
+	cfg := RenderClickHouseConfig(DefaultClickHouseLimits())
+
+	t.Run("when rendering the config", func(t *testing.T) {
+		t.Run("bounds background pools to the small VM it shares", func(t *testing.T) {
+			for _, want := range []string{
+				"<max_concurrent_queries>32</max_concurrent_queries>",
+				"<background_pool_size>8</background_pool_size>",
+				"<background_schedule_pool_size>64</background_schedule_pool_size>",
+			} {
+				if !strings.Contains(cfg, want) {
+					t.Errorf("missing %q in:\n%s", want, cfg)
+				}
+			}
+		})
+
+		t.Run("shrinks the merge_tree free-entries thresholds with the pool", func(t *testing.T) {
+			// Stock thresholds (8 to allow a large merge, 20 to run a mutation)
+			// assume the stock 16-thread pool; kept as-is against a smaller pool
+			// they would silently stop large merges and mutations ever scheduling.
+			// All three must shrink together: the server refuses to boot when
+			// number_of_free_entries_in_pool_to_execute_optimize_entire_partition
+			// (stock 25) exceeds pool*ratio — a sanity check, not a warning.
+			for _, want := range []string{
+				"<number_of_free_entries_in_pool_to_lower_max_size_of_merge>4</number_of_free_entries_in_pool_to_lower_max_size_of_merge>",
+				"<number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>",
+				"<number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>",
+			} {
+				if !strings.Contains(cfg, want) {
+					t.Errorf("missing %q in:\n%s", want, cfg)
+				}
+			}
+		})
+	})
+}
+
 // @scenario "The managed ClickHouse keeps its own telemetry lightweight"
 func TestSystemLogRetrofitStatements(t *testing.T) {
 	t.Run("given the default limits", func(t *testing.T) {

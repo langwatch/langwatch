@@ -33,6 +33,7 @@ export type UsageLimitResult =
       count: number;
       maxMessagesPerMonth: number;
       planName: string;
+      usageUnit: UsageUnit;
     };
 
 /**
@@ -109,6 +110,7 @@ export class UsageService {
         count,
         maxMessagesPerMonth: plan.maxMessagesPerMonth,
         planName: plan.name,
+        usageUnit: decision.usageUnit,
       };
     }
     return { exceeded: false };

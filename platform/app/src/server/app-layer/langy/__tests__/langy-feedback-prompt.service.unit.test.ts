@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { traced } from "../../tracing";
 import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
@@ -160,6 +161,41 @@ describe("LangyFeedbackPromptService", () => {
           assistantAnswerCount: 2,
         }),
       ).resolves.toBe(true);
+    });
+  });
+
+  /**
+   * The cadence is read through the tracing proxy the app publishes this
+   * service with, and the clock is reached as `this.now()`, so the proxy is
+   * part of the arithmetic that decides the quiet period.
+   */
+  describe("given the service as the app publishes it", () => {
+    const published = (
+      redis: LangyFeedbackPromptRedis | null,
+      now: number = NOW,
+    ) => traced(service(redis, now), "LangyFeedbackPromptService");
+
+    it("stays quiet inside the quiet period", async () => {
+      const redis = memoryRedis();
+      await published(redis).markShown({ userId: "u1", conversationId: "c1" });
+
+      await expect(
+        published(redis, NOW + 60_000).shouldAsk({
+          userId: "u1",
+          conversationId: "c2",
+          assistantAnswerCount: 3,
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("records when the card was shown as a timestamp", async () => {
+      const redis = memoryRedis();
+      await published(redis).markShown({ userId: "u1", conversationId: "c1" });
+
+      const stored = JSON.parse(
+        redis.store.get("langy:feedback:last-asked:u1")!,
+      ) as { atMs: unknown };
+      expect(stored.atMs).toBe(NOW);
     });
   });
 

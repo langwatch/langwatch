@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------
 
 export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
+export { isRpcPath } from "./version-builder.js";
+export type { RpcConfig, RpcPath } from "./version-builder.js";
 export { createErrorHandler, formatError } from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 
@@ -23,11 +25,13 @@ export {
   type BaseApp,
   type DateVersion,
   type EndpointConfig,
+  type EndpointDocs,
   type EndpointRegistration,
   type Handler,
   type HttpMethod,
   httpStatusText,
   isDateVersion,
+  type MountedRoute,
   type ServiceConfig,
   VERSION_LATEST,
   VERSION_PREVIEW,

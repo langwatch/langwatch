@@ -1,9 +1,7 @@
 import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import {
-  getGovernanceStatus,
-  GovernanceCliError,
-} from "@/cli/utils/governance/cli-api";
+import { getGovernanceStatus } from "@/cli/utils/governance/cli-api";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
  * `langwatch governance status [--json]`
@@ -28,8 +26,7 @@ export async function governanceStatusCommand(options: {
   try {
     result = await getGovernanceStatus(cfg);
   } catch (err) {
-    const msg = err instanceof GovernanceCliError ? err.message : String(err);
-    process.stderr.write(`Error: ${msg}\n`);
+    reportCommandError({ error: err, format: options.json ? "json" : undefined });
     process.exit(1);
   }
 

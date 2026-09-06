@@ -6,7 +6,7 @@ sidebarTitle: Claude Code
 
 Claude Code is Anthropic's official agentic CLI. It speaks the Anthropic Messages API and streams tool-call deltas with specific ordering that must be preserved end-to-end.
 
-The LangWatch AI Gateway's `/v1/messages` endpoint is designed to be Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough): this is load-bearing because Claude Code uses prompt caching aggressively), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
+The LangWatch AI Gateway's `/v1/messages` endpoint is Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough); Claude Code uses prompt caching aggressively, so it depends on this), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
 
 ## Quick path: `langwatch claude` wrapper (recommended for personal IDE keys)
 
@@ -29,7 +29,7 @@ export ANTHROPIC_AUTH_TOKEN="vk-lw-01HZX..."
 claude
 ```
 
-That's it. `claude` boots, authenticates to the gateway, and every call is traced, budgeted, and governed.
+`claude` boots, authenticates to the gateway, and every call is traced, budgeted, and governed.
 
 <Note>Claude Code reads `ANTHROPIC_AUTH_TOKEN` if set; otherwise it falls back to `ANTHROPIC_API_KEY`. Either works with a LangWatch VK. Using `AUTH_TOKEN` is the upstream recommendation for non-first-party tokens.</Note>
 
@@ -92,8 +92,7 @@ Each engineer's Claude Code usage is metered against their personal cap; no one 
 ### Fallback to Bedrock on Anthropic outage
 
 - VK fallback chain: `anthropic-primary → bedrock-us-east-1`.
-- `fallback.on: [5xx, timeout, rate_limit]`.
-- `fallback.timeout_ms: 30000`.
+- `fallback.max_attempts: 2`, one attempt per credential in the chain.
 
 When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently, the engineer sees a tiny latency bump but no error.
 

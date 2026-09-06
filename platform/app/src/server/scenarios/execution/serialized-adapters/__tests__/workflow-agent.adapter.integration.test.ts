@@ -143,7 +143,11 @@ function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
     },
     secrets: {},
   };
-  return new SerializedWorkflowAgentAdapter(config, NLP, "sk-e2e-3415");
+  return new SerializedWorkflowAgentAdapter({
+    config,
+    nlpServiceUrl: NLP,
+    projectApiKey: "sk-e2e-3415",
+  });
 }
 
 const TWO_TURN_HISTORY: AgentInput["messages"] = [

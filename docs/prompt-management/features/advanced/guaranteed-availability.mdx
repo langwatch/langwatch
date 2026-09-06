@@ -7,7 +7,7 @@ Guaranteed availability ensures your application can continue operating with pro
 
 ## How It Works
 
-When you use the Prompts CLI to manage dependencies, prompts are **materialized locally** as standard YAML files. The LangWatch SDKs automatically detect and use these materialized prompts when available, providing seamless fallback behavior.
+When you use the Prompts CLI to manage dependencies, prompts are **materialized locally** as standard YAML files. The LangWatch SDKs automatically detect and use these materialized prompts when available, and fall back to the API when they are not.
 
 **Benefits:**
 
@@ -116,68 +116,42 @@ The SDKs automatically detect and use materialized prompts when available, falli
 
   <Tab title="TypeScript SDK">
     ```typescript offline_app.ts
-    import { getPrompt, setupLangWatch } from "langwatch";
+    import { LangWatch, FetchPolicy } from "langwatch";
     import OpenAI from "openai";
 
     // Initialize LangWatch
-    await setupLangWatch();
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY,
+    });
+    const openai = new OpenAI();
 
-    # Example 1: Basic usage
-    prompt = langwatch.prompts.get("customer-support-bot")
-    compiled_prompt = prompt.compile(
-        user_name="John Doe",
-        input="Help me with my account"
-    )
+    // The SDK reads the materialized file first and only calls the API when it is missing
+    const prompt = await langwatch.prompts.get("customer-support-bot");
 
-    response = completion(
-        model=compiled_prompt.model,
-        messages=compiled_prompt.messages
-    )
+    // Compile prompt with variables
+    const compiledPrompt = prompt.compile({
+      user_name: "John Doe",
+      user_email: "john.doe@example.com",
+      input: "How do I reset my password?",
+    });
 
-    # Example 2: With tracing
-    @langwatch.trace()
-    def generate_response():
-        prompt = langwatch.prompts.get("customer-support-bot")
-        compiled_prompt = prompt.compile(
-            user_name="John Doe",
-            input="Help me with my account"
-        )
+    const response = await openai.chat.completions.create({
+      model: prompt.model.replace("openai/", ""),
+      messages: compiledPrompt.messages,
+    });
 
-        response = completion(
-            model=compiled_prompt.model,
-            messages=compiled_prompt.messages
-        )
-        return response.choices[0].message.content
+    console.log(response.choices[0].message.content);
 
-    # Example 3: Offline usage
-    prompt = langwatch.prompts.get("customer-support-bot")
-    compiled_prompt = prompt.compile(
-        user_name="John Doe",
-        input="Help me with my account"
-    )
-
-    response = completion(
-        model=compiled_prompt.model,
-        messages=compiled_prompt.messages
-    )
-
-    # Example 4: Final example
-    prompt = langwatch.prompts.get("customer-support-bot")
-    compiled_prompt = prompt.compile(
-        user_name="John Doe",
-        input="Help me with my account"
-    )
-
-    response = completion(
-        model=compiled_prompt.model,
-        messages=compiled_prompt.messages
-    )
+    // Air-gapped mode: never call the API, fail when the materialized file is missing
+    const offlinePrompt = await langwatch.prompts.get("customer-support-bot", {
+      fetchPolicy: FetchPolicy.MATERIALIZED_ONLY,
+    });
     ```
 
     **Behavior:**
-    1. SDK checks for `./prompts/.materialized/customer-support-bot.prompt.yaml`
-    2. If found, loads prompt from local file (no network call)
-    3. If not found, attempts to fetch from LangWatch API
+    1. SDK looks the handle up in `prompts.json` and resolves the materialized file through `prompts-lock.json`
+    2. If the file is there, loads the prompt from disk (no network call)
+    3. If not, fetches from the LangWatch API
     4. Throws error if both local file and API are unavailable
 
   </Tab>
@@ -207,7 +181,7 @@ Include these files in your deployment package:
 
 ### 3. Deploy to Air-Gapped Environment
 
-The application will run entirely offline, using only materialized prompts. No LangWatch API access required.
+The application runs entirely offline, using only materialized prompts. No LangWatch API access required.
 {/*
 ## Advanced Fetch Policies (Future Feature)
 

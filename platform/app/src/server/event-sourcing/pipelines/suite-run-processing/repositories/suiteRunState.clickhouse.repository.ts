@@ -188,8 +188,8 @@ export class SuiteRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
-        { batchRunId, tenantId: context.tenantId, error: errorMessage },
+      logger.warn(
+        { batchRunId, tenantId: context.tenantId, error },
         "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
@@ -253,12 +253,12 @@ export class SuiteRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           batchRunId: String(projection.aggregateId),
           projectionId: projection.id,
-          error: errorMessage,
+          error,
         },
         "Failed to store projection in ClickHouse",
       );
@@ -325,11 +325,11 @@ export class SuiteRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           count: projections.length,
-          error: errorMessage,
+          error,
         },
         "Failed to batch store suite projections in ClickHouse",
       );

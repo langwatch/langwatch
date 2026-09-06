@@ -34,6 +34,7 @@ import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
  */
 const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 
+import type { TraceTableMeta } from "./selectColumn";
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
 import { TraceStatisticsProvider } from "./traceStatisticsContext";
@@ -146,9 +147,16 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [lens.columns],
   );
 
+  // The header cells only see the table, and a placeholder row is
+  // indistinguishable from a real one once it is inside Tanstack's row model.
+  // `meta` is how the select header learns the page is still loading and holds
+  // its "select all" back. See `TraceTableMeta`.
+  const tableMeta = useMemo<TraceTableMeta>(() => ({ isLoading }), [isLoading]);
+
   const table = useReactTable({
     data: effectiveTraces,
     columns,
+    meta: tableMeta,
     state: { sorting, columnSizing, columnOrder: columnOrderState },
     onSortingChange: handleSortingChange,
     onColumnSizingChange: handleColumnSizingChange,

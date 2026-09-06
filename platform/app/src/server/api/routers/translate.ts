@@ -6,7 +6,6 @@ import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:translate");
@@ -24,7 +23,7 @@ export const translateRouter = createTRPCRouter({
     // Translation reads content the caller can already see — gate on the
     // same permission that grants viewing the trace, so read-only members
     // (VIEWER, demo/public view) aren't shown an action that then 403s.
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input }) => {
       const feature = featureByKey(TRANSLATE_FEATURE_KEY);
       if (!feature) {

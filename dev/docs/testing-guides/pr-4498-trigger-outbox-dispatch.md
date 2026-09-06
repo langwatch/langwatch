@@ -7,7 +7,7 @@ Branch: `feat/trigger-outbox-dispatch` → `main`. ADRs: 026, 027, 028, 029, 030
 Trigger notifications (email + Slack) and persist-class actions
 (`ADD_TO_DATASET`, `ADD_TO_ANNOTATION_QUEUE`) now go through a
 transactional outbox on the event-sourcing GroupQueue instead of firing
-in-line from the reactor. Authors get a staged automations drawer plus a
+in-line from the subscriber. Authors get a staged automations drawer plus a
 Monaco-Liquid template editor for email + Slack. Every dispatch pays a
 `traceDebounceMs` settle window first (so datasets get the settled trace,
 not the half-formed one), respects per-project and per-recipient email

@@ -162,8 +162,14 @@ export function formatCost(cost: number, estimated?: boolean): string {
   return `${prefix}$${cost.toFixed(2)}`;
 }
 
+/**
+ * Token counts in one decimal place, stepping up a tier at each thousand:
+ * `840`, `12.4K`, `1.1M`. Coding-agent sessions routinely run into millions of
+ * cached tokens, and `2400.0K` costs the reader a division to understand.
+ */
 export function formatTokens(tokens: number): string {
   if (tokens === 0) return "—";
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
   return `${tokens}`;
 }

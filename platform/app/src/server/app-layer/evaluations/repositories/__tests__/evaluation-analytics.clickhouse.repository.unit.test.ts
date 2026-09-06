@@ -30,7 +30,10 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
-import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import {
+  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type EvaluationAnalyticsRow,
+} from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import {
   capturingInsertClient,
   clientReturning,
@@ -367,7 +370,7 @@ describe("EvaluationAnalyticsClickHouseRepository insert settings", () => {
   const ROW: EvaluationAnalyticsRow = {
     tenantId: TENANT_ID,
     evaluationId: EVALUATION_ID,
-    version: "2026-07-27",
+    version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
     occurredAtMs: 1_750_000_000_000,
     createdAtMs: 1_750_000_000_000,
     updatedAtMs: 1_750_000_000_000,

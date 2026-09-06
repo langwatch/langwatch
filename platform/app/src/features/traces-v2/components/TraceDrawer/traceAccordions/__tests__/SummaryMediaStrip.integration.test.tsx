@@ -51,7 +51,9 @@ describe("SummaryMediaStrip", () => {
     ]);
 
     it("renders a player, an inline image, and an attachment chip", () => {
-      render(<SummaryMediaStrip refsJson={refsJson} />, { wrapper: Wrapper });
+      render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("media-part-audio")).toHaveAttribute(
         "src",
@@ -70,13 +72,13 @@ describe("SummaryMediaStrip", () => {
   describe("given no refs attribute or unparseable JSON", () => {
     it("renders nothing", () => {
       const { container: empty } = render(
-        <SummaryMediaStrip refsJson={undefined} />,
+        <SummaryMediaStrip refsJson={undefined} side="input" />,
         { wrapper: Wrapper },
       );
       expect(empty).toBeEmptyDOMElement();
 
       const { container: garbage } = render(
-        <SummaryMediaStrip refsJson="not json at all" />,
+        <SummaryMediaStrip refsJson="not json at all" side="input" />,
         { wrapper: Wrapper },
       );
       expect(garbage).toBeEmptyDOMElement();
@@ -89,10 +91,64 @@ describe("SummaryMediaStrip", () => {
         { kind: "image", url: "https://attacker.example/beacon.png" },
         { kind: "file", url: "javascript:alert(1)", filename: "invoice.pdf" },
       ]);
-      const { container } = render(<SummaryMediaStrip refsJson={refsJson} />, {
+      const { container } = render(
+        <SummaryMediaStrip refsJson={refsJson} side="input" />,
+        { wrapper: Wrapper },
+      );
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  // A voice turn's span input holds the caller's recording AND the agent's
+  // reply, so both refs ride the same reserved attribute. Without the side
+  // split the summary stacked two players under INPUT for one spoken turn.
+  describe("given a voice turn whose refs carry both roles", () => {
+    const refsJson = JSON.stringify([
+      { kind: "audio", url: "/api/files/p1/spoken", role: "user" },
+      { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+    ]);
+
+    /** @scenario "The summary input strip carries only the audio spoken into the trace" */
+    it("plays only the caller's recording under the input strip", () => {
+      render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
         wrapper: Wrapper,
       });
-      expect(container).toBeEmptyDOMElement();
+
+      const players = screen.getAllByTestId("media-part-audio");
+      expect(players).toHaveLength(1);
+      expect(players[0]).toHaveAttribute("src", "/api/files/p1/spoken");
+    });
+
+    /** @scenario "The summary output strip carries only the reply audio" */
+    it("plays only the agent's reply under the output strip", () => {
+      render(<SummaryMediaStrip refsJson={refsJson} side="output" />, {
+        wrapper: Wrapper,
+      });
+
+      const players = screen.getAllByTestId("media-part-audio");
+      expect(players).toHaveLength(1);
+      expect(players[0]).toHaveAttribute("src", "/api/files/p1/reply");
+    });
+  });
+
+  describe("given refs recorded before roles existed", () => {
+    const refsJson = JSON.stringify([
+      { kind: "audio", url: "/api/files/p1/a1" },
+    ]);
+
+    /** @scenario "Media refs recorded without a role render on both summary strips" */
+    it("renders the recording on both strips, exactly as before", () => {
+      for (const side of ["input", "output"] as const) {
+        const { unmount } = render(
+          <SummaryMediaStrip refsJson={refsJson} side={side} />,
+          { wrapper: Wrapper },
+        );
+        expect(screen.getByTestId("media-part-audio")).toHaveAttribute(
+          "src",
+          "/api/files/p1/a1",
+        );
+        unmount();
+      }
     });
   });
 });

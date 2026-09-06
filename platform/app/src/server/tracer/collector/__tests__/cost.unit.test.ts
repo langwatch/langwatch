@@ -114,6 +114,101 @@ describe("estimateCost", () => {
     });
   });
 
+  describe("when audio tokens are given", () => {
+    const realtime: MaybeStoredLLMModelCost = {
+      projectId: "",
+      model: "openai/gpt-realtime",
+      regex: "^(openai\\/)?gpt-realtime",
+      inputCostPerToken: 0.000004,
+      outputCostPerToken: 0.000016,
+      inputAudioCostPerToken: 0.000032,
+      outputAudioCostPerToken: 0.000064,
+    };
+
+    it("prices input audio at the audio rate, not the text rate", () => {
+      expect(
+        estimateCost({
+          llmModelCost: realtime,
+          inputTokens: 200,
+          inputAudioTokens: 800,
+        }),
+      ).toBeCloseTo(200 * 0.000004 + 800 * 0.000032, 10);
+    });
+
+    it("prices output audio at its own rate", () => {
+      expect(
+        estimateCost({
+          llmModelCost: realtime,
+          outputTokens: 50,
+          outputAudioTokens: 250,
+        }),
+      ).toBeCloseTo(50 * 0.000016 + 250 * 0.000064, 10);
+    });
+
+    it("prices a split exactly like the flat total when the model declares no audio rate", () => {
+      const noAudioRates: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "x/y",
+        regex: "^x\\/y$",
+        inputCostPerToken: 0.00001,
+        outputCostPerToken: 0.00002,
+      };
+      const flat = estimateCost({
+        llmModelCost: noAudioRates,
+        inputTokens: 1000,
+        outputTokens: 300,
+      });
+      const split = estimateCost({
+        llmModelCost: noAudioRates,
+        inputTokens: 200,
+        inputAudioTokens: 800,
+        outputTokens: 50,
+        outputAudioTokens: 250,
+      });
+      expect(split).toBe(flat);
+    });
+
+    it("counts an audio-only rate as a priced model", () => {
+      expect(
+        estimateCost({
+          llmModelCost: {
+            projectId: "",
+            model: "audio/only",
+            regex: "^audio\\/only$",
+            inputAudioCostPerToken: 0.000032,
+          },
+          inputAudioTokens: 800,
+        }),
+      ).toBeCloseTo(800 * 0.000032, 10);
+    });
+  });
+
+  describe("when characters, seconds and tokens all arrive together", () => {
+    it("sums every term", () => {
+      const mixed: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "mixed/model",
+        regex: "^mixed\\/model$",
+        inputCostPerToken: 0.000004,
+        outputCostPerToken: 0.000016,
+        inputCostPerCharacter: 0.000015,
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({
+          llmModelCost: mixed,
+          inputTokens: 100,
+          outputTokens: 20,
+          inputCharacters: 4000,
+          audioSeconds: 30,
+        }),
+      ).toBeCloseTo(
+        100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001,
+        10,
+      );
+    });
+  });
+
   describe("when the model has no rates at all", () => {
     it("returns undefined", () => {
       expect(
@@ -568,6 +663,112 @@ describe("estimateCost", () => {
           outputTokens: 500,
         }),
       ).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * Anthropic bills a prompt-cache write by how long the entry lives: a
+ * short-lived one at 1.25x the input rate, an hour-long one at 2x. An emitter
+ * that knows the split reports the hour-long portion; the rest, and every
+ * emitter that reports no split at all, prices short-lived.
+ */
+describe("cache write TTL pricing", () => {
+  const model = {
+    projectId: "",
+    model: "anthropic/claude-opus-5",
+    regex: "",
+    inputCostPerToken: 0.000005,
+    outputCostPerToken: 0.000025,
+    cacheReadCostPerToken: 0.0000005,
+    cacheCreationCostPerToken: 0.00000625,
+    cacheCreation1hCostPerToken: 0.00001,
+  };
+
+  describe("given a call reporting how long its cache entry lives", () => {
+    describe("when the cost is estimated", () => {
+      /** @scenario "Each cache write bucket is priced at its own rate" */
+      it("prices the hour-long portion at the hour-long rate", () => {
+        expect(
+          estimateCost({
+            llmModelCost: model,
+            cacheCreationTokens: 17854,
+            cacheCreation1hTokens: 17854,
+          }),
+        ).toBeCloseTo(17854 * 0.00001, 10);
+      });
+
+      /** @scenario "Each cache write bucket is priced at its own rate" */
+      it("prices a mixed write at both rates", () => {
+        expect(
+          estimateCost({
+            llmModelCost: model,
+            cacheCreationTokens: 1000,
+            cacheCreation1hTokens: 400,
+          }),
+        ).toBeCloseTo(400 * 0.00001 + 600 * 0.00000625, 10);
+      });
+
+      /** @scenario "Each cache write bucket is priced at its own rate" */
+      it("prices the hour-long portion when no total came with it", () => {
+        expect(
+          estimateCost({ llmModelCost: model, cacheCreation1hTokens: 400 }),
+        ).toBeCloseTo(400 * 0.00001, 10);
+      });
+
+      /** @scenario "Each cache write bucket is priced at its own rate" */
+      it("never charges below zero when the parts exceed the whole", () => {
+        expect(
+          estimateCost({
+            llmModelCost: model,
+            cacheCreationTokens: 100,
+            cacheCreation1hTokens: 400,
+          }),
+        ).toBeCloseTo(400 * 0.00001, 10);
+      });
+    });
+  });
+
+  describe("given a call that does not report how long its cache entry lives", () => {
+    describe("when the cost is estimated", () => {
+      /** @scenario "A call that does not say how long its cache lives is priced as before" */
+      it("prices every write at the short-lived rate", () => {
+        expect(
+          estimateCost({ llmModelCost: model, cacheCreationTokens: 17854 }),
+        ).toBeCloseTo(17854 * 0.00000625, 10);
+      });
+    });
+  });
+
+  describe("given a model with only one cache write rate", () => {
+    describe("when the cost is estimated", () => {
+      /** @scenario "A model with no hour-long rate prices every write the same" */
+      it("prices an hour-long write at that one rate", () => {
+        const { cacheCreation1hCostPerToken: _omitted, ...oneRate } = model;
+        expect(
+          estimateCost({
+            llmModelCost: oneRate,
+            cacheCreationTokens: 1000,
+            cacheCreation1hTokens: 1000,
+          }),
+        ).toBeCloseTo(1000 * 0.00000625, 10);
+      });
+
+      /** @scenario "A model with no hour-long rate prices every write the same" */
+      it("falls back to the input rate when it has no cache write rate at all", () => {
+        expect(
+          estimateCost({
+            llmModelCost: {
+              projectId: "",
+              model: "x",
+              regex: "",
+              inputCostPerToken: 0.000005,
+              outputCostPerToken: 0.000025,
+            },
+            cacheCreation1hTokens: 1000,
+          }),
+        ).toBeCloseTo(1000 * 0.000005, 10);
+      });
     });
   });
 });

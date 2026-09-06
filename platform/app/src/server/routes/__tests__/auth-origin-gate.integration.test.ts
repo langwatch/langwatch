@@ -112,6 +112,10 @@ describe("given a dev checkout running on a non-default port", () => {
       data: {
         userId: user.id,
         provider: "credential",
+        // better-auth 1.7 keys a credential account by
+        // `(providerId, issuer, accountId)`; a row without the issuer is
+        // invisible to its lookup and this sign-in answers 401.
+        issuer: "local:credential",
         providerAccountId: user.id,
         type: "credentials",
         password: await hash(PASSWORD, 10),

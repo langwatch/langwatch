@@ -38,11 +38,12 @@ export function createExtractorContext(
     out[key] = value;
   });
 
+  // Mirrors the production guard, which yields to a value the emitter already
+  // sent under the canonical key as well as to one an earlier extractor wrote.
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
-    if (!(key in out)) {
-      if (value === null || value === undefined) return;
-      out[key] = value;
-    }
+    if (bag.attrs.has(key) || key in out) return;
+    if (value === null || value === undefined) return;
+    out[key] = value;
   });
 
   const recordRule = vi.fn();
@@ -85,11 +86,12 @@ export function createLogExtractorContext(
     out[key] = value;
   });
 
+  // Mirrors the production guard, which yields to a value the emitter already
+  // sent under the canonical key as well as to one an earlier extractor wrote.
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
-    if (!(key in out)) {
-      if (value === null || value === undefined) return;
-      out[key] = value;
-    }
+    if (bag.attrs.has(key) || key in out) return;
+    if (value === null || value === undefined) return;
+    out[key] = value;
   });
 
   const recordRule = vi.fn();

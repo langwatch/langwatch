@@ -1,7 +1,7 @@
 /**
  * admin-ottl-dogfood.ts — Ask A real-user QA for IngestionTemplates
- * authoring flow at /settings/governance/tool-catalog → Ingestion
- * Templates tab. Drives the 4 paths shipped at d61842a3f:
+ * authoring flow at /governance/inventory?tab=catalog → Ingestion
+ * Templates inner tab. Drives the 4 paths shipped at d61842a3f:
  *
  *   1. List view shows platform rows + org-authored rows
  *   2. View OTTL on platform row → read-only drawer with ottlRules
@@ -66,10 +66,10 @@ void (async () => {
   const results: StepResult[] = [];
 
   await step(results, "navigate-to-tool-catalog", async () => {
-    await page.goto(`${BASE_URL}/settings/governance/tool-catalog`);
+    await page.goto(`${BASE_URL}/governance/inventory?tab=catalog`);
     await page.waitForLoadState("networkidle");
     await page
-      .locator('text="AI Tool Catalog"')
+      .locator('button:has-text("Tool Tiles")')
       .first()
       .waitFor({ state: "visible", timeout: 10_000 });
     await shoot(page, "01-tool-catalog-landing");

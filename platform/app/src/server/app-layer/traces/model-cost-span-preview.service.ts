@@ -34,6 +34,7 @@ export interface CostRulePreviewInput {
   outputCostPerToken?: number;
   cacheReadCostPerToken?: number;
   cacheCreationCostPerToken?: number;
+  cacheCreation1hCostPerToken?: number;
 }
 
 export interface CostRulePreviewSampleSpan {
@@ -45,6 +46,7 @@ export interface CostRulePreviewSampleSpan {
   outputTokens: number | null;
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
+  cacheCreation1hTokens: number | null;
   startTimeMs: number;
   /**
    * What this span would cost under the rates being edited, or null when no
@@ -93,6 +95,7 @@ export async function previewCostRuleMatchingSpans({
     outputCostPerToken: input.outputCostPerToken,
     cacheReadCostPerToken: input.cacheReadCostPerToken,
     cacheCreationCostPerToken: input.cacheCreationCostPerToken,
+    cacheCreation1hCostPerToken: input.cacheCreation1hCostPerToken,
   };
 
   const fromMs = Date.now() - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -137,6 +140,7 @@ export async function previewCostRuleMatchingSpans({
               outputTokens: row.outputTokens ?? 0,
               cacheReadTokens: row.cacheReadTokens ?? 0,
               cacheCreationTokens: row.cacheCreationTokens ?? 0,
+              cacheCreation1hTokens: row.cacheCreation1hTokens ?? 0,
             }) ?? null),
       };
     });

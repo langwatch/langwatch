@@ -114,9 +114,9 @@ describe("platformUrl", () => {
     it("generates correct trigger drawer URL", () => {
       const url = platformUrl({
         projectSlug: "p",
-        path: "/automations?drawer.open=editAutomationFilter&drawer.automationId=tr_1",
+        path: "/automations?drawer.open=automation&drawer.automationId=tr_1",
       });
-      expect(url).toContain("drawer.open=editAutomationFilter");
+      expect(url).toContain("drawer.open=automation");
       expect(url).toContain("drawer.automationId=tr_1");
     });
 

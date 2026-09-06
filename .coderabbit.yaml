@@ -93,10 +93,19 @@ reviews:
 
         FAIL when logging, analytics, or telemetry calls (console.*,
         logger.*, posthog.*, Sentry.*, captureException, track, identify)
-        include user-identifying fields — email, phone, name, IP, userId,
-        projectSlug, organizationId, apiKey, token — without an explicit
-        redaction wrapper (`redact(...)`, `hashEmail(...)`, masking) or a
-        comment marking it as intentional.
+        include personal data — email, phone, name, IP, postal address,
+        projectSlug — or credentials — apiKey, token, password, session
+        cookie — without an explicit redaction wrapper (`redact(...)`,
+        `hashEmail(...)`, masking) or a comment marking it as intentional.
+
+        Do NOT flag `userId`, `organizationId`, `projectId`, `traceId` or
+        `spanId`. Those are opaque internal identifiers and are logged raw
+        deliberately: they are what makes a log line attributable and what
+        lets an incident be filtered down to one tenant. Redacting them
+        costs that and protects nothing, because the identifier was never
+        the sensitive part. Asking for them to be hashed, truncated or
+        redacted is a false positive — see the "Identifiers Are Logged Raw,
+        On Purpose" section of dev/docs/best_practices/logging-and-tracing.md.
 
         FAIL when a new HTTP endpoint or tRPC procedure returns PII without
         both: (a) an explicit auth check (`ctx.session.user` consulted) and
@@ -248,7 +257,7 @@ reviews:
         `dev/docs/best_practices/typescript.md` § Named parameters.
 
     # soft-delete-vs-archive.md: archivedAt, not deletedAt.
-    - path: "langwatch/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
+    - path: "platform/app/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 

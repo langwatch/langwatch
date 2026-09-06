@@ -4,13 +4,15 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type {
   LangwatchSignalBucket,
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
-import { useDrawerStore } from "../../../stores/drawerStore";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
@@ -27,6 +29,7 @@ import {
 } from "./tree";
 import {
   DEFAULT_TREE_PCT,
+  type FlatRow,
   GROUP_ROW_HEIGHT,
   INDENT_PX,
   isTwoLineSpan,
@@ -35,10 +38,14 @@ import {
   ROW_HEIGHT,
   type WaterfallViewProps,
 } from "./types";
+import { useCorrectionMarks } from "./useCorrectionMarks";
+import { useScrollSelectedSpanIntoView } from "./useScrollSelectedSpanIntoView";
+import { useWaterfallEditing } from "./useWaterfallEditing";
 
 // Shared fallback for spans without signals — a fresh `[]` per row per
 // render would defeat TreeRow's memo by changing prop identity.
 const EMPTY_SIGNALS: readonly LangwatchSignalBucket[] = [];
+const EMPTY_COMMENTS: AnnotationByTrace[] = [];
 
 export const WaterfallView = memo(function WaterfallView({
   spans,
@@ -52,32 +59,37 @@ export const WaterfallView = memo(function WaterfallView({
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
 
-  // Pin gestures wire straight to the drawer store — `pinnedSpanIds`
-  // doubles as both the SpanTabBar tab list and the row-level "is this
-  // span pinned" check, so a Set lookup per render is cheaper than
-  // recomputing membership inside each row. `pinSpan`/`unpinSpan` are
-  // both no-ops on duplicates / unknowns, so the toggle handler is
-  // safe to call without first checking membership.
-  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const pinSpan = useDrawerStore((s) => s.pinSpan);
-  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
-  const pinnedSet = useMemo(() => new Set(pinnedSpanIds), [pinnedSpanIds]);
-  // Identity-stable: reads pin membership through a ref so memoized rows
-  // don't all re-render whenever the pinned set changes.
-  const pinnedSetRef = useRef(pinnedSet);
-  pinnedSetRef.current = pinnedSet;
-  const handleTogglePin = useCallback(
-    (spanId: string) => {
-      if (pinnedSetRef.current.has(spanId)) unpinSpan(spanId);
-      else pinSpan(spanId);
-    },
-    [pinSpan, unpinSpan],
-  );
+  const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } =
+    useWaterfallEditing(spans);
+  const { correctedSpanIds, deletedByCorrectionSpanIds } =
+    useCorrectionMarks(spans);
 
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
   const hasAnySignals = signalsBySpanId.size > 0;
   const { logsBySpanId } = useSpanLogs();
+
+  // What was said about each span, read once for the whole tree: a hundred rows
+  // each asking for the trace's comments is a hundred subscriptions to one
+  // answer. Only comments about a span as a whole belong on its row — the ones
+  // about its fields read on the sections holding those fields.
+  const { traceId } = useTraceQueryArgs();
+  const rowTraceId = traceId ?? undefined;
+  const annotations = useAnchoredAnnotations();
+  const commentsBySpanId = useMemo(() => {
+    const map = new Map<string, AnnotationByTrace[]>();
+    for (const annotation of annotations.all) {
+      if (annotation.anchorKind !== "span" || !annotation.anchorId) continue;
+      const list = map.get(annotation.anchorId);
+      if (list) list.push(annotation);
+      else map.set(annotation.anchorId, [annotation]);
+    }
+    return map;
+  }, [annotations.all]);
+  const commentsFor = useCallback(
+    (spanId: string) => commentsBySpanId.get(spanId) ?? EMPTY_COMMENTS,
+    [commentsBySpanId],
+  );
 
   const isDraggingDivider = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -344,6 +356,16 @@ export const WaterfallView = memo(function WaterfallView({
     overscan: 15,
   });
 
+  useScrollSelectedSpanIntoView({
+    selectedSpanId,
+    rows: flatRows,
+    spans: filteredSpans,
+    virtualizer,
+    setCollapsedIds,
+    setExpandedGroups,
+    groupKeyOf: siblingGroupKey,
+  });
+
   // Tree drives the timeline via a compositor-only `transform`. The rAF
   // guard collapses bursts of scroll events to one transform write per
   // frame (no React re-render between scrolls).
@@ -528,24 +550,15 @@ export const WaterfallView = memo(function WaterfallView({
               const i = virtualRow.index;
 
               if (row.kind === "group") {
-                const groupKey = siblingGroupKey(row);
                 return (
-                  <Box
-                    key={`group-${groupKey}`}
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    width="full"
-                    height={`${virtualRow.size}px`}
-                    transform={`translateY(${virtualRow.start}px)`}
-                  >
-                    <GroupRow
-                      group={row}
-                      groupKey={groupKey}
-                      isExpanded={expandedGroups.has(groupKey)}
-                      onToggle={handleToggleGroup}
-                    />
-                  </Box>
+                  <GroupVirtualRow
+                    key={`group-${siblingGroupKey(row)}`}
+                    group={row}
+                    size={virtualRow.size}
+                    start={virtualRow.start}
+                    expandedGroups={expandedGroups}
+                    onToggle={handleToggleGroup}
+                  />
                 );
               }
               const { node } = row;
@@ -560,6 +573,12 @@ export const WaterfallView = memo(function WaterfallView({
                   width="full"
                   height={`${virtualRow.size}px`}
                   transform={`translateY(${virtualRow.start}px)`}
+                  // The row's actions hang below it, over the row after it. Its
+                  // own transform makes it a stacking context, so nothing
+                  // inside can paint over a later row: the lift has to happen
+                  // here. In CSS rather than in state, so moving the pointer
+                  // down a long tree re-renders nothing.
+                  _hover={{ zIndex: 2 }}
                 >
                   {showSeparator && (
                     <Box
@@ -579,7 +598,6 @@ export const WaterfallView = memo(function WaterfallView({
                     isSelected={node.span.spanId === selectedSpanId}
                     isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
                     logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
-                    isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
                     hiddenDescendantCount={
@@ -594,9 +612,18 @@ export const WaterfallView = memo(function WaterfallView({
                     signals={
                       signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS
                     }
+                    traceId={rowTraceId}
+                    comments={commentsFor(node.span.spanId)}
+                    isEditing={isEditing}
+                    isDraftDeleted={deletedSpanIds.has(node.span.spanId)}
+                    isCorrected={correctedSpanIds.has(node.span.spanId)}
+                    isDeletedByCorrection={deletedByCorrectionSpanIds.has(
+                      node.span.spanId,
+                    )}
+                    draftName={draftNames.get(node.span.spanId)}
+                    onToggleDelete={toggleSpanDeleted}
                     onToggleCollapse={handleToggleCollapse}
                     onSelect={handleSelectSpan}
-                    onTogglePin={handleTogglePin}
                   />
                 </Box>
               );
@@ -819,5 +846,39 @@ function ToolbarIconButton({
         <Icon as={icon} boxSize={3} />
       </Flex>
     </Tooltip>
+  );
+}
+
+/** One folded group of repeated siblings, positioned by the virtualizer. */
+function GroupVirtualRow({
+  group,
+  size,
+  start,
+  expandedGroups,
+  onToggle,
+}: {
+  group: Extract<FlatRow, { kind: "group" }>;
+  size: number;
+  start: number;
+  expandedGroups: Set<string>;
+  onToggle: (groupKey: string) => void;
+}) {
+  const groupKey = siblingGroupKey(group);
+  return (
+    <Box
+      position="absolute"
+      top={0}
+      left={0}
+      width="full"
+      height={`${size}px`}
+      transform={`translateY(${start}px)`}
+    >
+      <GroupRow
+        group={group}
+        groupKey={groupKey}
+        isExpanded={expandedGroups.has(groupKey)}
+        onToggle={onToggle}
+      />
+    </Box>
   );
 }

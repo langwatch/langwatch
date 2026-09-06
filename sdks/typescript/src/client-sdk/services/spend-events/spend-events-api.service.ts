@@ -63,7 +63,16 @@ export interface SpendEvent {
 }
 
 export interface SpendSummaryRow {
+  /**
+   * The FIRST grouping dimension's value. Unchanged from when a rollup could
+   * only be grouped one way, so existing code keeps reading what it did. With
+   * two dimensions, two rows can share a key: read `group` to tell them apart.
+   */
   key: string;
+  /** Every grouping dimension by name, e.g. `{ model: "gpt-5-mini" }`. */
+  group: Record<string, string>;
+  /** Start of the time bucket in the requested zone, null when unbucketed. */
+  bucket_start: string | null;
   /** Priced outcomes (confirmed and failed). */
   event_count: number;
   /** Unpriced settled requests, counted separately: never in cost sums. */
@@ -91,6 +100,132 @@ export type SpendEventStatus =
   | "confirmed"
   | "failed"
   | "settled";
+
+/**
+ * The states a ROLLUP can be filtered by. A rollup sums the cost of requests
+ * past admission, so `admitted` is refused there rather than answered with a
+ * zero; list the events to see those. Derived by exclusion so the two stay one
+ * vocabulary.
+ */
+export type SpendSummaryStatus = Exclude<SpendEventStatus, "admitted">;
+
+/** A dimension a rollup can be grouped by. */
+export type SpendGroupBy =
+  | "virtual_key"
+  | "end_user"
+  | "project"
+  | "model"
+  | "provider"
+  | "principal"
+  | "request_type";
+
+/**
+ * The filters BOTH spend reads accept. A reconciliation checksums the rollups
+ * and diffs the events when a checksum disagrees, so the two take the same
+ * vocabulary and a divergence can be walked on exactly the narrowing that
+ * produced it.
+ *
+ * Every field takes one value or many; many means "any of these". Naming two
+ * different fields narrows.
+ */
+export interface SpendFilterOptions {
+  projectId?: string | string[];
+  /** Resolved to the projects the team owns. A team with none matches nothing. */
+  teamId?: string | string[];
+  /** Your own id for a virtual key. One nobody minted matches nothing. */
+  externalId?: string | string[];
+  virtualKeyId?: string | string[];
+  endUserId?: string | string[];
+  principalUserId?: string | string[];
+  model?: string | string[];
+  providerKey?: string | string[];
+  requestType?: string | string[];
+  label?: string | string[];
+  /**
+   * Your own request metadata, e.g. `{ customer_tier: "gold" }`. Several
+   * values for one key widen it; several keys narrow.
+   */
+  metadata?: Record<string, string | string[]>;
+  status?: SpendEventStatus;
+}
+
+const FILTER_PARAMS: ReadonlyArray<[keyof SpendFilterOptions, string]> = [
+  ["projectId", "project_id"],
+  ["teamId", "team_id"],
+  ["externalId", "external_id"],
+  ["virtualKeyId", "virtual_key_id"],
+  ["endUserId", "end_user_id"],
+  ["principalUserId", "principal_user_id"],
+  ["model", "model"],
+  ["providerKey", "provider_key"],
+  ["requestType", "request_type"],
+  ["label", "label"],
+];
+
+/** Repeat the parameter once per value: that is how the API widens a filter. */
+function appendSpendFilters({
+  params,
+  filters,
+}: {
+  params: URLSearchParams;
+  filters: SpendFilterOptions;
+}): void {
+  for (const [field, name] of FILTER_PARAMS) {
+    const value = filters[field] as string | string[] | undefined;
+    if (value === undefined) continue;
+    for (const one of Array.isArray(value) ? value : [value]) {
+      params.append(name, one);
+    }
+  }
+  for (const [key, value] of Object.entries(filters.metadata ?? {})) {
+    // The API splits a pair on its FIRST colon, so a key carrying one would
+    // silently address a different key and report spend for a filter nobody
+    // wrote. Refused here rather than sent and misread.
+    if (key.includes(":")) {
+      throw new SpendEventsApiError(
+        `A metadata key cannot contain a colon: ${key}`,
+        "build spend filters",
+      );
+    }
+    for (const one of Array.isArray(value) ? value : [value]) {
+      params.append("metadata", `${key}:${one}`);
+    }
+  }
+  if (filters.status) params.set("status", filters.status);
+}
+
+/**
+ * What a rollup is grouped by, and over what window.
+ *
+ * Grouping by `model` or `provider`, or into time buckets, is REFUSED with
+ * `gateway_spend_group_by_unstable` over a window recent enough that outcomes
+ * can still arrive: until a request settles, the model and provider recorded
+ * against it are the ones that were asked for, and they are replaced by the
+ * ones that actually served it. A page walk over a group that can move counts
+ * some requests twice and misses others.
+ *
+ * Reconcile closed periods and this never fires. For a live view where an
+ * approximate shape is enough, send `allowUnstable`.
+ */
+export interface SpendSummariesOptions
+  extends Omit<SpendFilterOptions, "status"> {
+  /**
+   * One lifecycle status, minus `admitted`: a rollup sums the cost of requests
+   * past admission, and an admitted request has none yet. List the events for
+   * those.
+   */
+  status?: SpendSummaryStatus;
+  /** One or two dimensions. Two rows can share `key`; read `group`. */
+  groupBy: SpendGroupBy | SpendGroupBy[];
+  from: number;
+  to: number;
+  /** Adds a time column. Counts as movable, so the same refusal applies. */
+  bucket?: "none" | "hour" | "day";
+  /** IANA zone the bucket boundary falls on, e.g. "Europe/Amsterdam". */
+  timezone?: string;
+  /** Serve a movable grouping anyway, accepting an inexact walk. */
+  allowUnstable?: boolean;
+}
 
 export interface SpendSummariesPage {
   data: SpendSummaryRow[];
@@ -169,6 +304,14 @@ export class SpendEventsApiError extends Error {
  * query filter rather than scoping on a header, so the project belongs to the
  * call, not to the client.
  *
+ * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
+ * Settings > API Keys). A project API key is refused before any permission is
+ * consulted, with `credential_class_mismatch`, and no header makes it work:
+ * these are organization-scoped routes and a project key names one project.
+ * The same organization key also reaches the project-scoped surfaces when
+ * given `X-Project-Id`, so one key covers both families and a project key
+ * covers only one.
+ *
  * Neither collection on this service offers an eager whole-set read. The
  * ledger is unbounded, and materialising a window of it is the very
  * under-counting and out-of-memory footgun the page docstrings warn about:
@@ -230,28 +373,21 @@ export class SpendEventsApiService {
    * stops on the first page silently under-counts the window, so read every
    * page or stream them with `iterate()`.
    */
-  async listPage(options: {
-    /** Required: the pull is a ranged read by contract. */
-    from: number;
-    to: number;
-    cursor?: string;
-    limit?: number;
-    virtualKeyId?: string;
-    endUserId?: string;
-    projectId?: string;
-    model?: string;
-    status?: SpendEventStatus;
-  }): Promise<SpendEventsPage> {
+  async listPage(
+    options: SpendFilterOptions & {
+      /** Required: the pull is a ranged read by contract. */
+      from: number;
+      to: number;
+      cursor?: string;
+      limit?: number;
+    },
+  ): Promise<SpendEventsPage> {
     const params = new URLSearchParams();
     params.set("from", String(options.from));
     params.set("to", String(options.to));
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
-    if (options.virtualKeyId) params.set("virtual_key_id", options.virtualKeyId);
-    if (options.endUserId) params.set("end_user_id", options.endUserId);
-    if (options.projectId) params.set("project_id", options.projectId);
-    if (options.model) params.set("model", options.model);
-    if (options.status) params.set("status", options.status);
+    appendSpendFilters({ params, filters: options });
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     return await this.request<SpendEventsPage>(
       "list spend events",
@@ -268,18 +404,15 @@ export class SpendEventsApiService {
    * collect it into an array. Raises rather than looping forever on a cursor
    * chain that never ends.
    */
-  async *iterate(options: {
-    /** Required: the pull is a ranged read by contract. */
-    from: number;
-    to: number;
-    cursor?: string;
-    limit?: number;
-    virtualKeyId?: string;
-    endUserId?: string;
-    projectId?: string;
-    model?: string;
-    status?: SpendEventStatus;
-  }): AsyncGenerator<SpendEvent> {
+  async *iterate(
+    options: SpendFilterOptions & {
+      /** Required: the pull is a ranged read by contract. */
+      from: number;
+      to: number;
+      cursor?: string;
+      limit?: number;
+    },
+  ): AsyncGenerator<SpendEvent> {
     const pages = walkCursorPages<SpendEventsPage>({
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
@@ -309,23 +442,20 @@ export class SpendEventsApiService {
    * reconciler that reads only the first page silently under-counts every
    * tenant past the limit.
    */
-  async summariesPage(options: {
-    groupBy: "virtual_key" | "end_user";
-    from: number;
-    to: number;
-    projectId?: string;
-    /** Narrow the rollup to one key, exact match. */
-    virtualKeyId?: string;
-    cursor?: string;
-    limit?: number;
-  }): Promise<SpendSummariesPage> {
+  async summariesPage(
+    options: SpendSummariesOptions & { cursor?: string; limit?: number },
+  ): Promise<SpendSummariesPage> {
     const params = new URLSearchParams();
-    params.set("group_by", options.groupBy);
+    const groupBy = Array.isArray(options.groupBy)
+      ? options.groupBy
+      : [options.groupBy];
+    params.set("group_by", groupBy.join(","));
     params.set("from", String(options.from));
     params.set("to", String(options.to));
-    if (options.projectId) params.set("project_id", options.projectId);
-    if (options.virtualKeyId)
-      params.set("virtual_key_id", options.virtualKeyId);
+    if (options.bucket) params.set("bucket", options.bucket);
+    if (options.timezone) params.set("timezone", options.timezone);
+    if (options.allowUnstable) params.set("allow_unstable", "true");
+    appendSpendFilters({ params, filters: options });
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
     return await this.request<SpendSummariesPage>(
@@ -342,16 +472,9 @@ export class SpendEventsApiService {
    * covers, so there is deliberately no eager whole-set read here either: a
    * checksum that quietly covers part of the window is worse than none.
    */
-  async *iterSummaries(options: {
-    groupBy: "virtual_key" | "end_user";
-    from: number;
-    to: number;
-    projectId?: string;
-    /** Narrow the rollup to one key, exact match. */
-    virtualKeyId?: string;
-    cursor?: string;
-    limit?: number;
-  }): AsyncGenerator<SpendSummaryRow> {
+  async *iterSummaries(
+    options: SpendSummariesOptions & { cursor?: string; limit?: number },
+  ): AsyncGenerator<SpendSummaryRow> {
     const pages = walkCursorPages<SpendSummariesPage>({
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,

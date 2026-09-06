@@ -1,4 +1,8 @@
-import type { Notification, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Notification,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 /**
  * Derives create params from Prisma schema, omitting auto-generated fields

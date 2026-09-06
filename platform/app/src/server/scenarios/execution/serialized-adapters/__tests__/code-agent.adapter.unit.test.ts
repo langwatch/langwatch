@@ -3,7 +3,9 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { guardAgainstGlobalFetch } from "../../../../../test-utils/globalFetchGuard";
+import { closeNlpFetchDispatchers } from "../../../../nlpgo/timeouts";
 import type { CodeAgentData } from "../../types";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
@@ -56,14 +58,49 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+vi.mock("@langwatch/observability/tracing", () => ({
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
+}));
+
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import {
   SerializedCodeAgentAdapter,
   SerializedCodeAgentAdapterError,
 } from "../code-agent.adapter";
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
+
+// The adapter calls undici's own fetch, so that export is the interception
+// point. Hoisted, because the vi.mock factory below is hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    fetch: mockFetch,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite, which is how that bug reached production once already.
+guardAgainstGlobalFetch();
 
 describe("SerializedCodeAgentAdapter", () => {
   const defaultConfig: CodeAgentData = {
@@ -100,37 +137,58 @@ describe("SerializedCodeAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
+    agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "processed: Hello" }));
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("has AGENT role", () => {
-    const adapter = new SerializedCodeAgentAdapter(
-      defaultConfig,
-      nlpServiceUrl,
-      apiKey,
-    );
+    const adapter = new SerializedCodeAgentAdapter({
+      config: defaultConfig,
+      nlpServiceUrl: nlpServiceUrl,
+      projectApiKey: apiKey,
+    });
     expect(adapter.role).toBe(AgentRole.AGENT);
   });
 
   it("has correct name", () => {
-    const adapter = new SerializedCodeAgentAdapter(
-      defaultConfig,
-      nlpServiceUrl,
-      apiKey,
-    );
+    const adapter = new SerializedCodeAgentAdapter({
+      config: defaultConfig,
+      nlpServiceUrl: nlpServiceUrl,
+      projectApiKey: apiKey,
+    });
     expect(adapter.name).toBe("SerializedCodeAgentAdapter");
   });
 
   describe("when the adapter receives a message from the simulator", () => {
     it("sends an execute_flow event to /go/studio/execute_sync", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -150,17 +208,17 @@ describe("SerializedCodeAgentAdapter", () => {
 
     describe("when the config has project secrets", () => {
       it("includes them on the synthesized workflow DSL so `secrets.NAME` resolves", async () => {
-        const adapter = new SerializedCodeAgentAdapter(
-          {
+        const adapter = new SerializedCodeAgentAdapter({
+          config: {
             ...defaultConfig,
             secrets: {
               WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
               OTHER_SECRET: "value-2",
             },
           },
-          nlpServiceUrl,
-          apiKey,
-        );
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
 
         await adapter.call(defaultInput);
 
@@ -173,11 +231,11 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("builds a workflow with entry, code, and end nodes", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -194,11 +252,11 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("returns the end node output as a response string", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       const result = await adapter.call(defaultInput);
 
@@ -215,11 +273,11 @@ describe("SerializedCodeAgentAdapter", () => {
         text: vi.fn().mockResolvedValue('{"detail": "Python runtime error"}'),
       });
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         "Code execution failed: HTTP 500 - Python runtime error",
@@ -234,11 +292,11 @@ describe("SerializedCodeAgentAdapter", () => {
         text: vi.fn().mockResolvedValue("Bad Gateway"),
       });
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         "Code execution failed: HTTP 502 - Bad Gateway",
@@ -254,11 +312,11 @@ describe("SerializedCodeAgentAdapter", () => {
         outputs: [],
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        configNoIO,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: configNoIO,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -275,11 +333,11 @@ describe("SerializedCodeAgentAdapter", () => {
     it("extracts the first output by identifier", async () => {
       mockFetch.mockResolvedValue(nlpResponse({ output: "nested result" }));
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("nested result");
@@ -288,11 +346,11 @@ describe("SerializedCodeAgentAdapter", () => {
     it("returns empty string when result is null", async () => {
       mockFetch.mockResolvedValue(nlpResponse(null));
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("");
@@ -310,11 +368,11 @@ describe("SerializedCodeAgentAdapter", () => {
         ],
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(multiMessageInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -335,11 +393,11 @@ describe("SerializedCodeAgentAdapter", () => {
         ],
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        multiInputConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: multiInputConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -353,23 +411,43 @@ describe("SerializedCodeAgentAdapter", () => {
 
   describe("when sending the request to the NLP service", () => {
     it("passes an abort signal for timeout protection", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it("sets run_evaluations to false and do_not_trace to true", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
+    // The abort signal above is not the only deadline in play: undici's own
+    // headersTimeout lives on the dispatcher and defaults to 300s, so without
+    // one sized to this adapter's deadline a longer run dies at 300s no matter
+    // how far out the abort is armed.
+    it("passes a dispatcher whose headers timeout matches the adapter's own fetch timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBeGreaterThan(300_000);
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(
+        agentOptions.at(-1)?.bodyTimeout,
       );
+    });
+
+    it("sets run_evaluations to false and do_not_trace to true", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -378,11 +456,11 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("generates a valid 32-char hex trace_id", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -405,11 +483,11 @@ describe("SerializedCodeAgentAdapter", () => {
 
     /** @scenario Code agent adapter uses resolved fieldMappings for input assignment */
     it("uses resolved mappings for input assignment in the input record", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        multiInputConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: multiInputConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -420,11 +498,11 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("uses resolved mappings for workflow node input values", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        multiInputConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: multiInputConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -446,11 +524,11 @@ describe("SerializedCodeAgentAdapter", () => {
           deleted_field: { type: "value", value: "stale mapping" },
         },
       };
-      const adapter = new SerializedCodeAgentAdapter(
-        singleInputConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: singleInputConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -472,11 +550,11 @@ describe("SerializedCodeAgentAdapter", () => {
           { identifier: "context", type: "str" },
         ],
       };
-      const adapter = new SerializedCodeAgentAdapter(
-        multiInputConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: multiInputConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await adapter.call(defaultInput);
 
@@ -501,11 +579,11 @@ describe("SerializedCodeAgentAdapter", () => {
         scenarioOutputField: "answer",
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        config,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("42");
@@ -521,11 +599,11 @@ describe("SerializedCodeAgentAdapter", () => {
         scenarioOutputField: "structured",
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        config,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe(JSON.stringify({ key: "value" }));
@@ -538,11 +616,11 @@ describe("SerializedCodeAgentAdapter", () => {
         scenarioOutputField: "missing_field",
       };
 
-      const adapter = new SerializedCodeAgentAdapter(
-        config,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         'Scenario output field "missing_field" not found in agent output. Available fields: output',
@@ -554,11 +632,11 @@ describe("SerializedCodeAgentAdapter", () => {
     it("uses that output (default behavior)", async () => {
       mockFetch.mockResolvedValue(nlpResponse({ output: "single result" }));
 
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       const result = await adapter.call(defaultInput);
 
       expect(result).toBe("single result");
@@ -567,11 +645,11 @@ describe("SerializedCodeAgentAdapter", () => {
 
   describe("when building the workflow", () => {
     it("includes a valid dataset on the entry node", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -586,11 +664,11 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("connects entry -> code_agent -> end with correct edge handles", async () => {
-      const adapter = new SerializedCodeAgentAdapter(
-        defaultConfig,
-        nlpServiceUrl,
-        apiKey,
-      );
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
       await adapter.call(defaultInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
@@ -629,11 +707,11 @@ describe("SerializedCodeAgentAdapter", () => {
     describe("when the request succeeds", () => {
       /** @scenario code-agent adapter emits a span tagged with the request URL on success */
       it("emits a CLIENT span tagged with the agent id and HTTP url", async () => {
-        const adapter = new SerializedCodeAgentAdapter(
-          defaultConfig,
-          nlpServiceUrl,
-          apiKey,
-        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
         await adapter.call(defaultInput);
 
         const span = findExecuteSpan();
@@ -646,11 +724,11 @@ describe("SerializedCodeAgentAdapter", () => {
       });
 
       it("annotates the span with the response status code", async () => {
-        const adapter = new SerializedCodeAgentAdapter(
-          defaultConfig,
-          nlpServiceUrl,
-          apiKey,
-        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
         await adapter.call(defaultInput);
 
         const span = findExecuteSpan();
@@ -692,18 +770,18 @@ describe("SerializedCodeAgentAdapter", () => {
         );
         vi.useFakeTimers();
         try {
-          const adapter = new SerializedCodeAgentAdapter(
-            defaultConfig,
-            nlpServiceUrl,
-            apiKey,
-          );
+          const adapter = new SerializedCodeAgentAdapter({
+            config: defaultConfig,
+            nlpServiceUrl: nlpServiceUrl,
+            projectApiKey: apiKey,
+          });
           const callPromise = adapter.call(defaultInput);
           // Attach the rejection handler before advancing timers so the
           // synchronous abort doesn't surface as an unhandled rejection.
           const settled = expect(callPromise).rejects.toBeInstanceOf(
             SerializedCodeAgentAdapterError,
           );
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await settled;
         } finally {
           vi.useRealTimers();
@@ -725,23 +803,23 @@ describe("SerializedCodeAgentAdapter", () => {
         vi.useFakeTimers();
         let captured: SerializedCodeAgentAdapterError | undefined;
         try {
-          const adapter = new SerializedCodeAgentAdapter(
-            defaultConfig,
-            nlpServiceUrl,
-            apiKey,
-          );
+          const adapter = new SerializedCodeAgentAdapter({
+            config: defaultConfig,
+            nlpServiceUrl: nlpServiceUrl,
+            projectApiKey: apiKey,
+          });
           const callPromise = adapter
             .call(defaultInput)
             .catch((e: SerializedCodeAgentAdapterError) => {
               captured = e;
             });
-          await vi.advanceTimersByTimeAsync(120_001);
+          await vi.advanceTimersByTimeAsync(630_001);
           await callPromise;
         } finally {
           vi.useRealTimers();
         }
         expect(captured?.kind).toBe("timeout");
-        expect(captured?.message).toContain("did not respond within 120000ms");
+        expect(captured?.message).toContain("did not respond within 630000ms");
       });
     });
 
@@ -750,11 +828,11 @@ describe("SerializedCodeAgentAdapter", () => {
       it("emits an error span with kind=fetch", async () => {
         mockFetch.mockRejectedValue(new TypeError("fetch failed"));
 
-        const adapter = new SerializedCodeAgentAdapter(
-          defaultConfig,
-          nlpServiceUrl,
-          apiKey,
-        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
         await expect(adapter.call(defaultInput)).rejects.toBeInstanceOf(
           SerializedCodeAgentAdapterError,
         );
@@ -777,11 +855,11 @@ describe("SerializedCodeAgentAdapter", () => {
           text: vi.fn().mockResolvedValue('{"detail": "service down"}'),
         });
 
-        const adapter = new SerializedCodeAgentAdapter(
-          defaultConfig,
-          nlpServiceUrl,
-          apiKey,
-        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
         await expect(adapter.call(defaultInput)).rejects.toBeInstanceOf(
           SerializedCodeAgentAdapterError,
         );
@@ -804,11 +882,11 @@ describe("SerializedCodeAgentAdapter", () => {
           text: vi.fn().mockResolvedValue('{"detail": "boom"}'),
         });
 
-        const adapter = new SerializedCodeAgentAdapter(
-          defaultConfig,
-          nlpServiceUrl,
-          apiKey,
-        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl: nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
         let captured: SerializedCodeAgentAdapterError | undefined;
         try {
           await adapter.call(defaultInput);
@@ -817,6 +895,467 @@ describe("SerializedCodeAgentAdapter", () => {
         }
         expect(captured?.kind).toBe("http");
         expect(captured?.httpStatus).toBe(500);
+      });
+    });
+  });
+
+  describe("when the run resolved parameter values", () => {
+    /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+    it("carries them on the synthesized workflow DSL beside its secrets", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, secrets: { API_KEY: "sk-test" } },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      expect(callBody.payload.workflow.params).toEqual({
+        region: "eu-central",
+      });
+      expect(callBody.payload.workflow.secrets).toEqual({ API_KEY: "sk-test" });
+    });
+
+    /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+    it("keeps each value's native type", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { seats: 12, trial: false, region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      expect(callBody.payload.workflow.params).toEqual({
+        seats: 12,
+        trial: false,
+        region: "eu-central",
+      });
+    });
+
+    it("sends an empty namespace when the run resolved none", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      expect(callBody.payload.workflow.params).toEqual({});
+    });
+  });
+
+  describe("when a turn has an active trace context", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = ({
+      traceId,
+      traceparent,
+    }: {
+      traceId: string;
+      traceparent: string;
+    }) => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = traceparent;
+        return { headers, traceId };
+      });
+    };
+
+    const sentParams = (call = 0) =>
+      JSON.parse(mockFetch.mock.calls[call]![1].body).payload.workflow.params;
+
+    /** @scenario "A code execution receives the trace context in its params" */
+    it("carries params.trace_id and params.traceparent on the workflow", async () => {
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentParams()).toEqual({
+        region: "eu-central",
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The trace context wins over a run parameter with the same name" */
+    it("overrides a run parameter named trace_id or traceparent", async () => {
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { trace_id: "supplied", traceparent: "supplied" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentParams()).toEqual({
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "A code execution receives the trace context in its params" */
+    it("captures a fresh context on every turn", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
+      await adapter.call(defaultInput);
+
+      const secondTraceId = "1bf7651916cd43dd8448eb211c80319d";
+      const secondTraceparent = `00-${secondTraceId}-b7ad6b7169203331-01`;
+      injectTraceContext({
+        traceId: secondTraceId,
+        traceparent: secondTraceparent,
+      });
+      await adapter.call(defaultInput);
+
+      expect(sentParams(0).trace_id).toBe(TRACE_ID);
+      expect(sentParams(1).trace_id).toBe(secondTraceId);
+      expect(sentParams(1).traceparent).toBe(secondTraceparent);
+    });
+  });
+  describe("when the agent config carries a per-agent code timeout", () => {
+    /** The code node's parameters, as sent on the synthesized workflow DSL. */
+    const codeNodeParameters = (): {
+      identifier: string;
+      type: string;
+      value: unknown;
+    }[] => {
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const codeNode = callBody.payload.workflow.nodes.find(
+        (n: { id: string }) => n.id === "code_agent",
+      );
+      return codeNode.data.parameters;
+    };
+
+    it("sends it as the code node's timeout_ms parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "timeout_ms",
+        type: "int",
+        value: 5000,
+      });
+    });
+
+    it("still sends the code parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "code",
+        type: "code",
+        value: defaultConfig.code,
+      });
+    });
+
+    it("keeps its own fetch deadline above the requested code budget", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 300_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"] as number).toBeGreaterThan(
+        300_000,
+      );
+    });
+
+    it("clamps its own fetch deadline to the platform's maximum for one turn", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      // The engine ceiling bounds the agent's Python, not this HTTP request.
+      // Without a maximum here an absurd config parks a worker on a socket
+      // for as long as the number says — up to ~24.9 days.
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
+    });
+
+    it("clamps a budget only just past the platform's maximum", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        // 890s + the 30s headroom lands at 920s, above the 900s maximum.
+        config: { ...defaultConfig, timeoutMs: 890_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"]).toBe(900_000);
+    });
+
+    it("omits timeout_ms when the config carries no timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(
+        codeNodeParameters().some((p) => p.identifier === "timeout_ms"),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the operator configures the platform's fetch ceiling", () => {
+    /** The fetch deadline this adapter armed, as reported on the span. */
+    const armedFetchTimeoutMs = (): unknown =>
+      withActiveSpanCalls[0]!.options.attributes["nlp.timeout_ms"];
+
+    /** A code budget large enough that only the ceiling can decide the result. */
+    const hugeBudget = { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER };
+
+    const callWith = async (config: CodeAgentData) => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to 15 minutes when NLP_FETCH_MAX_TIMEOUT_MS is unset", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", undefined);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("honors a raised ceiling so the engine still gets to report its own timeout", async () => {
+      // An operator who raises NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS past
+      // 900s must be able to raise this one too, or the platform aborts the
+      // fetch first and the caller sees a generic fetch-side timeout instead
+      // of the engine's diagnosis.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "1800000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(1_800_000);
+    });
+
+    it("honors a lowered ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+    });
+
+    it.each([
+      ["an empty value", ""],
+      ["a non-numeric value", "banana"],
+      ["a zero", "0"],
+      ["a negative value", "-5000"],
+      ["a whitespace-only value", "   "],
+      ["an infinite value", "Infinity"],
+    ])("falls back to 15 minutes on %s", async (_label, raw) => {
+      // Clamp, never reject: the same contract the engine keeps for its own
+      // knobs. A nonsensical ceiling must not fail the scenario run.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", raw);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("clamps a large code budget down to the configured ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "200000");
+
+      // 300s + the 30s headroom would be 330s, above the 200s ceiling.
+      await callWith({ ...defaultConfig, timeoutMs: 300_000 });
+
+      expect(armedFetchTimeoutMs()).toBe(200_000);
+    });
+
+    it("bounds the default deadline too when set below the floor", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
+
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(45_000);
+    });
+
+    it("leaves the default deadline at the engine ceiling + headroom (630s) under the default max", async () => {
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(630_000);
+    });
+
+    it("is read per call, so a change between turns takes effect", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+
+      withActiveSpanCalls.length = 0;
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "600000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(600_000);
+    });
+  });
+
+  describe("given a code agent with an input mapped to the scenario session", () => {
+    const sessionConfig: CodeAgentData = {
+      ...defaultConfig,
+      inputs: [
+        { identifier: "input", type: "str" },
+        { identifier: "session", type: "dict" },
+      ],
+      scenarioMappings: {
+        input: { type: "source", sourceId: "scenario", path: ["input"] },
+        session: { type: "source", sourceId: "scenario", path: ["session"] },
+      },
+    };
+
+    /** A success reply whose code node returned `outputs` beside the end result. */
+    const replyWith = (codeOutputs: Record<string, unknown>) => ({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        trace_id: "trace_abc123",
+        status: "success",
+        result: { output: codeOutputs.output },
+        nodes: {
+          entry: { id: "entry", status: "success" },
+          code_agent: {
+            id: "code_agent",
+            status: "success",
+            outputs: codeOutputs,
+          },
+          end: { id: "end", status: "success" },
+        },
+      }),
+      text: vi.fn().mockResolvedValue(""),
+    });
+
+    /** The `session` input of the nth request the adapter sent. */
+    const sentSession = (call: number): unknown => {
+      const body = JSON.parse(mockFetch.mock.calls[call]?.[1]?.body as string);
+      return body.payload.inputs[0].session;
+    };
+
+    const turn = (threadId: string, text: string): AgentInput => ({
+      ...defaultInput,
+      threadId,
+      messages: [{ role: "user", content: text }],
+      newMessages: [{ role: "user", content: text }],
+    });
+
+    describe("when the code returns a session beside its reply", () => {
+      /** @scenario "A code agent that returns a session receives it on the next turn" */
+      /** @scenario "A code agent receives no session on the first turn of a thread" */
+      /** @scenario "Two threads of one code agent run do not share a session" */
+      it("sends null on the first turn, the value on the next turn, and nothing to another thread", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: { cursor: 7 } }),
+          )
+          .mockResolvedValueOnce(
+            replyWith({ output: "two", session: { cursor: 8 } }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "other" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).resolves.toBe(
+          "one",
+        );
+        await expect(adapter.call(turn("thread_a", "second"))).resolves.toBe(
+          "two",
+        );
+        await expect(adapter.call(turn("thread_b", "hello"))).resolves.toBe(
+          "other",
+        );
+
+        expect(sentSession(0)).toBeNull();
+        expect(sentSession(1)).toEqual({ cursor: 7 });
+        expect(sentSession(2)).toBeNull();
+      });
+
+      it("keeps the held value when a later turn returns no session", async () => {
+        mockFetch
+          .mockResolvedValueOnce(
+            replyWith({ output: "one", session: "conv_1" }),
+          )
+          .mockResolvedValueOnce(replyWith({ output: "two" }))
+          .mockResolvedValueOnce(replyWith({ output: "three" }));
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await adapter.call(turn("thread_a", "first"));
+        await adapter.call(turn("thread_a", "second"));
+        await adapter.call(turn("thread_a", "third"));
+
+        expect(sentSession(2)).toBe("conv_1");
+      });
+    });
+
+    describe("when the code returns a session above the cap", () => {
+      /** @scenario "A code agent session above the cap fails the turn" */
+      it("fails the turn with the payload code", async () => {
+        mockFetch.mockResolvedValueOnce(
+          replyWith({ output: "one", session: "x".repeat(70_000) }),
+        );
+        const adapter = new SerializedCodeAgentAdapter({
+          config: sessionConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).rejects.toThrow(
+          /agent_payload_too_large/,
+        );
       });
     });
   });

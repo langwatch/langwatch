@@ -1,9 +1,9 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
   simulationMessageSnapshotEventDataSchema,
+  simulationRunAgentInstanceRecordedEventDataSchema,
   simulationRunCancelRequestedEventDataSchema,
   simulationRunDeletedEventDataSchema,
-  simulationRunFinishedEventDataSchema,
   simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
@@ -14,9 +14,13 @@ import {
 /**
  * All pure simulation-processing commands defined from event data schemas.
  *
- * computeRunMetrics is NOT here — it's a complex command with DI (TraceSummaryStore,
- * scheduleRetry) and stays as a manual class.
+ * computeRunMetrics and finishRun are not DEFINED here — they carry DI
+ * (TraceSummaryStore/scheduleRetry and loadPriorEvents respectively) and stay
+ * as manual classes under ./commands/. FinishRunCommand is surfaced from this
+ * module so callers have one import site for the pipeline's commands.
  */
+
+export { FinishRunCommand } from "./commands/finishRun.command";
 
 export const QueueRunCommand = defineCommand({
   commandType: "lw.simulation_run.queue",
@@ -102,18 +106,19 @@ export const TextMessageEndCommand = defineCommand({
     `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
 });
 
-export const FinishRunCommand = defineCommand({
-  commandType: "lw.simulation_run.finish",
-  eventType: "lw.simulation_run.finished",
-  eventVersion: "2026-02-01",
+export const RecordAgentInstanceCommand = defineCommand({
+  commandType: "lw.simulation_run.record_agent_instance",
+  eventType: "lw.simulation_run.agent_instance_recorded",
+  eventVersion: "2026-08-30",
   aggregateType: "simulation_run",
-  schema: simulationRunFinishedEventDataSchema,
+  schema: simulationRunAgentInstanceRecordedEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:finishRun`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordAgentInstance`,
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
+    "payload.agentInstance.hostname": d.agentInstance.hostname,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:finish-run`,
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-agent-instance`,
 });
 
 export const CancelRunCommand = defineCommand({

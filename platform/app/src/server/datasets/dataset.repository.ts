@@ -1,4 +1,4 @@
-import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
+import type { Dataset, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { attachDatasetRecordCounts } from "./dataset-record-counts";
 

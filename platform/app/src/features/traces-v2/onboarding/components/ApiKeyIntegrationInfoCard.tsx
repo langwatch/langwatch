@@ -1,5 +1,4 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -7,8 +6,10 @@ import { showErrorToast } from "~/features/errors";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
 import { InlineCopyButton } from "~/features/onboarding/components/sections/shared/InlineCopyButton";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
+import { selfHostedEndpoint } from "../logic/selfHostedEndpoint";
 
 interface ApiKeyIntegrationInfoCardProps {
   organizationId: string;
@@ -110,12 +111,10 @@ export function ApiKeyIntegrationInfoCard({
 }: ApiKeyIntegrationInfoCardProps) {
   const publicEnv = usePublicEnv();
   // Mirror the onboarding ApiIntegrationInfoCard / codegen logic: only
-  // surface LANGWATCH_ENDPOINT when BASE_HOST is set AND differs from the
-  // cloud default. An empty string falls into "default" too — otherwise we
-  // emit `LANGWATCH_ENDPOINT=""`, which silently breaks customer SDKs.
-  const baseHost = publicEnv.data?.BASE_HOST;
-  const endpoint = baseHost || CLOUD_ENDPOINT;
-  const showEndpoint = !!baseHost && baseHost !== CLOUD_ENDPOINT;
+  // surface LANGWATCH_ENDPOINT on a self-hosted deployment.
+  const selfHosted = selfHostedEndpoint(publicEnv.data?.BASE_HOST);
+  const endpoint = selfHosted ?? CLOUD_ENDPOINT;
+  const showEndpoint = !!selfHosted;
 
   // Default to revealed: this token is shown exactly once, so the whole
   // point of the card is to let the user copy it. Masking it by default
@@ -153,7 +152,7 @@ export function ApiKeyIntegrationInfoCard({
   const handleGenerateRef = useRef(handleGenerate);
   handleGenerateRef.current = handleGenerate;
   useEffect(() => {
-    if (token || createMutation.isLoading) return;
+    if (token || createMutation.isPending) return;
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
@@ -171,7 +170,7 @@ export function ApiKeyIntegrationInfoCard({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [token, createMutation.isLoading]);
+  }, [token, createMutation.isPending]);
 
   // Pre-generation preview shows the .env shape with a non-secret
   // placeholder for the API key. The placeholder is hidden behind a
@@ -239,7 +238,7 @@ export function ApiKeyIntegrationInfoCard({
                   variant="ghost"
                   colorPalette="orange"
                   onClick={handleGenerate}
-                  loading={createMutation.isLoading}
+                  loading={createMutation.isPending}
                   flexShrink={0}
                 >
                   <Key size={12} />
@@ -273,7 +272,7 @@ export function ApiKeyIntegrationInfoCard({
                   colorPalette="orange"
                   variant="solid"
                   onClick={handleGenerate}
-                  loading={createMutation.isLoading}
+                  loading={createMutation.isPending}
                   flexShrink={0}
                 >
                   Generate access token

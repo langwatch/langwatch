@@ -1,11 +1,5 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
-import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  Zap,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
 import { useFilterStore } from "../../../../../stores/filterStore";
 import { useViewStore } from "../../../../../stores/viewStore";
@@ -27,10 +21,9 @@ function conversationIO(group: ConversationGroup): ConversationIO {
 }
 
 /**
- * Chevron affordance for the inline turns expansion. The row itself also
- * toggles expansion, but the chevron makes the action discoverable; it stops
- * propagation so a click on it toggles exactly once rather than also firing
- * the row handler.
+ * Expands the conversation's turns inline. The rest of the row opens the
+ * conversation's latest trace in the drawer, so the chevron is what expanding
+ * goes through; its click stops propagating rather than doing both at once.
  */
 const ExpandToggle: React.FC<{
   isExpanded: boolean;
@@ -62,15 +55,27 @@ const ExpandToggle: React.FC<{
 );
 
 /**
- * The conversation id, rendered as a link that scopes the All lens to just
- * this conversation. The id IS the filter affordance (the rest of the row
- * opens the drawer), so its click stops propagation; the blue colour plus a
- * hover underline and tooltip signal it acts differently from the row.
+ * What the row calls the conversation: the agent's own title when there is one
+ * the viewer may read, otherwise the shortened conversation id.
+ * `titleRedacted` is decided server-side and only read here.
+ */
+export function sessionLabelOf(group: ConversationGroup): string {
+  if (group.title && !group.titleRedacted) return group.title;
+  return truncateId(group.conversationId);
+}
+
+/**
+ * The conversation's label, a button styled as a link that scopes the All lens
+ * to just this conversation. It filters rather than navigates, so it is a
+ * button and not an anchor. The label IS the filter affordance (the rest of
+ * the row opens the drawer), so its click stops propagation; the blue colour
+ * plus a hover underline and tooltip signal it acts differently from the row.
  */
 const ConversationIdLabel: React.FC<{
   conversationId: string;
+  label: string;
   comfortable?: boolean;
-}> = ({ conversationId, comfortable = false }) => {
+}> = ({ conversationId, label, comfortable = false }) => {
   const selectLens = useViewStore((s) => s.selectLens);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
 
@@ -99,9 +104,13 @@ const ConversationIdLabel: React.FC<{
       textStyle="xs"
       fontWeight={comfortable ? "500" : undefined}
       marginTop={comfortable ? "2px" : undefined}
+      // A generated title can run long; the preview beside it keeps the rest
+      // of the row, so the label truncates rather than pushing it out.
+      maxWidth="320px"
+      truncate
       _hover={{ textDecoration: "underline" }}
     >
-      {truncateId(conversationId)}
+      {label}
     </chakra.button>
   );
 };
@@ -119,7 +128,10 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           boxSize="14px"
           marginTop="2px"
         />
-        <ConversationIdLabel conversationId={row.conversationId} />
+        <ConversationIdLabel
+          conversationId={row.conversationId}
+          label={sessionLabelOf(row)}
+        />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
@@ -143,7 +155,11 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           boxSize="16px"
           marginTop="3px"
         />
-        <ConversationIdLabel conversationId={row.conversationId} comfortable />
+        <ConversationIdLabel
+          conversationId={row.conversationId}
+          label={sessionLabelOf(row)}
+          comfortable
+        />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
@@ -194,14 +210,6 @@ const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({
         <Text>
           {group.evalsPassedCount}/{group.totalEvals}
         </Text>
-      </HStack>
-    )}
-    {group.totalSpans > 0 && (
-      <HStack gap={0.5}>
-        <Icon boxSize="10px">
-          <GitBranch />
-        </Icon>
-        <Text>{group.totalSpans}</Text>
       </HStack>
     )}
   </HStack>

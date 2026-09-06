@@ -60,9 +60,42 @@ const statusFromResults = async ({
   }
 };
 
+/** A run in one of these states will not move again. */
+const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "stopped",
+  "interrupted",
+]);
+
+/** How long `--wait` waits when the caller names no limit. */
+const DEFAULT_WAIT_SECONDS = 60;
+/** How long the command sleeps between reads while waiting. */
+const DEFAULT_POLL_MS = 3_000;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export interface ExperimentStatusOptions {
+  runId?: string;
+  /**
+   * Keep reading until the run reaches a terminal state or the limit is up.
+   *
+   * The alternative callers reach for is `sleep 30; langwatch experiment
+   * status`, which is one command that prints nothing for half a minute: an
+   * agent driving a page shows the sleep as the work in progress, and a turn
+   * that ends while it is open loses the run it was waiting for.
+   */
+  wait?: boolean;
+  /** Seconds to keep waiting for, as the CLI hands it over. */
+  timeout?: string;
+  /** Poll interval, for tests. */
+  pollMs?: number;
+}
+
 export const experimentStatusCommand = async (
   experimentSlug: string,
-  options?: { runId?: string },
+  options?: ExperimentStatusOptions,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -76,7 +109,7 @@ export const experimentStatusCommand = async (
       runId: options?.runId,
     });
 
-    let status: {
+    type RunStatus = {
       runId?: string;
       status: string;
       progress: number;
@@ -92,24 +125,61 @@ export const experimentStatusCommand = async (
       };
     };
 
-    try {
-      status = await service.getRunStatus(runId);
-    } catch (error) {
-      // Only a missing Redis run-state warrants the ClickHouse fallback. Real
-      // 5xx / auth / network failures must propagate, otherwise a working
-      // results call would mask them as a healthy derived status.
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/404|not found/i.test(message)) {
-        throw error;
-      }
+    const readStatus = async (): Promise<RunStatus> => {
+      try {
+        return await service.getRunStatus(runId);
+      } catch (error) {
+        // Only a missing Redis run-state warrants the ClickHouse fallback. Real
+        // 5xx / auth / network failures must propagate, otherwise a working
+        // results call would mask them as a healthy derived status.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/404|not found/i.test(message)) {
+          throw error;
+        }
 
-      const fallback = await statusFromResults({
-        service,
-        runId,
-        experimentSlug,
-      });
-      if (!fallback) throw error;
-      status = fallback;
+        const fallback = await statusFromResults({
+          service,
+          runId,
+          experimentSlug,
+        });
+        if (!fallback) throw error;
+        return fallback;
+      }
+    };
+
+    let status = await readStatus();
+
+    if (options?.wait) {
+      const seconds = Number(options.timeout ?? DEFAULT_WAIT_SECONDS);
+      const limitMs =
+        Number.isFinite(seconds) && seconds >= 0
+          ? seconds * 1000
+          : DEFAULT_WAIT_SECONDS * 1000;
+      const deadline = Date.now() + limitMs;
+      const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
+
+      let lastReadError: Error | null = null;
+      while (!TERMINAL_STATUSES.has(status.status) && Date.now() < deadline) {
+        spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
+        await sleep(pollMs);
+        try {
+          status = await readStatus();
+          lastReadError = null;
+        } catch (error) {
+          // One unreadable poll says nothing about the run. The wait keeps the
+          // status it already has and looks again, so a dropped socket at
+          // second 12 of a 60 second wait no longer reports a healthy run as
+          // failed.
+          lastReadError =
+            error instanceof Error ? error : new Error(String(error));
+        }
+      }
+      // Still unreadable when the wait ended: the caller has no current answer,
+      // so they get the failure rather than a stale status dressed up as fresh.
+      if (lastReadError) throw lastReadError;
+      // A run still going when the limit is up is not a failure: the caller
+      // asked how far it had got, and that is what it gets. Failing here would
+      // make a slow run indistinguishable from a broken one.
     }
 
     const color = statusColor(status.status);

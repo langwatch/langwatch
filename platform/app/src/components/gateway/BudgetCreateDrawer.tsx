@@ -16,10 +16,20 @@ import { useMemo, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { describeError, readHandledError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 import { humanizeGatewayError } from "./gatewayErrorCopy";
+
+/**
+ * A budget on a scope no active key can reach is refused, because it would
+ * never spend and never block. Provisioning one ahead of the keys that will
+ * use it is legitimate, so the refusal offers the way through instead of
+ * being a dead end. Offered here rather than as a checkbox on the form: an
+ * admin who has not hit the refusal has no way to know what it would mean.
+ */
+const UNREACHABLE_SCOPE_CODE = "gateway_budget_scope_unreachable";
 
 type BudgetCreateDrawerProps = {
   open: boolean;
@@ -73,6 +83,8 @@ export function BudgetCreateDrawer({
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
   const [cycleAnchorAt, setCycleAnchorAt] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /** Set once the server has refused this budget as unreachable. */
+  const [scopeUnreachable, setScopeUnreachable] = useState(false);
 
   // Only a window that rolls on its own can be phased. Total never rolls
   // and manual rolls only when someone asks it to, so neither offers the
@@ -136,7 +148,7 @@ export function BudgetCreateDrawer({
     [providersQuery.data],
   );
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createMutation = api.gatewayBudgets.create.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -165,6 +177,7 @@ export function BudgetCreateDrawer({
     setOnBreach("BLOCK");
     setCycleAnchorAt("");
     setSubmitError(null);
+    setScopeUnreachable(false);
   };
 
   const close = () => {
@@ -173,13 +186,29 @@ export function BudgetCreateDrawer({
     onOpenChange(false);
   };
 
+  /**
+   * The refusal was about the scope that was picked, and the retry beside it
+   * resubmits the form as it stands with `allowUnreachable` set. Left behind
+   * after a different scope is picked, that button would wave through a
+   * scope the server never refused.
+   */
+  const clearRefusal = () => {
+    setSubmitError(null);
+    setScopeUnreachable(false);
+  };
+
   const pickKind = (kind: ScopeKind) => {
     setScopeKind(kind);
-    setSubmitError(null);
+    clearRefusal();
     // Seed the target with the current context where one exists.
     if (kind === "TEAM") setTargetId(team?.id ?? "");
     else if (kind === "PROJECT") setTargetId(project?.id ?? "");
     else setTargetId("");
+  };
+
+  const pickTarget = (id: string) => {
+    setTargetId(id);
+    clearRefusal();
   };
 
   const targetOptions: Array<{ id: string; name: string }> | null =
@@ -209,7 +238,7 @@ export function BudgetCreateDrawer({
     (scopeKind === "PRINCIPAL" && membersQuery.isLoading) ||
     (scopeKind === "VIRTUAL_KEY" && keysQuery.isLoading);
 
-  const submit = async () => {
+  const submit = async ({ allowUnreachable = false } = {}) => {
     if (!organization) return;
     if (!name || !limitUsd) {
       toaster.create({ title: "Name and limit are required", type: "error" });
@@ -255,11 +284,18 @@ export function BudgetCreateDrawer({
         // one the admin typed it in.
         cycleAnchorAt:
           isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
+        allowUnreachable: allowUnreachable || undefined,
       });
       onCreated();
       reset();
       onOpenChange(false);
     } catch (error) {
+      if (readHandledError(error)?.code === UNREACHABLE_SCOPE_CODE) {
+        setScopeUnreachable(true);
+        setSubmitError(describeError({ error }));
+        return;
+      }
+      setScopeUnreachable(false);
       setSubmitError(humanizeGatewayError(error, "Failed to create budget"));
     }
   };
@@ -346,7 +382,7 @@ export function BudgetCreateDrawer({
                     value={targetId}
                     aria-label="Budget target"
                     data-testid="budget-target"
-                    onChange={(e) => setTargetId(e.target.value)}
+                    onChange={(e) => pickTarget(e.target.value)}
                   >
                     <option value="">
                       {targetsLoading
@@ -408,6 +444,20 @@ export function BudgetCreateDrawer({
                 <Field.ErrorText data-testid="budget-submit-error">
                   {submitError}
                 </Field.ErrorText>
+                {scopeUnreachable && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    alignSelf="flex-start"
+                    mt={2}
+                    loading={createMutation.isPending}
+                    onClick={() => void submit({ allowUnreachable: true })}
+                    data-testid="budget-create-anyway"
+                  >
+                    Create it anyway
+                  </Button>
+                )}
               </Field.Root>
             )}
             <HStack gap={4} align="flex-start">
@@ -506,7 +556,7 @@ export function BudgetCreateDrawer({
             </Button>
             <Button
               colorPalette="orange"
-              onClick={submit}
+              onClick={() => void submit()}
               loading={createMutation.isPending}
               disabled={!name || !limitUsd}
             >

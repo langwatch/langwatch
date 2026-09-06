@@ -1,7 +1,8 @@
 // From: https://github.com/prisma/prisma/issues/20169
 
-import type { Prisma } from "@prisma/client";
 import isEmpty from "lodash-es/isEmpty";
+
+import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
  * Middleware featured below
@@ -39,8 +40,8 @@ const _guardEnMasse = ({
   actions,
   safeWord,
 }: {
-  params: Prisma.MiddlewareParams;
-  actions: Prisma.MiddlewareParams["action"][];
+  params: GuardParams;
+  actions: string[];
   safeWord: string;
 }) => {
   // Check if empty, if not and safeWord is provided, then set where = {} and proceed to execute
@@ -58,7 +59,7 @@ const _guardEnMasse = ({
   }
 };
 
-export const guardEnMasse: any = async (params: any, next: any) => {
+export const guardEnMasse: GuardMiddleware = async (params, next) => {
   /* DELETION PROTECTION MIDDLEWARE */
   _guardEnMasse({
     actions: ["delete", "deleteMany"],

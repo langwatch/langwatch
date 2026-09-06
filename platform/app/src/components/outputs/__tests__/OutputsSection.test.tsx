@@ -245,6 +245,7 @@ describe("OutputsSection", () => {
 
       // Should show input field
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       expect(input).toBeInTheDocument();
       expect(input).toHaveValue("output");
     });
@@ -262,6 +263,7 @@ describe("OutputsSection", () => {
 
       // Change the value
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "new_output");
       fireEvent.blur(input);
@@ -338,6 +340,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with dashes
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "my-custom-score");
 
@@ -357,6 +360,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with spaces
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "my score");
 
@@ -376,6 +380,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with special characters
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "my@score!test#123");
 
@@ -395,6 +400,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with uppercase
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "MyScore");
 
@@ -414,6 +420,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with underscores
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "my_custom_score");
 
@@ -433,6 +440,7 @@ describe("OutputsSection", () => {
 
       // Type identifier with dashes and blur
       const input = screen.getByRole("textbox");
+      await waitFor(() => expect(input).toHaveFocus());
       await user.clear(input);
       await user.type(input, "my-score");
       fireEvent.blur(input);

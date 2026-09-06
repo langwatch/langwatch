@@ -74,6 +74,24 @@ Feature: Batch Evaluation Results Visualization
     Then I see the latency displayed
     And I can access cost information
 
+  # A saved run holds only the rows it produced, so its pass rate covers those
+  # rows and no others. The results page draws the rate on the column header
+  # with nothing to say how much of the dataset it describes, and a reader then
+  # compares one column over 30 rows against another over 40. The workbench
+  # header says the same thing the same way, so the two surfaces read alike.
+
+  @integration
+  Scenario: A column header says how much of the dataset its score covers
+    Given a saved run holds results for 5 of the dataset's 10 rows
+    When the results table renders the column header
+    Then the header shows the score together with "5/10"
+
+  @integration
+  Scenario: A column that covers the whole dataset shows the score on its own
+    Given a saved run holds results for every row of the dataset
+    When the results table renders the column header
+    Then the header shows the score with no row count beside it
+
   @unimplemented
   Scenario: Display error state in target cell
     Given a target execution failed with error "Rate limit exceeded"
@@ -92,7 +110,7 @@ Feature: Batch Evaluation Results Visualization
     Given a target execution failed with an error longer than two lines
     When I click on the error cell
     Then the error expands into an overlay showing the full message
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   @unimplemented
   Scenario: Expand long target output
@@ -101,7 +119,7 @@ Feature: Batch Evaluation Results Visualization
     Then a fade overlay appears at the bottom of the cell
     When I click on the cell
     Then the output expands to show the full content
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   # ============================================================================
   # Evaluator Results Display
@@ -272,6 +290,17 @@ Feature: Batch Evaluation Results Visualization
     And the CSV contains target output columns
     And the CSV contains cost and duration columns
     And the CSV contains evaluator result columns (score, passed, details)
+
+  # A comparison grades no single target, so it has no per-target column to ride
+  # in. Without a block of its own the export silently loses the verdict, and
+  # the reader sees every candidate's output with no record of which one won.
+  @unit
+  Scenario: CSV contains the comparison verdict
+    Given the evaluation ran a comparison over several targets
+    When I export to CSV
+    Then each comparison has a winner, candidates and reasoning column
+    And the winner column names the winning target, or reads tie
+    And a row the judge did not call leaves those columns empty
 
   @unimplemented
   Scenario: CSV handles special characters

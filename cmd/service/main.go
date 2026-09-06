@@ -14,6 +14,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
+	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
 	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
 )
@@ -45,6 +46,7 @@ type ServiceBoot func(ctx context.Context, args []string) error
 
 var services = map[string]ServiceBoot{
 	"aigateway":  aigateway.Root,
+	"idpsim":     idpsim.Root,
 	"langyagent": langyagent.Root,
 	"nlpgo":      nlpgo.Root,
 }

@@ -3,6 +3,7 @@
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
 import { HandledError } from "@langwatch/handled-error";
+import { remediation } from "../app-layer/error-remediation";
 
 export class DatasetNotFoundError extends Error {
   constructor(message = "Dataset not found") {
@@ -379,14 +380,30 @@ export class DatasetChunkCountMissingError extends Error {
 /**
  * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
  * storage made a writable backend mandatory, so this is a deployment-config
- * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
- * can surface its actionable message to the client (configure S3 / set
- * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
- * 500 that the browser then mistakes for "no object storage".
+ * error, not a transient failure. We can name the cause and we can name the
+ * fix, so per ADR-045 it crosses the boundary as a handled error under
+ * `storage_not_writable` rather than as an unattributed 500.
+ *
+ * `fault: "platform"`, because provisioning object storage is ours: nothing
+ * the caller changes about the request makes the write land.
+ *
+ * The message is customer-safe by construction. The storage root and the
+ * environment variables that set it are operator detail: they ride the log
+ * line at the throw site and the remediation tips, never the response body.
  */
-export class StorageNotWritableError extends Error {
-  constructor(message: string) {
-    super(message);
+export class StorageNotWritableError extends HandledError {
+  declare readonly code: "storage_not_writable";
+
+  constructor() {
+    super(
+      "storage_not_writable",
+      "Dataset storage is not writable, so nothing was saved",
+      {
+        httpStatus: 500,
+        fault: "platform",
+        ...remediation("storage_not_writable"),
+      },
+    );
     this.name = "StorageNotWritableError";
   }
 }

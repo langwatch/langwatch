@@ -1,10 +1,15 @@
+import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
+import { app as scimApp } from "@ee/scim/routes";
 import fs from "fs";
-import { generateSpecs } from "hono-openapi";
+import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
-
+import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
+import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
+import { app as codingAgentV1App } from "../app/api/coding-agent/[[...route]]/app.v1";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -15,12 +20,30 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
+import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
+import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
+import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
+import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
+import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
+import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
+import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
+import {
+  allRegisteredRoutes,
+  type CredentialClass,
+  documentedPathOf,
+  isHttpMethod,
+  securityForCredentialClass,
+} from "../server/api/security";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
@@ -28,6 +51,7 @@ import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
@@ -41,6 +65,108 @@ import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
 import { mergeOpenAPISpecs } from "./mergeOpenAPISpecs";
+
+/**
+ * `generateSpecs`, with response schemas read as output rather than input.
+ *
+ * The single correction the upgrade needs, applied in one place instead of at
+ * 44 call sites. See `openapi-response-required.ts` for why.
+ *
+ * Operation ids are deliberately NOT corrected. hono-openapi v1 derives them
+ * differently — `getApiCoding-agentPull-request-usage` becomes
+ * `getApiCodingAgentPullRequestUsage` for the 49 paths carrying a hyphen or an
+ * underscore — and the new ones are simply better. They are also not a break:
+ * `openapi-python-client` snake-cases the id, so both spellings produce the
+ * same `get_api_coding_agent_pull_request_usage`, and the TypeScript client is
+ * keyed on `paths`, not `operations`. An id that genuinely must not move is
+ * declared on its own route, the way 53 operations already declare theirs.
+ */
+const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
+  requireDefaultedResponseFields(await generateSpecsUnpinned(hono, options, c));
+
+// Namespaces owned by a Hono app. The MERGE no longer consults this list —
+// `mergeOpenAPISpecs` derives ownership dynamically from `appSpecs` each run, so
+// the prune can no longer drift (issue #2987). The list survives only as the
+// input to `assertMayInheritTheDefault`: the security-stamping guard that
+// refuses to leave an app-derived operation on the document-wide default.
+const APP_DERIVED_PREFIXES = [
+  "/api/agent-cache",
+  "/api/agents",
+  "/api/v1/agents",
+  "/api/api-keys",
+  "/api/analytics",
+  "/api/coding-agent",
+  "/api/v1/coding-agent",
+  "/api/v1/langy/control",
+  "/api/v1/projects",
+  "/api/v1/query",
+  // The query domain's former prefix, kept listed so the two paths it used to
+  // publish are pruned from the committed spec rather than riding the merge
+  // union forever. Nothing serves it any more; remove this entry once a
+  // regenerated spec no longer contains `/api/query/v1`.
+  "/api/query/v1",
+  "/api/dashboards",
+  "/api/evaluators",
+  "/api/events",
+  // Singular and plural are two surfaces, not one: `/api/experiment/init` lives
+  // in `misc.ts`, the rest under `/api/experiments`. Both used to be
+  // hand-maintained entries in the JSON; they are generated now, so the
+  // hand-written copies are pruned here.
+  "/api/experiment",
+  "/api/experiments",
+  "/api/guardrails",
+  "/api/evaluations",
+  "/api/dspy",
+  "/api/optimization",
+  "/api/track_event",
+  "/api/trigger",
+  "/api/webhooks",
+  "/api/gateway/v1",
+  "/api/governance",
+  "/api/graphs",
+  "/api/groups",
+  "/api/me",
+  "/api/organization",
+  "/api/organizations",
+  "/api/projects",
+  "/api/prompts",
+  "/api/role-bindings",
+  "/api/roles",
+  "/api/scim-tokens",
+  // Two surfaces again, and the segment boundary keeps them apart: the SCIM
+  // 2.0 endpoints an identity provider calls live under `/api/scim/v2`, while
+  // `/api/scim-tokens` is how a LangWatch admin mints the credential for them.
+  "/api/scim/v2",
+  "/api/dataset",
+  "/api/model-defaults",
+  "/api/model-providers",
+  "/api/monitors",
+  "/api/scenario-events",
+  "/api/scenarios",
+  "/api/secrets",
+  "/api/simulation-runs",
+  "/api/suites",
+  "/api/v1/run-plans",
+  "/api/v1/test-suites",
+  "/api/teams",
+  "/api/traces",
+  "/api/triggers",
+  "/api/workflows",
+] as const;
+
+/**
+ * Whether a path is owned by one of the apps above — the prefix itself, or
+ * anything below it.
+ *
+ * The boundary is a whole path segment, which rules out both directions of
+ * accident: a bare `startsWith` would let `/api/experiment` claim a future
+ * `/api/experimental-runs`, and a substring test would match the prefix
+ * anywhere in the key.
+ */
+const isAppDerivedPath = (key: string): boolean =>
+  APP_DERIVED_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}/`),
+  );
 
 const langwatchSpec = {
   openapi: "3.1.0",
@@ -63,12 +189,22 @@ const langwatchSpec = {
  */
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
+  console.log("Building agent cache spec...");
+  const agentCacheSpec = await generateSpecs(agentCacheApp);
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
   console.log("Building api keys spec...");
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building governed analytics SQL spec...");
+  const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
+  console.log("Building query domain spec...");
+  const querySpec = await generateSpecs(queryApp);
+  console.log("Building coding agent spec...");
+  const codingAgentSpec = await generateSpecs(codingAgentApp);
+  console.log("Building coding agent v1 spec...");
+  const codingAgentV1Spec = await generateSpecs(codingAgentV1App);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -91,6 +227,8 @@ export default async function execute() {
   const governanceSpec = await generateSpecs(governanceApp);
   console.log("Building graphs spec...");
   const graphsSpec = await generateSpecs(graphsApp);
+  console.log("Building langy control spec...");
+  const langyControlSpec = await generateSpecs(langyControlApp);
   console.log("Building me spec...");
   const meSpec = await generateSpecs(meApp);
   console.log("Building llm configs spec...");
@@ -103,8 +241,27 @@ export default async function execute() {
   const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building organization spec...");
+  const organizationSpec = await generateSpecs(organizationApp);
+  console.log("Building organizations (instance provisioning) spec...");
+  const organizationsSpec = await generateSpecs(
+    organizationsApp,
+    ORGANIZATIONS_SPEC_OPTIONS,
+  );
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
+  console.log("Building roles spec...");
+  const rolesSpec = await generateSpecs(rolesApp);
+  console.log("Building role bindings spec...");
+  const roleBindingsSpec = await generateSpecs(roleBindingsApp);
+  console.log("Building scim tokens spec...");
+  const scimTokensSpec = await generateSpecs(scimTokensApp);
+  console.log("Building scim spec...");
+  // A family that authenticates with its own credential declares the scheme
+  // next to the operations that name it, and `documentation` is how a
+  // generated spec contributes a `components` entry the merge carries into
+  // the document.
+  const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
   const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
@@ -113,6 +270,10 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building run plans spec...");
+  const runPlansSpec = await generateSpecs(runPlansApp);
+  console.log("Building test suites spec...");
+  const testSuitesSpec = await generateSpecs(testSuitesApp);
   console.log("Building teams spec...");
   const teamsSpec = await generateSpecs(teamsApp);
   console.log("Building groups spec...");
@@ -131,9 +292,14 @@ export default async function execute() {
   // replaced). Apps own disjoint /api/<namespace>s, so their paths never collide
   // here — order only affects shared top-level keys such as components.schemas.
   const appSpecs = [
+    agentCacheSpec,
     agentsSpec,
     apiKeysSpec,
     analyticsSpec,
+    analyticsSqlSpec,
+    querySpec,
+    codingAgentSpec,
+    codingAgentV1Spec,
     dashboardsSpec,
     datasetSpec,
     evaluatorsSpec,
@@ -145,17 +311,26 @@ export default async function execute() {
     gatewayPlatformSpec,
     governanceSpec,
     graphsSpec,
+    langyControlSpec,
     meSpec,
     llmConfigsSpec,
     modelDefaultsSpec,
     modelProvidersSpec,
     monitorsSpec,
+    organizationSpec,
+    organizationsSpec,
+    roleBindingsSpec,
+    rolesSpec,
+    scimTokensSpec,
+    scimSpec,
     scenarioEventsSpec,
     scenariosSpec,
     projectsSpec,
     secretsSpec,
     simulationRunsSpec,
     suitesSpec,
+    runPlansSpec,
+    testSuitesSpec,
     teamsSpec,
     groupsSpec,
     tracesSpec,
@@ -170,10 +345,138 @@ export default async function execute() {
     baseSpec: langwatchSpec,
   });
 
+  console.log("Stamping per-operation security...");
+  stampSecurityFromRegistry(mergedSpec as SpecShape);
+  normalizeExclusiveBounds(mergedSpec);
+
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
     JSON.stringify(withoutEmptyPaths(mergedSpec), null, 2),
   );
+}
+
+type SpecShape = {
+  paths?: Record<string, Record<string, unknown>>;
+};
+
+/**
+ * Give every documented operation the security requirement its route actually
+ * enforces.
+ *
+ * The document declares one top-level default, and a default is a claim about
+ * every operation that does not override it. That claim was `project_api_key`
+ * for the whole API, including the organization-scoped spend and webhook
+ * routes a project key can never reach: an integrator following the document
+ * got a 401 the document said was impossible.
+ *
+ * Read from the route registry rather than written per route, so an operation
+ * cannot publish a credential class nothing enforces, and a route added
+ * tomorrow is stamped without anyone remembering to.
+ */
+export function stampSecurityFromRegistry(spec: SpecShape): void {
+  const registry = indexRegistryByOperation();
+
+  for (const { routePath, operationKey, operation } of documentedOperations(
+    spec,
+  )) {
+    const credentialClass =
+      registry.byOperation.get(operationKey) ??
+      registry.byAnyMethodPath.get(routePath);
+    if (!credentialClass) {
+      assertMayInheritTheDefault(operationKey, routePath);
+      continue;
+    }
+    operation.security = securityForCredentialClass({
+      operationKey,
+      credentialClass,
+    });
+  }
+}
+
+/**
+ * Refuse to leave an app-derived operation on the document default.
+ *
+ * Paths under an app prefix are generated from the same Hono apps the registry
+ * walks, so every one of them has a route and a credential class. No match
+ * means the two spellings disagree, and the operation then publishes whatever
+ * the document happens to default to. That was survivable while every affected
+ * route sat on a project app and the default was already right; the first one
+ * on an org app would publish `project_api_key` for a route only an admin key
+ * can reach, which is the precise bug this stamping exists to prevent.
+ *
+ * Hand-maintained entries in the JSON have no route by design and are left
+ * alone.
+ */
+function assertMayInheritTheDefault(
+  operationKey: string,
+  routePath: string,
+): void {
+  if (!isAppDerivedPath(routePath)) return;
+  throw new Error(
+    `${operationKey} is generated from a Hono app but matches no registered route, ` +
+      `so it would inherit the document-wide security default. The documented path and ` +
+      `the route path have to agree — check how the route spells its parameters.`,
+  );
+}
+
+/** Every operation object in the document, with the key the registry uses. */
+function* documentedOperations(spec: SpecShape): Generator<{
+  routePath: string;
+  operationKey: string;
+  operation: { security?: unknown };
+}> {
+  for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
+    for (const [method, operation] of operationsOf(item)) {
+      yield {
+        routePath,
+        operationKey: `${method.toUpperCase()} ${routePath}`,
+        operation,
+      };
+    }
+  }
+}
+
+/**
+ * The operation members of one Path Item.
+ *
+ * Filtered by method name rather than by value shape: a Path Item also holds
+ * `servers` and `parameters`, both arrays, and an array is an object to
+ * `typeof`. Stamping `security` onto `servers` produces a document that no
+ * longer validates.
+ */
+function operationsOf(
+  item: Record<string, unknown>,
+): Array<[string, { security?: unknown }]> {
+  return Object.entries(item).filter(
+    (entry): entry is [string, { security?: unknown }] =>
+      isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
+  );
+}
+
+/**
+ * The route registry keyed the way a document path is spelled.
+ *
+ * Any-method routes are kept in their own index rather than expanded into
+ * verbs, so a specific registration on the same path still wins, and so a
+ * documented verb of an `.all(...)` route is stamped rather than left
+ * inheriting the document default, which is the one outcome the stamping
+ * exists to prevent.
+ */
+function indexRegistryByOperation(): {
+  byOperation: Map<string, CredentialClass>;
+  byAnyMethodPath: Map<string, CredentialClass>;
+} {
+  const byOperation = new Map<string, CredentialClass>();
+  const byAnyMethodPath = new Map<string, CredentialClass>();
+  for (const route of allRegisteredRoutes()) {
+    const documented = documentedPathOf(route.path);
+    if (route.method === "ALL") {
+      byAnyMethodPath.set(documented, route.credentialClass);
+      continue;
+    }
+    byOperation.set(`${route.method} ${documented}`, route.credentialClass);
+  }
+  return { byOperation, byAnyMethodPath };
 }
 
 const OPENAPI_METHODS = [
@@ -185,7 +488,7 @@ const OPENAPI_METHODS = [
   "head",
   "options",
   "trace",
-];
+] as const;
 
 /**
  * Drops path entries left holding no operation.

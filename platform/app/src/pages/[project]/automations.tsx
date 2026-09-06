@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Code,
@@ -8,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Monitor, TriggerAction } from "@prisma/client";
 import { useMemo } from "react";
 import {
   Calendar,
@@ -46,10 +46,12 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
+import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -118,6 +120,14 @@ function AutomationsPage() {
   const statsByTriggerId = useMemo(
     () => new Map((triggerStats.data ?? []).map((s) => [s.triggerId, s])),
     [triggerStats.data],
+  );
+
+  // How much each automation has been throttled today. Read separately from
+  // the trigger rows because the counters live in Redis, not Postgres, and a
+  // Redis outage should cost the page these badges rather than the whole list.
+  const capStatus = api.automation.getDailyCapStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
   );
 
   // A report's cron only DESCRIBES its schedule; the scheduler owns the real
@@ -221,9 +231,6 @@ function AutomationsPage() {
             title: "Update automation",
             type: "error",
             description: "Failed to update automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -254,9 +261,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "success",
             description: "Automation deleted",
-            meta: {
-              closable: true,
-            },
           });
           void triggers.refetch();
         },
@@ -265,9 +269,6 @@ function AutomationsPage() {
             title: "Delete automation",
             type: "error",
             description: "Failed to delete automation",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -347,7 +348,10 @@ function AutomationsPage() {
 
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
-      <Box padding={1} borderRightRadius="md">
+      // minWidth 0 opts out of the flex child's min-width: auto, so a long
+      // unbreakable value (a monitor id) clamps inside the chip instead of
+      // widening it past its border.
+      <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
         <HoverableBigText lineClamp={1} expandable={false}>
           {children}
         </HoverableBigText>
@@ -433,21 +437,51 @@ function AutomationsPage() {
     onClick: () => openDrawer("viewAutomation", { automationId: trigger.id }),
   });
 
-  const activeCell = (trigger: EnhancedTrigger) => (
-    <Table.Cell
-      textAlign="center"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <Switch
-        checked={trigger.active}
-        onCheckedChange={({ checked }) => {
-          handleToggleTrigger(trigger.id, checked);
+  const activeCell = (trigger: EnhancedTrigger) => {
+    const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
+    const pausedForVolume = trigger.pausedReason === RUNAWAY_PAUSE_REASON;
+    return (
+      <Table.Cell
+        textAlign="center"
+        onClick={(event) => {
+          event.stopPropagation();
         }}
-      />
-    </Table.Cell>
-  );
+      >
+        <VStack gap={1} align="center">
+          <Switch
+            checked={trigger.active}
+            inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
+            onCheckedChange={({ checked }) => {
+              handleToggleTrigger(trigger.id, checked);
+            }}
+          />
+          {/* An automation that is running but silently dropping matches is
+              the confusing case: without this the customer sees it switched
+              on and no records appearing, with nothing to explain the gap.
+              `tabIndex` is what makes the tooltip reachable: Badge renders a
+              plain span, and a span with no tab stop can be hovered but never
+              focused, so the explanation would be mouse-only. */}
+          {pausedForVolume ? (
+            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+              <Badge colorPalette="red" size="sm" tabIndex={0}>
+                Paused
+              </Badge>
+            </Tooltip>
+          ) : skipped > 0 ? (
+            <Tooltip
+              content={`This automation passed its daily limit of ${(
+                capStatus.data?.cap ?? 0
+              ).toLocaleString()} matches. It starts again tomorrow.`}
+            >
+              <Badge colorPalette="orange" size="sm" tabIndex={0}>
+                {skipped.toLocaleString()} skipped today
+              </Badge>
+            </Tooltip>
+          ) : null}
+        </VStack>
+      </Table.Cell>
+    );
+  };
 
   const isLoading = triggers.isLoading;
 
@@ -540,26 +574,34 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="20%">
+                              Watches
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
                               Fires when
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="14%">
+                              Notifies
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this alert last crossed its threshold and notified you."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Status"
                                 help="Firing while the metric is past its threshold, back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -735,26 +777,34 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%">
+                              Sends
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%" whiteSpace="nowrap">
                               Schedule
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
                                 help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last run"
                                 help="The last time this was sent."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="9%">
+                              Delivery
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -800,7 +850,13 @@ function AutomationsPage() {
                                       graphNameById={graphNameById}
                                     />
                                   </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
+                                  {/* No nowrap here: a cadence plus an IANA
+                                      zone ("Weekly · Monday 09:00
+                                      Europe/Amsterdam") is far wider than this
+                                      column, and under a fixed layout a
+                                      nowrap cell prints straight over its
+                                      neighbour instead of widening. */}
+                                  <Table.Cell>
                                     <Text textStyle="sm">
                                       {schedule?.cron
                                         ? describeSchedule(
@@ -858,23 +914,31 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                            <Table.ColumnHeader>Then</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="24%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="25%">
+                              Acts on
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="17%">
+                              Then
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="13%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="10%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Fires (30d)"
                                 help="Times this automation fired in the last 30 days."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -898,8 +962,12 @@ function AutomationsPage() {
                                   <Table.Cell fontWeight="medium">
                                     {trigger.name}
                                   </Table.Cell>
-                                  <Table.Cell maxWidth="360px">
-                                    <VStack gap={2} align="stretch">
+                                  <Table.Cell>
+                                    <VStack
+                                      gap={2}
+                                      align="stretch"
+                                      minWidth={0}
+                                    >
                                       {applyChecks(
                                         trigger.checks?.filter(
                                           (check): check is Monitor => !!check,
@@ -909,14 +977,20 @@ function AutomationsPage() {
                                       {trigger.filterQuery ? (
                                         // ADR-043: a trace-subject automation shows
                                         // its search query.
-                                        <Code
-                                          size="sm"
-                                          variant="surface"
-                                          whiteSpace="pre-wrap"
-                                          wordBreak="break-word"
+                                        <HoverableBigText
+                                          lineClamp={2}
+                                          expandedVersion={trigger.filterQuery}
                                         >
-                                          {trigger.filterQuery}
-                                        </Code>
+                                          <Code
+                                            size="sm"
+                                            variant="surface"
+                                            display="block"
+                                            minWidth={0}
+                                            wordBreak="break-word"
+                                          >
+                                            {trigger.filterQuery}
+                                          </Code>
+                                        </HoverableBigText>
                                       ) : trigger.filters &&
                                         typeof trigger.filters === "string" &&
                                         trigger.filters !== "{}" ? (
@@ -928,16 +1002,28 @@ function AutomationsPage() {
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell>
-                                    <VStack align="start" gap={0}>
+                                    <VStack align="start" gap={0} minWidth={0}>
                                       <Text textStyle="sm" fontWeight="medium">
                                         {triggerActionName(trigger.action)}
                                       </Text>
-                                      <Box textStyle="xs" color="fg.muted">
+                                      {/* Clamped, so it needs a reveal: the
+                                          destination (a long email, a webhook
+                                          URL) is the whole point of the cell.
+                                          Not expandable — the dialog wants a
+                                          string and these are nodes. */}
+                                      <HoverableBigText
+                                        textStyle="xs"
+                                        color="fg.muted"
+                                        width="full"
+                                        lineClamp={2}
+                                        overflowWrap="anywhere"
+                                        expandable={false}
+                                      >
                                         {actionItems(
                                           trigger.action,
                                           actionParams,
                                         )}
-                                      </Box>
+                                      </HoverableBigText>
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">

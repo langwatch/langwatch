@@ -1,10 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "~/server/api/rbac";
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import type {
   DataPrivacyScope,
@@ -53,16 +53,16 @@ async function canWriteScope(
             })
           )?.organizationId;
     if (!organizationId) return false;
-    return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
+    return probeOrganizationPermission(
+      { session: ctx.session },
       organizationId,
       "organization:manage",
     );
   }
   if (scope.scopeType === "TEAM") {
-    return hasTeamPermission(ctx, scope.scopeId, "team:manage");
+    return probeTeamPermission(ctx, scope.scopeId, "team:manage");
   }
-  return hasProjectPermission(ctx, scope.scopeId, "project:update");
+  return probeProjectPermission(ctx, scope.scopeId, "project:update");
 }
 
 /**

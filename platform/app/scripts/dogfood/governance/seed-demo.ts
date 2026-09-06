@@ -28,10 +28,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
 import { prisma as defaultPrisma } from "~/server/db";
+import type { PrismaClient } from "../../../src/generated/prisma/client";
 import { seedBirdEye } from "./_actions/seedBirdEye";
 import { seedHeavyUsage } from "./_actions/seedHeavyUsage";
 import { verifyOrgIdentity } from "./_actions/verifyOrgIdentity";

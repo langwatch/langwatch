@@ -1,205 +1,90 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  Database,
-  Edit3,
-  Languages,
-  Lightbulb,
-  MessageSquare,
-} from "lucide-react";
-import { forwardRef, useState } from "react";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
+import { useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Popover } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../stores/annotationQueueSessionStore";
+import {
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../../utils/traceEditMode";
 import { AnnotationPopover } from "./AnnotationPopover";
+import { HoverActionButton, HoverActionCluster } from "./HoverActionCluster";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 
-interface TurnAnnotationProps {
+/**
+ * The one action the turn separator carries: opening the turn's trace where a
+ * correction can be written.
+ *
+ * Everything said about a message is said on the message itself, so the
+ * separator is left with the one thing that is about the turn rather than
+ * about either side of it. Correcting a trace is what the annotation queue's
+ * own Edit trace does, and it asks for the same permission here.
+ */
+export function TurnEditTraceAction({
+  traceId,
+  occurredAtMs,
+}: {
   traceId: string;
-  /** The current output for this turn — pre-filled into the suggest form. */
-  output?: string | null;
-  /**
-   * Per-turn translate-to-English control, owned by the ChatTurnRow so the
-   * bubbles can swap text. Rendered here so it sits with the turn's other
-   * inline actions — but unlike them it does NOT require annotation
-   * permissions (reading a conversation is a viewer activity).
-   */
-  translation?: {
-    isActive: boolean;
-    isLoading: boolean;
-    onToggle: () => void;
-  };
+  /** When the turn ran, which tells the drawer where to look for it. */
+  occurredAtMs?: number | null;
+}) {
+  const { hasPermission } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
+
+  if (!hasPermission("annotations:update")) return null;
+
+  return (
+    <HoverActionCluster label="Turn actions">
+      <HoverActionButton
+        icon={Pencil}
+        label="Edit trace"
+        tooltip="Open this turn's trace to correct it"
+        onActivate={() =>
+          openTraceEditorFromConversation({
+            openDrawer,
+            traceId,
+            occurredAtMs: tracePartitionHint(occurredAtMs),
+          })
+        }
+      />
+    </HoverActionCluster>
+  );
 }
 
 /**
- * Inline action row that sits in each turn separator. Each action button is
- * its own popover trigger — clicking opens the form anchored to that button
- * rather than dropping a heavy panel into the conversation flow.
+ * Whether this turn's trace is one the sitting at the queue counts.
+ *
+ * Annotating a turn counts it on its own, so the box is mostly a way to
+ * disagree: to keep a trace the reviewer only read, or to drop one they
+ * annotated and thought better of.
  */
-export function TurnActionRow({
-  traceId,
-  output,
-  translation,
-}: TurnAnnotationProps) {
-  const { hasPermission } = useOrganizationTeamProject();
-  const { openDrawer } = useDrawer();
-  const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
-    null,
+export function TurnSessionCheckbox({ traceId }: { traceId: string }) {
+  const isMarked = useAnnotationQueueSessionStore((s) =>
+    isSessionMarked(s.marks, traceId),
   );
-
-  const canManage = hasPermission("annotations:manage");
-
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
-
-  const annotationsGate = usePersonalFeatureGate("annotations");
-  const datasetsGate = usePersonalFeatureGate("datasets");
-
-  if (!canManage && !translation) return null;
-
-  // The trio used to sit permanently visible on every turn separator —
-  // ~180px of chrome multiplied across N turns adds a lot of visual
-  // weight to a view that's supposed to be "read the conversation".
-  // Default to invisible + reveal on `_groupHover` of the parent
-  // ChatTurnRow Flex (which already declares `role="group"`). Forced
-  // visible while a popover is open so the anchor doesn't vanish under
-  // the user mid-edit — and while a translation is showing/loading so
-  // the way back to the original text stays discoverable.
-  const isForceVisible =
-    openPopover !== null || !!translation?.isActive || !!translation?.isLoading;
+  const toggle = useAnnotationQueueSessionStore((s) => s.toggle);
 
   return (
-    <HStack
-      gap={0.5}
-      flexShrink={0}
-      flexWrap="wrap"
-      justify="flex-end"
-      onClick={stop}
-      opacity={isForceVisible ? 1 : 0}
-      _groupHover={{ opacity: 1 }}
-      _groupFocusWithin={{ opacity: 1 }}
-      transition="opacity 120ms ease"
-    >
-      {translation && (
-        <Tooltip
-          content={
-            translation.isActive
-              ? "Show the original text"
-              : "Translate this turn to English"
-          }
-          positioning={{ placement: "top" }}
-        >
-          <Button
-            size="2xs"
-            variant="ghost"
-            color={translation.isActive ? "blue.fg" : "fg.muted"}
-            gap={1}
-            paddingX={2}
-            aria-pressed={translation.isActive}
-            disabled={translation.isLoading}
-            onClick={(e) => {
-              e.stopPropagation();
-              translation.onToggle();
-            }}
-          >
-            <Icon as={Languages} boxSize={3} />
-            <Text textStyle="2xs">
-              {translation.isLoading
-                ? "Translating…"
-                : translation.isActive
-                  ? "Original"
-                  : "Translate"}
-            </Text>
-          </Button>
-        </Tooltip>
-      )}
-      {canManage && (
-        <>
-          <AnnotationPopover
-            traceId={traceId}
-            output={output}
-            mode="annotate"
-            open={openPopover === "annotate"}
-            onOpenChange={async (open) => {
-              if (open) {
-                const allowed = await annotationsGate.requestEnable();
-                if (!allowed) return;
-              }
-              setOpenPopover(open ? "annotate" : null);
-            }}
-            triggerTooltip="Add a note or score"
-            trigger={<ActionButton icon={Edit3} label="Annotate" />}
-          />
-          <AnnotationPopover
-            traceId={traceId}
-            output={output}
-            mode="suggest"
-            open={openPopover === "suggest"}
-            onOpenChange={async (open) => {
-              if (open) {
-                const allowed = await annotationsGate.requestEnable();
-                if (!allowed) return;
-              }
-              setOpenPopover(open ? "suggest" : null);
-            }}
-            triggerTooltip="Suggest a corrected output"
-            trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
-          />
-          <Tooltip
-            content="Add this turn to a dataset"
-            positioning={{ placement: "top" }}
-          >
-            <Button
-              size="2xs"
-              variant="ghost"
-              color="fg.muted"
-              gap={1}
-              paddingX={2}
-              onClick={async (e) => {
-                e.stopPropagation();
-                const allowed = await datasetsGate.requestEnable();
-                if (!allowed) return;
-                openDrawer("addDatasetRecord", { traceId });
-              }}
-            >
-              <Icon as={Database} boxSize={3} />
-              <Text textStyle="2xs">Dataset</Text>
-            </Button>
-          </Tooltip>
-        </>
-      )}
-      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
-      <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
-    </HStack>
+    <Checkbox
+      size="sm"
+      checked={isMarked}
+      onCheckedChange={() => toggle(traceId)}
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      inputProps={{
+        "aria-label": "Count this turn in the annotation session",
+      }}
+    />
   );
 }
-
-const ActionButton = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: typeof Edit3;
-    label: string;
-  } & React.ComponentProps<typeof Button>
->(function ActionButton({ icon, label, ...buttonProps }, ref) {
-  return (
-    <Button
-      ref={ref}
-      size="2xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1}
-      paddingX={2}
-      {...buttonProps}
-    >
-      <Icon as={icon} boxSize={3} />
-      <Text textStyle="2xs">{label}</Text>
-    </Button>
-  );
-});
 
 interface TurnAnnotationBadgesProps {
   traceId: string;
@@ -226,8 +111,11 @@ export function TurnAnnotationBadges({
   const { project, hasPermission } = useOrganizationTeamProject();
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // What the turn carries is what was said about the turn. A comment about one
+  // of its spans reads beside it in the rail and is counted nowhere, so one
+  // reviewer marking up six steps of a turn leaves its count where it was.
   const annotations = api.annotation.getByTraceId.useQuery(
-    { projectId: project?.id ?? "", traceId },
+    { projectId: project?.id ?? "", traceId, anchor: "trace" },
     {
       enabled:
         !!project?.id &&
@@ -244,140 +132,163 @@ export function TurnAnnotationBadges({
   if (annotationCount === 0) return null;
 
   return (
-    <>
-      <Popover.Root
-        open={listOpen}
-        onOpenChange={(e) => setListOpen(e.open)}
-        positioning={{
-          placement: "bottom-end",
-          flip: true,
-          shift: 16,
-          overflowPadding: 16,
-        }}
-      >
-        <Popover.Trigger asChild>
-          <Button
-            variant="ghost"
-            size="2xs"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`${annotationCount} annotation${
-              annotationCount === 1 ? "" : "s"
-            } on this turn`}
-            flexShrink={0}
-            paddingX={1.5}
-            paddingY={0.5}
-            height="auto"
-            borderRadius="sm"
-            bg="amber.subtle"
-            color="amber.fg"
-            _hover={{ bg: "amber.subtle", filter: "brightness(1.1)" }}
-            gap={1}
-          >
-            <Icon as={MessageSquare} boxSize={3} />
-            <Text textStyle="2xs" fontWeight="600">
-              {annotationCount}
-            </Text>
-            {hasCorrection && (
-              <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
-            )}
-          </Button>
-        </Popover.Trigger>
-        <Popover.Content
-          width="320px"
-          bg="bg.panel/92"
+    <Popover.Root
+      open={listOpen}
+      onOpenChange={(e) => setListOpen(e.open)}
+      positioning={{
+        placement: "bottom-end",
+        flip: true,
+        shift: 16,
+        overflowPadding: 16,
+      }}
+    >
+      <Popover.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="2xs"
           onClick={(e) => e.stopPropagation()}
+          aria-label={`${annotationCount} annotation${
+            annotationCount === 1 ? "" : "s"
+          } on this turn`}
+          flexShrink={0}
+          paddingX={1.5}
+          paddingY={0.5}
+          height="auto"
+          borderRadius="sm"
+          bg="amber.subtle"
+          color="amber.fg"
+          _hover={{ bg: "amber.subtle", filter: "brightness(1.1)" }}
+          gap={1}
         >
-          <Popover.Arrow />
-          <Popover.Body padding={1.5}>
-            <VStack align="stretch" gap={0.5}>
-              {items.map((a) => (
-                <Box
-                  key={a.id}
-                  role={canEdit ? "button" : undefined}
-                  tabIndex={canEdit ? 0 : undefined}
-                  onClick={
-                    canEdit
-                      ? (e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          setListOpen(false);
-                          setEditingId(a.id);
-                        }
-                      : undefined
-                  }
-                  cursor={canEdit ? "pointer" : "default"}
-                  textAlign="left"
-                  paddingX={2}
-                  paddingY={1.5}
-                  borderRadius="sm"
-                  _hover={canEdit ? { bg: "bg.muted" } : undefined}
-                >
-                  <HStack gap={2} align="start">
-                    <UserAvatar
-                      size="xs"
-                      background="gray.solid"
-                      color="white"
-                      name={a.user?.name ?? a.email ?? "?"}
-                      image={a.user?.image}
-                    />
-                    <VStack align="start" gap={0} flex={1} minWidth={0}>
-                      <HStack gap={1.5} width="full">
-                        <Text textStyle="2xs" fontWeight="600">
-                          {a.user?.name ?? a.email ?? "anonymous"}
-                        </Text>
-                        {a.expectedOutput && (
-                          <Icon
-                            as={Lightbulb}
-                            boxSize={2.5}
-                            color="yellow.fg"
-                          />
-                        )}
-                        <Box flex={1} />
-                        <Text textStyle="2xs" color="fg.subtle">
-                          {new Date(a.createdAt).toLocaleDateString()}
-                        </Text>
-                      </HStack>
-                      {a.comment && (
-                        <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
-                          {a.comment}
-                        </Text>
-                      )}
-                    </VStack>
-                  </HStack>
-                </Box>
-              ))}
-            </VStack>
-          </Popover.Body>
-        </Popover.Content>
-      </Popover.Root>
+          <Icon as={MessageSquare} boxSize={3} />
+          <Text textStyle="2xs" fontWeight="600">
+            {annotationCount}
+          </Text>
+          {hasCorrection && (
+            <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
+          )}
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content
+        width="320px"
+        bg="bg.panel/92"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Popover.Arrow />
+        <Popover.Body padding={1.5}>
+          <VStack align="stretch" gap={0.5}>
+            {items.map((a) => (
+              <AnnotationListRow
+                key={a.id}
+                annotation={a}
+                traceId={traceId}
+                output={output}
+                canEdit={canEdit}
+                isEditing={editingId === a.id}
+                onEditingChange={(open) => setEditingId(open ? a.id : null)}
+              />
+            ))}
+          </VStack>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
 
-      {/* Hidden second popover that re-opens for edit. We need a separate
-          AnnotationPopover so opening it doesn't fight the badge popover's
-          state, and we anchor it with a hidden span next to the badge. */}
-      {canEdit && editingId && (
-        <AnnotationPopover
-          traceId={traceId}
-          output={output}
-          mode={
-            items.find((a) => a.id === editingId)?.expectedOutput
-              ? "suggest"
-              : "annotate"
-          }
-          annotationId={editingId}
-          open={!!editingId}
-          onOpenChange={(o) => {
-            if (!o) setEditingId(null);
-          }}
-          trigger={
-            <Box
-              as="span"
-              aria-hidden="true"
-              display="inline-block"
-              width="0"
-              height="0"
-            />
-          }
-        />
-      )}
-    </>
+/**
+ * One annotation in the badge's list, and the way into editing it.
+ *
+ * For a reviewer who may edit, the line itself is the button that opens the
+ * correction popover: it anchors the form where the reviewer was reading, it
+ * answers Enter and Space like any button, and closing hands the keyboard back
+ * to it. For everyone else it is text.
+ */
+function AnnotationListRow({
+  annotation,
+  traceId,
+  output,
+  canEdit,
+  isEditing,
+  onEditingChange,
+}: {
+  annotation: AnnotationItem;
+  traceId: string;
+  output?: string | null;
+  canEdit: boolean;
+  isEditing: boolean;
+  onEditingChange: (open: boolean) => void;
+}) {
+  const summary = <AnnotationListRowSummary annotation={annotation} />;
+
+  if (!canEdit) {
+    return (
+      <Box textAlign="left" paddingX={2} paddingY={1.5} borderRadius="sm">
+        {summary}
+      </Box>
+    );
+  }
+
+  return (
+    <AnnotationPopover
+      traceId={traceId}
+      output={output}
+      mode={annotation.expectedOutput ? "suggest" : "annotate"}
+      annotationId={annotation.id}
+      open={isEditing}
+      onOpenChange={onEditingChange}
+      trigger={
+        <Box
+          as="button"
+          width="full"
+          textAlign="left"
+          cursor="pointer"
+          paddingX={2}
+          paddingY={1.5}
+          borderRadius="sm"
+          _hover={{ bg: "bg.muted" }}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          {summary}
+        </Box>
+      }
+    />
+  );
+}
+
+/** Who left the annotation, when, whether it corrects the turn, and what it says. */
+function AnnotationListRowSummary({
+  annotation,
+}: {
+  annotation: AnnotationItem;
+}) {
+  return (
+    <HStack gap={2} align="start">
+      <UserAvatar
+        size="xs"
+        background="gray.solid"
+        color="white"
+        name={annotation.user?.name ?? annotation.email ?? "?"}
+        image={annotation.user?.image}
+      />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <HStack gap={1.5} width="full">
+          <Text textStyle="2xs" fontWeight="600">
+            {annotation.user?.name ?? annotation.email ?? "anonymous"}
+          </Text>
+          {annotation.expectedOutput && (
+            <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
+          )}
+          <Box flex={1} />
+          <Text textStyle="2xs" color="fg.subtle">
+            {new Date(annotation.createdAt).toLocaleDateString()}
+          </Text>
+        </HStack>
+        {annotation.comment && (
+          <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
+            {annotation.comment}
+          </Text>
+        )}
+      </VStack>
+    </HStack>
   );
 }

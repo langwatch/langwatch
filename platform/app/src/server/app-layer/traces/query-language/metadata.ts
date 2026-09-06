@@ -489,9 +489,10 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "skipped",
     "error",
   ],
-  // `unknown` (Passed null but not errored) is query-language-only: the
-  // sidebar drilldown surfaces pass/fail/error rows and has no unknown
-  // bucket by design — it's reachable by typing the filter by hand.
-  evaluatorVerdict: ["pass", "fail", "error", "unknown"],
+  // `skipped` and `unknown` (Passed null but not errored/skipped) are
+  // query-language-only: the sidebar drilldown surfaces pass/fail/error rows
+  // and has no bucket for either — both are reachable by typing the filter
+  // by hand.
+  evaluatorVerdict: ["pass", "fail", "error", "skipped", "unknown"],
   spanStatus: ["ok", "error", "unset"],
 };

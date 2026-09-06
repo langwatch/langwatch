@@ -15,6 +15,12 @@
 export interface LeadingContextSplit {
   /** The leading `<tag>…</tag>` blocks, joined (empty when there are none). */
   context: string;
+  /**
+   * The same blocks, still separate. A surface that draws one line per block
+   * reads these rather than cutting `context` back apart on the same rule this
+   * peeled it with, which would go quietly wrong the moment the rule changes.
+   */
+  blocks: string[];
   /** The text that followed the leading context blocks. */
   body: string;
 }
@@ -45,6 +51,10 @@ export function splitLeadingContextBlocks(text: string): LeadingContextSplit {
     rest = rest.slice(blockEnd);
   }
 
-  if (blocks.length === 0) return { context: "", body: text };
-  return { context: blocks.join("\n\n"), body: rest.replace(/^\s+/, "") };
+  if (blocks.length === 0) return { context: "", blocks, body: text };
+  return {
+    context: blocks.join("\n\n"),
+    blocks,
+    body: rest.replace(/^\s+/, ""),
+  };
 }

@@ -6,6 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
+import warnings
 from typing import Any, Dict, Optional
 
 import httpx
@@ -65,10 +66,19 @@ class SuitesFacade:
     """
     Facade for managing LangWatch suites via REST API.
 
+    Deprecated. A suite was two things at once: the test suite the scenarios
+    are filed in and the configuration a run executes under. Those are now
+    ``langwatch.test_suites`` and ``langwatch.run_plans``.
+
     Provides list, get, create, update, run, and delete operations.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
+        warnings.warn(
+            "langwatch.suites is deprecated; use langwatch.run_plans and langwatch.test_suites",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._client = rest_api_client
 
     @classmethod
@@ -157,6 +167,7 @@ class SuitesFacade:
         suite_id: str,
         *,
         params: Optional[Dict[str, Any]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Trigger a suite run.
@@ -166,12 +177,18 @@ class SuitesFacade:
 
         Args:
             suite_id: The suite ID to run.
-            params: Optional run parameters (e.g., repeatCount overrides).
+            params: Optional request body fields (e.g., an idempotencyKey).
+            parameters: Optional constants applied to every scenario in the run
+                (e.g. ``{"account_tier": "gold"}``). A value given here
+                overrides the scenario's own default for that name, and wins
+                over a ``parameters`` key inside ``params``.
 
         Returns:
             Dictionary containing the run result with batch run ID.
         """
-        body = params or {}
+        body = dict(params or {})
+        if parameters is not None:
+            body["parameters"] = parameters
         response = self._http().post(
             f"/api/suites/{_quote(suite_id)}/run", json=body
         )

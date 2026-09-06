@@ -8,7 +8,7 @@ import {
   type GatewayChangeEventKind,
   Prisma,
   type PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 export type AppendChangeEventInput = {
   organizationId: string;

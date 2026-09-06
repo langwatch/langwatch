@@ -10,12 +10,12 @@ from ...models.post_api_scenarios_response_400 import PostApiScenariosResponse40
 from ...models.post_api_scenarios_response_401 import PostApiScenariosResponse401
 from ...models.post_api_scenarios_response_422 import PostApiScenariosResponse422
 from ...models.post_api_scenarios_response_500 import PostApiScenariosResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiScenariosBody | Unset = UNSET,
+    body: PostApiScenariosBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,8 +24,7 @@ def _get_kwargs(
         "url": "/api/scenarios",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -96,8 +95,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
 ) -> Response[
     PostApiScenariosResponse201
     | PostApiScenariosResponse400
@@ -108,7 +107,7 @@ def sync_detailed(
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,8 +130,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
 ) -> (
     PostApiScenariosResponse201
     | PostApiScenariosResponse400
@@ -144,7 +143,7 @@ def sync(
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,8 +161,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
 ) -> Response[
     PostApiScenariosResponse201
     | PostApiScenariosResponse400
@@ -174,7 +173,7 @@ async def asyncio_detailed(
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -195,8 +194,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenariosBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenariosBody,
 ) -> (
     PostApiScenariosResponse201
     | PostApiScenariosResponse400
@@ -208,7 +207,7 @@ async def asyncio(
     """Create a new scenario
 
     Args:
-        body (PostApiScenariosBody | Unset):
+        body (PostApiScenariosBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

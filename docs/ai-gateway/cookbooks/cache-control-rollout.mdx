@@ -97,7 +97,7 @@ On `/v1/chat/completions` (OpenAI), the rule still fires + attributes + bumps th
 
 ## Scenario 2: Disable cache for evaluation traffic
 
-Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request with `X-Langwatch-Suite: evals`. You want these to hit provider caches as rarely as possible, fresh completions keep eval scores honest.
+Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request with `X-Langwatch-Suite: evals`. These requests should hit provider caches as rarely as possible, because fresh completions keep cache effects out of the eval scores.
 
 ### Author
 

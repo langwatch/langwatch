@@ -16,8 +16,11 @@
  *     scrubbed.
  *  3. Basic PII patterns: email addresses, phone numbers (international
  *     `+`-prefixed or punctuated formats), credit card numbers (Luhn-checked),
- *     public IP addresses. Loopback, private-range, and link-local addresses
+ *     public IPv4 addresses. Loopback, private-range, and link-local addresses
  *     are kept: they identify nobody and are essential to debug local setups.
+ *     There is no IPv6 pattern, so a native IPv6 address is sent as written.
+ *     An IPv4-mapped one loses its dotted-quad tail to the IPv4 pattern, which
+ *     is a side effect rather than IPv6 coverage.
  *
  * Deliberate limits, so reports stay debuggable:
  *  - Bare unformatted digit runs only count as card numbers at lengths 14-16;
@@ -352,5 +355,5 @@ export const SESSION_REDACTION_SUMMARY: readonly string[] = [
   "AWS access key ids, Google API keys, GitHub / Slack / Stripe tokens",
   "JWTs, bearer tokens, private-key blocks, passwords inside connection URLs",
   "JSON fields named like password, api_key, authorization, cookie, and similar",
-  "email addresses, phone numbers, credit card numbers, public IP addresses",
+  "email addresses, phone numbers, credit card numbers, public IPv4 addresses",
 ];

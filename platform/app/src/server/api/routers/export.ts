@@ -12,7 +12,6 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { checkProjectPermission, type Permission } from "../rbac";
 
 const logger = createLogger("langwatch:api:export");
 
@@ -66,10 +65,12 @@ function readProgressEvent({
  * `scenarios:view` and a trace export by `traces:view`. Factored rather than
  * copied so the two cannot drift on filtering or teardown.
  */
-function exportProgressSubscription(permission: Permission) {
+function exportProgressSubscription(
+  permission: "traces:view" | "scenarios:view",
+) {
   return protectedProcedure
     .input(z.object({ projectId: z.string(), exportId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .subscription(async function* (opts) {
       const { projectId, exportId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
@@ -81,7 +82,6 @@ function exportProgressSubscription(permission: Permission) {
 
       try {
         for await (const eventArgs of on(emitter, "export_progress", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const event = eventArgs[0] as { event: string; timestamp: number };

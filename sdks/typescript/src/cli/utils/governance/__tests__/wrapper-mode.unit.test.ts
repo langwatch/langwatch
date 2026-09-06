@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as cliApi from "../cli-api";
-import type * as configMod from "../config";
+import * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
 
 vi.mock("../cli-api", async () => {
@@ -21,6 +21,7 @@ vi.mock("../cli-api", async () => {
 		...actual,
 		mintIngestionKey: vi.fn(),
 		listIngestionKeys: vi.fn(),
+		issuePersonalVirtualKey: vi.fn(),
 	};
 });
 
@@ -142,7 +143,8 @@ describe("resolveWrapperMode", () => {
 			expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
 		});
 
-		it("writes the [otel] block to the codex config.toml as a side effect", async () => {
+		/** @scenario "codex wiring persists the Authorization header inline" */
+		it("writes the [otel] block with the Authorization header to the codex config.toml", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
 			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
 				token: "sk-lw-test-token",
@@ -158,8 +160,30 @@ describe("resolveWrapperMode", () => {
 			// codex 0.137+ separates trace_exporter from exporter (logs).
 			// Wrapper writes [otel.trace_exporter.otlp-http] so traces emit.
 			expect(contents).toContain("[otel.trace_exporter.otlp-http]");
-			// Authorization header must NOT land on disk.
-			expect(contents).not.toContain("sk-lw-test-token");
+			// The Authorization header persists inline (0600 file), so a
+			// plain `codex` run captures without the wrapper's env.
+			expect(contents).toContain(
+				`headers = { "Authorization" = "Bearer sk-lw-test-token" }`,
+			);
+		});
+
+		/** @scenario "Every seam that persists the codex exporters wires the turn harvest" */
+		it("wires the turn harvest beside the exporters it persisted", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-test-token",
+				prefix: "sk-lw-test",
+				endpoint: "http://app.example.com/api/otel",
+			});
+
+			const out = await resolveWrapperMode(baseCfg(), "codex", {});
+
+			// The exporters carry tokens and timing but no conversation; the
+			// notify harvest is what recovers it, so persisting one without the
+			// other leaves plain codex runs with nothing to read.
+			const contents = fs.readFileSync(out.codexConfigPath!, "utf8");
+			expect(contents).toContain("langwatch codex notify begin");
+			expect(contents).toContain('"ingest", "codex"');
 		});
 
 		it("reuses the cached key rather than minting again when one is already stored", async () => {
@@ -260,11 +284,21 @@ describe("resolveWrapperMode", () => {
 	describe("when the tool has no ingestion template (e.g. cursor)", () => {
 		it("falls back to gateway mode without erroring", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			// No VK stored: the gateway path now issues one lazily.
+			(
+				cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+			).mockResolvedValue({
+				id: "vk1",
+				secret: "vk-lw-issued",
+				prefix: "vk-lw-iss",
+			});
 			const out = await resolveWrapperMode(baseCfg(), "cursor", {
 				OPENAI_BASE_URL: "http://gw",
 			});
 			expect(out.mode).toBe("gateway");
-			expect(out.vars.OPENAI_BASE_URL).toBe("http://gw");
+			// The vars are recomputed from the freshly issued key.
+			expect(out.vars.OPENAI_API_KEY).toBe("vk-lw-issued");
+			expect(out.vars.OPENAI_BASE_URL).toContain("http://gw.example.com");
 		});
 	});
 
@@ -389,6 +423,241 @@ describe("resolveWrapperMode", () => {
 		});
 	});
 
+	describe("when copilot resolves to ingestion mode", () => {
+		const mintCopilot = () => {
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-copilot-test-token",
+				prefix: "sk-lw-copi",
+				endpoint: "http://app.example.com/api/otel",
+			});
+		};
+
+		/** @scenario Ingestion mode mints a copilot_cli ingest key and enables native OTel */
+		it("mints a copilot_cli key and enables copilot's native OTel export", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintCopilot();
+
+			const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+			const out = await resolveWrapperMode(cfg, "copilot", {});
+
+			expect(out.mode).toBe("ingestion");
+			expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(cfg, "copilot_cli");
+			expect(out.vars.COPILOT_OTEL_ENABLED).toBe("true");
+			expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+				"http://app.example.com/api/otel",
+			);
+			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+				"Authorization=Bearer sk-lw-copilot-test-token",
+			);
+			expect(out.vars.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/json");
+			expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=copilot-cli");
+		});
+
+		it("clears inherited Copilot BYOK provider vars so ingestion preserves the seat", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintCopilot();
+
+			const out = await resolveWrapperMode(baseCfg(), "copilot", {});
+
+			expect(out.mode).toBe("ingestion");
+			// an inherited COPILOT_PROVIDER_BASE_URL would keep BYOK active and
+			// route traffic off the seat — ingestion must scrub it from the child
+			expect(out.clears).toContain("COPILOT_PROVIDER_BASE_URL");
+			expect(out.clears).toContain("COPILOT_PROVIDER_TYPE");
+			expect(out.clears).toContain("COPILOT_PROVIDER_API_KEY");
+		});
+
+		/** @scenario Ingestion mode pins the OTLP exporter type against an inherited file exporter */
+		it("pins COPILOT_OTEL_EXPORTER_TYPE=otlp-http so an inherited file exporter can't swallow telemetry", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintCopilot();
+
+			const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+			const out = await resolveWrapperMode(cfg, "copilot", {});
+
+			expect(out.vars.COPILOT_OTEL_EXPORTER_TYPE).toBe("otlp-http");
+		});
+
+		/** @scenario Content capture is enabled by default in ingestion mode */
+		it("enables content capture via the standard GenAI env var (capture-everything default)", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintCopilot();
+
+			const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+			const out = await resolveWrapperMode(cfg, "copilot", {});
+
+			expect(out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT).toBe(
+				"true",
+			);
+		});
+
+		/** @scenario An explicit user opt-out of content capture is never overwritten */
+		it("respects an explicit user opt-out of content capture and warns tokens-only", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintCopilot();
+			process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "false";
+			try {
+				const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+				const out = await resolveWrapperMode(cfg, "copilot", {});
+
+				expect(
+					out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+				).toBeUndefined();
+				expect(out.notice).toContain("tokens only");
+			} finally {
+				delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+			}
+		});
+
+		/** @scenario An explicit user opt-out of content capture is never overwritten */
+		it.each(["FALSE", "False", "0", "no", "off", "  false  "])(
+			"treats the case-insensitive/falsey opt-out %j as off (never silently forces capture on)",
+			async (value) => {
+				const { resolveWrapperMode } = await import("../wrapper-mode.js");
+				mintCopilot();
+				process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = value;
+				try {
+					const cfg = baseCfg({ tool_mode: { copilot: "ingestion" } });
+					const out = await resolveWrapperMode(cfg, "copilot", {});
+
+					expect(
+						out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+					).toBeUndefined();
+					expect(out.notice).toContain("tokens only");
+				} finally {
+					delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+				}
+			},
+		);
+
+		/** @scenario A cached copilot_cli ingest key is reused instead of re-minting */
+		it("reuses a live cached copilot_cli key instead of minting again", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(
+				cliApi.listIngestionKeys as ReturnType<typeof vi.fn>
+			).mockResolvedValueOnce([
+				{ sourceType: "copilot_cli", lookupId: "cachedlookupid123" },
+			]);
+
+			const cfg = baseCfg({
+				tool_mode: { copilot: "ingestion" },
+				default_personal_ingest_keys: {
+					copilot_cli: {
+						id: "ik_cp",
+						secret: "ik-lw-cachedlookupid123_secretpart",
+						prefix: "ik-lw-",
+					},
+				},
+			});
+			const out = await resolveWrapperMode(cfg, "copilot", {});
+
+			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
+				"ik-lw-cachedlookupid123_secretpart",
+			);
+		});
+	});
+
+	describe("when code (VS Code Copilot Chat) resolves to ingestion mode", () => {
+		const mintVscode = () => {
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-vscode-test-token",
+				prefix: "sk-lw-vsco",
+				endpoint: "http://app.example.com/api/otel",
+			});
+		};
+
+		/** @scenario VS Code has no gateway path */
+		it("resolves to ingestion even when a personal VK is present (no gateway path)", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintVscode();
+
+			const cfg = baseCfg({
+				default_personal_vk: { id: "vk1", secret: "lw_vk_secret", prefix: "lw_vk_" },
+			});
+			const out = await resolveWrapperMode(cfg, "code", {});
+
+			expect(out.mode).toBe("ingestion");
+			// no BYOK / gateway env is injected
+			expect(out.vars.OPENAI_BASE_URL).toBeUndefined();
+			expect(out.vars.ANTHROPIC_BASE_URL).toBeUndefined();
+		});
+
+		/** @scenario `langwatch code` mints a copilot_vscode ingest key */
+		it("mints a copilot_vscode ingest key", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintVscode();
+
+			await resolveWrapperMode(baseCfg(), "code", {});
+
+			expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
+				expect.any(Object),
+				"copilot_vscode",
+			);
+		});
+
+		/** @scenario The code env enables the extension's OTel and points it at LangWatch */
+		it("enables copilot OTel, points the OTLP endpoint at LangWatch, and carries the Bearer", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintVscode();
+
+			const out = await resolveWrapperMode(baseCfg(), "code", {});
+
+			expect(out.vars.COPILOT_OTEL_ENABLED).toBe("true");
+			expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+				"http://app.example.com/api/otel",
+			);
+			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+				"Authorization=Bearer sk-lw-vscode-test-token",
+			);
+		});
+
+		/** @scenario The surface is labelled copilot-chat */
+		it("labels the surface copilot-chat", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintVscode();
+
+			const out = await resolveWrapperMode(baseCfg(), "code", {});
+
+			expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=copilot-chat");
+		});
+
+		/** @scenario Content capture is on by default */
+		it("enables message-content capture by default", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			mintVscode();
+
+			const out = await resolveWrapperMode(baseCfg(), "code", {});
+
+			expect(
+				out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+			).toBe("true");
+		});
+
+		/** @scenario An explicit opt-out yields a loud tokens-only notice, never silent */
+		it("respects an explicit content-capture opt-out with a loud tokens-only notice", async () => {
+			const prev = process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+			process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "false";
+			try {
+				const { resolveWrapperMode } = await import("../wrapper-mode.js");
+				mintVscode();
+
+				const out = await resolveWrapperMode(baseCfg(), "code", {});
+
+				expect(
+					out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+				).toBeUndefined();
+				expect(out.notice ?? "").toContain("tokens only");
+				// the notice names the actual tool, not a hardcoded "copilot"
+				expect(out.notice ?? "").toContain("code traces");
+			} finally {
+				if (prev === undefined)
+					delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+				else process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = prev;
+			}
+		});
+	});
+
 	describe("when the cached policy disables direct OTLP for a tool", () => {
 		/**
 		 * An org admin turned direct OTLP off for claude. A member with no
@@ -396,8 +665,16 @@ describe("resolveWrapperMode", () => {
 		 * gate sits ABOVE the mint: the wrapper must route through the
 		 * gateway instead and never mint an ingestion key.
 		 */
-		it("routes through the gateway and does NOT mint an ingestion key", async () => {
+		/** @scenario "The personal virtual key is issued on first gateway use, not at login" */
+		it("routes through the gateway, issuing the VK lazily, and does NOT mint an ingestion key", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(
+				cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+			).mockResolvedValue({
+				id: "vk1",
+				secret: "vk-lw-issued",
+				prefix: "vk-lw-iss",
+			});
 
 			const cfg = baseCfg({
 				tool_policies: { claude: { allowVk: true, allowOtelDirect: false } },
@@ -409,6 +686,8 @@ describe("resolveWrapperMode", () => {
 			expect(out.mode).toBe("gateway");
 			expect(out.newKeyMinted).toBeUndefined();
 			expect(out.notice).toContain("direct OTLP ingestion is disabled");
+			expect(cliApi.issuePersonalVirtualKey).toHaveBeenCalledTimes(1);
+			expect(out.vars.ANTHROPIC_AUTH_TOKEN).toBe("vk-lw-issued");
 			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
 		});
 
@@ -463,6 +742,110 @@ describe("resolveWrapperMode", () => {
 			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
 				"Authorization=Bearer sk-lw-claude-token",
 			);
+		});
+	});
+
+	describe("when the cached policy disables direct OTLP for copilot", () => {
+		/** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+		it("routes through the gateway with a notice naming the Copilot seat bypass", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+			const cfg = baseCfg({
+				default_personal_vk: { id: "vk1", secret: "lw_vk", prefix: "lw_" },
+				tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+			});
+			const gw = { COPILOT_PROVIDER_BASE_URL: "http://gw/v1" };
+			const out = await resolveWrapperMode(cfg, "copilot", gw, [], "ingestion");
+
+			expect(out.mode).toBe("gateway");
+			expect(out.notice).toContain("Copilot seat");
+			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("when the mode was forced by the path-selection UX (silent default)", () => {
+		// Regression: resolveWrapperMode used to pin tool_mode="ingestion"
+		// unconditionally — one aborted prompt / CI run silently pinned
+		// copilot forever and the path prompt never appeared again. When a
+		// forcedMode is passed, persistence belongs to the upstream UX
+		// (explicit prompt answers persist there; silent defaults don't).
+		it("does not pin tool_mode when a forcedMode was passed", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-copilot-tok",
+				prefix: "sk-lw-copi",
+				endpoint: "http://app.example.com/api/otel",
+			});
+
+			const cfg = baseCfg();
+			await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
+
+			const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+				.calls;
+			for (const call of saved) {
+				const persisted = call[0] as GovernanceConfig;
+				expect(persisted.tool_mode?.copilot).toBeUndefined();
+			}
+		});
+
+		// The `forcedMode === undefined` gate changed behavior for ALL tools,
+		// and production `runWrapped` always supplies a concrete forcedMode —
+		// so cover a non-copilot tool too, not just copilot.
+		it.each(["claude", "codex"])(
+			"does not pin tool_mode for %s either when a forcedMode was passed (cross-tool regression)",
+			async (tool) => {
+				const { resolveWrapperMode } = await import("../wrapper-mode.js");
+				(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue(
+					{
+						token: "sk-lw-tok",
+						prefix: "sk-lw-tok",
+						endpoint: "http://app.example.com/api/otel",
+					},
+				);
+
+				const cfg = baseCfg();
+				await resolveWrapperMode(cfg, tool, {}, [], "ingestion");
+
+				const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+					.calls;
+				for (const call of saved) {
+					const persisted = call[0] as GovernanceConfig;
+					expect(persisted.tool_mode?.[tool]).toBeUndefined();
+				}
+			},
+		);
+
+		it("still caches the freshly minted ingest key", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-copilot-tok2",
+				prefix: "sk-lw-copi",
+				endpoint: "http://app.example.com/api/otel",
+			});
+
+			const cfg = baseCfg();
+			await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
+
+			const persisted = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+				.calls[
+				(configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls.length - 1
+			]?.[0] as GovernanceConfig;
+			expect(persisted.default_personal_ingest_keys?.copilot_cli?.secret).toBe(
+				"sk-lw-copilot-tok2",
+			);
+		});
+	});
+
+	describe("when evaluating the Copilot seat-bypass suffix", () => {
+		// The policy-forced gateway notices (wrapper-mode's downgrade branch
+		// and wrapper-path-choice's single-allowed-path branch) append this
+		// suffix; asserting the helper here keeps the who-pays wording pinned
+		// without simulating a full spawn.
+		/** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+		it("names the seat bypass for copilot and stays silent for other tools", async () => {
+			const { copilotSeatBypassSuffix } = await import("../wrapper-mode.js");
+			expect(copilotSeatBypassSuffix("copilot")).toContain("Copilot seat");
+			expect(copilotSeatBypassSuffix("claude")).toBe("");
 		});
 	});
 
@@ -594,6 +977,82 @@ describe("resolveWrapperMode", () => {
 			expect(
 				fs.existsSync(path.join(tmpCwd, ".claude", "settings.local.json")),
 			).toBe(false);
+		});
+	});
+});
+
+describe("resolveWrapperMode with a project pin", () => {
+	describe("given the tool is pinned to a team project", () => {
+		/** @scenario "The wrapper keeps a pinned tool on the pinned project" */
+		it("forces ingestion with the pinned secret, over a remembered gateway preference", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			const cfg = baseCfg({
+				// Both a VK and a remembered gateway preference are present; the
+				// pin is the later, more specific choice and must win.
+				default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+				tool_mode: { codex: "gateway" },
+				tool_project_keys: {
+					codex: {
+						secret: "ik-lw-pinnedproj000000_secret",
+						project_id: "proj_1",
+						project_slug: "acme-app",
+					},
+				},
+			});
+
+			const out = await resolveWrapperMode(cfg, "codex", {
+				OPENAI_API_KEY: "vk-lw-secret",
+			});
+
+			expect(out.mode).toBe("ingestion");
+			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+				"Authorization=Bearer ik-lw-pinnedproj000000_secret",
+			);
+			expect(out.projectScope).toEqual({ label: "acme-app" });
+			expect(out.newKeyMinted).toBe(false);
+			// The pinned credential is used verbatim: no probe, no mint.
+			expect(cliApi.listIngestionKeys).not.toHaveBeenCalled();
+			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+		});
+
+		it("routes to the pin's endpoint override when one is stored", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			const cfg = baseCfg({
+				tool_project_keys: {
+					codex: { secret: "sk-lw-pasted", endpoint: "https://lw.acme.dev" },
+				},
+			});
+
+			const out = await resolveWrapperMode(cfg, "codex", {});
+
+			expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+				"https://lw.acme.dev/api/otel",
+			);
+			expect(out.endpoint).toBe("https://lw.acme.dev/api/otel");
+			expect(out.ingestionToken).toBe("sk-lw-pasted");
+		});
+
+		describe("when the org policy disables direct OTLP for the tool", () => {
+			/** @scenario "A pinned tool fails rather than rerouting onto the gateway" */
+			it("throws otel_direct_disabled instead of silently rerouting to the gateway", async () => {
+				const { resolveWrapperMode } = await import("../wrapper-mode.js");
+				const cfg = baseCfg({
+					default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+					tool_policies: {
+						codex: { allowVk: true, allowOtelDirect: false },
+					},
+					tool_project_keys: {
+						codex: { secret: "sk-lw-pinned" },
+					},
+				});
+
+				// Rerouting silently would move telemetry (and billing) off the
+				// pinned team project onto the personal gateway path.
+				await expect(
+					resolveWrapperMode(cfg, "codex", { OPENAI_API_KEY: "vk-lw-secret" }),
+				).rejects.toMatchObject({ code: "otel_direct_disabled" });
+				expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+			});
 		});
 	});
 });

@@ -11,7 +11,7 @@
  *
  * Dual path so the routes keep working for both callers:
  *   1. NextAuth session cookie (the upload UI) — verified with
- *      `hasProjectPermission`.
+ *      `probeProjectPermission`.
  *   2. Project API key / legacy key / PAT (parity with the rest of the surface)
  *      — resolved via `TokenResolver` + `enforceApiKeyCeiling`.
  *
@@ -19,15 +19,15 @@
  * and passes it in) since there is no `authMiddleware` to set `c.get("project")`.
  */
 
-import type { Project } from "@prisma/client";
 import type { Context } from "hono";
-import { hasProjectPermission } from "~/server/api/rbac";
+import type { Project } from "~/generated/prisma/client";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
@@ -102,8 +102,8 @@ export async function authorizeDirectUpload(
         error: "Cross-site request blocked.",
       };
     }
-    const permitted = await hasProjectPermission(
-      { prisma, session },
+    const permitted = await probeProjectPermission(
+      { session },
       projectId,
       PERMISSION,
     );
@@ -144,7 +144,7 @@ export async function authorizeDirectUpload(
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission: PERMISSION });
+    await enforceApiKeyCeiling({ resolved, permission: PERMISSION });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // The ceiling only ever denies with 403; narrowed here so the result keeps

@@ -1,4 +1,4 @@
-import type { CustomGraph } from "@prisma/client";
+import type { CustomGraph } from "~/generated/prisma/client";
 
 /** The id/name pair the automations list renders for a graph-alert row. */
 export interface CustomGraphNameRef {

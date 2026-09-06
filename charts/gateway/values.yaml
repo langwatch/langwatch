@@ -115,11 +115,6 @@ secrets:
   # disable (strict single-key mode; production steady state).
   jwtSecretPreviousKey: ""
 
-# Redis for the L2 auth cache (optional but recommended for multi-replica).
-redis:
-  url: ""                # e.g. redis://redis.langwatch.svc:6379/0
-  existingSecretName: "" # optional; referenced as GATEWAY_REDIS_URL if set
-
 cache:
   lruSize: 50000
   refreshInterval: 60s
@@ -364,14 +359,6 @@ networkPolicy:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: langwatch-app
-
-  # Redis for L2 auth cache. Matches the default deployment pattern;
-  # if you run Redis elsewhere (managed service, another namespace)
-  # override with ipBlock or a namespace selector.
-  egressToRedis:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: redis
 
   # OTLP collector — leave empty to disable the NetworkPolicy rule
   # when spans export out-of-cluster or per-project endpoints vary.

@@ -17,11 +17,11 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget } from "@prisma/client";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { GatewayBudget } from "~/generated/prisma/client";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -30,6 +30,7 @@ import {
   confirmSpendWireSchema,
   failSpendWireSchema,
   type SpendUsage,
+  spendUsageSchema,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
@@ -46,12 +47,19 @@ import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
-import { resolveTraceProject } from "~/server/gateway/scopeResolver";
+import {
+  correlateRealtimeSession,
+  releaseRealtimeSession,
+  reportRealtimeSessionUsage,
+  reserveRealtimeSession,
+} from "~/server/gateway/realtimeSession.service";
+import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
   parseVirtualKey,
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
+import { ROUTING_POLICY_SELECT } from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
@@ -341,11 +349,23 @@ function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   }
 }
 
-/** Why a resolved key's status bars it from serving, or null when it may.
- *  Disabled is distinct from revoked AND from a bad key: a disabled tenant
- *  must be able to tell "we turned you off" from "your credential is
- *  wrong", and the platform's own tooling branches on this code. */
-function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
+/** Why a resolved key bars itself from serving, or null when it may.
+ *  Each stop carries its own code: a tenant must be able to tell "we turned
+ *  you off" from "your credential is wrong" from "your key ran out", and the
+ *  platform's own tooling branches on this code.
+ *
+ *  Expiry is a date rather than a status, so it is checked here rather than
+ *  read off the row's status: the key stays ACTIVE past the date, which is
+ *  what keeps extending the date an ordinary edit. A key that expires now
+ *  stops being resolved immediately, and a token minted before then ends at
+ *  the date itself, because the mint clamps its exp to the key's expiry. */
+function virtualKeyStatusRejection({
+  status,
+  expiresAt,
+}: {
+  status: string;
+  expiresAt: Date | null;
+}): KeyAuthRejection | null {
   if (status === "REVOKED") {
     return {
       status: 403,
@@ -361,6 +381,15 @@ function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
       code: "virtual_key_disabled",
       message:
         "virtual key is disabled; it can be re-enabled by an administrator",
+    };
+  }
+  if (expiresAt && expiresAt.getTime() <= Date.now()) {
+    return {
+      status: 403,
+      type: "virtual_key_expired",
+      code: "virtual_key_expired",
+      message:
+        "virtual key has expired; extend its expiration or mint a new one",
     };
   }
   return null;
@@ -408,7 +437,10 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       401,
     );
   }
-  const statusRejection = virtualKeyStatusRejection(vk.status);
+  const statusRejection = virtualKeyStatusRejection({
+    status: vk.status,
+    expiresAt: vk.expiresAt,
+  });
   if (statusRejection) {
     logAuthDecision(c, statusRejection.code, statusRejection.status, {
       vkId: vk.id,
@@ -416,12 +448,16 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     return c.json(rejectionBody(statusRejection), statusRejection.status);
   }
 
-  // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
-  // exactly one PROJECT scope -> that project; otherwise -> the org's
-  // `internal_governance` project; otherwise -> null (gateway skips
-  // span export rather than failing the auth handshake).
-  const traceProject = await resolveTraceProject(prisma, vk);
+  // Where this key's traces land, read off the key. Null for a key written
+  // before the destination was stored in an organization with no governance
+  // project to fall back to; the gateway then skips span export rather than
+  // failing the auth handshake.
+  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
 
+  // notAfter ends the token at the key's expiration date when that arrives
+  // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
+  // claim. Without it the gateway holds a token that outlives the key, and its
+  // auth cache keeps serving that key while the control plane is unreachable.
   const { jwt } = signGatewayJwt({
     vk_id: vk.id,
     project_id: traceProject?.id ?? null,
@@ -429,6 +465,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     org_id: vk.organizationId,
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
+    notAfter: vk.expiresAt,
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.
@@ -524,9 +561,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
       // Without it the materialiser reads an absent relation and emits an
       // empty alias map plus empty deny/allow lists, so the gateway never
       // resolves an alias and never enforces a model deny rule.
-      routingPolicy: {
-        select: { id: true, modelAliases: true, policyRules: true },
-      },
+      routingPolicy: { select: ROUTING_POLICY_SELECT },
     },
   });
   if (!vk) {
@@ -542,11 +577,16 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     );
   }
 
+  const materialiser = new GatewayConfigMaterialiser(
+    prisma,
+    getApp().gateway.budgets ?? null,
+  );
+
   const ifNoneMatch = c.req.header("If-None-Match");
-  const currentRevision = vk.revision.toString();
-  if (ifNoneMatch && ifNoneMatch === currentRevision) {
+  const currentETag = await materialiser.versionToken(vk);
+  if (ifNoneMatch && ifNoneMatch === currentETag) {
     return c.body(null, 304, {
-      ETag: currentRevision,
+      ETag: currentETag,
       "Cache-Control": "no-store",
     });
   }
@@ -557,12 +597,9 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   // then sees fresh state on every re-materialise after a BUDGET_UPDATED
   // eviction. Without this the wire output reads the stale
   // `GatewayBudget.spentUsd` PG column that no writer updates.
-  const payload = await new GatewayConfigMaterialiser(
-    prisma,
-    getApp().gateway.budgets ?? null,
-  ).materialise(vk);
+  const payload = await materialiser.materialise(vk);
   return c.json(payload, 200, {
-    ETag: currentRevision,
+    ETag: currentETag,
     "Cache-Control": "no-store",
   });
 });
@@ -1011,19 +1048,20 @@ type AttributionVirtualKey = {
   lastUsedAt: Date | null;
 };
 
-/** The ids an admit record was validated with. Every one of them is a
- *  required field on the wire schema, so these reads are total. */
-function admitIdentity(admit: Record<string, unknown>): {
+/** The ids an attributed record was validated with. Required on an
+ *  admission, so those reads are total; an outcome from a build that
+ *  predates attribution-on-outcome carries empty strings instead. */
+function attributedIdentity(command: Record<string, unknown>): {
   gatewayRequestId: string;
   virtualKeyId: string;
   projectId: string;
   organizationId: string;
 } {
   return {
-    gatewayRequestId: String(admit.gateway_request_id ?? ""),
-    virtualKeyId: String(admit.virtual_key_id ?? ""),
-    projectId: String(admit.tenantId ?? ""),
-    organizationId: String(admit.organization_id ?? ""),
+    gatewayRequestId: String(command.gateway_request_id ?? ""),
+    virtualKeyId: String(command.virtual_key_id ?? ""),
+    projectId: String(command.tenantId ?? ""),
+    organizationId: String(command.organization_id ?? ""),
   };
 }
 
@@ -1079,11 +1117,64 @@ async function touchAdmittedVirtualKeys(
  * and an event is immutable once appended, so it propagates to a 500 and the
  * drainer retries the whole batch.
  */
-async function enrichAdmitCommands(
-  admits: Array<Record<string, unknown>>,
-): Promise<void> {
-  if (admits.length === 0) return;
-  const identities = admits.map(admitIdentity);
+/**
+ * What the control plane could not resolve for one admission, reported and
+ * never dropped.
+ *
+ * The record is already durable on the gateway's side, and discarding an
+ * admission loses the outcome that follows it, so each of these is a
+ * control-plane inconsistency to chase rather than a reason to lose billing
+ * evidence.
+ */
+function reportAttributionGaps({
+  identity,
+  key,
+  teamId,
+}: {
+  identity: ReturnType<typeof attributedIdentity>;
+  key: AttributionVirtualKey | undefined;
+  teamId: string;
+}): void {
+  if (!key) {
+    logger.error(
+      identity,
+      "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+    );
+  } else if (key.organizationId !== identity.organizationId) {
+    logger.error(
+      { ...identity, keyOrganizationId: key.organizationId },
+      "spend admission names a virtual key from another organization",
+    );
+  }
+  if (!teamId) {
+    logger.error(
+      identity,
+      "spend admission names a project with no team: team budgets will not see this request",
+    );
+  }
+}
+
+async function enrichAttributedCommands({
+  admits,
+  outcomes,
+}: {
+  admits: Array<Record<string, unknown>>;
+  outcomes: Array<Record<string, unknown>>;
+}): Promise<void> {
+  // An outcome emitted by a build that predates attribution-on-outcome names
+  // no key, so there is nothing to join it against. Those requests keep the
+  // admit-time join in the consuming process managers, which is exactly what
+  // `outcome_carries_attribution` on their admission tells those processes to
+  // do — so skipping here is the correct no-op, not a dropped join. Silent by
+  // design: one line per record through a fleet roll is a log flood that says
+  // nothing an operator can act on.
+  const attributableOutcomes = outcomes.filter(
+    (outcome) => String(outcome.virtual_key_id ?? "") !== "",
+  );
+  const commands = [...admits, ...attributableOutcomes];
+  if (commands.length === 0) return;
+
+  const identities = commands.map(attributedIdentity);
   const [virtualKeys, projects] = await Promise.all([
     prisma.virtualKey.findMany({
       where: {
@@ -1104,36 +1195,29 @@ async function enrichAdmitCommands(
   const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
   const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));
 
-  admits.forEach((admit, index) => {
+  commands.forEach((command, index) => {
     const identity = identities[index]!;
     const key = keyById.get(identity.virtualKeyId);
     const teamId = teamIdByProject.get(identity.projectId) ?? "";
-    if (!key) {
-      logger.error(
-        identity,
-        "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
-      );
-    } else if (key.organizationId !== identity.organizationId) {
-      // Logged, not dropped. The record is already durable on the gateway's
-      // side, and a discarded admission loses the outcome that follows it;
-      // the mismatch is a control-plane inconsistency to chase, not a reason
-      // to lose billing evidence.
-      logger.error(
-        { ...identity, keyOrganizationId: key.organizationId },
-        "spend admission names a virtual key from another organization",
-      );
+    // Only the admission reports these. An outcome names the same key and
+    // the same project, so reporting both would say everything twice.
+    if (index < admits.length) {
+      reportAttributionGaps({ identity, key, teamId });
     }
-    if (!teamId) {
-      logger.error(
-        identity,
-        "spend admission names a project with no team: team budgets will not see this request",
-      );
-    }
-    admit.principal_user_id = key?.principalUserId ?? "";
-    admit.team_id = teamId;
+    command.principal_user_id = key?.principalUserId ?? "";
+    command.team_id = teamId;
   });
 
-  await touchAdmittedVirtualKeys(virtualKeys, new Date());
+  // Admission is what marks a key used. An outcome is the same request
+  // arriving a second time, so touching on both would double the writes to
+  // say the same thing.
+  const admittedKeyIds = new Set(
+    identities.slice(0, admits.length).map((i) => i.virtualKeyId),
+  );
+  await touchAdmittedVirtualKeys(
+    virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
+    new Date(),
+  );
 }
 
 interface SpendCommandSender {
@@ -1217,7 +1301,10 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
 
   const { perCommand, rejected } = groupSpendCommands(parsed.data.records);
 
-  await enrichAdmitCommands(perCommand.admitSpend);
+  await enrichAttributedCommands({
+    admits: perCommand.admitSpend,
+    outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
+  });
 
   const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
   if (unregistered) {
@@ -1238,6 +1325,212 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     rejected,
   });
 });
+
+// ── realtime voice sessions (ADR-097) ───────────────────────────────────
+
+const reserveRealtimeSessionSchema = z.object({
+  session_id: z.string().min(1).max(256),
+  project_id: z.string().min(1).max(256),
+  organization_id: z.string().min(1).max(256),
+  virtual_key_id: z.string().min(1).max(256),
+  model_provider_id: z.string().min(1).max(256),
+  // The trace the mint's own span belongs to. Optional so a gateway that
+  // predates this field, or a request with no trace context, still books.
+  trace_id: z.string().max(128).optional(),
+  requested_model: z.string().max(512).optional(),
+  vendor: z.enum(["openai", "elevenlabs"]),
+  agent_id: z.string().max(256).optional(),
+  model: z.string().min(1).max(512),
+});
+
+/**
+ * A patch has to change something. Both fields are optional on their own, so
+ * the refinement is what enforces the rule the 400 message states: without it
+ * a body carrying only `project_id` parses, applies nothing, and answers 404
+ * as though the session were missing.
+ */
+const patchRealtimeSessionSchema = z
+  .object({
+    project_id: z.string().min(1).max(256),
+    vendor_conversation_id: z.string().min(1).max(256).optional(),
+    status: z.enum(["FAILED", "EXPIRED"]).optional(),
+    reason: z.string().max(256).optional(),
+  })
+  .refine((body) => Boolean(body.vendor_conversation_id ?? body.status), {
+    message: "a vendor_conversation_id or a terminal status is required",
+  });
+
+const reportRealtimeUsageSchema = z.object({
+  project_id: z.string().min(1).max(256),
+  // Required, not optional. Several virtual keys can point at one project, so
+  // the project alone does not say whose session this is; the spend record
+  // belongs to the key that was admitted.
+  virtual_key_id: z.string().min(1).max(256),
+  usage: spendUsageSchema,
+});
+
+/**
+ * Books a voice session and decides the key's open-session cap in the same
+ * transaction that inserts the row.
+ *
+ * The gateway calls this BEFORE it mints, and refuses the mint when this
+ * refuses. That ordering is what makes the cap real: a mint that ran first
+ * would already have handed out a working credential by the time the count
+ * said no.
+ */
+secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
+  const parsed = reserveRealtimeSessionSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_reservation",
+          message:
+            "a session reservation names the session, its tenancy, its key and its vendor",
+        },
+      },
+      400,
+    );
+  }
+  const body = parsed.data;
+  const result = await reserveRealtimeSession({
+    sessionId: body.session_id,
+    projectId: body.project_id,
+    organizationId: body.organization_id,
+    virtualKeyId: body.virtual_key_id,
+    modelProviderId: body.model_provider_id,
+    vendor: body.vendor,
+    agentId: body.agent_id,
+    model: body.model,
+    traceId: body.trace_id,
+    requestedModel: body.requested_model,
+  });
+  if (!result.ok) {
+    return c.json(
+      {
+        error: {
+          type: "rate_limited",
+          code: "realtime_session_limit",
+          message:
+            "this virtual key already holds the most realtime voice sessions it may keep open at once",
+          open: result.open,
+          limit: result.limit,
+        },
+      },
+      429,
+    );
+  }
+  return c.json({ session_id: body.session_id, status: "OPEN" });
+});
+
+/**
+ * Records the vendor's own conversation id on a booked session, or closes a
+ * booking whose mint never produced a credential.
+ */
+secured
+  .access(gatewayPolicy())
+  .patch("/realtime-sessions/:session_id", async (c) => {
+    const parsed = patchRealtimeSessionSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_session_patch",
+            message:
+              "project_id is required, with a vendor_conversation_id or a terminal status",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const body = parsed.data;
+    let applied = false;
+    if (body.vendor_conversation_id) {
+      applied = await correlateRealtimeSession({
+        sessionId,
+        projectId: body.project_id,
+        vendorConversationId: body.vendor_conversation_id,
+      });
+    }
+    if (body.status) {
+      applied =
+        (await releaseRealtimeSession({
+          sessionId,
+          projectId: body.project_id,
+          status: body.status,
+          reason: body.reason ?? "released by the gateway",
+        })) || applied;
+    }
+    if (!applied) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ session_id: sessionId, updated: true });
+  });
+
+/**
+ * Closes an OpenAI voice session with the usage its socket reported.
+ *
+ * OpenAI reports a realtime session's usage over the socket, and that socket
+ * runs client to vendor, so the client posting it back is the only path by
+ * which those numbers reach billing. The gateway has already made the audio
+ * and text counts disjoint.
+ */
+secured
+  .access(gatewayPolicy())
+  .post("/realtime-sessions/:session_id/usage", async (c) => {
+    const parsed = reportRealtimeUsageSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_usage_report",
+            message:
+              "project_id, virtual_key_id and a usage object of integer quantities are required",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const outcome = await reportRealtimeSessionUsage({
+      sessionId,
+      projectId: parsed.data.project_id,
+      virtualKeyId: parsed.data.virtual_key_id,
+      usage: parsed.data.usage,
+    });
+    if (outcome === "not_found") {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ session_id: sessionId, status: "CLOSED" });
+  });
 
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 

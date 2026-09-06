@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
 import {
   grafanaConfigFromEnv,
   grafanaLinksForTrace,
@@ -159,12 +160,8 @@ function determineErrorResponse(
   // codes (P2003 foreign-key, P2021 missing table, etc.) are real backend
   // failures and must not be mislabeled as conflicts.
   if (error.code === "P2002") {
-    const target = (error as { meta?: { target?: unknown } }).meta?.target;
-    const targetStr = Array.isArray(target)
-      ? target.join(", ")
-      : typeof target === "string"
-        ? target
-        : undefined;
+    const targets = uniqueConstraintTargets(error);
+    const targetStr = targets.length > 0 ? targets.join(", ") : undefined;
     return {
       statusCode: 409,
       response: errorSchema.parse({

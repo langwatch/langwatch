@@ -22,9 +22,10 @@
 
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { ExperimentType, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { chromium } from "playwright";
+import { ExperimentType, PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5571";
 const EMAIL = `qa-archive-${Date.now()}@test.local`;
@@ -32,7 +33,9 @@ const PASSWORD = "qa-archive-pass-1234";
 const NAME = "Archive QA User";
 const SHOTS_DIR = "./.playwright-mcp";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 let passes = 0;
 let fails = 0;

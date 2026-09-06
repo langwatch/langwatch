@@ -36,7 +36,11 @@ This module provides two ways to run experiments:
 from typing import Optional
 
 # Re-export the Experiment class for SDK-defined experiments
-from langwatch.experiment.experiment import Experiment
+from langwatch.experiment.experiment import (
+    ComparisonStatus,
+    ComparisonVerdict,
+    Experiment,
+)
 
 # Re-export the platform run function and related types
 from langwatch.experiment.platform_run import (
@@ -67,6 +71,7 @@ def init(name: str, *, run_id: Optional[str] = None) -> Experiment:
         Experiment instance with methods:
         - loop(): Iterate over dataset rows with parallel execution
         - evaluate(): Run an evaluator on the current row
+        - compare(): Judge a row's target outputs against each other
         - log(): Log custom metrics
         - submit(): Submit async tasks
 
@@ -96,6 +101,8 @@ def init(name: str, *, run_id: Optional[str] = None) -> Experiment:
 __all__ = [
     "init",
     "run",
+    "ComparisonStatus",
+    "ComparisonVerdict",
     "Experiment",
     "ExperimentRunResult",
     "ExperimentRunSummary",

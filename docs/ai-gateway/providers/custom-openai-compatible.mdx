@@ -25,7 +25,7 @@ The gateway forwards requests 1:1 to the upstream path (`/v1/chat/completions`, 
 
 Common subsets:
 
-- **Groq, Together, Fireworks**: chat + embeddings (most models).
+- **Groq, Together, Fireworks**: chat + embeddings (depends on the model).
 - **vLLM, SGLang**: chat + embeddings (depends on the model).
 - **Ollama**: chat (via the OpenAI-compat endpoint mode).
 
@@ -47,7 +47,7 @@ The prefix before `/` is the ModelProvider's **Name** (e.g. `custom-groq`); ever
 
 ## Caching
 
-Gateway default `cache.mode = respect` forwards any cache-control headers or body fields the upstream understands. Most OpenAI-compatible servers don't expose a standardised prompt-caching API, so `X-LangWatch-Cache: hit` will generally read as `miss` unless the upstream implements one.
+Gateway default `cache.mode = respect` forwards any cache-control headers or body fields the upstream understands. OpenAI-compatible servers rarely expose a prompt-caching API, so `X-LangWatch-Cache` reads as `miss` unless the upstream implements one.
 
 ## Known quirks
 

@@ -41,7 +41,7 @@ function GroupsSettings() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [creating, setCreating] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const deleteGroup = api.group.delete.useMutation({
     onSuccess: () => {

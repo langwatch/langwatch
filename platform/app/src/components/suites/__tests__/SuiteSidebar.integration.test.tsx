@@ -11,20 +11,10 @@
  * @see specs/features/suites/suite-sidebar-status-summary.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-// VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
-// which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't
-// provide. Stub it here so the sidebar tests keep their narrow scope; the
-// callout itself has dedicated coverage in VoiceAgentsCallout.unit.test.tsx.
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(() => ({
-    project: { id: "project_1" },
-  })),
-}));
+import type { SimulationSuite } from "~/generated/prisma/client";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -44,6 +34,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "project_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

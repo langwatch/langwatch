@@ -10,6 +10,10 @@ import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import { RedisReplayMarkerChecker } from "../../projections/replayMarkerCheck";
+import type {
+  StateProjectionDefinition,
+  StateProjectionStore,
+} from "../../projections/stateProjection.types";
 import {
   COMPLETED_KEY_PREFIX,
   CUTOFF_KEY_PREFIX,
@@ -20,6 +24,7 @@ import { ReplayService } from "../replayService";
 import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
+  RegisteredStateProjection,
 } from "../types";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
@@ -366,19 +371,26 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       };
     }
 
+    /** @scenario "Live processing resumes before the batch's records are rebuilt" */
     it("drains, marks cutoffs, bulk-appends mapped records, and cleans markers", async () => {
       const redis = getTestRedisConnection()!;
       const projectionName = `mapReplayHappy_${Date.now()}`;
       const pausedSetKey = "{event-sourcing/jobs}:gq:paused-jobs";
 
-      // Capture whether the pause-set entry is active at the moment records
-      // are flushed. The replay batch must keep the projection paused through
-      // the WRITE phase and only unpause in the UNMARK step that follows.
+      // Capture pause-set membership AND the cutoff hash at the moment
+      // records are flushed. The pause window ends once the batch's cutoffs
+      // are recorded (ADR-015, 2026-08-13 amendment), so the WRITE phase must
+      // run unpaused — protected by the still-live cutoff markers, which the
+      // live checker uses to skip/defer the batch's aggregates.
       let pausedDuringWrite: number | null = null;
+      let cutoffsDuringWrite: Record<string, string> | null = null;
       const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
         pausedDuringWrite = await redis.sismember(
           pausedSetKey,
           `test_pipeline/handler/${projectionName}`,
+        );
+        cutoffsDuringWrite = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${projectionName}`,
         );
       });
 
@@ -419,8 +431,13 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         expect(ctx.tenantId).toBe(tenantA);
       }
 
-      // Pause was held active while records were being written.
-      expect(pausedDuringWrite).toBe(1);
+      // The queue was already flowing again while records were being written —
+      // the pause ends at cutoff-recording, not after the write...
+      expect(pausedDuringWrite).toBe(0);
+      // ...while the batch's cutoff markers were still live at write time,
+      // which is what protects the rebuild from interleaving live writes.
+      expect(cutoffsDuringWrite).not.toBeNull();
+      expect(Object.keys(cutoffsDuringWrite!)).not.toHaveLength(0);
 
       // Pause cleared on success.
       const stillPaused = await redis.sismember(
@@ -484,7 +501,8 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(bulkAppendCalledWhileJobActive).toBe(false);
     });
 
-    it("runs both fold and map projections in the same replay, isolating pause-set entries", async () => {
+    /** @scenario "Replaying fold and map projections together" */
+    it("runs both fold and map projections through one shared batch", async () => {
       const redis = getTestRedisConnection()!;
       const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const foldName = `mixedFold_${suffix}`;
@@ -493,19 +511,20 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       const foldPauseKey = `test_pipeline/projection/${foldName}`;
       const mapPauseKey = `test_pipeline/handler/${mapName}`;
 
-      // Capture the pause-set membership of each projection at WRITE time. The
-      // map's `bulkAppend` runs inside `replayMapBatch.write`, which fires only
-      // after the fold loop has finished and unpaused itself; so the fold should
-      // already be back in the live set by then. The fold's `store.store` runs
-      // inside its own batch's WRITE phase, while it's still paused.
+      // Both projections replay in the SAME batch: one event load feeds both
+      // accumulators, and both write phases run after the batch's unpause —
+      // protected by each projection's own cutoff markers, which must still
+      // be live at write time.
       let foldPausedAtWrite: number | null = null;
-      let mapPausedAtFoldWrite: number | null = null;
+      let foldCutoffsAtWrite: Record<string, string> | null = null;
+      let mapCutoffsAtBulkAppend: Record<string, string> | null = null;
       let mapPausedAtBulkAppend: number | null = null;
-      let foldPausedAtBulkAppend: number | null = null;
 
       const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
         foldPausedAtWrite = await redis.sismember(pausedSetKey, foldPauseKey);
-        mapPausedAtFoldWrite = await redis.sismember(pausedSetKey, mapPauseKey);
+        foldCutoffsAtWrite = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${foldName}`,
+        );
       });
 
       const foldDefinition: FoldProjectionDefinition<{ count: number }, any> = {
@@ -536,9 +555,8 @@ describe("ReplayService tenant-specific ClickHouse", () => {
             pausedSetKey,
             mapPauseKey,
           );
-          foldPausedAtBulkAppend = await redis.sismember(
-            pausedSetKey,
-            foldPauseKey,
+          mapCutoffsAtBulkAppend = await redis.hgetall(
+            `${CUTOFF_KEY_PREFIX}${mapName}`,
           );
         },
       );
@@ -571,10 +589,11 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       });
 
       expect(result.batchErrors).toBe(0);
-      // 2 aggregates × 2 projections.
-      expect(result.aggregatesReplayed).toBe(4);
-      // 2 events folded + 2 events mapped.
-      expect(result.totalEvents).toBe(4);
+      // 2 aggregates, replayed ONCE for both projections — the engine loads
+      // each batch's events a single time and feeds every accumulator, so
+      // aggregates and events are not double-counted per projection.
+      expect(result.aggregatesReplayed).toBe(2);
+      expect(result.totalEvents).toBe(2);
 
       // Fold persisted both aggregate states.
       expect(foldStore).toHaveBeenCalledTimes(2);
@@ -594,17 +613,13 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         );
       }
 
-      // Fold projection was paused while its own WRITE phase ran. The map's
-      // pauseKey is independent — `replay()` pauses each projection only for
-      // its own batch, not for the whole replay session.
-      expect(foldPausedAtWrite).toBe(1);
-      // While the fold was writing, the map projection had not been paused yet.
-      expect(mapPausedAtFoldWrite).toBe(0);
-
-      // When the map's bulkAppend fires, the fold loop is long done and
-      // unpaused; only the map should be in the pause set.
-      expect(mapPausedAtBulkAppend).toBe(1);
-      expect(foldPausedAtBulkAppend).toBe(0);
+      // Both write phases ran AFTER the batch's unpause — the pause window
+      // ends at cutoff-recording — with each projection's cutoff markers
+      // still live to protect the rebuild.
+      expect(foldPausedAtWrite).toBe(0);
+      expect(mapPausedAtBulkAppend).toBe(0);
+      expect(Object.keys(foldCutoffsAtWrite ?? {})).not.toHaveLength(0);
+      expect(Object.keys(mapCutoffsAtBulkAppend ?? {})).not.toHaveLength(0);
 
       // Both projections unpaused on success.
       expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
@@ -617,7 +632,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       }
     });
 
-    it("skips the map projection when an earlier fold projection batch fails", async () => {
+    it("aborts the shared batch and clears both projections' markers when the fold write fails", async () => {
       const redis = getTestRedisConnection()!;
       const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const foldName = `failingFold_${suffix}`;
@@ -688,33 +703,30 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         since: "2023-11-01",
       });
 
-      // Fold batch surfaced an error and the outer loop short-circuited.
+      // The shared batch surfaced the error and the run stopped.
       expect(result.batchErrors).toBeGreaterThan(0);
       expect(result.firstError).toMatch(/fold store boom/);
 
-      // The map projection must NOT have run — `replay()` guards the map loop
-      // behind `if (totalBatchErrors === 0)`. Without this guard, a partial
-      // fold write would be followed by map writes that assume the fold
-      // succeeded.
+      // The engine flushes fold accumulators before map accumulators, so the
+      // fold failure aborted the batch before any map write could assume the
+      // fold succeeded.
       expect(bulkAppend).not.toHaveBeenCalled();
 
-      // Map's pause key was never added to the pause set (it never got far
-      // enough to be paused).
+      // Both projections were unpaused by the batch's finally.
       expect(await redis.sismember(pausedSetKey, mapPauseKey)).toBe(0);
-
-      // Fold projection was unpaused by the error path in `replayProjection`.
       expect(await redis.sismember(pausedSetKey, foldPauseKey)).toBe(0);
 
       // The cutoff markers were live at the moment the write failed...
       expect(foldCutoffsAtFailure).not.toBeNull();
       expect(Object.keys(foldCutoffsAtFailure!)).not.toHaveLength(0);
 
-      // ...and the failed batch's pending/cutoff markers were cleared too —
-      // live events for its aggregates process normally right away instead of
-      // deferring until the marker TTL lapses.
+      // ...and the failed batch's pending/cutoff markers were cleared for
+      // BOTH projections — live events for its aggregates process normally
+      // right away instead of deferring until the marker TTL lapses.
       expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual(
         {},
       );
+      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual({});
     });
 
     it("clears the failed batch's markers and unpauses when a map projection batch fails", async () => {
@@ -827,6 +839,183 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       );
       expect(completedLeft).toBe(0);
       expect(cutoffLeft).toBe(0);
+    });
+  });
+
+  describe("union event-type filtering", () => {
+    /** @scenario "The rebuild reads only the events the replayed projections consume" */
+    it("reads only the selected projections' event types from the event history", async () => {
+      const tenantC = generateTestTenantId();
+      // One aggregate carrying a consumed event AND an event of a type no
+      // selected projection declares. The engine's load filters on the union
+      // of selected event types, so the noise event must never reach the
+      // accumulators nor count towards the processed total.
+      await client.insert({
+        table: "event_log",
+        values: [
+          {
+            TenantId: tenantC,
+            AggregateType: "trace",
+            AggregateId: "trace-c1",
+            EventId: "evt-c-001",
+            IdempotencyKey: "evt-c-001",
+            EventType: "trace.upserted",
+            EventTimestamp: 1700000000000,
+            EventOccurredAt: 1700000000000,
+            EventVersion: "2025-01-01",
+            EventPayload: JSON.stringify({ value: 7 }),
+            _retention_days: 0,
+          },
+          {
+            TenantId: tenantC,
+            AggregateType: "trace",
+            AggregateId: "trace-c1",
+            EventId: "evt-c-002",
+            IdempotencyKey: "evt-c-002",
+            EventType: "trace.noise",
+            EventTimestamp: 1700000000500,
+            EventOccurredAt: 1700000000500,
+            EventVersion: "2025-01-01",
+            EventPayload: JSON.stringify({ blob: "x".repeat(1000) }),
+            _retention_days: 0,
+          },
+        ],
+        format: "JSONEachRow",
+      });
+
+      try {
+        const bulkAppend = vi.fn().mockResolvedValue(undefined);
+        const mapName = `unionFilter_${Date.now()}`;
+        const projection: RegisteredMapProjection = {
+          projectionName: mapName,
+          pipelineName: "test_pipeline",
+          aggregateType: "trace",
+          source: "pipeline",
+          pauseKey: `test_pipeline/handler/${mapName}`,
+          kind: "map",
+          definition: {
+            name: mapName,
+            eventTypes: ["trace.upserted"],
+            map: (event: any) => ({
+              src: event.aggregateId,
+              type: event.type,
+            }),
+            store: { append: async () => undefined, bulkAppend },
+          },
+        };
+        const service = createServiceWithResolver();
+
+        const result = await service.replay({
+          projections: [],
+          mapProjections: [projection],
+          tenantIds: [tenantC],
+          since: "2023-11-01",
+        });
+
+        expect(result.batchErrors).toBe(0);
+        expect(result.aggregatesReplayed).toBe(1);
+        // Only the consumed event was read and processed — the noise event
+        // never left ClickHouse.
+        expect(result.totalEvents).toBe(1);
+        const records = bulkAppend.mock.calls.flatMap(
+          ([recs]) => recs as Array<{ type: string }>,
+        );
+        expect(records.map((r) => r.type)).toEqual(["trace.upserted"]);
+      } finally {
+        await client.exec({
+          query: `ALTER TABLE event_log DELETE WHERE TenantId = {tenantC:String}`,
+          query_params: { tenantC },
+        });
+      }
+    });
+  });
+
+  describe("state projections alongside fold and map projections", () => {
+    /** @scenario "State projections replay in the same run as fold and map projections" */
+    it("rebuilds all three kinds in one run — folds and maps through the engine, state in its own lane", async () => {
+      const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const foldName = `triFold_${suffix}`;
+      const mapName = `triMap_${suffix}`;
+      const stateName = `triState_${suffix}`;
+
+      const foldStore = vi.fn(async () => undefined);
+      const foldProjection: RegisteredFoldProjection = {
+        projectionName: foldName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/projection/${foldName}`,
+        kind: "fold",
+        definition: {
+          name: foldName,
+          version: "v1",
+          eventTypes: ["trace.upserted"],
+          LastEventOccurredAtKey: "LastEventOccurredAt",
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+          store: { store: foldStore, get: vi.fn().mockResolvedValue(null) },
+        } as FoldProjectionDefinition<{ count: number }, any>,
+      };
+
+      const bulkAppend = vi.fn().mockResolvedValue(undefined);
+      const mapProjection: RegisteredMapProjection = {
+        projectionName: mapName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/handler/${mapName}`,
+        kind: "map",
+        definition: {
+          name: mapName,
+          eventTypes: ["trace.upserted"],
+          map: (event: any) => ({ src: event.aggregateId }),
+          store: { append: async () => undefined, bulkAppend },
+        },
+      };
+
+      const stateWrites: unknown[] = [];
+      const stateStore: StateProjectionStore<{ seen: number }> = {
+        load: vi.fn(async () => null),
+        store: vi.fn(async (stored, _context) => {
+          stateWrites.push(stored);
+        }),
+      };
+      const stateDefinition: StateProjectionDefinition<{ seen: number }, any> =
+        {
+          name: stateName,
+          version: "v1",
+          eventTypes: ["trace.upserted"],
+          init: () => ({ seen: 0 }),
+          apply: (state, _event) => ({ seen: state.seen + 1 }),
+          store: stateStore,
+        };
+      const stateProjection: RegisteredStateProjection = {
+        projectionName: stateName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/stateProjection/${stateName}`,
+        kind: "state",
+        definition: stateDefinition,
+      };
+
+      const service = createServiceWithResolver();
+      const result = await service.replay({
+        projections: [foldProjection],
+        mapProjections: [mapProjection],
+        stateProjections: [stateProjection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      expect(result.batchErrors).toBe(0);
+      // The engine's fold and map replay share one event load (2 aggregates,
+      // 2 events, counted once); the state lane replays the same 2 events
+      // into its own store afterwards.
+      expect(result.totalEvents).toBe(4);
+      expect(foldStore).toHaveBeenCalledTimes(2);
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
+      expect(stateWrites.length).toBeGreaterThan(0);
     });
   });
 
@@ -1066,6 +1255,7 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     }
 
     describe("when a replay spans multiple batches", () => {
+      /** @scenario "Only the batch being replayed pauses live processing" */
       it("pauses only while a batch is replayed and resumes between batches", async () => {
         const redis = getTestRedisConnection()!;
         const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -1114,9 +1304,11 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         expect(result.batchErrors).toBe(0);
         expect(result.aggregatesReplayed).toBe(2);
 
-        // One flush per batch — pause held while each batch's records land.
+        // One flush per batch — each batch's records land AFTER its unpause
+        // (the pause window ends at cutoff-recording), with the cutoff
+        // markers carrying the protection through the write.
         expect(bulkAppend).toHaveBeenCalledTimes(2);
-        expect(pausedDuringWrite).toEqual([1, 1]);
+        expect(pausedDuringWrite).toEqual([0, 0]);
 
         // Between batches (onBatchComplete fires after the batch's finally
         // unpauses), live processing is running again — the freeze is

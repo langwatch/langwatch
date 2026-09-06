@@ -1,12 +1,30 @@
-import { getApp } from "~/server/app-layer/app";
+import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
+import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import {
-  type ClickHouseClientResolver,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import type { BlobResolutionDeps } from "./trace.service";
+
+/**
+ * Production spool storage: the same `stored-objects` registry and destination
+ * resolver every other byte-writing surface uses, so the trace spool honours a
+ * deployment's Azure / S3 / local-filesystem choice instead of assuming S3
+ * (langwatch/langwatch-saas#800).
+ */
+const defaultSpoolStorage: SpoolStorage = {
+  objectStoreFor: (projectId: string) => createStorageRegistry({ projectId }),
+  resolveDestination: resolveProjectStorageDestination,
+  // The env read lives here, at the composition root, so `BlobStore` stays
+  // env-free and testable. Default false: the spool stays off on Azure until an
+  // operator states the lifecycle rule exists, because nothing else bounds an
+  // orphan left by a crash between the write and its delete.
+  azureRetentionConfirmed: env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED ?? false,
+};
 
 /**
  * Builds the ADR-022 blob-resolution dependencies ({@link BlobResolutionDeps})
@@ -17,7 +35,7 @@ import type { BlobResolutionDeps } from "./trace.service";
  * inside `initializeWebApp` (worker-only import). So the customer detail
  * procedures can't reach the app-layer deps. This factory is the single
  * source of truth for constructing those deps; `presets.ts` consumes it too
- * (passing its own composition-root values) so the `new BlobStore(...)` +
+ * (passing its own composition-root values) so the `new BlobStore({ … })` +
  * `new TraceIOExtractionService()` shape is defined in exactly one place.
  *
  * Construction does NO network I/O: `BlobStore` only stores the resolver
@@ -56,10 +74,14 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
 
   return {
-    blobStore: new BlobStore(
-      createS3Client,
-      clickhouseEnabled ? resolveClickHouseClient : undefined,
-    ),
+    blobStore: new BlobStore({
+      resolveS3Client: createS3Client,
+      resolveClickHouseClient: clickhouseEnabled
+        ? resolveClickHouseClient
+        : undefined,
+      spoolStorage: defaultSpoolStorage,
+      logger: createLogger("langwatch:traces:blob-store"),
+    }),
     ioExtractionService: new TraceIOExtractionService(),
   };
 }
@@ -68,18 +90,12 @@ export function buildTraceBlobResolutionDeps(overrides?: {
  * Whether the resolver above can reach anything, answered by the App when
  * there is one.
  *
- * `isClickHouseEnabled()` alone reads the shared client, while the App gates
- * on `!!config.clickhouseUrl || isClickHouseEnabled()`. On a deployment
- * configured only by `CLICKHOUSE_URL`, the two disagree until the shared
- * client exists, and `BlobStore` built with `undefined` refuses the read
- * before it ever calls the resolver - so an ADR-022 full read degraded to a
- * preview on a deployment that has ClickHouse. The fallback keeps building
- * deps free of an initialised App, which is why the App is not read directly.
+ * Read from the App and only the App - the composition root is the one
+ * authority on whether ClickHouse is configured. Before the App initialises
+ * (a boot-order window that production never serves requests in) the answer
+ * degrades to false, which refuses the full read the same way any other
+ * pre-init caller is refused.
  */
 function defaultClickHouseEnabled(): boolean {
-  try {
-    return getApp().clickhouse.enabled;
-  } catch {
-    return isClickHouseEnabled();
-  }
+  return tryGetApp()?.clickhouse.enabled ?? false;
 }

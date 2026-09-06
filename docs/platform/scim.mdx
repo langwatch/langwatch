@@ -5,6 +5,10 @@ sidebarTitle: SCIM Provisioning
 keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider, sso, user management
 ---
 
+<Note>
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is created, so if it lapses, tokens that already exist stop verifying and your identity provider's requests are refused. Minting a token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
 
 ## Prerequisites

@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DEFAULT_ENDPOINT } from "../constants";
-import { normalizeEndpoint, resolveEndpoint } from "../endpoint";
+import {
+  normalizeEndpoint,
+  resolveEndpoint,
+  resolveLogsEndpoint,
+} from "../endpoint";
 
 describe("resolveEndpoint", () => {
   const previousEndpoint = process.env.LANGWATCH_ENDPOINT;
@@ -73,6 +77,35 @@ describe("resolveEndpoint", () => {
       it("falls back to the cloud default", () => {
         expect(resolveEndpoint()).toBe(DEFAULT_ENDPOINT);
       });
+    });
+  });
+});
+
+describe("resolveLogsEndpoint", () => {
+  describe("given the signal-specific endpoint is set", () => {
+    it("uses it verbatim", () => {
+      expect(
+        resolveLogsEndpoint({
+          OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://collector:4318/custom/logs",
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://ignored:4318",
+        }),
+      ).toBe("http://collector:4318/custom/logs");
+    });
+  });
+
+  describe("given only the generic endpoint is set", () => {
+    it("hangs the logs path off it", () => {
+      expect(
+        resolveLogsEndpoint({
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318/",
+        }),
+      ).toBe("http://collector:4318/v1/logs");
+    });
+  });
+
+  describe("given no endpoint is set", () => {
+    it("reports that there is nowhere to send logs", () => {
+      expect(resolveLogsEndpoint({})).toBeNull();
     });
   });
 });

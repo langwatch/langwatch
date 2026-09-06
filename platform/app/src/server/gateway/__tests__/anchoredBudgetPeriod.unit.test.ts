@@ -6,9 +6,10 @@
  * in anchoredBudgetCycles.unit.test.ts; this file is about what the stored
  * columns of a row mean once the anchor is applied to them.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
 import { explainHandledError } from "~/features/errors/logic/presentation";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { GatewayBudgetService } from "../budget.service";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "../budgetPeriod";
 
@@ -186,8 +187,16 @@ describe("GatewayBudgetService.create with a cycle anchor", () => {
     return {
       organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
       team: { findFirst: vi.fn().mockResolvedValue(null) },
-      project: { findFirst: vi.fn().mockResolvedValue({ id: "project_1" }) },
+      project: {
+        findFirst: vi.fn().mockResolvedValue({ id: "project_1" }),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       modelProvider: { findFirst: vi.fn().mockResolvedValue(null) },
+      // No active keys, the one shape the reach guard always allows, so
+      // these tests keep answering the anchor question rather than being
+      // answered by a later guard.
+      virtualKey: { findMany: vi.fn().mockResolvedValue([]) },
+      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       // Reaching here means the anchor was accepted.
       $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
     } as unknown as PrismaClient;

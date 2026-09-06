@@ -72,9 +72,24 @@ Feature: CLI evaluation results command
   @unit
   Scenario: Comparison verdicts follow the rows that survive filtering
     Given an experiment whose latest run includes a Comparison evaluator
-    When I run `langwatch experiment results <experiment> --limit 5`
-    Then the output includes comparison verdicts only for the rows shown
+    When I run `langwatch experiment results <experiment> --filter failed`
+    Then the output includes comparison verdicts only for the rows that failed
     And no verdict is reported for a row that was filtered out
+
+  # A caller that asks for JSON is usually an agent, and it does arithmetic on
+  # what it receives. While the row limit cut the payload as well as the table,
+  # such a caller got the first 20 rows with nothing in them saying rows were
+  # missing, and any rate it worked out was quietly wrong. One report of "70%"
+  # was 14 of 20 rows of a run whose real figure was 30 of 40, and the reader
+  # was told an optimization had failed when it had in fact won.
+
+  @unit
+  Scenario: The row limit shortens the table and never the answer
+    Given an experiment whose latest run has more rows than the row limit
+    When I run `langwatch experiment results <experiment> --limit 5`
+    Then the table shows five rows
+    And the answer still carries every row of the run
+    And the answer says how many rows matched and how many it returned
 
   @unit
   Scenario: Narrowing to one evaluator excludes the comparison

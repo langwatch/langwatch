@@ -327,9 +327,6 @@ export default function OptimizationStudio() {
                                 description: result.error,
                                 type: "error",
                                 duration: 5000,
-                                meta: {
-                                  closable: true,
-                                },
                               });
                             }
                           }}

@@ -31,11 +31,20 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "acme" },
+    hasPermission: () => true,
+  }),
+}));
 vi.mock("~/components/me/usePersonalFeatureGate", () => ({
   usePersonalFeatureGate: () => ({
     requestEnable: async () => true,
     dialogState: { open: false },
   }),
+}));
+vi.mock("../../AddToAnnotationQueueDialog", () => ({
+  AddToAnnotationQueueDialog: () => null,
 }));
 
 import { useSelectionStore } from "../../../stores/selectionStore";

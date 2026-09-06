@@ -1,3 +1,4 @@
+import { keepPreviousData as holdPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -29,21 +30,37 @@ export interface UseAnnotationsByTraceIdsResult {
   isError: boolean;
 }
 
+/**
+ * Annotations for a set of traces.
+ *
+ * Reads the comments about the traces themselves by default: a surface that
+ * answers per trace across a page of them, the annotations list say, must not
+ * change what it says because a reviewer marked six spans of one trace. A
+ * surface that carries everything said about a trace, its own comments or a
+ * dataset's annotations column, passes `anchor: "all"` and gets the anchored
+ * ones too.
+ */
 export function useAnnotationsByTraceIds({
   projectId,
   traceIds,
   enabled = true,
   keepPreviousData = false,
+  anchor = "trace",
 }: {
   projectId: string;
   traceIds: string[];
   enabled?: boolean;
   keepPreviousData?: boolean;
+  anchor?: "trace" | "all";
 }): UseAnnotationsByTraceIdsResult {
   // Dedupe before chunking: duplicate ids spanning chunks would fetch the
   // same annotations twice and double them in `data` after the flatMap.
+  //
+  // Sort too. The chunk contents are the query key, so two consumers reading
+  // the same traces in different orders would otherwise key differently and
+  // each fetch its own copy of the same annotations.
   const uniqueTraceIds = useMemo(
-    () => Array.from(new Set(traceIds)),
+    () => Array.from(new Set(traceIds)).sort(),
     [traceIds],
   );
 
@@ -56,10 +73,10 @@ export function useAnnotationsByTraceIds({
   const results = api.useQueries((t) =>
     chunks.map((ids) =>
       t.annotation.getByTraceIds(
-        { projectId, traceIds: ids },
+        { projectId, traceIds: ids, anchor },
         {
           enabled: enabled && !!projectId && ids.length > 0,
-          keepPreviousData,
+          placeholderData: keepPreviousData ? holdPreviousData : undefined,
           staleTime: 5 * 60_000,
           refetchOnWindowFocus: false,
         },

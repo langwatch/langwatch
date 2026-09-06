@@ -32,7 +32,7 @@ export const CopyExperimentDialog = ({
 }) => {
   const { organizations, project } = useOrganizationTeamProject();
   const session = useRequiredSession();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const copyExperiment = api.experiments.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
@@ -187,7 +187,7 @@ export const CopyExperimentDialog = ({
             onClick={() => {
               void handleCopy();
             }}
-            loading={copyExperiment.isLoading}
+            loading={copyExperiment.isPending}
             disabled={
               !selectedProjectId.length ||
               !projects.find((p) => p.value === selectedProjectId[0])

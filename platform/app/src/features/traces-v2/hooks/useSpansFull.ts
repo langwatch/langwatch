@@ -1,11 +1,22 @@
+import { keepPreviousData } from "@tanstack/react-query";
+import { useMemo } from "react";
+import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import {
+  expandDeletedSpanIds,
+  indexSpanPatches,
+} from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
+import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { api } from "~/utils/api";
 import {
   asSharedQueryResult,
   useSharedTrace,
 } from "../context/SharedTraceContext";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
-export function useSpansFull(enabled: boolean) {
+/** Every span's detail exactly as captured, before any correction. */
+export function useSpansFullCanonical(enabled: boolean) {
   const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
 
@@ -15,14 +26,78 @@ export function useSpansFull(enabled: boolean) {
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the
     // conversation strip with no loading flash.
-    cacheTime: 1_800_000,
+    gcTime: 1_800_000,
     // While the new trace's spans are loading, keep showing the previous
     // trace's spans rather than a skeleton. The visualizer panel pops
     // back instantly when navigating between siblings.
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   if (shared)
     return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
   return query;
+}
+
+/**
+ * Applies a correction to a whole page of span details: deleted spans (and
+ * their descendants) drop out, corrected fields land. Returns the same array
+ * when nothing changed so consumers can compare references.
+ */
+export function applyOverlayToSpansFull({
+  spans,
+  patch,
+}: {
+  spans: SpanDetail[];
+  patch: TraceEditOverlayPatch | null | undefined;
+}): SpanDetail[] {
+  if (!patch) return spans;
+
+  const deleted = expandDeletedSpanIds({
+    links: spans.map((span) => ({
+      id: span.spanId,
+      parentId: span.parentSpanId,
+    })),
+    deletedSpanIds: patch.deletedSpanIds,
+  });
+
+  // Built once for the whole page: the per-span call would otherwise rebuild it
+  // every time, and a large corrected trace would block the UI walking it.
+  const spanPatches = indexSpanPatches(patch);
+
+  let changed = false;
+  const next: SpanDetail[] = [];
+  for (const span of spans) {
+    if (deleted.has(span.spanId)) {
+      changed = true;
+      continue;
+    }
+    const corrected = applyOverlayToSpanDetail({
+      detail: span,
+      patch,
+      spanPatches,
+    });
+    if (corrected !== span) changed = true;
+    next.push(corrected);
+  }
+  return changed ? next : spans;
+}
+
+/**
+ * Every span's detail as the reader sees it: corrected when a correction
+ * applies, captured otherwise.
+ */
+export function useSpansFull(enabled: boolean) {
+  const query = useSpansFullCanonical(enabled);
+  const patch = useAppliedTraceEditPatch();
+  const spans = query.data;
+
+  const data = useMemo(
+    () => (spans ? applyOverlayToSpansFull({ spans, patch }) : spans),
+    [spans, patch],
+  );
+
+  return useMemo(
+    () => (data === spans ? query : { ...query, data }),
+    [query, data, spans],
+  );
 }

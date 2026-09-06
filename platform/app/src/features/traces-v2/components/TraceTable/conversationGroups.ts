@@ -2,7 +2,14 @@ import type { TraceListItem, TraceStatus } from "../../types/trace";
 
 export interface ConversationGroup {
   conversationId: string;
+  /**
+   * The turn rows shown when the session is expanded. Server-grouped session
+   * rows start empty and lazily fill on expand; `traceCount` below carries
+   * the TRUE total either way, so never read `traces.length` for totals.
+   */
   traces: TraceListItem[];
+  /** True number of traces in the session across the whole time range. */
+  traceCount: number;
   totalDuration: number;
   totalCost: number;
   totalTokens: number;
@@ -13,12 +20,72 @@ export interface ConversationGroup {
   evalsPassedCount: number;
   evalsFailedCount: number;
   worstStatus: TraceStatus;
+  /**
+   * The conversation's most recent trace, the one a click on the row opens.
+   * Server rows carry the field but its value is null when the rollup named no
+   * trace; page-local groups built client-side (sample preview) and skeleton
+   * rows leave it out entirely. A row without one expands on click instead.
+   */
+  lastTraceId?: string | null;
   latestTimestamp: number;
   earliestTimestamp: number;
   lastMessage: string;
   lastOutput: string;
   primaryModel: string;
   serviceName: string;
+  /**
+   * Server-rollup extras (specs/traces-v2/sessions-lens.feature). Absent on
+   * page-local groups built client-side (sample preview) and on skeletons.
+   */
+  contextSizeTokens?: number | null;
+  /** Pre-folded coding-agent counters; null when the session has no coding-agent row. */
+  modelCalls?: number | null;
+  compactions?: number | null;
+  /**
+   * Where the session ran, and what the agent called it. Null when nothing
+   * reported it; `title` is also null when the viewer may not read captured
+   * content, which `titleRedacted` is what tells apart.
+   */
+  repositoryHost?: string | null;
+  repositoryOwner?: string | null;
+  repositoryName?: string | null;
+  gitBranch?: string | null;
+  gitWorktree?: string | null;
+  title?: string | null;
+  titleRedacted?: boolean;
+  /**
+   * The pull request this session's work belongs to, decided server-side from
+   * the branch's pull-request history. Null when the session has no git
+   * context, the repository is not connected, or the branch has no pull
+   * request yet.
+   */
+  pullRequest?: ConversationPullRequest | null;
+}
+
+/** Identity only: the number, where it lives, and what it is called. */
+export interface ConversationPullRequest {
+  number: number;
+  htmlUrl: string;
+  title: string;
+}
+
+/** Evaluation outcomes summed across one conversation's traces. */
+function tallyEvaluations(traces: TraceListItem[]): {
+  totalEvals: number;
+  evalsPassedCount: number;
+  evalsFailedCount: number;
+} {
+  let totalEvals = 0;
+  let evalsPassedCount = 0;
+  let evalsFailedCount = 0;
+  for (const t of traces) {
+    for (const ev of t.evaluations) {
+      totalEvals++;
+      if (ev.passed === true) evalsPassedCount++;
+      else if (ev.passed === false) evalsFailedCount++;
+    }
+  }
+  return { totalEvals, evalsPassedCount, evalsFailedCount };
 }
 
 export function groupTracesByConversation(
@@ -61,18 +128,10 @@ export function groupTracesByConversation(
     let totalSpans = 0;
     let errorCount = 0;
     let totalEvents = 0;
-    let totalEvals = 0;
-    let evalsPassedCount = 0;
-    let evalsFailedCount = 0;
     for (const t of sorted) {
       totalSpans += t.spanCount;
       if (t.status === "error") errorCount++;
       totalEvents += t.events.totalCount;
-      totalEvals += t.evaluations.length;
-      for (const ev of t.evaluations) {
-        if (ev.passed === true) evalsPassedCount++;
-        else if (ev.passed === false) evalsFailedCount++;
-      }
     }
 
     const lastOutput =
@@ -81,15 +140,14 @@ export function groupTracesByConversation(
     result.push({
       conversationId: id,
       traces: sorted,
+      traceCount: sorted.length,
       totalDuration: sorted.reduce((s, t) => s + t.durationMs, 0),
       totalCost: sorted.reduce((s, t) => s + t.totalCost, 0),
       totalTokens: sorted.reduce((s, t) => s + t.totalTokens, 0),
       totalSpans,
       errorCount,
       totalEvents,
-      totalEvals,
-      evalsPassedCount,
-      evalsFailedCount,
+      ...tallyEvaluations(sorted),
       worstStatus,
       latestTimestamp: lastTrace.timestamp,
       earliestTimestamp: firstTrace.timestamp,
@@ -111,7 +169,7 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
   cost: (g) => g.totalCost,
   tokens: (g) => g.totalTokens,
   duration: (g) => g.totalDuration,
-  turns: (g) => g.traces.length,
+  turns: (g) => g.traceCount,
   started: (g) => g.earliestTimestamp,
   lastTurn: (g) => g.latestTimestamp,
 };
@@ -119,15 +177,12 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
 /**
  * Order conversation groups by the active lens sort, using the per-group
  * aggregates. The conversation table renders with `manualSorting`, so the
- * order it shows is whatever we return here — without this, groups always
- * fell back to latest-first regardless of the lens (e.g. "Expensive
- * Conversations" didn't actually lead with the costliest, and "Longest
- * Conversations" / "Token-Heavy Conversations" couldn't sort at all, since
- * turn-count and group-total tokens aren't trace-level sort columns).
+ * order it shows is whatever we return here.
  *
- * Note: grouping is page-local — this orders the conversations within the
- * fetched page, not globally across all data. See
- * specs/traces-v2/lens-preset-groups.feature
+ * Only the onboarding sample-preview path still comes through here: real
+ * data uses the server-side session rollup, which sorts and paginates in
+ * ClickHouse (specs/traces-v2/sessions-lens.feature). Sample preview groups
+ * the fixture page client-side, so it keeps needing a local sort.
  */
 export function sortConversationGroups({
   groups,

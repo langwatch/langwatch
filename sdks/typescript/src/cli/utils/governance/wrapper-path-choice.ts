@@ -42,7 +42,7 @@ import prompts from "prompts";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import type { WrapperMode } from "./wrapper-mode";
+import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
 import {
   resolvePlatformToolPolicy,
   type PlatformToolPolicyMap,
@@ -110,6 +110,58 @@ export function parseToolModeFlag(
 
   const override = flagOverride ?? tokenToMode(env.LANGWATCH_TOOL_MODE) ?? undefined;
   return { args: out, override };
+}
+
+export interface ParsedProjectScope {
+  /** Args with the scope flags removed, order otherwise preserved. */
+  args: string[];
+  /** Project id or slug from `--project <value>` / `--project=<value>`. */
+  project?: string;
+  /** True when `--personal` was passed (clear the project pin). */
+  personal?: boolean;
+}
+
+/**
+ * Strip the wrapper-only telemetry-scope flags from the forwarded args:
+ * `--project <id-or-slug>` pins the tool's telemetry to a team project
+ * (minting a project ingest key), `--personal` clears the pin. Same
+ * contract as `parseToolModeFlag`: only these flags are consumed, every
+ * other arg is forwarded untouched and in order.
+ */
+export function parseProjectScopeFlags(args: string[]): ParsedProjectScope {
+  const out: string[] = [];
+  let project: string | undefined;
+  let personal = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--project") {
+      const value = args[i + 1];
+      // A following option is a missing value, not the project name. Reading
+      // `--project --personal` as a project called "--personal" swallows the
+      // second flag, so the scope conflict never surfaces and the pin is
+      // attempted against a name no project can have.
+      if (value !== undefined && !value.startsWith("-")) {
+        project = value;
+        i++;
+      }
+      continue;
+    }
+    if (arg.startsWith("--project=")) {
+      project = arg.slice("--project=".length);
+      continue;
+    }
+    if (arg === "--personal") {
+      personal = true;
+      continue;
+    }
+    out.push(arg);
+  }
+  const normalizedProject = project?.trim();
+  return {
+    args: out,
+    project: normalizedProject === "" ? undefined : normalizedProject,
+    personal,
+  };
 }
 
 /**
@@ -185,7 +237,7 @@ export function gatewayChoiceTitle(): string {
 }
 
 export function gatewayChoiceDescription(): string {
-  return "route calls through LangWatch with a virtual key, billed per token";
+  return "route calls through LangWatch with a virtual key";
 }
 
 /**
@@ -239,12 +291,39 @@ export async function resolveWrapperPath(
 
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
+    // Explicit or not, a copilot gateway route shifts spend off the user's
+    // Copilot seat — every route that lands there names the shift (ADR-039
+    // D3): here, the pinned branch below, the policy branches, and
+    // resolveWrapperMode's downgrade.
+    if (
+      override === "gateway" &&
+      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
+    ) {
+      // Policy gate: when the org disables the gateway, resolveWrapperMode
+      // downgrades this run to ingestion with its own notice — warning about
+      // a billing shift that then doesn't happen would be false.
+      const suffix = copilotSeatBypassSuffix(tool);
+      if (suffix) {
+        writeImpl(`${lwTag()} using the gateway (--tool-mode).${suffix}\n`);
+      }
+    }
     return { mode: override, prompted: false };
   }
 
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
+    if (
+      pinned === "gateway" &&
+      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
+    ) {
+      const suffix = copilotSeatBypassSuffix(tool);
+      if (suffix) {
+        writeImpl(
+          `${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`,
+        );
+      }
+    }
     return { mode: pinned, prompted: false };
   }
 
@@ -278,6 +357,15 @@ export async function resolveWrapperPath(
   // enforces this (downgrade / throw), but resolving it here keeps the
   // prompt logic honest: we only ever prompt for a real either-or.
   if (allowGateway && !allowOtlp) {
+    // Copilot lands on the gateway by admin policy here, BEFORE
+    // resolveWrapperMode's downgrade branch can attach its notice — so
+    // the who-pays shift must be named at this seam too (ADR-039 D3).
+    const suffix = copilotSeatBypassSuffix(tool);
+    if (suffix) {
+      writeImpl(
+        `${lwTag()} direct OTLP is disabled for ${tool} by your org admin; using the gateway.${suffix}\n`,
+      );
+    }
     return { mode: "gateway", prompted: false };
   }
   if (!allowGateway && allowOtlp) {
@@ -297,7 +385,9 @@ export async function resolveWrapperPath(
     // gateway bills model usage to the organization. Take the same option
     // the prompt pre-selects, which costs nothing beyond telemetry. A CI
     // job that wants the gateway asks for it with --tool-mode=gateway,
-    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode.
+    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode. This also keeps
+    // copilot billing-safe (ADR-039 D3): its gateway path rides
+    // COPILOT_PROVIDER_* BYOK keys, shifting spend off the user's seat.
     return { mode: "ingestion", prompted: false };
   }
 
@@ -346,10 +436,16 @@ export async function resolveWrapperPath(
 
   const label =
     chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
+  // The prompt answer is the route that actually moves copilot spend off
+  // the user's seat — it must name the shift like every other gateway
+  // route (ADR-039 D3), not leave the user to learn it from the pinned
+  // branch on run 2.
+  const seatSuffix =
+    chosen === "gateway" ? copilotSeatBypassSuffix(tool) : "";
   writeImpl(
     `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
-      `or edit ~/.langwatch/config.json (tool_mode.${tool}).\n`,
+      `or edit ~/.langwatch/config.json (tool_mode.${tool}).${seatSuffix}\n`,
   );
 
   return { mode: chosen, prompted: true };

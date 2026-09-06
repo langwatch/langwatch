@@ -50,6 +50,11 @@ Feature: Scenario judge reasoning and tool compatibility
       | azure/gpt-5.6-sol        |
       | openai/gpt-5.5-sol       |
 
+  # Scoped to how the request is BUILT: no reasoning effort is injected up
+  # front. If the provider then refuses a tool-carrying request and names
+  # reasoning off as its remedy, the shared transport answers that refusal for
+  # any scenario model — the judge holds no monopoly on the retry. That rule
+  # and its bounds live in specs/scenarios/judge-transport-tool-reasoning.feature.
   @unit
   Scenario: The same model outside the judge is untouched
     Given a simulator or tested target uses "openai/gpt-5.6-sol"

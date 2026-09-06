@@ -1,14 +1,7 @@
-import {
-  Box,
-  Container,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
-import { UserAvatar } from "~/components/UserAvatar";
+import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -30,41 +23,46 @@ export default function Annotations() {
 
   const queueMembers = queue.data?.members?.map((member) => member.user);
 
-  const QueueHeader = () => {
-    if (!queue.data) return null;
-    return (
-      <VStack width="full" align="start">
-        <Heading size="lg">{queue.data?.name}</Heading>
-        <HStack>
-          <Text fontSize="sm">Members: </Text>
-          {queueMembers?.map((member) => {
-            return (
-              <Tooltip key={member.id} content={member.name}>
-                <Box display="inline-flex">
-                  <UserAvatar
-                    size="xs"
-                    name={member.name ?? ""}
-                    image={member.image}
-                  />
-                </Box>
-              </Tooltip>
-            );
-          })}
-        </HStack>
-      </VStack>
-    );
-  };
+  const queueHeader = queue.data ? (
+    <VStack align="start" minWidth={0}>
+      <Heading size="lg">{queue.data.name}</Heading>
+      <HStack>
+        <Text fontSize="sm">Members: </Text>
+        {queueMembers?.map((member) => (
+          <Tooltip key={member.id} content={member.name}>
+            <Box display="inline-flex">
+              <RandomColorAvatar
+                size="xs"
+                name={member.name ?? ""}
+                image={member.image}
+              />
+            </Box>
+          </Tooltip>
+        ))}
+      </HStack>
+    </VStack>
+  ) : null;
 
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 330px)"} padding={0} margin={0}>
+      <Flex direction="column" flex={1} minWidth={0} height="full">
         <AnnotationsTable
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."
-          tableHeader={<QueueHeader />}
+          titleContent={queueHeader}
+          dateColumnLabel="Date queued"
+          showStatusFilter={true}
+          rowTarget="queueItem"
           queueId={queue.data?.id ?? ""}
+          // The page is this queue, so moving a selection elsewhere starts
+          // from the queue the rows are already on.
+          pageQueue={
+            queue.data
+              ? { annotatorId: `queue-${queue.data.id}`, name: queue.data.name }
+              : undefined
+          }
         />
-      </Container>
+      </Flex>
     </AnnotationsLayout>
   );
 }

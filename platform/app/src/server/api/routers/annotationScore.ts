@@ -1,6 +1,5 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const annotationScoreRouter = createTRPCRouter({
@@ -26,7 +25,7 @@ export const annotationScoreRouter = createTRPCRouter({
         defaultCheckboxOption: z.array(z.string()).optional().nullable(),
       }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .permission("annotations:manage")
     .mutation(async ({ ctx, input }) => {
       type OptionType = { label: string; value: string; reason?: string };
       const options: OptionType[] = [];
@@ -64,7 +63,7 @@ export const annotationScoreRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: {
@@ -76,7 +75,7 @@ export const annotationScoreRouter = createTRPCRouter({
     }),
   getAllActive: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId, active: true, deletedAt: null },
@@ -89,7 +88,7 @@ export const annotationScoreRouter = createTRPCRouter({
         scoreId: z.string(),
       }),
     )
-    .use(checkProjectPermission("annotations:view"))
+    .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findFirstOrThrow({
         where: {
@@ -107,7 +106,7 @@ export const annotationScoreRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },
@@ -121,7 +120,7 @@ export const annotationScoreRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("annotations:delete"))
+    .permission("annotations:delete")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },

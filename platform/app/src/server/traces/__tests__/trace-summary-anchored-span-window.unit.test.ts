@@ -21,10 +21,19 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: true,
+      resolveClient: () => Promise.resolve({ query: mockClickHouseQuery }),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -143,8 +152,10 @@ async function readTraces(traceIds: string[]) {
     "../clickhouse-trace.service"
   );
   const service = new ClickHouseTraceService({
-    project: { findUnique: vi.fn() },
-  } as never);
+    prisma: {
+      project: { findUnique: vi.fn() },
+    } as never,
+  });
   await service.getTracesWithSpans("proj-1", traceIds, protections);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),

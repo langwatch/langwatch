@@ -1,7 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import {
   anyAuthenticated,
   requires,
@@ -44,12 +44,14 @@ function sessionFor(userId: string | undefined): Session | null {
 
 /**
  * Uniform error mapping for the default-model write handlers: a typed
- * HTTPException (e.g. the 404 orphan-config ownership backstop) passes through
- * untouched, any other Error collapses to a 400, and non-Error throwables
- * re-throw as-is.
+ * HTTPException (e.g. the 404 orphan-config ownership backstop) and any
+ * HandledError (the app's onError serialises those with their own status
+ * and code) pass through untouched, any other Error collapses to a 400,
+ * and non-Error throwables re-throw as-is.
  */
 function rethrowModelDefaultsWriteError(err: unknown): never {
   if (err instanceof HTTPException) throw err;
+  if (HandledError.isHandled(err)) throw err;
   if (err instanceof Error) {
     throw new HTTPException(400, { message: err.message });
   }

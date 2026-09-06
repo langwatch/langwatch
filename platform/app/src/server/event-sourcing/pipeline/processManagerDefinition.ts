@@ -1,11 +1,12 @@
 import type { ZodTypeAny, z } from "zod";
 
+import type { ProcessRole } from "../../app-layer/config";
 import type { Event } from "../domain/types";
 import type {
   ProcessEventEnvelope,
   ProcessIntent,
 } from "../process-manager/processManager.types";
-import type { DeduplicationStrategy } from "../queues/queue.types";
+import type { DeduplicationConfig } from "../queues/queue.types";
 
 /** Shared delivery descriptor for lightweight subscribers. */
 export type TriggerSpec =
@@ -16,9 +17,30 @@ export type TriggerSpec =
 export interface TriggerOptions<E extends Event = Event> {
   delay?: number;
   ttl?: number;
-  dedup?: DeduplicationStrategy<E>;
+  /**
+   * Full dedup strategy. Fold/map-bound subscribers receive the committed
+   * projection state as `makeId`'s second argument (raw subscribers get
+   * `undefined`), for keys derived from folded values rather than the event.
+   */
+  dedup?:
+    | "aggregate"
+    | (Omit<DeduplicationConfig<E>, "makeId"> & {
+        makeId: (event: E, state?: unknown) => string;
+      });
   dedupId?: (event: E) => string;
-  when?: (event: E) => boolean;
+  /**
+   * Pure, synchronous relevance guard, evaluated before enqueue (an
+   * irrelevant event never pays serialization) and again in the handler.
+   * Fold/map-bound subscribers receive the committed projection state in
+   * `context.state`; raw subscribers receive `undefined` there. A throwing
+   * guard is logged and treated as relevant — fail open, never drop a side
+   * effect (the ADR-026 contract, carried over by ADR-098).
+   */
+  when?: (event: E, context: TriggerContext<any>) => boolean;
+  /** Process roles where this subscriber runs. Omit to run everywhere. */
+  runIn?: ProcessRole[];
+  /** Statically disable the subscriber (e.g. a transport dependency is absent). */
+  disabled?: boolean;
   /**
    * Domain key for the subscriber's GroupQueue group. Default is
    * per-aggregate (`<aggregateType>:<aggregateId>`), which maximizes
@@ -29,10 +51,15 @@ export interface TriggerOptions<E extends Event = Event> {
    * state) should key by tenant so queued deliveries serialize in one lane
    * instead of stacking into a parallel storm (2026-07-31: ~85 concurrent
    * trigger sweeps for one tenant where the 5s debounce intended 0.2/s).
-   * The queue prefixes `<tenantId>/subscriber/<name>/` around this key, so
-   * tenant scoping holds regardless.
+   * The queue prefixes a tenant-scoped lane around this key, so tenant scoping
+   * holds regardless. Which lane depends on where the subscriber is attached:
+   * a pipeline-level one gets `<tenantId>/subscriber/<name>/`, while one
+   * attached to a projection keeps the pre-retirement job path,
+   * `<tenantId>/<fold|map>/<projection>/reactor/<name>/` — that path is the
+   * GroupQueue routing key, so ADR-098 left it spelled the old way rather
+   * than strand in-flight jobs across a rolling deploy.
    */
-  groupKeyFn?: (event: E) => string;
+  groupKeyFn?: (event: E, state?: unknown) => string;
 }
 
 export interface TriggerContext<State = unknown> {
@@ -138,6 +165,23 @@ export interface ProcessManagerConfig<
    */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
   intents: Intents;
+  /**
+   * Opt in to the transient path: an event whose evolution keeps the initial
+   * state and arms no wake commits its intents alone — no
+   * `ProcessManagerInstance` row, no inbox row, and no transaction (see
+   * `AppendIntentsResult`).
+   *
+   * It is a property of the EVOLUTION, not of the process manager, so a
+   * process may be transient for the keys that hold nothing and still durable
+   * for the keys that hold a buffer or a deadline. `webhookDelivery` is
+   * exactly that shape: per-request keys write nothing, per-endpoint streams
+   * keep their state and their wake.
+   *
+   * Declaring it asserts that every `messageKey` this process mints is a pure
+   * function of the event. That is the contract the absent transaction rests
+   * on, and it is enforced by test rather than by comment.
+   */
+  transient?: boolean;
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;

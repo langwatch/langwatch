@@ -67,7 +67,19 @@ export function buildMarkdownComponents(colorMode: string) {
       </Box>
     ),
     a: ({ children, href }: { children?: React.ReactNode; href?: string }) => (
-      <Link href={href} color="blue.fg" textDecoration="underline">
+      // `display="inline"` for the same reason `strong`/`em`/`del` below set
+      // it: Chakra's link recipe is `inline-flex`, which makes the anchor an
+      // atomic inline box that cannot break across lines. A long autolinked
+      // URL would then paint outside the message. `overflowWrap="anywhere"`
+      // additionally shrinks min-content so a link in a table cell doesn't
+      // force the column wide.
+      <Link
+        href={href}
+        color="blue.fg"
+        textDecoration="underline"
+        display="inline"
+        overflowWrap="anywhere"
+      >
         {children}
       </Link>
     ),

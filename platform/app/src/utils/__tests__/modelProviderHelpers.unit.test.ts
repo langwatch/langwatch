@@ -7,6 +7,7 @@ import {
   getProviderFromModel,
   getSchemaShape,
   hasUserEnteredNewApiKey,
+  headerSignature,
   shouldAutoEnableAsDefault,
 } from "../modelProviderHelpers";
 
@@ -292,6 +293,57 @@ describe("modelProviderHelpers", () => {
         expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(
           false,
         );
+      });
+    });
+  });
+
+  describe("given headerSignature() compares a form header list with the stored one", () => {
+    describe("when only the form list carries the display-only concealed flag", () => {
+      it("reads the two lists as equal", () => {
+        const stored = [{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }];
+        const asShownInTheForm = [
+          { key: "api-key", value: MASKED_KEY_PLACEHOLDER, concealed: true },
+        ];
+
+        expect(headerSignature(asShownInTheForm)).toBe(headerSignature(stored));
+      });
+    });
+
+    describe("when a header key was renamed", () => {
+      it("reads the lists as different", () => {
+        expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
+          headerSignature([{ key: "x-api-key", value: "v" }]),
+        );
+      });
+    });
+
+    describe("when a header value was edited", () => {
+      it("reads the lists as different", () => {
+        expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
+          headerSignature([{ key: "api-key", value: "w" }]),
+        );
+      });
+    });
+
+    describe("when the headers were dragged into a new order", () => {
+      it("reads the lists as different, because reordering is a real edit", () => {
+        const a = [
+          { key: "one", value: "1" },
+          { key: "two", value: "2" },
+        ];
+        const b = [
+          { key: "two", value: "2" },
+          { key: "one", value: "1" },
+        ];
+
+        expect(headerSignature(a)).not.toBe(headerSignature(b));
+      });
+    });
+
+    describe("when there are no headers at all", () => {
+      it("treats null, undefined and the empty list the same", () => {
+        expect(headerSignature(null)).toBe(headerSignature([]));
+        expect(headerSignature(undefined)).toBe(headerSignature([]));
       });
     });
   });

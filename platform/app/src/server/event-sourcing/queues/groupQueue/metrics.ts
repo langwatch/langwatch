@@ -40,6 +40,12 @@ const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_batch_bisections_total",
+  // Work-conserving override visibility
+  "gq_jobs_dispatched_override_total",
+  // #4682 single-group staging accumulation
+  "gq_group_staging_depth_max",
+  "gq_groups_over_staging_depth",
 ] as const;
 
 for (const name of metricNames) {
@@ -85,6 +91,24 @@ export const gqJobsStagedTotal = new Counter({
 export const gqJobsDispatchedTotal = new Counter({
   name: "gq_jobs_dispatched_total",
   help: "Total number of jobs dispatched from staging to the processing queue",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * The subset of `gq_jobs_dispatched_total` admitted by the work-conserving
+ * override — jobs let past a tenant's fair share because slots would otherwise
+ * have sat idle.
+ *
+ * It exists to make `gq_parked_groups` readable. A high parked count has two
+ * opposite causes that look identical on their own: the cap is holding work
+ * back while capacity is free (bad — the override should have fired), or the
+ * fleet is saturated and there is no slot to give (expected). A non-zero rate
+ * here says the override is doing its job; a flat zero alongside a full fleet
+ * says the parked work is waiting on capacity, not on fairness.
+ */
+export const gqJobsDispatchedOverrideTotal = new Counter({
+  name: "gq_jobs_dispatched_override_total",
+  help: "Jobs dispatched by the work-conserving override, past a tenant's fair share, into slots that would otherwise be idle",
   labelNames: ["queue_name"] as const,
 });
 
@@ -208,6 +232,60 @@ export const gqOldestBacklogAgeMilliseconds = new Gauge({
 });
 
 /**
+ * Deepest single group's staging hash, in staged jobs.
+ *
+ * The aggregate gauges cannot see this. `gq_pending_groups` counts groups and
+ * `gq_oldest_backlog_age_milliseconds` clocks the head job's age, so one group
+ * holding hundreds of thousands of staged fields looks, to both of them, like
+ * a queue with one slightly old group in it. In the 2026-06 incident a single
+ * trace's `:data` hash reached ~290k fields and ~2.9 GB, and it grew for hours
+ * behind a coarse Redis-capacity alarm that only fired at 50% of the cluster.
+ *
+ * Per-key, because that is the shape of the failure. A per-group accumulation
+ * is caused by one producer or one hot key, and the aggregate is unremarkable
+ * the whole time it is happening.
+ *
+ * Published from a rotating sweep, so it means "the deepest group seen since
+ * this rotation began" rather than "the deepest group right now". See
+ * `sweepStagingDepth` in metricsCollector.ts for why a rotation rather than a
+ * sample, and what the lag costs.
+ */
+export const gqGroupStagingDepthMax = new Gauge({
+  name: "gq_group_staging_depth_max",
+  help: "Staged jobs in the deepest single group seen in the current sweep rotation (catches one hot group accumulating behind unremarkable aggregates)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * How many groups are at or above {@link STAGING_DEPTH_REPORT_FLOOR}.
+ *
+ * Separate from the max because they answer different questions under alarm.
+ * One deep group is a hot key; a thousand is the drainer having stopped. The
+ * max alone cannot tell those apart, and they want different responses.
+ */
+export const gqGroupsOverStagingDepth = new Gauge({
+  name: "gq_groups_over_staging_depth",
+  help: "Groups whose staging hash is at or above the reporting floor, in the current sweep rotation",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Depth at which a group starts being counted as accumulating.
+ *
+ * A floor, and inclusive: a group sitting at exactly this depth is counted.
+ * The alternative reads better in a sentence and worse in an incident, since
+ * the one depth that would slip through is the round number a person is most
+ * likely to have chosen deliberately.
+ *
+ * 10k staged jobs in one group is far outside anything the queue produces in
+ * normal operation and far below the ~290k the incident reached, so it leaves
+ * room to act. It is a reporting floor only: nothing in the queue changes
+ * behaviour when a group crosses it, and where the alarm sits is a dashboard
+ * decision, not this module's.
+ */
+export const STAGING_DEPTH_REPORT_FLOOR = 10_000;
+
+/**
  * Jobs whose producer supplied a ready score the queue refused.
  *
  * Raised at the staging fallback, once per job, the moment the value is
@@ -271,7 +349,7 @@ export const gqGroupsPoisonParkedTotal = new Counter({
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
-  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover reactor jobs; see gq_jobs_dropped_total)",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover subscriber jobs; see gq_jobs_dropped_total)",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
@@ -306,14 +384,14 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
  *   exists that we have not named; that is a bug in the enum, not a shrug.
  *
- * ⚠️ A non-zero rate on a reactor pipeline is PERMANENT DATA LOSS, not a blip.
- * Replay rebuilds fold projections and never invokes reactors
+ * ⚠️ A non-zero rate on a subscriber pipeline is PERMANENT DATA LOSS, not a blip.
+ * Replay rebuilds fold projections and never invokes subscribers
  * (`projections/projectionRouter.ts:61-71`), so nothing re-fires a dropped
- * reactor job. This counter is the ONLY signal that it happened.
+ * subscriber job. This counter is the ONLY signal that it happened.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
-  help: "Staged jobs discarded because they could not be decoded — for reactor pipelines this is permanent data loss (replay does not re-invoke reactors)",
+  help: "Staged jobs discarded because they could not be decoded — for subscriber pipelines this is permanent data loss (replay does not re-invoke subscribers)",
   labelNames: [
     "queue_name",
     "pipeline_name",
@@ -368,7 +446,7 @@ export const gqJobsUnroutableTotal = new Counter({
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
-  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
+  help: 'Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total). The "tier" label is where the blob lived, not which provider stored it: "redis" or "s3", where "s3" means the durable object store whatever its scheme — an Azure Blob deployment reports "s3" here.',
   labelNames: ["queue_name", "tier"] as const,
 });
 
@@ -411,4 +489,36 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
   help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * A coalesced batch failed retryably and was split in half to isolate the
+ * cause.
+ *
+ * Increments ONCE PER SPLIT, not once per batch, so one failing batch produces
+ * a burst rather than a single event. Read it as a rate, not a total, and do
+ * not infer a batch count from it — how many splits a batch costs depends on
+ * why it failed:
+ * - a single unprocessable payload costs one split per level of the descent to
+ *   it, so roughly `log2(batchSize)` — but the exact count moves with the
+ *   payload's position (a batch of 5 costs 2 or 3, not 2.32).
+ * - a batch that fails purely on size keeps splitting until every part fits, so
+ *   the cost is driven by how far the working size is below the batch bound and
+ *   approaches `batchSize - 1` in the worst case, far above `log2(batchSize)`.
+ *
+ * A steady non-zero rate is the signal worth acting on, and it means one of two
+ * things — both real:
+ * - the batch bound is too generous for what the handler can process in one
+ *   pass (size-driven; the fix is a tighter budget, not more bisection), or
+ * - a payload in this pipeline is persistently unprocessable (poison; bisection
+ *   is containing the blast radius but something still needs to look at it).
+ *
+ * Zero means batches either succeed whole or fail non-retryably. Correlate with
+ * `gq_jobs_retried_total` to tell "we recovered inside the dispatch" from "we
+ * gave the whole batch back to the queue".
+ */
+export const gqBatchBisectionsTotal = new Counter({
+  name: "gq_batch_bisections_total",
+  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — increments once per split, so one failing batch costs several",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });

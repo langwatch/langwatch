@@ -27,11 +27,26 @@
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  *       specs/ai-gateway/budgets-principal-cascade.feature
  */
-import type { GatewayBudget, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  GatewayBudget,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
+  /**
+   * The team the request's traces land in. Callers pass only this one; the
+   * teams the key is itself scoped to are read here, from the key, so
+   * every path gets them without plumbing (see `keyTeamScopeIds`).
+   */
   teamId?: string | null;
+  /**
+   * The teams the key is scoped to, when the caller already knows them.
+   * Omit it and they are read from the key. The draft-key path passes them
+   * explicitly because the key it is previewing does not exist yet.
+   */
+  scopedTeamIds?: string[] | null;
   projectId?: string | null;
   virtualKeyId?: string | null;
   principalUserId?: string | null;
@@ -66,22 +81,42 @@ export type ResolvedBudget = {
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 /**
- * Every budget that constrains this target, one entry per enforcement
- * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
- * snapshots stay byte-stable across runs.
+ * Which budget scopes this request could match, as one OR list.
+ *
+ * A scope missing here is a budget that silently never fires, so each arm
+ * says what it covers rather than leaving it to the reader.
  */
-export async function resolveApplicableBudgets(
-  client: PrismaLike,
-  target: BudgetResolutionTarget,
-): Promise<ResolvedBudget[]> {
+async function scopePredicatesFor({
+  client,
+  target,
+}: {
+  client: PrismaLike;
+  target: BudgetResolutionTarget;
+}): Promise<Prisma.GatewayBudgetWhereInput[]> {
   const ors: Prisma.GatewayBudgetWhereInput[] = [
     { scopeType: "ORGANIZATION", scopeId: target.organizationId },
   ];
   if (target.virtualKeyId) {
     ors.push({ scopeType: "VIRTUAL_KEY", scopeId: target.virtualKeyId });
   }
-  if (target.teamId) {
-    ors.push({ scopeType: "TEAM", scopeId: target.teamId });
+
+  // A request belongs to the team its traces land in AND to every team its
+  // key is scoped to. Those two differ whenever the key is not scoped to
+  // exactly one project, because the trace project then falls back to the
+  // organization's governance project: a team-scoped key reported the
+  // governance team, and a budget on the team that owns the key matched
+  // nothing while both sides looked correctly configured.
+  //
+  // Reading the key's scopes here rather than making every caller pass
+  // them is what puts the fix on all four paths at once, the debit path
+  // included, and that is the one that actually accrues spend.
+  const teamIds = presentIds([
+    target.teamId,
+    ...(target.scopedTeamIds ??
+      (await keyTeamScopeIds({ client, virtualKeyId: target.virtualKeyId }))),
+  ]);
+  if (teamIds.length > 0) {
+    ors.push({ scopeType: "TEAM", scopeId: { in: teamIds } });
   }
   if (target.projectId) {
     ors.push({ scopeType: "PROJECT", scopeId: target.projectId });
@@ -90,9 +125,7 @@ export async function resolveApplicableBudgets(
   // ATTRIBUTED_USER templates anchor on a virtual key or a project: the
   // template applies to every request on its anchor, whoever the end user
   // turns out to be.
-  const templateAnchors = [target.virtualKeyId, target.projectId].filter(
-    (id): id is string => typeof id === "string" && id.length > 0,
-  );
+  const templateAnchors = presentIds([target.virtualKeyId, target.projectId]);
   if (templateAnchors.length > 0) {
     ors.push({
       scopeType: "ATTRIBUTED_USER",
@@ -103,18 +136,33 @@ export async function resolveApplicableBudgets(
   // GROUP budgets only enforce through a member. A key with no principal
   // (a shared org/team/project key) has nobody to charge the per-member
   // bucket to, so group budgets do not apply to it at all.
-  let groupIds: string[] = [];
-  if (target.principalUserId) {
-    ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
-    groupIds = await memberGroupIds(
-      client,
-      target.organizationId,
-      target.principalUserId,
-    );
-    if (groupIds.length > 0) {
-      ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
-    }
+  if (!target.principalUserId) return ors;
+
+  ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
+  const groupIds = await memberGroupIds({
+    client,
+    organizationId: target.organizationId,
+    userId: target.principalUserId,
+  });
+  if (groupIds.length > 0) {
+    ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
   }
+  return ors;
+}
+
+/**
+ * Every budget that constrains this target, one entry per enforcement
+ * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
+ * snapshots stay byte-stable across runs.
+ */
+export async function resolveApplicableBudgets({
+  client,
+  target,
+}: {
+  client: PrismaLike;
+  target: BudgetResolutionTarget;
+}): Promise<ResolvedBudget[]> {
+  const ors = await scopePredicatesFor({ client, target });
 
   const rows = await client.gatewayBudget.findMany({
     where: {
@@ -123,7 +171,6 @@ export async function resolveApplicableBudgets(
       OR: ors,
     },
   });
-
   const resolved = rows.map((budget) => {
     if (budget.scopeType === "GROUP") {
       return {
@@ -161,6 +208,39 @@ export async function resolveApplicableBudgets(
   return resolved.sort(byScopeThenId);
 }
 
+/** The ids actually worth querying: present, non-empty, and each asked for once. */
+function presentIds(
+  ids: (string | null | undefined)[] | null | undefined,
+): string[] {
+  if (!ids) return [];
+  return Array.from(
+    new Set(
+      ids.filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  );
+}
+
+/**
+ * The teams a key is scoped to. Empty when there is no key in context,
+ * which is the draft path before the key exists; that caller passes
+ * `scopedTeamIds` instead so the drawer previews the same set the key will
+ * resolve once it is saved.
+ */
+async function keyTeamScopeIds({
+  client,
+  virtualKeyId,
+}: {
+  client: PrismaLike;
+  virtualKeyId: string | null | undefined;
+}): Promise<string[]> {
+  if (!virtualKeyId) return [];
+  const scopes = await client.virtualKeyScope.findMany({
+    where: { virtualKeyId, scopeType: "TEAM" },
+    select: { scopeId: true },
+  });
+  return scopes.map((scope) => scope.scopeId);
+}
+
 /**
  * The ledger buckets spend by (Scope, ScopeId), so anything that must
  * accrue separately has to be separate in that key. Two budgets on the
@@ -184,11 +264,15 @@ export const PROVIDER_BUCKET_SEPARATOR = "|provider:";
  * org so a user in several orgs never drags another org's group
  * budget into this one's cascade.
  */
-async function memberGroupIds(
-  client: PrismaLike,
-  organizationId: string,
-  userId: string,
-): Promise<string[]> {
+async function memberGroupIds({
+  client,
+  organizationId,
+  userId,
+}: {
+  client: PrismaLike;
+  organizationId: string;
+  userId: string;
+}): Promise<string[]> {
   const memberships = await client.groupMembership.findMany({
     where: { userId, group: { organizationId } },
     select: { groupId: true },

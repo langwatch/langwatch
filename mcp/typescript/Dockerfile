@@ -21,6 +21,9 @@ COPY platform/app/package.json ./platform/app/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
+COPY packages/authz/package.json ./packages/authz/
+COPY packages/authz-server/package.json ./packages/authz-server/
+COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
@@ -43,4 +46,13 @@ COPY services/langevals/ ./services/langevals/
 EXPOSE 3000
 
 WORKDIR /app/mcp/typescript
-CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000"]
+
+# The HTTP server is network reachable, so it does not run as root. The node
+# image ships this unprivileged user; everything under /app is read-only at
+# runtime and tsx compiles into the system temp directory.
+USER node
+# The HTTP server binds loopback by default. A container has to bind every
+# interface to be reachable from outside itself, so that is opted into here.
+# Publish the port only to a network you trust, and pass --allowedOrigin for
+# any browser origin that needs to reach it.
+CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000", "--host", "0.0.0.0"]

@@ -16,8 +16,8 @@
  */
 import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
-import { isProxyBypassed } from "../src/server/mailer/providers/proxy";
 import { EmailProviderConfigurationError } from "../src/server/mailer/providers/types";
+import { isProxyBypassed } from "../src/server/outboundProxy";
 
 const PROXY_PORT = 8888;
 
@@ -87,7 +87,7 @@ const egressHost = (): string => {
 
 /** Whether the observed routing matches what the proxy settings asked for. */
 function report(tunnelled: string[]): never {
-  // Ask the mailer's own matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
+  // Ask the shared proxy matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
   // leaves the gateway host proxied, and treating that as a bypass would invert
   // the verdict.
   const host = egressHost();

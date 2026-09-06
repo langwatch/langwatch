@@ -102,7 +102,7 @@ langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
 
 ## Setup-from-scratch via agent (v1 preview)
 
-The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
+The end state is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
 
 ```bash
 # 1. List existing platform templates (admin shape, includes ottl_rules)

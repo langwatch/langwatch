@@ -26,6 +26,8 @@ const mockGetAllInstances = vi.fn();
 // exercises the fan-out, failure-isolation, and "no instances" contracts
 // through the actual repository code, not a hand-rolled substitute.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     storedObjects: {
       crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(() =>

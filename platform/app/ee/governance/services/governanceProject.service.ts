@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { nanoid } from "nanoid";
 /**
  * Hidden Governance Project — internal routing/tenancy artifact.
  *
@@ -17,7 +18,7 @@
  *     enforces the bulk of this; per-consumer assertions land in Layer 2.
  *
  * Lifecycle: lazily ensured on first need — typically the first
- * IngestionSource mint per org. Any later callsite (anomaly reactor,
+ * IngestionSource mint per org. Any later callsite (anomaly subscriber,
  * receiver, UI sub-route) calls the SAME helper. There is no other
  * lazy-create path. Feature-flag activation alone does NOT create a
  * Governance Project; the user must mint a real governance entity
@@ -28,8 +29,11 @@
  *   - specs/ai-gateway/governance/ui-contract.feature
  *   - specs/ai-gateway/governance/receiver-shapes.feature
  */
-import { Prisma, type PrismaClient, type Project } from "@prisma/client";
-import { nanoid } from "nanoid";
+import {
+  Prisma,
+  type PrismaClient,
+  type Project,
+} from "~/generated/prisma/client";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 

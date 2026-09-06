@@ -83,6 +83,12 @@ const CODING_AGENT_SOURCE_TYPES: ReadonlySet<string> = new Set([
   "gemini",
   "opencode",
   "cursor",
+  // The three copilot capture surfaces (ADR-039): CLI wrapper, standalone
+  // app login agent, VS Code Copilot Chat. Without these, copilot traces
+  // surface as origin=ai_tool and drop out of coding-agent filters.
+  "copilot_cli",
+  "copilot_app",
+  "copilot_vscode",
 ]);
 
 /**
@@ -114,7 +120,8 @@ type OtlpSpanLike = OtlpAttributeHolder & {
   events?: OtlpAttributeHolder[] | null;
   links?: OtlpAttributeHolder[] | null;
 };
-type OtlpScopeSpans = { spans?: OtlpSpanLike[] | null };
+type OtlpScope = { name?: string | null } | null;
+type OtlpScopeSpans = { scope?: OtlpScope; spans?: OtlpSpanLike[] | null };
 type OtlpResourceSpans = {
   resource?: OtlpResource | null;
   scopeSpans?: OtlpScopeSpans[] | null;
@@ -127,12 +134,76 @@ type OtlpResourceLogs = {
 };
 type OtlpLogRequest = { resourceLogs?: OtlpResourceLogs[] | null };
 type OtlpMetricLike = OtlpAttributeHolder;
-type OtlpScopeMetrics = { metrics?: OtlpMetricLike[] | null };
+type OtlpScopeMetrics = {
+  scope?: OtlpScope;
+  metrics?: OtlpMetricLike[] | null;
+};
 type OtlpResourceMetrics = {
   resource?: OtlpResource | null;
   scopeMetrics?: OtlpScopeMetrics[] | null;
 };
 type OtlpMetricRequest = { resourceMetrics?: OtlpResourceMetrics[] | null };
+
+/**
+ * Instrumentation scopes a `copilot_vscode` ingest key may carry. The `code`
+ * wrapper injects SPEC-STANDARD `OTEL_*` env into the whole VS Code process;
+ * `terminal.integrated.env` clears it from integrated terminals, but VS Code's
+ * js-debug internal console and extension-spawned processes still inherit it.
+ * A developer F5-debugging their own OTel-instrumented service would POST that
+ * service's traces here under the copilot key, labelled copilot-chat, into
+ * governance analytics. Scope-gate the key: only Copilot's own scopes pass.
+ */
+export const COPILOT_VSCODE_ALLOWED_SCOPES: ReadonlySet<string> = new Set([
+  "github.copilot",
+  "@github/copilot",
+]);
+
+/**
+ * Drop scope-spans (or scope-metrics) whose instrumentation scope is not
+ * Copilot's when the ingest key is `copilot_vscode`. Returns the number of
+ * scope groups dropped (0 for every other sourceType — no-op).
+ */
+function scopeAllowedForVscode(scope: OtlpScope | undefined): boolean {
+  return COPILOT_VSCODE_ALLOWED_SCOPES.has(scope?.name ?? "");
+}
+
+/** Filter one resource group's scope list in place; returns how many dropped. */
+function dropForeignFromGroups<T extends { scope?: OtlpScope }>(
+  groups: T[] | null | undefined,
+): { kept: T[]; dropped: number } {
+  const all = groups ?? [];
+  const kept = all.filter((g) => scopeAllowedForVscode(g.scope));
+  return { kept, dropped: all.length - kept.length };
+}
+
+export function dropForeignScopesForVscodeKey(
+  request: OtlpTraceRequest & OtlpMetricRequest,
+  sourceType: string,
+): number {
+  if (sourceType !== "copilot_vscode") return 0;
+  let dropped = 0;
+  if (request.resourceSpans) {
+    for (const rs of request.resourceSpans) {
+      const r = dropForeignFromGroups(rs.scopeSpans);
+      rs.scopeSpans = r.kept;
+      dropped += r.dropped;
+    }
+    request.resourceSpans = request.resourceSpans.filter(
+      (rs) => (rs.scopeSpans?.length ?? 0) > 0,
+    );
+  }
+  if (request.resourceMetrics) {
+    for (const rm of request.resourceMetrics) {
+      const r = dropForeignFromGroups(rm.scopeMetrics);
+      rm.scopeMetrics = r.kept;
+      dropped += r.dropped;
+    }
+    request.resourceMetrics = request.resourceMetrics.filter(
+      (rm) => (rm.scopeMetrics?.length ?? 0) > 0,
+    );
+  }
+  return dropped;
+}
 
 export function stampIngestKeyProvenanceOnTraceRequest(
   request: OtlpTraceRequest,

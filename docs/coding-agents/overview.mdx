@@ -1,0 +1,111 @@
+---
+title: Coding Agent Monitoring and Cost Tracking
+sidebarTitle: Overview
+description: Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+keywords:
+  - coding agent monitoring
+  - claude code usage
+  - ccusage
+  - codex usage tracking
+  - copilot usage
+  - ai agent cost tracking
+  - opentelemetry coding agents
+---
+
+## Getting started
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    npx langwatch claude
+    ```
+  </Tab>
+  <Tab title="Codex">
+    ```bash
+    npx langwatch codex
+    ```
+  </Tab>
+  <Tab title="GitHub Copilot">
+    ```bash
+    npx langwatch copilot
+    ```
+  </Tab>
+  <Tab title="Gemini CLI">
+    ```bash
+    npx langwatch gemini
+    ```
+  </Tab>
+  <Tab title="OpenCode">
+    ```bash
+    npx langwatch opencode
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+  </Tab>
+</Tabs>
+
+This will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more.
+
+Check out the [quickstart](/coding-agents/quickstart) for next steps.
+
+## Set up your agent
+
+<CardGroup cols={3}>
+  <Card title="Claude Code" icon="/images/logos/claude-code.svg" href="/coding-agents/claude-code" />
+  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex" />
+  <Card title="GitHub Copilot" icon="/images/logos/github-copilot.svg" href="/coding-agents/github-copilot-cli" />
+  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli" />
+  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode" />
+  <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/cli/overview">
+    Through the LangWatch AI Gateway.
+  </Card>
+</CardGroup>
+
+## See your usage
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="terminal" href="/coding-agents/sessions">
+    Context carried, compactions, cost, and a terminal replay of the whole conversation.
+  </Card>
+  <Card title="Pull requests" icon="code-pull-request" href="/coding-agents/pull-requests">
+    What each change cost, across every session and contributor.
+  </Card>
+  <Card title="Usage analytics" icon="chart-column" href="/coding-agents/usage-analytics">
+    Spend and activity on your personal page, the CLI and the API.
+  </Card>
+  <Card title="Repository and PR attribution" icon="code-branch" href="/coding-agents/repository-and-pr-attribution">
+    How sessions get joined to repositories, branches and pull requests.
+  </Card>
+</CardGroup>
+
+## Teams, fleets and privacy
+
+<CardGroup cols={2}>
+  <Card title="Team projects" icon="users" href="/coding-agents/team-projects">
+    Point agents at a shared project.
+  </Card>
+  <Card title="Headless machines and CI" icon="server" href="/coding-agents/headless-and-ci">
+    Servers, build agents and fleets, with no login.
+  </Card>
+  <Card title="Privacy" icon="lock" href="/coding-agents/privacy">
+    Where your data lands and who can read it, stated exactly.
+  </Card>
+  <Card title="Secrets redaction" icon="key" href="/coding-agents/secrets-redaction">
+    Credentials become a typed marker before storage. On by default.
+  </Card>
+</CardGroup>
+
+## Investigate with your agent
+
+<CardGroup cols={3}>
+  <Card title="Explore your usage" href="/coding-agents/explore-your-usage-with-your-own-agent">
+    Your agent answers "where did my tokens go".
+  </Card>
+  <Card title="Find your context sweet spot" href="/coding-agents/find-your-context-sweet-spot">
+    Where fat context stops paying for itself.
+  </Card>
+  <Card title="Compare provider costs" href="/coding-agents/compare-provider-costs">
+    Price your real usage mix against other providers.
+  </Card>
+</CardGroup>

@@ -8,7 +8,7 @@
  * which templates apply and which period their figures cover is business
  * logic, and it is the same logic whichever surface asks for it.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { bucketPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";

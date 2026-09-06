@@ -7,10 +7,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
+import type { Evaluator } from "~/generated/prisma/client";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { RenderCode } from "../code/RenderCode";
 import { HorizontalFormControl } from "../HorizontalFormControl";

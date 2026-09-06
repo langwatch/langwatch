@@ -1,15 +1,53 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
 import type { EvaluatorConfig } from "../types";
 
 /**
- * Batch-fetch display names for multiple evaluators.
+ * What an evaluator with no stored name is called: the catalog's name for its
+ * type, and the type itself for a project's own evaluators, whose
+ * `custom/<id>` and `code/<id>` types the catalog has no entry for.
  *
- * Resolution order per evaluator:
- *  1. localEvaluatorConfig.name  (unsaved local edit)
- *  2. DB name via evaluators.getById
- *  3. evaluator.id (fallback)
+ * The same order the get-state projection answers in, so the page and the
+ * agent read one name for one evaluator.
+ */
+const typeName = (evaluator: EvaluatorConfig): string =>
+  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
+  evaluator.evaluatorType;
+
+/**
+ * What one evaluator is called, in order:
+ *  1. the name the workbench holds
+ *  2. the name of the database evaluator it points at
+ *  3. the name of its type
+ *
+ * The config id is not in that list. It was the last step until an evaluator
+ * arrived carrying neither a workbench name nor a database evaluator, which is
+ * what the add-evaluator action produced, and three chips on one row read
+ * `evaluator_AzPF-HSd`, `evaluator_E27nxt8l` and `evaluator_I72w-XB4`. A type
+ * name is a worse name than the one its author should have given it, and a far
+ * better one than an id.
+ *
+ * A name is a name only when it holds a character: a stored empty string is
+ * absence, not a name, and reads as a blank chip.
+ */
+export const resolveEvaluatorName = ({
+  evaluator,
+  dbName,
+}: {
+  evaluator: EvaluatorConfig;
+  dbName?: string | null;
+}): string =>
+  evaluator.localEvaluatorConfig?.name?.trim() ||
+  dbName?.trim() ||
+  typeName(evaluator);
+
+/**
+ * Batch-fetch display names for multiple evaluators.
  *
  * Returns a stable Map<evaluatorConfigId, displayName>.
  */
@@ -36,20 +74,20 @@ export const useEvaluatorNames = (
   // Derive a cheap string key so useMemo only recomputes when names actually
   // change, not on every render (api.useQueries returns a new array ref).
   const namesKey = evaluators
-    .map((ev, i) => {
-      const name =
-        ev.localEvaluatorConfig?.name ?? queries[i]?.data?.name ?? ev.id;
-      return `${ev.id}:${name}`;
-    })
+    .map(
+      (ev, i) =>
+        `${ev.id}:${resolveEvaluatorName({ evaluator: ev, dbName: queries[i]?.data?.name })}`,
+    )
     .join("|");
 
   return useMemo(() => {
     return new Map(
       evaluators.map((evaluator, index) => [
         evaluator.id,
-        evaluator.localEvaluatorConfig?.name ??
-          queries[index]?.data?.name ??
-          evaluator.id,
+        resolveEvaluatorName({
+          evaluator,
+          dbName: queries[index]?.data?.name,
+        }),
       ]),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +100,7 @@ export const useEvaluatorNames = (
  */
 export const useEvaluatorName = (evaluator: EvaluatorConfig): string => {
   const names = useEvaluatorNames([evaluator]);
-  return names.get(evaluator.id) ?? evaluator.id;
+  return names.get(evaluator.id) ?? resolveEvaluatorName({ evaluator });
 };
 
 /**

@@ -10,19 +10,43 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
+import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "~/server/connected-agents/constants";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
+import { parseSuiteTargets } from "../../suites/types";
+import { isAgentTestScenarioId } from "../agent-test-scenario";
+import {
+  mergeRunParameters,
+  parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
+  type RunParameterValues,
+  withoutParameterNames,
+} from "../parameters";
+import { type ResolvedRunModels, resolveRunModels } from "../run-models";
+import {
+  decryptRunSecretValues,
+  type RunSecretCiphertext,
+} from "../run-secret-values";
+import { prefetchAgentTestData } from "./agent-test-prefetch";
+import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -37,13 +61,15 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "../../prompt-config/prompt.service";
+import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
+import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
+  type ConnectedAgentData,
   type ExecutionContext,
-  FieldMappingSchema,
   type HttpAgentData,
   type LiteLLMParams,
   type PromptConfigData,
@@ -69,6 +95,11 @@ export interface ScenarioFetcher {
     simulatorModel?: string | null;
     /** Per-scenario judge model override (null = use default). */
     judgeModel?: string | null;
+    /** The parameters the scenario declares, as stored on its JSON column. */
+    parameters?: unknown;
+    /** Turn config (ADR-015); null = SDK default. */
+    maxTurns?: number | null;
+    minTurns?: number | null;
   } | null>;
 }
 
@@ -78,13 +109,24 @@ export interface ScenarioFetcher {
  * prefetcher can pick up a run plan's choices without threading them through
  * the event-sourcing queue. Returns null when the run is not part of a suite.
  */
-export interface SuiteModelFetcher {
+export interface SuiteConfigFetcher {
   getBySetId(
     setId: string,
     projectId: string,
   ): Promise<{
     simulatorModel: string | null;
     judgeModel: string | null;
+    /**
+     * The suite's configured targets. Prompt targets carry the bindings from a
+     * scenario source to the prompt's declared inputs; agents keep theirs on
+     * the agent record. Read through the same set-id lookup as the model
+     * overrides, so no binding has to travel through the event queue.
+     */
+    targets?: Array<{
+      type: string;
+      referenceId: string;
+      scenarioMappings?: Record<string, FieldMapping>;
+    }>;
   } | null>;
 }
 
@@ -115,11 +157,29 @@ export interface WorkflowVersionFetcher {
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
-/** Minimal interface for project lookup */
+/**
+ * Minimal interface for project lookup.
+ *
+ * The organization comes along because minting a run's sandbox key needs it,
+ * and the project row is already being read.
+ */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
+    team: { organizationId: string } | null;
   } | null>;
+}
+
+/**
+ * Mints the short-lived credential a code agent's sandbox authenticates with.
+ * Answers undefined when the platform could not mint one, which leaves the run
+ * to do its work once per row.
+ */
+export interface SandboxKeyMinter {
+  mint(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | undefined>;
 }
 
 /**
@@ -147,11 +207,15 @@ export type ModelParamsFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
+  | "model_not_configured"
   | "preparation_error";
 
 /** Structured result from model params preparation */
 export type ModelParamsResult =
-  | { success: true; params: LiteLLMParams }
+  | {
+      success: true;
+      params: LiteLLMParams;
+    }
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
 /** Minimal interface for model params preparation */
@@ -159,10 +223,19 @@ export interface ModelParamsProvider {
   prepare(projectId: string, model: string): Promise<ModelParamsResult>;
 }
 
+/**
+ * Resolves the verdict-time trace wait budget for remote-trace judging from
+ * the project's own ingest lag. Only consulted for http targets - the only
+ * ones whose judge fetches remote traces.
+ */
+export interface TraceWaitBudgetResolver {
+  resolveTraceWaitTimeoutMs(params: { projectId: string }): Promise<number>;
+}
+
 /** All dependencies required by prefetchScenarioData */
 export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
-  suiteModelFetcher: SuiteModelFetcher;
+  suiteConfigFetcher: SuiteConfigFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
@@ -170,6 +243,8 @@ export interface DataPrefetcherDependencies {
   modelParamsProvider: ModelParamsProvider;
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
+  traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -181,6 +256,13 @@ export type PrefetchResult =
       success: true;
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data` rather than a member
+       * of it: the child process builds its models from the prepared params,
+       * so it needs no name, while the caller that queues the run records the
+       * names on it. Null for a scripted run, which resolves no model.
+       */
+      resolvedModels: ResolvedRunModels | null;
     }
   | {
       success: false;
@@ -193,17 +275,105 @@ export type PrefetchResult =
 // ============================================================================
 
 /**
+ * Everything the child's environment needs, which is a strict subset of a full
+ * prefetch and resolves much earlier. See `onChildEnvReady`.
+ */
+export interface ChildEnvInputs {
+  labels: string[];
+  telemetry: { endpoint: string; apiKey: string };
+}
+
+/**
+ * What a prefetch is asked to prepare: the run's execution context, plus the
+ * parameter values it resolved.
+ *
+ * The values travel with the context rather than beside it because they are
+ * part of what identifies this run: the same scenario, the same target and the
+ * same set can be run again with different ones and be a different run.
+ */
+export type PrefetchContext = ExecutionContext & {
+  /**
+   * The values the run resolved for this scenario, as recorded on the queued
+   * event. Merged again over the scenario's declared defaults here, which
+   * makes the merge idempotent: a job queued by a build that did not resolve
+   * them still gets the defaults, and one queued by a build that did gets the
+   * same answer twice.
+   */
+  parameters?: RunParameterValues;
+  /**
+   * The run's secret parameter values, encrypted, as recorded on the queued
+   * event. Decrypted once here and merged over the project's own secrets, so
+   * the target reads them as `secrets.NAME` like any other secret.
+   */
+  secretParameters?: RunSecretCiphertext;
+};
+
+/**
+ * Merges the run's own secrets over the project's.
+ *
+ * One wrapper rather than a merge in each of the three fetch functions that
+ * load secrets: they then keep one source of secrets, and a fourth target type
+ * cannot be added that reads the project's set alone.
+ *
+ * The run's value wins on a name collision. Overriding a project secret for one
+ * run is the point: the same scenario runs against staging with the staging
+ * credential without a second project set up for it.
+ */
+function withRunSecrets({
+  fetcher,
+  runSecrets,
+}: {
+  fetcher: ProjectSecretsFetcher;
+  runSecrets: Record<string, string>;
+}): ProjectSecretsFetcher {
+  return {
+    getSecrets: async (projectId: string) => ({
+      ...(await fetcher.getSecrets(projectId)),
+      ...runSecrets,
+    }),
+  };
+}
+
+/**
+ * How a target reads in the failure a run reports when its row is gone, one
+ * label per target type so the run names the kind the customer picked.
+ */
+const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
+  prompt: "Prompt",
+  code: "Code agent",
+  workflow: "Workflow agent",
+  connected: "Connected agent",
+  http: "HTTP agent",
+};
+
+/**
  * Pre-fetch all data needed for scenario execution.
  *
- * @param context - Execution context with project/scenario IDs
+ * @param context - Execution context with project/scenario IDs and the run's
+ *   resolved parameter values
  * @param target - Target configuration (prompt or http)
  * @param deps - Injected dependencies for data fetching
+ * @param onChildEnvReady - Called once, as soon as the scenario and project
+ *   resolve, with the only two prefetched values the child's environment
+ *   depends on. It exists so the caller can start the child booting against
+ *   the rest of this function rather than after it; a caller that does not
+ *   care may omit it.
+ *
+ *   Never called when the run is doomed — a missing scenario, a failed project
+ *   lookup or a project with no API key all skip it, so no child is started
+ *   for a run that is about to fail.
  */
-export async function prefetchScenarioData(
-  context: ExecutionContext,
-  target: TargetConfig,
-  deps: DataPrefetcherDependencies,
-): Promise<PrefetchResult> {
+export async function prefetchScenarioData({
+  context,
+  target,
+  deps,
+  onChildEnvReady,
+}: {
+  context: PrefetchContext;
+  target: TargetConfig;
+  deps: DataPrefetcherDependencies;
+  onChildEnvReady?: (inputs: ChildEnvInputs) => void;
+}): Promise<PrefetchResult> {
   logger.debug(
     {
       projectId: context.projectId,
@@ -214,11 +384,106 @@ export async function prefetchScenarioData(
     "Prefetching scenario data",
   );
 
-  const scenarioResult = await fetchScenario(
+  // An agent test has no scenario row and no model: it reads the project and
+  // the agent the way every run does, and nothing else.
+  if (isAgentTestScenarioId(context.scenarioId)) {
+    return prefetchAgentTestData({
+      context,
+      target,
+      reads: {
+        project: () => fetchProject(context.projectId, deps.projectFetcher),
+        adapter: () => fetchAgentData(context.projectId, target, deps),
+        agentName: async () =>
+          (
+            await deps.agentFetcher.findById({
+              projectId: context.projectId,
+              id: target.referenceId,
+            })
+          )?.name ?? null,
+      },
+      onChildEnvReady,
+    });
+  }
+
+  // Decrypted once, before anything is fetched. A key that no longer opens the
+  // values fails the run here rather than sending the target a request with a
+  // credential missing from it, which would report a result about the
+  // credential instead of about the scenario.
+  let secretDeps = deps;
+  if (
+    context.secretParameters &&
+    Object.keys(context.secretParameters).length > 0
+  ) {
+    try {
+      secretDeps = {
+        ...deps,
+        projectSecretsFetcher: withRunSecrets({
+          fetcher: deps.projectSecretsFetcher,
+          runSecrets: decryptRunSecretValues(context.secretParameters),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  // The scenario, the project, the target adapter and the suite config are
+  // independent lookups keyed off ids we already hold, so they go out together
+  // rather than one await at a time. This runs on the path between a run being
+  // queued and its child starting, once per simulation.
+  //
+  // The checks below keep their original order, so the error reported for any
+  // given failure is unchanged; the only difference is that a doomed run may
+  // have issued the other queries before finding out.
+  const scenarioPromise = fetchScenario({
+    projectId: context.projectId,
+    scenarioId: context.scenarioId,
+    fetcher: deps.scenarioFetcher,
+    suppliedParameters: context.parameters,
+  });
+  const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
+  const adapterPromise = fetchAgentData(context.projectId, target, secretDeps);
+  const suitePromise = deps.suiteConfigFetcher.getBySetId(
+    context.setId,
     context.projectId,
-    context.scenarioId,
-    deps.scenarioFetcher,
   );
+
+  // The child's environment needs only the scenario's labels and the project's
+  // API key, and those two land well before the adapter, suite config and
+  // model params. Announcing them here lets the caller start the child booting
+  // against the slow half of this function instead of after it — the child is
+  // still one fresh process per run, only started sooner.
+  //
+  // Deliberately not awaited: a failure here is re-reported by the ordered
+  // checks below, and this must not become the thing that decides the run.
+  if (onChildEnvReady) {
+    void Promise.all([scenarioPromise, projectPromise])
+      .then(([scenario, project]) => {
+        if (!scenario || !project.success || !project.data.apiKey) return;
+        onChildEnvReady({
+          labels: scenario.config.labels,
+          telemetry: {
+            endpoint: env.LANGWATCH_ENDPOINT,
+            apiKey: project.data.apiKey,
+          },
+        });
+      })
+      .catch(() => {
+        // Swallowed on purpose: the awaited results below own error reporting.
+      });
+  }
+
+  const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
+    await Promise.all([
+      scenarioPromise,
+      projectPromise,
+      adapterPromise,
+      suitePromise,
+    ]);
+
   if (!scenarioResult) {
     logger.warn(
       { projectId: context.projectId, scenarioId: context.scenarioId },
@@ -231,10 +496,6 @@ export async function prefetchScenarioData(
   }
   const scenario = scenarioResult.config;
 
-  const projectResult = await fetchProject(
-    context.projectId,
-    deps.projectFetcher,
-  );
   if (!projectResult.success) {
     logger.warn(
       { projectId: context.projectId, error: projectResult.error },
@@ -244,7 +505,6 @@ export async function prefetchScenarioData(
   }
   const project = projectResult.data;
 
-  const adapterResult = await fetchAgentData(context.projectId, target, deps);
   if (
     adapterResult !== null &&
     "success" in adapterResult &&
@@ -275,98 +535,158 @@ export async function prefetchScenarioData(
       },
       "Target adapter not found",
     );
-    const targetLabel =
-      target.type === "prompt"
-        ? "Prompt"
-        : target.type === "code"
-          ? "Code agent"
-          : target.type === "workflow"
-            ? "Workflow agent"
-            : "HTTP agent";
     return {
       success: false,
-      error: `${targetLabel} ${target.referenceId} not found`,
+      error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
     };
   }
 
-  // Resolve the three model roles a run needs:
-  //   - the target adapter (prompt / workflow under test): the prompt's own
-  //     model when set, else the project's scenarios.generator default.
+  // Resolve the model roles a run needs:
+  //   - the target adapter, ONLY for a prompt target: the prompt's own
+  //     model when set, else the project's scenarios.agent_under_test
+  //     DEFAULT-role default. workflow / code / http targets never consume
+  //     an LLM key for the agent under test — the workflow/code adapters
+  //     send the project's platform API key instead (see
+  //     serialized-adapter.registry.ts) and http needs neither — so
+  //     resolving and preparing one for them is skipped entirely rather
+  //     than risking a project whose FAST/coding default is a
+  //     terms-restricted model (issue #6634).
   //   - the user-simulator and the judge: a run-plan override, else the
   //     scenario's own override, else the DEFAULT-role scenarios.user_simulator
   //     / scenarios.judge model. The split lets the role-play and evaluation
   //     use a smart model independently of the agent under test.
   // ModelNotConfiguredError bubbles as a structured "model not configured"
   // failure with the resolver's message.
-  const suiteOverrides = await deps.suiteModelFetcher.getBySetId(
-    context.setId,
-    context.projectId,
-  );
-  let modelForParams: string;
+  // A prompt's bindings are configured on the suite target that paired the
+  // prompt with this run plan, so they arrive with the suite rather than with
+  // the prompt. Agents carry their own on the agent record, already loaded
+  // above.
+  // One key for the whole run, and the same key the project's other runs
+  // hold: every turn of this run shares the cache entries it writes, and a key
+  // per turn or per run would leave a ledger of live credentials behind. A
+  // run that cannot get one still runs, and every turn does its own work.
+  if (adapterData.type === "code" && project.organizationId) {
+    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
+      projectId: context.projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
+  if (adapterData.type === "prompt") {
+    adapterData.scenarioMappings = suiteOverrides?.targets?.find(
+      (candidate) =>
+        candidate.type === "prompt" &&
+        candidate.referenceId === target.referenceId,
+    )?.scenarioMappings;
+  }
+
+  let modelForParams: string | undefined;
   let simulatorModel: string;
   let judgeModel: string;
   try {
-    modelForParams =
-      adapterData.type === "prompt" && adapterData.model
+    if (adapterData.type === "prompt") {
+      modelForParams = adapterData.model
         ? adapterData.model
         : await deps.modelResolver.resolve(
-            "scenarios.generator",
+            "scenarios.agent_under_test",
             context.projectId,
           );
-    simulatorModel =
-      suiteOverrides?.simulatorModel ??
-      scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
-    judgeModel =
-      suiteOverrides?.judgeModel ??
-      scenarioResult.judgeModel ??
-      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+    }
+    ({ simulatorModel, judgeModel } = await resolveRunModels({
+      plan: {
+        simulatorModel: suiteOverrides?.simulatorModel,
+        judgeModel: suiteOverrides?.judgeModel,
+      },
+      scenario: {
+        simulatorModel: scenarioResult.simulatorModel,
+        judgeModel: scenarioResult.judgeModel,
+      },
+      resolveFeatureModel: (featureKey) =>
+        deps.modelResolver.resolve(featureKey, context.projectId),
+    }));
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "No default model configured for this project";
-    return { success: false, error: message };
+    // A project with no model set for scenarios is the customer's to fix and
+    // carries its own remediation message, so it is named rather than left
+    // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    //
+    // Any other failure here is ours. `error` reaches the customer as the
+    // reason a run or an agent test was refused, so only a message LangWatch
+    // authored may go in it. A HandledError carries a customer-safe message by
+    // contract; everything else is logged and named in one sentence.
+    if (!(err instanceof HandledError)) {
+      logger.error(
+        { projectId: context.projectId, error: err },
+        "Model resolution failed for a scenario run",
+      );
+    }
+    return {
+      success: false,
+      error:
+        err instanceof HandledError
+          ? err.message
+          : "The models this run needs could not be resolved",
+      ...(err instanceof ModelNotConfiguredError
+        ? { reason: "model_not_configured" as const }
+        : {}),
+    };
   }
 
   const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
     await Promise.all([
-      deps.modelParamsProvider.prepare(context.projectId, modelForParams),
+      modelForParams !== undefined
+        ? deps.modelParamsProvider.prepare(context.projectId, modelForParams)
+        : Promise.resolve(undefined),
       deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
       deps.modelParamsProvider.prepare(context.projectId, judgeModel),
     ]);
-  for (const { label, model, result } of [
-    { label: "adapter", model: modelForParams, result: modelParamsResult },
-    {
-      label: "user-simulator",
-      model: simulatorModel,
-      result: simulatorParamsResult,
-    },
-    { label: "judge", model: judgeModel, result: judgeParamsResult },
-  ]) {
-    if (!result.success) {
-      logger.warn(
-        {
-          projectId: context.projectId,
-          role: label,
-          model,
-          reason: result.reason,
-        },
-        `Failed to prepare model params: ${result.message}`,
-      );
-      return { success: false, error: result.message, reason: result.reason };
-    }
+
+  if (modelParamsResult && !modelParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "adapter",
+        model: modelForParams,
+        reason: modelParamsResult.reason,
+      },
+      `Failed to prepare model params: ${modelParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: modelParamsResult.message,
+      reason: modelParamsResult.reason,
+    };
   }
-  // Narrowing: the loop above returns on any failure, so all three succeeded.
-  if (
-    !modelParamsResult.success ||
-    !simulatorParamsResult.success ||
-    !judgeParamsResult.success
-  ) {
-    return { success: false, error: "Failed to prepare model params" };
+  if (!simulatorParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "user-simulator",
+        model: simulatorModel,
+        reason: simulatorParamsResult.reason,
+      },
+      `Failed to prepare model params: ${simulatorParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: simulatorParamsResult.message,
+      reason: simulatorParamsResult.reason,
+    };
+  }
+  if (!judgeParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "judge",
+        model: judgeModel,
+        reason: judgeParamsResult.reason,
+      },
+      `Failed to prepare model params: ${judgeParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: judgeParamsResult.message,
+      reason: judgeParamsResult.reason,
+    };
   }
 
   logger.debug(
@@ -378,22 +698,39 @@ export async function prefetchScenarioData(
     "Prefetch complete",
   );
 
+  const modelParams = modelParamsResult?.success
+    ? modelParamsResult.params
+    : undefined;
+
+  // Only an http or a connected target's judge fetches remote traces, so
+  // only those need a wait budget. The resolver degrades to a default on any failure, so this
+  // never fails the prefetch.
+  const traceWaitTimeoutMs =
+    target.type === "http" || target.type === "connected"
+      ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
+          projectId: context.projectId,
+        })
+      : undefined;
+
   return {
     success: true,
     data: {
       context,
       scenario,
+      parameters: scenarioResult.parameters,
       adapterData,
-      modelParams: modelParamsResult.params,
+      modelParams,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
+      ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
     },
     telemetry: {
       endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
+    resolvedModels: { simulatorModel, judgeModel },
   };
 }
 
@@ -401,32 +738,76 @@ export async function prefetchScenarioData(
 // Internal Fetch Functions
 // ============================================================================
 
-async function fetchScenario(
-  projectId: string,
-  scenarioId: string,
-  fetcher: ScenarioFetcher,
-): Promise<{
+async function fetchScenario({
+  projectId,
+  scenarioId,
+  fetcher,
+  suppliedParameters,
+}: {
+  projectId: string;
+  scenarioId: string;
+  fetcher: ScenarioFetcher;
+  suppliedParameters?: RunParameterValues;
+}): Promise<{
   config: ScenarioConfig;
+  parameters: RunParameterValues;
   simulatorModel: string | null;
   judgeModel: string | null;
 } | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
+
+  const definitions = parseScenarioParameterDefinitions(scenario.parameters);
+  // The secret declarations are taken out before the merge, so no secret value
+  // can reach `params` or the scenario's own text. They stay in
+  // `declaredNames`, which is what makes a `params.SECRET` reference fail here
+  // as a backstop, the same way the run request already refused it.
+  const { plain, secret } = partitionParameterDefinitions(definitions);
+  const parameters = mergeRunParameters({
+    definitions: plain,
+    values: withoutParameterNames({
+      values: suppliedParameters,
+      names: new Set(secret.map((definition) => definition.name)),
+    }),
+  });
+
+  const rendered = await renderScenarioContent({
+    situation: scenario.situation,
+    criteria: scenario.criteria,
+    parameters,
+    declaredNames: definitions.map((definition) => definition.name),
+  });
+  if (!rendered.ok) {
+    // The request that started this run rendered the same text against the
+    // same values and accepted it, so reaching here means the scenario or its
+    // parameters changed underneath a queued run. There is nothing the run can
+    // do with that, and nothing the customer chose that explains it.
+    throw new Error(
+      `Scenario ${scenarioId} ${rendered.field} could not be rendered against the run's parameters (${rendered.reason})`,
+    );
+  }
+
   return {
     config: {
       id: scenario.id,
       name: scenario.name,
-      situation: scenario.situation,
-      criteria: scenario.criteria,
+      situation: rendered.situation,
+      criteria: rendered.criteria,
       labels: scenario.labels,
+      maxTurns: scenario.maxTurns ?? undefined,
+      minTurns: scenario.minTurns ?? undefined,
     },
+    parameters,
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
   };
 }
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string } }
+  | {
+      success: true;
+      data: { apiKey: string; organizationId: string | null };
+    }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -440,7 +821,13 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  return { success: true, data: { apiKey: project.apiKey } };
+  return {
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      organizationId: project.team?.organizationId ?? null,
+    },
+  };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -470,6 +857,13 @@ async function fetchAgentData(
       deps.projectSecretsFetcher,
     );
   }
+  if (target.type === "connected") {
+    return fetchConnectedAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
       projectId,
@@ -480,7 +874,12 @@ async function fetchAgentData(
       projectSecretsFetcher: deps.projectSecretsFetcher,
     });
   }
-  return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
+  return fetchHttpAgentData({
+    projectId,
+    agentId: target.referenceId,
+    fetcher: deps.agentFetcher,
+    projectSecretsFetcher: deps.projectSecretsFetcher,
+  });
 }
 
 async function fetchPromptConfigData(
@@ -502,6 +901,10 @@ async function fetchPromptConfigData(
       (m): m is { role: "user" | "assistant"; content: string } =>
         m.role === "user" || m.role === "assistant",
     ),
+    inputs: (prompt.inputs ?? []).map((declared) => ({
+      identifier: declared.identifier,
+      type: String(declared.type),
+    })),
     model: prompt.model ?? undefined,
     temperature: prompt.temperature ?? undefined,
     maxTokens: prompt.maxTokens ?? undefined,
@@ -519,14 +922,21 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
-async function fetchHttpAgentData(
-  projectId: string,
-  agentId: string,
-  fetcher: AgentFetcher,
-): Promise<HttpAgentData | null> {
+async function fetchHttpAgentData({
+  projectId,
+  agentId,
+  fetcher,
+  projectSecretsFetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+}): Promise<HttpAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (agent?.type !== "http") return null;
 
@@ -535,6 +945,11 @@ async function fetchHttpAgentData(
     return null;
   }
   const config = parseResult.data;
+
+  // Loaded once for the whole run, the same way the code and workflow paths
+  // load them: the child process has no database access, so a secret the url,
+  // a header or an auth field references has to travel with the job.
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
 
   return {
     type: "http",
@@ -545,7 +960,37 @@ async function fetchHttpAgentData(
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+    sessionPath: config.sessionPath,
     scenarioMappings: config.scenarioMappings,
+    secrets,
+  };
+}
+
+/**
+ * The child reaches a connected agent through the relay route, so the job
+ * carries the agent id, where the platform is, and the per-call budget the
+ * agent declared, capped by the platform.
+ */
+async function fetchConnectedAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<ConnectedAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "connected") return null;
+  const config = agent.config as ConnectedComponentConfig;
+  return {
+    type: "connected",
+    agentId: agent.id,
+    endpoint: env.LANGWATCH_ENDPOINT,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
   };
 }
 
@@ -579,6 +1024,8 @@ const RawCodeAgentConfigSchema = z.object({
     .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
+  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -614,6 +1061,7 @@ async function fetchCodeAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
     secrets,
+    timeoutMs: config.timeoutMs,
   };
 }
 
@@ -936,18 +1384,19 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
     scenarioFetcher: {
       getById: (params) => scenarioService.getById(params),
     },
-    suiteModelFetcher: {
+    suiteConfigFetcher: {
       getBySetId: async (setId, projectId) => {
         const suiteId = extractSuiteId(setId);
         if (!suiteId) return null;
         const suite = await prisma.simulationSuite.findFirst({
           where: { id: suiteId, projectId },
-          select: { simulatorModel: true, judgeModel: true },
+          select: { simulatorModel: true, judgeModel: true, targets: true },
         });
         if (!suite) return null;
         return {
           simulatorModel: suite.simulatorModel,
           judgeModel: suite.judgeModel,
+          targets: parseSuiteTargets(suite.targets),
         };
       },
     },
@@ -980,8 +1429,11 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKey: true, team: { select: { organizationId: true } } },
         }),
+    },
+    sandboxKeyMinter: {
+      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {
@@ -991,6 +1443,9 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         });
         return resolved.model;
       },
+    },
+    traceWaitBudgetResolver: {
+      resolveTraceWaitTimeoutMs: (params) => resolveTraceWaitTimeoutMs(params),
     },
     projectSecretsFetcher: {
       getSecrets: async (projectId) => {
@@ -1076,7 +1531,10 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
             };
           }
 
-          return { success: true, params: params as LiteLLMParams };
+          return {
+            success: true,
+            params: params as LiteLLMParams,
+          };
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);

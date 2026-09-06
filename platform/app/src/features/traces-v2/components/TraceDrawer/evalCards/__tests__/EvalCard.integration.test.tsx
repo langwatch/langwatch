@@ -191,6 +191,64 @@ describe("given a categorising evaluator that returned only a category", () => {
   });
 });
 
+describe("given a processed evaluation with neither passed nor score", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getEvaluationInputsUseQueryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+  });
+
+  // How a verdict-less run arrives: processed status, no verdict, no score.
+  const verdictlessEval: EvalEntry = {
+    name: "Custom check",
+    score: null,
+    scoreType: "numeric",
+    status: "processed",
+    evaluationId: "eval-verdictless",
+  };
+
+  describe("when the card renders", () => {
+    it("shows no PASS badge for a run that produced no verdict", () => {
+      renderCard(verdictlessEval);
+      expect(screen.queryByText("PASS")).not.toBeInTheDocument();
+      expect(screen.getByText("PROCESSED")).toBeInTheDocument();
+    });
+
+    it("shows no fabricated 0.00 score", () => {
+      renderCard(verdictlessEval);
+      expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+      expect(screen.queryByText("/ 1.00")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a processed score-only evaluation (score, no pass/fail)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getEvaluationInputsUseQueryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    });
+  });
+
+  describe("when the card renders", () => {
+    it("shows the real score with the neutral tag, not a PASS badge", () => {
+      renderCard({
+        name: "Relevance",
+        score: 0.85,
+        scoreType: "numeric",
+        status: "processed",
+        evaluationId: "eval-score-only",
+      });
+      expect(screen.queryByText("PASS")).not.toBeInTheDocument();
+      expect(screen.getByText("PROCESSED")).toBeInTheDocument();
+      expect(screen.getByText("0.85")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("given an evaluator that returned a label alongside a real verdict", () => {
   beforeEach(() => {
     vi.clearAllMocks();

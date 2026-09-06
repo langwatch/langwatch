@@ -173,6 +173,14 @@ describe("ChildProcessJobDataSchema", () => {
           api_key: "key",
           model: "openai/gpt-5-mini",
         },
+        simulatorModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        judgeModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
         nlpServiceUrl: "http://localhost:8080",
         target: { type: "code", referenceId: "agent_1" },
       };
@@ -223,6 +231,14 @@ describe("ChildProcessJobDataSchema", () => {
         },
         modelParams: {
           api_key: "key",
+          model: "openai/gpt-5-mini",
+        },
+        simulatorModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        judgeModelParams: {
+          api_key: "test-key",
           model: "openai/gpt-5-mini",
         },
         nlpServiceUrl: "http://localhost:8080",

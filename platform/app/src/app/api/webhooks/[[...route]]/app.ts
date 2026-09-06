@@ -4,18 +4,21 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
-import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import {
+  type SqsDestinationInput,
+  WebhookEndpointService,
+  type WebhookEndpointView,
+} from "@ee/webhooks/webhookEndpoint.service";
 import {
   WebhookEventNotFoundError,
   WebhookEventsService,
 } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { createLogger } from "@langwatch/observability";
-import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
@@ -27,12 +30,9 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
-import {
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-} from "~/server/webhooks/sendWebhook";
-import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import {
   canonicalBaseResponses,
   canonicalConflictResponses,
@@ -100,14 +100,92 @@ const deliveryControlsSchema = {
   max_in_flight: z.number().int().optional(),
 };
 
-const createEndpointSchema = z.object({
-  url: z.string().min(1).max(2000),
-  enabled_events: z.array(z.string().min(1).max(200)).min(1).max(100),
-  ...deliveryControlsSchema,
+const destinationKindSchema = z.enum(WEBHOOK_DESTINATION_KINDS);
+
+/**
+ * The queue half of a destination. Only the queue URL is ever required: the
+ * credential fields select which of the three modes the endpoint runs in, and
+ * which of them are allowed is the service's call, not this schema's.
+ */
+const sqsDestinationSchema = z.object({
+  queue_url: z.string().min(1).max(2000),
+  role_arn: z.string().min(1).max(2048).optional(),
+  external_id: z.string().min(1).max(1224).optional(),
+  access_key_id: z.string().min(1).max(128).optional(),
+  secret_access_key: z.string().min(1).max(256).optional(),
 });
 
+/**
+ * Each kind requires its own address and refuses the other kind's, and a 400
+ * has to say WHICH field is wrong rather than that the body is wrong
+ * somewhere. A superRefine puts the message on the path of the offending
+ * field, which is what turns the refusal into an instruction.
+ *
+ * The second half matters as much as the first. An endpoint stores one
+ * address, so a body carrying both would have half of it dropped on the way
+ * to the row, and a 201 would tell the caller their queue configuration was
+ * saved when it was discarded.
+ */
+function refineDestinationShape(
+  body: {
+    destination_kind?: "http" | "sqs";
+    url?: string;
+    sqs?: { queue_url: string };
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const kind = body.destination_kind ?? "http";
+  if (kind === "http" && !body.url) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["url"],
+      message: "url is required when destination_kind is http",
+    });
+  }
+  if (kind === "http" && body.sqs !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sqs"],
+      message:
+        "sqs does not apply when destination_kind is http; remove it, or set destination_kind to sqs",
+    });
+  }
+  if (kind === "sqs" && !body.sqs?.queue_url) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sqs", "queue_url"],
+      message: "sqs.queue_url is required when destination_kind is sqs",
+    });
+  }
+  if (kind === "sqs" && body.url !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["url"],
+      message:
+        "url does not apply when destination_kind is sqs; the queue URL goes in sqs.queue_url",
+    });
+  }
+}
+
+const createEndpointSchema = z
+  .object({
+    /** Absent means http, which is what every endpoint was before there was
+     *  more than one kind. */
+    destination_kind: destinationKindSchema.optional(),
+    url: z.string().min(1).max(2000).optional(),
+    sqs: sqsDestinationSchema.optional(),
+    enabled_events: z.array(z.string().min(1).max(200)).min(1).max(100),
+    ...deliveryControlsSchema,
+  })
+  .superRefine(refineDestinationShape);
+
 const updateEndpointSchema = z.object({
+  /** Accepted only when it repeats the kind the endpoint already has; the
+   *  service refuses a change, because batches planned against the old
+   *  transport are already in the outbox. */
+  destination_kind: destinationKindSchema.optional(),
   url: z.string().min(1).max(2000).optional(),
+  sqs: sqsDestinationSchema.partial().optional(),
   enabled_events: z
     .array(z.string().min(1).max(200))
     .min(1)
@@ -122,33 +200,39 @@ const deliveriesQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
 
-const eventsQuerySchema = z.object({
-  type: z.string().min(1).max(200).optional(),
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(200).optional().default(50),
-});
+const eventsQuerySchema = z
+  .object({
+    type: z.string().min(1).max(200).optional(),
+    // The events log is a RANGED read by contract, the same contract the
+    // spend-events pull carries and over the same table: without bounds the
+    // walk sorts the whole 13-month table under FINAL on every page.
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional().default(50),
+  })
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
-function endpointResponse(endpoint: {
-  id: string;
-  url: string;
-  enabledEvents: string[];
-  status: "ACTIVE" | "DISABLED";
-  disabledReason: string | null;
-  disabledAt: Date | null;
-  failingSince: Date | null;
-  lastSuccessAt: Date | null;
-  lastFailureAt: Date | null;
-  maxBatchSize: number;
-  maxBatchDelayMs: number;
-  maxInFlight: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function endpointResponse(endpoint: WebhookEndpointView) {
   return {
     id: endpoint.id,
+    destination_kind: endpoint.destinationKind,
+    /** Null on every endpoint that is not an HTTPS one. */
     url: endpoint.url,
+    sqs: endpoint.sqs
+      ? {
+          queue_url: endpoint.sqs.queueUrl,
+          region: endpoint.sqs.region,
+          account_id: endpoint.sqs.accountId,
+          queue_name: endpoint.sqs.queueName,
+          credential_mode: endpoint.sqs.credentialMode,
+          role_arn: endpoint.sqs.roleArn,
+          external_id: endpoint.sqs.externalId,
+          access_key_id: endpoint.sqs.accessKeyId,
+        }
+      : null,
     enabled_events: endpoint.enabledEvents,
     status: toWireEnum(endpoint.status),
     disabled_reason: endpoint.disabledReason,
@@ -168,9 +252,28 @@ function endpointResponse(endpoint: {
 // {@link endpointResponse} is the one builder behind create, list, get,
 // patch and roll-secret, so one schema describes all five.
 
-const endpointDtoSchema = z.object({
+const sqsDestinationDtoSchema = z.object({
+  queue_url: z.string(),
+  /** Read off the queue URL, never configured beside it. */
+  region: z.string(),
+  /** Whose queue this is. Surfaced so an operator can see it without
+   *  decoding a URL by eye. */
+  account_id: z.string(),
+  queue_name: z.string(),
+  /** `assume_role` when a role is named, `static` when a key pair is stored,
+   *  `ambient` when the deployment's own identity is used, which needs an
+   *  operator opt-in. */
+  credential_mode: z.enum(["assume_role", "static", "ambient"]),
+  role_arn: z.string().nullable(),
+  /** Generated at save time, to paste into the role's trust policy. */
+  external_id: z.string().nullable(),
+  /** The key id only. The secret half is never returned. */
+  access_key_id: z.string().nullable(),
+});
+
+/** Everything an endpoint carries that is not its destination. */
+const endpointCommonDtoFields = {
   id: z.string(),
-  url: z.string(),
   enabled_events: z.array(z.string()),
   status: endpointStatusSchema,
   /** `manual` when an operator paused it, `auto_failures_72h` when the
@@ -185,16 +288,47 @@ const endpointDtoSchema = z.object({
   max_in_flight: z.number().int(),
   created_at: z.string(),
   updated_at: z.string(),
+};
+
+/**
+ * The destination is a union on `destination_kind`, not two independent
+ * nullable fields.
+ *
+ * Described as two nullable fields, the document permitted `destination_kind:
+ * "http"` beside a populated `sqs`, and a generated client had to null-check
+ * both and hope. As a union each branch states exactly one address, and the
+ * kind narrows to it.
+ */
+const httpEndpointDtoSchema = z.object({
+  destination_kind: z.literal("http"),
+  /** The receiver URL. An http endpoint always has one. */
+  url: z.string(),
+  sqs: z.null(),
+  ...endpointCommonDtoFields,
 });
+
+const sqsEndpointDtoSchema = z.object({
+  destination_kind: z.literal("sqs"),
+  url: z.null(),
+  /** The queue this endpoint delivers to. */
+  sqs: sqsDestinationDtoSchema,
+  ...endpointCommonDtoFields,
+});
+
+const endpointDtoSchema = z.discriminatedUnion("destination_kind", [
+  httpEndpointDtoSchema,
+  sqsEndpointDtoSchema,
+]);
 
 /**
  * The endpoint plus its plaintext signing secret. Create and roll-secret are
  * the only two responses that carry it; every read serves
  * {@link endpointDtoSchema}, which has no `secret` field to be absent from.
  */
-const endpointWithSecretDtoSchema = endpointDtoSchema.extend({
-  secret: z.string(),
-});
+const endpointWithSecretDtoSchema = z.discriminatedUnion("destination_kind", [
+  httpEndpointDtoSchema.extend({ secret: z.string() }),
+  sqsEndpointDtoSchema.extend({ secret: z.string() }),
+]);
 
 const deliveryDtoSchema = z.object({
   id: z.string(),
@@ -287,6 +421,58 @@ const notFoundResponse = {
 
 const logger = createLogger("langwatch:webhooks:rest");
 
+/** The queue fields, wire spelling to service spelling. */
+function sqsFromBody(sqs: {
+  queue_url?: string;
+  role_arn?: string;
+  external_id?: string;
+  access_key_id?: string;
+  secret_access_key?: string;
+}) {
+  return {
+    ...(sqs.queue_url !== undefined ? { queueUrl: sqs.queue_url } : {}),
+    ...(sqs.role_arn !== undefined ? { roleArn: sqs.role_arn } : {}),
+    ...(sqs.external_id !== undefined ? { externalId: sqs.external_id } : {}),
+    ...(sqs.access_key_id !== undefined
+      ? { accessKeyId: sqs.access_key_id }
+      : {}),
+    ...(sqs.secret_access_key !== undefined
+      ? { secretAccessKey: sqs.secret_access_key }
+      : {}),
+  };
+}
+
+/**
+ * The destination half of a create body, wire spelling to service spelling.
+ *
+ * The schema already refused a kind without its own address, so the queue URL
+ * is present here. That is stated by narrowing the parameter rather than by
+ * casting the result: a cast would go on asserting it after a future
+ * loosening of the refinement, and the row written would carry an empty
+ * queue URL instead of failing the compile.
+ */
+function destinationFromBody(body: {
+  destination_kind?: "http" | "sqs";
+  url?: string;
+  sqs?: { queue_url: string };
+}):
+  | { destinationKind: "http"; url: string | undefined }
+  | { destinationKind: "sqs"; sqs: SqsDestinationInput } {
+  if ((body.destination_kind ?? "http") !== "sqs") {
+    return { destinationKind: "http", url: body.url };
+  }
+  const sqs = body.sqs;
+  if (!sqs?.queue_url) {
+    // Unreachable through the route, whose schema refuses this body. Saying so
+    // out loud beats a cast that would quietly write an empty queue URL.
+    throw new BadRequestError("sqs.queue_url is required for an sqs endpoint");
+  }
+  return {
+    destinationKind: "sqs",
+    sqs: { ...sqsFromBody(sqs), queueUrl: sqs.queue_url },
+  };
+}
+
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Date): string {
   return JSON.stringify({
@@ -338,7 +524,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
     tags: ["Webhooks"],
     summary: "Create a webhook endpoint",
     description:
-      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
@@ -370,7 +556,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
       handler: async () => {
         const { endpoint, secret } = await endpoints.create({
           organizationId: organization.id,
-          url: body.url,
+          ...destinationFromBody(body),
           enabledEvents: body.enabled_events,
           maxBatchSize: body.max_batch_size,
           maxBatchDelayMs: body.max_batch_delay_ms,
@@ -434,7 +620,7 @@ secured.access(requires("webhookEndpoints:manage")).patch(
     tags: ["Webhooks"],
     summary: "Update a webhook endpoint",
     description:
-      "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
+      "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
     responses: {
       ...okResponse(
         "The endpoint as it now stands",
@@ -450,7 +636,9 @@ secured.access(requires("webhookEndpoints:manage")).patch(
     const body = c.req.valid("json");
 
     const hasFieldUpdate =
+      body.destination_kind !== undefined ||
       body.url !== undefined ||
+      body.sqs !== undefined ||
       body.enabled_events !== undefined ||
       body.max_batch_size !== undefined ||
       body.max_batch_delay_ms !== undefined ||
@@ -459,7 +647,9 @@ secured.access(requires("webhookEndpoints:manage")).patch(
       ? await endpoints.update({
           organizationId: organization.id,
           endpointId,
+          destinationKind: body.destination_kind,
           url: body.url,
+          ...(body.sqs !== undefined ? { sqs: sqsFromBody(body.sqs) } : {}),
           enabledEvents: body.enabled_events,
           maxBatchSize: body.max_batch_size,
           maxBatchDelayMs: body.max_batch_delay_ms,
@@ -555,45 +745,48 @@ secured.access(requires("webhookEndpoints:manage")).post(
   async (c) => {
     const organization = c.get("organization") as Organization;
     const endpointId = c.req.param("id");
-    const endpoint = await endpoints.getById({
-      organizationId: organization.id,
-      endpointId,
-    });
-    const secrets = await endpoints.getSigningSecrets({
-      organizationId: organization.id,
-      endpointId,
-    });
+    const [secrets, destination] = await Promise.all([
+      endpoints.getSigningSecrets({
+        organizationId: organization.id,
+        endpointId,
+      }),
+      endpoints.getDestinationConfig({
+        organizationId: organization.id,
+        endpointId,
+      }),
+    ]);
     const dispatchId = `test:${randomUUID()}`;
     try {
-      const result = await sendWebhook({
-        url: endpoint.url,
+      // The test has to reach exactly what real delivery reaches, including
+      // the transport: a queue endpoint's test must land on the queue, not
+      // on a URL it does not have.
+      const result = await webhookDestinationFor(destination).send({
+        organizationId: organization.id,
+        endpointId,
         body: testFireBody(new Date()),
-        triggerName: endpointId,
-        contextLabel: `Webhook endpoint ${endpointId} (test)`,
-        testFire: true,
-        eventId: dispatchId,
-        dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
-        signingSecrets: secrets,
+        batchId: dispatchId,
         attempt: 1,
-        // The test button has to reach exactly what real delivery reaches. It
-        // did not: real delivery passes this flag and the test send did not,
-        // so on an install running the escape hatch a local endpoint delivered
-        // fine and its own test said the address was blocked.
-        allowInsecureLocal: allowsInsecureLocalUrls(),
+        signingSecrets: secrets,
+        isTestFire: true,
       });
-      const delivered = result.status >= 200 && result.status < 300;
+      const delivered = result.verdict === "success";
       await recordTestFire({
         organizationId: organization.id,
         endpointId,
         dispatchId,
         outcome: delivered ? "success" : "terminal",
-        responseStatus: result.status,
+        ...(result.status !== null ? { responseStatus: result.status } : {}),
       });
       return c.json({
         data: {
           delivered,
+          // Null on a transport with no status of its own: a queue accepted
+          // the message or it did not, and there is no code to report.
           response_status: result.status,
-          response_body: result.body.slice(0, 500),
+          response_body: (delivered ? result.body : (result.error ?? "")).slice(
+            0,
+            500,
+          ),
         },
       });
     } catch (error) {
@@ -750,7 +943,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     tags: ["Webhooks"],
     summary: "List emitted events",
     description:
-      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
       "One page of emitted-event envelopes, newest first",
       z.object({

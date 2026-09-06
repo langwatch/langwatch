@@ -23,7 +23,7 @@ let allRunsPanelLoading = false;
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getSummaries: { invalidate: vi.fn() },

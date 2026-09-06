@@ -6,7 +6,7 @@ Feature: Extensible metadata on scenario run events
   Background:
     Given a project with scenarios configured
 
-  @integration @unimplemented
+  @integration
   Scenario: Custom metadata passes through from ingestion to read projection
     Given a SCENARIO_RUN_STARTED event with metadata:
       | name        | Login flow  |

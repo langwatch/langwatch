@@ -1,6 +1,7 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { Database, Download, Sparkles } from "lucide-react";
+import { Database, Download, Pencil, Sparkles } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
@@ -9,10 +10,12 @@ import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
+import { AddToAnnotationQueueDialog } from "../AddToAnnotationQueueDialog";
 
 interface BulkActionBarProps {
   /** Total traces matching the active filter (for the "Select all N" hint). */
@@ -36,7 +39,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const enableAllMatching = useSelectionStore((s) => s.enableAllMatching);
   const clear = useSelectionStore((s) => s.clear);
   const { openDrawer } = useDrawer();
+  const { hasPermission } = useOrganizationTeamProject();
   const datasetGate = usePersonalFeatureGate("datasets");
+  const annotationGate = usePersonalFeatureGate("annotations");
+  const [annotationQueueOpen, setAnnotationQueueOpen] = useState(false);
+  const canQueueForAnnotation = hasPermission("annotations:create");
   // `langy:create`, not `langy:view`. This control exists to prime a question —
   // filling a composer that cannot send is a dead end that looks like a feature.
   const showLangy = useCanAskLangy();
@@ -126,6 +133,32 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
           </Tooltip>
         )}
 
+        {/* Explicit selection only, like add-to-dataset: the reviewer picks
+            the traces a person will read, and a filter that matches 10k
+            traces is not that. */}
+        {canQueueForAnnotation && (
+          <Tooltip
+            content="Disabled. Add to annotation queue requires explicit row selection."
+            disabled={!isAllMatchingMode}
+            showArrow
+          >
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={isAllMatchingMode}
+              onClick={async () => {
+                if (isAllMatchingMode) return;
+                const allowed = await annotationGate.requestEnable();
+                if (!allowed) return;
+                setAnnotationQueueOpen(true);
+              }}
+            >
+              <Pencil size={14} />
+              Add to annotation queue
+            </Button>
+          </Tooltip>
+        )}
+
         <Tooltip
           content="Disabled. Add to dataset requires explicit row selection."
           disabled={!isAllMatchingMode}
@@ -150,6 +183,12 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
         </Tooltip>
       </SelectionActionBar>
       <PersonalFeatureGateDialog state={datasetGate.dialogState} />
+      <PersonalFeatureGateDialog state={annotationGate.dialogState} />
+      <AddToAnnotationQueueDialog
+        open={annotationQueueOpen}
+        onClose={() => setAnnotationQueueOpen(false)}
+        traceIds={idsArray}
+      />
     </>
   );
 };

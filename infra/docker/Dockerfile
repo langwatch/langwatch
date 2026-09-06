@@ -23,9 +23,6 @@ RUN ARCH=$(uname -m) && \
 
 WORKDIR /app
 
-# Skip Prisma checksum verification for air-gapped builds
-ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-
 # mcp/typescript is a workspace member — copy it early so pnpm install can link
 # it. Its build runs automatically as part of the app's `pnpm run build`
 # (via start:prepare:files → build:mcp-server).
@@ -115,13 +112,12 @@ RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@la
 # `prune` takes no --filter, which is why the install above is filtered and
 # this is not. That is fine here: the members outside the app's closure have
 # no node_modules in this image at all, so there is nothing for prune to get
-# wrong. It must run BEFORE `prisma generate`, because prune drops the
-# generated client (it is not a declared dependency).
+# wrong. No post-prune `prisma generate` anymore: Prisma 7's generator emits
+# into platform/app/src/generated/prisma (first-party source, inlined into the
+# dist bundles by the build above), not into node_modules, so prune cannot
+# drop it. The runtime stage still needs the `prisma` CLI (a prod dep) for
+# `migrate deploy` at boot.
 RUN CI=true pnpm prune --prod
-# Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
-WORKDIR /app/platform/app
-RUN pnpm prisma generate
-WORKDIR /app
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine

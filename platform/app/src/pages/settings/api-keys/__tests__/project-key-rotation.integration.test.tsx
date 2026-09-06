@@ -67,7 +67,7 @@ const regenerateImpl = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },
       organization: { getAll: { invalidate: vi.fn() } },
     }),
@@ -223,8 +223,15 @@ describe("<ApiKeysSection /> project base key rotation", () => {
           await screen.findByRole("button", { name: "Regenerate Key" }),
         );
 
-        // TokenCreatedDialog opens and the new key appears in at least one snippet
+        // TokenCreatedDialog opens masked; revealing the .env snippet shows
+        // the new key. (CodePreview only puts the unmasked form in the DOM
+        // once revealed — the copy button hands out the real value either
+        // way.)
         expect(await screen.findByText("Token Created")).toBeInTheDocument();
+        const revealButtons = await screen.findAllByRole("button", {
+          name: "Show sensitive values",
+        });
+        await user.click(revealButtons[0]!);
         const keyElements = await screen.findAllByText(
           /sk-lw-newrotatedkey1234/,
         );

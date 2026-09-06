@@ -61,6 +61,14 @@ export class AttributeBag {
     this.map.delete(key);
   }
 
+  /** Whether any unconsumed key starts with `prefix` (no allocation). */
+  hasByPrefix(prefix: string): boolean {
+    for (const key of this.map.keys()) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
   remaining(): NormalizedAttributes {
     return Object.fromEntries(this.map.entries());
   }

@@ -7,8 +7,9 @@
  * a view grant. These tests pin the default role matrix, which is the product
  * contract — a silent widening here hands turn-spend to read-only accounts.
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+
 import { describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 import { organizationRoleHasPermission, teamRoleHasPermission } from "../rbac";
 
@@ -85,7 +86,7 @@ describe("Langy permissions", () => {
     ])("is not available to an organization %s", (role) => {
       // EXTERNAL is the lite-member tier; before Langy had its own
       // permission family, membership alone let it enumerate the org's
-      // private repositories through langyGithub.listRepos.
+      // private repositories through the GitHub connection's repository list.
       expect(organizationRoleHasPermission(role, "langy:manage")).toBe(false);
     });
   });

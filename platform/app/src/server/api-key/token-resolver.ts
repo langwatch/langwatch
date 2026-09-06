@@ -1,7 +1,8 @@
-import type { PrismaClient, Project } from "@prisma/client";
-import { RoleBindingScopeType } from "@prisma/client";
+import type { PrismaClient, Project } from "~/generated/prisma/client";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { ApiKeyService } from "./api-key.service";
 import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
+import { LANGY_SESSION_API_KEY_NAME } from "./reserved-names";
 
 /**
  * The result of resolving a token. Contains enough context to set up the
@@ -25,6 +26,15 @@ export type ResolvedToken =
       ingestSourceType: string | null;
       /** The template this ingestion key was minted for, if any. */
       ingestionTemplateId: string | null;
+      /**
+       * Set when the resolved ApiKey is the ephemeral key a Langy chat mints
+       * for itself. The permission ceiling reads it to tell two refusals
+       * apart: a permission the caller could hold, and one the platform never
+       * delegates to Langy however the key or the role is widened. Absent
+       * means an ordinary key, so a caller that never sets it keeps the
+       * generic refusal.
+       */
+      isLangySessionKey?: boolean;
       project: Project & { team: { id: string; organizationId: string } };
     };
 
@@ -38,6 +48,19 @@ export type OrgResolvedToken = {
   userId: string | null;
   organizationId: string;
 };
+
+/**
+ * The outcome of org-level resolution, with the two failures kept apart.
+ *
+ * `wrong_credential_class` is a working credential of the other family: the
+ * caller has to swap the key, and telling them to check it for typos wastes
+ * their afternoon. `unusable_credential` is everything else, and stays
+ * deliberately vague, since distinguishing "no such key" from "revoked key"
+ * for an unauthenticated caller would confirm which secrets exist.
+ */
+export type OrgResolution =
+  | { ok: true; resolved: OrgResolvedToken }
+  | { ok: false; reason: "wrong_credential_class" | "unusable_credential" };
 
 /**
  * Strategy-based token resolver. Routes tokens to the correct verification
@@ -165,31 +188,45 @@ export class TokenResolver {
       organizationId: apiKey.organizationId,
       ingestSourceType: apiKey.ingestSourceType,
       ingestionTemplateId: apiKey.ingestionTemplateId,
+      isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
       project,
     };
   }
 
   /**
-   * Resolves an API key to organization-level context without requiring a project.
-   * Returns null when the token is invalid or not an API key.
+   * Resolves an API key to organization-level context without requiring a
+   * project.
+   *
+   * On failure it says WHICH failure, because the three are far apart in what
+   * the caller should do next and used to be told apart by nothing: a typo, a
+   * revoked key, and a perfectly good project key sent to a route only an
+   * organization key reaches all produced the same sentence asserting the
+   * last of the three. `wrong_credential_class` is returned only when the
+   * token really does resolve as a project key, so the answer is never a
+   * guess about a credential we could not read.
    */
-  async resolveOrgOnly({
-    token,
-  }: {
-    token: string;
-  }): Promise<OrgResolvedToken | null> {
-    const tokenType = getTokenType(token);
-    if (tokenType !== "apiKey") return null;
+  async resolveOrgOnly({ token }: { token: string }): Promise<OrgResolution> {
+    if (getTokenType(token) === "apiKey") {
+      const apiKey = await this.apiKeyService.verify({ token });
+      if (apiKey) {
+        return {
+          ok: true,
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: apiKey.id,
+            userId: apiKey.userId,
+            organizationId: apiKey.organizationId,
+          },
+        };
+      }
+    }
 
-    const apiKey = await this.apiKeyService.verify({ token });
-    if (!apiKey) return null;
-
-    return {
-      type: "apiKey-org",
-      apiKeyId: apiKey.id,
-      userId: apiKey.userId,
-      organizationId: apiKey.organizationId,
-    };
+    // A legacy project key can be shaped exactly like an API key, so the
+    // shape alone never decides this; only a hit on the stored key does.
+    const legacy = await this.resolveLegacyProjectKey(token);
+    return legacy
+      ? { ok: false, reason: "wrong_credential_class" }
+      : { ok: false, reason: "unusable_credential" };
   }
 
   /**

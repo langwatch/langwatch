@@ -4,6 +4,7 @@ import type { EvaluationRunService } from "~/server/app-layer/evaluations/evalua
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
@@ -18,6 +19,8 @@ import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
+import { deriveTraceTimestamp } from "./derive-trace-timestamp";
+import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
@@ -29,6 +32,7 @@ import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
+  EventMetricValues,
   TraceListCursor,
   TraceListRepository,
   TraceListSort,
@@ -406,6 +410,9 @@ interface CategoricalFacetDescriptor {
     label?: string;
     count: number;
     aggregates?: EvaluatorValueAggregates;
+    /** Set only on the event facet: per-metric-key value tallies for the
+     *  inline drilldown (see {@link EventMetricValues}). */
+    eventMetrics?: EventMetricValues[];
   }[];
   totalDistinct: number;
 }
@@ -512,6 +519,16 @@ export class TraceListService {
   async getList(params: ListParams): Promise<TraceListPage> {
     const sortColumn = SORT_COLUMN_MAP[params.sort.columnId] ?? "OccurredAt";
 
+    // Position reads pay for every skipped row, so their depth is bounded;
+    // cursor reads are keyset and stay open-ended. The pagination bar greys
+    // out the pages this refuses, so the error is for callers that bypass it.
+    const offset = params.cursor
+      ? 0
+      : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize;
+    if (offset + params.pageSize > TRACE_LIST_MAX_OFFSET_ROWS) {
+      throw new PageTooDeepError(TRACE_LIST_MAX_OFFSET_ROWS);
+    }
+
     const result = await this.repository.findAll({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
@@ -520,9 +537,7 @@ export class TraceListService {
       // totalHits (which may change under a live range between requests).
       limit: params.pageSize + 1,
       cursor: params.cursor,
-      offset: params.cursor
-        ? 0
-        : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize,
+      offset,
       filterWhere: params.filterWhere,
     });
 
@@ -1061,9 +1076,25 @@ export class TraceListService {
   private async computeFacetValues(
     params: FacetValuesParams,
   ): Promise<FacetValuesResult> {
-    // Dynamic per-attribute drill: "attribute.<key>" — not in the static registry.
+    // Dynamic per-attribute drills — not in the static registry. Each prefix
+    // routes to the store its filter actually queries: `event.attribute.` /
+    // `span.attribute.` read stored_spans (Events.Attributes / SpanAttributes),
+    // the bare `attribute.` prefix keeps its legacy trace_summaries alias.
+    // Order matters: the specific prefixes must match before the generic one.
+    if (params.facetKey.startsWith("event.attribute.")) {
+      return this.attributeFacetValues(params, "event.attribute.", (p) =>
+        this.repository.findEventAttributeValues(p),
+      );
+    }
+    if (params.facetKey.startsWith("span.attribute.")) {
+      return this.attributeFacetValues(params, "span.attribute.", (p) =>
+        this.repository.findSpanAttributeValues(p),
+      );
+    }
     if (params.facetKey.startsWith("attribute.")) {
-      return this.attributeFacetValues(params);
+      return this.attributeFacetValues(params, "attribute.", (p) =>
+        this.repository.findAttributeValues(p),
+      );
     }
 
     const def = FACET_REGISTRY.find((d) => d.key === params.facetKey);
@@ -1109,13 +1140,22 @@ export class TraceListService {
 
   private async attributeFacetValues(
     params: FacetValuesParams,
+    facetPrefix: string,
+    find: (p: {
+      tenantId: string;
+      timeRange: { from: number; to: number };
+      attributeKey: string;
+      prefix?: string;
+      limit: number;
+      offset: number;
+    }) => Promise<CategoricalFacetResult>,
   ): Promise<FacetValuesResult> {
-    const attributeKey = params.facetKey.slice("attribute.".length);
+    const attributeKey = params.facetKey.slice(facetPrefix.length);
     if (!attributeKey || !ATTRIBUTE_KEY_REGEX.test(attributeKey)) {
       throw new Error(`Invalid attribute key: ${attributeKey}`);
     }
 
-    return this.repository.findAttributeValues({
+    return find({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       attributeKey,
@@ -1301,7 +1341,7 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1309,7 +1349,10 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
-    timestamp: row.occurredAt,
+    timestamp: deriveTraceTimestamp({
+      occurredAt: row.occurredAt,
+      storageAnchorMs: row.storageAnchorMs,
+    }),
     name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,

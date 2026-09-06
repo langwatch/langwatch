@@ -4,15 +4,18 @@ import {
   type PrismaClient,
   type ProcessManagerInstance,
   type ProcessManagerOutbox,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { JsonValue } from "../json";
 import type { ProcessRef } from "../processManager.types";
 import { deriveInboxKey } from "./inboxKey";
 import type {
+  AppendIntentsResult,
   CommitResult,
   DueWake,
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
+  NewOutboxMessage,
   OutboxMessageIdentity,
   OutboxMessageRecord,
   PersistedProcessInstance,
@@ -40,7 +43,7 @@ function asDate(epochMs: number): Date {
 
 function toJsonInput(
   value: JsonValue,
-): Prisma.InputJsonValue | Prisma.NullTypes.JsonNull {
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   return value === null ? Prisma.JsonNull : value;
 }
 
@@ -79,6 +82,31 @@ function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
   return { ...message, leaseToken: message.leaseToken };
 }
 
+/**
+ * Timeouts for the commit transaction. The two knobs cover different windows,
+ * and only one of them covers the lock.
+ *
+ * `timeout` bounds the callback body, which is where the waiting happens: the
+ * first thing the body does is take a BLOCKING `pg_advisory_xact_lock` on the
+ * process reference, so this budget has to cover however long a concurrent
+ * commit for the same process holds that lock, not just this commit's own
+ * work. A suite finishing several runs at once produces exactly that
+ * contention, and Prisma's 5s default was not enough for it — observed in
+ * local dev as "timeout was 5000 ms, however 7737 ms passed".
+ *
+ * `maxWait` bounds the window *before* the callback runs: acquiring a
+ * connection from the pool. It moves up too because the same contention keeps
+ * connections busy, and a commit that never gets a connection fails without
+ * ever reaching its `timeout`.
+ *
+ * The work inside is unchanged and still small: a lock, a dedup read, a
+ * compare-and-swap on the instance, and the inbox/outbox inserts.
+ */
+const COMMIT_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
+
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
 export class PrismaProcessStore implements ProcessStore {
   constructor(private readonly prisma: PrismaClient) {}
@@ -113,6 +141,7 @@ export class PrismaProcessStore implements ProcessStore {
         // Revision remains an explicit compare-and-swap below; the lock also
         // closes the absent-row race for the first commit.
         await tx.$queryRaw`
+          -- @tenancy: advisory-lock helper, key is process-ref-bounded
           WITH process_lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(
               hashtextextended(${refLockKey(commit.ref)}, 0)
@@ -269,13 +298,86 @@ export class PrismaProcessStore implements ProcessStore {
           insertedMessageKeys,
           duplicateMessageKeys,
         };
-      });
+      }, COMMIT_TRANSACTION_OPTIONS);
     } catch (error) {
       if (error instanceof DuplicateInboxRollback) {
         return { outcome: "duplicateEvent" };
       }
       throw error;
     }
+  }
+
+  /**
+   * The transient path: one idempotent multi-row insert, no transaction, no
+   * advisory lock, no instance row and no inbox row. See
+   * {@link AppendIntentsResult} for the reasoning.
+   *
+   * `skipDuplicates` is what makes the absent transaction safe. It compiles to
+   * ON CONFLICT DO NOTHING against the (processName, projectId, messageKey)
+   * unique index, so a redelivery, a crash midway through an earlier attempt,
+   * and two workers racing the same event all converge on the same row set.
+   */
+  async appendIntents(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string | null;
+    messages: NewOutboxMessage[];
+    now: number;
+  }): Promise<AppendIntentsResult> {
+    if (params.messages.length === 0) {
+      return { insertedMessageKeys: [], duplicateMessageKeys: [] };
+    }
+    const at = asDate(params.now);
+    const inserted = await this.prisma.processManagerOutbox.createMany({
+      data: params.messages.map((message) => ({
+        id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
+        ...refWhere(params.ref),
+        tenantId: params.tenantId,
+        userId: message.userId ?? params.userId ?? null,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        payload: toJsonInput(message.payload),
+        traceCarrier: message.traceCarrier,
+        sourceEventId: params.sourceEventId,
+        status: "pending" as const,
+        attempts: 0,
+        nextAttemptAt: at,
+        leasedUntil: null,
+        leaseToken: null,
+        dispatchedAt: null,
+        createdAt: at,
+        updatedAt: at,
+      })),
+      skipDuplicates: true,
+    });
+
+    const keys = params.messages.map((message) => message.messageKey);
+    // The overwhelmingly common case is a clean insert, and it costs no
+    // second read. Only a partial insert has to ask which keys were already
+    // there, and only to REPORT them — the rows themselves are already right
+    // either way, so this read is diagnostic and never load-bearing. Rows this
+    // call wrote carry exactly `at`, which is what separates them from earlier
+    // ones; a concurrent insert landing in the same millisecond would be
+    // reported as inserted rather than duplicate, and misattributing a log
+    // line is the whole cost of that.
+    if (inserted.count === keys.length) {
+      return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
+    }
+    const preexisting = await this.prisma.processManagerOutbox.findMany({
+      where: {
+        projectId: params.ref.projectId,
+        processName: params.ref.processName,
+        messageKey: { in: keys },
+        createdAt: { lt: at },
+      },
+      select: { messageKey: true },
+    });
+    const duplicates = new Set(preexisting.map((row) => row.messageKey));
+    return {
+      insertedMessageKeys: keys.filter((key) => !duplicates.has(key)),
+      duplicateMessageKeys: keys.filter((key) => duplicates.has(key)),
+    };
   }
 
   async findMessagesByRef(params: {
@@ -306,6 +408,7 @@ export class PrismaProcessStore implements ProcessStore {
       : Prisma.empty;
     const rows = await this.prisma.$transaction(async (tx) => {
       return await tx.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
+        -- @tenancy: outbox claim is cross-project worker infrastructure by design
         WITH candidates AS (
           SELECT "id"
           FROM "ProcessManagerOutbox"
@@ -320,6 +423,7 @@ export class PrismaProcessStore implements ProcessStore {
         UPDATE "ProcessManagerOutbox" AS outbox
         SET "leasedUntil" = ${leasedUntil},
             "leaseToken" = CAST(${leaseBatchToken} AS TEXT) || ':' || outbox."id",
+            "attempts" = outbox."attempts" + 1,
             "updatedAt" = ${now}
         FROM candidates
         WHERE outbox."id" = candidates."id"
@@ -333,8 +437,8 @@ export class PrismaProcessStore implements ProcessStore {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
-  }): Promise<void> {
-    await this.prisma.processManagerOutbox.updateMany({
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
       where: {
         ...params.identity,
         leaseToken: params.leaseToken,
@@ -342,13 +446,13 @@ export class PrismaProcessStore implements ProcessStore {
       },
       data: {
         status: "dispatched",
-        attempts: { increment: 1 },
         leasedUntil: null,
         leaseToken: null,
         dispatchedAt: asDate(params.now),
         updatedAt: asDate(params.now),
       },
     });
+    return { applied: result.count === 1 };
   }
 
   async markFailed(params: {
@@ -357,8 +461,8 @@ export class PrismaProcessStore implements ProcessStore {
     now: number;
     nextAttemptAt: number;
     dead: boolean;
-  }): Promise<void> {
-    await this.prisma.processManagerOutbox.updateMany({
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
       where: {
         ...params.identity,
         leaseToken: params.leaseToken,
@@ -366,13 +470,65 @@ export class PrismaProcessStore implements ProcessStore {
       },
       data: {
         status: params.dead ? "dead" : "pending",
-        attempts: { increment: 1 },
         nextAttemptAt: asDate(params.nextAttemptAt),
         leasedUntil: null,
         leaseToken: null,
         updatedAt: asDate(params.now),
       },
     });
+    return { applied: result.count === 1 };
+  }
+
+  async recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    // Two queries, failure path only: the attempt row needs the outbox row's
+    // id, and updateMany cannot return it. The read uses the uniqueness
+    // contract, so it is index-covered either way.
+    const row = await this.prisma.processManagerOutbox.findUnique({
+      where: {
+        projectId: params.identity.projectId,
+        processName_projectId_messageKey: params.identity,
+      },
+      select: { id: true, projectId: true },
+    });
+    if (!row) return;
+    await this.prisma.processManagerOutboxAttempt.create({
+      data: {
+        outboxId: row.id,
+        projectId: row.projectId,
+        attempt: params.attempt.attempt,
+        occurredAt: asDate(params.attempt.occurredAt),
+        outcome: params.attempt.outcome,
+        errorType: params.attempt.errorType,
+        errorMessage: params.attempt.errorMessage,
+        retryAfterMs: params.attempt.retryAfterMs ?? null,
+      },
+    });
+  }
+
+  async releaseLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        ...params.identity,
+        leaseToken: params.leaseToken,
+        status: "pending",
+      },
+      data: {
+        // The decrement hands back the attempt the lease charged: the
+        // delivery never started, so it must not burn retirement budget.
+        attempts: { decrement: 1 },
+        leasedUntil: null,
+        leaseToken: null,
+        updatedAt: asDate(params.now),
+      },
+    });
+    return { applied: result.count === 1 };
   }
 
   async findDueWakes(params: {
@@ -463,5 +619,81 @@ export class PrismaProcessStore implements ProcessStore {
       -- @tenancy: process-manager outbox retention cross-tenant sweep (system-owned maintenance)
     `;
     return affected;
+  }
+
+  // The three batched sweeps below share one shape: pick at most `limit` ids
+  // with a bounded SELECT, then delete exactly those. Putting the LIMIT in a
+  // subquery rather than on the DELETE is what keeps one statement's lock
+  // footprint bounded — an unbounded `DELETE ... WHERE age < x` against
+  // millions of rows holds row locks for the whole scan and is exactly the
+  // shape that made the pre-existing single-process prune unusable at volume.
+  //
+  // All three are cross-tenant by design (see the port docs), so each carries
+  // the multitenancy guard's sanctioned `-- @tenancy:` marker, the same opt-out
+  // `deleteDispatchedBefore` above already uses.
+
+  async deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+          AND "dispatchedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dispatched outbox (system-owned maintenance)
+    `;
+  }
+
+  async deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    // Dead rows carry no `deadAt`; `updatedAt` is stamped by the markFailed
+    // that retired them, so it IS the moment the row became a failure record.
+    // No new index: `dead` is a rare status, so the existing
+    // (status, nextAttemptAt, leasedUntil) index already makes this selective.
+    //
+    // `discarded` is reaped on the same window and by the same sweep. It is
+    // the terminal state an operator writes rather than one the dispatcher
+    // writes, but it means the same thing to retention — a record of work
+    // that will never run, kept for as long as the operator might ask about
+    // it. Leaving it out is what would make it immortal: no other family's
+    // predicate matches it, and this is the highest-volume table in the
+    // system (specs/ops/dead-letter-recovery.feature).
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" IN (
+            'dead'::"ProcessManagerOutboxStatus",
+            'discarded'::"ProcessManagerOutboxStatus"
+          )
+          AND "updatedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dead outbox (system-owned maintenance)
+    `;
+  }
+
+  async deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerInbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerInbox"
+        WHERE "consumedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, consumed inbox (system-owned maintenance)
+    `;
   }
 }

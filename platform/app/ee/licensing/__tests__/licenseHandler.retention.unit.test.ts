@@ -4,6 +4,8 @@ const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockListOrganizationRules = vi.fn().mockResolvedValue([]);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     dataRetention: {
       policy: {
@@ -14,7 +16,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,

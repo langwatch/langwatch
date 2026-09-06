@@ -7,7 +7,6 @@ import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
@@ -28,6 +27,10 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { EvaluationProcessingEvent } from "./schemas/events";
+import {
+  type CustomerIoEvaluationSyncSubscriberDeps,
+  createCustomerIoEvaluationSyncSubscriber,
+} from "./subscribers/customerIoEvaluationSync.subscriber";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
@@ -48,10 +51,8 @@ export interface EvaluationProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  customerIoEvaluationSyncReactor?: ReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
+  /** CRM nurturing sync; absent until the counting strategy is finalised. */
+  customerIoEvaluationSync?: CustomerIoEvaluationSyncSubscriberDeps;
 }
 
 /**
@@ -62,7 +63,7 @@ export interface EvaluationProcessingPipelineDeps {
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + emit events (reactor path)
+ * - executeEvaluation: Preconditions + sampling + run eval + emit events (subscriber path)
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
@@ -116,11 +117,10 @@ export function createEvaluationProcessingPipeline(
         deps.automations.graphActivityHandler(event, context),
     });
 
-  if (deps.customerIoEvaluationSyncReactor) {
-    builder = builder.withReactor(
-      "evaluationRun",
+  if (deps.customerIoEvaluationSync) {
+    builder = builder.withSubscriber(
       "customerIoEvaluationSync",
-      deps.customerIoEvaluationSyncReactor,
+      createCustomerIoEvaluationSyncSubscriber(deps.customerIoEvaluationSync),
     );
   }
 

@@ -8,6 +8,8 @@ const appMocks = vi.hoisted(() => ({
   getTotalStorageBytesForTenants: vi.fn(),
 }));
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     dataRetention: {
       metering: {

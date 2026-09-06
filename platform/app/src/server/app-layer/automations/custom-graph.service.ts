@@ -1,4 +1,4 @@
-import type { CustomGraph, PrismaClient } from "@prisma/client";
+import type { CustomGraph, PrismaClient } from "~/generated/prisma/client";
 import { PrismaAutomationCustomGraphRepository } from "./repositories/custom-graph.prisma.repository";
 import type {
   AutomationCustomGraphRepository,

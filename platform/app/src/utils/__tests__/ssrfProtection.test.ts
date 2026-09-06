@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const undiciFetchMock = vi.fn();
+vi.mock("undici", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("undici")>()),
+  fetch: (...args: unknown[]) => undiciFetchMock(...args),
+}));
+
 import {
   createSSRFValidator,
+  fetchWithResolvedIp,
   isBlockedCloudDomain,
   isPrivateOrLocalhostIP,
+  RedirectRefusedError,
 } from "../ssrfProtection";
 
 describe("isPrivateOrLocalhostIP", () => {
@@ -218,5 +227,42 @@ describe("createSSRFValidator (dependency injection)", () => {
     await expect(
       validator("http://169.254.169.254/latest/meta-data/"),
     ).rejects.toThrow("cloud metadata endpoints");
+  });
+});
+
+describe("given a caller that refuses redirects", () => {
+  /**
+   * The failure this exists to stop is not the redirect — it is what the
+   * refusal looks like on the way out. Every other error leaving this function
+   * is rewritten as "Connection failed to host:port: …", which is right for a
+   * socket problem and wrong for a decision this module made. A caller told
+   * "connection failed" goes and checks their network, when the endpoint
+   * answered perfectly well and simply pointed elsewhere.
+   *
+   * A consumer matching on the message rather than the type shipped exactly
+   * that bug, green tests included, because the message it compared against was
+   * one this module never emits.
+   */
+  it("lets the refusal out as its own type, not rewritten as a connection failure", async () => {
+    undiciFetchMock.mockResolvedValueOnce({
+      status: 302,
+      headers: new Headers({ location: "https://elsewhere.example.com/v1" }),
+    });
+
+    const error = await fetchWithResolvedIp(
+      {
+        type: "resolved",
+        resolvedIp: "93.184.216.34",
+        originalUrl: "https://example.com/v1/models",
+        hostname: "example.com",
+        port: 443,
+        protocol: "https:",
+        path: "/v1/models",
+      },
+      { followRedirects: false },
+    ).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(RedirectRefusedError);
+    expect((error as Error).message).not.toContain("Connection failed");
   });
 });

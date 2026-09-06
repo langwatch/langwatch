@@ -7,21 +7,25 @@
  * the redaction reason, and applies retroactively (changing the rule changes
  * what an existing reader sees, with no re-ingestion).
  */
-import type { Project } from "@prisma/client";
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import type { Session } from "~/server/auth";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestProject } from "../../../utils/testUtils";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../db";
 import { getUserProtectionsForProject } from "../utils";
+
+wireDefaultTestApp();
 
 const NAMESPACE = "dataprivacy-visibility";
 

@@ -2,48 +2,11 @@ import { generate } from "@langwatch/ksuid";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { createHash } from "crypto";
-import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
-
-const thumbsUpDownSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("thumbs_up_down"),
-  metrics: z.object({ vote: z.number().min(-1).max(1) }),
-  event_details: z.object({ feedback: z.string().nullish() }).optional(),
-});
-
-const selectedTextSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("selected_text"),
-  metrics: z.object({ text_length: z.number().positive() }),
-  event_details: z.object({ selected_text: z.string().optional() }).optional(),
-});
-
-const waitedToFinishSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("waited_to_finish"),
-  metrics: z.object({ finished: z.number().min(0).max(1) }),
-  event_details: z.object({}).optional(),
-});
-
-/**
- * Predefined event-type schemas (`thumbs_up_down`, `selected_text`,
- * `waited_to_finish`). Custom event types validate against
- * `trackEventRESTParamsValidatorSchema` only.
- */
-export const predefinedEventsSchemas = z.union([
-  thumbsUpDownSchema,
-  selectedTextSchema,
-  waitedToFinishSchema,
-]);
-
-export const predefinedEventTypes = predefinedEventsSchemas.options.map(
-  (schema) => schema.shape.event_type.value,
-);
 
 /**
  * Build the OTEL span for a tracked event and dispatch it through the

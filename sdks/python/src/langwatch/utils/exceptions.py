@@ -28,6 +28,53 @@ def extract_api_error_code(body: Any) -> Optional[str]:
     return _first_string(body.get("code"), body.get("type"), body.get("kind"))
 
 
+def extract_api_error_reasons(body: Any) -> List[str]:
+    """The fields a validation refusal named, as ``field: message`` lines.
+
+    A ``validation_error`` carries one ``reasons`` entry per rejected field,
+    each with ``meta.field`` and ``meta.message``. Those two are what the
+    caller needs to fix the request, and neither ever quotes what was sent.
+    An envelope without ``reasons`` answers an empty list.
+
+    Three envelope spellings carry the same list: ``reasons`` at the top, the
+    whole object nested under ``error``, and the list under ``meta`` beside the
+    ``fields`` it names, which is what the REST routes send.
+    """
+    if not isinstance(body, Mapping):
+        return []
+    reasons = _reasons_list(body)
+    if reasons is None:
+        inner = body.get("error")
+        reasons = _reasons_list(inner) if isinstance(inner, Mapping) else None
+    if reasons is None:
+        return []
+    lines: List[str] = []
+    for reason in reasons:
+        if not isinstance(reason, Mapping):
+            continue
+        meta = reason.get("meta")
+        if not isinstance(meta, Mapping):
+            continue
+        field = meta.get("field")
+        message = meta.get("message")
+        if isinstance(field, str) and isinstance(message, str):
+            lines.append(f"{field}: {message}")
+        elif isinstance(message, str):
+            lines.append(message)
+    return lines
+
+
+def _reasons_list(body: Mapping) -> Optional[list]:
+    """The ``reasons`` list of one envelope, at the top or under ``meta``."""
+    reasons = body.get("reasons")
+    if isinstance(reasons, list):
+        return reasons
+    meta = body.get("meta")
+    if isinstance(meta, Mapping) and isinstance(meta.get("reasons"), list):
+        return cast(list, meta["reasons"])
+    return None
+
+
 def extract_api_error_detail(body: Any) -> str:
     """Build a readable detail line from a LangWatch API error body.
 
@@ -41,10 +88,25 @@ def extract_api_error_detail(body: Any) -> str:
     Reads the discriminant as ``code`` -> ``type`` -> ``kind``; the platform
     sets all three to the same value (``type`` is the OpenAI-compatible name
     Go emits), so the order only decides which answers first.
+
+    Two envelope spellings carry the same failure: the gateway families put
+    ``code`` and ``message`` at the top level, while some routes nest that
+    whole object under ``error``. The nested one is read when the top level
+    describes nothing, so the platform's own sentence reaches the caller either
+    way rather than being reduced to a bare status.
     """
     if not isinstance(body, Mapping):
         return ""
 
+    detail = _detail_from_envelope(body)
+    if detail:
+        return detail
+
+    nested = body.get("error")
+    return _detail_from_envelope(nested) if isinstance(nested, Mapping) else ""
+
+
+def _detail_from_envelope(body: Mapping) -> str:
     code = _first_string(body.get("code"), body.get("type"), body.get("kind"))
 
     meta = body.get("meta")

@@ -55,6 +55,10 @@ export type {
   EvaluationResult,
   BatchEntry,
   Batch,
+  ComparisonMetric,
+  ComparisonOptions,
+  ComparisonStatus,
+  ComparisonVerdict,
   ExperimentInitOptions,
   LogOptions,
   EvaluateOptions,
@@ -72,6 +76,7 @@ export {
   ExperimentInitError,
   ExperimentApiError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./errors";
 

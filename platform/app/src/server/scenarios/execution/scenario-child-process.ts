@@ -26,17 +26,17 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
-import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
+import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
+import { selectRoleModelParams } from "./job-model-params";
 import {
   createJudgeModelFromParams,
   createModelFromParams,
 } from "./model.factory";
-import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
+import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
-import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
-import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import type { ChildProcessJobData } from "./types";
+import { SerializedConnectedAgentAdapter } from "./serialized-adapters/connected-agent.adapter";
+import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -81,7 +81,14 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
     });
     process.stdin.on("end", () => {
       try {
-        resolve(JSON.parse(data) as ChildProcessJobData);
+        // A real .parse(), not an unchecked cast: every model-params field
+        // is individually optional (workflow/code/http targets resolve no
+        // adapter model; a pre-split payload carries only modelParams), so
+        // the schema's refinement is what guarantees each role can be built.
+        // A payload that fails it must fail loudly here with a named Zod
+        // error rather than as an opaque "undefined has no properties" crash
+        // three layers into model construction (issue #6634).
+        resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
       } catch (error) {
         reject(new Error(`Failed to parse job data: ${error}`));
       }
@@ -90,20 +97,16 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
   });
 }
 
-async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const {
-    context,
-    scenario,
-    adapterData,
-    modelParams,
-    simulatorModelParams,
-    judgeModelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
-
-  // These are injected as env vars by the parent process (scenario.processor.ts
-  // buildChildProcessEnv). They originate from prefetchScenarioData telemetry.
+/**
+ * The telemetry endpoint and key the run reports to.
+ *
+ * The parent process injects them as env vars (buildChildProcessEnv in
+ * scenario.processor.ts) and they come from prefetchScenarioData telemetry.
+ */
+function readTelemetryEnv(): {
+  langwatchEndpoint: string;
+  langwatchApiKey: string;
+} {
   const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
   const langwatchApiKey = process.env.LANGWATCH_API_KEY;
   if (!langwatchEndpoint || !langwatchApiKey) {
@@ -111,56 +114,38 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
     );
   }
+  return { langwatchEndpoint, langwatchApiKey };
+}
 
+async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
+  const {
+    context,
+    scenario,
+    parameters,
+    adapterData,
+    modelParams,
+    nlpServiceUrl,
+    target,
+  } = jobData;
+
+  const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
+
+  // The platform API key rides the same telemetry channel every child
+  // process already gets (buildChildProcessEnv in scenario.processor.ts
+  // sets LANGWATCH_API_KEY from prefetchScenarioData's telemetry.apiKey) —
+  // no need to duplicate it onto the job payload. The workflow/code
+  // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = createAdapter({
     adapterData,
     modelParams,
     nlpServiceUrl,
+    projectApiKey: langwatchApiKey,
+    parameters,
   });
-  // The user-simulator and judge resolve their own models (run-plan /
-  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
-  // only carried modelParams, so fall back to it when the split params are
-  // absent — preserves the previous single-model behavior during rollout.
-  const simulatorModel = createModelFromParams({
-    litellmParams: simulatorModelParams ?? modelParams,
-    nlpServiceUrl,
-  });
-  const judgeModel = createJudgeModelFromParams({
-    litellmParams: judgeModelParams ?? modelParams,
-    nlpServiceUrl,
-  });
-
-  // For HTTP targets, use a remote span judge that queries spans from
-  // the platform API before evaluation. The trace ID will be captured
-  // from the adapter after the conversation completes.
-  let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
-  const judgeAgent =
-    target.type === "http"
-      ? (() => {
-          remoteSpanJudge = new RemoteSpanJudgeAgent({
-            criteria: scenario.criteria,
-            model: judgeModel,
-            projectId: context.projectId,
-            querySpans: createTraceApiSpanQuery({
-              endpoint: langwatchEndpoint,
-              apiKey: langwatchApiKey,
-            }),
-          });
-          return remoteSpanJudge;
-        })()
-      : ScenarioRunner.judgeAgent({
-          criteria: scenario.criteria,
-          model: judgeModel,
-        });
+  const cast = buildRunCast({ jobData, adapter });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
-
-  // Hook into the scenario lifecycle to capture the trace ID from the adapter
-  // before judge evaluation. The adapter captures it during HTTP calls.
-  if (remoteSpanJudge && adapter instanceof SerializedHttpAgentAdapter) {
-    bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
-  }
 
   const result = await ScenarioRunner.run(
     {
@@ -168,17 +153,27 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       name: scenario.name,
       description: scenario.situation,
       setId: context.setId,
-      agents: [
-        adapter,
-        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-        judgeAgent,
-      ],
+      agents: cast.agents,
+      ...(cast.script ? { script: cast.script } : {}),
       verbose,
+      // An http target's own spans land in the trace each turn propagates,
+      // so the judge fetches them back from the platform's trace API before
+      // any verdict. The wait budget comes from the prefetcher's per-project
+      // ingest-lag measurement.
+      ...buildRemoteTraceRunConfig({
+        targetType: target.type,
+        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+        langwatchEndpoint,
+        langwatchApiKey,
+      }),
+      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
       metadata: {
         langwatch: {
           targetReferenceId: target.referenceId,
           targetType: target.type,
         },
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
     },
     {
@@ -205,14 +200,77 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } =
-    {
-      success: result.success,
-    };
+  const outputResult: {
+    success: boolean;
+    reasoning?: string;
+    error?: string;
+    agentInstance?: { hostname: string; label: string | null };
+  } = {
+    success: result.success,
+  };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
   }
-  process.stdout.write(JSON.stringify(outputResult) + "\n");
+  // The connected agent instance that answered the run's turns, for the
+  // parent's record of which process served the run.
+  if (
+    adapter instanceof SerializedConnectedAgentAdapter &&
+    adapter.servedInstance
+  ) {
+    outputResult.agentInstance = adapter.servedInstance;
+  }
+  // The result line is the last thing the child says. Exit once it is
+  // written rather than wait for the event loop to drain: the run's adapters
+  // and the SDK can leave handles open after the run, and a child that stays
+  // up keeps the parent from reading the result until its timeout.
+  process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
+    process.exit(0);
+  });
+}
+
+/**
+ * Who takes part in the run, and whether the conversation is written down.
+ *
+ * A scripted run (an agent test) carries its user's lines and decides its
+ * own verdict, so it builds no model. Every other run lets a user simulator
+ * play the person and a judge decide: both resolve their own models (run-plan
+ * or scenario override, else the DEFAULT-role scenarios.* defaults). A job
+ * queued before that split carried only modelParams, so both roles fall
+ * back to it, preserving the previous single-model behavior across a deploy.
+ */
+function buildRunCast({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script?: ScenarioRunner.ScriptStep[];
+} {
+  if (jobData.script) {
+    return buildAgentTestRun({ adapter, script: jobData.script });
+  }
+  const { nlpServiceUrl, scenario } = jobData;
+  const roleModelParams = selectRoleModelParams(jobData);
+  const simulatorModel = createModelFromParams({
+    litellmParams: roleModelParams.simulator,
+    nlpServiceUrl,
+  });
+  const judgeModel = createJudgeModelFromParams({
+    litellmParams: roleModelParams.judge,
+    nlpServiceUrl,
+  });
+  return {
+    agents: [
+      adapter,
+      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.judgeAgent({
+        criteria: scenario.criteria,
+        model: judgeModel,
+      }),
+    ],
+  };
 }
 
 /**

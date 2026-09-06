@@ -1,6 +1,5 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
-import { resolveRunStatus } from "../scenarios/stall-detection";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -39,6 +38,13 @@ export interface ClickHouseSimulationRunRow {
   UpdatedAt: string;
   FinishedAt: string | null;
   ArchivedAt: string | null;
+  /**
+   * How many messages the run actually holds, selected only by the trimmed
+   * list projection so a caller can tell a 6-message page from a 6-message
+   * conversation. Absent on the full-column reads, where the row already
+   * carries every message.
+   */
+  TotalMessageCount?: string;
 }
 
 export function mapStatus(status: string): ScenarioRunStatus {
@@ -81,11 +87,12 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
 
 /**
  * Maps a ClickHouse simulation_runs row to ScenarioRunData.
- * Applies stall detection using UpdatedAt timestamp.
+ * Stored status is the only truth: runs without a finish timestamp read as
+ * IN_PROGRESS regardless of age — a stalled run reaches terminal ERROR via
+ * the process-manager stall watchdog, not a read-time derivation.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
-  now = Date.now(),
 ): ScenarioRunData {
   const baseStatus = mapStatus(row.Status);
   const updatedAt = Number(row.UpdatedAt);
@@ -97,12 +104,10 @@ export function mapClickHouseRowToScenarioRunData(
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
-  // Apply stall detection: if run has no finished timestamp, check if it's stalled
-  const resolvedStatus = resolveRunStatus({
-    finishedStatus: finishedAt != null ? baseStatus : undefined,
-    lastEventTimestamp: updatedAt,
-    now,
-  });
+  // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its
+  // stored status.
+  const resolvedStatus =
+    finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
 
   const verdictEnum = mapVerdict(row.Verdict);
 
@@ -136,6 +141,15 @@ export function mapClickHouseRowToScenarioRunData(
     };
   }) as ScenarioMessages;
 
+  // The trimmed list projection selects the real message count alongside the
+  // sliced arrays. Without it (full-column reads) the row holds every message,
+  // so nothing was trimmed.
+  const totalMessageCount =
+    row.TotalMessageCount != null
+      ? parseInt(row.TotalMessageCount, 10)
+      : messages.length;
+  const messagesTruncated = totalMessageCount > messages.length;
+
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
 
@@ -154,11 +168,20 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          return parsed != null &&
-            typeof parsed === "object" &&
-            !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : null;
+          if (
+            parsed == null ||
+            typeof parsed !== "object" ||
+            Array.isArray(parsed)
+          ) {
+            return null;
+          }
+          // A run's secret parameter values never belong in a stored row, and
+          // the fold projection keeps them out. Dropped again on the way out
+          // so a row written by another path cannot serve one. The names, on
+          // `secretParameterNames`, stay.
+          const { secretParameters: _secretParameters, ...rest } =
+            parsed as Record<string, unknown>;
+          return rest;
         } catch {
           return null;
         }
@@ -179,6 +202,7 @@ export function mapClickHouseRowToScenarioRunData(
     status: resolvedStatus,
     results,
     messages,
+    messagesTruncated,
     timestamp: startedAt ?? createdAt,
     updatedAt,
     durationInMs:

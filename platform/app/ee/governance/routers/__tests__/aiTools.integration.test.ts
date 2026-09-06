@@ -19,21 +19,25 @@
  *   specs/ai-governance/personal-portal/tool-catalog-scoping.feature
  *   specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { AiToolEntryService } from "../../services/aiToolEntry.service";
+import {
+  AiToolEntryService,
+  STARTER_PACK_TILES,
+} from "../../services/aiToolEntry.service";
 
 describe("aiToolsRouter integration", () => {
   const ns = `aitools-${nanoid(8)}`;
@@ -235,7 +239,7 @@ describe("aiToolsRouter integration", () => {
             linkUrl: "https://wiki.example.com",
           },
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     /** @scenario "External (lite) members can also list (portal must work for everyone)" */
@@ -557,6 +561,7 @@ describe("aiToolsRouter integration", () => {
           "claude-code",
           "codex",
           "gemini",
+          "github-copilot",
           "google",
           "openai",
           "opencode",
@@ -567,7 +572,7 @@ describe("aiToolsRouter integration", () => {
         const again = await callerFor(member.id).aiTools.list({
           organizationId: org.id,
         });
-        expect(again).toHaveLength(8);
+        expect(again).toHaveLength(STARTER_PACK_TILES.length);
       } finally {
         await prisma.aiToolEntry.deleteMany({
           where: { organizationId: org.id },
@@ -712,7 +717,7 @@ describe("aiToolsRouter integration", () => {
         const result = await callerFor(adminUserId).aiTools.importStarterPack({
           organizationId: freshOrgId,
         });
-        expect(result.created).toBe(8); // 4 coding assistants + 4 model providers
+        expect(result.created).toBe(9); // 5 coding assistants + 4 model providers
         expect(result.updated).toBe(0);
         expect(result.skipped).toBe(0);
 
@@ -726,6 +731,7 @@ describe("aiToolsRouter integration", () => {
           "claude-code",
           "codex",
           "gemini",
+          "github-copilot",
           "google",
           "openai",
           "opencode",
@@ -737,11 +743,11 @@ describe("aiToolsRouter integration", () => {
         });
         expect(second.created).toBe(0);
         expect(second.updated).toBe(0);
-        expect(second.skipped).toBe(8);
+        expect(second.skipped).toBe(9);
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(8);
+        expect(after).toHaveLength(9);
       } finally {
         await prisma.aiToolEntry
           .deleteMany({ where: { organizationId: freshOrgId } })
@@ -811,9 +817,9 @@ describe("aiToolsRouter integration", () => {
           organizationId: freshOrgId,
         });
         // Only the genuinely missing tile comes back; the archived one and
-        // the six untouched ones are treated as present.
+        // the rest of the untouched tiles are treated as present.
         expect(result.created).toBe(1);
-        expect(result.skipped).toBe(7);
+        expect(result.skipped).toBe(STARTER_PACK_TILES.length - 1);
 
         const rows = await prisma.aiToolEntry.findMany({
           where: { organizationId: freshOrgId },
@@ -845,7 +851,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.importStarterPack({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("merges iconAsset into pre-existing admin-created tiles by displayName", async () => {
@@ -942,12 +948,13 @@ describe("aiToolsRouter integration", () => {
         });
         expect(result.updated).toBe(1); // Claude Code merged in place
         expect(result.skipped).toBe(1); // Codex admin-curated icon preserved
-        expect(result.created).toBe(6); // remaining starter set inserted
+        // remaining starter set inserted (all tiles minus the merged + skipped)
+        expect(result.created).toBe(STARTER_PACK_TILES.length - 2);
 
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(8); // no duplicate row created
+        expect(after).toHaveLength(STARTER_PACK_TILES.length); // no duplicate row created
 
         const claudeRows = after.filter(
           (e) =>
@@ -1092,7 +1099,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.providerOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -1327,7 +1334,6 @@ describe("aiToolsRouter integration", () => {
           },
           name: `Drawer Default ${nanoid(4)}`,
           modelProviderIds: [],
-          strategy: "priority",
           isDefault: true,
           createdById: adminUserId,
           updatedById: adminUserId,
@@ -1353,7 +1359,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.routingPolicyOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });

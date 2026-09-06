@@ -12,7 +12,7 @@
  * surfaces, and none of those should reach into infrastructure to find out
  * what period a budget is in.
  */
-import type { GatewayBudgetWindow } from "@prisma/client";
+import type { GatewayBudgetWindow } from "~/generated/prisma/client";
 
 import {
   anchoredPeriodStart,

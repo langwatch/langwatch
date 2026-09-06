@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 
 import {
   checkRoleBindingPermission,

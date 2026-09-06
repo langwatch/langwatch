@@ -44,6 +44,18 @@ Rule: Trace list data fetching
     Then TanStack Query collapses them to a single network request
     And both components receive the same data
 
+  # trace_summaries keeps every version of a trace's row until the merge
+  # collapses them. A filter evaluated before the version dedup finds stale
+  # versions: a freshly annotated trace matched both "annotated" and
+  # "unannotated" at once, and the facet counts counted it twice.
+  @integration
+  Scenario: A filter reads only the latest version of each trace
+    Given a trace whose older stored version does not match a filter and whose newest does
+    When the list is filtered by it
+    Then the trace is found
+    And filtering by the opposite value does not find it
+    And the facet counts count the trace exactly once
+
 
 # Not yet implemented as of 2026-05-01 — there is no `useTraceListGrouped`
 # hook or `tracesV2.listGrouped` endpoint. Lens capabilities define grouping

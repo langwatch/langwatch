@@ -26,9 +26,6 @@ export function CopyButton(props: CopyButtonProps) {
             title: `Your browser does not support clipboard access, please copy the prompt ID manually`,
             type: "error",
             duration: 2000,
-            meta: {
-              closable: true,
-            },
           });
           return;
         }
@@ -39,9 +36,6 @@ export function CopyButton(props: CopyButtonProps) {
             title: `${label} copied to your clipboard`,
             type: "success",
             duration: 2000,
-            meta: {
-              closable: true,
-            },
           });
         })();
       }}

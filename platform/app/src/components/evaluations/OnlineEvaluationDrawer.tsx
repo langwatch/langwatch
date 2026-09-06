@@ -11,7 +11,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode } from "@prisma/client";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import {
   useCallback,
@@ -37,6 +36,7 @@ import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mappingValidation";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import {
   getComplexProps,
   getDrawerStack,
@@ -189,7 +189,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =

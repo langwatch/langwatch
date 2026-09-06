@@ -135,7 +135,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 Per-VK rate limits are configurable (`rate_limits.rpm|tpm|rpd`) and enforced at the gateway before the request leaves for the provider. Breaches return `429 rate_limit_exceeded` with a `Retry-After` header in seconds.
 
-Upstream provider rate limits are opaque to the VK owner but can trigger fallback (if `rate_limit` is in the VK's `fallback.on`). A `Retry-After` from upstream is surfaced to the client when no fallback remains.
+Upstream provider rate limits are opaque to the VK owner. An upstream 429 is fallback-eligible: the gateway moves to the next credential in the VK's chain when there is one and the attempt budget allows it. A `Retry-After` from upstream is surfaced to the client when no fallback remains.
 
 ## Observability
 

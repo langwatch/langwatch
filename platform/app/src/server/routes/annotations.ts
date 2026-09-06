@@ -7,9 +7,16 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
+import {
+  ANNOTATION_ANCHOR_SCOPES,
+  type AnnotationAnchorScope,
+  annotationAnchorScopeSchema,
+  annotationAnchorScopeWhere,
+} from "~/server/annotations/annotationAnchor";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -73,7 +80,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     return {
@@ -92,6 +99,26 @@ async function authenticateRequest(c: Context, permission: Permission) {
   return { project: resolved.project, markUsed };
 }
 
+/**
+ * Which comments a list endpoint returns. Absent means every comment on the
+ * trace, each carrying the part of it that was commented on: an anchored
+ * comment is the primary annotation now, so a list that left them out would
+ * answer with silence exactly when a reviewer had spoken. `?anchor=trace` asks
+ * for only what was said about the traces as a whole.
+ */
+function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
+  const requested = c.req.query("anchor");
+  if (requested === undefined) return "all";
+
+  const parsed = annotationAnchorScopeSchema.safeParse(requested);
+  if (!parsed.success) {
+    throw new ValidationError(
+      `[anchor] must be one of: ${ANNOTATION_ANCHOR_SCOPES.join(", ")}.`,
+    );
+  }
+  return parsed.data;
+}
+
 // ---------- GET /api/annotations ----------
 secured.access(annotationsViewAuth).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
@@ -99,10 +126,14 @@ secured.access(annotationsViewAuth).get("/annotations", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const anchorScope = anchorScopeFromQuery(c);
 
   try {
     const annotations = await prisma.annotation.findMany({
-      where: { projectId: project.id },
+      where: {
+        projectId: project.id,
+        ...annotationAnchorScopeWhere(anchorScope),
+      },
     });
 
     markUsed();
@@ -252,11 +283,16 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const anchorScope = anchorScopeFromQuery(c);
 
   try {
     const trace = c.req.param("id");
     const annotationsByTrace = await prisma.annotation.findMany({
-      where: { traceId: trace, projectId: project.id },
+      where: {
+        traceId: trace,
+        projectId: project.id,
+        ...annotationAnchorScopeWhere(anchorScope),
+      },
     });
 
     markUsed();
@@ -279,10 +315,11 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
 secured
   .access(annotationsCreateAuth)
   .post("/annotations/trace/:id", async (c) => {
-    // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
-    // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
-    // only ever grants annotations:create, never :manage. PATCH/DELETE above
-    // correctly stay on :manage.
+    // `:create` (not `:manage`) — same fix as evaluators' POST route. A create
+    // asks for the create grain; demanding `:manage` here would refuse every
+    // restricted key that can create but not delete, which is exactly how
+    // `scenarios:create` produced a production 403. (`:manage` still implies
+    // `:create` via the hierarchy, so nobody loses access.)
     const auth = await authenticateRequest(c, "annotations:create");
     if ("error" in auth) {
       return c.json(auth.body, auth.status);

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   getCustomLLMModelCosts,
   type MaybeStoredLLMModelCost,
@@ -6,6 +6,8 @@ import {
 import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import { CLAUDE_CODE_LLM_REQUEST_SPAN_NAME } from "./canonicalisation/extractors/claudeCode";
+import { CODEX_TURN_SPAN_NAME } from "./canonicalisation/extractors/codex";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -17,6 +19,38 @@ const MODEL_ATTRIBUTE_KEYS = [
   "llm.model_name",
   "ai.model",
 ] as const;
+
+/**
+ * The same keys plus the bare `model`, used only for the spans named below.
+ *
+ * Enrichment runs on the raw OTLP span, before canonicalisation, and the
+ * coding agents that export their own telemetry name the model under a bare
+ * `model` and nothing else. Without it a custom cost rule silently does
+ * nothing to exactly the traffic whose pricing a customer is most likely to
+ * want to override.
+ *
+ * `model` is also a very common generic attribute key far outside coding-agent
+ * telemetry, and what this service writes sits at priority 1 in
+ * computeSpanCost, above even a reported cost. Reading it from every span
+ * would let a customer's existing cost rule start pricing spans it never
+ * matched before, at whatever rate they set, with no migration and no signal
+ * that a dormant rule went live. So the loose key is scoped to the two spans
+ * that need it.
+ */
+const CODING_AGENT_MODEL_ATTRIBUTE_KEYS = [
+  ...MODEL_ATTRIBUTE_KEYS,
+  "model",
+] as const;
+
+/**
+ * The coding-agent spans that carry their model under a bare `model`. Both
+ * names come from the extractors that own them, so a rename cannot leave this
+ * gate silently matching nothing.
+ */
+const CODING_AGENT_MODEL_SPAN_NAMES: ReadonlySet<string> = new Set([
+  CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
+  CODEX_TURN_SPAN_NAME,
+]);
 
 /**
  * Dependencies for OtlpSpanCostEnrichmentService that can be injected for testing.
@@ -69,7 +103,12 @@ export class OtlpSpanCostEnrichmentService {
    * @param tenantId - The project ID to look up custom costs for
    */
   async enrichSpan(span: OtlpSpan, tenantId: string): Promise<void> {
-    const modelName = extractModelName(span, MODEL_ATTRIBUTE_KEYS);
+    const modelName = extractModelName(
+      span,
+      CODING_AGENT_MODEL_SPAN_NAMES.has(span.name)
+        ? CODING_AGENT_MODEL_ATTRIBUTE_KEYS
+        : MODEL_ATTRIBUTE_KEYS,
+    );
     if (!modelName) return;
 
     const customCosts = await this.deps.getCustomModelCosts(tenantId);
@@ -102,6 +141,12 @@ export class OtlpSpanCostEnrichmentService {
       span.attributes.push({
         key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
         value: { doubleValue: matched.cacheCreationCostPerToken },
+      });
+    }
+    if (matched.cacheCreation1hCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheCreation1hCostPerToken },
       });
     }
   }

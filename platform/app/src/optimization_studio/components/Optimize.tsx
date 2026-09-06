@@ -513,7 +513,7 @@ export function OptimizeModalContent({
                   variant="outline"
                   type="submit"
                   loading={
-                    commitVersion.isLoading ||
+                    commitVersion.isPending ||
                     optimizationState?.status === "waiting"
                   }
                   disabled={!!isDisabled}

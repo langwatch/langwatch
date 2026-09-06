@@ -6,7 +6,8 @@
  * gone in alongside.
  *
  * Covers @unit scenarios from
- * specs/model-providers/credential-validation.feature.
+ * specs/model-providers/credential-validation.feature and
+ * specs/scenarios/secret-run-parameters.feature.
  */
 import { describe, expect, it } from "vitest";
 
@@ -18,10 +19,12 @@ describe("redactAuditArgs", () => {
       /** @scenario "A credential is never persisted to the audit trail" */
       it("replaces the values but keeps which credentials were set", () => {
         const redacted = redactAuditArgs({
-          organizationId: "org-1",
-          provider: "gemini",
-          customKeys: {
-            GEMINI_API_KEY: "AIzaSyTheCustomersRealKey",
+          input: {
+            organizationId: "org-1",
+            provider: "gemini",
+            customKeys: {
+              GEMINI_API_KEY: "AIzaSyTheCustomersRealKey",
+            },
           },
         }) as Record<string, unknown>;
 
@@ -38,9 +41,11 @@ describe("redactAuditArgs", () => {
 
       it("redacts every credential, not only the first", () => {
         const redacted = redactAuditArgs({
-          customKeys: {
-            AZURE_OPENAI_API_KEY: "secret-one",
-            AZURE_OPENAI_ENDPOINT: "https://example.openai.azure.com",
+          input: {
+            customKeys: {
+              AZURE_OPENAI_API_KEY: "secret-one",
+              AZURE_OPENAI_ENDPOINT: "https://example.openai.azure.com",
+            },
           },
         }) as Record<string, unknown>;
 
@@ -54,10 +59,12 @@ describe("redactAuditArgs", () => {
       /** @scenario "A credential typed as a header is never persisted either" */
       it("redacts a header's value while keeping its name", () => {
         const redacted = redactAuditArgs({
-          extraHeaders: [
-            { key: "Authorization", value: "Bearer sk-the-real-token" },
-            { key: "X-Tenant", value: "acme" },
-          ],
+          input: {
+            extraHeaders: [
+              { key: "Authorization", value: "Bearer sk-the-real-token" },
+              { key: "X-Tenant", value: "acme" },
+            ],
+          },
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("sk-the-real-token");
@@ -67,10 +74,34 @@ describe("redactAuditArgs", () => {
         ]);
       });
 
+      // A header that does not carry the `{ key, value }` shape the schema
+      // declares still carries whatever was typed into it.
+      /** @scenario "A credential typed as a header is never persisted either" */
+      it("replaces a header entry of any other shape", () => {
+        const redacted = redactAuditArgs({
+          input: {
+            extraHeaders: [
+              "Authorization: Bearer sk-a-bare-string",
+              { raw: "Bearer sk-in-another-field" },
+              { key: 7, value: "sk-under-a-numeric-name" },
+            ],
+          },
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("sk-");
+        expect(redacted.extraHeaders).toEqual([
+          "[redacted]",
+          "[redacted]",
+          "[redacted]",
+        ]);
+      });
+
       /** A passthrough object, so its contents cannot be assumed harmless. */
       it("redacts providerConfig values", () => {
         const redacted = redactAuditArgs({
-          providerConfig: { serviceAccountJson: '{"private_key":"pk"}' },
+          input: {
+            providerConfig: { serviceAccountJson: '{"private_key":"pk"}' },
+          },
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("private_key");
@@ -83,7 +114,7 @@ describe("redactAuditArgs", () => {
       // an unexpected shape must not be the one that gets through.
       it("redacts a credential field arriving in an unexpected shape", () => {
         const redacted = redactAuditArgs({
-          customKeys: ["sk-off-schema-but-still-a-secret"],
+          input: { customKeys: ["sk-off-schema-but-still-a-secret"] },
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("off-schema");
@@ -91,10 +122,12 @@ describe("redactAuditArgs", () => {
 
       it("redacts every credential-carrying field on one write", () => {
         const redacted = redactAuditArgs({
-          provider: "custom",
-          customKeys: { CUSTOM_API_KEY: "key-secret" },
-          extraHeaders: [{ key: "Authorization", value: "header-secret" }],
-          providerConfig: { token: "config-secret" },
+          input: {
+            provider: "custom",
+            customKeys: { CUSTOM_API_KEY: "key-secret" },
+            extraHeaders: [{ key: "Authorization", value: "header-secret" }],
+            providerConfig: { token: "config-secret" },
+          },
         }) as Record<string, unknown>;
 
         const serialized = JSON.stringify(redacted);
@@ -111,23 +144,75 @@ describe("redactAuditArgs", () => {
       it("passes the arguments through untouched", () => {
         const input = { projectId: "proj-1", name: "Gemini" };
 
-        expect(redactAuditArgs(input)).toBe(input);
+        expect(redactAuditArgs({ input })).toBe(input);
       });
 
       it.each([undefined, null, "a string", 42])("leaves %s alone", (input) => {
-        expect(redactAuditArgs(input)).toBe(input);
+        expect(redactAuditArgs({ input })).toBe(input);
       });
 
       it("leaves a non-object customKeys alone", () => {
         const input = { customKeys: null };
 
-        expect(redactAuditArgs(input)).toBe(input);
+        expect(redactAuditArgs({ input })).toBe(input);
       });
 
       it("leaves a non-array extraHeaders alone", () => {
         const input = { extraHeaders: null };
 
-        expect(redactAuditArgs(input)).toBe(input);
+        expect(redactAuditArgs({ input })).toBe(input);
+      });
+    });
+  });
+
+  describe("given a run started with parameter values", () => {
+    describe("when the action is one that can carry a secret parameter", () => {
+      /** @scenario "Audit log entries never record a secret value" */
+      it.each([
+        "suites.run",
+        "scenarios.run",
+      ])("keeps the names and drops every value on %s", (action) => {
+        const redacted = redactAuditArgs({
+          input: {
+            projectId: "proj-1",
+            parameters: { api_token: "tok-live-1", region: "eu-central" },
+          },
+          action,
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+        expect(redacted.parameters).toEqual({
+          api_token: "[redacted]",
+          region: "[redacted]",
+        });
+        expect(redacted.projectId).toBe("proj-1");
+      });
+
+      /** @scenario "Audit log entries never record a secret value" */
+      it("redacts the values typed into the http test button", () => {
+        const redacted = redactAuditArgs({
+          input: {
+            projectId: "proj-1",
+            url: "https://api.example.com/chat",
+            templateVariables: { token: "tok-live-1" },
+          },
+          action: "httpProxy.execute",
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+        expect(redacted.templateVariables).toEqual({ token: "[redacted]" });
+        expect(redacted.url).toBe("https://api.example.com/chat");
+      });
+    });
+
+    describe("when the action is any other one", () => {
+      // `parameters` is an ordinary word: a code agent's config carries one,
+      // and its contents are the agent's own code, not a credential.
+      it("leaves a parameters field on an unrelated action alone", () => {
+        const input = { parameters: { region: "eu-central" } };
+
+        expect(redactAuditArgs({ input, action: "agents.update" })).toBe(input);
+        expect(redactAuditArgs({ input })).toBe(input);
       });
     });
   });

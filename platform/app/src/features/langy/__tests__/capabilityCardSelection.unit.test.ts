@@ -55,6 +55,22 @@ describe("hasCapabilityCard", () => {
         }),
       ).toBe(false);
     });
+
+    // `prompt create` scaffolds a local file and exits 0 with
+    // { name, path, dependency: "file:..." }. That names a file on disk, not a
+    // prompt on the platform, so it earns no "Created and ready to use." card.
+    it("earns no card for a local file scaffold", () => {
+      expect(
+        hasCapabilityCard({
+          ...createCall({
+            name: "cart-intent-classifier",
+            path: "prompts/cart-intent-classifier.prompt.yaml",
+            dependency: "file:prompts/cart-intent-classifier.prompt.yaml",
+          }),
+          name: "langwatch.prompt.create",
+        }),
+      ).toBe(false);
+    });
   });
 
   describe("given a read whose result is genuinely empty", () => {

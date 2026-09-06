@@ -8,7 +8,7 @@ import {
   LANGWATCH_SDK_VERSION,
 } from "../constants";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { scopedApiKey } from "@/internal/credentialContext";
+import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
 
@@ -80,7 +80,12 @@ export const createLangWatchApiClient = (
   // scope and falls back to the environment unchanged.
   apiKey: string = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "",
   endpoint?: string,
-  projectId: string | undefined = process.env.LANGWATCH_PROJECT_ID,
+  // Same precedence as the key: the request-scoped target project (the CLI
+  // resolver's output, personal by default and `--project` when given) wins
+  // over the global env, and a plain SDK embed that scopes nothing falls back
+  // to the environment unchanged.
+  projectId: string | undefined = scopedProjectId() ??
+    process.env.LANGWATCH_PROJECT_ID,
 ) => {
   const client = openApiCreateClient<paths>({
     baseUrl: resolveEndpoint(endpoint),

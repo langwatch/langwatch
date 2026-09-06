@@ -8,12 +8,35 @@ Feature: BetterAuth config (unmounted)
   # instance with every provider we care about and every custom hook ported
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.
+  #
+  # Retiring at the IDENTITY_ROUTER_V2 flip (D03/D13, ADR-117), and kept until
+  # then because each one is still the live mechanism behind the flag:
+  #
+  #   - the `NEXTAUTH_PROVIDER` matrix below no longer decides WHERE anyone
+  #     signs in. Routing is the router's (specs/identity/signin-router.feature),
+  #     and what the env names is now the deployment's default METHOD SET
+  #     (ADR-117 §4). Which providers get mounted, and the email/password gate
+  #     that comes with them, are unchanged and stay here.
+  #   - `isSsoProviderMatch` is replaced by callback linking on the router
+  #     (ADR-117 §3: two-sided evidence, or a proposal a human resolves).
+  #   - `pendingSsoSetup` is reconciled once against identifier data and the
+  #     column dropped at bake end (D03 plan item 5).
+  #
+  # Nothing here is deleted while the legacy path still answers: rollback is
+  # the flag, so the behavior it rolls back to has to stay covered.
 
   Background:
     Given the BetterAuth instance is exported from `~/server/better-auth`
 
   # ============================================================================
   # Provider selection via NEXTAUTH_PROVIDER env
+  #
+  # What these scenarios assert is MOUNTING: which providers the instance
+  # stands up, and whether email and password sign-in is enabled beside them.
+  # That survives the front door (ADR-117 §4) - the env's provider becomes the
+  # default method set, one element, offered automatically, which is what a
+  # single-provider deployment already does. Where a person is SENT is no
+  # longer decided here.
   # ============================================================================
 
   Scenario: Credentials-only on-prem mode
@@ -46,6 +69,11 @@ Feature: BetterAuth config (unmounted)
 
   # ============================================================================
   # SSO domain + provider matching (ported from NextAuth signIn callback)
+  #
+  # Retires at the flip: the router's callback linking replaces string
+  # matching with evidence (ADR-117 §3), and a match it cannot make
+  # unambiguously becomes a proposal for a human rather than a guess. Kept
+  # while the legacy callback is still the one that runs.
   # ============================================================================
 
   Scenario: isSsoProviderMatch — Auth0 prefix match
@@ -109,6 +137,9 @@ Feature: BetterAuth config (unmounted)
     Then the Account row is upserted
     And pendingSsoSetup remains false
 
+  # `pendingSsoSetup` is the flag this sets; it is reconciled once against
+  # identifier data and dropped at bake end. Under the front door the same
+  # situation is a routing decision the screen explains instead (ADR-117 §6).
   Scenario: Existing user with wrong SSO provider gets pending flag
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false

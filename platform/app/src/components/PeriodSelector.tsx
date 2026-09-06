@@ -1,3 +1,4 @@
+import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import {
   Box,
   Button,
@@ -68,7 +69,7 @@ const isValidDateString = (dateString: string) => {
  * Day-based presets snap the start to start-of-day to match the historical
  * behaviour of the day quick selectors.
  */
-const computeRelativeWindow = (
+export const computeRelativeWindow = (
   presetKey: RelativePresetKey,
   now: Date,
 ): Period => {
@@ -108,7 +109,11 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   const queryStartDate = router.query.startDate;
   const queryEndDate = router.query.endDate;
 
-  const { period, mode } = useMemo<{ period: Period; mode: PeriodMode }>(() => {
+  const { period, mode, isDefault } = useMemo<{
+    period: Period;
+    mode: PeriodMode;
+    isDefault: boolean;
+  }>(() => {
     if (
       typeof queryStartDate === "string" &&
       typeof queryEndDate === "string" &&
@@ -121,16 +126,17 @@ export const usePeriodSelector = (defaultNDays = 30) => {
       return {
         period: { startDate: safeStart, endDate },
         mode: "absolute",
+        isDefault: false,
       };
     }
 
-    const presetKey = isRelativePresetKey(queryPeriod)
-      ? queryPeriod
-      : defaultPresetForDays(defaultNDays);
+    const picked = isRelativePresetKey(queryPeriod);
+    const presetKey = picked ? queryPeriod : defaultPresetForDays(defaultNDays);
 
     return {
       period: computeRelativeWindow(presetKey, now),
       mode: "relative",
+      isDefault: !picked,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryPeriod, queryStartDate, queryEndDate, defaultNDays]);
@@ -189,6 +195,13 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   return {
     period,
     mode,
+    /**
+     * True while the URL carries no range of its own, so `period` is this
+     * hook's own fallback rather than something the reader asked for. Surfaces
+     * where a default window would hide rows read this to filter only once a
+     * range has actually been picked.
+     */
+    isDefault,
     setPeriod,
     setRelativePeriod,
     daysDifference,
@@ -209,16 +222,89 @@ const getPresetForRange = (
   );
 };
 
-export function PeriodSelector({
+/**
+ * The preset a window matches, by whole days or by a sub-day minute span.
+ * Undefined for a window that matches no preset, which is any free range.
+ */
+export const matchPeriodPreset = ({
   period: { startDate, endDate },
   mode,
-  setPeriod,
-  setRelativePeriod,
 }: {
   period: Period;
   mode: PeriodMode;
+}): (typeof RELATIVE_PRESETS)[number] | undefined => {
+  if (mode !== "relative") return undefined;
+
+  const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+  if (matchedByDays) return matchedByDays;
+
+  const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  return RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+};
+
+/**
+ * What the window is called, the way the trigger names it: the matched
+ * preset's own label, or the start and end dates for a free range. A surface
+ * that renders its own trigger text uses this for the accessible name, so the
+ * name says what the control is set to rather than a day count.
+ */
+export const describePeriod = ({
+  period,
+  mode,
+}: {
+  period: Period;
+  mode: PeriodMode;
+}): string => {
+  const preset = matchPeriodPreset({ period, mode });
+  if (preset) return preset.label;
+
+  return `${format(period.startDate, "MMM d")} - ${format(period.endDate, "MMM d")}`;
+};
+
+/** Where the range list opens, relative to the trigger. */
+export type PeriodSelectorPlacement = NonNullable<
+  NonNullable<PopoverRootProps["positioning"]>["placement"]
+>;
+
+export function PeriodSelector({
+  period: { startDate, endDate },
+  mode,
+  label,
+  setPeriod,
+  setRelativePeriod,
+  clearPeriod,
+  size = "sm",
+  triggerVariant = "outline",
+  placement = "bottom-end",
+  triggerProps,
+}: {
+  period: Period;
+  mode: PeriodMode;
+  /**
+   * Replaces the range shown on the trigger. For a surface that only filters
+   * once a range is picked, so the control does not name a window it is not
+   * applying.
+   */
+  label?: string;
   setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (presetKey: RelativePresetKey) => void;
+  /**
+   * Takes the range back off, offered as "All time". Only surfaces that show
+   * everything without a range have somewhere to go back to, so the entry
+   * appears only when they pass this.
+   */
+  clearPeriod?: () => void;
+  /** The size of the trigger. A rail foot wants "xs". */
+  size?: ButtonProps["size"];
+  /** The look of the trigger. A rail foot wants "ghost". */
+  triggerVariant?: ButtonProps["variant"];
+  /** Where the range list opens. A control at the foot of a rail wants "top-start". */
+  placement?: PeriodSelectorPlacement;
+  /**
+   * Spread onto the trigger button, for a surface that needs a test id or a
+   * height the size scale does not offer.
+   */
+  triggerProps?: ButtonProps & { "data-testid"?: string };
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
@@ -227,39 +313,26 @@ export function PeriodSelector({
     onClose();
   };
 
-  const getDateRangeLabel = () => {
-    if (mode === "relative") {
-      const matchedByDays = getPresetForRange(startDate, endDate, new Date());
-      if (matchedByDays) return matchedByDays.label;
-
-      const minutes = Math.round(
-        (endDate.getTime() - startDate.getTime()) / 60000,
-      );
-      const subDay = RELATIVE_PRESETS.find(
-        (preset) => preset.minutes === minutes,
-      );
-      if (subDay) return subDay.label;
-    }
-
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-  };
+  const getDateRangeLabel = () =>
+    describePeriod({ period: { startDate, endDate }, mode });
 
   return (
     <Popover.Root
       open={open}
       onOpenChange={({ open }) => setOpen(open)}
-      positioning={{ placement: "bottom-end" }}
+      positioning={{ placement }}
       size="sm"
     >
       <Popover.Trigger asChild>
         <Button
-          variant="outline"
-          size="sm"
+          variant={triggerVariant}
+          size={size}
           minWidth="fit-content"
           onClick={onOpen}
+          {...triggerProps}
         >
           <LuCalendar />
-          <Text>{getDateRangeLabel()}</Text>
+          <Text>{label ?? getDateRangeLabel()}</Text>
           <Box>
             <ChevronDown />
           </Box>
@@ -294,6 +367,17 @@ export function PeriodSelector({
               </Field.Root>
             </VStack>
             <VStack>
+              {clearPeriod && (
+                <Button
+                  width="full"
+                  onClick={() => {
+                    clearPeriod();
+                    onClose();
+                  }}
+                >
+                  All time
+                </Button>
+              )}
               {RELATIVE_PRESETS.map((preset) => (
                 <Button
                   width="full"

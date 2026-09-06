@@ -25,6 +25,8 @@ function makeTurn(opts: {
     userText: opts.userText ?? "Hello",
     assistantText: opts.assistantText,
     assistantReasoning: "",
+    userMedia: [],
+    assistantMedia: [],
     gapSecs: 0,
     showGap: false,
   };

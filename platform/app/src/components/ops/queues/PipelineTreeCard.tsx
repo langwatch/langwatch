@@ -1,19 +1,11 @@
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
-import { Search } from "lucide-react";
+import { Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { PipelineNode } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
+import { PipelineTreeFilter } from "./PipelineTreeFilter";
 import { PipelineTreeNode } from "./PipelineTreeNode";
 import { filterTree } from "./pipelineUtils";
 
@@ -27,16 +19,50 @@ export function PipelineTreeCard({
   queueNames: string[];
 }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [filter, setFilter] = useState("");
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(),
   );
 
+  const [showIdle, setShowIdle] = useState(false);
+
   const pausedKeySet = useMemo(() => new Set(pausedKeys), [pausedKeys]);
+
+  // The tree is seeded from a 24h known-pipelines registry, which is right for
+  // continuity and wrong for a default view: an idle pipeline renders as a row
+  // of pure whitespace, and half the tree was whitespace between the reader and
+  // the two pipelines that had work. Idle rows fold away and say how many.
+  // Recursive on purpose: a root is a namespace, and namespaces usually carry
+  // no counters of their own. Classifying on the root's direct counts alone
+  // folded away every parent of a busy child — hiding the work rather than the
+  // whitespace this fold exists to remove.
+  const { working, idle } = useMemo(() => {
+    const hasWork = (node: PipelineNode): boolean =>
+      node.pending > 0 ||
+      node.active > 0 ||
+      node.blocked > 0 ||
+      node.children.some(hasWork);
+    return {
+      working: pipelineTree.filter(hasWork),
+      idle: pipelineTree.filter((node) => !hasWork(node)),
+    };
+  }, [pipelineTree]);
+
+  // A pipeline that gains work leaves the fold on its own, because membership
+  // is derived from the counts rather than latched when the fold was closed.
+  const visibleTree = useMemo(
+    () => (showIdle ? [...working, ...idle] : working),
+    [working, idle, showIdle],
+  );
+  const idleNames = useMemo(
+    () => new Set(idle.map((node) => node.name)),
+    [idle],
+  );
+
   const filteredTree = useMemo(
-    () => filterTree(pipelineTree, filter),
-    [pipelineTree, filter],
+    () => filterTree(visibleTree, filter),
+    [visibleTree, filter],
   );
 
   const pauseMutation = api.ops.pausePipeline.useMutation({
@@ -99,36 +125,12 @@ export function PipelineTreeCard({
           </Text>
           <Spacer />
           {pipelineTree.length > 0 && (
-            <>
-              <Box position="relative" width="200px">
-                <Box
-                  position="absolute"
-                  left={2.5}
-                  top="50%"
-                  transform="translateY(-50%)"
-                  zIndex={1}
-                >
-                  <Search size={11} color="var(--chakra-colors-fg-muted)" />
-                </Box>
-                <Input
-                  size="xs"
-                  placeholder="Filter..."
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  paddingLeft={7}
-                />
-              </Box>
-              <Button variant="ghost" size="2xs" onClick={handleExpandAll}>
-                Expand all
-              </Button>
-              <Button
-                variant="ghost"
-                size="2xs"
-                onClick={() => setExpandedPaths(new Set())}
-              >
-                Collapse
-              </Button>
-            </>
+            <PipelineTreeFilter
+              filter={filter}
+              onFilterChange={setFilter}
+              onExpandAll={handleExpandAll}
+              onCollapseAll={() => setExpandedPaths(new Set())}
+            />
           )}
         </HStack>
 
@@ -145,21 +147,44 @@ export function PipelineTreeCard({
             </Text>
           </Box>
         ) : (
-          filteredTree.map((node) => (
-            <PipelineTreeNode
-              key={node.name}
-              node={node}
-              parentPath=""
-              depth={0}
-              pausedKeys={pausedKeySet}
-              expandedPaths={expandedPaths}
-              onToggleExpand={handleToggleExpand}
-              onPause={handlePause}
-              onUnpause={handleUnpause}
-              hasAccess={hasAccess}
-              queueNames={queueNames}
-            />
-          ))
+          <>
+            {filteredTree.map((node) => (
+              <Box
+                key={node.name}
+                // Revealed idle pipelines stay distinguishable from working
+                // ones rather than padding the list back out again.
+                opacity={idleNames.has(node.name) ? 0.55 : 1}
+                data-idle={idleNames.has(node.name) ? "true" : "false"}
+              >
+                <PipelineTreeNode
+                  node={node}
+                  parentPath=""
+                  depth={0}
+                  pausedKeys={pausedKeySet}
+                  expandedPaths={expandedPaths}
+                  onToggleExpand={handleToggleExpand}
+                  onPause={handlePause}
+                  onUnpause={handleUnpause}
+                  hasAccess={hasAccess}
+                  queueNames={queueNames}
+                />
+              </Box>
+            ))}
+            {idle.length > 0 && (
+              <Box paddingX={4} paddingY={2}>
+                <Button
+                  variant="ghost"
+                  size="2xs"
+                  onClick={() => setShowIdle((prior) => !prior)}
+                  data-testid="ops-idle-pipelines-toggle"
+                >
+                  {showIdle
+                    ? `Hide ${idle.length} idle pipelines`
+                    : `Show ${idle.length} idle pipelines`}
+                </Button>
+              </Box>
+            )}
+          </>
         )}
       </Card.Body>
     </Card.Root>

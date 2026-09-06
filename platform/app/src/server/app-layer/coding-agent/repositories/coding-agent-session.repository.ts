@@ -1,6 +1,47 @@
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 
 /**
+ * One session as the pull-request rollup reads it: the numbers it adds up, the
+ * labels it groups by, and the one-line title the agent generated for it. No
+ * file list and no transcript: this row exists to be summed, grouped and
+ * named, and everything it does not carry is something the usage response can
+ * never accidentally disclose.
+ *
+ * The title is conversation-derived content, so whether a reader gets to see
+ * it is decided at the read boundary against the protections of the project
+ * the session ran in, never here.
+ */
+export interface CodingAgentBranchSessionRow {
+  sessionId: string;
+  tenantId: string;
+  startedAtMs: number;
+  /**
+   * When the session last produced an event, epoch ms, 0 when it never did.
+   * A long session's start time says when it began, not when it was last worked
+   * in, so this is what "last activity" is read from.
+   */
+  lastEventOccurredAtMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+  agent: string;
+  models: string[];
+  /** The AGENT's reported identity, not the LangWatch account. */
+  userId: string;
+  gitBranch: string;
+  /**
+   * Every branch the session drove, first seen first. Empty for a row folded
+   * before the column existed, where `gitBranch` is the whole of what is known;
+   * read both through `branchesOf` rather than either one alone.
+   */
+  gitBranches: string[];
+  /** The generated conversation title, empty when the agent never made one. */
+  title: string;
+}
+
+/**
  * Persistence for the coding-agent session row (ADR-056, migration 00051).
  *
  * One row per session. Idempotent by construction: the table is a
@@ -79,6 +120,35 @@ export interface CodingAgentSessionRepository {
     toMs: number;
     limit: number;
   }): Promise<CodingAgentSessionRow[]>;
+
+  /**
+   * The sessions that ran on one repository's branches, across several
+   * projects of ONE organization: the read behind pull-request usage.
+   *
+   * `startedAtFromMs` is required: without a bound on the partition key this
+   * read opens every partition the retention holds. Carries only the columns
+   * the rollup sums and groups by, never content.
+   */
+  listByRepositoryBranch(params: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]>;
+
+  /**
+   * The same rows as `listByRepositoryBranch`, fetched by session id instead
+   * of by repository: the read behind fact-stamp discovery, where a session's
+   * stamped rows name a repository its own row has since moved away from.
+   * `startedAtFromMs` is required for the same partition-pruning reason.
+   */
+  listBySessionIds(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -101,6 +171,14 @@ export class NullCodingAgentSessionRepository
   }
 
   async findManyRecent(): Promise<CodingAgentSessionRow[]> {
+    return [];
+  }
+
+  async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
+    return [];
+  }
+
+  async listBySessionIds(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
 }

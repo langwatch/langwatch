@@ -1,5 +1,5 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
-import type { PrismaClient, User } from "@prisma/client";
+import type { PrismaClient, User } from "~/generated/prisma/client";
 import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
 
 export class UserService {
@@ -106,6 +106,22 @@ export class UserService {
       select: { createdAt: true },
     });
     return user ? { createdAt: user.createdAt } : null;
+  }
+
+  /**
+   * Whether this account can be signed into with a password.
+   *
+   * Not the same question as "does a credential row exist": a passkey sign-up
+   * creates one holding a NULL password, precisely so that password RESET has
+   * a row to update rather than silently matching none. So the password
+   * itself is what is asked about.
+   */
+  async hasPassword({ id }: { id: string }): Promise<boolean> {
+    const account = await this.prisma.account.findFirst({
+      where: { userId: id, provider: "credential" },
+      select: { password: true },
+    });
+    return !!account?.password;
   }
 
   async getSsoStatus({

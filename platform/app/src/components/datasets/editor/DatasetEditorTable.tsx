@@ -12,6 +12,7 @@
  *    data (draft datasets in the workflow DSL, prompt demonstrations);
  *    every change is propagated up, nothing touches the network.
  */
+
 import {
   Box,
   Button,
@@ -24,6 +25,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
   createColumnHelper,
@@ -31,7 +33,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import Parse from "papaparse";
 import {
   type ReactNode,
   useCallback,
@@ -55,6 +56,7 @@ import type {
   DatasetRecordEntry,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
+import { downloadCsv } from "~/utils/downloadCsv";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
   type AutosaveState,
@@ -200,7 +202,7 @@ export function DatasetEditorTable({
       // Hold the previous page's result while the next page loads, so a page
       // switch doesn't blank the grid (and doesn't momentarily drop the page
       // count, which would otherwise bounce navigation back to page 1).
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       // A background refetch (e.g. on reconnect) would reload the store via
       // setData and drop an unsaved local edit on the current page — page
       // navigation is gated on pending writes, but an automatic refetch is not,
@@ -210,10 +212,17 @@ export function DatasetEditorTable({
       // background so a cell edited then navigated-away-from shows its saved
       // value on return (the edit is persisted per-record, not into this cache).
       staleTime: 0,
-      onError: (error) =>
-        showErrorToast({ error, fallbackTitle: "Couldn't load dataset" }),
     },
   );
+
+  const databaseDatasetError = databaseDataset.error;
+  useEffect(() => {
+    if (!databaseDatasetError) return;
+    showErrorToast({
+      error: databaseDatasetError,
+      fallbackTitle: "Couldn't load dataset",
+    });
+  }, [databaseDatasetError]);
 
   // The PG-authoritative total record count from the last settled read (undefined
   // until the first response; held across a page switch by keepPreviousData so it
@@ -257,11 +266,11 @@ export function DatasetEditorTable({
   const loadedRef = useRef(false);
   const lastPropagatedRef = useRef<EditorRecord[] | null>(null);
   // While `keepPreviousData` serves the prior key's result during a key change,
-  // `isPreviousData` is true. Skip hydrating from it: a `datasetId` switch would
+  // `isPlaceholderData` is true. Skip hydrating from it: a `datasetId` switch would
   // otherwise populate the grid with the OLD dataset's rows under the NEW id
   // (a data-integrity mismatch until the new query settles). For a same-dataset
   // page switch this just holds the current page until the next one lands.
-  const holdingPreviousData = databaseDataset.isPreviousData;
+  const holdingPreviousData = databaseDataset.isPlaceholderData;
   useEffect(() => {
     if (datasetId && databaseDataset.data && !holdingPreviousData) {
       const columns = toEditorColumns(
@@ -608,24 +617,15 @@ export function DatasetEditorTable({
       }
     }
 
-    const csv = Parse.unparse({
+    downloadCsv({
       fields: exportColumns.map((col) => col.name),
-      data: exportRecords.map((record) =>
+      rows: exportRecords.map((record) =>
         exportColumns.map((col) => record[col.name] ?? ""),
       ),
+      fileName: `${
+        datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
+      }.csv`,
     });
-
-    const url = window.URL.createObjectURL(new Blob([csv]));
-    const link = document.createElement("a");
-    link.href = url;
-    const fileName = `${
-      datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
-    }.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
   }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
 
   // "Add row" only appends an empty row at the bottom. It must not steal focus
@@ -678,7 +678,7 @@ export function DatasetEditorTable({
               size="sm"
               variant="ghost"
               data-testid="download-csv"
-              loading={downloadDataset.isLoading}
+              loading={downloadDataset.isPending}
               onClick={() => void downloadCSV()}
             >
               <Download size={16} /> Download as CSV

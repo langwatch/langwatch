@@ -41,7 +41,7 @@ describe("roleRunsWorkers", () => {
 });
 
 describe("roleSatisfiesRunIn", () => {
-  describe("given a reactor with no runIn filter", () => {
+  describe("given a subscriber with no runIn filter", () => {
     it("runs under any role (undefined filter means run everywhere)", () => {
       expect(roleSatisfiesRunIn({ runIn: undefined, processRole: "web" })).toBe(
         true,
@@ -56,7 +56,7 @@ describe("roleSatisfiesRunIn", () => {
   });
 
   describe("given the process role is undefined", () => {
-    it("does not exclude the reactor (backwards-compatible run-everywhere)", () => {
+    it("does not exclude the subscriber (backwards-compatible run-everywhere)", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["worker"], processRole: undefined }),
       ).toBe(true);
@@ -64,9 +64,9 @@ describe("roleSatisfiesRunIn", () => {
   });
 
   describe("given the in-process 'all' role", () => {
-    // The regression the P0 fix guards: a worker-only reactor MUST run under
+    // The regression the P0 fix guards: a worker-only subscriber MUST run under
     // "all", otherwise `pnpm dev` boots the worker stack but every
-    // runIn-gated reactor is silently skipped.
+    // runIn-gated subscriber is silently skipped.
     it("satisfies a worker-only runIn filter", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["worker"], processRole: "all" }),
@@ -87,13 +87,13 @@ describe("roleSatisfiesRunIn", () => {
   });
 
   describe("given a dedicated role and a matching filter", () => {
-    it("runs a worker reactor under the worker role", () => {
+    it("runs a worker subscriber under the worker role", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["worker"], processRole: "worker" }),
       ).toBe(true);
     });
 
-    it("runs a web+worker reactor under the web role", () => {
+    it("runs a web+worker subscriber under the web role", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["web", "worker"], processRole: "web" }),
       ).toBe(true);
@@ -101,19 +101,19 @@ describe("roleSatisfiesRunIn", () => {
   });
 
   describe("given a dedicated role and a non-matching filter", () => {
-    it("excludes a worker-only reactor under the web role", () => {
+    it("excludes a worker-only subscriber under the web role", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["worker"], processRole: "web" }),
       ).toBe(false);
     });
 
-    it("excludes a web-only reactor under the worker role", () => {
+    it("excludes a web-only subscriber under the worker role", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["web"], processRole: "worker" }),
       ).toBe(false);
     });
 
-    it("excludes a worker-only reactor under the migration role", () => {
+    it("excludes a worker-only subscriber under the migration role", () => {
       expect(
         roleSatisfiesRunIn({ runIn: ["worker"], processRole: "migration" }),
       ).toBe(false);

@@ -52,16 +52,76 @@ function normalizePayloadValue(value: unknown): unknown {
   return value;
 }
 
-/** Raw `event_log` row shape shared by the paged-read query and its mapper. */
-interface PagedEventLogRow {
+/**
+ * Every `event_log` column the row mapper reads, and so the SELECT list all
+ * three reads project.
+ *
+ * One constant rather than a list per query. The three reads answer the same
+ * `EventRecord` through the same mapping, so a column present in one SELECT
+ * and absent from another does not fail: it decodes as `undefined` and the
+ * record is quietly short a field. `EventVersion` was missing from exactly one
+ * of them, and every event rehydrated through that read carried no version —
+ * which is the value a version-gated fold reads to decide how to decode a
+ * payload, and which one projection writes back to the log.
+ */
+const EVENT_LOG_COLUMNS = [
+  "EventId",
+  "EventTimestamp",
+  "EventOccurredAt",
+  "EventType",
+  "EventPayload",
+  "EventVersion",
+  "ProcessingTraceparent",
+  "IdempotencyKey",
+] as const;
+
+export const EVENT_LOG_SELECT_COLUMNS =
+  EVENT_LOG_COLUMNS.join(",\n            ");
+
+/** Raw `event_log` row shape shared by every read query and the mapper. */
+interface EventLogRow {
   EventId: string;
   EventTimestamp: number;
   EventOccurredAt: number;
   EventType: string;
+  /** Object when ClickHouse parses the JSON column, string when it does not. */
   EventPayload: unknown;
   EventVersion: string;
   ProcessingTraceparent: string;
   IdempotencyKey: string;
+}
+
+/**
+ * Rows to records, normalizing the payload so numeric fields stay numeric
+ * whichever way ClickHouse serialized the JSON column.
+ */
+function mapEventLogRows({
+  rows,
+  tenantId,
+  aggregateType,
+  aggregateId,
+}: {
+  rows: EventLogRow[];
+  tenantId: string;
+  aggregateType: string;
+  aggregateId: string;
+}): EventRecord[] {
+  return rows.map((row) => ({
+    TenantId: tenantId,
+    AggregateType: aggregateType,
+    AggregateId: String(aggregateId),
+    EventId: row.EventId,
+    EventTimestamp: row.EventTimestamp,
+    EventOccurredAt:
+      row.EventOccurredAt != null && row.EventOccurredAt > 0
+        ? row.EventOccurredAt
+        : null,
+    EventType: row.EventType,
+    EventVersion: row.EventVersion,
+    EventPayload: normalizePayloadValue(row.EventPayload),
+    ProcessingTraceparent: row.ProcessingTraceparent || "",
+    IdempotencyKey: row.IdempotencyKey || "",
+  }));
 }
 
 /**
@@ -104,13 +164,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const result = await client.query({
         query: `
           SELECT
-            EventId,
-            EventTimestamp,
-            EventOccurredAt,
-            EventType,
-            EventPayload,
-            ProcessingTraceparent,
-            IdempotencyKey
+            ${EVENT_LOG_SELECT_COLUMNS}
           FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
@@ -127,37 +181,11 @@ export class EventRepositoryClickHouse implements EventRepository {
         format: "JSONEachRow",
       });
 
-      const rows = await result.json<{
-        EventId: string;
-        EventTimestamp: number;
-        EventOccurredAt: number;
-        EventType: string;
-        EventPayload: unknown; // Can be object (when ClickHouse parses JSON) or string (when serialized)
-        EventVersion: string;
-        ProcessingTraceparent: string;
-        IdempotencyKey: string;
-      }>();
+      const rows = await result.json<EventLogRow>();
 
-      // Normalize payload so numeric fields stay numeric regardless of how
-      // ClickHouse serializes the JSON column.
-      return rows.map((row) => ({
-        TenantId: tenantId,
-        AggregateType: aggregateType,
-        AggregateId: String(aggregateId),
-        EventId: row.EventId,
-        EventTimestamp: row.EventTimestamp,
-        EventOccurredAt:
-          row.EventOccurredAt != null && row.EventOccurredAt > 0
-            ? row.EventOccurredAt
-            : null,
-        EventType: row.EventType,
-        EventVersion: row.EventVersion,
-        EventPayload: normalizePayloadValue(row.EventPayload),
-        ProcessingTraceparent: row.ProcessingTraceparent || "",
-        IdempotencyKey: row.IdempotencyKey || "",
-      }));
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,
@@ -201,14 +229,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const result = await client.query({
         query: `
           SELECT
-            EventId,
-            EventTimestamp,
-            EventOccurredAt,
-            EventType,
-            EventPayload,
-            EventVersion,
-            ProcessingTraceparent,
-            IdempotencyKey
+            ${EVENT_LOG_SELECT_COLUMNS}
           FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
@@ -234,37 +255,11 @@ export class EventRepositoryClickHouse implements EventRepository {
         format: "JSONEachRow",
       });
 
-      const rows = await result.json<{
-        EventId: string;
-        EventTimestamp: number;
-        EventOccurredAt: number;
-        EventType: string;
-        EventPayload: unknown;
-        EventVersion: string;
-        ProcessingTraceparent: string;
-        IdempotencyKey: string;
-      }>();
+      const rows = await result.json<EventLogRow>();
 
-      // Normalize payload so numeric fields stay numeric regardless of how
-      // ClickHouse serializes the JSON column.
-      return rows.map((row) => ({
-        TenantId: tenantId,
-        AggregateType: aggregateType,
-        AggregateId: String(aggregateId),
-        EventId: row.EventId,
-        EventTimestamp: row.EventTimestamp,
-        EventOccurredAt:
-          row.EventOccurredAt != null && row.EventOccurredAt > 0
-            ? row.EventOccurredAt
-            : null,
-        EventType: row.EventType,
-        EventVersion: row.EventVersion,
-        EventPayload: normalizePayloadValue(row.EventPayload),
-        ProcessingTraceparent: row.ProcessingTraceparent || "",
-        IdempotencyKey: row.IdempotencyKey || "",
-      }));
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,
@@ -305,10 +300,10 @@ export class EventRepositoryClickHouse implements EventRepository {
         query_params,
         format: "JSONEachRow",
       });
-      const rows = await result.json<PagedEventLogRow>();
-      return this.mapPagedRows(rows, { tenantId, aggregateType, aggregateId });
+      const rows = await result.json<EventLogRow>();
+      return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         { ...request, aggregateId: String(aggregateId), error },
         "Failed to get paged event records up to event from ClickHouse",
       );
@@ -356,14 +351,7 @@ export class EventRepositoryClickHouse implements EventRepository {
     return {
       query: `
         SELECT
-          EventId,
-          EventTimestamp,
-          EventOccurredAt,
-          EventType,
-          EventPayload,
-          EventVersion,
-          ProcessingTraceparent,
-          IdempotencyKey
+          ${EVENT_LOG_SELECT_COLUMNS}
         FROM event_log
         WHERE TenantId = {tenantId:String}
           AND AggregateType = {aggregateType:String}
@@ -393,30 +381,6 @@ export class EventRepositoryClickHouse implements EventRepository {
         limit,
       },
     };
-  }
-
-  /** Row-to-record mapping shared by {@link getEventRecordsUpToPaged}. */
-  private mapPagedRows(
-    rows: PagedEventLogRow[],
-    context: { tenantId: string; aggregateType: string; aggregateId: string },
-  ): EventRecord[] {
-    const { tenantId, aggregateType, aggregateId } = context;
-    return rows.map((row) => ({
-      TenantId: tenantId,
-      AggregateType: aggregateType,
-      AggregateId: String(aggregateId),
-      EventId: row.EventId,
-      EventTimestamp: row.EventTimestamp,
-      EventOccurredAt:
-        row.EventOccurredAt != null && row.EventOccurredAt > 0
-          ? row.EventOccurredAt
-          : null,
-      EventType: row.EventType,
-      EventVersion: row.EventVersion,
-      EventPayload: normalizePayloadValue(row.EventPayload),
-      ProcessingTraceparent: row.ProcessingTraceparent || "",
-      IdempotencyKey: row.IdempotencyKey || "",
-    }));
   }
 
   async countEventRecords(
@@ -456,7 +420,7 @@ export class EventRepositoryClickHouse implements EventRepository {
 
       return count;
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           tenantId,
           aggregateType,

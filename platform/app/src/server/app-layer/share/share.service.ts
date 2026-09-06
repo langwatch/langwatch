@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import {
   ShareLinkExhaustedError,
@@ -208,7 +208,7 @@ export class ShareService {
         // without clobbering a pre-existing manual pin.
         await this.pinnedTraces.autoPin({ projectId, traceId: resourceId });
       } catch (error) {
-        logger.error(
+        logger.warn(
           { projectId, traceId: resourceId, error },
           "Failed to auto-pin trace on share",
         );
@@ -283,7 +283,7 @@ export class ShareService {
       try {
         await this.pinnedTraces.autoUnpin({ projectId, traceId: resourceId });
       } catch (error) {
-        logger.error(
+        logger.warn(
           { projectId, traceId: resourceId, error },
           "Failed to auto-unpin trace on unshare",
         );

@@ -1,5 +1,5 @@
-import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PricingModel } from "~/generated/prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
@@ -17,7 +17,7 @@ vi.mock("../../tracing", () => ({
 
 vi.mock("../../../clickhouse/clickhouseClient", () => ({
   isClickHouseEnabled: () => false,
-  getClickHouseClientForProject: () => Promise.resolve(null),
+  getClickHouseClientForTenant: () => Promise.resolve(null),
 }));
 
 const PAID_TIERED_PLAN: PlanInfo = {

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"hash/fnv"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -24,45 +23,41 @@ import (
 // carries no internals — the stack is logged by the goroutine's recover.
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
-// wakingLangyStatuses are the cold pre-first-frame lines: this worker has never
-// answered, so the wait really is a boot. Varied by turn (see readyStatusFor)
-// because one phrase repeated under every conversation start reads as a looping
-// machine.
-var wakingLangyStatuses = []string{
-	"Waking Langy up…",
-	"Giving Langy a pep talk…",
-	"Poking Langy…",
-}
-
-// reachingLangyStatuses are the warm-worker pre-first-frame lines: the worker
-// has answered before, so the wait is a round-trip, not a boot.
-var reachingLangyStatuses = []string{
-	"Paging Langy…",
-	"Pinging Langy…",
-	"Getting Langy's attention…",
-	"Nudging Langy…",
-}
+// Pre-first-frame status lines. Plain and factual: the cold line names a boot
+// that is really happening, and the resume line names a checkpointed turn
+// being picked back up (ADR-048). The cold line pairs with the panel's own
+// pre-relay ladder ("Preparing Langy's workspace…", langyThinkingLine.ts): the
+// panel covers the spawn window before any frame exists, this status takes
+// over once the worker is up, and the two read as one startup progressing.
+// A warm worker gets "Thinking…": its dispatch is a millisecond round-trip,
+// so the whole window this status fills is the model working — a
+// connection-flavored line there read as a lost connection on every
+// follow-up message.
+const (
+	statusStartingUp = "Starting Langy…"
+	statusThinking   = "Thinking…"
+	statusResuming   = "Picking up where it left off…"
+)
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
-// never answered, or reaching one that has. Lines rotate deterministically off
-// the turn id — stable for a re-drive of the same turn, different across turns.
+// happening. "Starting Langy…" is reserved for the one case where the user
+// really is waiting on a first-ever boot: a brand-new conversation whose
+// worker a turn had to spawn. Everything else thinks:
+//   - a resume from a shutdown handoff names the pick-up (ADR-048);
+//   - a worker that has answered before is a round-trip;
+//   - a pre-warmed worker booted while the panel sat open, so its first turn
+//     has no startup the user should hear about;
+//   - a follow-up whose worker was reaped (non-empty history seed) respawns
+//     fast on the persisted session — the user just spoke to this
+//     conversation, and "starting" reads as the workspace having vanished.
 func readyStatusFor(req ChatRequest, worker Worker) string {
 	if req.ResumeToken != "" {
-		return "Picking up where it left off…"
+		return statusResuming
 	}
-	if !worker.HasServedTurn() {
-		return wakingLangyStatuses[statusIndexOf(req.TurnID, len(wakingLangyStatuses))]
+	if worker.HasServedTurn() || worker.Prewarmed() || req.HistorySeed != "" {
+		return statusThinking
 	}
-	return reachingLangyStatuses[statusIndexOf(req.TurnID, len(reachingLangyStatuses))]
-}
-
-// statusIndexOf maps a turn id onto [0, n) with FNV-1a — cheap, deterministic,
-// and evenly spread, which is all a copy rotation needs.
-func statusIndexOf(turnID string, n int) int {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(turnID))
-	return int(h.Sum32() % uint32(n)) //nolint:gosec // bounded by n
+	return statusStartingUp
 }
 
 // App is the langyagent application. It composes the worker pool and the
@@ -73,6 +68,7 @@ type App struct {
 	telemetry  *telemetry.Telemetry
 	finalizer  TurnFinalizer
 	frameRelay FrameRelay
+	stopped    *stoppedTurns
 }
 
 // finalizeTimeout bounds the durable final POST (across its internal retries).
@@ -83,7 +79,7 @@ type Option func(*App)
 
 // New constructs an App with the given options.
 func New(opts ...Option) *App {
-	a := &App{}
+	a := &App{stopped: newStoppedTurns()}
 	for _, o := range opts {
 		o(a)
 	}
@@ -98,7 +94,7 @@ func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.tele
 
 // WithFinalizer injects the durable turn-result poster. Optional: when absent
 // (tests, or a deployment with no internal secret) the app skips the durable
-// HTTP-final and relies on the relay + liveness reactor alone.
+// HTTP-final and relies on the relay + liveness subscriber alone.
 func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer = f } }
 
 // WithFrameRelay injects the control-plane relay push client. Optional: when
@@ -125,7 +121,7 @@ type ChatRequest struct {
 	HistorySeed string
 	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
-	// turn that handed off on shutdown. Threaded into PostMessage so opencode
+	// turn that handed off on shutdown. Threaded into PostMessage so the agent
 	// resumes from it; empty on a normal cold start.
 	ResumeToken string
 	// TurnID is the control plane's idempotency key for this turn. It rides the
@@ -145,14 +141,14 @@ type ChatRequest struct {
 	UserID string
 	// Intent is the caller's worker-turn label (create/revive/continue), a
 	// semantic hint the transport derives from the route. Recorded on the turn
-	// span + duration metric so per-intent behaviour is visible; it does NOT change
+	// span + duration metric so per-intent behavior is visible; it does NOT change
 	// how the turn runs (Acquire reconciles the real state).
 	Intent string
 }
 
 // Warm spawns the conversation's worker WITHOUT running a turn.
 //
-// Acquiring a worker is the expensive half of a cold turn: it forks opencode,
+// Acquiring a worker is the expensive half of a cold turn: it forks the worker,
 // lays out the worker home, installs the skills and waits for the session to
 // come up. The control plane knows a turn is coming the moment the browser POSTs
 // — long before the event-sourced dispatch actually reaches us — so it calls this
@@ -173,8 +169,11 @@ type ChatRequest struct {
 // warming only once its credentials are final.
 //
 // At capacity is not an error worth surfacing: the turn itself will report it.
+// AcquireWarm rather than Acquire: a warm may only evict an idle worker that
+// never served a turn (a stale warm cache); a worker holding real session
+// state is evicted only by a real turn's spawn.
 func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Credentials) error {
-	worker, err := a.pool.Acquire(ctx, conversationID, creds)
+	worker, err := a.pool.AcquireWarm(ctx, conversationID, creds)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			return nil
@@ -186,6 +185,24 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 	// outbox dispatch.
 	worker.Touch()
 	return nil
+}
+
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (ADR-078: the token-burn half of the user's Stop). Deliberately returns
+// nothing: the control plane treats a cancel as fire-and-forget. The stopped
+// terminal is already on the durable record before the cancel is sent, so a
+// cancel that finds nothing to halt (worker gone, turn finished, an agent
+// without abort support) has succeeded at its only job, which is best-effort.
+func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
+	clog.Get(ctx).Info("canceling in-flight turn",
+		zap.String("conversation_id", conversationID),
+		zap.String("turn_id", turnID),
+	)
+	// Remembered first, because the abort below can only reach a worker that is
+	// already running the turn. A stop during the cold start finds no worker at
+	// all, and StartTurn is where it is honored instead.
+	a.stopped.record(turnID)
+	a.pool.CancelTurn(conversationID, turnID)
 }
 
 // HasLiveWorker answers the control plane's pre-flight: is there already a worker
@@ -215,6 +232,17 @@ func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignatur
 // detached, panic-guarded goroutine — the client is not held open for the turn,
 // whose output flows out-of-band as signed frames to the relay.
 func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Context), error) {
+	// The user stopped this turn before it ever started running. Its terminal is
+	// already on the durable record, so there is nothing for the answer to land
+	// on: acquire no worker, claim nothing, and answer 202 so the caller retires
+	// the dispatch instead of re-driving it.
+	if a.stopped.has(req.TurnID) {
+		clog.Get(ctx).Info("turn was stopped before it started; not running it",
+			zap.String("conversation_id", req.ConversationID),
+			zap.String("turn_id", req.TurnID),
+		)
+		return func(context.Context) {}, nil
+	}
 	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
@@ -225,18 +253,20 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
 	}
 	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
-	// worker's OpenCode session is single-stream — two concurrent DIFFERENT turns
+	// worker's agent session is single-stream — two concurrent DIFFERENT turns
 	// would splice replies (busy → 409). But a redundant dispatch of the SAME
 	// turnId — exactly what the self-retry re-drive of a merely-slow worker
 	// produces — must be a benign no-op, never a second run.
 	switch worker.ClaimTurn(req.TurnID) {
 	case ClaimAlreadyHandled:
 		// Nothing claimed, nothing to drive; the transport answers 202 so the
-		// re-driving reactor treats it as accepted, not a failure.
+		// re-driving subscriber treats it as accepted, not a failure.
 		return func(context.Context) {}, nil
 	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
 		return nil, herr.NewLight(ctx, domain.ErrConversationBusy, nil)
+	case ClaimGranted:
+		// Fall through to drive the turn below.
 	}
 	worker.Touch()
 	return func(runCtx context.Context) { a.driveTurn(runCtx, req, worker) }, nil
@@ -276,21 +306,21 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
-	// the turn still runs + finalizes, it just has no live edge.
-	stream := a.openRelay(ctx, req)
-	if stream != nil {
-		defer func() { _ = stream.Close() }()
-	}
-	sink := newFrameSink(stream)
+	// the turn still runs + finalizes, it just has no live edge. The sink owns the
+	// stream from here (including any replacement it reopens after a push failure),
+	// so the deferred Close goes through it.
+	sink := newFrameSink(a.openRelay(ctx, req), func() FrameStream {
+		return a.openRelay(ctx, req)
+	})
+	defer sink.Close()
 	// A true status for the cold window: between the prompt POST and the first
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
-	// home) and produces NO frames — the panel would sit on an escalating
-	// "Starting up…" that reads as a hang. The wording names the transition the
-	// manager actually knows (readyStatusFor): a resume from a shutdown handoff
-	// (ADR-048) is picking a checkpointed turn back up, a worker that has never
-	// answered is waking up, and a warm worker gets a short reaching-Langy line
-	// that varies by turn — one phrase repeated under every message reads as a
-	// looping machine. Emitted BEFORE onFirstFrame is wired, so time-to-first-
+	// home) and produces NO frames — without a status the panel would sit on
+	// its own waiting ladder and read as a hang. The wording names the
+	// transition the manager actually knows (readyStatusFor): a resume from a
+	// shutdown handoff (ADR-048) is picking a checkpointed turn back up, a
+	// worker that has never answered is starting, and a warm worker is a
+	// round-trip. Emitted BEFORE onFirstFrame is wired, so time-to-first-
 	// frame keeps meaning the agent's own first output; the client clears the
 	// status the moment real output arrives.
 	if f, err := frames.Status(readyStatusFor(req, worker)); err == nil {
@@ -355,7 +385,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	}
 
 	streamErr := <-errCh
-	// The GitHub gate preempts every other outcome: a trip means WE cancelled
+	// The GitHub gate preempts every other outcome: a trip means WE canceled
 	// the stream deliberately (so streamErr is a benign nil/cancellation, and
 	// letting it fall through would emit a SUCCESS final for a turn we stopped).
 	if message, code, tripped := githubGate.Tripped(); tripped {
@@ -371,7 +401,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		a.finalizeCompletedTurn(ctx, req, sink)
 		a.turnObserved(ctx, start, "handoff", req.Intent)
 	case herr.IsCode(streamErr, domain.ErrAgentError):
-		// The agent itself reported the turn failed (an opencode error event —
+		// The agent itself reported the turn failed (an error terminal —
 		// e.g. its LLM call was rejected). Deterministic and terminal: emit the
 		// vetted `agent_error` herr NOW so the control plane fails the turn in
 		// milliseconds instead of the liveness sweep misreading it as a stall.
@@ -387,9 +417,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		failureMessage := "the agent hit an error before finishing"
 		if llmErr, ok := worker.LastLLMError(); ok {
 			reasons = append(reasons, llmErr)
-			// The captured cause's message is the provider's own error text
-			// (client-facing by design) — the trace should name the real
-			// failure, not the generic wrapper.
+			// The captured cause's message is OURS by the time it gets
+			// here: the relay keeps a gateway-authored message only when
+			// the response marker proved we wrote it, and strips it back
+			// off the codes that merely relay provider text (see
+			// scrubUpstreamRelayedProse). So this names the real failure
+			// rather than the generic wrapper, without putting a
+			// provider's sentence — written for whoever holds the API
+			// key, which on a mediated call is us — into the turn.
 			if m, _ := llmErr.Meta["message"].(string); m != "" {
 				failureMessage = m
 			}
@@ -408,7 +443,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		a.turnObserved(ctx, start, "agent-error", req.Intent)
 	case streamErr != nil:
-		// The worker's event stream died before the turn finished — the opencode
+		// The worker's event stream died before the turn finished — the worker
 		// subprocess crashed, was OOM-killed, or the connection dropped. The raw
 		// error is for the log only; the control plane classifies the vetted
 		// `worker_stopped` code into a final "Langy's worker stopped" state (never
@@ -474,7 +509,7 @@ func emitError(ctx context.Context, sink *frameSink, message, code string) {
 
 // finalizeCompletedTurn posts the accumulated final for a successful turn. It is
 // detached from the request ctx and fire-and-forget with a panic guard: a dropped
-// final is recoverable via the ingest's idempotency and the liveness reactor
+// final is recoverable via the ingest's idempotency and the liveness subscriber
 // backstop, so it must never block or fail the turn.
 func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *frameSink) {
 	if a.finalizer == nil || req.TurnID == "" {
@@ -493,7 +528,7 @@ func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *
 			Text:           text,
 			ToolCalls:      toolCalls,
 		}); err != nil {
-			clog.Get(detached).Warn("durable turn finalize failed; liveness reactor is the backstop", zap.Error(err))
+			clog.Get(detached).Warn("durable turn finalize failed; liveness subscriber is the backstop", zap.Error(err))
 		}
 	}()
 }

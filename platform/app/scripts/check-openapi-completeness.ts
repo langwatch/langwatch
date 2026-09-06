@@ -10,7 +10,7 @@
  * endpoint looks documented and generates a client that cannot call it. This
  * check makes each omission a build failure instead.
  *
- * Three rules, applied to every operation under the gated prefixes:
+ * Four rules, applied to every operation under the gated prefixes:
  *
  *   1. `request-body`     a body-accepting write (POST/PATCH/PUT) declares a
  *                         `requestBody`.
@@ -18,8 +18,18 @@
  *                         declares at least one `in: "query"` parameter.
  *   3. `response-schema`  the operation declares at least one 2xx response
  *                         carrying a `content.<media>.schema`.
+ *   4. `security`         the operation declares its own `security`, rather
+ *                         than inheriting the document-level default. The
+ *                         default is a claim about every operation that does
+ *                         not override it, and it claimed `project_api_key`
+ *                         for organization-scoped routes a project key can
+ *                         never reach: an integrator following the document
+ *                         got a 401 the document said was impossible. The
+ *                         generator stamps this from the route registry, so a
+ *                         violation means an operation the registry has no
+ *                         route for.
  *
- * Rules 1 and 3 read only the document. Rule 2 cannot: nothing in an OpenAPI
+ * Rules 1, 3 and 4 read only the document. Rule 2 cannot: nothing in an OpenAPI
  * operation records that a handler reads a query it forgot to declare, and
  * that omission is precisely the drift worth catching. So rule 2 cross-checks
  * the handler sources, as follows.
@@ -83,7 +93,11 @@ export const HANDLER_ROOTS = [
 
 const BODY_ACCEPTING_METHODS = new Set(["post", "patch", "put"]);
 
-export type Rule = "request-body" | "query-parameters" | "response-schema";
+export type Rule =
+  | "request-body"
+  | "query-parameters"
+  | "response-schema"
+  | "security";
 
 export interface Suppression {
   /** `METHOD /path/with/{templates}`, exactly as the document spells it. */
@@ -175,6 +189,7 @@ export const KNOWN_GAPS: Suppression[] = [];
 
 interface OpenApiOperation {
   requestBody?: unknown;
+  security?: unknown;
   parameters?: { in?: string; name?: string }[];
   responses?: Record<
     string,
@@ -286,6 +301,18 @@ function auditOperation(subject: {
       operation: key,
       rule: "response-schema",
       detail: `no 2xx response carries a schema (declared responses: ${declaredResponseCodes(operation)})`,
+    });
+  }
+
+  // An empty array is a real answer here: "this operation needs no credential
+  // an integrator can send". Only an absent key means the operation is
+  // silently inheriting whatever the document defaults to.
+  if (!Array.isArray(operation.security)) {
+    violations.push({
+      operation: key,
+      rule: "security",
+      detail:
+        "the operation declares no security of its own, so it inherits the document default, which is wrong for every route outside the project API-key family",
     });
   }
 

@@ -4,6 +4,9 @@
  *
  *   1. OpenAI + ElevenLabs ModelProvider rows on the user's org (keys from
  *      OPENAI_API_KEY / ELEVENLABS_API_KEY in env; each skipped when unset).
+ *      Read those from platform/app/.env, which is where this app's model
+ *      provider keys live. An env file from another repository drifts, and
+ *      a stale key is indistinguishable from a fresh one once stored.
  *   2. An org-default routing policy carrying BOTH providers with NO model
  *      allowlist (audio model ids like gpt-4o-mini-tts and scribe_v1 must
  *      not be filtered by a chat-shaped allowlist).
@@ -22,37 +25,46 @@
  *
  * Guardrails, because provider keys and the default policy are org-wide
  * records: refuses to run against a non-local DATABASE_URL unless
- * --allow-remote-db is passed, refuses to wipe a curated default-policy
- * modelAllowlist unless --clear-allowlist is passed, and refuses to pick
- * among multiple org memberships implicitly (pass --org <id or name>).
+ * --allow-remote-db is passed, refuses to pick among multiple org
+ * memberships implicitly (pass --org <id or name>), and never replaces a
+ * provider credential that is already stored unless --force-keys is passed.
+ * A development org is shared, and the key it was using cannot be recovered
+ * once overwritten.
  */
 
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { prisma } from "~/server/db";
+import {
+  credentialWriteLog,
+  decideCredentialWrite,
+  keepHint,
+  readStoredCredential,
+  skipHint,
+} from "~/server/modelProviders/seedProviderCredential";
 import { encrypt } from "~/utils/encryption";
 
 interface Args {
   email: string;
   org: string;
   allowRemoteDb: boolean;
-  clearAllowlist: boolean;
+  shouldForceKeys: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   let email = "";
   let org = "";
   let allowRemoteDb = false;
-  let clearAllowlist = false;
+  let shouldForceKeys = false;
   // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
     if (argv[i] === "--org") org = argv[++i] ?? "";
     if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
-    if (argv[i] === "--clear-allowlist") clearAllowlist = true;
+    if (argv[i] === "--force-keys") shouldForceKeys = true;
   }
   if (!email) throw new Error("--email is required");
-  return { email, org, allowRemoteDb, clearAllowlist };
+  return { email, org, allowRemoteDb, shouldForceKeys };
 }
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -84,34 +96,82 @@ async function ensureProvider({
   provider,
   name,
   keys,
+  shouldForceKeys,
 }: {
   organizationId: string;
   provider: string;
   name: string;
-  keys: Record<string, string>;
-}): Promise<string> {
+  /** Null when the provider's environment variable is unset on this run. */
+  keys: Record<string, string> | null;
+  shouldForceKeys: boolean;
+}): Promise<{ id: string; usable: boolean } | null> {
   // Deterministic pick: oldest row first, and be loud when the org carries
-  // more than one row for the provider, since only one gets the fresh key.
+  // more than one row for the provider, since only one is considered.
   const existingRows = await prisma.modelProvider.findMany({
     where: { organizationId, provider },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true },
+    select: { id: true, customKeys: true },
   });
   const existing = existingRows[0];
   if (existing) {
     if (existingRows.length > 1) {
       process.stderr.write(
-        `[seed-audio] WARNING: ${existingRows.length} ${provider} provider rows on this org, refreshing the oldest (${existing.id}) and leaving the rest untouched\n`,
+        `[seed-audio] WARNING: ${existingRows.length} ${provider} provider rows on this org, using the oldest (${existing.id}) and leaving the rest untouched\n`,
       );
     }
+    const stored = readStoredCredential(existing.customKeys);
+    const decision = decideCredentialWrite({
+      stored,
+      replacement: keys,
+      shouldForce: shouldForceKeys,
+    });
+    process.stderr.write(
+      credentialWriteLog({
+        tag: "seed-audio",
+        organizationId,
+        provider,
+        modelProviderId: existing.id,
+        stored,
+        incoming: keys ?? {},
+        decision,
+      }),
+    );
+    if (decision.action === "skip") {
+      // The row cannot serve a request: either nothing can decrypt it, or it
+      // has no credential and this run has none to give it. Enabling it would
+      // put a provider in the routing chain that fails at credential
+      // materialisation on every request, which reads as the gateway being
+      // broken rather than as this row needing attention.
+      process.stderr.write(skipHint("seed-audio", decision.reason));
+      return { id: existing.id, usable: false };
+    }
+    if (decision.action === "keep") {
+      process.stderr.write(keepHint("seed-audio"));
+      // Enabling a row that already has a key is safe and is what the rest
+      // of the seed needs; only the credential is left alone.
+      await prisma.modelProvider.update({
+        where: { id: existing.id },
+        data: { enabled: true },
+      });
+      return { id: existing.id, usable: true };
+    }
+    // Only a `write` reaches here, and the rule never returns one without a
+    // replacement in hand.
     await prisma.modelProvider.update({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
     });
+    return { id: existing.id, usable: true };
+  }
+
+  // No row for this provider. With no key in hand there is nothing to create,
+  // and creating an empty row would add a provider the gateway cannot build a
+  // credential for.
+  if (!keys) {
     process.stderr.write(
-      `[seed-audio] refreshed ${provider} provider ${existing.id}\n`,
+      `[seed-audio] no ${provider} provider row and no key in env, nothing to seed\n`,
     );
-    return existing.id;
+    return null;
   }
   const created = await prisma.modelProvider.create({
     data: {
@@ -128,7 +188,7 @@ async function ensureProvider({
   process.stderr.write(
     `[seed-audio] created ${provider} provider ${created.id}\n`,
   );
-  return created.id;
+  return { id: created.id, usable: true };
 }
 
 async function main() {
@@ -172,75 +232,79 @@ async function main() {
     `[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`,
   );
 
+  // A skipped row stays out of the policy, so the chain never carries a
+  // provider the gateway cannot build a credential for. Its id is remembered
+  // too, because an earlier run may already have put it in the policy and a
+  // merge that only adds would leave it there.
   const providerIds: string[] = [];
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    providerIds.push(
-      await ensureProvider({
-        organizationId: org.id,
-        provider: "openai",
-        name: "OpenAI",
-        keys: { OPENAI_API_KEY: openaiKey },
-      }),
-    );
-  } else {
-    process.stderr.write(
-      "[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n",
-    );
-  }
-  const elevenKey = process.env.ELEVENLABS_API_KEY;
-  if (elevenKey) {
-    providerIds.push(
-      await ensureProvider({
-        organizationId: org.id,
-        provider: "elevenlabs",
-        name: "ElevenLabs",
-        keys: { ELEVENLABS_API_KEY: elevenKey },
-      }),
-    );
-  } else {
-    process.stderr.write(
-      "[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n",
-    );
-  }
-  if (providerIds.length === 0) {
-    throw new Error("no provider keys in env, nothing to route");
-  }
+  const unusableIds: string[] = [];
 
-  // Org-default policy with all providers and NO model allowlist: the
-  // audio endpoints route by explicit provider/model, and an allowlist
-  // seeded for chat models would reject every audio model id.
-  const existingPolicy = await prisma.routingPolicy.findFirst({
-    where: { organizationId: org.id, isDefault: true },
-    select: { id: true, modelProviderIds: true, modelAllowlist: true },
-  });
-  if (existingPolicy) {
-    // A curated allowlist on the existing default policy is someone's
-    // deliberate restriction; wiping it silently would lift model limits
-    // for every caller in the org. Require the explicit flag.
-    const hasCuratedAllowlist =
-      Array.isArray(existingPolicy.modelAllowlist) &&
-      existingPolicy.modelAllowlist.length > 0;
-    if (hasCuratedAllowlist && !args.clearAllowlist) {
-      throw new Error(
-        `default policy ${existingPolicy.id} has a curated modelAllowlist, ` +
-          "which would reject audio model ids. Re-run with --clear-allowlist " +
-          "to clear it, or add the audio models to the allowlist yourself.",
+  // An unset environment variable is not a reason to ignore a provider the
+  // organization already has. The row is still consulted, and a readable
+  // stored credential keeps the provider in the chain; only a row that cannot
+  // serve a request drops out. Skipping the lookup entirely used to fail the
+  // whole run against an organization that was already configured.
+  for (const candidate of [
+    {
+      provider: "openai",
+      name: "OpenAI",
+      envVar: "OPENAI_API_KEY",
+      value: process.env.OPENAI_API_KEY,
+    },
+    {
+      provider: "elevenlabs",
+      name: "ElevenLabs",
+      envVar: "ELEVENLABS_API_KEY",
+      value: process.env.ELEVENLABS_API_KEY,
+    },
+  ]) {
+    if (!candidate.value) {
+      process.stderr.write(
+        `[seed-audio] ${candidate.envVar} unset, keeping whatever ${candidate.provider} credential the org already holds\n`,
       );
     }
+    const seeded = await ensureProvider({
+      organizationId: org.id,
+      provider: candidate.provider,
+      name: candidate.name,
+      keys: candidate.value ? { [candidate.envVar]: candidate.value } : null,
+      shouldForceKeys: args.shouldForceKeys,
+    });
+    if (!seeded) continue;
+    (seeded.usable ? providerIds : unusableIds).push(seeded.id);
+  }
+
+  if (providerIds.length === 0) {
+    throw new Error(
+      "no usable provider rows: no key was in env and the org holds no readable credential for either provider",
+    );
+  }
+
+  // Org-default policy carrying every provider: the audio endpoints route
+  // by explicit provider/model.
+  const existingPolicy = await prisma.routingPolicy.findFirst({
+    where: { organizationId: org.id, isDefault: true },
+    select: { id: true, modelProviderIds: true },
+  });
+  if (existingPolicy) {
     // modelProviderIds is a Json column, so Prisma types it as JsonValue.
     const priorIds = Array.isArray(existingPolicy.modelProviderIds)
       ? existingPolicy.modelProviderIds.filter(
           (id): id is string => typeof id === "string",
         )
       : [];
-    const merged = Array.from(new Set([...priorIds, ...providerIds]));
+    // Adding this run's providers is not enough: a provider the policy
+    // already names may have become unreadable since, and leaving it in the
+    // chain sends traffic to a credential that cannot materialise.
+    const merged = Array.from(new Set([...priorIds, ...providerIds])).filter(
+      (id) => !unusableIds.includes(id),
+    );
     await prisma.routingPolicy.update({
       where: { id: existingPolicy.id },
-      data: { modelProviderIds: merged, modelAllowlist: [] },
+      data: { modelProviderIds: merged },
     });
     process.stderr.write(
-      `[seed-audio] updated default policy ${existingPolicy.id}: providers=${merged.length} allowlist cleared\n`,
+      `[seed-audio] updated default policy ${existingPolicy.id}: providers=${merged.length}\n`,
     );
   } else {
     const policy = await prisma.routingPolicy.create({
@@ -249,9 +313,7 @@ async function main() {
         scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
         name: "audio-dogfood-default",
         isDefault: true,
-        strategy: "priority",
         modelProviderIds: providerIds,
-        modelAllowlist: [],
       },
     });
     process.stderr.write(`[seed-audio] created default policy ${policy.id}\n`);

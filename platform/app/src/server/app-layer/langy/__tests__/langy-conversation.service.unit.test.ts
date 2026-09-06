@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
+  LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "../errors";
@@ -19,6 +20,7 @@ type Row = {
   status: string;
   currentTurnId: string | null;
   lastError: string | null;
+  lastModel: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   cursorActivityAtMs?: number | null;
@@ -60,6 +62,12 @@ function makeCommands(
     recordTurnHandoff: vi.fn(async () => {}),
     consumeTurnHandoff: vi.fn(async () => {}),
     generateConversationTitle: vi.fn(async () => {}),
+    requestLocalControl: vi.fn(async () => {}),
+    connectLocalWorkspace: vi.fn(async () => {}),
+    disconnectLocalWorkspace: vi.fn(async () => {}),
+    changeLocalPolicy: vi.fn(async () => {}),
+    startUserWait: vi.fn(async () => {}),
+    endUserWait: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -72,6 +80,7 @@ const row = (o: Partial<Row> = {}): Row => ({
   status: "active",
   currentTurnId: null,
   lastError: null,
+  lastModel: null,
   messageCount: 0,
   lastActivityAtMs: 0,
   createdAtMs: Date.parse("2026-04-01T00:00:00.000Z"),
@@ -369,6 +378,101 @@ describe("LangyConversationService", () => {
       });
       expect(result.id).not.toBe("archived-id");
       expect(result.id).toBeTruthy();
+    });
+
+    it("mints a fresh conversation id when the projection row is archived", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "archived-id",
+      });
+      expect(result.id).not.toBe("archived-id");
+      expect(result.id).toBeTruthy();
+    });
+  });
+
+  describe("when ensureConversation is asked to adopt an unknown id", () => {
+    it("adopts the caller-chosen id as a new conversation", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: true,
+      });
+    });
+
+    it("reuses an already-adopted id on later turns without re-adopting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("owned"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      const result = await svc.ensureConversation({
+        projectId: "p1",
+        userId: "alice",
+        conversationId: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        adoptUnknownId: true,
+      });
+      expect(result).toEqual({
+        id: "scenariothread_3I8C5T9e7qLkChHcSqdFitI9wjp",
+        isNew: false,
+      });
+    });
+
+    it("still refuses an id owned by another user", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("other"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "c1",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+    });
+
+    it("throws loudly on an archived collision instead of resurrecting or minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("archived"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "archived-id",
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
+    });
+
+    it("throws loudly on an id that fails the shape gate instead of minting", async () => {
+      const repo = makeRepo({
+        findOwnership: vi.fn().mockResolvedValue("missing"),
+      });
+      const svc = new LangyConversationService(repo, makeCommands());
+      await expect(
+        svc.ensureConversation({
+          projectId: "p1",
+          userId: "alice",
+          conversationId: "bad id!", // space and punctuation
+          adoptUnknownId: true,
+        }),
+      ).rejects.toBeInstanceOf(LangyConversationIdUnadoptableError);
     });
   });
 
@@ -944,6 +1048,303 @@ describe("LangyConversationService", () => {
           eventId: last.id,
         });
       });
+    });
+  });
+
+  // Two paths finish a turn and race each other: the relay's terminal frame and
+  // the agent's own HTTP post. Both land here, so the turn's ordered account is
+  // read HERE rather than by either caller — otherwise the record's shape would
+  // depend on which of them won.
+  describe("given a turn that wrote between its calls", () => {
+    const account = [
+      { kind: "text" as const, text: "Reading the failures first." },
+      { kind: "tool" as const, id: "call-1" },
+      { kind: "text" as const, text: "Now trying a tighter prompt." },
+      { kind: "tool" as const, id: "call-2" },
+      { kind: "text" as const, text: "Done." },
+    ];
+    const toolCalls = [
+      { id: "call-1", name: "read", output: "{}" },
+      { id: "call-2", name: "write", output: "{}" },
+    ];
+
+    const partKinds = (
+      recordAgentResponse: ReturnType<typeof vi.fn>,
+    ): string[] => {
+      const [call] = recordAgentResponse.mock.calls;
+      const { parts } = (call?.[0] ?? { parts: [] }) as {
+        parts: Array<{ type: string; text?: string }>;
+      };
+      return parts.map((part) =>
+        part.type === "text" ? `text:${part.text}` : part.type,
+      );
+    };
+
+    /** @scenario "The order does not depend on which path finished the turn" */
+    it("records the paragraphs and the calls in the order they happened", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        { readTurnOrder: vi.fn(async () => account) },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "text:Reading the failures first.",
+        "tool-read",
+        "text:Now trying a tighter prompt.",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+
+    /** @scenario "A turn whose order cannot be read is still recorded" */
+    it("records the calls before the reply when the account cannot be read", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = new LangyConversationService(
+        makeRepo(),
+        makeCommands({ recordAgentResponse }),
+        undefined,
+        null,
+        {
+          readTurnOrder: vi.fn(async () => {
+            throw new Error("redis is down");
+          }),
+        },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "tool-read",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+  });
+  describe("getLocalRecord — the cards the developer's machine put up (ADR-129)", () => {
+    const waitEvent = (o: {
+      id: string;
+      type: string;
+      data: Record<string, unknown>;
+      at?: number;
+    }) => ({
+      id: o.id,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: o.at ?? 100,
+      occurredAt: o.at ?? 100,
+      type: o.type,
+      version: "2026-09-02",
+      data: o.data,
+    });
+
+    const started = (o: {
+      id: string;
+      waitId: string;
+      turnId?: string;
+      summary?: string;
+      at?: number;
+    }) =>
+      waitEvent({
+        id: o.id,
+        ...(o.at !== undefined ? { at: o.at } : {}),
+        type: "lw.langy_conversation.user_wait_started",
+        data: {
+          conversationId: "c1",
+          turnId: o.turnId ?? "t1",
+          waitId: o.waitId,
+          kind: "permission",
+          toolCallId: `tc-${o.waitId}`,
+          expiresAt: 9_000,
+          permission: {
+            callId: `lcc-${o.waitId}`,
+            summary: o.summary ?? "pnpm typecheck",
+            pattern: "pnpm *",
+            reason: "not on the read-only list",
+            skipOffered: true,
+            workspaceName: "acme-app",
+            hostname: "rogerio-mbp",
+          },
+        },
+      });
+
+    const ended = (o: {
+      id: string;
+      waitId: string;
+      outcome: string;
+      decision?: string;
+      turnId?: string;
+      at?: number;
+    }) =>
+      waitEvent({
+        id: o.id,
+        ...(o.at !== undefined ? { at: o.at } : {}),
+        type: "lw.langy_conversation.user_wait_ended",
+        data: {
+          conversationId: "c1",
+          turnId: o.turnId ?? "t1",
+          waitId: o.waitId,
+          kind: "permission",
+          toolCallId: `tc-${o.waitId}`,
+          outcome: o.outcome,
+          ...(o.decision ? { decision: o.decision } : {}),
+        },
+      });
+
+    const workspaceEvent = (o: { id: string; type: string; at: number }) =>
+      waitEvent({
+        id: o.id,
+        at: o.at,
+        type: o.type,
+        data: { conversationId: "c1", instanceId: "lci_1", reason: "cli_exit" },
+      });
+
+    const serviceOver = (events: readonly unknown[]) =>
+      new LangyConversationService(
+        makeRepo({ findVisibleById: vi.fn().mockResolvedValue(row()) }),
+        makeCommands(),
+        undefined,
+        { getEventsOccurredSince: vi.fn(async () => events as never) },
+      );
+
+    describe("when the conversation is not visible to the caller", () => {
+      it("reports not-found rather than the cards", async () => {
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          { getEventsOccurredSince: vi.fn(async () => [] as never) },
+        );
+
+        await expect(
+          svc.getLocalRecord({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+          }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
+      });
+    });
+
+    /** @scenario "Every card of the conversation is on screen again after a reload" */
+    it("hands back every card of every turn with the answer it ended on", async () => {
+      const svc = serviceOver([
+        started({ id: "e1", waitId: "w1", at: 100 }),
+        ended({
+          id: "e2",
+          waitId: "w1",
+          outcome: "answered",
+          decision: "allow_pattern",
+          at: 110,
+        }),
+        started({
+          id: "e3",
+          waitId: "w2",
+          turnId: "t2",
+          summary: "rm -rf build",
+          at: 200,
+        }),
+        ended({
+          id: "e4",
+          waitId: "w2",
+          outcome: "expired",
+          turnId: "t2",
+          at: 210,
+        }),
+      ]);
+
+      const { waits } = await svc.getLocalRecord({
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      });
+
+      expect(waits).toHaveLength(2);
+      expect(waits[0]).toMatchObject({
+        waitId: "w1",
+        turnId: "t1",
+        status: "answered",
+        decision: "allow_pattern",
+        pattern: "pnpm *",
+        summary: "pnpm typecheck",
+      });
+      expect(waits[1]).toMatchObject({
+        waitId: "w2",
+        turnId: "t2",
+        status: "expired",
+        summary: "rm -rf build",
+      });
+    });
+
+    /** @scenario "A card raised before this tab was watching still appears" */
+    it("hands back a card still waiting, so a tab that adopted the turn shows it", async () => {
+      const svc = serviceOver([started({ id: "e1", waitId: "w1" })]);
+
+      const { waits } = await svc.getLocalRecord({
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      });
+
+      expect(waits[0]).toMatchObject({
+        waitId: "w1",
+        status: "pending",
+        toolCallId: "tc-w1",
+        hostname: "rogerio-mbp",
+      });
+    });
+
+    /** @scenario "The card reads the connection off the record, not only off the stream" */
+    it("says whether the folder is connected, from the record's last word", async () => {
+      const connected = serviceOver([
+        workspaceEvent({
+          id: "e1",
+          type: "lw.langy_conversation.local_workspace_connected",
+          at: 100,
+        }),
+      ]);
+      const gone = serviceOver([
+        workspaceEvent({
+          id: "e1",
+          type: "lw.langy_conversation.local_workspace_connected",
+          at: 100,
+        }),
+        workspaceEvent({
+          id: "e2",
+          type: "lw.langy_conversation.local_workspace_disconnected",
+          at: 200,
+        }),
+      ]);
+      const read = {
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      };
+
+      expect((await connected.getLocalRecord(read)).workspaceConnected).toBe(
+        true,
+      );
+      expect((await gone.getLocalRecord(read)).workspaceConnected).toBe(false);
     });
   });
 });

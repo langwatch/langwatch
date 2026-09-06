@@ -1,8 +1,9 @@
 /**
  * StorageRegistry — scheme-dispatch registry for StorageDriver instances.
  *
- * Both drivers are always registered so historical URIs of any scheme
- * remain readable after a deployment swaps the active minting backend.
+ * S3 and file drivers are always registered. Azure may be registered lazily
+ * so historical URIs remain readable without validating Azure configuration
+ * on requests that dispatch to another scheme.
  */
 import type { Readable } from "node:stream";
 import { redactStorageUri } from "./project-storage-destination";
@@ -10,12 +11,15 @@ import type { StorageDriver } from "./storage-driver";
 import type { UriScheme } from "./uri";
 import { getUriScheme } from "./uri";
 
+type StorageDriverFactory = () => StorageDriver | undefined;
+
 /**
  * Routes storage operations to the correct driver by extracting the URI scheme.
  *
- * The `azure-blob` driver is optional: deployments that have not configured
- * Azure credentials don't need it registered. The registry throws a
- * descriptive error if a URI of an unregistered scheme is dispatched.
+ * The `azure-blob` driver is optional and may be supplied as a factory:
+ * deployments that have not configured Azure credentials don't construct it,
+ * and inactive Azure configuration cannot block S3/file traffic. The registry
+ * throws a descriptive error if a URI of an unregistered scheme is dispatched.
  *
  * The field uses `Partial<Record<UriScheme, StorageDriver>>` so that adding
  * a new scheme only requires one constant change in uri.ts — no field or
@@ -24,6 +28,9 @@ import { getUriScheme } from "./uri";
  */
 export class StorageRegistry {
   private readonly drivers: Partial<Record<UriScheme, StorageDriver>>;
+  private readonly driverFactories: Partial<
+    Record<UriScheme, StorageDriverFactory>
+  >;
 
   constructor({
     s3,
@@ -32,14 +39,28 @@ export class StorageRegistry {
   }: {
     s3: StorageDriver;
     file: StorageDriver;
-    "azure-blob"?: StorageDriver;
+    "azure-blob"?: StorageDriver | StorageDriverFactory;
   }) {
-    this.drivers = { s3, file, "azure-blob": azureBlob };
+    this.drivers = { s3, file };
+    this.driverFactories = {};
+
+    if (typeof azureBlob === "function") {
+      this.driverFactories["azure-blob"] = azureBlob;
+    } else {
+      this.drivers["azure-blob"] = azureBlob;
+    }
   }
 
   private driverFor(uri: string): StorageDriver {
     const scheme = getUriScheme(uri);
-    const driver = this.drivers[scheme];
+    let driver = this.drivers[scheme];
+    const factory = this.driverFactories[scheme];
+    if (!driver && factory) {
+      driver = factory();
+      if (driver) {
+        this.drivers[scheme] = driver;
+      }
+    }
     if (!driver) {
       throw new Error(
         `Storage scheme "${scheme}" is not configured in this deployment (uri: ${redactStorageUri(uri)})`,

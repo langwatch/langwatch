@@ -17,7 +17,7 @@ import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -38,7 +38,7 @@ export default function SecretsPage() {
   const createMutation = api.secrets.create.useMutation();
   const updateMutation = api.secrets.update.useMutation();
   const deleteMutation = api.secrets.delete.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSecretName, setNewSecretName] = useState("");

@@ -40,6 +40,29 @@
 import { z } from "zod";
 
 /**
+ * Matches `wireMoney.ts`'s DECIMAL_PATTERN — the same shape `usdToNanoUsd`
+ * accepts. Anchored so the schema rejects values the downstream converter
+ * would throw on (`"banana"`, `"0x1a"`, etc.) at the parse boundary instead
+ * of deep in the pricing service.
+ */
+const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
+
+/** Validates and stringifies a cost_usd value at the Zod boundary. */
+const costUsdSchema = z
+  .union([z.string(), z.number()])
+  .transform((v) => {
+    const s = String(v).trim();
+    if (s === "" || s === "0" || s === "0.0") return "0";
+    if (!COST_USD_PATTERN.test(s)) return "0";
+    // Reject negative costs — adapters currently only produce non-negative.
+    // If credits/refunds are needed, this guard should be removed explicitly.
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 0) return "0";
+    return s;
+  })
+  .default("0");
+
+/**
  * Canonical event shape produced by every adapter. Downstream code
  * (worker handoff to trace-store) doesn't care which adapter produced
  * the event — it only cares about this canonical shape. New fields
@@ -57,8 +80,10 @@ export const normalizedPullEventSchema = z.object({
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */
   target: z.string(),
-  /** USD cost (0 if the source doesn't expose it). */
-  cost_usd: z.number().nonnegative().default(0),
+  /** USD cost as a decimal string ("0" if the source doesn't expose it).
+   *  Kept as a string so sub-cent amounts survive without float rounding.
+   *  Validated against DECIMAL_PATTERN and nonnegative at the parse boundary. */
+  cost_usd: costUsdSchema,
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),
   /** Output tokens (0 if unknown). */
@@ -81,10 +106,38 @@ export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 
 /**
  * Result of a single `runOnce` invocation. Drained when `cursor === null`.
+ *
+ * `cursor` and `errorCount` are ONE contract, not two independent fields: the
+ * worker reads them together to decide whether a run that reported errors made
+ * progress or not, so an adapter that sets one without the other is telling it
+ * the wrong thing.
+ *
+ *   - An adapter that DELIBERATELY ADVANCES past input it cannot read (a
+ *     malformed line, an object it cannot fetch) MUST return the advanced
+ *     cursor together with a non-zero `errorCount`. The worker treats that as a
+ *     partial success: it writes the events collected, persists the advance, and
+ *     logs the error count. This is what stops one unreadable object wedging a
+ *     source forever.
+ *   - An adapter that COULD NOT MAKE PROGRESS (transport failure, exhausted
+ *     retries) MUST return the INCOMING cursor unchanged, with a non-zero
+ *     `errorCount`. The worker fails the run and the same window is retried.
+ *
+ * Returning `null` never signals progress — it is the "no cursor yet / drained"
+ * sentinel — so an adapter reporting errors must not use it to mean "advanced".
  */
 export interface PullResult {
   events: NormalizedPullEvent[];
+  /**
+   * The cursor to persist. Advanced past everything this run consumed —
+   * INCLUDING input it deliberately skipped — or the incoming cursor unchanged
+   * when the run made no progress. See the contract note above.
+   */
   cursor: string | null;
+  /**
+   * How many items this run could not read. Read together with `cursor`: with
+   * an advanced cursor it reports skipped input on an otherwise successful run;
+   * with an unchanged cursor it fails the run.
+   */
   errorCount: number;
 }
 

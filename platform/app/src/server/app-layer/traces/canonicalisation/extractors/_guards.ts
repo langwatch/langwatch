@@ -4,6 +4,13 @@
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
+/**
+ * `Array.isArray` is typed `(arg: any): arg is any[]`, so it narrows an
+ * `unknown` value to `any[]` and silently drops element-level type safety.
+ * Use this instead when the narrowed elements should stay `unknown`.
+ */
+export const isUnknownArray = (v: unknown): v is unknown[] => Array.isArray(v);
+
 export const isNonEmptyString = (v: unknown): v is string =>
   typeof v === "string" && v.trim().length > 0;
 
@@ -34,6 +41,22 @@ export const asNumber = (v: unknown): number | null => {
   return null;
 };
 
+/**
+ * Coerces a value to a boolean. Accepts native booleans and the stringy
+ * spellings that arrive over OTLP ("true"/"false", "1"/"0"). Returns null when
+ * the value is absent or not a recognisable boolean, so callers can leave the
+ * attribute unset rather than guessing.
+ */
+export const asBoolean = (v: unknown): boolean | null => {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true" || s === "1") return true;
+    if (s === "false" || s === "0") return false;
+  }
+  return null;
+};
+
 export const coerceToStringArray = (v: unknown): string[] | null => {
   if (v == null) return null;
   const xs = Array.isArray(v) ? v : [v];
@@ -60,5 +83,14 @@ export const safeJsonParse = (v: unknown): unknown => {
     return JSON.parse(s);
   } catch {
     return v;
+  }
+};
+
+export const safeStringify = (value: unknown): string | null => {
+  try {
+    const s = JSON.stringify(value);
+    return typeof s === "string" ? s : null;
+  } catch {
+    return null;
   }
 };

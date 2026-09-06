@@ -7,9 +7,9 @@ from litellm.utils import trim_messages
 
 from pydantic import Field
 from typing import List, Optional, cast
-import os
 import json
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluatorEntry,
@@ -58,10 +58,6 @@ class CompetitorLLMEvaluator(
     def evaluate(self, entry: CompetitorLLMEntry) -> SingleEvaluationResult:
         passed = True
         vendor, model = self.settings.model.split("/")
-        if vendor == "azure":
-            os.environ["AZURE_API_KEY"] = self.get_env("AZURE_API_KEY")
-            os.environ["AZURE_API_BASE"] = self.get_env("AZURE_API_BASE")
-            os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
         content = ""
         content += entry.input if entry.input else ""
         content += "\n" + entry.output if entry.output else ""
@@ -109,6 +105,7 @@ class CompetitorLLMEvaluator(
             ),
         )
         response = litellm.completion(
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             model=litellm_model,
             messages=messages,
             tools=[

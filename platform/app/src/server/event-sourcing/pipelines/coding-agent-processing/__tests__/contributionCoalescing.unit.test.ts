@@ -29,6 +29,7 @@ import {
   applyLogToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
+import { InMemorySessionContextMemo } from "../services/session-context-memo";
 
 vi.mock("../../../utils/killSwitch", () => ({
   isComponentDisabled: vi.fn().mockResolvedValue(false),
@@ -49,6 +50,8 @@ function buildPipeline() {
     codingAgentSessionStore: store,
     codingAgentTraceSessionAppendStore: store,
     sessionMetricSeriesAppendStore: store,
+    codingAgentSessionEventsAppendStore: store,
+    sessionContextMemo: new InMemorySessionContextMemo(),
   });
 }
 
@@ -100,7 +103,9 @@ function batchParamsFor({
     payloads: payloads as unknown as Record<string, unknown>[],
     commandType: CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
     commandSchema: ContributeLogFactsCommand.schema,
-    handler: new ContributeLogFactsCommand(),
+    handler: new ContributeLogFactsCommand({
+      contextMemo: new InMemorySessionContextMemo(),
+    }),
     getAggregateId: ContributeLogFactsCommand.getAggregateId,
     storeEventsFn: storeEventsFn as never,
     aggregateType: "coding_agent_session" as const,

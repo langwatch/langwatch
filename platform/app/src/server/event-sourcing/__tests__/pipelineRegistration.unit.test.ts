@@ -66,11 +66,32 @@ describe("PipelineRegistry.registerAll", () => {
         expect(registeredPipelineNames()).toContain("langy_maintenance");
       });
 
+      it("mounts the agent sandbox key reaper", () => {
+        // Nothing revokes a sandbox key at the end of a run, so an unmounted
+        // sweep leaves every key of every run live until it expires.
+        expect(registeredPipelineNames()).toContain(
+          "agent_sandbox_maintenance",
+        );
+      });
+
       it("mounts the blob-maintenance sweep alongside it", () => {
         // Same class of defect, same guard: a scheduled sweep with no caller
         // is indistinguishable from a working one until the thing it protects
         // against actually happens.
         expect(registeredPipelineNames()).toContain("blob_maintenance");
+      });
+
+      /**
+       * The GitHub branch recheck moved off a per-replica `setTimeout` and onto
+       * this schedule. If the registration is ever dropped, the sweep stops
+       * running entirely and nothing else notices: pull requests opened after a
+       * session goes quiet simply never get linked, which looks like a mapping
+       * bug rather than a missing caller.
+       *
+       * @scenario "The recheck sweep runs once per fleet, not once per replica"
+       */
+      it("mounts the GitHub branch recheck and retention sweep", () => {
+        expect(registeredPipelineNames()).toContain("github_maintenance");
       });
     });
   });

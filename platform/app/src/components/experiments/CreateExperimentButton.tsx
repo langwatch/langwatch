@@ -17,7 +17,7 @@ export const CreateExperimentButton = () => {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
       void utils.experiments.getAllForEvaluationsList.invalidate();
@@ -33,7 +33,7 @@ export const CreateExperimentButton = () => {
     },
   });
 
-  if (!project || !hasPermission("workflows:create")) return null;
+  if (!project || !hasPermission("experiments:update")) return null;
 
   const handleCreate = () => {
     if (isCreating) return;

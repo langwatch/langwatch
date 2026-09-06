@@ -38,12 +38,23 @@ interface ModeSwitchProps {
    */
   showTerminal?: boolean;
   /**
+   * True while the reviewer is annotating the trace. Usage and Terminal replay
+   * an agent run rather than showing the trace's own spans, so there is nothing
+   * in them to correct or comment on and they stay unavailable until the
+   * reviewer finishes. The Conversation stays open: a turn is a trace, and it
+   * is where commenting on one reads best.
+   */
+  isEditing?: boolean;
+  /**
    * Right-aligned trailing content for this row — typically the trace ID
    * + relative timestamp. Sits in the same horizontal band as the tabs so
    * the meta tucks neatly into the corner.
    */
   endSlot?: ReactNode;
 }
+
+/** Shown on every tab annotation mode makes unavailable. */
+const EDITING_DISABLED_REASON = "Finish annotating to switch views";
 
 interface TabProps {
   label: string;
@@ -139,6 +150,79 @@ function ModeTab({
 }
 
 /**
+ * Tristate gate on the Conversation tab: no conversation id → permanently
+ * disabled; has an id but its turns are still in flight → disabled with loading
+ * copy; id plus turns → enabled. Annotating the trace does not close it, since
+ * a turn is a trace and commenting on one happens here.
+ */
+function conversationTabState({
+  hasConversation,
+  isConversationLoading,
+}: {
+  hasConversation: boolean;
+  isConversationLoading: boolean;
+}): { disabled: boolean; reason?: string } {
+  if (!hasConversation) {
+    return {
+      disabled: true,
+      reason: "This trace is not part of a conversation",
+    };
+  }
+  if (isConversationLoading) {
+    return { disabled: true, reason: "Loading conversation…" };
+  }
+  return { disabled: false };
+}
+
+/**
+ * Usage and Terminal, the two tabs only a coding-agent trace has.
+ *
+ * "Usage" (not "Session", which already means the agent's own process/session
+ * id elsewhere in this UI, and reads as jargon here) comes first: it answers
+ * "what happened, what did it cost, what went wrong" in one screen, which is
+ * what someone opening a coding-agent trace wants first.
+ * Terminal is the replay you go to once you know which moment you are after.
+ */
+function CodingAgentTabs({
+  viewMode,
+  onViewModeChange,
+  isEditing,
+  presenceFor,
+}: {
+  viewMode: DrawerViewMode;
+  onViewModeChange: (mode: DrawerViewMode) => void;
+  isEditing: boolean;
+  presenceFor: (mode: DrawerViewMode) => ReactNode;
+}) {
+  const disabledReason = isEditing ? EDITING_DISABLED_REASON : undefined;
+
+  return (
+    <>
+      <ModeTab
+        label="Usage"
+        shortcut="U"
+        active={viewMode === "session"}
+        disabled={isEditing}
+        disabledReason={disabledReason}
+        onClick={() => onViewModeChange("session")}
+        presence={presenceFor("session")}
+      />
+      <ModeTab
+        label="Terminal"
+        // NOT M: that's Maximize. The tab advertised a shortcut that did
+        // something else entirely, which is worse than having none.
+        shortcut="E"
+        active={viewMode === "terminal"}
+        disabled={isEditing}
+        disabledReason={disabledReason}
+        onClick={() => onViewModeChange("terminal")}
+        presence={presenceFor("terminal")}
+      />
+    </>
+  );
+}
+
+/**
  * Inline tab strip below the header chips. Three modes:
  *   - Trace       — waterfall + (optional) span detail pane
  *   - Summary     — trace-level accordions (I/O, metadata, evals, events)
@@ -158,17 +242,13 @@ export function ModeSwitch({
   isConversationHidden = false,
   traceId,
   showTerminal = false,
+  isEditing = false,
   endSlot,
 }: ModeSwitchProps) {
-  // Tristate gate: no conversationId → permanently disabled; has id
-  // but turns still in flight → disabled with loading copy; has id +
-  // turns → enabled.
-  const conversationDisabled = !hasConversation || isConversationLoading;
-  const conversationDisabledReason = !hasConversation
-    ? "This trace is not part of a conversation"
-    : isConversationLoading
-      ? "Loading conversation…"
-      : undefined;
+  const conversationTab = conversationTabState({
+    hasConversation,
+    isConversationLoading,
+  });
   const presenceFor = (mode: DrawerViewMode) =>
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
@@ -209,40 +289,20 @@ export function ModeSwitch({
         be noise.
       */}
       {showTerminal && (
-        <>
-          {/*
-            "Usage" (not "Session" — that word already means the agent's own
-            process/session id elsewhere in this UI, and reads as jargon here)
-            before Terminal: it answers "what happened, what did it cost, what
-            went wrong" in one screen, which is what someone opening a
-            coding-agent trace wants first. Terminal is the replay you go to
-            once you know which moment you're looking for.
-          */}
-          <ModeTab
-            label="Usage"
-            shortcut="U"
-            active={viewMode === "session"}
-            onClick={() => onViewModeChange("session")}
-            presence={presenceFor("session")}
-          />
-          <ModeTab
-            label="Terminal"
-            // NOT M — that's Maximize. The tab advertised a shortcut that did
-            // something else entirely, which is worse than having none.
-            shortcut="E"
-            active={viewMode === "terminal"}
-            onClick={() => onViewModeChange("terminal")}
-            presence={presenceFor("terminal")}
-          />
-        </>
+        <CodingAgentTabs
+          viewMode={viewMode}
+          onViewModeChange={onViewModeChange}
+          isEditing={isEditing}
+          presenceFor={presenceFor}
+        />
       )}
       {!isConversationHidden && (
         <ModeTab
           label="Conversation"
           shortcut="C"
           active={viewMode === "conversation"}
-          disabled={conversationDisabled}
-          disabledReason={conversationDisabledReason}
+          disabled={conversationTab.disabled}
+          disabledReason={conversationTab.reason}
           onClick={() => onViewModeChange("conversation")}
           presence={presenceFor("conversation")}
         />

@@ -41,6 +41,7 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
+import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 import type { Command } from "./types";
 
 /**
@@ -80,17 +81,25 @@ export const navigationCommands: Command[] = [
       "logs",
       "requests",
       "history",
+      // Carried over from the removed "Traces (Legacy)" entry so operators
+      // who still search by the old name land on the Trace Explorer.
+      "legacy",
+      "old",
     ],
     path: "/[project]/traces",
   },
   {
-    id: "nav-traces",
-    label: "Traces (Legacy)",
-    description: "The legacy traces view, going away soon",
-    icon: ListTree,
+    id: "nav-agent-testing",
+    label: "Agent Testing",
+    description: "Test cases and their results",
+    icon: FlaskConical,
     category: "navigation",
-    keywords: ["messages", "logs", "legacy", "old"],
-    path: "/[project]/messages",
+    keywords: ["test", "cases", "agent", "simulation", "scenario", "run"],
+    path: "/[project]/agent-testing",
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: true,
+    },
   },
   {
     id: "nav-simulations",
@@ -100,6 +109,12 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["test", "run", "execute"],
     path: "/[project]/simulations",
+    // Agent Testing replaces this destination. The two lead to the same runs
+    // by different routes, so exactly one of them is offered.
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: false,
+    },
   },
   {
     id: "nav-scenarios",
@@ -109,6 +124,10 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["test", "simulation", "scenario"],
     path: "/[project]/simulations/scenarios",
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: false,
+    },
   },
   {
     id: "nav-online-evaluations",
@@ -232,38 +251,47 @@ export const navigationCommands: Command[] = [
   {
     id: "nav-ops-queues",
     label: "Ops Pipelines",
-    description: "Ops → Queues & Pipelines",
+    description: "Ops → Pipelines",
     icon: Terminal,
     category: "navigation",
     keywords: ["ops", "queues", "pipelines", "groups", "redis", "pending"],
-    path: "/ops/queues",
+    path: "/ops",
   },
   {
     id: "nav-ops-blocked",
     label: "Ops Blocked",
-    description: "Ops → Blocked Groups",
+    description: "Ops → Blocked groups",
     icon: Terminal,
     category: "navigation",
     keywords: ["ops", "blocked", "errors", "stuck", "failed"],
-    path: "/ops/queues",
+    path: "/ops",
   },
   {
     id: "nav-ops-dlq",
     label: "Ops Dead Letters",
-    description: "Ops → Dead Letter Queue",
+    description: "Ops → Dead-letter queue",
     icon: Terminal,
     category: "navigation",
     keywords: ["ops", "dlq", "dead", "letter", "queue", "redrive"],
-    path: "/ops/queues",
+    path: "/ops",
+  },
+  {
+    id: "nav-ops-process-dead-letters",
+    label: "Process Dead Letters",
+    description: "Ops → Event Sourcing → Dead Letters",
+    icon: Terminal,
+    category: "navigation",
+    keywords: ["ops", "dead", "letter", "process", "outbox", "intent", "stuck"],
+    path: "/ops/event-sourcing/dead-letters",
   },
   {
     id: "nav-ops-projections",
     label: "Projection Replay",
-    description: "Ops → Projection Replay",
+    description: "Ops → Event Sourcing → Projections",
     icon: Terminal,
     category: "navigation",
     keywords: ["ops", "projections", "replay", "event", "sourcing"],
-    path: "/ops/projections",
+    path: "/ops/event-sourcing/projections",
   },
   {
     id: "nav-ops-dejaview",
@@ -678,6 +706,7 @@ const topLevelNavIds = new Set([
   "nav-analytics",
   "nav-traces",
   "nav-traces-v2",
+  "nav-agent-testing",
   "nav-simulations",
   "nav-online-evaluations",
   "nav-experiments",
@@ -707,6 +736,33 @@ export const allStaticCommands: Command[] = [
   ...supportCommands,
   ...themeCommands,
 ];
+
+/**
+ * Values of the release flags the command list reads, as resolved for the
+ * person using it. A flag missing from the map has not answered yet.
+ */
+export type CommandFeatureFlagValues = Partial<
+  Record<FrontendFeatureFlag, boolean>
+>;
+
+/**
+ * Drops the commands whose release flag does not hold the value they need.
+ * A command with no flag is always offered, and a flag that has not answered
+ * yet keeps its command out until it does, so the bar never lists two routes
+ * to the same work while the flag is in flight.
+ */
+export function filterCommandsByFeatureFlags({
+  commands,
+  flags,
+}: {
+  commands: Command[];
+  flags: CommandFeatureFlagValues;
+}): Command[] {
+  return commands.filter((command) => {
+    if (!command.featureFlag) return true;
+    return flags[command.featureFlag.flag] === command.featureFlag.enabled;
+  });
+}
 
 /**
  * Filter commands by query string.

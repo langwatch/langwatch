@@ -26,7 +26,7 @@
  *
  * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
  * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
- * of the `bash` call opencode actually made. `resolveCliCapability` (below)
+ * of the `bash` call the worker actually made. `resolveCliCapability` (below)
  * resolves EVERY such name to a card: the capability catalog
  * (`capabilityCatalog.ts`) binds the view (surface, noun, body widget) for the
  * resources it lists, and anything it has never heard of — a command the
@@ -124,6 +124,7 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   apiKeys: "API keys",
   modelProviders: "Model providers",
   gateway: "AI Gateway",
+  organization: "Organization",
   platform: "LangWatch",
 };
 
@@ -137,7 +138,7 @@ const nestedResourceHref = (base: string, resourceId: string) =>
   `${base}/${encodeURIComponent(resourceId)}`;
 
 const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
-  traces: { path: "messages", resourceHref: nestedResourceHref },
+  traces: { path: "traces", resourceHref: nestedResourceHref },
   analytics: { path: "analytics" },
   experiments: { path: "experiments", resourceHref: nestedResourceHref },
   evaluations: {
@@ -188,6 +189,10 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   apiKeys: { path: "settings/authentication", deepLink: false },
   modelProviders: { path: "settings/model-providers", deepLink: false },
   gateway: { path: "settings", deepLink: false },
+  // The provisioning pages live at `/settings/...`, outside the project-slug
+  // prefix every href here is built under, so there is no project-relative
+  // path to hand a card. It carries no link at all rather than one that 404s.
+  organization: { path: "settings/members", deepLink: false },
   platform: { path: "settings", deepLink: false },
 };
 
@@ -352,7 +357,8 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "evaluations.online-evaluation": "evaluations",
   "agent-simulations.scenarios": "scenarios",
   "agent-simulations.runs": "simulations",
-  "agent-simulations.suites": "simulations",
+  "agent-simulations.test-suites": "simulations",
+  "agent-simulations.run-plans": "simulations",
   "prompt-management.prompts": "prompts",
   "library.agents": "agents",
   "library.workflows": "workflows",
@@ -362,6 +368,13 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   triggers: "automations",
   "settings.projects": "projects",
   "settings.api-keys": "apiKeys",
+  "settings.organization": "organization",
+  "settings.members": "organization",
+  "settings.teams": "organization",
+  "settings.groups": "organization",
+  "settings.roles": "organization",
+  "settings.role-bindings": "organization",
+  "settings.scim": "organization",
   "settings.model-providers": "modelProviders",
   "settings.secrets": "secrets",
 };
@@ -728,11 +741,35 @@ export function isProposalOutput(output: unknown): boolean {
   );
 }
 
+/**
+ * A line of a serialised document rather than prose.
+ *
+ * `extractToolText` stringifies a structured payload so a RAW view always has
+ * something to show. A summary line must not repeat that: the reader gets `{`
+ * and `"id": "scenario_0002Yw…",` where a sentence belongs. Both shapes occur —
+ * a whole document on one line when the tool returned JSON as a string, and the
+ * pretty-printed structure when it returned an object.
+ */
+export function isSerializedDocumentLine(line: string): boolean {
+  if (/^[[{]/.test(line) && /[\]}]$/.test(line)) return true;
+  if (/^[[\]{},]+$/.test(line)) return true;
+  if (/^"[^"]*"\s*:/.test(line)) return true;
+  // One element of a pretty-printed array: `"refunds",`. A quoted word with
+  // nothing around it is a value out of its document, never a sentence.
+  return /^"[^"]*"[,;]?$/.test(line);
+}
+
 /** First N non-empty, non-heading lines of a tool's textual result. */
 export function summaryLines(output: unknown, max = 3): string[] {
   return extractToolText(output)
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith(">") && !l.startsWith("#"))
+    .filter(
+      (l) =>
+        l.length > 0 &&
+        !l.startsWith(">") &&
+        !l.startsWith("#") &&
+        !isSerializedDocumentLine(l),
+    )
     .slice(0, max);
 }

@@ -11,7 +11,9 @@
  * (demo, traces) set the policy without blocking, since a brief stale stamp
  * still outlives their near-now data.
  */
-import { PrismaClient } from "@prisma/client";
+
+import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
 
 const ORG_ID = "local-dev-organization";
@@ -22,7 +24,9 @@ function windowDaysFromEnv(): number {
 }
 
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
     const windowDays = windowDaysFromEnv();
     const retentionDays = seededRetentionDays(windowDays);

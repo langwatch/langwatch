@@ -125,7 +125,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: [], isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

@@ -1,6 +1,7 @@
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { TraceListItem } from "../../../types/trace";
 
-export type Mode = "thread" | "bubbles" | "markdown" | "annotations";
+export type Mode = "thread" | "bubbles" | "markdown";
 
 /** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
 export type TurnLayout = "thread" | "bubbles";
@@ -15,6 +16,14 @@ export interface ParsedTurn {
    */
   assistantText: string;
   assistantReasoning: string;
+  /**
+   * Media recorded on the turn's input side, rendered under the user message.
+   * The caller's own media only: a reply recording that rode along in the
+   * turn's input belongs to the assistant and is not repeated here.
+   */
+  userMedia: MediaPartData[];
+  /** Media recorded on the turn's output side, rendered under the reply. */
+  assistantMedia: MediaPartData[];
   gapSecs: number;
   showGap: boolean;
 }

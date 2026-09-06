@@ -38,3 +38,14 @@ Feature: Resource caps — shared services can't take the machine
     When haven provisions the ClickHouse it manages
     Then its logs stay within a small, bounded disk footprint over time
     But the operator can opt back into full stock logging via the environment
+
+  # Bound by domain/clickhouse_test.go (`// @scenario` on
+  # TestRenderClickHouseConfigBoundsBackgroundWork). CPU is the cap here:
+  # stock ClickHouse sizes its merge and scheduling pools for a dedicated
+  # server, and on the small shared VM those threads contend with the very
+  # queries they exist to serve.
+  @unit
+  Scenario: The managed ClickHouse bounds its background work
+    When haven provisions the ClickHouse it manages
+    Then its background merge and scheduling pools are sized for the shared VM
+    And large merges and mutations still get scheduled under the smaller pools

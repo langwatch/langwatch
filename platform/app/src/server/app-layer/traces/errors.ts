@@ -1,5 +1,5 @@
-// Wired at the resilient ClickHouse client (`app-layer/clients/clickhouse/
-// resilient-client.ts`), which translates raw driver errors into these typed
+// Wired at the resilient ClickHouse client assembly (`server/clickhouse/
+// managedClient.ts`), which translates raw driver errors into these typed
 // errors after retries are exhausted.
 //
 // Tips/docs links come from the central registry (`../error-remediation`) —
@@ -82,6 +82,32 @@ export class QueryMemoryExceededError extends HandledError {
   }
 }
 
+/**
+ * The query would have read past a scan ceiling (`max_rows_to_read` /
+ * `max_bytes_to_read`) and was aborted rather than truncated.
+ *
+ * Distinct from {@link QueryMemoryExceededError}: a query can sit well inside
+ * the memory ceiling and still be refused for the volume it would touch, and
+ * the remedy is the same shape but the cause is not. `customer` fault — the
+ * ceiling is deliberate and the caller narrows the query to clear it.
+ */
+export class QueryScanLimitExceededError extends HandledError {
+  declare readonly code: "query_scan_limit_exceeded";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "query_scan_limit_exceeded",
+      "Query would read more data than its scan limit allows and was aborted",
+      {
+        httpStatus: 422,
+        ...remediation("query_scan_limit_exceeded"),
+        reasons: options.reasons,
+      },
+    );
+    this.name = "QueryScanLimitExceededError";
+  }
+}
+
 export class FilterParseError extends HandledError {
   declare readonly code: "filter_parse_error";
 
@@ -130,6 +156,25 @@ export class TimeRangeTooWideError extends HandledError {
       },
     );
     this.name = "TimeRangeTooWideError";
+  }
+}
+
+export class PageTooDeepError extends HandledError {
+  declare readonly code: "page_too_deep";
+
+  constructor(maxRows: number) {
+    const base = remediation("page_too_deep");
+    super(
+      "page_too_deep",
+      `Pages past the first ${maxRows} rows cannot be opened by number. Narrow the range, or page forward.`,
+      {
+        httpStatus: 422,
+        meta: { maxRows },
+        ...(base.tips ? { tips: base.tips } : {}),
+        ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
+      },
+    );
+    this.name = "PageTooDeepError";
   }
 }
 

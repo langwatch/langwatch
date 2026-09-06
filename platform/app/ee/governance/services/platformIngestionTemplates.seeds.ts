@@ -28,7 +28,7 @@
  *   specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *   specs/ai-gateway/governance/personal-project-ingest-via-template.feature
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 export interface PlatformTemplateSeed {
   slug: string;

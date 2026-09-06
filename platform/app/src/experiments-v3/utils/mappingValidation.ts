@@ -41,6 +41,27 @@ export type EvaluatorValidationResult = {
   missingMappings: MissingMapping[];
 };
 
+/** A message of a prompt template, as stored on the prompt or its draft. */
+export type PromptTemplateMessage = {
+  role: string;
+  content: string;
+};
+
+/**
+ * Resolves the variables a prompt target's saved template consumes.
+ *
+ * Only asked for prompt targets that carry no local draft. Returns undefined
+ * when the template is not loaded, and the target then has nothing that can be
+ * proven required.
+ */
+export type PromptTemplateFieldsLookup = (
+  target: TargetConfig,
+) => Set<string> | undefined;
+
+export type MappingValidationOptions = {
+  promptTemplateFields?: PromptTemplateFieldsLookup;
+};
+
 export type WorkbenchValidationResult = {
   /** Whether all targets and evaluators have valid mappings */
   isValid: boolean;
@@ -81,41 +102,101 @@ export const extractFieldsFromContent = (content: string): Set<string> => {
 };
 
 /**
- * Get all fields that are actually used in a target's prompt.
- * For prompts, checks message content for {{fieldName}} references.
- * For code targets, all inputs are considered used.
+ * The variables a prompt template consumes.
  *
- * @param target - The target to check
- * @returns Set of field identifiers that are used
+ * A `{{variable}}` reference in any message counts, the system message
+ * included: the engine renders the system prompt from the same variable map as
+ * the rest of the template (`buildMessages`, engine.go).
+ *
+ * A template with no user or assistant message consumes every declared input
+ * instead. With no turn to render, the engine folds the scalar inputs into a
+ * single user turn (`composeUserPrompt`, engine.go), so each declared input
+ * reaches the model and needs a value.
+ *
+ * @param messages - The template messages, system message included
+ * @param declaredFieldIds - The variables the prompt declares
+ * @returns Set of variables the template consumes
  */
-export const getUsedFields = (target: TargetConfig): Set<string> => {
-  const usedFields = new Set<string>();
+export const getFieldsUsedByPromptTemplate = ({
+  messages,
+  declaredFieldIds,
+}: {
+  messages: PromptTemplateMessage[];
+  declaredFieldIds: string[];
+}): Set<string> => {
+  const hasConversationTurn = messages.some(
+    (message) => message.role !== "system",
+  );
+  if (!hasConversationTurn) {
+    return new Set(declaredFieldIds);
+  }
 
-  if (target.type === "prompt") {
-    // For prompt targets, check localPromptConfig if available (has actual content)
-    if (target.localPromptConfig) {
-      for (const message of target.localPromptConfig.messages) {
-        const fieldsInMessage = extractFieldsFromContent(message.content);
-        for (const field of fieldsInMessage) {
-          usedFields.add(field);
-        }
-      }
-    } else {
-      // If no localPromptConfig yet, fall back to target.inputs
-      // These are the explicitly defined variables that need mappings
-      for (const input of target.inputs ?? []) {
-        usedFields.add(input.identifier);
-      }
-    }
-  } else {
-    // For code targets, all inputs are used
-    for (const input of target.inputs ?? []) {
-      usedFields.add(input.identifier);
+  const usedFields = new Set<string>();
+  for (const message of messages) {
+    for (const field of extractFieldsFromContent(message.content)) {
+      usedFields.add(field);
     }
   }
 
   return usedFields;
 };
+
+type UsedFieldsResolution = {
+  usedFields: Set<string>;
+  /**
+   * Whether a template proved which variables the target consumes. False only
+   * for a prompt target with neither a draft nor a loaded template, where the
+   * declared input list is a guess and never a requirement.
+   */
+  isProven: boolean;
+};
+
+const declaredFieldIdsOf = (target: TargetConfig): string[] =>
+  (target.inputs ?? []).map((input) => input.identifier);
+
+const resolveUsedFields = (
+  target: TargetConfig,
+  options?: MappingValidationOptions,
+): UsedFieldsResolution => {
+  // Every input of a code, agent or evaluator target is passed to it.
+  if (target.type !== "prompt") {
+    return { usedFields: new Set(declaredFieldIdsOf(target)), isProven: true };
+  }
+
+  // A draft carries the message content the user is editing right now.
+  if (target.localPromptConfig) {
+    return {
+      usedFields: getFieldsUsedByPromptTemplate({
+        messages: target.localPromptConfig.messages,
+        declaredFieldIds: target.localPromptConfig.inputs.map(
+          (input) => input.identifier,
+        ),
+      }),
+      isProven: true,
+    };
+  }
+
+  const templateFields = options?.promptTemplateFields?.(target);
+  if (templateFields) {
+    return { usedFields: templateFields, isProven: true };
+  }
+
+  return { usedFields: new Set(declaredFieldIdsOf(target)), isProven: false };
+};
+
+/**
+ * Get all fields that a target consumes.
+ * For prompts, the template decides (see getFieldsUsedByPromptTemplate).
+ * For code targets, all inputs are consumed.
+ *
+ * @param target - The target to check
+ * @param options - Resolves the saved template of an undrafted prompt target
+ * @returns Set of field identifiers that are used
+ */
+export const getUsedFields = (
+  target: TargetConfig,
+  options?: MappingValidationOptions,
+): Set<string> => resolveUsedFields(target, options).usedFields;
 
 // ============================================================================
 // Target Validation
@@ -127,8 +208,10 @@ export const getUsedFields = (target: TargetConfig): Set<string> => {
  * Validation rules vary by target type:
  *
  * **Prompts:**
- * - A mapping is required if the field is BOTH used (referenced via {{fieldName}}) AND in inputs
+ * - A mapping is required if the field is BOTH consumed by the template AND in inputs
  * - Fields only used but not listed ("Undefined variables") are NOT required
+ * - A declared field the template does not consume is never required
+ * - With no template at hand, nothing is required
  *
  * **HTTP Agents:**
  * - All fields are OPTIONAL (no individual field is required)
@@ -140,14 +223,16 @@ export const getUsedFields = (target: TargetConfig): Set<string> => {
  *
  * @param target - The target to validate
  * @param datasetId - The dataset to validate against
+ * @param options - Resolves the saved template of an undrafted prompt target
  * @returns Validation result with missing mappings
  */
 export const getTargetMissingMappings = (
   target: TargetConfig,
   datasetId: string,
+  options?: MappingValidationOptions,
 ): TargetValidationResult => {
   const missingMappings: MissingMapping[] = [];
-  const usedFields = getUsedFields(target);
+  const { usedFields, isProven } = resolveUsedFields(target, options);
   const datasetMappings = target.mappings[datasetId] ?? {};
 
   // Get the set of input identifiers (fields explicitly defined by user)
@@ -161,6 +246,19 @@ export const getTargetMissingMappings = (
     target.type === "agent" &&
     "agentType" in target &&
     target.agentType === "http";
+
+  // A connected agent declares the turn it reads plus the parameters of its
+  // own function. Every parameter carries the function's default, so only the
+  // turn has to be mapped for the column to run.
+  const isConnectedAgent =
+    target.type === "agent" &&
+    "agentType" in target &&
+    target.agentType === "connected";
+  const optionalInputIds = new Set(
+    inputs
+      .filter((input) => "optional" in input && input.optional)
+      .map((input) => input.identifier),
+  );
 
   // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
   const isEvaluatorTarget = target.type === "evaluator";
@@ -274,21 +372,21 @@ export const getTargetMissingMappings = (
     };
   }
 
-  // For a prompt target that follows the latest version with no local
-  // edits, we don't have the message templates, so `usedFields` is a coarse
-  // proxy (all declared inputs). A prompt scaffold can declare variables it
-  // never references (e.g. the default `input`), so we cannot prove these
-  // are actually required. Surface them as an advisory (alert) instead of a
-  // hard requirement so an unreferenced declared variable never blocks the
-  // run. Once the prompt is opened/edited (localPromptConfig present) the
-  // `{{var}}`-based detection is exact and these become hard-required again.
-  const isUnprovenPromptUsage =
-    target.type === "prompt" && !target.localPromptConfig;
+  // A prompt target with no draft and no loaded template gives us only its
+  // declared input list, and a prompt scaffold declares variables it never
+  // references (every prompt is born with an `input` the template may drop).
+  // Report those as advisory so an unreferenced variable neither warns nor
+  // blocks the run.
+  const isUnprovenPromptUsage = target.type === "prompt" && !isProven;
 
   // Standard validation for prompts and code agents
   for (const fieldId of usedFields) {
     // Skip if not in inputs list - user hasn't defined this variable
     if (!inputIds.has(fieldId)) continue;
+
+    // An unmapped parameter of a connected agent is not a gap: the function
+    // applies its own default for it.
+    if (isConnectedAgent && optionalInputIds.has(fieldId)) continue;
 
     const hasMapping = datasetMappings[fieldId] !== undefined;
 
@@ -308,25 +406,23 @@ export const getTargetMissingMappings = (
 };
 
 /**
- * Check if a target has any missing mappings (simpler check for UI alerts).
+ * Check if a target is short of a mapping it needs to run.
  *
- * Drives the alert icon, so it surfaces ANY missing mapping — including
- * advisory ones (a follow-latest prompt whose declared variables can't yet
- * be proven required). Advisory misses still warn the user to configure the
- * target, but they do not hard-block the run (see `getTargetMissingMappings`
- * and the `isValid` gate used by the run button).
+ * Drives the alert icon on the column header and the per-column play button,
+ * so it answers the same question the run buttons ask: can this target run as
+ * configured. Advisory misses, such as a declared variable the template never
+ * consumes, are not missing mappings the user can act on and are excluded.
  *
  * @param target - The target to check
  * @param datasetId - The dataset to check against
- * @returns true if there are any missing mappings (required or advisory)
+ * @param options - Resolves the saved template of an undrafted prompt target
+ * @returns true if a mapping the target needs is absent
  */
 export const targetHasMissingMappings = (
   target: TargetConfig,
   datasetId: string,
-): boolean => {
-  const { missingMappings } = getTargetMissingMappings(target, datasetId);
-  return missingMappings.length > 0;
-};
+  options?: MappingValidationOptions,
+): boolean => !getTargetMissingMappings(target, datasetId, options).isValid;
 
 // ============================================================================
 // Evaluator Validation
@@ -346,7 +442,7 @@ export type SimpleMappingValidationResult = {
 
 /**
  * Core validation logic for evaluator mappings.
- * Used by both validateEvaluatorMappings and validateEvaluatorMappingsWithFields.
+ * Used by validateEvaluatorMappingsWithFields.
  */
 const validateMappingsCore = (
   requiredFields: string[],
@@ -390,32 +486,6 @@ const validateMappingsCore = (
 };
 
 /**
- * Check if mappings are valid for an evaluator type.
- * This is a simpler version that works with just mappings and evaluator type,
- * without needing the full EvaluatorConfig.
- *
- * Validation rules:
- * 1. ALL required fields MUST have mappings
- * 2. Optional fields MAY have mappings
- * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
- *    (at least one field must be mapped)
- *
- * @param evaluatorType - The evaluator type (e.g., "langevals/exact_match")
- * @param mappings - The current mappings (field -> mapping)
- * @returns Validation result
- */
-export const validateEvaluatorMappings = (
-  evaluatorType: string,
-  mappings: Record<string, { type: string; path?: string[] } | undefined>,
-): SimpleMappingValidationResult => {
-  const evaluatorDef = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-  const requiredFields = evaluatorDef?.requiredFields ?? [];
-  const optionalFields = evaluatorDef?.optionalFields ?? [];
-
-  return validateMappingsCore(requiredFields, optionalFields, mappings);
-};
-
-/**
  * Check if mappings are valid given explicit field definitions.
  * Use this when you already have the field definitions and don't need to look them up.
  *
@@ -431,6 +501,34 @@ export const validateEvaluatorMappingsWithFields = (
 ): SimpleMappingValidationResult => {
   return validateMappingsCore(requiredFields, optionalFields, mappings);
 };
+
+/**
+ * Whether the evaluator's fields come from somewhere other than the built-in
+ * catalog, so a missing catalog entry says nothing about it.
+ */
+const isDefinedOutsideTheCatalog = (evaluatorType: string): boolean =>
+  evaluatorType.startsWith("custom/") ||
+  evaluatorType.startsWith("code/") ||
+  evaluatorType === "workflow";
+
+/**
+ * What to report for a built-in evaluator with no catalog entry: it cannot run
+ * whatever the mappings say, so the evaluator itself is the finding. Calling
+ * the mappings complete would let the row be queued against an evaluator that
+ * is not there.
+ */
+const unavailableEvaluatorResult = (
+  evaluatorType: string,
+): EvaluatorValidationResult => ({
+  isValid: false,
+  missingMappings: [
+    {
+      fieldId: "evaluatorType",
+      fieldName: `${evaluatorType} is not available`,
+      isRequired: true,
+    },
+  ],
+});
 
 /**
  * Check if an evaluator has all required mappings for a specific target and dataset.
@@ -491,6 +589,11 @@ export const getEvaluatorMissingMappings = (
   // Get the evaluator definition to know which fields are required vs optional
   const evaluatorDef =
     AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+
+  if (!evaluatorDef && !isDefinedOutsideTheCatalog(evaluator.evaluatorType)) {
+    return unavailableEvaluatorResult(evaluator.evaluatorType);
+  }
+
   const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
   const optionalFieldsArr = evaluatorDef?.optionalFields ?? [];
 
@@ -578,16 +681,25 @@ export const evaluatorHasMissingMappings = (
  * @param targets - All targets in the workbench
  * @param evaluators - All evaluators in the workbench
  * @param activeDatasetId - The currently active dataset
+ * @param promptTemplateFields - Resolves the saved template of an undrafted
+ *   prompt target
  * @returns Validation result with first invalid entity
  */
-export const validateWorkbench = (
-  targets: TargetConfig[],
-  evaluators: EvaluatorConfig[],
-  activeDatasetId: string,
-): WorkbenchValidationResult => {
+export const validateWorkbench = ({
+  targets,
+  evaluators,
+  activeDatasetId,
+  promptTemplateFields,
+}: {
+  targets: TargetConfig[];
+  evaluators: EvaluatorConfig[];
+  activeDatasetId: string;
+} & MappingValidationOptions): WorkbenchValidationResult => {
   // Check targets first
   for (const target of targets) {
-    const validation = getTargetMissingMappings(target, activeDatasetId);
+    const validation = getTargetMissingMappings(target, activeDatasetId, {
+      promptTemplateFields,
+    });
     if (!validation.isValid) {
       return {
         isValid: false,
@@ -626,16 +738,18 @@ export const validateWorkbench = (
  *
  * @param targets - All targets to check
  * @param datasetId - The dataset to check against
+ * @param options - Resolves the saved template of an undrafted prompt target
  * @returns Map of targetId -> missing mappings
  */
 export const getAllTargetMissingMappings = (
   targets: TargetConfig[],
   datasetId: string,
+  options?: MappingValidationOptions,
 ): Map<string, MissingMapping[]> => {
   const result = new Map<string, MissingMapping[]>();
 
   for (const target of targets) {
-    const validation = getTargetMissingMappings(target, datasetId);
+    const validation = getTargetMissingMappings(target, datasetId, options);
     if (validation.missingMappings.length > 0) {
       result.set(target.id, validation.missingMappings);
     }

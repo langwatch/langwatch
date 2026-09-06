@@ -4,7 +4,7 @@ import pino, {
   type Logger as PinoLogger,
 } from "pino";
 import type SuperJSON from "superjson";
-import { DEFAULT_SERVICE_NAME } from "./constants";
+import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -51,6 +51,23 @@ const superjsonErrorSerializer = (error: unknown) => {
     _superjson: serialized.meta,
   };
 };
+
+/**
+ * Every key a cause may be logged under, mapped to the same serializer.
+ *
+ * pino matches serializers by exact property name and nothing warns when a key
+ * has none: the value is passed to `JSON.stringify`, and an `Error` has no
+ * enumerable own properties, so it lands as `{}` with the message and stack -
+ * the only reasons it was logged - gone. Keeping the map in one exported
+ * constant is what lets a test drive the real thing rather than a copy of it.
+ *
+ * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
+ * cause on records deliberately logged below error level.
+ */
+export const NODE_LOG_SERIALIZERS = {
+  error: superjsonErrorSerializer,
+  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+} as const;
 
 export interface CreateLoggerOptions {
   /**
@@ -119,13 +136,62 @@ function getSharedTransport(): DestinationStream | null {
  * async request context. Browser loggers use Pino's browser mode and never load
  * the package's OpenTelemetry or Node-only context modules.
  */
+// One logger per (name, disableContext) pair, kept for the life of the process.
+//
+// `createLogger` has 400+ call sites, many of them per-instance class fields
+// and a few inline in catch blocks, so a fresh `pino()` per call was measured
+// at 2.3% of the app's wall time in production — nearly a quarter of that
+// inside `pino/lib/caller.js:getCallers`, which captures a stack trace on
+// every construction to work out who called it. None of that work varies
+// between calls that pass the same name.
+//
+// Sharing an instance is safe because nothing request-scoped is baked in at
+// construction. `name`, `service` and `service.version` are process-wide, and
+// the per-request fields — traceId, spanId, organizationId, projectId, userId
+// — arrive through the `mixin` in createNodeLogger, which pino invokes on
+// every log call and which reads the async-local context at that moment. Two
+// requests sharing a logger still get their own context on their own lines.
+// The transport above is shared for the same reason.
+//
+// The cache is bounded by the number of distinct logger names in the source.
+// The handful of call sites that build a name rather than writing a literal
+// derive it from module or route identity, never from tenant or request data;
+// a name derived per project would make this grow without limit.
+//
+// `disableContext` is part of the key because it is the one option that
+// changes the logger that gets constructed.
+const loggerCache = new Map<string, PinoLogger>();
+
+/**
+ * Drops the memoised loggers.
+ *
+ * Only tests need this. They mutate the environment a logger reads at
+ * construction — SERVICE_VERSION, OTEL_RESOURCE_ATTRIBUTES, the log levels —
+ * between cases, and a process-lifetime cache would otherwise pin every case
+ * to whichever one ran first. Production reads that environment once at boot
+ * and never changes it.
+ */
+export function resetLoggerCache(): void {
+  loggerCache.clear();
+}
+
 export function createLogger(
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger {
-  return isNodeRuntime
+  // The prefix keeps a context-disabled logger from being handed out for a
+  // name that also has a context-enabled one, which would silently drop the
+  // request fields from every line written through it.
+  const key = options?.disableContext ? `-${name}` : `+${name}`;
+
+  const cached = loggerCache.get(key);
+  if (cached) return cached;
+
+  const logger = isNodeRuntime
     ? createNodeLogger(name, options)
     : createBrowserLogger(name);
+  loggerCache.set(key, logger);
+  return logger;
 }
 
 function createBrowserLogger(name: string): PinoLogger {
@@ -141,13 +207,71 @@ function createBrowserLogger(name: string): PinoLogger {
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: pino.stdSerializers.err },
+    // Both keys, same serializer. pino matches serializers by exact property
+    // name, so a cause moved to REQUEST_CAUSE_FIELD and not registered here is
+    // emitted as a bare Error - which serialises to `{}`, losing the message
+    // and stack that are the whole reason it was logged.
+    serializers: {
+      error: pino.stdSerializers.err,
+      [REQUEST_CAUSE_FIELD]: pino.stdSerializers.err,
+    },
     formatters: {
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
     },
     browser: { asObject: true },
   });
+}
+
+/**
+ * `service.version` for a log record, read from the same place the OTel
+ * resource reads it.
+ *
+ * `OTEL_RESOURCE_ATTRIBUTES` is the `k=v,k=v` form the deployment already sets.
+ * Parsing it keeps one source of truth — two ways to state the version is how
+ * they drift — and `SERVICE_VERSION` is accepted as an explicit override for
+ * anything that sets only that.
+ *
+ * Returns nothing when unset, so a local run adds no field rather than an empty
+ * one.
+ */
+/**
+ * `OTEL_RESOURCE_ATTRIBUTES` values are percent-encoded (the spec's W3C Baggage
+ * octet string), which is how a value containing `,` or `=` survives a format
+ * that separates on both. The OTel SDK's own envDetector decodes them, so this
+ * has to as well: the whole point of reading this variable rather than adding a
+ * second one is that a log and a span cannot disagree about the version, and
+ * emitting `git%2Dabc` where the trace says `git-abc` would be exactly that
+ * disagreement.
+ *
+ * A malformed escape falls back to the raw text. `decodeURIComponent` throws on
+ * a stray `%`, and a version we can print imperfectly beats no version at all.
+ */
+function decodeAttributeValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+export function serviceVersionField(): Record<string, string> {
+  const explicit = process.env.SERVICE_VERSION?.trim();
+  if (explicit) return { "service.version": explicit };
+
+  const attrs = process.env.OTEL_RESOURCE_ATTRIBUTES;
+  if (!attrs) return {};
+
+  for (const pair of attrs.split(",")) {
+    const separator = pair.indexOf("=");
+    if (separator === -1) continue;
+    if (pair.slice(0, separator).trim() !== "service.version") continue;
+
+    const value = decodeAttributeValue(pair.slice(separator + 1).trim());
+    if (value) return { "service.version": value };
+  }
+
+  return {};
 }
 
 function createNodeLogger(
@@ -163,7 +287,7 @@ function createNodeLogger(
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: superjsonErrorSerializer },
+    serializers: NODE_LOG_SERIALIZERS,
     formatters: {
       // Adds process identity alongside pino's own pid/hostname bindings,
       // distinct from `name` (the per-module label like "langwatch:api:hono").
@@ -177,6 +301,17 @@ function createNodeLogger(
       bindings: (bindings) => ({
         ...bindings,
         service: process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+        // Which build produced the line.
+        //
+        // The deployment already states this — OTEL_RESOURCE_ATTRIBUTES carries
+        // `service.version=<tag>` and `envDetector` merges it into the OTel
+        // resource — but that resource only reaches telemetry we EXPORT.
+        // These logs go to stdout and are picked up from the pod's log file, a
+        // path the resource never touches, so no log line has ever carried a
+        // version: measured 2026-08-07, `service_version` appeared on no record
+        // in the fleet. Reading the same env var keeps one source of truth
+        // rather than introducing a second way to say it.
+        ...serviceVersionField(),
       }),
       level: (label) => ({ level: label.toUpperCase() }),
     },

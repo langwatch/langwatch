@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import type { TopicClusteringRunStatusData } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {

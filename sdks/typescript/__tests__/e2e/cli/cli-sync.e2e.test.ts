@@ -279,7 +279,10 @@ describe("CLI E2E", () => {
           });
 
           // Second sync - should detect conflict
-          const sync2 = await cli.runInteractive("prompt sync", ["r"]);
+          const sync2 = await cli.runInteractive({
+            command: "prompt sync",
+            inputs: ["r"],
+          });
 
           // Verify conflict output
           expect(sync2.output).toContain(`Conflict`);
@@ -314,7 +317,10 @@ describe("CLI E2E", () => {
           const current =
             localPromptFileManagement.readPromptFile(promptHandle);
           // Run sync and choose local version ('l')
-          const sync = await cli.runInteractive(`prompt sync`, ["l"]);
+          const sync = await cli.runInteractive({
+            command: `prompt sync`,
+            inputs: ["l"],
+          });
           expectCliResultSuccess(sync);
 
           // Remote should now match local
@@ -343,10 +349,10 @@ describe("CLI E2E", () => {
         });
 
         // Update to change from draft
-        const addResult = await cli.runInteractive(
-          `prompt add ${promptHandle}@latest`,
-          ["y"],
-        );
+        const addResult = await cli.runInteractive({
+          command: `prompt add ${promptHandle}@latest`,
+          inputs: ["y"],
+        });
 
         expectCliResultSuccess(addResult);
 
@@ -405,10 +411,10 @@ describe("CLI E2E", () => {
 
       describe("when pegged to a version", () => {
         it("syncs the correct version", async () => {
-          const addResult = await cli.runInteractive(
-            `prompt add ${promptHandle}@0`,
-            ["y"],
-          );
+          const addResult = await cli.runInteractive({
+            command: `prompt add ${promptHandle}@0`,
+            inputs: ["y"],
+          });
           expectCliResultSuccess(addResult);
 
           const sync = cli.run("prompt sync");

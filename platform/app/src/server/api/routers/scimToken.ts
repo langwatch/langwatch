@@ -2,11 +2,10 @@ import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
 
 const enterpriseScimProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
-  .use(checkOrganizationPermission("organization:manage"))
+  .permission("organization:manage")
   .use(async ({ ctx, input, next }) => {
     await assertEnterprisePlan({
       organizationId: input.organizationId,
@@ -17,29 +16,26 @@ const enterpriseScimProcedure = protectedProcedure
 
 export const scimTokenRouter = createTRPCRouter({
   list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
-    const tokens = await ctx.prisma.scimToken.findMany({
-      where: { organizationId: input.organizationId },
-      select: {
-        id: true,
-        description: true,
-        createdAt: true,
-        lastUsedAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return tokens;
+    const tokenService = ScimTokenService.create(ctx.prisma);
+    return tokenService.list({ organizationId: input.organizationId });
   }),
 
   generate: enterpriseScimProcedure
     .input(
       z.object({
         description: z.string().optional(),
+        // D08: which connection this token is for. Optional on the wire and
+        // required by the service, so a client that has not been updated
+        // gets the named `scim_connection_required` refusal rather than a
+        // schema error the customer cannot read.
+        connectionId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const tokenService = ScimTokenService.create(ctx.prisma);
       return tokenService.generate({
         organizationId: input.organizationId,
+        connectionId: input.connectionId,
         description: input.description,
       });
     }),
@@ -51,12 +47,10 @@ export const scimTokenRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.scimToken.delete({
-        where: {
-          id: input.tokenId,
-          organizationId: input.organizationId,
-        },
+      const tokenService = ScimTokenService.create(ctx.prisma);
+      return tokenService.revoke({
+        organizationId: input.organizationId,
+        tokenId: input.tokenId,
       });
-      return { success: true };
     }),
 });

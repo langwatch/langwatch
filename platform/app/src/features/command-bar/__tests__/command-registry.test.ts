@@ -24,13 +24,13 @@ describe("command-registry", () => {
     it("filters commands by label match", () => {
       const result = filterCommands(navigationCommands, "traces");
       expect(result.length).toBeGreaterThan(0);
-      expect(result.some((cmd) => cmd.id === "nav-traces")).toBe(true);
+      expect(result.some((cmd) => cmd.id === "nav-traces-v2")).toBe(true);
     });
 
     it("filters commands by keyword match", () => {
       const result = filterCommands(navigationCommands, "logs");
       expect(result.length).toBeGreaterThan(0);
-      expect(result.some((cmd) => cmd.id === "nav-traces")).toBe(true);
+      expect(result.some((cmd) => cmd.id === "nav-traces-v2")).toBe(true);
     });
 
     it("filters commands by description match", () => {
@@ -41,7 +41,7 @@ describe("command-registry", () => {
 
     it("is case-insensitive", () => {
       const result = filterCommands(navigationCommands, "TRACES");
-      expect(result.some((cmd) => cmd.id === "nav-traces")).toBe(true);
+      expect(result.some((cmd) => cmd.id === "nav-traces-v2")).toBe(true);
     });
 
     it("returns empty array when no matches", () => {

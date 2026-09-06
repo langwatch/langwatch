@@ -1,14 +1,34 @@
 import { create } from "zustand";
 
 /**
- * Closed set of section ids that header chips can deep-link into. Kept
- * narrow on purpose — adding a new section here is intentional and the
- * extra typing makes typos surface at the call site instead of silently
- * triggering a no-op at runtime when `TraceSummaryAccordions` fails to
- * find a matching `data-section` element.
+ * Closed set of section ids that header chips and comment anchors can deep-link
+ * into. Kept closed on purpose — adding a new section here is intentional and
+ * the extra typing makes typos surface at the call site instead of silently
+ * triggering a no-op at runtime when the accordion stack fails to find a
+ * matching `data-section` element.
+ *
+ * Holds every section either stack renders, because a comment can be left on
+ * any part a reader can read and jumping to it has to land on the section
+ * holding that part.
  */
-const FOCUS_SECTIONS = ["evals", "events", "exceptions"] as const;
+const FOCUS_SECTIONS = [
+  "attributes",
+  "evals",
+  "events",
+  "exceptions",
+  "io",
+  "logs",
+  "other",
+  "prompt",
+  "prompts",
+  "scope",
+] as const;
 export type FocusSection = (typeof FOCUS_SECTIONS)[number];
+
+/** Whether a section id is one this build can focus. */
+export function isFocusSection(value: string): value is FocusSection {
+  return (FOCUS_SECTIONS as readonly string[]).includes(value);
+}
 
 interface PendingFocus {
   /** Trace this focus request applies to — observers ignore other traces. */

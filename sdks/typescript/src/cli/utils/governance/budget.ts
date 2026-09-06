@@ -87,7 +87,10 @@ const PERIOD_LABEL: Record<string, string> = {
   total: "total",
 };
 
-export function renderBudgetExceeded(e: BudgetExceededPayload): string {
+export function renderBudgetExceeded(
+  e: BudgetExceededPayload,
+  { fallbackUrl }: { fallbackUrl?: string } = {},
+): string {
   const period = (e.period || "month").toLowerCase();
   const periodLabel = PERIOD_LABEL[period] ?? period;
   const lines: string[] = [];
@@ -100,7 +103,15 @@ export function renderBudgetExceeded(e: BudgetExceededPayload): string {
     lines.push(`   Admin: ${e.admin_email}`);
     lines.push("");
   }
-  lines.push("   Need urgent access? Run:");
-  lines.push("     langwatch request-increase");
+  // The gateway-signed URL carries the scope/limit/spent params so the
+  // request form arrives pre-filled; the static page is the fallback.
+  // An empty payload URL falls back too, so `??` would be wrong here.
+  const signedUrl = e.request_increase_url?.trim();
+  let requestUrl = fallbackUrl;
+  if (signedUrl !== undefined && signedUrl !== "") requestUrl = signedUrl;
+  if (requestUrl) {
+    lines.push("   Need urgent access? Request an increase:");
+    lines.push(`     ${requestUrl}`);
+  }
   return lines.join("\n") + "\n";
 }

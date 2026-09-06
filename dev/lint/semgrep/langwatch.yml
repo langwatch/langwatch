@@ -13,10 +13,13 @@ rules:
   # to a follow-up if AC6 shows the shape mismatters).
   - id: pii-in-logger-call
     message: >
-      Logger call references PII fields (email, phone, name, ip, userId,
-      apiKey, token, etc.) without redaction. Wrap with `redact(...)` or
+      Logger call references PII fields (email, phone, name, ip, apiKey,
+      token, etc.) without redaction. Wrap with `redact(...)` or
       `hashEmail(...)`, or pass the minimal non-identifying fields needed
       for debugging. See #3754 AC2.
+
+      Note: userId, organizationId and projectId are deliberately NOT
+      flagged — see dev/docs/best_practices/logging-and-tracing.md.
     severity: WARNING
     languages: [typescript, javascript]
     paths:
@@ -35,13 +38,19 @@ rules:
           # Literal PII keys anywhere in an object argument. Semgrep ellipsis is
           # `...` (the bare token); `$...` is NOT valid semgrep and fails to
           # parse — see #3754 (semgrep --validate is now a CI gate).
+          # userId / organizationId / projectId are deliberately absent from
+          # this list and must not be added back. They are opaque internal
+          # identifiers, logged raw on purpose: they are what makes a log line
+          # attributable and what lets an incident be filtered to one tenant.
+          # Redacting them costs that and protects nothing, because the
+          # identifier was never the sensitive part. See the "Identifiers Are
+          # Logged Raw, On Purpose" section of
+          # dev/docs/best_practices/logging-and-tracing.md.
           - pattern: 'logger.$LEVEL(..., { ..., email: $E, ... }, ...)'
           - pattern: 'logger.$LEVEL(..., { ..., phone: $P, ... }, ...)'
-          - pattern: 'logger.$LEVEL(..., { ..., userId: $U, ... }, ...)'
           - pattern: 'logger.$LEVEL(..., { ..., apiKey: $K, ... }, ...)'
           - pattern: 'logger.$LEVEL(..., { ..., token: $T, ... }, ...)'
           - pattern: 'console.$LEVEL(..., { ..., email: $E, ... }, ...)'
-          - pattern: 'console.$LEVEL(..., { ..., userId: $U, ... }, ...)'
           - pattern: 'console.$LEVEL(..., { ..., apiKey: $K, ... }, ...)'
           - pattern: 'console.$LEVEL(..., { ..., token: $T, ... }, ...)'
           # Spread of a user/session/account object.

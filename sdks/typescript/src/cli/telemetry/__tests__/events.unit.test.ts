@@ -48,7 +48,6 @@ import {
   areEventsEnabled,
   createCommandEvents,
   redactSecrets,
-  resolveLogsEndpoint,
   resolveTransport,
 } from "../events";
 import {
@@ -579,33 +578,6 @@ describe("redactSecrets()", () => {
   describe("given a very long message", () => {
     it("truncates it so a stack trace cannot ride along", () => {
       expect(redactSecrets("x".repeat(5_000), {}).length).toBeLessThanOrEqual(500);
-    });
-  });
-});
-
-describe("resolveLogsEndpoint()", () => {
-  describe("given the signal-specific endpoint is set", () => {
-    it("uses it verbatim", () => {
-      expect(
-        resolveLogsEndpoint({
-          OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://collector:4318/custom/logs",
-          OTEL_EXPORTER_OTLP_ENDPOINT: "http://ignored:4318",
-        }),
-      ).toBe("http://collector:4318/custom/logs");
-    });
-  });
-
-  describe("given only the generic endpoint is set", () => {
-    it("hangs the logs path off it", () => {
-      expect(
-        resolveLogsEndpoint({ OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318/" }),
-      ).toBe("http://collector:4318/v1/logs");
-    });
-  });
-
-  describe("given no endpoint is set", () => {
-    it("reports that there is nowhere to send events", () => {
-      expect(resolveLogsEndpoint({})).toBeNull();
     });
   });
 });

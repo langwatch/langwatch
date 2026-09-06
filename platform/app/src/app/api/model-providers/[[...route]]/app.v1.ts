@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

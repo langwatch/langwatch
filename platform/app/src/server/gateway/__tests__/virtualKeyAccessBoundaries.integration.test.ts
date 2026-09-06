@@ -31,7 +31,7 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
-import { resolveTraceProject } from "../scopeResolver";
+import { traceProjectFor } from "../scopeResolver";
 
 const suffix = nanoid(8)
   .toLowerCase()
@@ -192,7 +192,7 @@ describe("virtual key access boundaries (real PG)", () => {
       expect(row.scopes.map((s) => s.scopeType)).toEqual(["TEAM"]);
 
       // Traces still land exactly where the creator chose.
-      const resolved = await resolveTraceProject(prisma, row);
+      const resolved = await traceProjectFor(prisma, row.traceProjectId);
       expect(resolved?.id).toBe(PROJECT_TRACE_ID);
     });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { REQUEST_CAUSE_FIELD } from "../constants";
 import {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
@@ -145,6 +146,61 @@ describe("requestLogging", () => {
       });
     });
 
+    describe("when the response is a server error but no cause reached the logger", () => {
+      const uncaused = () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/otel/v1/traces",
+          statusCode: 500,
+          duration: 100,
+          userAgent: null,
+          // A route that RETURNS a 500 rather than throwing leaves the
+          // middleware nothing to attach.
+        });
+        return logger;
+      };
+
+      /** @scenario A server error with no cause attached says so */
+      it("does not claim the request was handled", () => {
+        expect(uncaused().error.mock.calls[0][1]).not.toBe("request handled");
+      });
+
+      /** @scenario A server error with no cause attached says so */
+      it("states that no cause was attached", () => {
+        const [data, message] = uncaused().error.mock.calls[0];
+        expect(message).toMatch(/without a cause/i);
+        expect(data.errorType).toBe("UncausedServerError");
+      });
+
+      /** @scenario A server error with no cause attached says so */
+      it("is still logged at error level with its status", () => {
+        const logger = uncaused();
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        expect(logger.warn).not.toHaveBeenCalled();
+        expect(logger.error.mock.calls[0][0]).toMatchObject({
+          statusCode: 500,
+        });
+      });
+
+    });
+
+    describe("when the response succeeds", () => {
+      /** @scenario A successful request is still reported as handled */
+      it("still reports the request as handled", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/ok",
+          statusCode: 200,
+          duration: 1,
+          userAgent: null,
+        });
+        expect(logger.info.mock.calls[0][1]).toBe("request handled");
+        expect(logger.info.mock.calls[0][0]).not.toHaveProperty("errorType");
+      });
+    });
+
     describe("when the error is a handled error", () => {
       const handled = (fault: string, httpStatus: number) =>
         Object.assign(new Error("handled"), {
@@ -153,6 +209,7 @@ describe("requestLogging", () => {
           fault,
         });
 
+      /** @scenario A handled customer failure is logged below error */
       it("logs customer-fault at warn even for 5xx, with code and fault in the data", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
@@ -176,6 +233,7 @@ describe("requestLogging", () => {
         expect(logger.error).not.toHaveBeenCalled();
       });
 
+      /** @scenario A platform fault is logged at error */
       it("logs platform-fault at error", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
@@ -192,6 +250,89 @@ describe("requestLogging", () => {
           expect.objectContaining({ handledErrorFault: "platform" }),
           "error handling request",
         );
+      });
+    });
+
+    /**
+     * A record we chose to log at warn should not carry a key that claims it
+     * failed. The level we meant is on `severity_text`; the payload must not
+     * argue with it.
+     */
+    describe("when the record is logged below error level", () => {
+      const handledCustomer = Object.assign(new Error("over quota"), {
+        name: "PlanLimitExceededError",
+        code: "ERR_PLAN_LIMIT",
+        httpStatus: 402,
+        fault: "customer",
+      });
+
+      function warnData() {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/otel/v1/traces",
+          statusCode: 402,
+          duration: 5,
+          userAgent: null,
+          error: handledCustomer,
+        });
+        return logger.warn.mock.calls[0][0];
+      }
+
+      /** @scenario A record below error level does not carry a field named error */
+      it("does not attach the cause under a field named error", () => {
+        expect(warnData()).not.toHaveProperty("error");
+      });
+
+      it("still carries the cause for diagnosis", () => {
+        expect(warnData()[REQUEST_CAUSE_FIELD]).toBe(handledCustomer);
+      });
+
+      /** @scenario The error type stays groupable after the cause is re-keyed */
+      it("keeps the error type groupable after the move", () => {
+        expect(warnData().errorType).toBe("PlanLimitExceededError");
+      });
+
+      it("keeps the handled attribution", () => {
+        expect(warnData()).toMatchObject({
+          handledErrorCode: "ERR_PLAN_LIMIT",
+          handledErrorFault: "customer",
+        });
+      });
+
+      it("applies to info-level records too", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/missing",
+          statusCode: 404,
+          duration: 1,
+          userAgent: null,
+          error: Object.assign(new Error("nope"), { status: 404 }),
+        });
+
+        expect(logger.info.mock.calls[0][0]).not.toHaveProperty("error");
+      });
+    });
+
+    describe("when the record is logged at error level", () => {
+      /** @scenario A record at error level keeps its cause on the error field */
+      it("keeps the cause under error so 5xx dashboards are unchanged", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        const boom = new Error("boom");
+
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/fail",
+          statusCode: 500,
+          duration: 100,
+          userAgent: null,
+          error: boom,
+        });
+
+        const logData = logger.error.mock.calls[0][0];
+        expect(logData.error).toBe(boom);
+        expect(logData).not.toHaveProperty(REQUEST_CAUSE_FIELD);
       });
     });
   });

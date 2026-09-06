@@ -5,18 +5,36 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 
 import { useWorkspaceData } from "../useWorkspaceData";
-
 import type { WorkspaceSwitcherProps } from "../WorkspaceSwitcher";
+import type { BudgetOverviewItemView } from "./BudgetOverviewList";
 
 export type PersonalSummary = {
   /** Theoretical (list-price) total, including bundled / non-billed usage. */
   spentThisMonthUsd: number;
   /** Portion actually billed per token; the bundled part is spent - billed. */
   billedThisMonthUsd: number;
-  budgetUsd: number | null;
   requestsThisMonth: number;
   requestsDeltaPctVsLastMonth: number | null;
   mostUsedModel: { name: string; usagePct: number } | null;
+};
+
+/**
+ * Mirror of `api.user.budgetOverview`: every budget that binds the
+ * user's own keys, most binding first, each labelled with its scope.
+ * `gatewayAccess: false` means the org gives this user no member-facing
+ * gateway path at all, so budget UI renders nothing (not an empty state).
+ */
+export type PersonalBudgetOverview = {
+  gatewayAccess: boolean;
+  budgets: BudgetOverviewItemView[];
+  /**
+   * True once the server has answered at least once. An empty `budgets`
+   * only means "no budget binds you" while this holds; before it, the
+   * list is empty because nothing has come back yet and a surface must
+   * not say so. A later refetch that fails leaves the last answer
+   * standing rather than blanking a card the member is reading.
+   */
+  isResolved: boolean;
 };
 
 export type PersonalApiKeyRow = {
@@ -63,11 +81,22 @@ export type PersonalContext = {
   switcher: WorkspaceSwitcherProps;
   summary: PersonalSummary;
   budget: PersonalBudgetState;
+  budgetOverview: PersonalBudgetOverview;
   spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
   spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
+  /**
+   * Whether the read behind `personalProjectId` has answered.
+   *
+   * `ready` is about the session and the organization, and the personal
+   * context is only asked for once those land, so there is a window where
+   * `ready` is true and the project is still unknown. A surface that says
+   * something about the workspace when there is no project has to tell that
+   * window apart from a genuine absence, or it states a fact it does not have.
+   */
+  isPersonalProjectResolved: boolean;
   apiKeys: PersonalApiKeyRow[];
 };
 
@@ -76,7 +105,7 @@ export type PersonalContext = {
  * + API-key list from real tRPC. Cost / spend-over-time / by-tool /
  * recent-activity are still mocked because the per-user ClickHouse
  * aggregations aren't shipped yet — they will plug in here once the
- * trace-fold reactor learns to project per-user totals.
+ * trace-fold subscriber learns to project per-user totals.
  *
  * Spec: specs/ai-gateway/governance/personal-keys.feature
  *       specs/ai-gateway/governance/my-usage-dashboard.feature
@@ -110,6 +139,11 @@ export function usePersonalContext(): PersonalContext {
 
   const personalBudgetQuery = api.user.personalBudget.useQuery(
     { organizationId: orgId },
+    { enabled: !!organization, refetchOnWindowFocus: false },
+  );
+
+  const budgetOverviewQuery = api.user.budgetOverview.useQuery(
+    { organizationId: orgId, includeTopModels: true },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
@@ -163,6 +197,21 @@ export function usePersonalContext(): PersonalContext {
     [switcherData, orgId],
   );
 
+  // Before the first answer, gatewayAccess true + empty budgets keeps
+  // every budget surface blank rather than flashing a "no access" state.
+  // `isResolved` is what separates that from a member who genuinely has
+  // no budget, so the empty-state copy cannot claim "no budgets apply"
+  // about a request that never came back.
+  const budgetOverview = useMemo<PersonalBudgetOverview>(() => {
+    const raw = budgetOverviewQuery.data;
+    if (!raw) return { gatewayAccess: true, budgets: [], isResolved: false };
+    return {
+      gatewayAccess: raw.gatewayAccess,
+      budgets: raw.gatewayAccess ? raw.budgets : [],
+      isResolved: true,
+    };
+  }, [budgetOverviewQuery.data]);
+
   return {
     ready: !!session && !!organization,
     email: userEmail,
@@ -178,16 +227,13 @@ export function usePersonalContext(): PersonalContext {
     summary: {
       spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
       billedThisMonthUsd: personalUsageQuery.data?.summary.billedUsd ?? 0,
-      // Always-on chip data: `limitUsd` flows through whenever the user
-      // has any applicable budget, regardless of `status`. Banner-only
-      // surfaces (BudgetExceededBanner) still gate on `budget.status`.
-      budgetUsd: "limitUsd" in budget ? budget.limitUsd : null,
       requestsThisMonth: personalUsageQuery.data?.summary.requests ?? 0,
       // Month-over-month delta requires a second window query; defer.
       requestsDeltaPctVsLastMonth: null,
       mostUsedModel: personalUsageQuery.data?.summary.mostUsedModel ?? null,
     },
     budget,
+    budgetOverview,
     spendByDay:
       personalUsageQuery.data?.dailyBuckets.map((bucket) => ({
         day: bucket.day,
@@ -204,6 +250,7 @@ export function usePersonalContext(): PersonalContext {
         usd: row.spentUsd,
         billedUsd: row.billedUsd,
       })) ?? [],
+    isPersonalProjectResolved: personalContextQuery.isSuccess,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,

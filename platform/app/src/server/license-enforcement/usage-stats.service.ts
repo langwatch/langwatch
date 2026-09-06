@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";

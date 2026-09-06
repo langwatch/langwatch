@@ -4,9 +4,9 @@
 # the key's name and links to that key on the API keys settings page.
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/ApiKeyAttribute.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx
-#   langwatch/src/pages/settings/api-keys/apiKeyAnchor.ts
+#   platform/app/src/features/traces-v2/components/TraceDrawer/ApiKeyAttribute.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx
+#   platform/app/src/pages/settings/api-keys/apiKeyAnchor.ts
 
 Feature: Ingest API key attribute in the trace drawer
   As a user inspecting a trace

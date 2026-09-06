@@ -56,20 +56,23 @@ One name per command, one meaning per flag, no aliases (ADR-064). The daily
 surface is six verbs; `db` and `clean` are the only destructive nouns.
 
 ```text
-haven            the hub: every stack + actions on the selected one (agents/pipes
-                 get the plain status report)
+haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
+                 the daemon's reaping — with actions on the selected row
+                 (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
                  sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
-                 app + nlp + gateway, langy off. -w watches the Go services via
+                 app + nlp + gateway + idp, langy off. -w watches the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
+haven idp        run ONLY the IdP simulator — no app, API or databases — routed
+                 at idp.langwatch.localhost; --tenants <n> sizes the range
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
                  --since 10m windows, --level warn filters severity,
@@ -89,6 +92,11 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Postgres/ClickHouse/Redis containers, own play-<n> hostname.
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
+                 --seed <preset> seeds it from the same registry `db seed`
+                 reads, so it can open on data rather than the onboarding
+                 screen: demo, traces and mass load data, onboarding and
+                 post-onboarding move the onboarding flag, bare is the
+                 identity alone
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
@@ -98,6 +106,11 @@ haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
 haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven slot       run any command under the machine-wide check slot:
+                 `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
+                 runs with stdio passed through, releases; `slot explain`
+                 prints the resolved limit. check-queue.mjs delegates every
+                 whole-repo check here when haven is installed
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
@@ -108,6 +121,11 @@ worktree (`.haven.json`), shown by `status`, remembered across terminals and
 reboots. A running stack reconciles: matching selection is a no-op, a changed
 one replaces the stack in place. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
+idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
+SAML + SCIM tenants with DNS/HTTP domain verification, routed at
+`idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
+want it says `haven up -idp` once. `haven idp` runs the simulator alone —
+no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
 running stack: portless install + CA trust, `pnpm install` when the lockfile
@@ -121,15 +139,36 @@ ever dropped silently.
 **Logs.** The supervisor captures every service's output to per-service,
 size-capped files whether the stack runs attached or detached — so `haven
 logs` works from any terminal, filters by plain argument, and still reads
-after a crash or a `down`.
+after a crash or a `down`. Capture is built to keep going: a line longer than
+1 MiB (the api lane prints its errors as one-line JSON, so a stack dump is one
+line) is split across captured lines instead of ending the read, the pipe is
+drained to EOF before the child is reaped so nothing buffered is lost, and a
+log file that cannot be written or rotated is retried a few seconds later
+rather than dropped for the life of the process. A rotation that cannot happen
+degrades to appending past the cap, never to silence.
 
-**The hub.** Bare `haven` opens the interactive fleet view:
-every stack with its liveness, branch, service health, and RAM footprint.
-Actions run on the selected stack — enter/`g` opens its git view (and returns
-to the hub on quit), `d` shuts it down keeping its databases, and `x` destroys
-the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
-directory deleted, confirmed by typing the stack's name. The primary checkout
-and the worktree haven runs from can never be destroyed.
+**The hub.** Bare `haven` opens the interactive machine view. The header is
+the machine's real memory picture from one process listing, every process
+attributed once: each stack charged its whole process **tree** (supervised
+children lead their own process groups, so a group sum sees only the ~20MB
+launcher), the shared servers (ClickHouse, Postgres, Redis, the container VM),
+the coding agents and dev tooling beside them, and everything that is not dev
+work as its own colour in the chart — with the daemon's pressure level when it
+is not green. Below it, every stack (liveness, branch, service health, RAM);
+idle worktrees stay collapsed behind `t` while stacks run and show by default
+otherwise. Actions run on the selected row — enter/`g` opens its git view (and
+returns to the hub on quit), `o` opens the stack's app, `r` restarts it, `d`
+shuts it down keeping its databases, and `x` destroys the worktree entirely:
+stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
+confirmed by typing the name. The primary checkout and the worktree haven runs
+from can never be destroyed. One-key handoffs: `c` opens the interactive
+cleanup picker and returns, `w` opens the machine's web dashboard, and `m`
+toggles the monitor panel — the shared servers' footprints plus the daemon's
+recent reaping (stacks, test containers, governed processes, idle databases),
+newest first, from the persisted event record. The web dashboard
+(`langwatch.localhost`) shows the same machine: the memory chart, the stack
+cards (their own services only — the shared servers are stated once), the idle
+worktrees, and the reaping feed.
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
@@ -165,6 +204,16 @@ play for an explicit default-no confirmation, and in agent mode only
 `--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
 record and finishes the teardown.
 
+A sandbox's databases start empty, so the PR opens on the onboarding screen —
+the wrong place to be standing if the change is about anything afterwards.
+`haven play 4913 --seed demo` takes the same presets as `haven db seed` (one
+registry, no play-only variants) and applies them where each belongs: the
+preset's switches go to the sandbox's own seed, and any data that has to travel
+through the collector is ingested once the sandbox's app answers, in a lane
+beside the services. A failed ingest never takes the sandbox down — it names
+the step and the command that retries it, since a PR that broke the collector
+is exactly the PR you want to keep watching.
+
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current
 worktree; pass a stack slug, worktree name, or path to open another. Inside the
@@ -182,7 +231,11 @@ fall back to when a worktree doesn't need its own data.
 
 **Agent mode.** `--agent` (or `HAVEN_AGENT=1`, `NO_COLOR`, or a non-TTY stdout)
 switches to plain, colourless, redraw-free output — zero token waste when an AI
-agent drives haven. `haven status --json` is the machine-readable inventory.
+agent drives haven. `haven status --json` is the machine-readable inventory:
+`stacks` is always a list (`[]` when nothing is registered, never `null`), each
+stack carries `live` (its launcher process is running), and each service carries
+`listening` (something accepts connections on the port its hostname routes to).
+A listed stack is a registered stack, which is not the same as a running one.
 
 ## Design
 
@@ -201,6 +254,19 @@ A single **daemon** (auto-spawned by the first `haven up`) hosts the dashboard +
 telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
 registry/*.json`), and **reaps** stacks whose launcher has exited or whose
 heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
+
+**A dead stack deregisters, it never respawns.** Every 10s the daemon compares
+each registered stack against its launcher process. When the launcher is gone
+(an out-of-memory kill from the OS, a closed terminal, a crashed `pnpm dev`) it
+removes every hostname the stack could own (the four per-worktree services, any
+service the stack recorded, and the `clickhouse` + `postgres` aliases) and then
+drops the registry entry. The hostname then gets portless's own "no route"
+answer. Leaving the route up is the failure this closes: the kernel reissues the
+loopback port to the next process that asks, and the hostname starts serving an
+unrelated worktree's dev server, which answers HTML 404s to `/api/*` and reads
+like an auth or routing bug rather than a dead stack. haven does not restart
+what it did not start; `haven up` is the recovery, and it deregisters the dead
+entry's routes before it provisions.
 
 The resolved config lands in `platform/app/.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`
@@ -224,7 +290,43 @@ registry, and dashboard stay the same.
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
   prints this stack's URL, `haven db reset` gives it a fresh database, and the
   daemon prunes databases whose worktree hasn't been up for `HAVEN_DB_TTL`
-  (default 14 days).
+  (default 4 days). `LANGWATCH_HAVEN_CH_STOP_IDLE=1` additionally stops the
+  server once no stack is running (opt-in: native-mode tests and
+  `haven db url clickhouse` reach it with no stack up) — the next `up`
+  restarts it over the same data in seconds.
+- **The TypeScript compiler can never take the machine down.** The daemon
+  watches every compiler process on the machine — `tsc` (typescript@7) and
+  `tsgo` (the preview package) alike, as one class against one budget, however
+  it was spawned — and reclaims runaways: a
+  whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
+  server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
+  `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
+  per-run ceiling) — the youngest run
+  until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
+  spawns — half the machine, clamped to `[3, 6]` GiB — so the common case
+  degrades to "slower" rather than expanding into whatever room the machine
+  happens to have (`dev/docs/adr/100-the-typecheck-memory-ceiling.md`). On a
+  machine already under memory pressure (ADR-090's levels) the queue goes
+  further: the derived slot limit narrows to one, `GOMEMLIMIT` drops to its
+  3 GiB floor and `GOMAXPROCS` is halved, so the check pays for the shortage
+  instead of everything else swapping. `CHECK_PRESSURE=green|amber|red`
+  forces the level; explicit `GOMEMLIMIT`/`GOMAXPROCS`/`CHECK_SLOTS` win. The
+  same watch observes gopls, biome, vitest workers, node, bun and claude
+  agents (never touched — observed only) and ships every class's footprint to
+  the local Grafana as `haven_proc_*` metrics. See
+  `dev/docs/adr/095-haven-tsgo-governor.md`.
+- **Leaked test containers are reaped.** An interrupted integration-test run
+  leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
+  VM forever — the library's own reaper (Ryuk) dies with the run, and reused
+  containers are skipped by it entirely. The daemon removes
+  Testcontainers-labelled containers: terminally stopped ones (exited or dead)
+  older than `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep),
+  every other state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  (default 2h) since a running (or paused, or mid-restart) container may still
+  be serving a live run whatever its age. Ryuk itself is never touched, and the
+  sweep never boots the VM just to clean it. See
+  `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
@@ -268,7 +370,7 @@ registry, and dashboard stay the same.
   `--yes` skips the picker and applies only the safe categories. Agents (and
   any non-TTY) get the read-only report and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU). The
+  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
   `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
   `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
   spawns and stays the only thing counting it.

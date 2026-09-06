@@ -16,8 +16,11 @@ import {
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
+  LuShare2,
   LuX,
 } from "react-icons/lu";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
   MenuContent,
@@ -52,12 +55,15 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { guardTraceEditExit } from "../../../utils/traceEditMode";
+import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { EditedOriginalToggle } from "../editMode/EditedOriginalToggle";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
@@ -127,7 +133,6 @@ function TraceIdChip({ traceId }: { traceId: string }) {
           description: traceId,
           type: "success",
           duration: 2500,
-          meta: { closable: true },
         });
         return;
       }
@@ -139,7 +144,6 @@ function TraceIdChip({ traceId }: { traceId: string }) {
           "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
         type: "error",
         duration: 6000,
-        meta: { closable: true },
       });
     }
   };
@@ -473,6 +477,19 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
   { key: "langwatch.labels", label: "Labels", category: "tag" },
 ];
 
+/**
+ * Metadata keys the auto-pin sweep leaves alone, because the metrics row one
+ * line above already states them: the Model / Models pill is built from
+ * `trace.models` and folds the rest behind a "+N" with the full list on hover.
+ * `metadata.models` also arrives as a raw JSON array, which reads worse than
+ * the pill it duplicates. A key the reviewer pins explicitly is still theirs
+ * and still renders, because the user-pin check runs first.
+ */
+const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set([
+  "metadata.model",
+  "metadata.models",
+]);
+
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
   onClose,
@@ -486,6 +503,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
@@ -509,7 +527,11 @@ export const DrawerHeader = memo(function DrawerHeader({
     useTraceDrawerNavigation();
 
   const statusColor = STATUS_COLORS[trace.status] as string;
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  // Sharing a trace is how a reviewer hands it to someone without an account,
+  // which is frequent enough that it earns a button rather than a click into
+  // the overflow menu. Gated on the same permission the menu item used.
+  const canShare = hasPermission("traces:share");
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,
@@ -683,10 +705,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: def.category,
         onFilter: filterField
-          ? () => {
-              toggleFacet(filterField, value);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                toggleFacet(filterField, value);
+                closeDrawer();
+              })
           : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -710,6 +733,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     for (const [key, rawValue] of Object.entries(trace.attributes)) {
       if (!key.startsWith("metadata.")) continue;
       if (userKeys.has(`attribute:${key}`)) continue;
+      if (AUTO_PIN_SUPPRESSED_METADATA_KEYS.has(key)) continue;
       if (seenMetadataKeys.has(key)) continue;
       seenMetadataKeys.add(key);
       const value = formatPinValue({ key, value: rawValue ?? null });
@@ -732,10 +756,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: "custom",
         onFilter: filterQuery
-          ? () => {
-              applyQueryTextFromPin(filterQuery);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                applyQueryTextFromPin(filterQuery);
+                closeDrawer();
+              })
           : undefined,
       });
     }
@@ -758,10 +783,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         category: "custom",
         onFilter:
           filterField && value
-            ? () => {
-                toggleFacet(filterField, value);
-                closeDrawer();
-              }
+            ? () =>
+                guardTraceEditExit(() => {
+                  toggleFacet(filterField, value);
+                  closeDrawer();
+                })
             : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -786,6 +812,14 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const [rawOpen, setRawOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [annotationQueueOpen, setAnnotationQueueOpen] = useState(false);
+  const annotationGate = usePersonalFeatureGate("annotations");
+
+  const handleAddToAnnotationQueue = useCallback(async () => {
+    const allowed = await annotationGate.requestEnable();
+    if (!allowed) return;
+    setAnnotationQueueOpen(true);
+  }, [annotationGate]);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -828,8 +862,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   }, [trace.serviceName, trace.status, trace.traceName]);
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
-    applyQueryText(findSimilarQuery);
-    closeDrawer();
+    guardTraceEditExit(() => {
+      applyQueryText(findSimilarQuery);
+      closeDrawer();
+    });
   }, [applyQueryText, closeDrawer, findSimilarQuery]);
 
   const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(
@@ -1004,6 +1040,18 @@ export const DrawerHeader = memo(function DrawerHeader({
             queries. */}
         {!readOnly && (
           <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+            {canShare && (
+              <Tooltip content="Share" positioning={{ placement: "bottom" }}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setShareOpen(true)}
+                  aria-label="Share trace"
+                >
+                  <Icon as={LuShare2} boxSize={3.5} />
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip
               content={
                 <HStack gap={1}>
@@ -1066,9 +1114,10 @@ export const DrawerHeader = memo(function DrawerHeader({
               dejaViewHref={dejaView.href ?? null}
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
-              onShare={() => setShareOpen(true)}
+              onAddToAnnotationQueue={handleAddToAnnotationQueue}
               pinned={pinned}
               onTogglePinned={togglePinned}
+              readOnly={readOnly}
             />
             <Box
               width="1px"
@@ -1293,8 +1342,13 @@ export const DrawerHeader = memo(function DrawerHeader({
               origin: trace.origin,
             })
           }
+          isEditing={isEditing}
           endSlot={
             <HStack gap={2}>
+              {/* Switching between the corrected and the captured trace, and
+                  the full difference between them. Renders nothing until the
+                  trace actually has a correction. */}
+              {!readOnly && <EditedOriginalToggle />}
               {/* Presence avatars sit at the trailing edge of the mode-tab
                   row — out of the way of the title and not crowding the
                   action cluster. Copy trace ID lives in the overflow
@@ -1341,12 +1395,20 @@ export const DrawerHeader = memo(function DrawerHeader({
         trace={trace}
       />
       {!readOnly && (
-        <ShareTraceDialog
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          projectId={project?.id}
-          traceId={trace.traceId}
-        />
+        <>
+          <ShareTraceDialog
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            projectId={project?.id}
+            traceId={trace.traceId}
+          />
+          <AddToAnnotationQueueDialog
+            open={annotationQueueOpen}
+            onClose={() => setAnnotationQueueOpen(false)}
+            traceIds={[trace.traceId]}
+          />
+          <PersonalFeatureGateDialog state={annotationGate.dialogState} />
+        </>
       )}
     </VStack>
   );

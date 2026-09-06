@@ -6,7 +6,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -18,12 +18,20 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
@@ -127,6 +135,14 @@ describe("enterprise feature guards", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
+      // organization.updateMemberRole delegates its orchestration to
+      // getApp().organizations, which needs the Prisma-backed repository:
+      // createTestApp's default organizations service sits on the null
+      // repository and refuses those operations.
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        new PromptTagRepository(prisma),
+      ),
     });
   });
 
@@ -150,6 +166,7 @@ describe("enterprise feature guards", () => {
       ["organizationUser", { organizationId }],
       ["organization", { id: organizationId }],
       ["user", { email: `test-${testNamespace}@example.com` }],
+      ["user", { email: `test-2-${testNamespace}@example.com` }],
     ]);
   });
 
@@ -616,9 +633,41 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
+        // Demote a second admin rather than the caller: the caller is the
+        // team's only admin, and demoting yourself as last admin is refused
+        // (cannot_remove_self_as_last_admin), which is not the plan gate
+        // this test pins.
+        const target = await prisma.user.create({
+          data: {
+            name: "Second Team Admin",
+            email: `test-2-${testNamespace}@example.com`,
+          },
+        });
+        await prisma.organizationUser.create({
+          data: {
+            userId: target.id,
+            organizationId,
+            role: OrganizationUserRole.MEMBER,
+          },
+        });
+        await prisma.teamUser.create({
+          data: { userId: target.id, teamId, role: TeamUserRole.ADMIN },
+        });
+        // The role update reads and rewrites TEAM-scoped role bindings, so
+        // membership has to exist there too, not only in TeamUser.
+        await prisma.roleBinding.create({
+          data: {
+            organizationId,
+            userId: target.id,
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        });
+
         const result = await caller.organization.updateTeamMemberRole({
           teamId,
-          userId,
+          userId: target.id,
           role: TeamUserRole.MEMBER,
         });
 
@@ -627,9 +676,15 @@ describe("enterprise feature guards", () => {
     });
   });
 
-  // --- createInviteRequest conditional guard ---
+  // --- invite-request surface, now served by createInvites ---
+  //
+  // `createInviteRequest` was consolidated into `createInvites`, which
+  // carries the same custom-role guard. The scenario is kept bound here
+  // because the behaviour it names still holds; only the procedure it goes
+  // through changed. AUDIT_MANIFEST.md already records the scenario itself
+  // as a duplicate of the createInvites pair above.
 
-  describe("organization.createInviteRequest", () => {
+  describe("organization.createInvites via the invite-request surface", () => {
     describe("when invites include custom role on non-enterprise plan", () => {
       /** @scenario Non-enterprise org cannot create invite requests with custom roles */
       it("rejects with FORBIDDEN", async () => {
@@ -637,7 +692,7 @@ describe("enterprise feature guards", () => {
         const caller = createCaller();
 
         await expect(
-          caller.organization.createInviteRequest({
+          caller.organization.createInvites({
             organizationId,
             invites: [
               {
@@ -665,7 +720,7 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        const result = await caller.organization.createInviteRequest({
+        const result = await caller.organization.createInvites({
           organizationId,
           invites: [
             {

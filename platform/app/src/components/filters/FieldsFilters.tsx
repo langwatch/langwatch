@@ -12,6 +12,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -547,7 +548,7 @@ function ListSelection({
     {
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       enabled: queryOpts.enabled,
     },
   );

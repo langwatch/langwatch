@@ -3,13 +3,13 @@ import type { ProcessRole } from "../../app-layer/config";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 import {
   type JobRegistryEntry,
   QueueManager,
 } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { MapProjectionDefinition } from "./mapProjection.types";
 import { ProjectionRouter } from "./projectionRouter";
@@ -33,13 +33,13 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     string,
     MapProjectionDefinition<any, EventType>
   >();
-  private readonly reactors = new Map<
+  private readonly subscribers = new Map<
     string,
-    { foldName: string; definition: ReactorDefinition<EventType> }
+    { foldName: string; definition: SubscriberDispatchDefinition<EventType> }
   >();
-  private readonly mapReactorEntries = new Map<
+  private readonly mapSubscriberEntries = new Map<
     string,
-    { mapName: string; definition: ReactorDefinition<EventType> }
+    { mapName: string; definition: SubscriberDispatchDefinition<EventType> }
   >();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
@@ -70,60 +70,63 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.mapProjections.set(projection.name, projection);
   }
 
-  registerReactor(
+  registerSubscriber(
     foldName: string,
-    reactor: ReactorDefinition<EventType>,
+    subscriber: SubscriberDispatchDefinition<EventType>,
   ): void {
     if (!this.foldProjections.has(foldName)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Cannot register reactor "${reactor.name}" on fold "${foldName}" — fold not registered`,
-        { foldName, reactorName: reactor.name },
+        `Cannot register subscriber "${subscriber.name}" on fold "${foldName}" — fold not registered`,
+        { foldName, subscriberName: subscriber.name },
       );
     }
-    if (this.reactors.has(reactor.name)) {
+    if (this.subscribers.has(subscriber.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Reactor "${reactor.name}" already registered`,
-        { reactorName: reactor.name },
+        `Subscriber "${subscriber.name}" already registered`,
+        { subscriberName: subscriber.name },
       );
     }
-    if (this.mapReactorEntries.has(reactor.name)) {
+    if (this.mapSubscriberEntries.has(subscriber.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Reactor "${reactor.name}" already registered`,
-        { reactorName: reactor.name },
+        `Subscriber "${subscriber.name}" already registered`,
+        { subscriberName: subscriber.name },
       );
     }
-    this.reactors.set(reactor.name, { foldName, definition: reactor });
+    this.subscribers.set(subscriber.name, { foldName, definition: subscriber });
   }
 
-  registerMapReactor(
+  registerMapSubscriber(
     mapName: string,
-    reactor: ReactorDefinition<EventType>,
+    subscriber: SubscriberDispatchDefinition<EventType>,
   ): void {
     if (!this.mapProjections.has(mapName)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Cannot register reactor "${reactor.name}" on map "${mapName}" — map not registered`,
-        { mapName, reactorName: reactor.name },
+        `Cannot register subscriber "${subscriber.name}" on map "${mapName}" — map not registered`,
+        { mapName, subscriberName: subscriber.name },
       );
     }
-    if (this.reactors.has(reactor.name)) {
+    if (this.subscribers.has(subscriber.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Map reactor "${reactor.name}" already registered`,
-        { reactorName: reactor.name },
+        `Map subscriber "${subscriber.name}" already registered`,
+        { subscriberName: subscriber.name },
       );
     }
-    if (this.mapReactorEntries.has(reactor.name)) {
+    if (this.mapSubscriberEntries.has(subscriber.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
-        `Map reactor "${reactor.name}" already registered`,
-        { reactorName: reactor.name },
+        `Map subscriber "${subscriber.name}" already registered`,
+        { subscriberName: subscriber.name },
       );
     }
-    this.mapReactorEntries.set(reactor.name, { mapName, definition: reactor });
+    this.mapSubscriberEntries.set(subscriber.name, {
+      mapName,
+      definition: subscriber,
+    });
   }
 
   /**
@@ -166,12 +169,12 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       this.router.registerMapProjection(mapProj);
     }
 
-    for (const { foldName, definition } of this.reactors.values()) {
-      this.router.registerReactor(foldName, definition);
+    for (const { foldName, definition } of this.subscribers.values()) {
+      this.router.registerSubscriber(foldName, definition);
     }
 
-    for (const { mapName, definition } of this.mapReactorEntries.values()) {
-      this.router.registerMapReactor(mapName, definition);
+    for (const { mapName, definition } of this.mapSubscriberEntries.values()) {
+      this.router.registerMapSubscriber(mapName, definition);
     }
 
     if (this.foldProjections.size > 0) {
@@ -182,8 +185,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       this.router.initializeMapQueues();
     }
 
-    if (this.reactors.size > 0 || this.mapReactorEntries.size > 0) {
-      this.router.initializeReactorQueues();
+    if (this.subscribers.size > 0 || this.mapSubscriberEntries.size > 0) {
+      this.router.initializeProjectionSubscriberQueues();
     }
   }
 
@@ -195,8 +198,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     return (
       this.foldProjections.size > 0 ||
       this.mapProjections.size > 0 ||
-      this.reactors.size > 0 ||
-      this.mapReactorEntries.size > 0
+      this.subscribers.size > 0 ||
+      this.mapSubscriberEntries.size > 0
     );
   }
 
@@ -211,14 +214,29 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       return;
     }
     if (!this.router) {
-      this.logger.warn(
-        "ProjectionRegistry.dispatch called before initialize(). Events will be dropped.",
+      // Error, not warning: nothing is thrown and nothing retries, so this is
+      // the last layer that can report the loss. The router is absent either
+      // before initialize() or after close() — in prod it is overwhelmingly
+      // the latter, dispatches still in flight when SIGTERM lands. Naming only
+      // the first case sent five days of shutdown drops looking for a boot
+      // race. See specs/observability/retryable-failure-log-level.feature.
+      this.logger.error(
+        { eventCount: events.length },
+        "ProjectionRegistry has no router (not initialized, or already closed); events dropped",
       );
       return;
     }
     await this.router.dispatch(events, context);
   }
 
+  /**
+   * Release the router, after which any further dispatch drops its events.
+   *
+   * That makes the ORDER this is called in load-bearing: it must come after the
+   * queue that feeds it has stopped, or jobs still draining will dispatch into
+   * a closed registry. See `EventSourcing.close()` and
+   * `specs/event-sourcing/worker-graceful-shutdown.feature`.
+   */
   async close(): Promise<void> {
     await this.queueManager?.close();
     this.queueManager = undefined;

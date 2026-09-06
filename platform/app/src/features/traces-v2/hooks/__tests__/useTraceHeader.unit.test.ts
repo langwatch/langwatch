@@ -18,6 +18,11 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
+    // The header is corrected after it is read; with no correction stored the
+    // hook returns the very same object the query produced.
+    traceEditOverlay: {
+      getByTraceId: { useQuery: () => ({ data: null }) },
+    },
   },
 }));
 

@@ -30,9 +30,6 @@ export const useWorkflowExecution = () => {
         title: "Studio is not connected yet",
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
       return false;
     }
@@ -66,9 +63,6 @@ export const useWorkflowExecution = () => {
         } workflow execution`,
         type: "error",
         duration: 5000,
-        meta: {
-          closable: true,
-        },
       });
     }
   }, [triggerTimeout, setWorkflowExecutionState, getWorkflow]);

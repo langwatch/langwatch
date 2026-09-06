@@ -22,9 +22,14 @@ import {
 interface ReportGridProps {
   graphs: GraphData[];
   projectSlug: string;
+  projectId: string;
   dashboardId?: string;
   onGraphDelete: (graphId: string) => void;
   onGraphSizeChange: (graphId: string, size: SizeOption) => void;
+  onGraphGranularityChange?: (input: {
+    graphId: string;
+    granularitySeconds: number;
+  }) => void;
   onGraphsReorder: (layouts: GridLayout[]) => void;
   deletingGraphId: string | null;
 }
@@ -32,9 +37,11 @@ interface ReportGridProps {
 export function ReportGrid({
   graphs,
   projectSlug,
+  projectId,
   dashboardId,
   onGraphDelete,
   onGraphSizeChange,
+  onGraphGranularityChange,
   onGraphsReorder,
   deletingGraphId,
 }: ReportGridProps) {
@@ -95,9 +102,19 @@ export function ReportGrid({
               key={graph.id}
               graph={graph}
               projectSlug={projectSlug}
+              projectId={projectId}
               dashboardId={dashboardId}
               onDelete={() => onGraphDelete(graph.id)}
               onSizeChange={(size) => onGraphSizeChange(graph.id, size)}
+              {...(onGraphGranularityChange
+                ? {
+                    onGranularityChange: (granularitySeconds: number) =>
+                      onGraphGranularityChange({
+                        graphId: graph.id,
+                        granularitySeconds,
+                      }),
+                  }
+                : {})}
               isDeleting={deletingGraphId === graph.id}
             />
           ))}

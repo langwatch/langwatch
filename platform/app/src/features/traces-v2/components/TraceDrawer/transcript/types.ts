@@ -40,6 +40,14 @@ export type ContentBlock =
   | { kind: "media"; part: MediaPartData }
   | { kind: "raw"; data: unknown };
 
+/**
+ * A content block with the identity a comment can be left on. The key is
+ * derived from what the block holds rather than from where it sits, so reading
+ * the same transcript again recognises the same messages, and a message whose
+ * content changed is a message nothing points at.
+ */
+export type KeyedContentBlock = ContentBlock & { blockKey: string };
+
 export type ConversationTurn =
   | {
       kind: "user";

@@ -7,18 +7,23 @@
  * The `revokeAllSessionsForUser` helper clears BOTH stores so admin
  * actions like `user.deactivate` actually kick the user out.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 const mockRedisGet = vi.fn();
 const mockRedisDel = vi.fn();
 const mockRedisSet = vi.fn();
-vi.mock("~/server/redis", () => ({
-  connection: {
-    get: (...args: unknown[]) => mockRedisGet(...args),
-    del: (...args: unknown[]) => mockRedisDel(...args),
-    set: (...args: unknown[]) => mockRedisSet(...args),
-  },
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    redis: {
+      get: (...args: unknown[]) => mockRedisGet(...args),
+      del: (...args: unknown[]) => mockRedisDel(...args),
+      set: (...args: unknown[]) => mockRedisSet(...args),
+    },
+  }),
 }));
 
 import {

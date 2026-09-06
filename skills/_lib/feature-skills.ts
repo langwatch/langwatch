@@ -11,17 +11,25 @@ export const FEATURE_SKILLS = [
   "online-evaluations",
   "evaluations",
   "scenarios",
+  "connect-agent",
   "prompts",
   "agent-performance",
   "agent-improve",
   "level-up",
   "datasets",
+  "context-sweet-spot",
+  "provider-cost-comparison",
 ] as const;
 
 // Skills that ship only with Langy. Their canonical sources still live at the
 // repository root so Docker and catalogue generation need no service-internal
 // input, but they are deliberately excluded from the public publisher.
-export const NATIVE_ONLY_SKILLS = ["github"] as const;
+export const NATIVE_ONLY_SKILLS = [
+  "github",
+  "prompt-optimization",
+  "drive-the-ui",
+  "code-changes",
+] as const;
 
 export interface PublishedSkill {
 	slug: string; // unique skill name

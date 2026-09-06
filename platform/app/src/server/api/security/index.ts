@@ -2,6 +2,8 @@ export {
   type AccessPolicy,
   anyAuthenticated,
   apiKeyPermission,
+  type CredentialClass,
+  credentialClassFor,
   describeAccessPolicy,
   handlerManagedAuth,
   internalSecret,
@@ -9,6 +11,12 @@ export {
   requires,
   requiresOnProject,
 } from "./access-policy";
+export {
+  documentedPathOf,
+  isHttpMethod,
+  type SecurityRequirement,
+  securityForCredentialClass,
+} from "./openapi-security";
 export {
   allRegisteredRoutes,
   getRoutePolicy,
@@ -19,6 +27,7 @@ export {
   createOrgApp,
   createProjectApp,
   createServiceApp,
+  familyFromBasePath,
   SecuredApp,
   type SecuredVerbs,
 } from "./secured-app";

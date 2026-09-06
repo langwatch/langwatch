@@ -97,7 +97,7 @@ vi.mock("~/utils/api", () => ({
     // Batched name lookups (useTargetNames). No target here is a comparison
     // column, so every caller passes an empty variant list.
     useQueries: () => [],
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
@@ -180,9 +180,6 @@ vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
 // Mock Prompt Drawers
 vi.mock("~/components/prompts/PromptListDrawer", () => ({
   PromptListDrawer: () => null,
-}));
-vi.mock("~/components/prompts/registry/RegistryDrawer", () => ({
-  RegistryDrawer: () => null,
 }));
 vi.mock("~/components/prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,

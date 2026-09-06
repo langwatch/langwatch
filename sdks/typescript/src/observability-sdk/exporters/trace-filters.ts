@@ -97,7 +97,8 @@ export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): Reada
  *
  * Available presets:
  * - `vercelAIOnly`: Keeps only spans from the Vercel AI SDK (instrumentationScope.name === 'ai')
- * - `excludeHttpRequests`: Removes spans that appear to be HTTP requests (span name starts with HTTP verb)
+ * - `excludeHttpRequests`: Removes spans emitted by HTTP instrumentations (identified by scope,
+ *   method attribute, or an uppercase-verb span name)
  *
  * @param preset - Name of the preset filter to apply
  * @param spans - Array of spans to filter
@@ -232,19 +233,38 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
 }
 
 /**
- * Checks if a span appears to be an HTTP request based on its name.
- * A span is considered an HTTP request if its name starts with a common HTTP verb
- * (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD) followed by a word boundary.
+ * Instrumentation scopes that emit HTTP client/server request spans. Only
+ * fully qualified package scopes count: an application is free to name its
+ * own instrumentation "fetch" or "undici", and such spans are user data.
+ */
+const HTTP_INSTRUMENTATION_SCOPES = new Set([
+  "@opentelemetry/instrumentation-http",
+  "@opentelemetry/instrumentation-undici",
+  "@opentelemetry/instrumentation-fetch",
+]);
+
+/**
+ * Checks if a span is an HTTP instrumentation span.
+ *
+ * The exact signals come first: the emitting instrumentation scope, or the
+ * semantic-convention method attribute. Only when neither is present does the
+ * name heuristic apply, and it matches only the shape OpenTelemetry's HTTP
+ * instrumentations actually emit — an uppercase verb alone or followed by a
+ * space. User spans like "post-publish-smoke" or "get-user-profile" never
+ * match it.
  *
  * @param span - Span to check
- * @returns True if the span appears to be an HTTP request, false otherwise
+ * @returns True if the span is an HTTP request span, false otherwise
  *
  * @example
  * ```typescript
- * // These would return true:
- * // span.name = "GET /api/users"
- * // span.name = "POST /api/data"
- * // span.name = "DELETE /resource/123"
+ * // These return true:
+ * // scope "@opentelemetry/instrumentation-http", name "GET /api/users"
+ * // attributes { "http.request.method": "POST" }, any name
+ * // unknown scope, name "POST /v1/traces" (uppercase-verb fallback)
+ * //
+ * // These return false:
+ * // name "post-publish-smoke", "get-user-profile", "postgres-query"
  *
  * if (isHttpRequestSpan(span)) {
  *   console.log('This is an HTTP request span');
@@ -252,7 +272,18 @@ export function isVercelAiSpan(span: ReadableSpan): boolean {
  * ```
  */
 export function isHttpRequestSpan(span: ReadableSpan): boolean {
-  const name = span.name ?? "";
-  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
-  return verbMatch;
+  const scopeName = span.instrumentationScope?.name ?? "";
+  if (HTTP_INSTRUMENTATION_SCOPES.has(scopeName)) return true;
+
+  const attributes = (span.attributes ?? {}) as Record<string, unknown>;
+  if (
+    attributes["http.request.method"] !== undefined ||
+    attributes["http.method"] !== undefined
+  ) {
+    return true;
+  }
+
+  return /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE)( |$)/.test(
+    span.name ?? "",
+  );
 }

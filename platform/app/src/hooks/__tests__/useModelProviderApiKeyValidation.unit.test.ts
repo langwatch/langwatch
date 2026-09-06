@@ -26,7 +26,7 @@ vi.mock("../../utils/api", () => ({
         useMutation: () => ({ mutateAsync: mockMutateAsync }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       modelProvider: {
         // Present so a regression back to the query transport would be
         // silently satisfied rather than throwing — the test has to catch
@@ -39,11 +39,11 @@ vi.mock("../../utils/api", () => ({
 }));
 
 import { TRPCClientError } from "@trpc/client";
+import { errorFormatter } from "../../server/api/trpc";
 import {
   ProviderKeyRestrictedError,
   ProviderUnreachableError,
-} from "../../server/api/routers/providerValidation";
-import { errorFormatter } from "../../server/api/trpc";
+} from "../../server/modelProviders/providerValidation";
 import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
 
 /**
@@ -124,9 +124,10 @@ describe("useModelProviderApiKeyValidation", () => {
         expect(valid).toBe(false);
         expect(result.current.validationError).toBe(
           "This key's restrictions block the request. " +
-            "Its API restrictions exclude the Generative Language API. " +
-            "Allow that API in the Google Cloud console, or set up a " +
-            "Vertex AI provider instead.",
+            "This key belongs to a different Google service. If it is a " +
+            "Gemini Enterprise Agent Platform key, fill in the Google Cloud " +
+            "Project and Location fields and save again; otherwise allow " +
+            "the Generative Language API in the Google Cloud console.",
         );
         expect(result.current.validationError).not.toContain(
           "provider_key_restricted",

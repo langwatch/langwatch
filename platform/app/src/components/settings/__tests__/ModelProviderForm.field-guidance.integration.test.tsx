@@ -45,7 +45,7 @@ vi.mock("../../../utils/api", () => ({
       },
       isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
     },
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {
         getAllForProject: { invalidate: vi.fn() },
@@ -158,20 +158,21 @@ describe("Feature: the drawer says where each credential comes from", () => {
   });
 
   /**
-   * A Google Cloud key is commonly restricted to a single API, and the
-   * console names that restriction. Unless the drawer names the same API,
-   * the customer cannot tell which one to allow — which is exactly how a
-   * valid key came to read as invalid. Pinned to the copy so it cannot
-   * quietly drift back to "your Gemini API key".
+   * A Google Cloud key is commonly restricted to a single Google service,
+   * and both kinds now belong on this one provider: validation detects
+   * which door the key opens. The copy has to say an Agent Platform key is
+   * welcome here — the old text sent those customers hunting for another
+   * provider, which is exactly how a valid key came to read as invalid.
+   * Pinned so it cannot quietly drift back to "your Gemini API key".
    */
   describe("given the customer holds a Google Cloud key", () => {
     describe("when they read the credential field", () => {
-      it("names the API their key has to be allowed to call", () => {
+      it("says either kind of Google key belongs here", () => {
         const description =
           geminiEntry?.fieldMetadata?.GEMINI_API_KEY?.description ?? "";
 
-        expect(description).toContain("Generative Language API");
-        expect(description).toContain("Vertex AI");
+        expect(description).toContain("AI Studio");
+        expect(description).toContain("Gemini Enterprise Agent Platform");
       });
     });
   });

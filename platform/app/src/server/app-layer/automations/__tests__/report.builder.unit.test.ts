@@ -1,5 +1,5 @@
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,

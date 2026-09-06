@@ -16,27 +16,30 @@
 
 import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
-import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { bodyLimit } from "hono/body-limit";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
-import { type ZodError, z } from "zod";
+import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
+import type { Project } from "~/generated/prisma/client";
+import {
+  AlertType,
+  ExperimentType,
+  TriggerAction,
+} from "~/generated/prisma/client";
 import { getOAuthClient } from "~/mcp/oauthClientRegistry";
+import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
+import { isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -48,14 +51,17 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
-  generateTrackedEventId,
   predefinedEventsSchemas,
   predefinedEventTypes,
+} from "~/server/app-layer/events/predefinedEvents.schema";
+import {
+  generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
@@ -75,7 +81,6 @@ import {
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import { connection as redis } from "~/server/redis";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
@@ -89,6 +94,8 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
+import { bodyLimit } from "./_lib/body-limit";
 import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
@@ -118,25 +125,20 @@ const logger = createLogger("langwatch:misc");
 // enforces the per-route ceiling and returns 403 on denial.
 const authMiddleware = createUnifiedAuthMiddleware({ prisma });
 const requireAnalyticsView = requireApiKeyPermission({
-  prisma,
   permission: "analytics:view",
 });
 const requireWorkflowsManage = requireApiKeyPermission({
-  prisma,
   permission: "workflows:manage",
 });
 // DSPy step logging + experiment bootstrapping are experiment writes, gated on
 // the dedicated experiments permission rather than the workflow studio's.
 const requireExperimentsManage = requireApiKeyPermission({
-  prisma,
   permission: "experiments:manage",
 });
 const requireTracesCreate = requireApiKeyPermission({
-  prisma,
   permission: "traces:create",
 });
 const requireTriggersManage = requireApiKeyPermission({
-  prisma,
   permission: "triggers:manage",
 });
 
@@ -250,8 +252,7 @@ secured.access(analyticsViewAuth).post(
         .extend(timeseriesSeriesInput.shape)
         .parse(input);
     } catch (error) {
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     try {
@@ -468,8 +469,7 @@ secured.access(experimentsManageAuth).post(
         "invalid log_steps data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     for (const param of params) {
@@ -478,7 +478,11 @@ secured.access(experimentsManageAuth).post(
         param.timestamps.created_at.toString().length === 10
       ) {
         logger.error(
-          { param, projectId: project.id },
+          {
+            stepId: param.index,
+            runId: param.run_id,
+            projectId: project.id,
+          },
           "timestamps not in milliseconds for step",
         );
         return c.json(
@@ -511,7 +515,11 @@ secured.access(experimentsManageAuth).post(
             "failed to validate data for DSPy step",
           );
           captureException(toError(error), {
-            extra: { projectId: project.id, param },
+            extra: {
+              projectId: project.id,
+              stepId: param.index,
+              runId: param.run_id,
+            },
           });
           const validationError = fromZodError(error);
           return c.json({ error: validationError.message }, 400);
@@ -526,7 +534,11 @@ secured.access(experimentsManageAuth).post(
             "internal server error processing DSPy step",
           );
           captureException(toError(error), {
-            extra: { projectId: project.id, param },
+            extra: {
+              projectId: project.id,
+              stepId: param.index,
+              runId: param.run_id,
+            },
           });
           return c.json(
             {
@@ -681,8 +693,7 @@ secured.access(experimentsManageAuth).post(
         "invalid init data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     let experiment;
@@ -783,16 +794,12 @@ secured
     }
 
     try {
-      const redirectUrl = new URL(redirect_uri);
-      if (
-        redirectUrl.protocol === "javascript:" ||
-        redirectUrl.protocol === "data:" ||
-        redirectUrl.protocol === "vbscript:"
-      ) {
-        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
-      }
+      new URL(redirect_uri);
     } catch {
       return c.json({ error: "Invalid redirect_uri" }, 400);
+    }
+    if (!isAllowedRedirectScheme(redirect_uri)) {
+      return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
     }
 
     // RFC 6749 §10.6: an authorization server must only ever issue a code to
@@ -819,8 +826,61 @@ secured
       );
     }
 
+    // Past this point the client_id is registered and the redirect_uri is one
+    // of the URIs it registered, so RFC 6749 §4.1.2.1 says a failure belongs
+    // back at the client rather than on this page: the client is waiting on
+    // its redirect and an error rendered here leaves it hanging forever. The
+    // checks above deliberately stay local — an unverified redirect_uri is
+    // exactly what an attacker would supply, so nothing is ever sent to it.
+    //
+    // The refusals below answer with `c.json` rather than throwing a
+    // HandledError on purpose. OAuth clients parse `error` and
+    // `error_description` at the top level of the body (RFC 6749 §5.2), and
+    // the HandledError envelope nests its own shape, which those clients read
+    // as a malformed response. This endpoint speaks the OAuth wire format, so
+    // the shape below is the contract; do not "fix" it into the envelope.
+    const errorRedirect = ({
+      error,
+      description,
+    }: {
+      error: string;
+      description: string;
+    }) => {
+      const url = new URL(redirect_uri);
+      url.searchParams.set("error", error);
+      url.searchParams.set("error_description", description);
+      if (state) {
+        url.searchParams.set("state", state);
+      }
+      return url.toString();
+    };
+
     if (!code_challenge) {
-      return c.json({ error: "code_challenge is required (PKCE S256)" }, 400);
+      const description = "code_challenge is required (PKCE S256)";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
+    }
+
+    // S256 is the only method the discovery document advertises, and the token
+    // endpoint verifies every code as S256 regardless of what was requested.
+    // Accepting another method here would mint a code that can never be
+    // redeemed, so the client learns now rather than at the exchange.
+    if (code_challenge_method && code_challenge_method !== "S256") {
+      const description = "code_challenge_method must be S256";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
     }
 
     // The demo project is a globally-readable showcase: isDemoProject grants
@@ -828,11 +888,22 @@ secured
     // below — otherwise any authenticated user could mint an MCP auth code
     // embedding the demo project's API key. (The old `team.members.some` check
     // happened to block this; the RoleBinding-aware check does not.)
-    if (isDemoProject(projectId, "project:view")) {
-      return c.json(
-        { error: "Project not found or you don't have access" },
+    const noAccessDescription = "Project not found or you don't have access";
+    const noAccessResponse = () =>
+      c.json(
+        {
+          error: "access_denied",
+          error_description: noAccessDescription,
+          redirect: errorRedirect({
+            error: "access_denied",
+            description: noAccessDescription,
+          }),
+        },
         403,
       );
+
+    if (isDemoProject(projectId, "project:view")) {
+      return noAccessResponse();
     }
 
     // Authorize against RoleBindings (the authoritative source since migration
@@ -840,7 +911,7 @@ secured
     // TeamUser relation. A user added to the team after that migration has no
     // TeamUser row, so the old `team.members.some` check rejected them with a
     // false 403. `project:view` is the baseline grant every team role (incl.
-    // VIEWER) has, and hasProjectPermission also honors org-level access.
+    // VIEWER) has, and probeProjectPermission also honors org-level access.
     // ProjectService is constructed directly (not via getApp()) so this handler
     // stays unit-testable without booting the app container — the same pattern
     // used in presets.ts and the project-service middleware.
@@ -852,24 +923,26 @@ secured
     if (
       !project ||
       project.archivedAt !== null ||
-      !(await hasProjectPermission(
-        { prisma, session },
-        projectId,
-        "project:view",
-      ))
+      !(await probeProjectPermission({ session }, projectId, "project:view"))
     ) {
       // Single 403 whether the project is missing, archived, or simply
       // inaccessible — never disclose existence of a project the caller can't reach.
-      return c.json(
-        { error: "Project not found or you don't have access" },
-        403,
-      );
+      return noAccessResponse();
     }
 
     const code = randomUUID();
 
+    const redis = tryGetApp()?.redis ?? null;
     if (!redis) {
-      return c.json({ error: "Redis is not available" }, 500);
+      const description = "Authorization is temporarily unavailable";
+      return c.json(
+        {
+          error: "server_error",
+          error_description: description,
+          redirect: errorRedirect({ error: "server_error", description }),
+        },
+        500,
+      );
     }
 
     const authCodeEntry = JSON.stringify({
@@ -1071,8 +1144,7 @@ secured.access(tracesCreateAuth).post(
         "invalid event received",
       );
       captureException(toError(error));
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     if (predefinedEventTypes.includes(rawBody.event_type)) {
@@ -1084,8 +1156,7 @@ secured.access(tracesCreateAuth).post(
           "invalid event received",
         );
         captureException(toError(error));
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
+        return c.json({ error: zodErrorMessage(error) }, 400);
       }
     }
 

@@ -157,7 +157,7 @@ pii = evaluate("presidio/pii_detection", as_guardrail=True, output=response)
 
 ### 2. Provide helpful error messages
 
-Don't just block - guide users toward acceptable behavior:
+Tell the user why the request was blocked and how to rephrase it:
 
 ```python
 if not guardrail.passed:

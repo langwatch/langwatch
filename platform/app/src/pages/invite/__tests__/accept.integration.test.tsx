@@ -37,6 +37,14 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
+// The page this file covers is the one a deployment gets before the
+// identifier-first front door is enforced (ADR-117 §7): accept on arrival,
+// explain the failure, offer the way out. The landing screen that replaces it
+// at the flip has its own tests.
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: { IDENTITY_FRONT_DOOR: false } }),
+}));
+
 vi.mock("~/hooks/useAcceptInviteOnce", () => ({
   useAcceptInviteOnce: () => mockAcceptState,
 }));

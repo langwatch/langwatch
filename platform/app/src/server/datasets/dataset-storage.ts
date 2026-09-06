@@ -160,6 +160,21 @@ export interface DatasetStorage {
  * truth for where a project's bytes live, so the azure backend (AC37, issue
  * #4133) covers datasets automatically once STORED_OBJECTS_BACKEND=azure is
  * configured: no separate dataset-specific toggle.
+ *
+ * MIGRATION LIMIT — datasets have no equivalent of `legacyAzureRead`. Stored
+ * objects survive a backend switch because they are addressed by a URI whose
+ * scheme picks the driver, so a read re-derives its provider. Dataset chunks
+ * are addressed by `{projectId, datasetId, index}` with no provider recorded
+ * anywhere (`contentLayout` records the FORMAT, postgres vs s3_jsonl, not the
+ * backend), so this selector can only consult the CURRENT toggle. Flip the
+ * backend after datasets exist and their chunks become unreachable — not
+ * deleted, just unaddressable until the toggle is flipped back.
+ *
+ * This is a pre-existing structural limit, not specific to Azure: the same
+ * holds for s3 -> local or local -> s3. Fixing it needs per-dataset storage
+ * provenance (a schema field plus a backfill), tracked in #6323. Documented
+ * here because `legacyAzureRead` otherwise implies a migration story that
+ * covers datasets, and it does not.
  */
 export const getDatasetStorage = async (
   projectId: string,

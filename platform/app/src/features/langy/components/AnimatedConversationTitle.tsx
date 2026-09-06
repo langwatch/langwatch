@@ -35,9 +35,10 @@ const TRUNCATE = {
 /**
  * A conversation title that transitions like magic when it changes: the old
  * text blurs and fades out, then the new text is re-written character by
- * character with a blur-to-clear reveal. Used in the panel header and the
- * recent-chats list so an auto-generated title visibly replaces the
- * first-message placeholder.
+ * character with a blur-to-clear reveal. Used in the panel header so an
+ * auto-generated title visibly replaces the first-message placeholder. It
+ * builds two components per character, so it belongs ONLY where one title is
+ * on screen — a list renders plain text (see RecentChatsView).
  *
  * It TRUNCATES with an ellipsis and never grows its container: a long generated
  * title clips instead of shoving the header's controls off-screen, and the full

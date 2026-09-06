@@ -1,3 +1,7 @@
+import {
+  NullQueueAuditSink,
+  type QueueAuditSink,
+} from "./queue-audit.repository";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -5,10 +9,38 @@ import type {
   JobEntry,
   QueueRepository,
 } from "./repositories/queue.repository";
-import type { GroupInfo, QueueSummaryInfo } from "./types";
+import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
+
+/** What an error with no recognizable class name is recorded as. */
+const UNTYPED_ERROR_SHAPE = "untyped_error";
+
+/**
+ * Reduce raw job errors to something safe to keep in a durable audit row.
+ *
+ * Only a leading error CLASS survives — `TimeoutError`, `HttpError`. Anything
+ * else becomes a fixed placeholder, because a job's error text is arbitrary
+ * and its first words are no safer than its last: `"alice@example.com payment
+ * failed"` leads with the address. Enough for an operator to see "these all
+ * died the same way" and no more; the full message stays on the failing job.
+ */
+function summarizeErrorShapes(messages: string[]): string[] {
+  const shapes = new Set<string>();
+  for (const message of messages) {
+    const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
+    shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
+    if (shapes.size >= 5) break;
+  }
+  return [...shapes];
+}
 
 export class QueueService {
-  constructor(readonly repo: QueueRepository) {}
+  readonly repo: QueueRepository;
+  private readonly audit: QueueAuditSink;
+
+  constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
+    this.repo = params.repo;
+    this.audit = params.audit ?? new NullQueueAuditSink();
+  }
 
   async getQueues(): Promise<QueueSummaryInfo[]> {
     const queueNames = await this.repo.discoverQueueNames();
@@ -90,6 +122,25 @@ export class QueueService {
     return this.repo.getBlockedSummary({ queueNames });
   }
 
+  /**
+   * One parked tenant's groups. Read at request time so an operator acting on
+   * a row is acting on current state, not on a snapshot cycle's worth of past.
+   */
+  async getParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    groups: ParkedGroupInfo[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const result = await this.repo.listParkedGroups(params);
+    return { ...result, page: params.page, pageSize: params.pageSize };
+  }
+
   async getAllDlqGroups(): Promise<
     Array<{
       queueName: string;
@@ -133,21 +184,59 @@ export class QueueService {
   async unblockGroup(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ wasBlocked: boolean }> {
-    return this.repo.unblockGroup(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.unblockGroup(rest);
+    // Only when it changed something. A no-op unblock on a group that was not
+    // blocked is a misread of the dashboard, not an act, and auditing it would
+    // bury the acts that did happen.
+    if (result.wasBlocked) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_unblock_group",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async unblockAll(params: {
     queueName: string;
+    requestedBy: string;
   }): Promise<{ unblockedCount: number }> {
-    return this.repo.unblockAll(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.unblockAll(rest);
+    if (result.unblockedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_unblock_all",
+        queueName: params.queueName,
+        metadata: { ...result },
+      });
+    }
+    return result;
   }
 
   async drainGroup(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsRemoved: number }> {
-    return this.repo.drainGroup(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.drainGroup(rest);
+    // A drain removes the jobs outright, so this row is the only thing that
+    // survives to say the group was emptied and by whom.
+    if (result.jobsRemoved > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_drain_group",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async pausePipeline(params: {
@@ -198,23 +287,67 @@ export class QueueService {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
+    requestedBy: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
-    return this.repo.drainTenant(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.drainTenant(rest);
+    // The widest act on this surface: every group for one tenant. The filter
+    // that selected them is recorded too, because "which groups" is not
+    // recoverable from the counts once the jobs are gone.
+    if (result.groupsDrained > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_drain_tenant",
+        queueName: params.queueName,
+        metadata: {
+          tenantId: params.tenantId,
+          groupIdContains: params.groupIdContains ?? null,
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async moveToDlq(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsMoved: number }> {
-    return this.repo.moveToDlq(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.moveToDlq(rest);
+    if (result.jobsMoved > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_move_group_to_dlq",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async moveAllBlockedToDlq(params: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
+    requestedBy: string;
   }): Promise<{ movedCount: number; jobsMoved: number }> {
-    return this.repo.moveAllBlockedToDlq(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.moveAllBlockedToDlq(rest);
+    if (result.movedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_move_all_blocked_to_dlq",
+        queueName: params.queueName,
+        metadata: {
+          pipelineFilter: params.pipelineFilter ?? null,
+          errorFilter: params.errorFilter ?? null,
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async replayFromDlq(params: {
@@ -230,6 +363,65 @@ export class QueueService {
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }> {
     return this.repo.replayAllFromDlq(params);
+  }
+
+  /**
+   * Redrive exactly the DLQ groups the operator's filter showed, audited.
+   * Explicit ids, not a re-evaluated filter: the confirmation and the act
+   * must cover the same groups (specs/ops/dead-letter-recovery.feature).
+   */
+  async redriveManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+    requestedBy: string;
+  }): Promise<{ redrivenCount: number; jobsRedriven: number }> {
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.redriveManyFromDlq(rest);
+    if (result.redrivenCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_redrive_dlq_groups",
+        queueName: params.queueName,
+        metadata: {
+          groupIds: params.groupIds.slice(0, 50),
+          requestedGroups: params.groupIds.length,
+          ...result,
+        },
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Discard exactly the DLQ groups the operator's filter showed. The Redis
+   * entries are removed (they TTL away regardless); the audit row IS the
+   * retained mark, carrying the queue, groups, job counts and last errors.
+   */
+  async discardManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+    requestedBy: string;
+  }): Promise<{ discardedCount: number; jobsDiscarded: number }> {
+    const { requestedBy, ...rest } = params;
+    const { lastErrors, ...result } = await this.repo.discardManyFromDlq(rest);
+    if (result.discardedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_discard_dlq_groups",
+        queueName: params.queueName,
+        metadata: {
+          groupIds: params.groupIds.slice(0, 50),
+          requestedGroups: params.groupIds.length,
+          // A job's error message is arbitrary thrown text and can carry
+          // customer payload; the audit log is long-lived and widely read, so
+          // it records the SHAPE of the failure rather than its content. The
+          // full message stays where it already was, on the failing job.
+          lastErrorTypes: summarizeErrorShapes(lastErrors),
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async canaryRedrive(params: {

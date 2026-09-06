@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluatorUnavailability,
-  LEGACY_EVALUATORS_ENABLE_ENV_VAR,
   LINGUA_ENABLE_ENV_VAR,
   PRESIDIO_ENABLE_ENV_VAR,
   unavailableEvaluatorMessage,
@@ -21,12 +20,6 @@ describe("evaluator availability on this install", () => {
       expect(
         evaluatorUnavailability({
           evaluatorType: "lingua/language_detection",
-          env: {},
-        }),
-      ).toBeUndefined();
-      expect(
-        evaluatorUnavailability({
-          evaluatorType: "legacy/ragas_faithfulness",
           env: {},
         }),
       ).toBeUndefined();
@@ -109,34 +102,9 @@ describe("evaluator availability on this install", () => {
       expect(result).toBeDefined();
       expect(result!.reason).toMatch(/not installed/i);
       expect(result!.howToEnable).toContain(LINGUA_ENABLE_ENV_VAR);
-      // It stays visible as a disabled card; only deprecated families hide.
-      expect(result!.isHiddenFromUi).toBeUndefined();
-    });
-  });
-
-  describe("when the install skipped the legacy evaluators", () => {
-    const env = { [LEGACY_EVALUATORS_ENABLE_ENV_VAR]: "false" };
-
-    it("hides them from pickers entirely", () => {
-      const result = evaluatorUnavailability({
-        evaluatorType: "legacy/ragas_faithfulness",
-        env,
-      });
-      expect(result).toBeDefined();
-      expect(result!.isHiddenFromUi).toBe(true);
     });
 
-    it("still explains itself when a saved evaluation runs one", () => {
-      const result = evaluatorUnavailability({
-        evaluatorType: "legacy/ragas_faithfulness",
-        env,
-      })!;
-      const message = unavailableEvaluatorMessage({ unavailability: result });
-      expect(message).toMatch(/not installed/i);
-      expect(message).toContain(LEGACY_EVALUATORS_ENABLE_ENV_VAR);
-    });
-
-    it("does not touch the current ragas family", () => {
+    it("does not touch the ragas family", () => {
       expect(
         evaluatorUnavailability({ evaluatorType: "ragas/faithfulness", env }),
       ).toBeUndefined();

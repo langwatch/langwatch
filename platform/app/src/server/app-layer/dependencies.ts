@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -8,13 +9,13 @@ import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { ActivityMonitorClickHouseRepository } from "../../../ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -30,6 +31,7 @@ import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
+import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -38,16 +40,21 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
+import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import type { TraceEvaluationsRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
+import type { GithubInstallationsService } from "./github/github-installations.service";
+import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
+import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
-import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { BlobStoreService } from "./ops/blob-store.service";
@@ -57,11 +64,15 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
+import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import type { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import type { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
@@ -75,6 +86,7 @@ import type { TopicClusteringStatusService } from "./topic-clustering/topic-clus
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { SessionGroupsService } from "./traces/session-groups.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
@@ -96,7 +108,13 @@ export interface OpsDependencies {
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;
   blobStore: BlobStoreService;
+  /**
+   * The lease-elected snapshot writer. Present on every pod that can reach
+   * Redis, but only scans on the pod currently holding the lease (ADR-090).
+   */
   metricsCollector: OpsMetricsCollector | null;
+  /** Serves the shared snapshot to this pod's dashboard subscribers. */
+  snapshotReader: OpsSnapshotReader | null;
 }
 
 export interface AppDependencies {
@@ -108,11 +126,15 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     list: TraceListService;
+    /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */
+    sessionGroups: SessionGroupsService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
+    /** Reviewer corrections applied over a captured trace at read time. */
+    editOverlay: TraceEditOverlayService;
   };
   evaluations: {
     runs: EvaluationRunService;
@@ -136,6 +158,18 @@ export interface AppDependencies {
   };
   simulations: {
     runs: SimulationRunService;
+    /**
+     * The atom reads behind the Results tab: one scenario, one target, one
+     * run. A sibling of `runs` because it answers a different question, and
+     * because nothing it does may change what `runs` serves to v1.
+     */
+    results: ResultAtomsService;
+    /**
+     * The configurations the run dialog offers back: what each run of a plan
+     * was asked to do, read off the runs rather than off the plan row, which
+     * holds only the configuration of its last run.
+     */
+    runConfigurations: RunConfigurationsService;
     /**
      * CSV export of run history. A sibling of `runs` rather than a method on
      * it: the export sweeps with its own keyset pagination and serializers,
@@ -200,7 +234,34 @@ export interface AppDependencies {
   clickhouse: {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
+    /** Per-organization resolution, for aggregates keyed by organization
+     *  rather than project (usage rollups, the grants ledger). */
+    resolveOrganizationClient: (
+      organizationId: string,
+    ) => Promise<ClickHouseClient>;
+    /** Every configured instance - shared plus private - for fleet sweeps
+     *  and admin surfaces that legitimately touch all of them. */
+    allInstances: () => Promise<
+      Array<{ target: string; client: ClickHouseClient }>
+    >;
   };
+  /**
+   * The process's one Redis connection, owned by the composition root and
+   * closed with the App (ADR-093).
+   *
+   * `null` when this deployment or test run configures no Redis — a supported
+   * outcome, not an error: consumers branch on it to take their documented
+   * fallback (an in-memory counter, a skipped dedupe, an uncached read).
+   *
+   * Prefer taking a connection as a constructor dependency. Read it from here
+   * only where there is no seam to inject through — a route module or a tRPC
+   * router — and read it *inside the handler*, never at module scope.
+   *
+   * Most such readers go through `tryGetApp()` rather than `getApp()`, because
+   * they already branch on absence and treat "no App" the same as "no Redis".
+   * See ADR-093 for which ones deliberately do not.
+   */
+  redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */
   billing: {
     events: BillableEventsRepository;
@@ -211,20 +272,9 @@ export interface AppDependencies {
     instance: InstanceUsageStatsRepository;
   };
   /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
-   * not configured, in which case both sweeps no-op.
-   */
-  scenarios: {
-    orphanReconciliation: {
-      client: ClickHouseClient | null;
-      finder: OrphanedRunFinder | null;
-    };
-  };
-  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
-   * audit trail and the reactor sync write through it; the SIEM export
+   * audit trail and the subscriber sync write through it; the SIEM export
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */
@@ -239,6 +289,9 @@ export interface AppDependencies {
     kpis: GovernanceKpisClickHouseRepository | undefined;
     /** The /me dashboard's spend/token/model rollups. */
     personalUsage: PersonalUsageClickHouseRepository | undefined;
+    /** The /governance activity-monitor read side (spend rollups, per-source
+     *  events and health). Undefined on a deployment without ClickHouse. */
+    activityMonitor: ActivityMonitorClickHouseRepository | undefined;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
@@ -246,6 +299,26 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** The Sessions screen's list, joined to the pull requests each drove. */
+    sessionsList: CodingAgentSessionsListService;
+    /** What a pull request cost in assistant usage, RBAC-scoped. */
+    pullRequestUsage: PullRequestUsageService;
+  };
+  /**
+   * The organization's GitHub connection, consumed by Langy for writes and by
+   * pull-request linkage for reads.
+   */
+  github: {
+    installations: GithubInstallationsService;
+    /**
+     * Branch to pull-request linkage: the mapping that discovers and stores
+     * them, the live status read, and the store both sit on.
+     */
+    pullRequests: {
+      mapping: GithubPullRequestMappingService;
+      status: GithubPullRequestStatusService;
+      repository: GithubPullRequestsRepository;
+    };
   };
   /** Cross-tenant stored-object lookups — the documented, project-filter-free
    *  exception `/api/files/:id` uses to resolve an id's owning project before
@@ -265,7 +338,6 @@ export interface AppDependencies {
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
-    githubInstallations: LangyGithubInstallationsService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
   };
@@ -280,6 +352,13 @@ export interface AppDependencies {
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;
+  /**
+   * ADR-092 decision 25 — the one permission-checking service. Every grant
+   * check on every surface (tRPC declarations, Hono session and API-key
+   * middlewares, the management API) resolves THIS instance via
+   * `getApp().permissions`; nothing composes its own from a client.
+   */
+  permissions: PermissionsService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

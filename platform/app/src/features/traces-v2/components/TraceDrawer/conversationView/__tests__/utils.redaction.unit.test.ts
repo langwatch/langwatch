@@ -38,6 +38,8 @@ const turn = (overrides: Partial<ParsedTurn> = {}): ParsedTurn => ({
   userText: "",
   assistantText: "",
   assistantReasoning: "",
+  userMedia: [],
+  assistantMedia: [],
   gapSecs: 0,
   showGap: false,
   ...overrides,

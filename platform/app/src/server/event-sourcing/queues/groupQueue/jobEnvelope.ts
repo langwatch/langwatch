@@ -235,7 +235,7 @@ export interface EnvelopeHeader {
    * GQ2: queue-machinery fields (every `__*` key in jobData) lifted out of the
    * body so they don't perturb the content hash. Restored onto the parsed body
    * on decode. The user payload is everything else; the body is hashed over
-   * the payload alone, so the same event fanned out to N reactors collapses to
+   * the payload alone, so the same event fanned out to N subscribers collapses to
    * one stored blob (ADR-029). Allowlist-free: any future `__*` field is
    * automatically treated as machinery.
    */
@@ -245,7 +245,7 @@ export interface EnvelopeHeader {
 /**
  * GQ2: split jobData into (machinery, payload). Every `__*` key is queue
  * machinery — the queue assigns these fields per-stage (`__stagedJobId`,
- * `__attempt`, `__context`) or per-reactor (`__jobName`, `__jobType`,
+ * `__attempt`, `__context`) or per-subscriber (`__jobName`, `__jobType`,
  * `__pipelineName`), and they perturb the body bytes if left in, defeating
  * content-addressed dedup. The user payload is the rest.
  */
@@ -524,7 +524,7 @@ export async function encodeJobEnvelope({
   if (enabled && tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
     // Lift queue machinery into the header so it doesn't perturb the content
-    // hash. Without this, N reactors fanning out the same event produce N
+    // hash. Without this, N subscribers fanning out the same event produce N
     // different hashes because each carries its own __jobName / __attempt
     // (ADR-029). The body now contains only the user payload.
     const { machinery, payload } = splitMachineryFromBody(jobData);

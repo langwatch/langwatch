@@ -15,7 +15,8 @@
  * query; the text of it belongs in the code, where it already is.
  */
 
-import type { QueryMiddleware, QueryRequest, QueryResult } from "./pipeline";
+import { quietly } from "./observability";
+import type { QueryRequest, QueryResult } from "./query";
 
 /**
  * A failure, reduced to what is safe to ship.
@@ -88,82 +89,94 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
+
 /**
- * Runs host observability code without letting it change the outcome.
+ * Records one span per statement.
  *
- * Everything this middleware calls - the tracer, the span, the completion
- * counter - is supplied by the host and runs on the query's own path. An
- * exception from any of it would surface to the caller as though the query had
- * failed, or would replace a real ClickHouse error with a telemetry one. A
- * span exporter that is misconfigured is a reporting problem; it must not
- * become an outage.
+ * {@link ClickHouseQueryClient} runs this *outside* the concurrency limiter, so
+ * time spent waiting for a slot falls inside the span. That wait is latency the
+ * caller experienced; a span opened after it would report a fast query on a
+ * slow request.
+ *
+ * Every interaction with the host tracer is wrapped in `quietly`: a broken
+ * tracer must not be able to fail a query that would otherwise have succeeded.
  */
-function quietly(report: () => void): void {
-  try {
-    report();
-  } catch {
-    // Deliberately swallowed. The only channel for reporting a telemetry
-    // failure is the telemetry that just failed.
+export class QueryTracer {
+  private readonly tracer: TracerPort;
+  private readonly spanName: string;
+  private readonly onComplete: TraceOptions["onComplete"];
+  private readonly now: () => number;
+
+  constructor({
+    tracer,
+    spanName = "clickhouse.query",
+    onComplete,
+    now = () => Date.now(),
+  }: TraceOptions) {
+    this.tracer = tracer;
+    this.spanName = spanName;
+    this.onComplete = onComplete;
+    this.now = now;
   }
-}
 
-export function trace({
-  tracer,
-  spanName = "clickhouse.query",
-  onComplete,
-  now = () => Date.now(),
-}: TraceOptions): QueryMiddleware {
-  return (next) =>
-    async <Row>(request: QueryRequest): Promise<QueryResult<Row>> => {
-      let span: SpanPort | undefined;
-      quietly(() => {
-        span = tracer.startSpan(spanName);
-      });
-      const startedAt = now();
+  /** Run `task` inside a span describing `request`. */
+  async trace<Row>({
+    request,
+    task,
+  }: {
+    request: QueryRequest;
+    task: () => Promise<QueryResult<Row>>;
+  }): Promise<QueryResult<Row>> {
+    let span: SpanPort | undefined;
+    quietly(() => {
+      span = this.tracer.startSpan(this.spanName);
+    });
+    const startedAt = this.now();
 
-      quietly(() => {
-        if (span === undefined) return;
-        span.setAttribute(SPAN_ATTRIBUTES.system, "clickhouse");
-        span.setAttribute(SPAN_ATTRIBUTES.tenant, request.tenantId);
-        span.setAttribute(SPAN_ATTRIBUTES.operation, request.kind ?? "read");
-        if (request.table !== undefined) {
-          span.setAttribute(SPAN_ATTRIBUTES.table, request.table);
-        }
-        // Recorded so an audit can enumerate every statement that opted out of
-        // the tenant predicate, and why, without reading the code.
-        if (request.unscoped !== undefined) {
-          span.setAttribute(
-            SPAN_ATTRIBUTES.unscopedReason,
-            request.unscoped.reason,
-          );
-        }
-      });
-
-      try {
-        const result = await next<Row>(request);
-        quietly(() => {
-          span?.setAttribute(SPAN_ATTRIBUTES.rows, result.rows.length);
-          if (result.stats?.bytesRead !== undefined) {
-            span?.setAttribute(
-              SPAN_ATTRIBUTES.bytesRead,
-              result.stats.bytesRead,
-            );
-          }
-          onComplete?.({
-            request,
-            durationMs: now() - startedAt,
-            rowCount: result.rows.length,
-          });
-        });
-        return result;
-      } catch (error) {
-        quietly(() => {
-          span?.recordError(describeQueryError(error));
-          onComplete?.({ request, durationMs: now() - startedAt, error });
-        });
-        throw error;
-      } finally {
-        quietly(() => span?.end());
+    quietly(() => {
+      if (span === undefined) return;
+      span.setAttribute(SPAN_ATTRIBUTES.system, "clickhouse");
+      span.setAttribute(SPAN_ATTRIBUTES.tenant, request.tenantId);
+      span.setAttribute(SPAN_ATTRIBUTES.operation, request.kind ?? "read");
+      if (request.table !== undefined) {
+        span.setAttribute(SPAN_ATTRIBUTES.table, request.table);
       }
-    };
+      // Recorded so an audit can enumerate every statement that opted out of
+      // the tenant predicate, and why, without reading the code.
+      if (request.unscoped !== undefined) {
+        span.setAttribute(
+          SPAN_ATTRIBUTES.unscopedReason,
+          request.unscoped.reason,
+        );
+      }
+    });
+
+    try {
+      const result = await task();
+      quietly(() => {
+        span?.setAttribute(SPAN_ATTRIBUTES.rows, result.rows.length);
+        if (result.stats?.bytesRead !== undefined) {
+          span?.setAttribute(SPAN_ATTRIBUTES.bytesRead, result.stats.bytesRead);
+        }
+        this.onComplete?.({
+          request,
+          durationMs: this.now() - startedAt,
+          rowCount: result.rows.length,
+        });
+      });
+      return result;
+    } catch (error) {
+      quietly(() => {
+        span?.recordError(describeQueryError(error));
+        this.onComplete?.({
+          request,
+          durationMs: this.now() - startedAt,
+          error,
+        });
+      });
+      throw error;
+    } finally {
+      quietly(() => span?.end());
+    }
+  }
 }

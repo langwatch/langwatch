@@ -58,6 +58,15 @@ Document **important technical and architectural decisions** — context, trade-
 | [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
 | [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
 | [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation (amended 2026-07-22) | Accepted                                          |
+| [081](./081-lwql-table-function-and-ssrf-policy.md)       | LangWatchQL analytics SQL blocks user-supplied table functions, by AST policy and by grants     | Accepted                                          |
+| [082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) | The LangWatchQL `analytics.*` schema is invoker-rights views, column grants, and `FINAL`  | Accepted                                          |
+| [083](./083-lwql-diagnostics-read-the-single-parse.md)    | LangWatchQL diagnostics read the validator's single parse, never a second one               | Accepted                                          |
+| [084](./084-lwql-postgres-mapping-tenant-predicate.md)    | PostgreSQL-resident data is reached through an approved view, a policed engine table, and a view-carried tenant predicate | Accepted                      |
+| [085](./085-lwql-chart-runtime-without-eval.md)               | The LangWatchQL chart runtime runs without `eval` — ahead-of-time schema validator, interpreted expressions, injected data   | Accepted                      |
+| [092](./092-unified-authorization-engine.md)                      | Unified authorization engine — one registry, one resolver, every principal                  | Proposed                                          |
+| [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
+| [098](./098-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
+| [110](./110-grant-aggregates-are-grants.md)                       | A grant aggregate is a grant, not an organization                                           | Proposed (supersedes ADR-092 §13's aggregate choice) |
 
 ## When to Write an ADR
 

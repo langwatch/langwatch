@@ -120,11 +120,11 @@ describe("PresenceMenuItem", () => {
     });
   });
 
-  // The placement contract lives in two consuming files — `MainMenu`
-  // shouldn't render the sidebar toggle anymore, and `DashboardLayout`
-  // gates the avatar-menu entry on the traces pathname. Source-level
-  // assertions are durable across UI restyles where DOM-level queries
-  // would drift.
+  // The placement contract lives in the consuming files: `MainMenu`
+  // shouldn't render the sidebar toggle anymore, `DashboardLayout`
+  // computes the traces-pathname gate, and `AppHeaderUserMenu` renders
+  // the entry only behind that gate. Source-level assertions are
+  // durable across UI restyles where DOM-level queries would drift.
   describe("given the main left navigation chrome", () => {
     /** @scenario Main left navigation no longer renders the presence toggle */
     it("does not import the legacy sidebar PresenceToggle component", () => {
@@ -136,20 +136,41 @@ describe("PresenceMenuItem", () => {
     });
   });
 
-  describe("given the avatar dropdown in DashboardLayout", () => {
+  describe("given the avatar dropdown in the navigation shell", () => {
     /** @scenario Avatar menu omits the presence toggle off the traces page */
     it("gates the PresenceMenuItem render on the /[project]/traces pathname", () => {
-      const src = readFileSync(
-        resolve(__dirname, "../../DashboardLayout.tsx"),
+      const shellStateSrc = readFileSync(
+        resolve(
+          __dirname,
+          "../../../features/navigation/shell/useNavigationV2ShellState.ts",
+        ),
         "utf8",
       );
       // The gating expression is the source of truth: the menu item is
       // only rendered when this flag is true, so the route check
       // staying in place is what enforces the off-traces behavior.
-      expect(src).toMatch(
-        /showPresenceMenuItem\s*=\s*router\.pathname\.startsWith\("\/\[project\]\/traces"\)/,
+      expect(shellStateSrc).toMatch(
+        /showPresenceMenuItem:\s*pathname\.startsWith\("\/\[project\]\/traces"\)/,
       );
-      expect(src).toMatch(
+      // Both header surfaces in the shell pass the gate through to the
+      // avatar menu.
+      const topBarSrc = readFileSync(
+        resolve(
+          __dirname,
+          "../../../features/navigation/shell/ShellTopBar.tsx",
+        ),
+        "utf8",
+      );
+      expect(topBarSrc).toMatch(
+        /showPresenceMenuItem=\{state\.showPresenceMenuItem\}/,
+      );
+      // The avatar menu renders the entry only when the gate is passed
+      // in true.
+      const menuSrc = readFileSync(
+        resolve(__dirname, "../../AppHeaderUserMenu.tsx"),
+        "utf8",
+      );
+      expect(menuSrc).toMatch(
         /\{showPresenceMenuItem\s*&&\s*<PresenceMenuItem\s*\/>\}/,
       );
     });

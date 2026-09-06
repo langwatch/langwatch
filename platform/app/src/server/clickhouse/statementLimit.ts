@@ -1,7 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  type ConcurrencyLimiter,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
@@ -33,6 +32,23 @@ export const QUEUE_DEPTH_PER_SLOT = 8;
 
 /** Never so shallow that a small pool sheds on ordinary burstiness. */
 export const MIN_QUEUE_DEPTH = 64;
+
+/**
+ * The longest a statement may wait for a slot before it is refused.
+ *
+ * The queue was bounded by DEPTH but not by TIME, so a caller could sit in it
+ * for as long as the statements ahead took — and then still spend the driver's
+ * full `request_timeout` on the wire. That is how a 46-second failure was
+ * assembled out of two limits, neither of which was 46 seconds.
+ *
+ * Shorter than the request timeout on purpose: a queued statement has done no
+ * work, so abandoning it costs nothing, while one already on the wire may be
+ * about to succeed. Refusal is also not loss — it raises
+ * `ClickHouseOverloadedError`, which classifies as transient, so a read retries
+ * and a job is re-staged by the queue. Waiting a further twenty seconds for a
+ * slot that arrives with no time left to use it serves nobody.
+ */
+export const STATEMENT_WAIT_TIMEOUT_MS = 20_000;
 
 type LimitedOperation = "query" | "insert" | "command" | "exec";
 
@@ -70,16 +86,19 @@ export function withStatementLimit<T extends ClickHouseClient>({
   client,
   maxConcurrent,
   instance,
+  waitTimeoutMs = STATEMENT_WAIT_TIMEOUT_MS,
 }: {
   client: T;
   maxConcurrent: number;
   instance: string;
+  /** Overridable so a test can prove the bound without spending it. */
+  waitTimeoutMs?: number;
 }): T {
   const maxQueued = Math.max(
     MIN_QUEUE_DEPTH,
     maxConcurrent * QUEUE_DEPTH_PER_SLOT,
   );
-  const limiter = createConcurrencyLimiter({ maxConcurrent, maxQueued });
+  const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
 
   registerClickHouseLimiter(instance, () => limiter.stats());
 
@@ -105,9 +124,11 @@ export function withStatementLimit<T extends ClickHouseClient>({
     (limited as Record<string, unknown>)[operation] = (params: unknown) =>
       run({
         limiter,
+        maxConcurrent,
         instance,
         operation,
         signal: signalOf(params),
+        waitTimeoutMs,
         task: () =>
           (inner as (p: unknown) => Promise<unknown>).call(client, params),
       });
@@ -129,32 +150,105 @@ export function withStatementLimit<T extends ClickHouseClient>({
   return limited;
 }
 
+/** An armed wait: what the limiter blocks on, and how it ended. */
+interface ArmedWait {
+  signal: AbortSignal | undefined;
+  /** True only if OUR timer fired — never merely that the signal aborted. */
+  hasTimedOut: () => boolean;
+  dispose: () => void;
+}
+
+const NOT_ARMED = (signal: AbortSignal | undefined): ArmedWait => ({
+  signal,
+  hasTimedOut: () => false,
+  dispose: () => {
+    // Nothing was armed, so there is nothing to clear.
+  },
+});
+
+/**
+ * Arm the wait bound, but only when the limiter is ALREADY saturated.
+ *
+ * On the ordinary path a slot is free and `acquire` resolves without waiting at
+ * all, so arming anything would cost a timer and an `AbortSignal.any` per
+ * statement — millions a day — to bound a wait that never happens.
+ *
+ * A plain timer rather than `AbortSignal.timeout` for two reasons: it can be
+ * CLEARED the moment the statement is admitted, where a timeout signal holds
+ * its timer for the full duration regardless, and a saturated limiter would
+ * accumulate one per queued statement; and it is fakeable, so the test for this
+ * does not have to spend twenty real seconds proving it.
+ */
+function armWait({
+  limiter,
+  maxConcurrent,
+  signal,
+  waitTimeoutMs,
+}: {
+  limiter: ConcurrencyLimiter;
+  maxConcurrent: number;
+  signal: AbortSignal | undefined;
+  waitTimeoutMs: number;
+}): ArmedWait {
+  if (limiter.stats().inFlight < maxConcurrent) return NOT_ARMED(signal);
+
+  const controller = new AbortController();
+  let hasFired = false;
+  const timer = setTimeout(() => {
+    hasFired = true;
+    controller.abort();
+  }, waitTimeoutMs);
+  // Never a reason to hold the process open: if nothing else is running there
+  // is no statement ahead of this one to wait for.
+  timer.unref?.();
+
+  return {
+    signal: signal
+      ? AbortSignal.any([signal, controller.signal])
+      : controller.signal,
+    hasTimedOut: () => hasFired,
+    dispose: () => clearTimeout(timer),
+  };
+}
+
 async function run({
   limiter,
+  maxConcurrent,
   instance,
   operation,
   signal,
+  waitTimeoutMs,
   task,
 }: {
   limiter: ConcurrencyLimiter;
+  maxConcurrent: number;
   instance: string;
   operation: LimitedOperation;
   signal: AbortSignal | undefined;
+  waitTimeoutMs: number;
   task: () => Promise<unknown>;
 }): Promise<unknown> {
   const queuedAt = performance.now();
   let admitted = false;
 
+  const wait = armWait({ limiter, maxConcurrent, signal, waitTimeoutMs });
+
   try {
-    return await limiter.run(() => {
-      admitted = true;
-      observeClickHouseStatementWait(
-        instance,
-        operation,
-        (performance.now() - queuedAt) / 1000,
-      );
-      return task();
-    }, signal);
+    return await limiter.run({
+      task: () => {
+        admitted = true;
+        // The wait is over the moment the slot is taken; holding the timer past
+        // here would abort nothing and keep one alive per admitted statement.
+        wait.dispose();
+        observeClickHouseStatementWait(
+          instance,
+          operation,
+          (performance.now() - queuedAt) / 1000,
+        );
+        return task();
+      },
+      signal: wait.signal,
+    });
   } catch (error) {
     // Only a refusal is translated. Once admitted, the statement's own errors
     // belong to the layers below - translating them here would relabel a
@@ -167,6 +261,26 @@ async function run({
       );
       throw new ClickHouseOverloadedError({ reasons: [toError(error)] });
     }
+    // A wait that ran out is the same verdict as a full queue — the server has
+    // no capacity for this statement — so it gets the same transient error.
+    // Checked against OUR timeout, never the aborted-ness of the composed
+    // signal: a caller cancelling its own request must keep surfacing as the
+    // cancellation it is, not be relabelled as overload.
+    if (!admitted && wait.hasTimedOut()) {
+      incrementClickHouseStatementsShed(instance, operation);
+      logger.warn(
+        {
+          instance,
+          operation,
+          waitedMs: Math.round(performance.now() - queuedAt),
+          timeoutMs: waitTimeoutMs,
+        },
+        "Refused a ClickHouse statement: waited too long for a slot",
+      );
+      throw new ClickHouseOverloadedError({ reasons: [toError(error)] });
+    }
     throw error;
+  } finally {
+    wait.dispose();
   }
 }

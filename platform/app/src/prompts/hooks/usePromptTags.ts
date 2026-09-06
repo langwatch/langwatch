@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { api } from "~/utils/api";
 
 export type TagDefinition = {
@@ -17,10 +19,14 @@ export function usePromptTags({
     { enabled: enabled && !!projectId },
   );
 
-  const data: TagDefinition[] = (query.data ?? []).map((t) => ({
-    name: t.name,
-    id: t.id,
-  }));
+  // Memoized because callers put this array in effect dependencies. Mapping on
+  // every render hands them a new reference each time, so an effect that reads
+  // it and sets state re-arms itself from its own commit and the component
+  // renders without ever settling.
+  const data: TagDefinition[] = useMemo(
+    () => (query.data ?? []).map((t) => ({ name: t.name, id: t.id })),
+    [query.data],
+  );
 
   return {
     data,

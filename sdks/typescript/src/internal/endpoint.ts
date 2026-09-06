@@ -44,3 +44,28 @@ export const resolveEndpoint = (endpoint?: string | null): string => {
   }
   return normalizeEndpoint(DEFAULT_ENDPOINT);
 };
+
+/**
+ * The OTLP logs endpoint an environment asks for, per the OTel exporter spec:
+ * the signal-specific variable wins and is used verbatim; the generic variable
+ * is a base that `/v1/logs` hangs off. Null when neither is set, which means no
+ * OTLP transport rather than a default one.
+ *
+ * It lives here rather than beside either of its callers because both need it
+ * and their module graphs must stay apart. The CLI's live event channel loads
+ * the OpenTelemetry logs pipeline and the card contract; the session context
+ * hook is bundled into a zero-dependency single file that ships inside the
+ * agent plugin. Reaching into the event channel for this one pure env read
+ * would put the whole telemetry graph in that bundle.
+ */
+export const resolveLogsEndpoint = (
+  env: NodeJS.ProcessEnv = process.env,
+): string | null => {
+  const signal = env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim();
+  if (signal) return signal;
+
+  const generic = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  if (generic) return `${normalizeEndpoint(generic)}/v1/logs`;
+
+  return null;
+};

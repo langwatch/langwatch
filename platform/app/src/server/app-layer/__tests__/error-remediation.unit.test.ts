@@ -16,6 +16,30 @@ describe("error remediation registry", () => {
     ).toBe(true);
   });
 
+  describe("when the dataset storage root is not writable", () => {
+    /** @scenario The remediation names the two ways an operator fixes it */
+    it("names the object storage bucket and the local storage path", async () => {
+      const { remediation } = await import("../error-remediation");
+      const tips = remediation("storage_not_writable").tips ?? [];
+
+      expect(tips.some((tip) => tip.includes("S3_BUCKET_NAME"))).toBe(true);
+      expect(
+        tips.some((tip) => tip.includes("LANGWATCH_LOCAL_STORAGE_PATH")),
+      ).toBe(true);
+    });
+  });
+
+  describe("when no model is configured for a feature", () => {
+    it("names the Default Models page, the organization scope, and the documentation", async () => {
+      const { remediation } = await import("../error-remediation");
+      const { tips = [], docsUrl } = remediation("model_not_configured");
+
+      expect(tips.some((tip) => tip.includes("Default Models"))).toBe(true);
+      expect(tips.some((tip) => tip.includes("organization scope"))).toBe(true);
+      expect(docsUrl).toContain("/platform/model-providers");
+    });
+  });
+
   it("has no duplicate codes", () => {
     expect(new Set(REMEDIATION_CODES).size).toBe(REMEDIATION_CODES.length);
   });

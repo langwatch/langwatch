@@ -62,11 +62,18 @@ function toBudgetDto({
   memberCount,
   spendAvailable = true,
   readAt = new Date(),
+  reachable,
 }: {
   budget: GatewayBudgetWithSeats;
   memberCount?: number;
   spendAvailable?: boolean;
   readAt?: Date;
+  /**
+   * Whether any active key can produce traffic this budget matches. Undefined
+   * where reach was not resolved, which leaves the field off the wire rather
+   * than publishing a guess as an answer.
+   */
+  reachable?: boolean;
 }) {
   // The period is computed here rather than read off the row. The stored
   // columns move only at create and at an explicit reset, so a budget past
@@ -108,5 +115,11 @@ function toBudgetDto({
     // reports the distribution instead of pretending there is one total.
     ...(b.endUsersSeen !== undefined ? { end_users_seen: b.endUsersSeen } : {}),
     ...(b.endUsersOver !== undefined ? { end_users_over: b.endUsersOver } : {}),
+    // A budget nothing can reach never accrues and never blocks, which on
+    // every other field reads exactly like a budget that was simply never
+    // breached. This is the only place the wire tells the two apart.
+    ...(reachable === undefined
+      ? {}
+      : { scope_reach: reachable ? "reachable" : "unreachable" }),
   };
 }

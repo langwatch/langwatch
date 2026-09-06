@@ -630,7 +630,7 @@ export const ComparisonCharts = ({
       const targetGroups = new Map<
         string,
         {
-          name: string;
+          displayName: string;
           costs: number[];
           latencies: number[];
           scores: Record<string, number[]>;
@@ -646,7 +646,7 @@ export const ComparisonCharts = ({
 
           // Use ID as key for uniqueness
           const existing = targetGroups.get(targetCol.id) ?? {
-            name: targetCol.name,
+            displayName: targetCol.displayName ?? targetCol.name,
             costs: [],
             latencies: [],
             scores: {},
@@ -677,9 +677,9 @@ export const ComparisonCharts = ({
         }
       }
 
-      // Use the stored name for display, include color from targetColors
+      // Use the display name, include color from targetColors
       return Array.from(targetGroups.entries()).map(([id, data], index) => ({
-        name: data.name,
+        name: data.displayName,
         color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency:
@@ -847,17 +847,19 @@ export const ComparisonCharts = ({
   // other three bars share a prefix with this one — which is how these charts
   // ended up rendering four bars all labelled "support-assista…" while their
   // siblings rendered "(1) (2) (3) (4)". Same names, same trim, everywhere.
-  const axisLabelByName = useMemo(() => {
-    const names = chartData.map((d) => String(d.name));
-    const labels = buildAxisLabels(names, axis.maxLabelLength);
-    return new Map(names.map((name, i) => [name, labels[i] ?? name]));
-  }, [chartData, axis.maxLabelLength]);
-  const formatAxisTick = (value: unknown): string => {
-    const name = String(value);
-    return (
-      axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength)
-    );
-  };
+  //
+  // Held by bar position, not by name: two targets on one board can carry the
+  // identical name, and a name-keyed lookup gives both bars the last label.
+  const axisLabels = useMemo(
+    () =>
+      buildAxisLabels(
+        chartData.map((d) => String(d.name)),
+        axis.maxLabelLength,
+      ),
+    [chartData, axis.maxLabelLength],
+  );
+  const formatAxisTick = (value: unknown, index: number): string =>
+    axisLabels[index] ?? truncateLabel(String(value), axis.maxLabelLength);
 
   // Height is shared by every chart in the row, including the WinRateCharts
   // rendered alongside — and a win-rate chart's bar count (its variants, plus

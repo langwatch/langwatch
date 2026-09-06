@@ -222,28 +222,26 @@ class WebhooksFacade:
     def events_page(
         self,
         *,
+        from_ms: int,
+        to_ms: int,
         type: Optional[str] = None,
-        from_ms: Optional[int] = None,
-        to_ms: Optional[int] = None,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> Dict[str, Any]:
         """One page of the organization's emitted-events log (Stripe
-        /v1/events parity): filter by type and created range.
+        /v1/events parity): filter by type over a created range.
         Returns {data, next_cursor}. ``from_ms`` and ``to_ms`` bound the
         created range in epoch milliseconds, named as the spend facade names
-        the same wire params because ``from`` is a python keyword.
+        the same wire params because ``from`` is a python keyword. They are
+        required: the log is a ranged read over the 13-month spend table, and
+        an unbounded walk sorts all of it on every page.
 
         ``type`` is a single event type, which is all the route filters on.
         An unknown type serves an empty page rather than an error, so a
         consumer can probe forward-compatibly."""
-        params: Dict[str, Any] = {}
+        params: Dict[str, Any] = {"from": from_ms, "to": to_ms}
         if type is not None:
             params["type"] = type
-        if from_ms is not None:
-            params["from"] = from_ms
-        if to_ms is not None:
-            params["to"] = to_ms
         if cursor is not None:
             params["cursor"] = cursor
         if limit is not None:
@@ -255,9 +253,9 @@ class WebhooksFacade:
     def iter_events(
         self,
         *,
+        from_ms: int,
+        to_ms: int,
         type: Optional[str] = None,
-        from_ms: Optional[int] = None,
-        to_ms: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every emitted event matching the filters, one envelope at a time,

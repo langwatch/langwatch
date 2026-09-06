@@ -43,7 +43,7 @@ const valueCellStyle: React.CSSProperties = {
 export const sendBudgetIncreaseRequestEmail = async (
   input: SendBudgetIncreaseRequestEmailInput,
 ): Promise<void> => {
-  const dashboardUrl = `${env.BASE_HOST.replace(/\/$/, "")}/settings/governance/budgets`;
+  const dashboardUrl = `${env.BASE_HOST.replace(/\/$/, "")}/gateway/budgets`;
   const periodLabel = input.period ?? "current period";
   const subject = `Budget increase requested by ${input.requesterEmail}`;
 

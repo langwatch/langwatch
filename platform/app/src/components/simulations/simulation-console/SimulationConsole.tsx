@@ -11,13 +11,22 @@ import { StatusDisplay } from "./StatusDisplay";
 /** Width of the traffic-light cluster — mirrored on the right so the filename centers. */
 const TRAFFIC_LIGHTS_WIDTH = "44px";
 
+/** What the title bar reads when the caller names no file. */
+export const DEFAULT_CONSOLE_FILE_NAME = "simulation-results.log";
+
 /**
  * macOS-style terminal title bar. Traffic lights render greyscale — the
  * unfocused-window treatment — since they're decoration, not controls.
  * The right slot hosts actions (e.g. copy results) at the same width as
  * the light cluster so the filename stays centered.
  */
-function ConsoleTitleBar({ actions }: { actions?: ReactNode }) {
+function ConsoleTitleBar({
+  actions,
+  fileName,
+}: {
+  actions?: ReactNode;
+  fileName: string;
+}) {
   return (
     <HStack
       paddingX={4}
@@ -40,7 +49,7 @@ function ConsoleTitleBar({ actions }: { actions?: ReactNode }) {
         color="gray.400"
         fontFamily="mono"
       >
-        simulation-results.log
+        {fileName}
       </Text>
       <HStack
         width={TRAFFIC_LIGHTS_WIDTH}
@@ -64,6 +73,7 @@ export function SimulationConsole({
   status,
   durationInMs,
   titleBarActions,
+  fileName = DEFAULT_CONSOLE_FILE_NAME,
 }: {
   results?: ScenarioResults | null;
   scenarioName?: string;
@@ -71,6 +81,8 @@ export function SimulationConsole({
   durationInMs?: number;
   /** Rendered in the title bar's right slot (e.g. a copy-results button). */
   titleBarActions?: ReactNode;
+  /** What the title bar reads. Agent Testing calls these test results. */
+  fileName?: string;
 }) {
   const isPending =
     status === ScenarioRunStatus.IN_PROGRESS ||
@@ -87,7 +99,7 @@ export function SimulationConsole({
       overflow="auto"
       width="full"
     >
-      <ConsoleTitleBar actions={titleBarActions} />
+      <ConsoleTitleBar actions={titleBarActions} fileName={fileName} />
       <Box paddingX={5} paddingY={4}>
         <Code
           colorPalette="green"

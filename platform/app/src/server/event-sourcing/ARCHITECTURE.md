@@ -9,7 +9,7 @@ Event sourcing stores **immutable events** rather than mutable state. Current st
 - **Audit trail**: Complete history of all changes
 - **Multiple views**: Different projections from the same events
 - **Debugging**: See exactly what happened and when
-- **Decoupled side effects**: Reactors and map projections fire independently
+- **Decoupled side effects**: Subscribers and map projections fire independently
 
 ## Core Concepts
 
@@ -32,7 +32,7 @@ See: [`domain/types.ts`](./domain/types.ts)
 
 Commands represent **intent** to perform an action. Command handlers validate the intent and produce events.
 
-**Flow:** Command --> Command Handler --> Events --> Event Store --> Projections + Reactors
+**Flow:** Command --> Command Handler --> Events --> Event Store --> Projections + Subscribers
 
 See: [`commands/command.ts`](./commands/command.ts)
 
@@ -65,19 +65,34 @@ Transforms individual events into records and appends them to a store. Stateless
 
 See: [`projections/mapProjection.types.ts`](./projections/mapProjection.types.ts), [`projections/mapProjectionExecutor.ts`](./projections/mapProjectionExecutor.ts)
 
-#### Reactor (post-fold side effects)
+#### Subscriber (post-fold side effects)
 
-A reactor is tied to a specific fold projection. It fires **after** the fold's `apply + store` succeeds. If the fold fails, the reactor never fires. This guarantees the reactor always sees consistent, persisted state.
+A subscriber is tied to a specific fold projection. It fires **after** the fold's `apply + store` succeeds. If the fold fails, the subscriber never fires. This guarantees the subscriber always sees consistent, persisted state.
 
 **Lifecycle:**
 
 1. Fold completes successfully (state stored)
-2. Reactor's `handle(event, { foldState, tenantId, aggregateId })` is invoked
-3. Reactor performs side effects (trigger evaluations, broadcast updates, sync to Elasticsearch, etc.)
+2. Subscriber's `handle(event, { foldState, tenantId, aggregateId })` is invoked
+3. Subscriber performs side effects (trigger evaluations, broadcast updates, sync to Elasticsearch, etc.)
 
-Reactors fire on every fold completion (no `eventTypes` filter). Downstream deduplication is handled via `makeJobId` + `delay` in reactor options.
+A subscriber fires on every fold completion unless it narrows itself: `events` restricts it to named event types, and `when` is a pure, synchronous predicate evaluated on the projection hot path **before** any job is enqueued, so a rejected event costs no serialize-and-queue (ADR-069). A throwing predicate is logged and treated as relevant — it fails open, never dropping a side effect. Downstream deduplication is handled via `dedupId`/`dedup` + `delay`.
 
-See: [`reactors/reactor.types.ts`](./reactors/reactor.types.ts)
+**Three places a subscriber can attach.** The contract above is the same in all
+three; what differs is what it waits for and which queue lane it lands in.
+
+| Attached to | Fires after | Receives as state | Queue lane |
+|---|---|---|---|
+| a fold projection | that fold's `apply + store` | the committed fold state | `<tenantId>/fold/<projection>/reactor/<name>/` |
+| a map projection | that map's write | the mapped record | `<tenantId>/map/<projection>/reactor/<name>/` |
+| the pipeline itself (a live event subscriber) | the event is committed to the log — it waits on no projection | no projection state | `<tenantId>/subscriber/<name>/` |
+
+The first two are *projection* subscribers, which is why the code spells them
+`projectionSubscriber*` where both families are in scope. The `reactor` segment
+in their job path is a deliberately kept name, not a missed rename — the path is
+the GroupQueue routing key, so ADR-098 left it alone rather than strand
+in-flight jobs across a rolling deploy.
+
+See: [`subscribers/subscriber.types.ts`](./subscribers/subscriber.types.ts)
 
 ## Architecture Overview
 
@@ -97,7 +112,7 @@ graph TB
         ES --> |"GroupQueue<br/>(parallel)"| MP[Map Projection]
         FP --> |"store.store(state)"| FS[(Fold Store)]
         MP --> |"store.append(record)"| AS[(Append Store)]
-        FP --> |"on success"| R[Reactor]
+        FP --> |"on success"| R[Subscriber]
         R --> |"side effect"| EXT[External Systems<br/>ES sync / Broadcasts / Triggers]
     end
 
@@ -118,19 +133,19 @@ graph TB
 1. Commands are sent and processed by command handlers
 2. Command handlers produce events
 3. Events are stored in the event store (immutable, append-only)
-4. Events are dispatched to fold projections (ordered per aggregate), map projections (parallel), and reactors (after fold success)
+4. Events are dispatched to fold projections (ordered per aggregate), map projections (parallel), and subscribers (after fold success)
 5. Fold projections reduce events into accumulated state
 6. Map projections transform individual events into appended records
-7. Reactors fire side effects after fold state is persisted
+7. Subscribers fire side effects after fold state is persisted
 
 ## Queue System
 
-Every projection — fold, map, reactor — dispatches through the in-house **GroupQueue**: per-aggregate FIFO + cross-aggregate parallelism on Redis primitives + Lua. Not BullMQ. The framework wires one GroupQueue per pipeline at the composition root.
+Every projection — fold, map, subscriber — dispatches through the in-house **GroupQueue**: per-aggregate FIFO + cross-aggregate parallelism on Redis primitives + Lua. Not BullMQ. The framework wires one GroupQueue per pipeline at the composition root.
 
 The summary:
 
 - **GroupQueue (for folds)** — fold projections need per-aggregate FIFO. The `groupKey` is the aggregate id; events for the same aggregate process in order, different aggregates parallelise.
-- **GroupQueue (for maps + reactors)** — same queue infrastructure, different group keys. No per-aggregate ordering; just dedup + retries + tiered storage.
+- **GroupQueue (for maps + subscribers)** — same queue infrastructure, different group keys. No per-aggregate ordering; just dedup + retries + tiered storage.
 - **Memory Queue (for testing / no Redis)** — when Redis is unavailable (local dev, fast unit tests), the framework drops to an in-process queue ([`queues/memory.ts`](./queues/memory.ts)) that processes jobs asynchronously with simple concurrency control. Not a tier of GroupQueue — entirely separate code path with no Lua, no Redis, no tiered storage.
 
 GroupQueue has its own deep-dive docs:
@@ -156,7 +171,7 @@ Unlike traditional event sourcing systems that use checkpoint stores to track pr
 - **GroupQueue provides ordering**: per-aggregate FIFO is enforced inside the staging Lua — events for the same aggregate are dispatched in stage-order without a sequence-number tracker.
 - **Fold state is the implicit checkpoint**: the last persisted fold state tells the system where it is. If processing fails, the queue retries the event with backoff (in front of the same group, preserving FIFO) and the fold re-applies from current state.
 - **Map projections are stateless**: each event is independently appended — no position tracking needed.
-- **Reactors are idempotent**: they fire after fold success. If they fail, the queue retries them. Downstream deduplication is handled via `makeJobId`.
+- **Subscribers are idempotent**: they fire after fold success. If they fail, the queue retries them. Downstream deduplication is handled via `makeJobId`.
 
 ## Global Projection Registry
 
@@ -176,7 +191,7 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 
 - **Fold failures**: GroupQueue retries the job with exponential backoff in front of the same group (FIFO is preserved). On retry, the fold loads current state and re-applies the event. If state was already stored, the fold is effectively idempotent.
 - **Map failures**: GroupQueue retries the job. Append stores should be idempotent or tolerate duplicates.
-- **Reactor failures**: GroupQueue retries the reactor independently. The fold state is already persisted, so the reactor can safely retry.
+- **Subscriber failures**: GroupQueue retries the subscriber independently. The fold state is already persisted, so the subscriber can safely retry.
 - **Transient blob-store failures** (offloaded body temporarily unreachable — network blip, 5xx): GroupQueue re-stages the SAME envelope without re-encoding, so the body stays referenced through the retry. Distinguished from "missing" so a transient store outage can't mass-drop every in-flight offloaded job.
 - **Genuinely missing offloaded body** (TTL backstop kicked in, or manual purge): decode returns null, the slot is completed, the work recovers via event replay. The append-only event log is the durable source of truth.
 
@@ -193,7 +208,7 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 | Fold executor | [`projections/foldProjectionExecutor.ts`](./projections/foldProjectionExecutor.ts) |
 | Map executor | [`projections/mapProjectionExecutor.ts`](./projections/mapProjectionExecutor.ts) |
 | Projection router | [`projections/projectionRouter.ts`](./projections/projectionRouter.ts) |
-| Reactor types | [`reactors/reactor.types.ts`](./reactors/reactor.types.ts) |
+| Subscriber types | [`subscribers/subscriber.types.ts`](./subscribers/subscriber.types.ts) |
 | GroupQueue (deep dive) | [`queues/groupQueue/ARCHITECTURE.md`](./queues/groupQueue/ARCHITECTURE.md) + [`queues/groupQueue/README.md`](./queues/groupQueue/README.md) |
 | GroupQueue (main class) | [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts) |
 | Event store (interface) | [`stores/eventStore.types.ts`](./stores/eventStore.types.ts) |

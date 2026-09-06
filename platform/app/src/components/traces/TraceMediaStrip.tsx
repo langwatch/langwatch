@@ -26,8 +26,7 @@ export function TraceMediaStrip({ parts }: { parts: MediaPartData[] }) {
       ))}
       {hidden > 0 && (
         <Text fontSize="xs" color="fg.muted" data-testid="trace-media-overflow">
-          +{hidden} more media {hidden === 1 ? "item" : "items"} in the raw
-          content below
+          +{hidden} more media {hidden === 1 ? "item" : "items"} not shown
         </Text>
       )}
     </VStack>

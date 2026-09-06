@@ -55,8 +55,8 @@ export const isValidEvaluatorType = (slug: string): boolean => slug in catalog;
 /**
  * The catalog slugs closest to a miss, best first — plain Levenshtein over
  * the whole slug, which ranks a stale rename ("ragas/answer_relevancy") right
- * next to its live successors ("ragas/response_relevancy",
- * "legacy/ragas_answer_relevancy") without any special-casing.
+ * next to its live successor ("ragas/response_relevancy") without any
+ * special-casing.
  */
 export const closestEvaluatorTypes = (
   input: string,

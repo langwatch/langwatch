@@ -35,9 +35,15 @@ const logger = createLogger("langwatch:export:scenario-runs");
 /**
  * The run-history dropdown's values, mapped onto outcome categories.
  *
- * Deliberately not pushed into SQL: STALLED is derived from timestamps at map
- * time by resolveRunStatus rather than stored, so only a post-mapping filter
- * can reproduce what the list shows.
+ * Deliberately not pushed into SQL: categories group several stored statuses
+ * (ERROR and FAILED are both "failure"), and categorizeRunStatus is the single
+ * source of truth for bucketing, so the filter applies after mapping and can
+ * never drift from what the list shows.
+ *
+ * Note "stalled" only matches legacy rows still stored as STALLED — no run
+ * reaches that status anymore (the process-manager stall watchdog finishes
+ * quiet runs ERROR), so the filter now yields an empty export in practice.
+ * Kept so the dropdown/API contract stays valid.
  */
 const FILTER_TO_CATEGORY: Record<
   ScenarioRunExportStatusFilter,

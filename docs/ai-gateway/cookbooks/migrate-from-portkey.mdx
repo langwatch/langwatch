@@ -16,7 +16,7 @@ Portkey and LangWatch both sit between your app and the upstream LLM providers, 
 | **Key, API Key** (client-facing credential) | **Virtual Key** (`vk-lw-…`) | LangWatch's VK is what your client code presents. It references a routing policy whose `modelProviderIds[]` is the ordered fallback chain, attaches budgets, and carries per-caller policy. |
 | **Config** (JSON routing blob) | **VK `config.*` JSON** + **RoutingPolicy.modelProviderIds[]** + **ModelProvider Advanced tab fields** | LangWatch spreads a Portkey config across three places, client-side routing lives in the VK, provider ordering lives in the routing policy, provider-side defaults live on the ModelProvider Advanced tab. |
 | **Budget** (spend cap, key-scoped) | **GatewayBudget** (org, team, project, VK, principal scoped) | LangWatch budgets are hierarchical: a single request is checked against *every* applicable budget, from org down. Portkey scopes at the key level only. |
-| **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch leverages the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail, no separate product surface. |
+| **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch uses the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail, no separate product surface. |
 | **Strategy: fallback** (provider retry ladder) | **RoutingPolicy.modelProviderIds[]** | Ordered list of ModelProvider ids that walk on 5xx/429/timeout per the standard precedence. The position in the array determines `primary`, `fallback-1`, … in the UI. |
 | **Strategy: loadbalance** (weight-spread across keys) | v1.1, see §Outstanding | LangWatch v1 doesn't ship multi-key sibling loadbalancing; the Portkey loadbalancer is the biggest v1 gap. v1.1 adds sibling-ModelProvider rotation driven by the routing policy. |
 | **Cache (Simple)** | **Anthropic `cache_control` passthrough + `X-LangWatch-Cache` override** | LangWatch v1 is pass-through by default (respect Anthropic's explicit cache hints) + rule-based enforcement for force/disable. Semantic caching is v1.1. |
@@ -108,7 +108,7 @@ From **AI Gateway → Budgets → New budget**:
 - **Limit**: your Portkey spend cap
 - **on_breach**: `block` (hard-cap, returns 402) or `warn` (soft-cap, adds `X-LangWatch-Budget-Warning` header)
 
-LangWatch budgets stack hierarchically, your org budget PLUS the project budget PLUS any per-VK budget all apply to the same request. This is a deliberate step-up from Portkey's key-scoped budgets and is one of the key enterprise-grade features.
+LangWatch budgets stack hierarchically, your org budget PLUS the project budget PLUS any per-VK budget all apply to the same request. This is a deliberate step-up from Portkey's key-scoped budgets.
 
 ## Rollout pattern: gradual migration without a big-bang
 
@@ -123,12 +123,12 @@ Run `/gateway/usage` spend + `/settings/audit-log` (filter Target = `virtual_key
 
 ## Feature-parity gaps (be explicit)
 
-Some Portkey features don't have LangWatch v1 equivalents. If any of these are load-bearing for you, weigh them carefully:
+Some Portkey features don't have LangWatch v1 equivalents. If your setup depends on any of these, weigh them carefully:
 
 - **Loadbalance strategy** (sibling-key rotation for rate-limit absorption), LangWatch v1 routes to one credential per provider slot. Sibling-key loadbalancing is on the v1.1 roadmap. Workaround: if you genuinely need it, keep Portkey for those routes, run LangWatch in parallel for governance.
 - **Semantic cache**: LangWatch v1 ships `respect`, `force`, `disable` modes for explicit Anthropic cache_control + a rule engine; semantic similarity lookups are v1.1.
-- **Prompt management embedded in the gateway**: LangWatch has a dedicated Prompt Management product surface that's more powerful than Portkey's embedded library, but it's a separate area rather than a subfolder of the gateway.
-- **Guardrails catalog**: Portkey ships a pre-built library of guardrails; LangWatch reuses the evaluator catalog you already have (and any custom evaluator you've built). For most enterprise teams this is a net win (you own the logic); for quick-start it's a cold start.
+- **Prompt management embedded in the gateway**: LangWatch has a dedicated Prompt Management product surface, but it's a separate area rather than a subfolder of the gateway.
+- **Guardrails catalog**: Portkey ships a pre-built library of guardrails; LangWatch reuses the evaluator catalog you already have (and any custom evaluator you've built). If you want to own the guardrail logic this is a net win; if you want to start fast it is a cold start.
 
 ## What to watch during + after migration
 

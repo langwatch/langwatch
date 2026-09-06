@@ -28,7 +28,6 @@ export function WebhookSecretDialog({
         toaster.create({
           title: "Signing secret copied",
           type: "success",
-          meta: { closable: true },
         });
       } catch {
         // The secret never shows again, so a silent copy failure is the
@@ -36,7 +35,6 @@ export function WebhookSecretDialog({
         toaster.create({
           title: "Copy failed. Select the secret and copy it manually.",
           type: "error",
-          meta: { closable: true },
         });
       }
     })();

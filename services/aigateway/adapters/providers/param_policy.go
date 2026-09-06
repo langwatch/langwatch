@@ -655,3 +655,105 @@ func renderPolicyNote(rules map[policyLane]paramRule) string {
 type paramRefusalError struct{ msg string }
 
 func (e *paramRefusalError) Error() string { return e.msg }
+
+// ── The codex Responses lane ─────────────────────────────────────────────
+//
+// The ChatGPT codex backend keeps an allowlist of its own and answers 400
+// "Unsupported parameter: <name>" on anything outside it, before a token is
+// generated, naming only the first offender. The gateway authors the
+// outgoing body for this lane (codexRequestBody builds it from the mapped
+// fields), so every field gets a disposition here just like the translated
+// chat lanes: a tuning knob the backend refuses is dropped with a signal,
+// and a field whose silent absence would change what the caller observably
+// gets is refused by name before a provider round trip is paid.
+//
+// Every row is verified against the live backend; the env-gated probe in
+// codex_live_conformance_test.go re-checks the table on demand. A field the
+// table does not name falls to paramPolicyDefaultRule (dropped), which is
+// the safe direction: the same field forwarded would have failed the whole
+// request upstream anyway.
+var codexParamPolicyTable = map[string]paramRule{
+	// Accepted by the backend and forwarded faithfully. model, stream and
+	// store are listed as mapped but pinned by codexRequestBody: bare model
+	// name, stream on, store off (the backend is stateless).
+	"model":               {disp: dispMapped, note: "pinned to the bare model name"},
+	"input":               mapped(),
+	"instructions":        mapped(),
+	"stream":              {disp: dispMapped, note: "pinned on (the backend is SSE-only)"},
+	"stream_options":      mapped(),
+	"store":               {disp: dispMapped, note: "pinned off (the backend is stateless)"},
+	"include":             mapped(),
+	"tools":               mapped(),
+	"tool_choice":         mapped(),
+	"parallel_tool_calls": mapped(),
+	"reasoning":           mapped(),
+	"text":                mapped(),
+	"prompt_cache_key":    mapped(),
+	// Functional: the answer without the field is not the answer that was
+	// asked for, so these refuse instead of dropping.
+	"previous_response_id": refused("the codex lane pins store: false, so the response chain the caller asked to continue would silently not continue"),
+	"background":           refused("the background response id the caller expects to poll would be silently absent"),
+	"top_logprobs":         refused("the requested log probabilities would be silently absent from the response"),
+	"max_tool_calls":       refused("the tool-call cap would be silently unenforced"),
+	// Tuning knobs the backend refuses: dropped with a signal.
+	"max_output_tokens":      dropped("the codex backend refuses an output cap"),
+	"temperature":            dropped("the codex backend refuses sampling options"),
+	"top_p":                  dropped("the codex backend refuses sampling options"),
+	"truncation":             dropped("the codex backend manages its own context truncation"),
+	"metadata":               dropped("the codex backend refuses request metadata"),
+	"service_tier":           dropped("the codex backend has no service tiers"),
+	"user":                   dropped("the codex backend refuses caller identifiers"),
+	"safety_identifier":      dropped("the codex backend refuses caller identifiers"),
+	"prompt_cache_options":   dropped("the codex backend manages its own prompt cache"),
+	"prompt_cache_retention": dropped("the codex backend manages its own prompt cache"),
+}
+
+const codexPolicyLane = "codex"
+
+// classifyCodexParam decides one Responses-body key against the codex
+// table. Same defaults as the chat lanes: an unknown key is a droppable
+// vendor param, and strict mode (drop_tuning_params false) turns drops
+// into refusals. drop_tuning_params itself is the gateway's own directive,
+// consumed by the caller before classification.
+func classifyCodexParam(name, model string, strict bool) paramVerdict {
+	rule, known := codexParamPolicyTable[name]
+	if !known {
+		rule = paramPolicyDefaultRule
+	}
+	label := fmt.Sprintf("%s/%s", codexPolicyLane, model)
+	switch rule.disp {
+	case dispRefused:
+		return paramVerdict{refusal: refusedFunctionally(name, label, rule.why)}
+	case dispDropped:
+		if strict {
+			return paramVerdict{refusal: refusedStrictMode(name, label, rule.why)}
+		}
+		return paramVerdict{drop: true}
+	default:
+		return paramVerdict{}
+	}
+}
+
+// renderCodexParamPolicyTable renders the codex lane's table for the docs
+// page; TestParamPolicyDocsInSync diffs it the same way as the chat table.
+func renderCodexParamPolicyTable() string {
+	names := make([]string, 0, len(codexParamPolicyTable))
+	for name := range codexParamPolicyTable {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var b strings.Builder
+	b.WriteString("| Parameter | codex | Notes |\n")
+	b.WriteString("|---|---|---|\n")
+	for _, name := range names {
+		rule := codexParamPolicyTable[name]
+		note := rule.note
+		if note == "" {
+			note = rule.why
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", name, dispositionLabel(rule), note)
+	}
+	b.WriteString("| any other key | dropped | the codex backend accepts a fixed set of fields |\n")
+	return b.String()
+}

@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import { prisma } from "~/server/db";
@@ -11,7 +11,7 @@ import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -45,7 +45,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => {
       return await getLLMModelCosts(input);
     }),
@@ -65,13 +65,19 @@ export const llmModelCostsRouter = createTRPCRouter({
         outputCostPerToken: z.number().optional(),
         cacheReadCostPerToken: z.number().optional(),
         cacheCreationCostPerToken: z.number().optional(),
+        cacheCreation1hCostPerToken: z.number().optional(),
         regex: z.string().refine((value) => isSafeRegex(value), {
           message:
             "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
         }),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -81,6 +87,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         outputCostPerToken,
         cacheReadCostPerToken,
         cacheCreationCostPerToken,
+        cacheCreation1hCostPerToken,
         regex,
       } = input;
 
@@ -117,6 +124,7 @@ export const llmModelCostsRouter = createTRPCRouter({
             outputCostPerToken,
             cacheReadCostPerToken,
             cacheCreationCostPerToken,
+            cacheCreation1hCostPerToken,
             regex,
           },
         });
@@ -150,6 +158,7 @@ export const llmModelCostsRouter = createTRPCRouter({
           outputCostPerToken,
           cacheReadCostPerToken,
           cacheCreationCostPerToken,
+          cacheCreation1hCostPerToken,
           regex,
         },
       });
@@ -157,7 +166,12 @@ export const llmModelCostsRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       // Derive the scope from the row itself, then authorize manage on that
       // scope. Never trust a caller-supplied scope for a delete.
@@ -185,7 +199,7 @@ export const llmModelCostsRouter = createTRPCRouter({
    */
   getModelLimits: protectedProcedure
     .input(z.object({ projectId: z.string(), model: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => getModelLimits(input.model)),
 
   /**
@@ -211,9 +225,10 @@ export const llmModelCostsRouter = createTRPCRouter({
         outputCostPerToken: z.number().nonnegative().optional(),
         cacheReadCostPerToken: z.number().nonnegative().optional(),
         cacheCreationCostPerToken: z.number().nonnegative().optional(),
+        cacheCreation1hCostPerToken: z.number().nonnegative().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) =>
       previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
     ),

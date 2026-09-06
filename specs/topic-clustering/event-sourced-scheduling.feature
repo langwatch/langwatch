@@ -57,12 +57,26 @@ Feature: Event-sourced topic clustering scheduling
     Then the pending continuation intent is recovered from durable storage
     And clustering resumes from the committed cursor, not from the beginning
 
+  @unit
   Scenario: A failing clustering effect retries then records a visible failure
-    Given the clustering effect fails persistently
+    Given the clustering effect fails persistently for a reason of ours
     When the intent has been attempted 3 times
     Then no further attempts are made for that intent
     And the failure is recorded on the project's durable state
     And the settings page can show the failed outcome
+
+  # Retrying a misconfiguration cannot fix it. Three attempts against a project
+  # with no model configured produce three identical failures, three records at
+  # error level, and the same outcome the first attempt already knew — while
+  # the customer waits longer to be told what to change.
+  @unit
+  Scenario: A failure only the customer can fix is recorded without burning retries
+    Given clustering failed because no default model is configured
+    When the first attempt fails
+    Then the failure is recorded immediately with its own code
+    And no further attempts are made for that intent
+    And the record is logged below error level
+    And it is counted apart from the failures that page us
 
   Scenario: A failure the user can fix shows guidance, not a stack trace
     Given clustering failed because no default model is configured

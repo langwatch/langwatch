@@ -70,8 +70,13 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // control-plane relay to intercept and move the user's browser — it fetches
   // no platform data and returns no result of its own.
   "navigate",
-  "init-shell",
-  "request-increase",
+  // Agent-only page control: `ui call` dispatches a typed action to the page
+  // the user has open and `workbench get-state` reads it live. Only works
+  // mid-turn over the turn's own stream, so it is channel plumbing, not a
+  // platform data surface (specs/langy/langy-ui-actions.feature).
+  "ui",
+  "workbench",
+  "instrument",
   // Local status + documentation fetchers.
   "status",
   "docs",
@@ -83,6 +88,13 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "cursor",
   "gemini",
   "opencode",
+  "copilot",
+  // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
+  // returning no LangWatch result. ADR-039 §Extension #2.
+  "code",
+  // Local capture setup for the standalone GitHub Copilot app: installs an
+  // OS login agent on this machine, no platform resource to card.
+  "copilot-app",
   // Support reporting: sends an issue report to the LangWatch team; no
   // platform resource to card. Mirrored in the app's capabilityCatalog
   // EXCLUDED_COMMANDS.

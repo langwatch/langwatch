@@ -1,8 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
+import type {
+  Experiment,
+  ExperimentType,
+  Project,
+} from "~/generated/prisma/client";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -69,7 +73,6 @@ export default async function handler(
   // initializing an experiment run requires `experiments:manage`.
   try {
     await enforceApiKeyCeiling({
-      prisma,
       resolved,
       permission: "experiments:manage",
     });
@@ -133,7 +136,7 @@ export const findOrCreateExperiment = async ({
   workflowId?: string;
 }) => {
   let experiment: Experiment | null = null;
-  const experiments = ExperimentService.create(prisma);
+  const experiments = ExperimentService.create({ prisma });
 
   if (experiment_id) {
     experiment = await experiments.findById({

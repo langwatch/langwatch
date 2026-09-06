@@ -66,7 +66,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get flow callbacks for this drawer (set by parent drawer like OnlineEvaluationDrawer)
   const flowCallbacks = getFlowCallbacks("evaluatorList");
@@ -240,7 +240,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         }"?`}
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!evaluatorToDelete) return;
           deleteMutation.mutate(

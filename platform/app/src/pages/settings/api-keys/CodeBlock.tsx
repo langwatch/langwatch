@@ -38,7 +38,6 @@ export function CodeBlock({
         title: "Clipboard not available. Copy manually.",
         type: "error",
         duration: 3000,
-        meta: { closable: true },
       });
       return;
     }
@@ -47,7 +46,6 @@ export function CodeBlock({
         title: copyToastTitle ?? "Copied to clipboard",
         type: "success",
         duration: 2000,
-        meta: { closable: true },
       });
     });
   };

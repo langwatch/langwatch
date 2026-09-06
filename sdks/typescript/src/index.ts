@@ -57,6 +57,10 @@ export {
   type TargetMetadata,
   type TargetInfo,
   type EvaluationResult as ExperimentEvaluationResult,
+  type ComparisonMetric,
+  type ComparisonOptions,
+  type ComparisonStatus,
+  type ComparisonVerdict,
   type ExperimentInitOptions,
   type LogOptions,
   type EvaluateOptions as ExperimentEvaluateOptions,
@@ -70,6 +74,7 @@ export {
   ExperimentInitError,
   ExperimentApiError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./client-sdk/services/experiments";
 
@@ -188,6 +193,10 @@ export {
   type SpendSummaryRow,
   type SpendSummariesPage,
   type SpendEventStatus,
+  type SpendSummaryStatus,
+  type SpendGroupBy,
+  type SpendFilterOptions,
+  type SpendSummariesOptions,
   type SpendReplayResult,
   type EndUserSpend,
   type EndUserCap,
@@ -204,6 +213,32 @@ export {
   type CreateGatewayBudgetInput,
   type UpdateGatewayBudgetInput,
 } from "./client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+
+/**
+ * Provisioning teams and projects, the two things an integration has to
+ * create before anything else exists to write to. Both families want an
+ * organization API key; creating a project also mints that project's own
+ * service API key, served once in the create response.
+ */
+export {
+  TeamsApiService,
+  TeamsApiError,
+  type Team,
+  type TeamPagination,
+  type TeamMember,
+  type ListTeamsResponse,
+  type ArchivedTeam,
+} from "./client-sdk/services/teams/teams-api.service";
+export {
+  ProjectsApiService,
+  ProjectsApiError,
+  type Project,
+  type PaginatedProjects,
+  type ProjectWithServiceKey,
+  type ArchivedProject,
+  type CreateProjectInput,
+  type UpdateProjectInput,
+} from "./client-sdk/services/projects/projects-api.service";
 
 export const logger = {
   ConsoleLogger,

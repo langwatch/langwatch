@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import { resolveEvaluatorSettingsWithSource } from "~/server/event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
@@ -320,6 +321,94 @@ describe("EvaluationExecutionService", () => {
 
         expect(result.status).toBe("skipped");
         expect(result.details).toBe("Cannot evaluate trace with errors");
+      });
+    });
+
+    describe("given settings recovered from a top-level config", () => {
+      // AC0f for langwatch#6397 — the ripple one hop before the judge.
+      //
+      // The fixture MUST carry a `model` key. evaluation-execution.factories.ts
+      // engages exactly two settings-driven branches, `"model" in settings` and
+      // `"embeddings_model" in settings`; it never reads `prompt`. A
+      // prompt-only fixture resolves an identical env before and after the fix,
+      // so the ripple is unobservable and the test cannot fail.
+      // DERIVED, not hand-written. A literal here keeps this test green with the
+      // entire D6 recovery reverted — it would only prove the service reads a
+      // `model` key it was handed. The bound scenario says the ONLINE PIPELINE
+      // resolves the model env from the RECOVERED settings, so the resolver has
+      // to sit in the path: revert it and `settings` collapses to the (absent)
+      // monitor parameters, the model key disappears, and this goes red.
+      const { settings: RECOVERED } = resolveEvaluatorSettingsWithSource({
+        config: {
+          evaluatorType: "custom/settings-eval",
+          prompt: "Score this answer for factual accuracy.",
+          model: "openai/gpt-5-mini",
+        },
+        parameters: null,
+        evaluatorRecordType: "evaluator",
+      });
+
+      /** @scenario Model environment is resolved from the recovered settings */
+      it("resolves the model environment from the settings that carry the prompt", async () => {
+        const { service, mockModelEnvResolver } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...RECOVERED },
+        });
+
+        expect(mockModelEnvResolver.resolveForEvaluator).toHaveBeenCalledWith(
+          expect.objectContaining({
+            settings: expect.objectContaining({ model: "openai/gpt-5-mini" }),
+          }),
+        );
+      });
+    });
+
+    describe("given a correctly-configured evaluator — the 99% regression case", () => {
+      // AC12b for langwatch#6397. The D6 change alters settings resolution on the
+      // hottest path in the product; this pins that a monitor whose config was
+      // ALREADY correct sends an unchanged payload.
+      //
+      // The fixture type is load-bearing. `custom/*`, `workflow` and code types
+      // return at evaluation-execution.service.ts:405-410, and native types
+      // return at :596 — all before `langevalsClient.evaluate` (:617). With any
+      // of those the capture is empty, and a "byte-identical payload" assertion
+      // degenerates to `[] vs []`: green, silent, and asserting nothing.
+      const USER_SETTINGS = {
+        prompt: "Score this answer for factual accuracy.",
+        model: "openai/gpt-5-mini",
+      } as const;
+
+      /** @scenario A correctly configured evaluator's settings reach the judge unchanged */
+      it("forwards the user's settings to the judge unchanged", async () => {
+        const { service, mockClient } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...USER_SETTINGS },
+        });
+
+        const payload = (mockClient.evaluate as ReturnType<typeof vi.fn>).mock
+          .calls[0]?.[0] as { settings?: Record<string, unknown> };
+
+        // Guard FIRST: an empty capture would make the equality below vacuous.
+        expect(Object.keys(payload?.settings ?? {})).not.toHaveLength(0);
+        expect(payload?.settings).toEqual(USER_SETTINGS);
+      });
+
+      it("reaches the judge at all with this fixture type", async () => {
+        // Pins the guard above: if someone swaps the fixture to a custom/*,
+        // workflow or native type, evaluate is never called and the assertion
+        // that matters stops running.
+        const { service, mockClient } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...USER_SETTINGS },
+        });
+
+        expect(mockClient.evaluate).toHaveBeenCalledTimes(1);
       });
     });
 

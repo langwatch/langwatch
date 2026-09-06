@@ -9,10 +9,11 @@ import {
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
-import { asMarkdownBody, parseContentBlocks } from "./parsing";
+import { CommentableBlock } from "./messageComments";
+import { asMarkdownBody, parseContentBlocks, withBlockKeys } from "./parsing";
 import { ReasoningBlock } from "./ReasoningBlock";
 import { OpenAIToolCallCard, ToolPairCard } from "./ToolBlocks";
-import type { ChatMessage, ContentBlock } from "./types";
+import type { ChatMessage, ContentBlock, KeyedContentBlock } from "./types";
 
 /**
  * Re-run parsing on a text block if it visibly looks like a serialized
@@ -36,19 +37,34 @@ export function reparseTextBlock(text: string): ContentBlock[] | null {
  * available). Used to flatten `tool_use → tool_result` walls into a
  * single grouped card per call.
  */
+type KeyedBlock<K extends ContentBlock["kind"]> = Extract<
+  KeyedContentBlock,
+  { kind: K }
+>;
+
 type StackItem =
-  | { kind: "block"; block: ContentBlock }
+  | { kind: "block"; block: KeyedContentBlock }
   | {
       kind: "tool_pair";
-      use: Extract<ContentBlock, { kind: "tool_use" }>;
-      result: Extract<ContentBlock, { kind: "tool_result" }> | null;
+      use: KeyedBlock<"tool_use">;
+      result: KeyedBlock<"tool_result"> | null;
     }
   | {
       kind: "orphan_result";
-      result: Extract<ContentBlock, { kind: "tool_result" }>;
+      result: KeyedBlock<"tool_result">;
     };
 
-export function pairToolBlocks(blocks: ContentBlock[]): StackItem[] {
+/**
+ * The key a comment on this item is stored against. A tool call and the result
+ * it was paired with read as one card, so the call's key is what identifies it.
+ */
+function itemBlockKey(item: StackItem): string {
+  if (item.kind === "tool_pair") return item.use.blockKey;
+  if (item.kind === "orphan_result") return item.result.blockKey;
+  return item.block.blockKey;
+}
+
+export function pairToolBlocks(blocks: KeyedContentBlock[]): StackItem[] {
   const out: StackItem[] = [];
   const consumed = new Set<number>();
   for (let i = 0; i < blocks.length; i++) {
@@ -77,10 +93,7 @@ export function pairToolBlocks(blocks: ContentBlock[]): StackItem[] {
         out.push({
           kind: "tool_pair",
           use: b,
-          result: blocks[resultIdx] as Extract<
-            ContentBlock,
-            { kind: "tool_result" }
-          >,
+          result: blocks[resultIdx] as KeyedBlock<"tool_result">,
         });
       } else {
         out.push({ kind: "tool_pair", use: b, result: null });
@@ -102,12 +115,21 @@ export function BlockStack({
   blocks,
   toolCalls,
   collapseTools = false,
+  keyPrefix = "",
 }: {
   blocks: ContentBlock[];
   toolCalls: NonNullable<ChatMessage["tool_calls"]>;
   collapseTools?: boolean;
+  /**
+   * Namespaces this stack's block keys under the block it was read out of, so
+   * a message nested inside another one is still identified uniquely.
+   */
+  keyPrefix?: string;
 }) {
-  const items = useMemo(() => pairToolBlocks(blocks), [blocks]);
+  const items = useMemo(
+    () => pairToolBlocks(withBlockKeys(blocks, keyPrefix)),
+    [blocks, keyPrefix],
+  );
   const isEmpty = items.length === 0 && toolCalls.length === 0;
 
   const toolItemCount = useMemo(
@@ -127,11 +149,20 @@ export function BlockStack({
   const [toolsOpen, setToolsOpen] = useState(false);
   const shouldCollapseTools = collapseTools && toolItemCount > 0;
 
-  const renderItem = (item: StackItem, i: number) => {
+  const renderItem = (item: StackItem) => {
+    const blockKey = itemBlockKey(item);
+    return (
+      <CommentableBlock key={blockKey} blockKey={blockKey}>
+        {renderBlockContent(item)}
+      </CommentableBlock>
+    );
+  };
+
+  const renderBlockContent = (item: StackItem) => {
     if (item.kind === "tool_pair") {
       return (
         <ToolPairCard
-          key={item.use.id ?? `tp-${i}`}
+          key={item.use.blockKey}
           name={item.use.name}
           input={item.use.input}
           id={item.use.id}
@@ -146,7 +177,7 @@ export function BlockStack({
     if (item.kind === "orphan_result") {
       return (
         <ToolPairCard
-          key={item.result.toolUseId ?? `or-${i}`}
+          key={item.result.blockKey}
           name={item.result.toolUseId ?? "tool"}
           input={undefined}
           id={item.result.toolUseId}
@@ -160,16 +191,17 @@ export function BlockStack({
     const b = item.block;
     switch (b.kind) {
       case "thinking":
-        return <ReasoningBlock key={`th-${i}`} text={b.text} />;
+        return <ReasoningBlock key={b.blockKey} text={b.text} />;
       case "text": {
         const reparsed = reparseTextBlock(b.text);
         if (reparsed) {
           return (
             <BlockStack
-              key={`t-${i}`}
+              key={b.blockKey}
               blocks={reparsed}
               toolCalls={[]}
               collapseTools={collapseTools}
+              keyPrefix={b.blockKey}
             />
           );
         }
@@ -179,7 +211,7 @@ export function BlockStack({
         const { context, body } = splitLeadingContextBlocks(b.text);
         if (context && body.trim()) {
           return (
-            <VStack key={`t-${i}`} align="stretch" gap={1.5}>
+            <VStack key={b.blockKey} align="stretch" gap={1.5}>
               <ContextDisclosure context={context} />
               <Box textStyle="xs" color="fg" lineHeight="1.6">
                 <RenderedMarkdown
@@ -192,7 +224,7 @@ export function BlockStack({
           );
         }
         return (
-          <Box key={`t-${i}`} textStyle="xs" color="fg" lineHeight="1.6">
+          <Box key={b.blockKey} textStyle="xs" color="fg" lineHeight="1.6">
             <RenderedMarkdown
               markdown={asMarkdownBody(b.text)}
               paddingX={0}
@@ -202,11 +234,11 @@ export function BlockStack({
         );
       }
       case "media":
-        return <TraceMediaPart key={`media-${i}`} part={b.part} />;
+        return <TraceMediaPart key={b.blockKey} part={b.part} />;
       case "raw":
         return (
           <Box
-            key={`r-${i}`}
+            key={b.blockKey}
             as="pre"
             textStyle="2xs"
             color="fg.muted"
@@ -271,18 +303,18 @@ export function BlockStack({
                 {expander}
                 {toolsOpen && (
                   <VStack align="stretch" gap={1.5} marginTop={1.5}>
-                    {renderItem(item, i)}
+                    {renderItem(item)}
                   </VStack>
                 )}
               </Box>
             );
           }
           if (toolsOpen) {
-            return renderItem(item, i);
+            return renderItem(item);
           }
           return null;
         }
-        return renderItem(item, i);
+        return renderItem(item);
       })}
       {shouldCollapseTools && toolCalls.length > 0 ? (
         <>

@@ -259,6 +259,118 @@ export type EvaluateOptions = {
   metadata?: TargetMetadata;
 };
 
+// ============================================================================
+// compare() Types
+// ============================================================================
+
+/**
+ * Per-candidate metric the judge can be asked to weigh alongside quality
+ *
+ * Duration is the one the SDK measures itself. Cost is not on offer: the
+ * platform works a target's cost out from its traces after the run, so there
+ * is nothing to show the judge at the moment a verdict is asked for.
+ */
+export type ComparisonMetric = "duration";
+
+/**
+ * Outcome of a comparison
+ *
+ * - `decided`: the judge picked a winner
+ * - `tie`: the judge judged the candidates and found none clearly better
+ * - `inconclusive`: the judge judged the candidates and established no winner,
+ *   which under swap-and-reconcile means its two passes disagreed. A finding
+ *   about the candidates, and not a tie: a tie is a measurement, this is the
+ *   absence of one
+ * - `skipped`: fewer than two targets had an output, so no judge ran
+ * - `error`: the judge could not be reached or failed, so nothing was measured
+ *   about the candidates at all. Never conflated with `inconclusive`, which
+ *   says something about them
+ */
+export type ComparisonStatus =
+  | "decided"
+  | "tie"
+  | "inconclusive"
+  | "skipped"
+  | "error";
+
+/**
+ * The result of comparing a row's targets
+ */
+export type ComparisonVerdict = {
+  /** What the comparison concluded */
+  status: ComparisonStatus;
+  /** The winning target's name. Non-null only when `status` is `decided` */
+  winner: string | null;
+  /**
+   * The judge's reasoning, why the row established no winner, or the failure
+   * when `status` is `error`
+   */
+  reasoning: string | null;
+  /** The target names actually judged, in registration order */
+  candidates: string[];
+};
+
+/**
+ * Options for the compare() method
+ *
+ * Every option below is optional because the judge already has a default for
+ * it. An option left unset is absent from the request, so the judge's own
+ * default applies and there is exactly one place where each default is
+ * written down. The defaults are documented here for reference only, and are
+ * deliberately not restated in code.
+ */
+export type ComparisonOptions = {
+  /**
+   * Row index in the dataset. Also seeds the judge's deterministic candidate
+   * shuffle.
+   *
+   * compare() takes the row the way log() does: inside a run() callback it is
+   * inferred from the row being processed, and outside one it is required.
+   */
+  index?: number;
+  /** Name the verdict is recorded under (default: "comparison") */
+  name?: string;
+  /**
+   * Restrict the comparison to these targets, in place of every target that
+   * recorded an output for the row. Naming a target with no output for the
+   * row is an error rather than a narrower comparison.
+   */
+  targets?: string[];
+  /** The task the candidates were answering, for the judge's framing */
+  input?: string;
+  /**
+   * Reference answer to judge the candidates against. Passing one is what
+   * turns on reference-answer judging; leave it out to have the candidates
+   * compared on their own merits.
+   */
+  golden?: string;
+  /**
+   * Judge prompt template, used verbatim. Placeholders: `{input}`,
+   * `{golden}`, `{candidates}`. Leave it out and the judge picks the shipped
+   * default that fits what the row actually carries.
+   */
+  prompt?: string;
+  /** Judge model (server default: the platform's configured judge model) */
+  model?: string;
+  /** Let the judge answer "tie" when no candidate is better (server default: true) */
+  allowTie?: boolean;
+  /** Shuffle candidate order per row to counter position bias (server default: true) */
+  randomizeOrder?: boolean;
+  /**
+   * Judge each row a second time with the candidate order reversed and report
+   * no verdict when the two disagree (server default: true). Doubles the
+   * judge-call cost per row.
+   */
+  swapAndReconcile?: boolean;
+  /**
+   * Per-candidate metrics to put in front of the judge, so it can prefer a
+   * faster candidate when quality is comparable (server default: none)
+   */
+  includeMetrics?: ComparisonMetric[];
+  /** Judge sampling temperature (server default: 0) */
+  temperature?: number;
+};
+
 /**
  * Context passed to the run() callback
  */

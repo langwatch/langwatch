@@ -1,40 +1,12 @@
 import { Flex, HStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import type { IconType } from "react-icons";
-import { SegmentSubmodeIcon } from "./SegmentSubmodeIcon";
-
-/**
- * A sub-mode toggle rendered *inside* the parent segment's pill when
- * that segment is active. Used to expose a secondary axis (e.g.
- * rendered/source markdown, thread/bubbles chat) without growing a
- * second standalone toggle row beside it.
- */
-export interface SegmentSubmode {
-  value: string;
-  label: string;
-  icon: IconType;
-  /** Override default tooltip `${label} view`. */
-  tooltip?: string;
-}
-
-export interface SegmentSubmodeGroup {
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly SegmentSubmode[];
-}
 
 /**
  * One option in a `<SegmentedToggle>`. The string-shorthand form covers
- * the simple case (label === value); the object form opts into either
- * `submodes` (declarative inline icon pair, the common case) or
- * `trailing` (escape hatch for arbitrary JSX inside the active pill).
+ * the simple case (label === value).
  */
 export interface SegmentedOption {
   value: string;
   label?: string;
-  submodes?: SegmentSubmodeGroup;
-  /** Escape hatch — prefer `submodes`. */
-  trailing?: ReactNode;
 }
 
 type Option = string | SegmentedOption;
@@ -49,6 +21,11 @@ function normalizeOption(option: Option): SegmentedOption {
   return typeof option === "string" ? { value: option } : option;
 }
 
+/**
+ * Side-by-side pill tabs for switching between a small number of peers
+ * (trace/spans, edited/original). View *formats* are picked through
+ * `<FormatSelect>` instead, which compresses them into one control.
+ */
 export function SegmentedToggle({
   value,
   onChange,
@@ -59,7 +36,6 @@ export function SegmentedToggle({
       {options.map((rawOption) => {
         const option = normalizeOption(rawOption);
         const isActive = value === option.value;
-        const hasInline = option.submodes != null || option.trailing != null;
         return (
           <Flex
             key={option.value}
@@ -71,43 +47,16 @@ export function SegmentedToggle({
             fontWeight="semibold"
             color={isActive ? "blue.fg" : "fg.subtle"}
             bg={isActive ? "blue.subtle" : "transparent"}
-            paddingLeft={2.5}
-            paddingRight={isActive && hasInline ? 0 : 2.5}
+            paddingX={2.5}
             overflow="hidden"
             height="full"
             align="center"
-            // Submode icons live flush together; the gap between the
-            // label and the first icon is recreated as a marginRight on
-            // the label below so it visually mirrors the badge's
-            // leading padding.
-            gap={0}
             cursor="pointer"
             borderRadius="sm"
             transition="background 0.12s ease, color 0.12s ease"
             _hover={isActive ? undefined : { color: "fg" }}
           >
-            <Flex
-              as="span"
-              align="center"
-              marginRight={isActive && hasInline ? 2.5 : 0}
-            >
-              {option.label ?? option.value}
-            </Flex>
-            {isActive && option.submodes && (
-              <>
-                {option.submodes.options.map((sub) => (
-                  <SegmentSubmodeIcon
-                    key={sub.value}
-                    icon={sub.icon}
-                    label={sub.label}
-                    tooltip={sub.tooltip}
-                    active={option.submodes!.value === sub.value}
-                    onClick={() => option.submodes!.onChange(sub.value)}
-                  />
-                ))}
-              </>
-            )}
-            {isActive && option.trailing}
+            {option.label ?? option.value}
           </Flex>
         );
       })}

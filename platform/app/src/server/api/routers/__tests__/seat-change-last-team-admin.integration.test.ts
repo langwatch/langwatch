@@ -23,7 +23,6 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -34,6 +33,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../../db";
 import { hasTeamPermission } from "../../rbac";
 import {
@@ -119,6 +119,63 @@ describe("given a member who is the only admin of shared teams", () => {
       expect(result.teamsLeftWithoutAdmin.map((team) => team.id)).not.toContain(
         fixture.sharedWithAnotherAdminTeamId,
       );
+    });
+
+    /** @scenario Moving a member to a Lite Member seat corrects their project access rows to Viewer */
+    it("corrects their access on a shared project to viewer", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+      await expect(
+        fixture.projectBindingOf({
+          userId: fixture.soloUserId,
+          projectId: fixture.sharedProjectId,
+        }),
+      ).resolves.toEqual({ role: TeamUserRole.VIEWER, customRoleId: null });
+    });
+
+    /** @scenario Moving a member to a Lite Member seat corrects their project access rows to Viewer */
+    it("leaves project access as it is on the way back to a full seat", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+      await moveSoloUserTo(OrganizationUserRole.MEMBER);
+
+      // The downgrade corrects; the upgrade grants nothing back on its own.
+      await expect(
+        fixture.projectBindingOf({
+          userId: fixture.soloUserId,
+          projectId: fixture.sharedProjectId,
+        }),
+      ).resolves.toEqual({ role: TeamUserRole.VIEWER, customRoleId: null });
+    });
+
+    /** @scenario A seat correction leaves the personal workspace access row alone */
+    it("leaves the personal workspace rows untouched", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+      await expect(
+        fixture.teamRoleOf({
+          userId: fixture.soloUserId,
+          teamId: fixture.personalTeamId,
+        }),
+      ).resolves.toBe(TeamUserRole.ADMIN);
+    });
+
+    /** @scenario The teams left without a team admin are named back to the admin */
+    it("leaves out a team a group with members still administers", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          const result = await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+          const reportedIds = result.teamsLeftWithoutAdmin.map(
+            (team) => team.id,
+          );
+          expect(reportedIds).not.toContain(fixture.onlyAdminTeamId);
+          // The sibling team has no group covering it, so the report still
+          // fires where nobody is actually left.
+          expect(reportedIds).toContain(fixture.alsoOnlyAdminTeamId);
+        },
+      });
     });
 
     /** @scenario Moving the only admin of a shared team to a Lite Member seat goes through */

@@ -7,11 +7,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -23,6 +19,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
@@ -273,6 +274,37 @@ describe("organization member role plan limit enforcement", () => {
           },
         });
         expect(updated?.role).toBe(OrganizationUserRole.EXTERNAL);
+      });
+    });
+
+    describe("when demoting the last admin of the organization", () => {
+      /** @scenario Demoting the last admin is refused */
+      it("refuses, so someone can always still sign in and fix it", async () => {
+        // Driven at the repository, where the guard lives: routing it through
+        // the caller would trip the self-demotion protections first and prove
+        // nothing about the guard. The guard raises the registered handled
+        // code; the tRPC boundary maps its 400 to BAD_REQUEST for procedure
+        // callers.
+        const repo = new PrismaOrganizationRepository(prisma);
+
+        await expect(
+          repo.updateMemberRole({
+            organizationId,
+            userId: adminUserId,
+            role: OrganizationUserRole.MEMBER,
+            effectiveTeamRoleUpdates: [],
+            currentUserId: adminUserId,
+          }),
+        ).rejects.toMatchObject({ code: "cannot_demote_last_admin" });
+
+        // And the admin seat is genuinely untouched.
+        const admin = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: adminUserId, organizationId },
+          },
+          select: { role: true },
+        });
+        expect(admin?.role).toBe(OrganizationUserRole.ADMIN);
       });
     });
   });

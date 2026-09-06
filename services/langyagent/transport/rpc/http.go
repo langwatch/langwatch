@@ -78,6 +78,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		deps.InternalSecret,
 		httprpc.Handle(rpc.maxBodyBytes, rpc.HandleProbe),
 	))
+	// Cancel aborts the named in-flight turn on the conversation's worker, the
+	// token-burn half of the user's Stop (ADR-078). Fire-and-forget: 204
+	// whether or not anything was left to halt.
+	mux.Handle("POST /worker/cancel", requireInternalSecret(
+		deps.InternalSecret,
+		httprpc.HandleNoContent(rpc.maxBodyBytes, rpc.HandleCancel),
+	))
 
 	// Middleware chain — applied so RequestID is outermost (mirrors aigateway).
 	var h http.Handler = mux

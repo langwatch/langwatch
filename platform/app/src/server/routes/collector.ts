@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
-import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
+import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -37,6 +36,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -124,7 +124,6 @@ secured
       // read-only API keys from ingesting traces.
       try {
         await enforceApiKeyCeiling({
-          prisma,
           resolved,
           permission: "traces:create",
         });
@@ -177,6 +176,9 @@ secured
           await getApp().usageLimits.notifyPlanLimitReached({
             organizationId: project.team.organizationId,
             planName: activePlan.name ?? "free",
+            usageUnit: limitResult.usageUnit,
+            current: limitResult.count,
+            max: limitResult.maxMessagesPerMonth,
           });
         } catch (error) {
           logger.error(
@@ -284,14 +286,20 @@ secured
       try {
         params = collectorRESTParamsValidatorSchema.parse(body);
       } catch (error) {
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing body"), {
-          extra: { projectId: project.id, body, zodError: error },
+          extra: { projectId: project.id, ...validation },
         });
 
         const validationError = fromZodError(error as ZodError);
 
-        logger.error(
-          { error, body, validationError },
+        // Shape, never the body. The rendered `validationError.message` quotes
+        // the offending values, so it answers the sender and stays out of the
+        // log; `validation` is the schema's own vocabulary and is what tells us
+        // whether the rule, rather than the payload, is the thing that is wrong.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid trace received",
         );
 
@@ -308,10 +316,12 @@ secured
         params;
 
       if (body.spans && !Array.isArray(body.spans)) {
-        logger.error(
+        // The type, not the value: whatever arrived in place of the array is
+        // still the sender's content, and the type is the whole diagnosis.
+        logger.warn(
           {
             projectId: project.id,
-            spans: body.spans,
+            receivedType: typeof body.spans,
             traceId: nullableTraceId,
           },
           "invalid spans field, expecting array",
@@ -378,20 +388,17 @@ secured
         }
       } catch (error) {
         const validationError = fromZodError(error as ZodError);
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing metadata"), {
-          extra: {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+          extra: { projectId: project.id, ...validation },
         });
 
-        logger.error(
-          {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+        // Metadata is customer-authored key/value content, so the values stay
+        // out. The rejected KEY names do not: a key refused across many
+        // projects is how we learn our reserved-metadata list is too narrow.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid metadata received",
         );
 
@@ -519,14 +526,16 @@ secured
         try {
           spans[index] = spanValidatorSchema.parse(span);
         } catch (error) {
+          const validation = validationMeta(error);
+
           captureException(new Error("ZodError on parsing spans"), {
-            extra: { projectId: project.id, span, zodError: error },
+            extra: { projectId: project.id, index, ...validation },
           });
 
           const validationError = fromZodError(error as ZodError);
 
-          logger.error(
-            { error, span, projectId: project.id, index, validationError },
+          logger.warn(
+            { projectId: project.id, index, ...validation },
             "invalid span received",
           );
 
@@ -703,6 +712,12 @@ secured
               evaluationNameAutoslug(evaluation.name);
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
+            // A verdict is only real when the evaluator ran to completion —
+            // an errored/skipped run's stray passed/score/label must not
+            // reach analytics or triggers as a real result (#6833). Same
+            // gate as the shared verdictGate helpers applied at the
+            // executeEvaluation command boundary.
+            const hasVerdict = status === "processed";
 
             await app.evaluations.reportEvaluation({
               tenantId: project.id,
@@ -713,9 +728,9 @@ secured
               traceId,
               isGuardrail: evaluation.is_guardrail ?? undefined,
               status,
-              score: evaluation.score ?? null,
-              passed: evaluation.passed ?? null,
-              label: evaluation.label ?? null,
+              score: hasVerdict ? (evaluation.score ?? null) : null,
+              passed: hasVerdict ? (evaluation.passed ?? null) : null,
+              label: hasVerdict ? (evaluation.label ?? null) : null,
               details: evaluation.details ?? null,
               error: evaluation.error?.message ?? null,
               occurredAt,

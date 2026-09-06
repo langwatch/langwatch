@@ -49,7 +49,7 @@ let evaluatorsData: unknown[] = [mockEvaluator];
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       evaluators: { getAll: { invalidate: vi.fn() } },
     }),
     evaluators: {

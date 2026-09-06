@@ -7,10 +7,12 @@
  * First-match-wins by priority descending.
  *
  * Every mutation writes:
- *   - a GatewayChangeEvent (CACHE_RULE_{CREATED,UPDATED,DELETED}) so the
- *     gateway's /changes long-poll picks up new rules ≤30 s and re-compiles
- *     the VK bundle (preserves the 700 ns hot path — Resolve() reads from
- *     the bundle array, not from Postgres per request);
+ *   - a GatewayChangeEvent (CACHE_RULE_{CREATED,UPDATED,DELETED}) that the
+ *     gateway's /changes long-poll returns on its next cycle. The gateway
+ *     drops the organization's cached bundles on it, so the next request
+ *     re-compiles against the new rules. This preserves the 700 ns hot
+ *     path: Resolve() reads from the bundle array, not from Postgres per
+ *     request;
  *   - a GatewayAuditLog row with before/after JSON for compliance.
  *
  * Matcher shape (validated at the service boundary; stored as JSONB so the
@@ -32,13 +34,14 @@
  * `modeEnum` is redundantly captured so we can index and aggregate by mode
  * without parsing the JSON in hot queries (e.g. Prometheus rule-hit export).
  */
+
+import { TRPCError } from "@trpc/server";
 import type {
   GatewayCacheRule,
   GatewayCacheRuleMode,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";

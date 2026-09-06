@@ -83,6 +83,12 @@ See `tests/agentic-e2e/README.md` for details on writing new tests.
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org) specification for our commit messages and PR titles. This helps us automate versioning and generate changelogs.
 
+### Breaking Changes
+
+The repo publishes eight independently versioned components: the product itself, the four SDKs, the MCP server, langevals and the skills package. release-please decides which of them a commit affects by path, then applies the whole commit message to every one of them. A `!` marker or a `BREAKING CHANGE:` footer on a commit that touches three components therefore releases three majors, whether or not the break means anything to all three.
+
+So keep a breaking change inside one component. If the work has to touch another one, land the incidental part as a separate non-breaking PR. The `release-scope-guard` check fails a PR that breaks this rule, and tells you what to do about it. See [dev/docs/RELEASES.md](./dev/docs/RELEASES.md) for the full procedure, including how to pin a version release-please got wrong.
+
 ## Additional Notes
 
 Please don't use the issue tracker for support questions. Check whether the [Docs](https://docs.langwatch.ai/) offer any help with your problem.

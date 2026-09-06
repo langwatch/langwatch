@@ -9,8 +9,8 @@
  *   → dedup invariant on re-tick → scope filter on a mismatched source.
  *
  * Test isolation strategy: seeds CH governance_kpis rows directly
- * (no fold reactor, no async pipeline delays) so the test stays
- * deterministic + sub-second. The reactor that populates
+ * (no fold subscriber, no async pipeline delays) so the test stays
+ * deterministic + sub-second. The subscriber that populates
  * governance_kpis is covered separately in 3b-iii integration tests.
  *
  * Spec contracts:
@@ -22,9 +22,9 @@
  *   - 3e-ii anomalyDetectionWorker (BullMQ orchestrator, separate test)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Organization, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Organization, Project } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import {

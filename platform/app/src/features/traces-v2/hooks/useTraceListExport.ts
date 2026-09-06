@@ -1,6 +1,6 @@
-import { useExportTraces } from "~/components/messages/useExportTraces";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useFilterStore } from "../stores/filterStore";
+import { useExportTraces } from "./useExportTraces";
 
 /**
  * Adapter around `useExportTraces` that pulls filter/time/query state out of

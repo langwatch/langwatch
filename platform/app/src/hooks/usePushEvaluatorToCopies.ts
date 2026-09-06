@@ -5,7 +5,7 @@ import { api } from "~/utils/api";
  * evaluators list for the project so the UI stays in sync.
  */
 export function usePushEvaluatorToCopies() {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   return api.evaluators.pushToCopies.useMutation({
     onSuccess: (_data, variables) => {
       void utils.evaluators.getAll.invalidate({

@@ -1,7 +1,7 @@
 import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "~/prompts/types";
 import { uppercaseFirstLetter } from "~/utils/stringCasing";
@@ -100,27 +100,24 @@ export function GenerateApiSnippetDialog({
   const [selectedTarget, setSelectedTarget] = useState<Target>(
     targets[0] ?? "python_python3",
   );
-  const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
-    snippets[0],
-  );
   const [selectedTab, setSelectedTab] = useState<string>(
     tabs?.[0]?.value ?? "python",
+  );
+
+  // Derived instead of synced via effect: an effect calling setState on every
+  // `snippets` identity change caused infinite re-render loops (React #185)
+  // when callers built `snippets` in their render body.
+  const selectedSnippet = useMemo<Snippet | undefined>(
+    () =>
+      snippets.find((snippet) => snippet.target === selectedTarget) ??
+      snippets[0],
+    [snippets, selectedTarget],
   );
 
   const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     onOpen();
   };
-
-  useEffect(() => {
-    if (!selectedTarget) return;
-    const snippet = snippets.find(
-      (snippet) => snippet.target === selectedTarget,
-    );
-    if (snippet) {
-      setSelectedSnippet(snippet);
-    }
-  }, [snippets, selectedTarget]);
 
   const useTabs = !!tabs && tabs.length > 0;
   const activeTab = useTabs

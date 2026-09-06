@@ -1,10 +1,9 @@
 /**
  * The exact live failure this pins: an agent ran
- * `langwatch evaluator create "quick-relevancy" --type "ragas/answer_relevancy"`
- * — a stale slug (the catalog has `ragas/response_relevancy` and
- * `legacy/ragas_answer_relevancy`) — and got a 422 whose reasons named the
- * field but not what it would have accepted, so the error's own "fix the
- * fields and retry" advice was impossible to follow.
+ * `langwatch evaluator create "quick-relevancy" --type "ragas/answer_relevancy"`,
+ * a stale slug (the catalog has `ragas/response_relevancy`), and got a 422
+ * whose reasons named the field but not what it would have accepted, so the
+ * error's own "fix the fields and retry" advice was impossible to follow.
  *
  * Runs the REAL `createEvaluatorInputSchema` through the REAL boundary
  * validator and error handler (same end-to-end posture as
@@ -66,13 +65,12 @@ describe("creating an evaluator with an unknown type", () => {
     });
 
     /** @scenario The rejection lists every type that would have been accepted */
-    it("lists the slugs a stale ragas name should be corrected to", async () => {
+    it("names the current ragas slug that replaces the stale one", async () => {
       const res = await post(staleSlug);
 
       const body = await res.json();
       const expected = body.reasons[0].meta.expected as string[];
       expect(expected).toContain("ragas/response_relevancy");
-      expect(expected).toContain("legacy/ragas_answer_relevancy");
     });
 
     /** @scenario The accepted types stay out of the prose message */
