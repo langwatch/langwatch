@@ -41,6 +41,7 @@ Rule: Picking a row opens its drilldown
   behaviour belongs to the section, so event rows and their metric values
   gain it on the same terms.
 
+  @integration
   Scenario: Clicking an evaluator row opens its verdict drilldown
     Given an inactive evaluator row with verdict/score aggregates
     When the user clicks the row itself
@@ -49,11 +50,13 @@ Rule: Picking a row opens its drilldown
 
   # Latching the open state would leave a row displaying verdict controls
   # for a filter it no longer contributes to.
+  @integration
   Scenario: Clicking the same row again closes the drilldown it opened
     Given an evaluator row whose drilldown was opened by clicking the row
     When the user clicks the row a second time to drop the filter
     Then the drilldown collapses with it
 
+  @integration
   Scenario: A row carrying no drilldown filters exactly as before
     Given a facet section whose rows have no sub-options
     When the user clicks a row

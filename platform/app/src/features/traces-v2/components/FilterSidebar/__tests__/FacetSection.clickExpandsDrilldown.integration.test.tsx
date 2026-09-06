@@ -127,74 +127,88 @@ afterEach(() => {
 
 describe("<FacetSection /> click-to-expand", () => {
   describe("given an inactive row carrying a drilldown", () => {
-    /** @scenario "Clicking an evaluator row opens its verdict drilldown" */
-    it("opens the drilldown and applies the filter on a single click", async () => {
-      const user = userEvent.setup();
-      const onToggleSpy = vi.fn();
-      render(<Harness onToggleSpy={onToggleSpy} />);
-      await openSection(user);
+    describe("when the user clicks the row itself", () => {
+      /** @scenario "Clicking an evaluator row opens its verdict drilldown" */
+      it("opens the drilldown and applies the filter on a single click", async () => {
+        const user = userEvent.setup();
+        const onToggleSpy = vi.fn();
+        render(<Harness onToggleSpy={onToggleSpy} />);
+        await openSection(user);
 
-      expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("drilldown-eval-a"),
+        ).not.toBeInTheDocument();
 
-      await user.click(screen.getByText("Faithfulness"));
+        await user.click(screen.getByText("Faithfulness"));
 
-      expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
-      expect(onToggleSpy).toHaveBeenCalledWith("evaluator", "eval-a");
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+        expect(onToggleSpy).toHaveBeenCalledWith("evaluator", "eval-a");
+      });
+
+      it("leaves the sibling rows closed", async () => {
+        const user = userEvent.setup();
+        render(<Harness />);
+        await openSection(user);
+
+        await user.click(screen.getByText("Faithfulness"));
+
+        expect(
+          screen.queryByTestId("drilldown-eval-b"),
+        ).not.toBeInTheDocument();
+      });
     });
 
-    it("leaves the sibling rows closed", async () => {
-      const user = userEvent.setup();
-      render(<Harness />);
-      await openSection(user);
+    describe("when the user clicks the trailing chevron instead of the row", () => {
+      it("opens the drilldown without applying the filter", async () => {
+        const user = userEvent.setup();
+        const onToggleSpy = vi.fn();
+        render(<Harness onToggleSpy={onToggleSpy} />);
+        await openSection(user);
 
-      await user.click(screen.getByText("Faithfulness"));
+        await user.click(screen.getByLabelText("expand eval-a"));
 
-      expect(screen.queryByTestId("drilldown-eval-b")).not.toBeInTheDocument();
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+        expect(onToggleSpy).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("given a row whose drilldown the user opened by clicking it", () => {
-    /** @scenario "Clicking the same row again closes the drilldown it opened" */
-    it("collapses the drilldown when the filter is dropped", async () => {
-      const user = userEvent.setup();
-      render(<Harness />);
-      await openSection(user);
+    describe("when the user clicks the row a second time", () => {
+      /** @scenario "Clicking the same row again closes the drilldown it opened" */
+      it("collapses the drilldown along with the filter", async () => {
+        const user = userEvent.setup();
+        render(<Harness />);
+        await openSection(user);
 
-      await user.click(screen.getByText("Faithfulness"));
-      expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
+        await user.click(screen.getByText("Faithfulness"));
+        expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
 
-      await user.click(screen.getByText("Faithfulness"));
+        await user.click(screen.getByText("Faithfulness"));
 
-      expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("drilldown-eval-a"),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 
   describe("given a section whose rows carry no drilldown", () => {
-    /** @scenario "A row carrying no drilldown filters exactly as before" */
-    it("applies the filter and renders nothing extra", async () => {
-      const user = userEvent.setup();
-      const onToggleSpy = vi.fn();
-      render(<Harness withDrilldown={false} onToggleSpy={onToggleSpy} />);
-      await openSection(user);
+    describe("when the user clicks a row", () => {
+      /** @scenario "A row carrying no drilldown filters exactly as before" */
+      it("applies the filter and renders nothing extra", async () => {
+        const user = userEvent.setup();
+        const onToggleSpy = vi.fn();
+        render(<Harness withDrilldown={false} onToggleSpy={onToggleSpy} />);
+        await openSection(user);
 
-      await user.click(screen.getByText("Faithfulness"));
+        await user.click(screen.getByText("Faithfulness"));
 
-      expect(onToggleSpy).toHaveBeenCalledWith("evaluator", "eval-a");
-      expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
-    });
-  });
-
-  describe("when the trailing chevron is used instead of the row", () => {
-    it("still opens the drilldown without applying the filter", async () => {
-      const user = userEvent.setup();
-      const onToggleSpy = vi.fn();
-      render(<Harness onToggleSpy={onToggleSpy} />);
-      await openSection(user);
-
-      await user.click(screen.getByLabelText("expand eval-a"));
-
-      expect(screen.getByTestId("drilldown-eval-a")).toBeInTheDocument();
-      expect(onToggleSpy).not.toHaveBeenCalled();
+        expect(onToggleSpy).toHaveBeenCalledWith("evaluator", "eval-a");
+        expect(
+          screen.queryByTestId("drilldown-eval-a"),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 });
