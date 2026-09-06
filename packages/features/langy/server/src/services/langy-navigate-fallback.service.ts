@@ -1,10 +1,15 @@
 /**
  * Resolution for a navigate destination the conversation remembered no platform
- * link for. The address is STILL platform-computed, never agent-authored, and
- * anything the page table does not know resolves to null so the navigate drops.
+ * link for. The address is STILL platform-computed, never agent-authored: a
+ * page name resolves through the closed page table, and a resource id is looked
+ * up with the project's own access. Anything neither table knows resolves to
+ * null so the navigate drops, and a lookup that fails resolves to null rather
+ * than tearing down the relay stream.
  */
 import type { LangyNavigateProjectPort } from "../ports/langy-navigate-project.port";
+import type { LangyNavigateResourcePort } from "../ports/langy-navigate-resource.port";
 import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules";
+import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules";
 
 /** Builds a deep link into the product from a project slug and a path. */
 export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: string }) => string;
@@ -13,31 +18,58 @@ export class LangyNavigateFallbackService {
   private constructor(
     private readonly projects: LangyNavigateProjectPort,
     private readonly platformUrl: LangyNavigatePlatformUrl,
+    private readonly resources: LangyNavigateResourcePort | undefined,
   ) {}
 
   static create(deps: {
     projects: LangyNavigateProjectPort;
     platformUrl: LangyNavigatePlatformUrl;
+    /**
+     * Absent where a process composed none of the eight features a resource id
+     * names; only page names resolve then.
+     */
+    resources?: LangyNavigateResourcePort;
   }): LangyNavigateFallbackService {
-    return new LangyNavigateFallbackService(deps.projects, deps.platformUrl);
+    return new LangyNavigateFallbackService(deps.projects, deps.platformUrl, deps.resources);
   }
 
   /**
    * The platform address this id names, or null when nothing in this project
-   * answers to it. A lookup that fails resolves to null rather than tearing
-   * down the relay stream.
+   * answers to it.
    */
   async tryResolveUrl(input: { projectId: string; resourceId: string }): Promise<string | null> {
-    const path = navigatePagePathFor(input.resourceId);
+    const path = await this.tryResolvePath(input);
     if (!path) {
       return null;
     }
 
+    // The slug is fetched once, and only after the destination is confirmed:
+    // an id that resolves to nothing never costs a project read.
     const projectSlug = await this.projects.trySlugOf(input.projectId).catch(() => null);
     if (!projectSlug) {
       return null;
     }
 
     return this.platformUrl({ projectSlug, path });
+  }
+
+  private async tryResolvePath({
+    projectId,
+    resourceId,
+  }: {
+    projectId: string;
+    resourceId: string;
+  }): Promise<string | null> {
+    const pagePath = navigatePagePathFor(resourceId);
+    if (pagePath) {
+      return pagePath;
+    }
+
+    const kind = navigateResourceKindFor(resourceId);
+    if (!kind || !this.resources) {
+      return null;
+    }
+
+    return await this.resources.tryLocate({ projectId, kind, resourceId }).catch(() => null);
   }
 }

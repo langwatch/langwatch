@@ -15,10 +15,10 @@ import { WorkbenchStaleBanner } from "../../ui/elements/experiments-v3/workbench
 import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
-} from "../../model/experiments-v3/actions/manifest";
-import { narrateWorkbenchAction } from "../../model/experiments-v3/actions/narration";
-import { readLiveWorkbench } from "../../model/experiments-v3/actions/live-workbench-read";
-import { scopeFromRunPayload } from "../../model/experiments-v3/actions/run-scope";
+} from "@langwatch/experiment-contract";
+import { narrateWorkbenchAction } from "@langwatch/experiment-contract";
+import { readLiveWorkbench } from "@langwatch/experiment-contract";
+import { scopeFromRunPayload } from "@langwatch/experiment-contract";
 import { startAndIdentifyRun } from "../../model/experiments-v3/execution/run-identification";
 import {
   revealTargetColumn,

@@ -49,10 +49,6 @@ export {
   type JudgeIndependence,
   type VerbosityProfile,
 } from "./ui/sections/batch-evaluation-results.judge-bias";
-export {
-  computeMetricStats,
-  type MetricStats,
-} from "./model/batch-evaluation-results.metric-stats";
 export { buildPairwiseComparisons } from "./ui/sections/batch-evaluation-results.pairwise";
 export {
   computeParetoDominance,

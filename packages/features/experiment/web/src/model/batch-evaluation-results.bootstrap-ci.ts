@@ -4,7 +4,7 @@
  */
 
 import { mulberry32 } from "./random.mulberry32";
-import { quantile } from "./batch-evaluation-results.metric-stats";
+import { quantile } from "@langwatch/experiment-contract";
 
 /** Resamples per interval. Matches the score bootstrap for the same reason. */
 const DEFAULT_SAMPLES = 1000;

@@ -8,12 +8,8 @@ import { LuChevronRight, LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
-import {
-  EVALUATION_STATUS_COLORS,
-  getStatusLabel,
-  type ParsedEvaluationResult,
-  parseEvaluationResult,
-} from "../../../model/evaluation-results";
+import { type ParsedEvaluationResult, parseEvaluationResult } from "@langwatch/evaluator-contract";
+import { EVALUATION_STATUS_COLORS, getStatusLabel } from "../../../model/evaluation-results";
 
 export type EvaluationStatus = ParsedEvaluationResult["status"];
 
@@ -250,4 +246,4 @@ export function EvaluatorResultChip({
 /**
  * Re-export utilities for convenience
  */
-export { EVALUATION_STATUS_COLORS, getStatusLabel, parseEvaluationResult };
+export { EVALUATION_STATUS_COLORS, getStatusLabel };

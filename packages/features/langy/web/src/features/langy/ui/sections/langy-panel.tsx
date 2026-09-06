@@ -1,5 +1,6 @@
 import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
 import { mergeContextChips } from "../../../../behavior/langy-context-chips";
+import { removeContextChip } from "../../../../behavior/langy-context-target.store";
 import {
   attachedContextToChip,
   type LangyPanelEffect,
@@ -494,7 +495,6 @@ function LangyPanel({
   const markProposalApplied = useLangyStore((s) => s.markProposalApplied);
   const clearProposalApplying = useLangyStore((s) => s.clearProposalApplying);
   const discardProposalInStore = useLangyStore((s) => s.discardProposal);
-  const dismissChip = useLangyStore((s) => s.dismissChip);
   // Drop a page target onto the panel to hand it over. See
   // `useLangyContextDropZone`; the click path is `useLangyContextTarget`.
   const { isOver: isContextDropOver, dropProps: contextDropProps } = useLangyContextDropZone();
@@ -503,7 +503,6 @@ function LangyPanel({
   // prominently in the sidebar and forwarded to the agent alongside the derived
   // page chips.
   const attachedContext = useLangyStore((s) => s.attachedContext);
-  const detachContext = useLangyStore((s) => s.detachContext);
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
   // An app shell (DashboardLayout) is mounted and places the dock as a second
@@ -1372,18 +1371,9 @@ function LangyPanel({
   );
 
   // The composer is the ONE remove affordance for context (the dock's old
-  // banner restated these chips and is gone). A chip can be page-derived,
-  // explicitly attached, or both (deduped above), clear every source it has,
-  // or it reappears from the other one.
-  const removeContextChip = useCallback(
-    (id: string) => {
-      if (useLangyStore.getState().attachedContext.some((c) => c.id === id)) {
-        detachContext(id);
-      }
-      dismissChip(id);
-    },
-    [detachContext, dismissChip],
-  );
+  // banner restated these chips and is gone). The clearing itself lives in the
+  // behavior layer, so it is the same operation wherever a chip is removed.
+  const onRemoveContextChip = useCallback((id: string) => removeContextChip(id), []);
 
   // Keep the transport's request context fresh every render; it is read at send
   // time (including on regenerate, which carries no per-send body). This is the
@@ -2713,7 +2703,7 @@ function LangyPanel({
                     // investigate/attach) — so the `#` palette can reference everything
                     // the conversation will actually be given.
                     contextChips={allContextChips}
-                    onRemoveChip={removeContextChip}
+                    onRemoveChip={onRemoveContextChip}
                     addableChips={addableChips}
                     onAddChip={chooseChip}
                   />

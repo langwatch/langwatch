@@ -1,4 +1,4 @@
-import type { EvaluationsV3State } from "../../types";
+import type { EvaluationsV3State } from "../../../experiment-workbench";
 
 /**
  * The slice of workbench state every transform reads and writes.

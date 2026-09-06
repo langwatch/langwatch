@@ -76,6 +76,10 @@ export interface UiActionOutcome {
  * Injected so the service stays testable and free of the execution pipeline.
  */
 export type UiActionBackendRunner = (args: {
+  /** The tenant the saved document belongs to. */
+  projectId: string;
+  /** Who the edit is recorded as: the dispatching agent's own user. */
+  userId: string;
   kind: string;
   definition: LangyUiActionDefinition;
   payload: unknown;
@@ -214,6 +218,8 @@ export class LangyUiActionService {
 
     return await this.awaitResult({
       actionId,
+      projectId,
+      userId,
       kind,
       definition,
       payload: parsed.data,
@@ -223,6 +229,8 @@ export class LangyUiActionService {
 
   private async runOnBackend({
     actionId,
+    projectId,
+    userId,
     kind,
     definition,
     payload,
@@ -230,6 +238,8 @@ export class LangyUiActionService {
     remainingMs,
   }: {
     actionId: string;
+    projectId: string;
+    userId: string;
     kind: string;
     definition: LangyUiActionDefinition;
     payload: unknown;
@@ -252,7 +262,7 @@ export class LangyUiActionService {
     let result: unknown;
     try {
       result = await Promise.race([
-        this.backendRunner({ kind, definition, payload, experimentSlug }),
+        this.backendRunner({ projectId, userId, kind, definition, payload, experimentSlug }),
         deadline,
       ]);
     } finally {
@@ -277,12 +287,16 @@ export class LangyUiActionService {
    */
   private async awaitResult({
     actionId,
+    projectId,
+    userId,
     kind,
     definition,
     payload,
     experimentSlug,
   }: {
     actionId: string;
+    projectId: string;
+    userId: string;
     kind: string;
     definition: LangyUiActionDefinition;
     payload: unknown;
@@ -333,6 +347,8 @@ export class LangyUiActionService {
 
         return await this.runOnBackend({
           actionId,
+          projectId,
+          userId,
           kind,
           definition,
           payload,

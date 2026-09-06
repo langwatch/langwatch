@@ -1,4 +1,4 @@
-import type { TargetConfig } from "../../types";
+import type { TargetConfig } from "../../../experiment-workbench";
 import { type UpdateTargetModelPayload, updateTargetModelPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import { type Transform, TransformError } from "./types";

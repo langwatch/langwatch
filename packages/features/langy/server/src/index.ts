@@ -8,6 +8,12 @@ export {
 } from "./adapters/langy.langy.adapter";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service";
 export { LangyNavigateProjectPort } from "./ports/langy-navigate-project.port";
+export { LangyNavigateResourcePort } from "./ports/langy-navigate-resource.port";
+export {
+  LANGY_NAVIGATE_RESOURCE_KINDS,
+  type LangyNavigateResourceKind,
+  navigateResourceKindFor,
+} from "./rules/langy-navigate-resources.rules";
 export type { LangyRelayCompositionOptions } from "./adapters/langy.langy.adapter";
 export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database.repository";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
@@ -81,9 +87,18 @@ export {
   type UiActionRedis,
 } from "./services/langy-ui-action.service";
 export {
+  type LangyUiActionBackendMode,
   LangyUiActionCatalogPort,
   type LangyUiActionDefinition,
 } from "./ports/langy-ui-action-catalog.port";
+export {
+  type LangyBackendActor,
+  type LangyBackendRunResult,
+  type LangyBackendSaveResult,
+  type LangyBackendStateRead,
+  LangyUiActionBackendPort,
+} from "./ports/langy-ui-action-backend.port";
+export { LangyUiActionBackendService } from "./services/langy-ui-action-backend.service";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to

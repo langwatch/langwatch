@@ -1,19 +1,39 @@
 /**
- * The Layer-2 facts the prompt-improvement suite asserts, in one place.
+ * The Layer-2 facts every prompt-improvement suite asserts, in one place.
+ *
+ * Two suites now grade the same loop from opposite sides, one with a page
+ * attached and one without, and the parity claim between them is only worth
+ * anything if both read the outcome the same way. So the outcome is a shared
+ * function rather than a block copied into each file.
  *
  * Not a test file on purpose: an `expect` inside a helper that lives beside its
  * `it()` reads as a misplaced assertion, and a helper the suites share has no
  * business being in one of them.
- *
- * The fake-tab helpers this module carried alongside these are not here: the
- * fake workbench tab did not travel, and nothing in this lane reads a run's
- * event stream.
  */
 
 import { expect } from "vitest";
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import { PROJECT_ID } from "./config";
+import type { FakeTabRun } from "./fake-tab-run";
+import type { FakeWorkbenchTab } from "./fake-workbench-tab";
 import { getWorkbenchState, listExperimentRuns } from "./seed-optimization-workbench";
 import { getSessionCookie, trpcQuery } from "./trpc";
+import { api } from "./workbench-rest";
+
+/** How long a run's rows may take to become queryable before it is a failure. */
+const RESULTS_VISIBILITY_TIMEOUT_MS = 60_000;
+
+/** One evaluation row, as the run-results API carries it. */
+interface RunEvaluation {
+  evaluator: string;
+  targetId?: string | null;
+  status: "processed" | "skipped" | "error";
+  index: number;
+  score?: number | null;
+  passed?: boolean | null;
+  label?: string | null;
+  details?: string | null;
+}
 
 /** The serialized baseline column, taken before Langy touches anything. */
 export async function readBaselineTarget({
@@ -76,6 +96,158 @@ export async function expectOptimizedWorkbench({
     (await listExperimentRuns(slug)).length,
     "no run was recorded for the experiment",
   ).toBeGreaterThan(0);
+}
+
+/** The newest run recorded for an experiment, or undefined when there is none. */
+export async function newestRunId(slug: string): Promise<string | undefined> {
+  const runs = await listExperimentRuns(slug);
+  return runs[0]?.runId;
+}
+
+/** Every evaluation row a run recorded, polled until ClickHouse has them. */
+export async function readRunEvaluations({
+  slug,
+  runId,
+}: {
+  slug: string;
+  runId: string;
+}): Promise<RunEvaluation[]> {
+  const deadline = Date.now() + RESULTS_VISIBILITY_TIMEOUT_MS;
+  let last: RunEvaluation[] = [];
+  // ClickHouse writes are not synchronous with the stream's terminal frame, so
+  // a single read can answer for a run whose rows have not landed yet.
+  while (Date.now() < deadline) {
+    const result = await api({
+      method: "GET",
+      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results?experimentSlug=${encodeURIComponent(slug)}`,
+    });
+    last = Array.isArray(result?.evaluations) ? result.evaluations : [];
+    if (last.length > 0) return last;
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+  return last;
+}
+
+/**
+ * A run that really scored something.
+ *
+ * This is what turns "a subset ran" from a judge opinion into a fact: a row the
+ * evaluator processed, carrying a number or a verdict. A run that only recorded
+ * skips and errors passes every shape-only check and measures nothing.
+ */
+export async function expectRunHasRealScores({
+  slug,
+  runId,
+}: {
+  slug: string;
+  runId: string;
+}): Promise<void> {
+  const evaluations = await readRunEvaluations({ slug, runId });
+  expect(evaluations.length, `run ${runId} recorded no evaluations at all`).toBeGreaterThan(0);
+  const scored = evaluations.filter(
+    (evaluation) =>
+      evaluation.status === "processed" &&
+      (typeof evaluation.score === "number" ||
+        typeof evaluation.passed === "boolean" ||
+        // A comparison reports its winner as a label rather than a number.
+        (typeof evaluation.label === "string" && evaluation.label !== "")),
+  );
+  expect(
+    scored.length,
+    `run ${runId} recorded ${evaluations.length} evaluations but none carries a score or a verdict: ${JSON.stringify(
+      evaluations.slice(0, 3),
+    )}`,
+  ).toBeGreaterThan(0);
+}
+
+// ── what a run left on the board ────────────────────────────────────────────
+
+/** Every verdict cell one evaluator wrote during a run. */
+const verdictsOf = ({
+  run,
+  evaluatorId,
+}: {
+  run: FakeTabRun;
+  evaluatorId: string;
+}): Array<{ rowIndex: number; result: Record<string, unknown> }> =>
+  run.events
+    .filter(
+      (event): event is Extract<EvaluationV3Event, { type: "evaluator_result" }> =>
+        event.type === "evaluator_result" && event.evaluatorId === evaluatorId,
+    )
+    .map((event) => ({
+      rowIndex: event.rowIndex,
+      result: (event.result ?? {}) as Record<string, unknown>,
+    }));
+
+/**
+ * A comparison that judged what it was asked to, with nothing left waiting.
+ *
+ * `MissingVariantOutput` and the "Waiting on …" sentence both come from
+ * `comparisonSkipMessage` in the orchestrator, and either one means the run
+ * asked the judge to compare an output it was never given.
+ */
+export function expectComparisonScored({
+  run,
+  evaluatorId,
+}: {
+  run: FakeTabRun;
+  evaluatorId: string;
+}): void {
+  const verdicts = verdictsOf({ run, evaluatorId });
+  expect(
+    verdicts.length,
+    `the comparison wrote no cell at all: ${JSON.stringify(run.events.map((event) => event.type))}`,
+  ).toBeGreaterThan(0);
+
+  const waiting = verdicts.filter(
+    ({ result }) =>
+      result.error_type === "MissingVariantOutput" ||
+      (typeof result.details === "string" && result.details.startsWith("Waiting on ")),
+  );
+  expect(
+    waiting,
+    `the comparison is waiting on a column whose output the run should have seeded: ${JSON.stringify(
+      waiting.slice(0, 2),
+    )}`,
+  ).toEqual([]);
+
+  const failed = verdicts.filter(({ result }) => result.status === "error");
+  expect(failed, `the comparison failed rows: ${JSON.stringify(failed.slice(0, 2))}`).toEqual([]);
+
+  const decided = verdicts.filter(
+    ({ result }) =>
+      // An empty label is the shape of a verdict with none of its content, the
+      // same degenerate case `expectRunHasRealScores` rejects.
+      (typeof result.label === "string" && result.label !== "") ||
+      typeof result.score === "number" ||
+      typeof result.passed === "boolean",
+  );
+  expect(
+    decided.length,
+    `no row carries a verdict: ${JSON.stringify(verdicts.slice(0, 2))}`,
+  ).toBeGreaterThan(0);
+}
+
+/** Every column named produced an output for every row the run covered. */
+export function expectColumnsFilled({
+  tab,
+  targetIds,
+  rows,
+}: {
+  tab: FakeWorkbenchTab;
+  targetIds: string[];
+  rows: number;
+}): void {
+  const results = tab.state().results;
+  for (const targetId of targetIds) {
+    const summary = results?.targets.find((target) => target.targetId === targetId);
+    expect(summary, `no results for column ${targetId}`).toBeDefined();
+    expect(
+      summary?.filledCells,
+      `column ${targetId} filled ${summary?.filledCells} of ${rows} rows`,
+    ).toBe(rows);
+  }
 }
 
 // ── what the conversation recorded ──────────────────────────────────────────

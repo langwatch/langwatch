@@ -9,7 +9,7 @@ import type {
 import {
   computeMetricStats,
   type MetricStats,
-} from "../../model/batch-evaluation-results.metric-stats";
+} from "@langwatch/experiment-contract";
 
 /**
  * Aggregate statistics for a target's evaluator results.

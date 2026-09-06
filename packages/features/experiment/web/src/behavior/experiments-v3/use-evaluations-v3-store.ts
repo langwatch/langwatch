@@ -6,7 +6,7 @@ import {
   isWorkbenchActionKind,
   WORKBENCH_ACTIONS,
   type WorkbenchActionDefinition,
-} from "../../model/experiments-v3/actions/manifest";
+} from "@langwatch/experiment-contract";
 import {
   addColumn as addColumnTransform,
   assertComparisonColumnAllowed,
@@ -21,7 +21,7 @@ import {
   setTargetPrompt as setTargetPromptTransform,
   type Transform,
   type WorkbenchState,
-} from "../../model/experiments-v3/actions/transforms/index";
+} from "@langwatch/experiment-contract";
 import {
   createInitialResults,
   createInitialState,
@@ -37,7 +37,7 @@ import {
   deriveComparisonTargetMappings,
   inferAllEvaluatorMappings,
   propagateMappingsToNewDataset,
-} from "../../model/experiments-v3/mapping-inference";
+} from "@langwatch/experiment-contract";
 import { normalizeEvaluators, normalizeTargets } from "@langwatch/experiment-contract";
 
 // ============================================================================

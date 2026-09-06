@@ -32,7 +32,7 @@ import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { newTargetId } from "../../../model/experiments-v3/actions/transforms/add-target";
+import { newTargetId } from "@langwatch/experiment-contract";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name";
 import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync";

@@ -3,7 +3,7 @@
  * helper — mirrors the shape of `computeBatchAggregates.ts`. No I/O, no React.
  */
 
-import { quantile } from "./batch-evaluation-results.metric-stats";
+import { quantile } from "@langwatch/experiment-contract";
 import { type Comparability, computeComparability } from "./batch-evaluation-results.comparability";
 import { mulberry32 } from "./random.mulberry32";
 

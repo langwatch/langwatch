@@ -1,7 +1,7 @@
-import { computeMetricStats, type MetricStats } from "../batch-evaluation-results.metric-stats";
-import { parseEvaluationResult } from "@langwatch/evaluator-web/surfaces/evaluation-results";
-import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "./types";
-import { resolveVerdictLabel, toComparisonConfig } from "@langwatch/experiment-contract";
+import { computeMetricStats, type MetricStats } from "./metric-stats";
+import { parseEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "../experiment-workbench";
+import { resolveVerdictLabel, toComparisonConfig } from "./normalize-comparison";
 
 /**
  * Aggregate statistics for a target's evaluator results.
@@ -401,10 +401,3 @@ export const formatPassRate = (passRate: number | null): string => {
   if (passRate === null) return "-";
   return `${Math.round(passRate)}%`;
 };
-
-// Re-export shared formatters for backward compatibility
-export {
-  formatCost,
-  formatLatency,
-  formatScore,
-} from "@langwatch/design-system/metric-value-formatters";

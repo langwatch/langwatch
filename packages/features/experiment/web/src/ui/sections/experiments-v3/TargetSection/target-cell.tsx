@@ -23,7 +23,7 @@ import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-
 import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name";
 import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types";
-import { formatLatency } from "../../../../model/experiments-v3/compute-aggregates";
+import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation";
 import { EvaluatorChip } from "./evaluator-chip";
 

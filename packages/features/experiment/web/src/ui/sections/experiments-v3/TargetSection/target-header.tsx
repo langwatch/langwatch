@@ -36,7 +36,7 @@ import {
   computeComparisonColumnTargetAggregate,
   computeComparisonTargetAggregate,
   computeTargetAggregates,
-} from "../../../../model/experiments-v3/compute-aggregates";
+} from "@langwatch/experiment-contract";
 import { isRowEmpty } from "@langwatch/experiment-contract";
 import { countCellsForTarget } from "@langwatch/experiment-contract";
 import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation";

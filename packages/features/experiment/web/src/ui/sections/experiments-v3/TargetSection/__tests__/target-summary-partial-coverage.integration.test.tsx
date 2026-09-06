@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TargetAggregate } from "../../../../../model/experiments-v3/compute-aggregates";
+import type { TargetAggregate } from "@langwatch/experiment-contract";
 import { TargetSummary } from "../target-summary";
 
 vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name", () => ({

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildParetoPoints } from "../pareto-scatter-chart";
 import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard";
-import type { MetricStats } from "../../../../model/batch-evaluation-results.metric-stats";
+import type { MetricStats } from "@langwatch/experiment-contract";
 import type { VariantMetrics } from "../../batch-evaluation-results.variant-metrics";
 
 /**

@@ -15,13 +15,13 @@ import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name";
 import type { EvaluatorConfig } from "../../../../model/experiments-v3/types";
-import type { TargetAggregate } from "../../../../model/experiments-v3/compute-aggregates";
+import type { TargetAggregate } from "@langwatch/experiment-contract";
+import { formatPassRate } from "@langwatch/experiment-contract";
 import {
   formatCost,
   formatLatency,
-  formatPassRate,
   formatScore,
-} from "../../../../model/experiments-v3/compute-aggregates";
+} from "@langwatch/design-system/metric-value-formatters";
 
 type TargetSummaryProps = {
   aggregates: TargetAggregate;

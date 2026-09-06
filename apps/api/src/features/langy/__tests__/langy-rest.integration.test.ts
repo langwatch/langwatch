@@ -122,14 +122,21 @@ describe("given the agent-to-page UI-action door", () => {
   });
 
   describe("when an agent asks what it may dispatch", () => {
-    it("answers an empty catalogue rather than one this process cannot run", async () => {
+    it("answers with the workbench kinds this process serves", async () => {
       const world = langyWorld();
       const api = mountUiActions(world);
 
       const response = await api.fetch("/api/langy/ui/actions", { headers: KEY });
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ actions: [] });
+      const body = (await response.json()) as { actions: { kind: string }[] };
+      expect(body.actions.map((action) => action.kind)).toEqual(
+        expect.arrayContaining([
+          "workbench.getState",
+          "workbench.run",
+          "workbench.duplicateTarget",
+        ]),
+      );
     });
   });
 });
@@ -257,6 +264,7 @@ describe("given a process composing the Langy doors", () => {
         redis: undefined,
         internalSecret: SECRET,
         metrics: apiLangyRestMetrics(),
+        workbench: undefined,
       });
 
       expect(composed?.turns).toBeDefined();
@@ -279,6 +287,7 @@ describe("given a process composing the Langy doors", () => {
           redis: undefined,
           internalSecret: SECRET,
           metrics: apiLangyRestMetrics(),
+          workbench: undefined,
         }),
       ).toBeUndefined();
     });
@@ -429,6 +438,9 @@ function mountUiActions(world: ReturnType<typeof langyWorld>) {
     redis: {} as never,
     internalSecret: world.internalSecret,
     metrics: apiLangyRestMetrics(),
+    // No workbench: the catalogue still names every kind, and an away page is
+    // refused by name rather than run against a stack this world has not built.
+    workbench: () => null,
   });
   if (!composed?.uiActions) throw new Error("the UI-action door did not compose");
   const hono = new Hono().route(

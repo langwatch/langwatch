@@ -6,7 +6,7 @@
 import type { Field } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 import { inferEvaluatorMappings } from "../mapping-inference";
-import type { DatasetColumn, DatasetReference, TargetConfig } from "../types";
+import type { DatasetColumn, DatasetReference, TargetConfig } from "../../experiment-workbench";
 
 const createTestColumn = (name: string): DatasetColumn => ({
   id: name,

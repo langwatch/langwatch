@@ -1,4 +1,4 @@
-import type { ExecutionScope } from "@langwatch/experiment-contract";
+import type { ExecutionScope } from "../execution/types";
 import type { RunPayload } from "./schemas";
 
 /**

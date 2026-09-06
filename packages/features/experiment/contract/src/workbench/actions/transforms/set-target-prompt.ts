@@ -1,5 +1,5 @@
 import type { Field } from "@langwatch/workflow-contract";
-import type { TargetConfig } from "../../types";
+import type { TargetConfig } from "../../../experiment-workbench";
 import { type SetTargetPromptPayload, setTargetPromptPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import type { Transform } from "./types";

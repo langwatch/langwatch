@@ -28,6 +28,20 @@ export function shortenChipId(id: string): string {
   return `${id.slice(0, 6)}…${id.slice(-2)}`;
 }
 
+/**
+ * The name a trace chip shows, through the fields the app already resolves: the
+ * trace's own resolved name, then the root span's name, then nothing — at which
+ * point the chip falls back to a shortened form of the id.
+ */
+export function traceChipDisplayName(trace: {
+  /** The resolved trace name, where the projection has one. */
+  traceName?: string | null;
+  /** The root span's name, which is what a trace header shows. */
+  name?: string | null;
+}): string | null {
+  return trace.traceName?.trim() || trace.name?.trim() || null;
+}
+
 /** The stable chip a trace becomes, wherever it was picked up from. */
 export function traceContextChip(traceId: string, displayName?: string | null): LangyContextChip {
   const name = displayName?.trim();

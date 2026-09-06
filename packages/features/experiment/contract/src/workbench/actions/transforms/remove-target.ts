@@ -1,4 +1,4 @@
-import type { FieldMapping } from "../../types";
+import type { FieldMapping } from "../../../experiment-workbench";
 import { type RemoveTargetPayload, removeTargetPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import type { Transform } from "./types";

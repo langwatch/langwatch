@@ -2,10 +2,11 @@
  * The API process's four Langy REST doors, and what it can and cannot put behind each of them.
  */
 import { LangyTokenBufferAdapter } from "@langwatch/langy-server";
+import { LangyUiNoBrowserError } from "@langwatch/langy-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import {
-  LangyUiActionRestCatalogPort,
+  LangyUiActionBackendService,
   type LangyActorUserReader,
   type LangyInternalMetricsPort,
   type LangyInternalRestPorts,
@@ -21,6 +22,11 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { Counter, register } from "prom-client";
 
 import { extractApiKeyRequestCredentials } from "../../app/api-key-request-credentials";
+import {
+  ApiWorkbenchUiActionBackend,
+  ApiWorkbenchUiActionCatalog,
+  type ApiLangyWorkbenchPeer,
+} from "./langy-workbench-actions.adapter";
 
 /** Everything this process can hand the Langy doors, where it has them. */
 export type ApiLangyRestComposition = Readonly<{
@@ -44,6 +50,12 @@ export type ApiLangyRestOptions = Readonly<{
   /** The shared bearer the agent presents on its callbacks, or none. */
   internalSecret: string | undefined;
   metrics: LangyRestMetricsPorts;
+  /**
+   * The experiments workbench, where this process composed one. Absent means an
+   * away page is a refusal rather than a silent backend run — the honest answer
+   * for a process that holds no workbench execution stack.
+   */
+  workbench: (() => ApiLangyWorkbenchPeer | null) | undefined;
 }>;
 
 /** The counters the internal doors publish, as this process registers them. */
@@ -51,21 +63,6 @@ export type LangyRestMetricsPorts = Readonly<{
   internal: LangyInternalMetricsPort;
   relayFrames: LangyRelayRestPorts["metrics"];
 }>;
-
-/**
- * The page-action catalogue, absent — and therefore every kind unknown. The only catalogue that
- * exists is the experiments workbench's, and it is a browser module: a server package may not
- * reach it and neither may this process.
- */
-class UnavailableApiLangyUiActionCatalog extends LangyUiActionRestCatalogPort {
-  tryFind(): null {
-    return null;
-  }
-
-  list(): readonly never[] {
-    return [];
-  }
-}
 
 /**
  * Composes the Langy REST ports, or none. `undefined` when any of the four collaborators every
@@ -113,7 +110,16 @@ export function composeApiLangyRest(
             ...credentials,
             langy: () => langy,
             redis: () => redis as unknown as UiActionRedis,
-            actions: () => new UnavailableApiLangyUiActionCatalog(),
+            actions: () => ApiWorkbenchUiActionCatalog.create(),
+            backendRunner: (args) => {
+              const peer = options.workbench?.();
+              // No workbench composed: the channel refuses by name one layer
+              // down rather than answering an away page with a silent no-op.
+              if (!peer) throw new LangyUiNoBrowserError(args.kind);
+              return LangyUiActionBackendService.create({
+                backend: ApiWorkbenchUiActionBackend.create(peer),
+              }).run(args);
+            },
           },
           relay: {
             langy: () => langy,

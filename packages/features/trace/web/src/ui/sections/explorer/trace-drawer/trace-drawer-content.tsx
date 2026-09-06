@@ -3,7 +3,10 @@ import { useRef } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary";
 import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
-import { traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
+import {
+  traceChipDisplayName,
+  traceContextChip,
+} from "@langwatch/langy-web/surfaces/langy-context";
 import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useTraceEditSession } from "../hooks/use-trace-edit-session";
@@ -67,7 +70,9 @@ export function TraceDrawerContent({
   // The open trace offers itself to Langy — the HEADER is the target, deliberately not
   // the whole surface.
   const langyTrace = useLangyContextTarget(
-    trace && !readOnly ? traceContextChip(trace.traceId, trace.traceName || trace.name) : null,
+    trace && !readOnly
+      ? traceContextChip(trace.traceId, traceChipDisplayName(trace))
+      : null,
   );
 
   const viewMode = useDrawerStore((s) => s.viewMode);

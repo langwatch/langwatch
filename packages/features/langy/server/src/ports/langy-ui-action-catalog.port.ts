@@ -17,6 +17,12 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 
 /**
+ * How an away page is stood in for: the saved document is read, rewritten by
+ * the action's own transform, or run.
+ */
+export type LangyUiActionBackendMode = "read" | "transform" | "run";
+
+/**
  * One dispatchable action, as the channel needs it.
  *
  * Structural rather than imported from the workbench that declares it: the
@@ -42,9 +48,16 @@ export type LangyUiActionDefinition = Readonly<{
   /** How long the page has to finish, before the channel's own ceiling. */
   executeBudgetMs?: number;
   /** Whether an away page can be stood in for by a backend run, and how. */
-  backend?: unknown;
-  /** The saved-state rewrite a backend run applies, where one exists. */
-  transform?: unknown;
+  backend?: LangyUiActionBackendMode;
+  /**
+   * The saved-state rewrite a backend run applies, where one exists. Declared
+   * as a method so a page family's own transform, which reads a state type
+   * this package never names, satisfies it.
+   */
+  transform?(args: { state: unknown; payload: unknown }): {
+    state: unknown;
+    result?: unknown;
+  };
   /** The permission the DOOR enforces before a dispatch reaches this service. */
   requiredPermission: AuthzPermission;
 }>;

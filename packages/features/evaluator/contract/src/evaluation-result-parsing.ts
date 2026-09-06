@@ -4,17 +4,8 @@ import {
 } from "@langwatch/handled-error";
 
 /**
- * Parsed evaluation result with status information.
- * Used for rendering evaluation results in UI components.
- *
- * Status meanings:
- * - pending: Not yet executed
- * - running: Currently executing
- * - passed: Explicitly passed (passed=true)
- * - failed: Explicitly failed (passed=false)
- * - processed: Completed but no pass/fail (score-only evaluators)
- * - error: Execution error
- * - skipped: Intentionally skipped
+ * One evaluation result, as every surface that renders one reads it.
+ * `processed` carries a score with no pass or fail; `skipped` never ran.
  */
 export type ParsedEvaluationResult = {
   status: "pending" | "running" | "passed" | "failed" | "processed" | "error" | "skipped";
@@ -30,12 +21,8 @@ function readSerializedDomainError(candidate: unknown): SerializedHandledError |
 }
 
 /**
- * Parses an unknown evaluation result into a typed structure.
- * Handles boolean results, objects with passed/score/label/details fields,
- * and error states.
- *
- * @param result - The raw evaluation result (can be boolean, object, or undefined)
- * @returns Parsed evaluation result with status and optional score/label/details
+ * Reads a raw evaluation result into that shape: a boolean, an object carrying
+ * `passed` / `score` / `label` / `details`, an error, or nothing at all.
  */
 export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult => {
   if (result === null || result === undefined) {

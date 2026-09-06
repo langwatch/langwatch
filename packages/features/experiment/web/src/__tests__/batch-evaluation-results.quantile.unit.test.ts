@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { quantile } from "../model/batch-evaluation-results.metric-stats";
+import { quantile } from "@langwatch/experiment-contract";
 
 describe("quantile", () => {
   describe("given a position that lands between two samples", () => {

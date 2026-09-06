@@ -58,6 +58,18 @@
     "./surfaces/batch-results": {
       "types": "./src/surfaces/batch-results/index.ts",
       "default": "./src/surfaces/batch-results/index.ts"
+    },
+    "./surfaces/workbench-store": {
+      "types": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+      "default": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts"
+    },
+    "./surfaces/workbench-results-fold": {
+      "types": "./src/model/experiments-v3/execution/results-fold.ts",
+      "default": "./src/model/experiments-v3/execution/results-fold.ts"
+    },
+    "./surfaces/workbench-run-identification": {
+      "types": "./src/model/experiments-v3/execution/run-identification.ts",
+      "default": "./src/model/experiments-v3/execution/run-identification.ts"
     }
   },
   "scripts": {

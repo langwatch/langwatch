@@ -11,6 +11,7 @@ import {
   promptContextChip,
   scenarioContextChip,
   shortenChipId,
+  traceChipDisplayName,
   traceContextChip,
   workflowContextChip,
 } from "../langy-context-chips";
@@ -320,6 +321,27 @@ describe("shortenChipId", () => {
       it("leaves it whole", () => {
         expect(shortenChipId("abc123")).toBe("abc123");
       });
+    });
+  });
+});
+
+describe("traceChipDisplayName", () => {
+  describe("given a trace with a resolved trace name", () => {
+    /** @scenario The trace display name falls back through the fields the app already uses */
+    it("falls back through the resolved name, the root span name, then nothing", () => {
+      expect(
+        traceChipDisplayName({ traceName: "checkout flow", name: "POST /checkout" }),
+      ).toBe("checkout flow");
+      expect(traceChipDisplayName({ traceName: null, name: "POST /checkout" })).toBe(
+        "POST /checkout",
+      );
+      expect(traceChipDisplayName({ traceName: "   ", name: "  " })).toBeNull();
+
+      // With no name of either kind, the chip itself shortens the id, which is
+      // what the reader sees as the last resort.
+      expect(traceContextChip("abc123def456", traceChipDisplayName({})).label).toBe(
+        "Trace \u00b7 abc123\u202656",
+      );
     });
   });
 });

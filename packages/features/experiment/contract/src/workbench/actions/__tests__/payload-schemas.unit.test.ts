@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMPARISON_EVALUATOR_TYPE } from "../../types";
+import { COMPARISON_EVALUATOR_TYPE } from "../../../experiment-workbench";
 import {
   addColumnPayloadSchema,
   addEvaluatorPayloadSchema,

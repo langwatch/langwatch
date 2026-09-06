@@ -1,4 +1,4 @@
-import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../types";
+import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../../experiment-workbench";
 import { type DuplicateTargetPayload, duplicateTargetPayloadSchema } from "../schemas";
 import { attachTarget, newTargetId } from "./add-target";
 import { requireTarget } from "./helpers";

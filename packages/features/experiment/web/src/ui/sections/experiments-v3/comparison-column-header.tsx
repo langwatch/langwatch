@@ -7,7 +7,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name";
-import { computeComparisonAggregate } from "../../../model/experiments-v3/compute-aggregates";
+import { computeComparisonAggregate } from "@langwatch/experiment-contract";
 import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";

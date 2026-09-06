@@ -9,6 +9,7 @@ import {
   FeatureFlagLangyUiActionSurfaceAdapter,
   LangyApp,
   LangyNavigateFallbackService,
+  type LangyNavigateResourcePort,
   LangyTokenBufferAdapter,
   LangyTurnAccessAdapter,
   LangyTurnHandoffAdapter,
@@ -71,6 +72,12 @@ export type LangyFeatureCollaborators = Readonly<{
     max: number;
   }) => Promise<{ allowed: boolean; resetAt: number }>;
   processName: string;
+  /**
+   * Where a resource id Langy opens is read. Absent means only page names
+   * resolve, which is the honest answer for a process holding none of the
+   * eight directories a resource id names.
+   */
+  navigateResources: LangyNavigateResourcePort | undefined;
 }>;
 
 /** The Langy application and the two routers built over it. */
@@ -95,6 +102,7 @@ export function composeLangyFeature(options: {
   demoProjectId: string | undefined;
   rateLimit: LangyFeatureCollaborators["rateLimit"];
   processName: string;
+  navigateResources?: LangyNavigateResourcePort | undefined;
 }): ComposedLangyFeature {
   const collaborators: LangyFeatureCollaborators = {
     prisma: options.infrastructure.prisma,
@@ -108,6 +116,7 @@ export function composeLangyFeature(options: {
     demoProjectId: options.demoProjectId,
     rateLimit: options.rateLimit,
     processName: options.processName,
+    navigateResources: options.navigateResources,
   };
   const app = composeLangy(collaborators);
   const gates = composeLangyGates(collaborators);
@@ -275,6 +284,7 @@ function composeLangyRelay(
         (await options.projects.tryGetSummaryById(projectId))?.slug ?? null,
     },
     platformUrl: createPlatformUrlBuilder(options.publicBaseUrl),
+    ...(options.navigateResources ? { resources: options.navigateResources } : {}),
   });
   return {
     redis,

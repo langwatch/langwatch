@@ -1,4 +1,4 @@
-import type { EvaluationsV3State } from "../types";
+import type { EvaluationsV3State } from "../../experiment-workbench";
 import {
   type ProjectedWorkbenchState,
   projectWorkbenchState,

@@ -1,8 +1,12 @@
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { ComparisonEvaluatorConfig, DatasetReference, EvaluationResults } from "../types";
+import type {
+  ComparisonEvaluatorConfig,
+  DatasetReference,
+  EvaluationResults,
+} from "../../experiment-workbench";
 import { computeTargetAggregates } from "../compute-aggregates";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { disambiguateNames } from "@langwatch/experiment-contract";
+import { toComparisonConfig } from "../normalize-comparison";
+import { disambiguateNames } from "../variant-disambiguation";
 import type { WorkbenchState } from "./transforms";
 
 /**

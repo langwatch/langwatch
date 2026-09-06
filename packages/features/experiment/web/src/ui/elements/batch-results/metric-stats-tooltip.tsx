@@ -3,7 +3,7 @@ import { formatCost, formatLatency } from "@langwatch/design-system/metric-value
 import {
   computeMetricStats,
   type MetricStats,
-} from "../../../model/batch-evaluation-results.metric-stats";
+} from "@langwatch/experiment-contract";
 
 export { computeMetricStats, type MetricStats };
 

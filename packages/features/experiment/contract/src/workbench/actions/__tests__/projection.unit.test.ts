@@ -4,7 +4,7 @@ import type {
   EvaluationResults,
   EvaluatorConfig,
   TargetConfig,
-} from "../../types";
+} from "../../../experiment-workbench";
 import { PROJECTION_BUDGET_BYTES, projectWorkbenchState } from "../projection";
 import type { WorkbenchState } from "../transforms";
 

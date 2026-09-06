@@ -6,7 +6,7 @@
 import {
   computeMetricStats,
   type MetricStats,
-} from "../../model/batch-evaluation-results.metric-stats";
+} from "@langwatch/experiment-contract";
 import { bootstrapMeanCI } from "../../model/batch-evaluation-results.bootstrap-ci";
 import type { BatchResultRow } from "./batch-evaluation-results.types";
 

@@ -360,3 +360,16 @@ export function releaseContextTarget(id: string): void {
   useLangyContextTargetStore.getState().unpick(id);
   useLangyStore.getState().dismissChip(id);
 }
+
+/**
+ * The composer's ✕, which is the ONE remove affordance for context. A chip can
+ * be page-derived, explicitly attached, or both, so removal clears every source
+ * it has — otherwise it reappears from the other one.
+ */
+export function removeContextChip(id: string): void {
+  const langy = useLangyStore.getState();
+  if (langy.attachedContext.some((attached) => attached.id === id)) {
+    langy.detachContext(id);
+  }
+  langy.dismissChip(id);
+}

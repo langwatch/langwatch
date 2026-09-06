@@ -14,10 +14,10 @@ import {
 
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
-  parseEvaluationResult,
 } from "@langwatch/evaluator-web/surfaces/evaluation-results";
 import { parseLLMError } from "../../../../model/format-llm-error";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants";

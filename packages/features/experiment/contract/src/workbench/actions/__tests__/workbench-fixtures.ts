@@ -1,4 +1,8 @@
-import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../../types";
+import type {
+  DatasetReference,
+  EvaluatorConfig,
+  TargetConfig,
+} from "../../../experiment-workbench";
 import { TransformError, type WorkbenchState } from "../transforms";
 
 /**

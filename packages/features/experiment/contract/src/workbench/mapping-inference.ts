@@ -10,7 +10,7 @@ import type {
   EvaluatorConfig,
   FieldMapping,
   TargetConfig,
-} from "./types";
+} from "../experiment-workbench";
 
 // ============================================================================
 // Semantic Mapping Dictionary
