@@ -107,7 +107,7 @@ const CLI_DEFAULT_WINDOW_PRESET = "24h";
  * Recover the search the agent actually ran.
  *
  * The CLI envelope records the tool call under `langwatch.trace.search` but
- * leaves the tool INPUT as opencode's original shell payload — `{ command:
+ * leaves the tool INPUT as the original shell payload — `{ command:
  * "langwatch trace search …" }` — because it only ever needed the resource and
  * the verb. So the flags have to come back out of the command string. A
  * structured input (the older MCP transport, and the gallery's fixtures) is

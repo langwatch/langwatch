@@ -60,6 +60,14 @@ export interface LangySessionState {
    * tripped the gate must reach the stream before the gate cancels it. */
   toolCommands: string[];
   /**
+   * Every settled tool card's NAME, in order.
+   *
+   * A scenario that has to prove a tool did NOT run reads this: the negative
+   * is on no reply, and a judge asked "did it call code_access" is guessing
+   * from prose.
+   */
+  toolNames: string[];
+  /**
    * Every settled tool card's OUTPUT, in order.
    *
    * The CLI prints the platform's own bytes unchanged, so a dispatched UI
@@ -604,6 +612,7 @@ export function makeLangyAdapter(
     currentTurnId: null,
     navigateHrefs: [],
     toolCommands: [],
+    toolNames: [],
     toolOutputs: [],
   };
   const adapter: AgentAdapter = {
@@ -651,6 +660,7 @@ export function makeLangyAdapter(
           if (typeof command === "string" && command) {
             state.toolCommands.push(command);
           }
+          state.toolNames.push(call.name);
           state.toolOutputs.push(call.output);
         },
         // Read at fire time, not captured: a tab attaches and detaches around
@@ -671,6 +681,7 @@ export function makeLangyAdapter(
       state.currentTurnId = null;
       state.navigateHrefs.length = 0;
       state.toolCommands.length = 0;
+      state.toolNames.length = 0;
       state.toolOutputs.length = 0;
     },
   });
