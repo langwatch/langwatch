@@ -770,13 +770,18 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Look up the credential and tenant saved by the session owner. */
-  async function getSessionFromRedis(sessionId: string): Promise<SessionCredential | null> {
+  async function getSessionFromRedis(
+    sessionId: string,
+  ): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SESSION_PREFIX}${sessionId}`);
       if (!data) return null;
       const stored = storedSessionSchema.parse(JSON.parse(data));
-      return { apiKey: decrypt(stored.encryptedApiKey), projectId: stored.projectId };
+      return {
+        apiKey: decrypt(stored.encryptedApiKey),
+        projectId: stored.projectId,
+      };
     } catch (err) {
       logger.error({ error: err }, "Redis session lookup failed");
       return null;
@@ -939,13 +944,18 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function getSseSessionFromRedis(sessionId: string): Promise<SessionCredential | null> {
+  async function getSseSessionFromRedis(
+    sessionId: string,
+  ): Promise<SessionCredential | null> {
     if (!redis) return null;
     try {
       const data = await redis.get(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
       if (!data) return null;
       const stored = storedSessionSchema.parse(JSON.parse(data));
-      return { apiKey: decrypt(stored.encryptedApiKey), projectId: stored.projectId };
+      return {
+        apiKey: decrypt(stored.encryptedApiKey),
+        projectId: stored.projectId,
+      };
     } catch (err) {
       logger.error({ error: err }, "Redis SSE session lookup failed");
       return null;
@@ -1352,7 +1362,8 @@ export function createMcpHandler(): McpHandler {
     if (!credential || credential.apiKey !== callerApiKey) return null;
     const redisApiKey = credential.apiKey;
     // Older replicas wrote no tenant. Resolve it once when recovering locally.
-    const projectId = credential.projectId ?? (await validateApiKey(redisApiKey))?.id;
+    const projectId =
+      credential.projectId ?? (await validateApiKey(redisApiKey))?.id;
 
     // WORKAROUND: The SDK transport starts uninitialized — we patch its
     // inner state so it accepts non-init requests with the existing
@@ -1703,7 +1714,10 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
-  async function handleSseConnect(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async function handleSseConnect(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
     const credential = await authenticateRequest(req, res);
     if (!credential) return;
     const { apiKey, projectId } = credential;
@@ -1819,10 +1833,13 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
-    const projectId = credential.projectId ?? (await validateApiKey(apiKey))?.id;
+    const projectId =
+      credential.projectId ?? (await validateApiKey(apiKey))?.id;
     noteLogFields(res, { projectId });
     if (!credential.projectId && projectId) {
-      await storeSseSessionInRedis(sessionId, apiKey, projectId).catch(() => {});
+      await storeSseSessionInRedis(sessionId, apiKey, projectId).catch(
+        () => {},
+      );
     }
 
     const body = await readJsonBody(req, res);

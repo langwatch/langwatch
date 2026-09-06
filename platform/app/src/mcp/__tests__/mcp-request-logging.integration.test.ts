@@ -7,71 +7,82 @@
  * nothing recorded that the request had happened at all.
  */
 import { createServer, type Server } from "node:http";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const VALID_API_KEY = "lw_logging_key";
 
-const { mockPrisma, logLines, loggerStub, redisRecords, mockRedis } = vi.hoisted(() => {
-  const lines: { fields: Record<string, unknown>; message: string }[] = [];
-  const record = () => (fields: unknown, message?: unknown) => {
-    if (typeof fields === "object" && fields !== null) {
-      lines.push({
-        fields: fields as Record<string, unknown>,
-        message: String(message ?? ""),
-      });
-    }
-  };
-  const stub: Record<string, unknown> = {
-    info: record(),
-    debug: record(),
-    warn: record(),
-    error: record(),
-    fatal: record(),
-    trace: record(),
-  };
-  stub.child = () => stub;
-  const records = new Map<string, string>();
-  return {
-    redisRecords: records,
-    mockRedis: {
-      get: vi.fn(async (key: string) => records.get(key) ?? null),
-      set: vi.fn(async (key: string, value: string) => {
-        records.set(key, value);
-      }),
-      del: vi.fn(async (key: string) => records.delete(key)),
-      sadd: vi.fn(async () => 1),
-      srem: vi.fn(async () => 1),
-      smembers: vi.fn(async () => []),
-      expire: vi.fn(async () => 1),
-      publish: vi.fn(async () => 1),
-    },
-    logLines: lines,
-    loggerStub: stub,
-    mockPrisma: {
-      project: {
-        findUnique: vi.fn(({ where }: { where: { apiKey: string } }) =>
-          Promise.resolve(
-            where.apiKey === "lw_logging_key"
-              ? {
-                  id: "logging-project",
-                  apiKey: where.apiKey,
-                  teamId: "team-1",
-                  archivedAt: null,
-                }
-              : null,
-          ),
-        ),
+const { mockPrisma, logLines, loggerStub, redisRecords, mockRedis } =
+  vi.hoisted(() => {
+    const lines: { fields: Record<string, unknown>; message: string }[] = [];
+    const record = () => (fields: unknown, message?: unknown) => {
+      if (typeof fields === "object" && fields !== null) {
+        lines.push({
+          fields: fields as Record<string, unknown>,
+          message: String(message ?? ""),
+        });
+      }
+    };
+    const stub: Record<string, unknown> = {
+      info: record(),
+      debug: record(),
+      warn: record(),
+      error: record(),
+      fatal: record(),
+      trace: record(),
+    };
+    stub.child = () => stub;
+    const records = new Map<string, string>();
+    return {
+      redisRecords: records,
+      mockRedis: {
+        get: vi.fn(async (key: string) => records.get(key) ?? null),
+        set: vi.fn(async (key: string, value: string) => {
+          records.set(key, value);
+        }),
+        del: vi.fn(async (key: string) => records.delete(key)),
+        sadd: vi.fn(async () => 1),
+        srem: vi.fn(async () => 1),
+        smembers: vi.fn(async () => []),
+        expire: vi.fn(async () => 1),
+        publish: vi.fn(async () => 1),
       },
-    },
-  };
-});
+      logLines: lines,
+      loggerStub: stub,
+      mockPrisma: {
+        project: {
+          findUnique: vi.fn(({ where }: { where: { apiKey: string } }) =>
+            Promise.resolve(
+              where.apiKey === "lw_logging_key"
+                ? {
+                    id: "logging-project",
+                    apiKey: where.apiKey,
+                    teamId: "team-1",
+                    archivedAt: null,
+                  }
+                : null,
+            ),
+          ),
+        },
+      },
+    };
+  });
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, createLogger: () => loggerStub };
 });
 
-vi.mock("~/server/app-layer/app", () => ({ tryGetApp: () => ({ redis: mockRedis }) }));
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => ({ redis: mockRedis }),
+}));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 vi.mock("~/utils/encryption", () => ({
@@ -80,6 +91,7 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import { createMcpHandler, type McpHandler } from "../handler";
+
 function initializeBody(id: number) {
   return {
     jsonrpc: "2.0",
@@ -106,7 +118,10 @@ async function postMessage({
 }) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
     body: JSON.stringify(body),
   });
   await response.text();
@@ -121,7 +136,9 @@ describe("Feature: MCP request logging", () => {
   beforeAll(async () => {
     handler = createMcpHandler();
     server = createServer((req, res) => handler.handleRequest(req, res));
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
     baseUrl = `http://127.0.0.1:${port}`;
@@ -139,7 +156,9 @@ describe("Feature: MCP request logging", () => {
   /** Waits for the access log line, which is written when the response closes. */
   async function accessLogFor(path: string) {
     for (let attempt = 0; attempt < 50; attempt++) {
-      const line = logLines.find((l) => l.message === "MCP request" && l.fields.path === path);
+      const line = logLines.find(
+        (l) => l.message === "MCP request" && l.fields.path === path,
+      );
       if (line) return line;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
@@ -171,47 +190,63 @@ describe("Feature: MCP request logging", () => {
     const sessionId = await initializeSession();
     const stored = redisRecords.get(`mcp:session:${sessionId}`);
     expect(stored).toBeDefined();
-    expect(JSON.parse(stored ?? "null")).toMatchObject({ projectId: "logging-project" });
+    expect(JSON.parse(stored ?? "null")).toMatchObject({
+      projectId: "logging-project",
+    });
   });
 
-  it.each(["POST", "GET", "DELETE"])(
-    "attributes an established session's %s without another project lookup",
-    async (method) => {
-      const sessionId = await initializeSession();
-      const abort = new AbortController();
-      try {
-        const response = await fetch(`${baseUrl}/mcp`, {
-          method,
-          headers: { ...requestHeaders, "mcp-session-id": sessionId },
-          signal: abort.signal,
-          ...(method === "POST"
-            ? { body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }) }
-            : {}),
-        });
-        expect(response.status).toBe(200);
-        if (method !== "GET") await response.text();
-      } finally {
-        abort.abort();
-      }
-      const line = await accessLogFor("/mcp");
-      expect(line.fields.projectId).toBe("logging-project");
-      expect(line.fields.sessionId).toBe(sessionId);
-      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
-      expect(JSON.stringify(line)).not.toContain(VALID_API_KEY);
-    },
-  );
+  it.each([
+    "POST",
+    "GET",
+    "DELETE",
+  ])("attributes an established session's %s without another project lookup", async (method) => {
+    const sessionId = await initializeSession();
+    const abort = new AbortController();
+    try {
+      const response = await fetch(`${baseUrl}/mcp`, {
+        method,
+        headers: { ...requestHeaders, "mcp-session-id": sessionId },
+        signal: abort.signal,
+        ...(method === "POST"
+          ? {
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "tools/list",
+                params: {},
+              }),
+            }
+          : {}),
+      });
+      expect(response.status).toBe(200);
+      if (method !== "GET") await response.text();
+    } finally {
+      abort.abort();
+    }
+    const line = await accessLogFor("/mcp");
+    expect(line.fields.projectId).toBe("logging-project");
+    expect(line.fields.sessionId).toBe(sessionId);
+    expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    expect(JSON.stringify(line)).not.toContain(VALID_API_KEY);
+  });
 
   it("does not attribute another project's session on a bearer mismatch", async () => {
     const sessionId = await initializeSession();
     const response = await fetch(`${baseUrl}/mcp`, {
       method: "DELETE",
-      headers: { authorization: "Bearer lw_other_project", "mcp-session-id": sessionId },
+      headers: {
+        authorization: "Bearer lw_other_project",
+        "mcp-session-id": sessionId,
+      },
     });
     expect(response.status).toBe(401);
     expect((await accessLogFor("/mcp")).fields).not.toHaveProperty("projectId");
   });
 
-  it.each([true, false])("attributes a Redis recovered session (legacy: %s)", async (legacy) => {
+  it.each([
+    true,
+    false,
+  ])("attributes a Redis recovered session (legacy: %s)", async (legacy) => {
     const sessionId = `recovered-logging-${legacy}`;
     redisRecords.set(
       `mcp:session:${sessionId}`,
@@ -226,11 +261,18 @@ describe("Feature: MCP request logging", () => {
       const response = await fetch(`${baseUrl}/mcp`, {
         method: "POST",
         headers: { ...requestHeaders, "mcp-session-id": sessionId },
-        body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/list", params: {} }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/list",
+          params: {},
+        }),
       });
       expect(response.status).toBe(200);
       await response.text();
-      expect((await accessLogFor("/mcp")).fields.projectId).toBe("logging-project");
+      expect((await accessLogFor("/mcp")).fields.projectId).toBe(
+        "logging-project",
+      );
     }
     expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
   });
@@ -245,7 +287,9 @@ describe("Feature: MCP request logging", () => {
       const reader = response.body?.getReader();
       if (!reader) throw new Error("SSE response has no body");
       const event = await reader.read();
-      const endpoint = new TextDecoder().decode(event.value).match(/data: (.+)/)?.[1];
+      const endpoint = new TextDecoder()
+        .decode(event.value)
+        .match(/data: (.+)/)?.[1];
       if (!endpoint) throw new Error("SSE stream has no message endpoint");
       mockPrisma.project.findUnique.mockClear();
       const posted = await postMessage({
@@ -255,14 +299,19 @@ describe("Feature: MCP request logging", () => {
         body: initializeBody(1),
       });
       expect(posted.status).toBe(202);
-      expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
+      expect((await accessLogFor("/messages")).fields.projectId).toBe(
+        "logging-project",
+      );
       expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
     } finally {
       abort.abort();
     }
   });
 
-  it.each([true, false])("attributes relayed SSE messages (legacy: %s)", async (legacy) => {
+  it.each([
+    true,
+    false,
+  ])("attributes relayed SSE messages (legacy: %s)", async (legacy) => {
     const sessionId = `remote-sse-${legacy}`;
     redisRecords.set(
       `mcp:sse:session:${sessionId}`,
@@ -281,7 +330,9 @@ describe("Feature: MCP request logging", () => {
         body: initializeBody(id),
       });
       expect(response.status).toBe(202);
-      expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
+      expect((await accessLogFor("/messages")).fields.projectId).toBe(
+        "logging-project",
+      );
     }
     expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(legacy ? 1 : 0);
     expect(mockRedis.publish).toHaveBeenCalledWith(

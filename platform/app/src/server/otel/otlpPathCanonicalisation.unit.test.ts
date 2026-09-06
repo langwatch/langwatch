@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readCorrectedPath, stampCorrectedPath } from "./otlpPathCanonicalisation";
+import {
+  readCorrectedPath,
+  stampCorrectedPath,
+} from "./otlpPathCanonicalisation";
 
 describe("the corrected-path marker", () => {
   /** @scenario The correction names the path the exporter used */

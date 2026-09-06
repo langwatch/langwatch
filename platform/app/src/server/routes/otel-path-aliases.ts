@@ -28,9 +28,7 @@ import { canonicalOtlpPath } from "@langwatch/observability";
  */
 
 import { Hono } from "hono";
-import {
-  stampCorrectedPath,
-} from "~/server/otel/otlpPathCanonicalisation";
+import { stampCorrectedPath } from "~/server/otel/otlpPathCanonicalisation";
 import { app as otelApp } from "./otel";
 
 export const app = new Hono();
