@@ -3946,7 +3946,7 @@ Run this more often than you read `/readyz`. The probe reports process state onl
 ---
 title: Credential-leak incident response
 description: What to do when a LangWatch AI Gateway virtual key leaks, from containment to rotation and the audit trail afterwards.
-sidebarTitle: Credential-leak incident
+sidebarTitle: Responding to credential-leaks
 ---
 
 The gateway gives you three operations on a leaked virtual key: disable, revoke and rotate. They differ in what happens to the old secret and in how fast the change reaches every pod.
