@@ -180,3 +180,19 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     When the user asks Langy with that modelOverride
     Then the request fails the allowlist check with 400
     And no permit was reserved against the daily counter
+
+  # ── The API process's own composition ──────────────────────────────────
+
+  @unit
+  Scenario: The API process meters the daily pull-request cap on its own Redis
+    Given the API process composed a Redis connection
+    When a turn reserves a pull-request permit
+    Then the permit is spent against that user's day bucket
+    And the turn is told the real per-day cap rather than zero
+
+  @unit
+  Scenario: A deployment with no counter never denies a pull request
+    Given the API process composed no Redis connection
+    When a turn reserves a pull-request permit
+    Then the reservation is allowed
+    And the turn is told nothing was reserved, so it releases nothing

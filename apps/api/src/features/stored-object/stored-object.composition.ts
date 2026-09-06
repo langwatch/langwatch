@@ -83,7 +83,7 @@ export type StoredObjectFeatureCollaborators = Readonly<{
    * delivery URL carries no project, so resolving its owner is the one read that
    * genuinely spans them; absent, those URLs resolve to nothing.
    */
-  clickHouseInstances: (() => readonly ApiStoredObjectOwnerInstance[]) | null;
+  clickHouseInstances?: (() => readonly ApiStoredObjectOwnerInstance[]) | null | undefined;
   /** The object storage this deployment addresses its bytes in. */
   storage: ApiStoredObjectsConfigResolution;
   report?: ApiStoredObjectAbsenceReport;
@@ -276,7 +276,7 @@ export type ApiStoredObjectOwnerInstance = Readonly<{
  */
 function composeOwnerResolver(
   options: StoredObjectFeatureCollaborators,
-  logger: Logger,
+  logger: Pick<Logger, "warn">,
 ): StoredObjectOwnerResolver {
   const instances = options.clickHouseInstances;
   if (!instances) return ApiStoredObjectOwnerAbsence.create(logger);
@@ -318,7 +318,9 @@ class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemet
 
   withLookupSpan<Result>(
     _input: { id: string },
-    operation: (span: { setAttribute(name: string, value: string | number | boolean): void }) => Promise<Result>,
+    operation: (span: {
+      setAttribute(name: string, value: string | number | boolean): void;
+    }) => Promise<Result>,
   ): Promise<Result> {
     return operation({ setAttribute: () => undefined });
   }

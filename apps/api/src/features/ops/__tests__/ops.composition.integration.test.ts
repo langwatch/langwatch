@@ -79,7 +79,17 @@ function composeApplication(
   // The operator's scheduled-job read is a cross-tenant `$queryRaw` scan, so it
   // reaches the client rather than a model delegate. An empty result is a real
   // answer for a deployment that has scheduled nothing.
-  const prisma = { $queryRaw: vi.fn(async () => []) } as unknown as PrismaClient;
+  // The process-manager delegates are named because the fleet explorer is
+  // composed over the same client; nothing in this suite reads them.
+  const prisma = {
+    $queryRaw: vi.fn(async () => []),
+    $executeRaw: vi.fn(async () => 0),
+    $transaction: vi.fn(async () => []),
+    processManagerInbox: {},
+    processManagerInstance: {},
+    processManagerOutbox: {},
+    processManagerOutboxAttempt: {},
+  } as unknown as PrismaClient;
   const authz = testAuthz();
   const infrastructure = {
     ...stubInfrastructureEntitlements(),

@@ -12,57 +12,67 @@ export {
   type OpsProcessExplorer,
   type OpsProcessRef,
   type OpsReplayRunner,
-} from "./app/ops.app";
+} from "./app/ops.app.ts";
 export {
   BugReportTrpcApi,
   BUG_REPORTS_NO_PERMISSION,
   type BugReportTrpcContext,
   type BugReportTrpcPorts,
-} from "./transport/api-trpc/bug-report.api";
-export { BugReportRepositoryPort } from "./ports/bug-report.port";
-export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository";
-export { BugReportInboxService, type BugReportListing } from "./services/bug-report-inbox.service";
-export { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "./transport/api-trpc/ops.api";
+} from "./transport/api-trpc/bug-report.api.ts";
+export { BugReportRepositoryPort } from "./ports/bug-report.port.ts";
+export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository.ts";
+export {
+  BugReportInboxService,
+  type BugReportListing,
+} from "./services/bug-report-inbox.service.ts";
+export {
+  OpsTrpcApi,
+  type OpsTrpcContext,
+  type OpsTrpcPorts,
+} from "./transport/api-trpc/ops.api.ts";
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,
-} from "./adapters/postgres.ops.adapter";
+} from "./adapters/postgres.ops.adapter.ts";
 export {
   RedisOpsSnapshotAdapter,
   type RedisOpsSnapshotAdapterOptions,
-} from "./adapters/redis.ops-snapshot.adapter";
+} from "./adapters/redis.ops-snapshot.adapter.ts";
 export {
   RedisSchedulerWakeAdapter,
   type SchedulerWakeRedis,
-} from "./adapters/redis.scheduler-wake.adapter";
-export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port";
-export { NoopSchedulerAuditSink, SchedulerAuditSinkPort } from "./ports/scheduler-audit-sink.port";
+} from "./adapters/redis.scheduler-wake.adapter.ts";
+export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port.ts";
+export {
+  NoopSchedulerAuditSink,
+  SchedulerAuditSinkPort,
+} from "./ports/scheduler-audit-sink.port.ts";
 export type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
-} from "./repositories/scheduler-ops.repository";
-export { NoopSchedulerWakeService } from "./services/scheduler-wake.service";
-export { SchedulerWakePort } from "./ports/scheduler-wake.port";
+} from "./repositories/scheduler-ops.repository.ts";
+export { NoopSchedulerWakeService } from "./services/scheduler-wake.service.ts";
+export { SchedulerWakePort } from "./ports/scheduler-wake.port.ts";
 export {
   type AdminAccess,
   AdminAccessService,
   type AdminAccessServiceOptions,
-} from "./services/admin-access.service";
-export { AdminAuditSink } from "./services/impersonation.service";
-export * from "./rules/ops-error-normalizer.rules";
-export * from "./rules/ops-redis-engine-cpu.rules";
-export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter";
-export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
-export { StorageStatsMetricsPort } from "./ports/storage-stats-metrics.port";
-export { OtelStorageStatsMetricsAdapter } from "./adapters/otel.storage-stats-metrics.adapter";
+} from "./services/admin-access.service.ts";
+export { AdminAuditSink } from "./services/impersonation.service.ts";
+export * from "./rules/ops-error-normalizer.rules.ts";
+export * from "./rules/ops-redis-engine-cpu.rules.ts";
+export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter.ts";
+export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port.ts";
+export { StorageStatsMetricsPort } from "./ports/storage-stats-metrics.port.ts";
+export { OtelStorageStatsMetricsAdapter } from "./adapters/otel.storage-stats-metrics.adapter.ts";
 export {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,
   type StorageStatsCollectionHandle,
   type StorageStatsCollectionOptions,
   type StorageStatsInstance,
-} from "./services/storage-stats-collection.service";
-export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
+} from "./services/storage-stats-collection.service.ts";
+export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port.ts";
 export {
   UsageStatsErrorReporterPort,
   UsageStatsClickHouseClientPort,
@@ -71,66 +81,76 @@ export {
   type UsageStatsClickHouseQuery,
   type UsageStatsClickHouseQueryResult,
   type UsageStatsWorkerDatabase,
-} from "./ports/usage-stats-worker.port";
+} from "./ports/usage-stats-worker.port.ts";
 export {
   OpsWorkerPort,
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
-} from "./ports/ops-worker.port";
+} from "./ports/ops-worker.port.ts";
 
 /** The operations explorers and the replay runner, moved off the application. */
-export { EventExplorerService } from "./services/event-explorer.service";
+export { EventExplorerService } from "./services/event-explorer.service.ts";
 export {
   ManagerExplorerService,
   OVERDUE_PENDING_MS,
   OVERDUE_WAKE_MS,
-} from "./services/manager-explorer.service";
-export { ReplayService } from "./services/replay.service";
-export { LOCK_REFRESH_INTERVAL_MS } from "./services/replay-lock-heartbeat.service";
-export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service";
-export { totalInFlight, type InFlightCounts } from "./rules/ops-in-flight.rules";
+} from "./services/manager-explorer.service.ts";
+export { ReplayService } from "./services/replay.service.ts";
+export { LOCK_REFRESH_INTERVAL_MS } from "./services/replay-lock-heartbeat.service.ts";
+export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service.ts";
+export { OpsQueueMetricsSourcePort } from "./ports/ops-queue-metrics-source.port.ts";
+export { QueueOpsMetricsSourceAdapter } from "./adapters/queue.ops-queue-metrics-source.adapter.ts";
+export { IoredisOpsSnapshotRedisAdapter } from "./adapters/ioredis.ops-snapshot-redis.adapter.ts";
+export { QueueService } from "./services/queue.service.ts";
+export { QueueRedisRepository } from "./repositories/redis/queue.repository.ts";
+export { RedisOpsMetricsRepository } from "./repositories/redis/redis.ops-metrics.repository.ts";
+export { totalInFlight, type InFlightCounts } from "./rules/ops-in-flight.rules.ts";
 export {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
   type OpsProjectionMetadata,
-} from "./ports/eventing-introspection.port";
-export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter";
-export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port";
-export { NullEventExplorerAdapter } from "./adapters/null.event-explorer.adapter";
+} from "./ports/eventing-introspection.port.ts";
+export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter.ts";
+export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port.ts";
+export { NullEventExplorerAdapter } from "./adapters/null.event-explorer.adapter.ts";
 export type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
-} from "./repositories/event-explorer.repository";
-export { NullProcessOpsAdapter } from "./adapters/null.process-ops.adapter";
+} from "./repositories/event-explorer.repository.ts";
+export { NullProcessOpsAdapter } from "./adapters/null.process-ops.adapter.ts";
 export type {
   ProcessNameCounts,
   ProcessOpsRepository,
-} from "./repositories/process-ops.repository";
-export { NullReplayAdapter } from "./adapters/null.replay.adapter";
-export type { ReplayRepository } from "./repositories/replay.repository";
-export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
-export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
-export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository";
+} from "./repositories/process-ops.repository.ts";
+export { NullReplayAdapter } from "./adapters/null.replay.adapter.ts";
+export type { ReplayRepository } from "./repositories/replay.repository.ts";
+export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository.ts";
+export { ProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";
+export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository.ts";
+export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 export {
   OpsExplainClientPort,
   type OpsExplainClientResolution,
-} from "./ports/ops-explain-client.port";
+} from "./ports/ops-explain-client.port.ts";
 
 /** Public intake for the reports customers' coding agents file. */
 export {
   BugReportIntakeService,
   BugReportRateLimitedError,
   type SubmitBugReportInput,
-} from "./services/bug-report-intake.service";
-export { BugReportNotifierPort, SilentBugReportNotifier } from "./ports/bug-report-notifier.port";
-export { BugReportRateLimiterPort } from "./ports/bug-report-rate-limiter.port";
+} from "./services/bug-report-intake.service.ts";
+export {
+  BugReportNotifierPort,
+  SilentBugReportNotifier,
+} from "./ports/bug-report-notifier.port.ts";
+export { BugReportRateLimiterPort } from "./ports/bug-report-rate-limiter.port.ts";
 export {
   SlackBugReportNotifierAdapter,
   type OpsSlackAlertTransport,
   type SlackBugReportNotifierConfig,
-} from "./adapters/slack.bug-report-notifier.adapter";
+} from "./adapters/slack.bug-report-notifier.adapter.ts";
 
 // The system-migration ops model, its cohort policy and the Prisma/Redis
 // implementations of the runner's repository interfaces. All were
@@ -141,37 +161,37 @@ export {
   type MigrationEnrollmentRecord,
   type SystemMigrationEnrollmentStore,
   type SystemMigrationStateReader,
-} from "./services/system-migrations.service";
+} from "./services/system-migrations.service.ts";
 export {
   migrationRunsOnThisInstallation,
   organizationMigrates,
-} from "./rules/ops-system-migration-cohort.rules";
+} from "./rules/ops-system-migration-cohort.rules.ts";
 export {
   PostgresSystemMigrationsAdapter,
   type PostgresSystemMigrationsAdapterOptions,
-} from "./adapters/postgres.system-migrations.adapter";
-export { NullOrganizationDataplaneAdapter } from "./adapters/null.organization-dataplane.adapter";
-export { RoutingTableOrganizationDataplaneAdapter } from "./adapters/routing-table.organization-dataplane.adapter";
+} from "./adapters/postgres.system-migrations.adapter.ts";
+export { NullOrganizationDataplaneAdapter } from "./adapters/null.organization-dataplane.adapter.ts";
+export { RoutingTableOrganizationDataplaneAdapter } from "./adapters/routing-table.organization-dataplane.adapter.ts";
 export {
   type OrganizationDataplane,
   OrganizationDataplanePort,
-} from "./ports/organization-dataplane.port";
+} from "./ports/organization-dataplane.port.ts";
 export {
   type OrganizationCohortAdmission,
   SystemMigrationCohortService,
-} from "./services/system-migration-cohort.service";
-export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task";
+} from "./services/system-migration-cohort.service.ts";
+export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task.ts";
 export {
   ProcessManagerPurgeTask,
   purgeProcessManagerTables,
   type ProcessManagerPurgeOptions,
   type ProcessManagerPurgeReport,
-} from "./tasks/process-manager-purge.task";
-export { PostgresProcessManagerPurgeAdapter } from "./adapters/postgres.process-manager-purge.adapter";
+} from "./tasks/process-manager-purge.task.ts";
+export { PostgresProcessManagerPurgeAdapter } from "./adapters/postgres.process-manager-purge.adapter.ts";
 export type {
   ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,
-} from "./repositories/process-manager-purge.repository";
+} from "./repositories/process-manager-purge.repository.ts";
 
 // The back-office REST transport: impersonation, and the React Admin resource
 // operations. Its two session reads are ports, because who is acting and which
@@ -181,7 +201,7 @@ export {
   type AdminRestActor,
   type AdminRestPorts,
   type AdminRestSessionPorts,
-} from "./transport/api-rest/admin.api";
+} from "./transport/api-rest/admin.api.ts";
 
 // The public issue-report intake, `POST /api/bug-reports`. Its optional
 // project credential is a port: reading one off a request is the deployment's
@@ -190,24 +210,24 @@ export {
   createBugReportsRestApp,
   type BugReportRestCredentialReader,
   type BugReportRestPorts,
-} from "./transport/api-rest/bug-report.api";
+} from "./transport/api-rest/bug-report.api.ts";
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the
 // decision about which client an EXPLAIN is allowed to reach.
-export { CLICKHOUSE_GUARDRAILS } from "./rules/ops-clickhouse-guardrails.rules";
+export { CLICKHOUSE_GUARDRAILS } from "./rules/ops-clickhouse-guardrails.rules.ts";
 export {
   ALLOWED_EXPLAIN_TYPES,
   explainBodySchema,
   type ExplainType,
   OpsClickHouseRuntime,
   type ParseResult,
-} from "./adapters/ops-clickhouse-explain.adapter";
-export { OpsClickhouseExplainAdapter } from "./adapters/ops-clickhouse-explain.adapter";
+} from "./adapters/ops-clickhouse-explain.adapter.ts";
+export { OpsClickhouseExplainAdapter } from "./adapters/ops-clickhouse-explain.adapter.ts";
 export {
   type OpsExplainOutcome,
   OpsExplainService,
-} from "./services/ops-clickhouse-explain.service";
+} from "./services/ops-clickhouse-explain.service.ts";
 export {
   createOpsClickHouseExplainRestApp,
   type OpsClickHouseExplainRestPorts,
-} from "./transport/api-rest/ops-clickhouse-explain.api";
+} from "./transport/api-rest/ops-clickhouse-explain.api.ts";

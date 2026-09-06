@@ -7,7 +7,11 @@ import type { FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   FeatureFlagLangyUiActionSurfaceAdapter,
+  LANGY_GITHUB_PRS_PER_DAY,
   LangyApp,
+  LangyGithubPermitPort,
+  LangyGithubPrCounterPort,
+  LangyGithubPrQuotaService,
   LangyNavigateFallbackService,
   type LangyNavigateResourcePort,
   LangyTokenBufferAdapter,
@@ -31,15 +35,15 @@ import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import type { ApiAuditPort } from "../../api-request.policy";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
-import { createPlatformUrlBuilder } from "../../app/api-rest-ports";
+import type { ApiAuditPort } from "../../api-request.policy.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
+import { createPlatformUrlBuilder } from "../../app/api-rest-ports.ts";
 import {
   createLangyEgressTrpcRouter,
   createLangyTrpcRouter,
   type LangyTrpcGates,
-} from "./langy-trpc.mount";
+} from "./langy-trpc.mount.ts";
 
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
@@ -86,7 +90,7 @@ export type LangyFeatureCollaborators = Readonly<{
   local: LangyLocalTrpcPorts | undefined;
 }>;
 
-import type { ComposedLangyFeature } from "./langy.composition.types";
+import type { ComposedLangyFeature } from "./langy.composition.types.ts";
 
 /** Composes the Langy feature over this process's own graph. */
 export function composeLangyFeature(options: {
@@ -198,6 +202,15 @@ class ApiLangyUnavailableError extends HandledError {
 function composeLangy(options: LangyFeatureCollaborators): LangyApp {
   const adapter = PostgresLangyAdapter.create({ database: options.prisma });
   const redis = options.redis;
+  // The daily pull-request budget, metered on the SAME connection the token
+  // buffer and the turn stores use. Without Redis the service answers every
+  // reservation `allowed` and reports nothing reserved, which is what a
+  // deployment holding no counter can honestly say.
+  const prQuota = ApiLangyGithubPrPermits.create(
+    LangyGithubPrQuotaService.create({
+      counter: redis ? ApiLangyGithubPrCounter.create(redis) : null,
+    }),
+  );
 
   const turns: LangyTurnTechnicalPorts = {
     // Resolving the model a turn runs on refuses rather than inventing one: a
@@ -210,16 +223,8 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     // No agent manager on a web process: dispatching is the worker's.
     worker: null,
     tokenBuffer: redis ? LangyTokenBufferAdapter.create({ redis }) : null,
-    permits: {
-      reserve: () =>
-        Promise.reject(new ApiLangyUnavailableError("Reserving a Langy pull-request permit")),
-      release: () => Promise.resolve(),
-      check: () =>
-        Promise.reject(new ApiLangyUnavailableError("Reading the Langy pull-request budget")),
-    },
-    // Zero rather than a number: with no permit store there is no budget to
-    // spend, and a positive cap would advertise one.
-    perDayPrCap: 0,
+    permits: prQuota,
+    perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     sessionKeys: {
       mint: () => Promise.reject(new ApiLangyUnavailableError("Minting a Langy session key")),
       revoke: () => Promise.resolve(),
@@ -452,4 +457,71 @@ function composeLangyEgressPorts(options: LangyFeatureCollaborators): LangyEgres
       }
     },
   };
+}
+
+/**
+ * The daily pull-request counter, on this process's own Redis. `eval` is
+ * declared because the quota service releases a permit through a Lua
+ * check-and-decrement; without it the release falls back to a read-then-decr
+ * that can underflow the bucket and grant unlimited permits.
+ */
+class ApiLangyGithubPrCounter extends LangyGithubPrCounterPort {
+  static create(redis: RedisConnection): ApiLangyGithubPrCounter {
+    return new ApiLangyGithubPrCounter(redis);
+  }
+
+  private constructor(private readonly redis: RedisConnection) {
+    super();
+  }
+
+  tryGet(key: string): Promise<string | null> {
+    return this.redis.get(key);
+  }
+
+  incr(key: string): Promise<number> {
+    return this.redis.incr(key);
+  }
+
+  decr(key: string): Promise<number> {
+    return this.redis.decr(key);
+  }
+
+  incrby(key: string, amount: number): Promise<number> {
+    return this.redis.incrby(key, amount);
+  }
+
+  expire(key: string, seconds: number): Promise<unknown> {
+    return this.redis.expire(key, seconds);
+  }
+
+  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown> {
+    return this.redis.eval(script, numKeys, ...args) as Promise<unknown>;
+  }
+}
+
+/** The turn's three permit calls, on the feature package's quota service. */
+class ApiLangyGithubPrPermits extends LangyGithubPermitPort {
+  static create(quota: LangyGithubPrQuotaService): ApiLangyGithubPrPermits {
+    return new ApiLangyGithubPrPermits(quota);
+  }
+
+  private constructor(private readonly quota: LangyGithubPrQuotaService) {
+    super();
+  }
+
+  reserve(input: { userId: string }): Promise<{
+    reserved: boolean;
+    allowed: boolean;
+    resetAt: number;
+  }> {
+    return this.quota.reservePermit(input);
+  }
+
+  release(input: { userId: string }): Promise<void> {
+    return this.quota.releasePermit(input);
+  }
+
+  check(input: { userId: string }): Promise<{ allowed: boolean }> {
+    return this.quota.usage(input);
+  }
 }
