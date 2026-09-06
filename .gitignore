@@ -158,3 +158,9 @@ server.log
 # binary here (packages/test-harness/src/nlpgo-subprocess.ts). It used to sit
 # inside the application package, whose own ignore file covered it.
 /.vitest-tmp/
+
+# apidiff scratch: worktrees, instance logs, generated compose overrides
+.apidiff/
+
+# visualdiff run directories: worktrees, screenshots, reports
+.visualdiff/

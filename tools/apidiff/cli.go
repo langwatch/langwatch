@@ -1,0 +1,311 @@
+package apidiff
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/langwatch/langwatch/tools/openapidiff"
+)
+
+// Exit codes: 0 no behavioral differences, 1 differences found, 2
+// operational or usage error.
+const (
+	exitEqual = iota
+	exitDifferences
+	exitError
+)
+
+// streams pairs the command's output writers: stdout carries only the
+// deterministic report, stderr carries progress and errors.
+type streams struct {
+	stdout io.Writer
+	stderr io.Writer
+}
+
+// stringSlice is a repeatable string flag (e.g. -exclude-prefix).
+type stringSlice []string
+
+func (values *stringSlice) String() string { return strings.Join(*values, ",") }
+
+func (values *stringSlice) Set(value string) error {
+	*values = append(*values, value)
+	return nil
+}
+
+// probeFlags holds the flags shared by `run` and `probe`.
+type probeFlags struct {
+	a               string
+	b               string
+	keys            Keys
+	concurrency     int
+	timeout         time.Duration
+	pathPrefix      string
+	method          string
+	excludePrefixes stringSlice
+	maxOps          int
+	exactStatus     bool
+	jsonOutput      bool
+	reportFile      string
+}
+
+func (probe *probeFlags) filter() OpFilter {
+	return OpFilter{Method: probe.method, PathPrefix: probe.pathPrefix, MaxOps: probe.maxOps}
+}
+
+func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
+	flags.StringVar(&probe.a, "a", "", "candidate (after) instance base URL")
+	flags.StringVar(&probe.b, "b", "", "base (before) instance base URL")
+	flags.StringVar(&probe.keys.ProjectKey, "project-key", DefaultProjectKey, "project API key (seed default)")
+	flags.StringVar(&probe.keys.OrgKey, "org-key", DefaultOrgKey, "organization bearer token (seed default)")
+	flags.StringVar(&probe.keys.AdminKey, "admin-key", "", "instance admin key (run mode injects a throwaway one)")
+	flags.StringVar(&probe.keys.ScimKey, "scim-key", "", "SCIM provisioning token (run mode seeds a fixed one)")
+	flags.StringVar(&probe.keys.ProjectKeyB, "project-key-b", "", "same-org sibling project key for permission probes (run mode provisions one)")
+	flags.StringVar(&probe.keys.ProjectKeyC, "project-key-c", "", "foreign-org project key for permission probes (run mode provisions one)")
+	flags.IntVar(&probe.concurrency, "concurrency", 1, "reserved; probing is lockstep (1)")
+	flags.DurationVar(&probe.timeout, "timeout", 30*time.Second, "per-request timeout")
+	flags.StringVar(&probe.pathPrefix, "path-prefix", "", "only probe operations under this path prefix")
+	flags.StringVar(&probe.method, "method", "", "only probe this HTTP method")
+	flags.Var(&probe.excludePrefixes, "exclude-prefix", "path prefix to skip (repeatable)")
+	flags.IntVar(&probe.maxOps, "max-ops", 0, "cap the number of probed operations (0 = all)")
+	flags.BoolVar(&probe.exactStatus, "exact-status", false, "compare exact status codes and error bodies (default: classes only, error bodies skipped)")
+	flags.BoolVar(&probe.jsonOutput, "json", false, "write the machine report to stdout instead of the summary")
+	flags.StringVar(&probe.reportFile, "report", "", "also write the machine report (JSON) to this file")
+}
+
+const usage = `apidiff — live two-instance API behavior diff
+
+usage:
+  apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
+                [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
+                [-pg-url URL -ch-url URL -redis-url URL] [-compose-project NAME]
+                [probe flags...]
+  apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
+                [-concurrency N] [-timeout DUR] [-path-prefix P] [-method M]
+                [-exclude-prefix P]... [-max-ops N] [-json] [-report FILE]
+
+exit codes: 0 no behavioral differences, 1 differences found, 2 error.
+`
+
+// Run executes the apidiff command and returns its documented exit code.
+func Run(args []string, stdout, stderr io.Writer) int {
+	if stdout == nil || stderr == nil {
+		return exitError
+	}
+	out := streams{stdout: stdout, stderr: stderr}
+	if len(args) == 0 {
+		fmt.Fprint(out.stderr, usage)
+		return exitError
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	switch args[0] {
+	case "probe":
+		return runProbeSubcommand(ctx, args[1:], out)
+	case "run":
+		return runBootSubcommand(ctx, args[1:], out)
+	default:
+		fmt.Fprintf(out.stderr, "unknown subcommand %q\n%s", args[0], usage)
+		return exitError
+	}
+}
+
+func runProbeSubcommand(ctx context.Context, args []string, out streams) int {
+	flags := flag.NewFlagSet("apidiff probe", flag.ContinueOnError)
+	flags.SetOutput(out.stderr)
+	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
+	registerProbeFlags(flags, probe)
+	if err := flags.Parse(args); err != nil {
+		return exitError
+	}
+	if probe.a == "" || probe.b == "" {
+		fmt.Fprintln(out.stderr, "probe requires -a and -b")
+		return exitError
+	}
+	return probePipeline(ctx, probe, out)
+}
+
+func runBootSubcommand(ctx context.Context, args []string, out streams) int {
+	flags := flag.NewFlagSet("apidiff run", flag.ContinueOnError)
+	flags.SetOutput(out.stderr)
+	boot := BootConfig{}
+	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
+	flags.StringVar(&boot.MainRef, "main-ref", "main", "git ref to boot as the base instance")
+	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to boot as the candidate instance")
+	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
+	flags.BoolVar(&boot.Keep, "keep", false, "keep infra, databases and worktree after the run")
+	flags.BoolVar(&boot.ReuseWorktrees, "reuse-worktrees", false, "reuse the existing <work-root>/main worktree")
+	flags.BoolVar(&boot.SkipInstall, "skip-install", false, "skip pnpm install in both worktrees")
+	flags.DurationVar(&boot.BootTimeout, "boot-timeout", 5*time.Minute, "per-instance health-wait timeout")
+	flags.StringVar(&boot.PGURL, "pg-url", "", "external postgres server URL (with -ch-url/-redis-url skips compose)")
+	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
+	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
+	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	registerProbeFlags(flags, probe)
+	if err := flags.Parse(args); err != nil {
+		return exitError
+	}
+
+	// The child processes inherit this context; canceling it kills them.
+	bootCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	booted, err := Boot(bootCtx, boot, out.stderr)
+	if err != nil {
+		fmt.Fprintln(out.stderr, "boot:", err)
+		return exitError
+	}
+	defer booted.Teardown()
+
+	probe.a = booted.A.URL
+	probe.b = booted.B.URL
+	// Run mode injected a throwaway instance admin key into both instances,
+	// seeded a fixed SCIM token, and provisioned the permission-probe
+	// fixtures; default the probe credentials to them.
+	if probe.keys.AdminKey == "" {
+		probe.keys.AdminKey = throwawayInstanceAdminKey
+	}
+	if probe.keys.ScimKey == "" {
+		probe.keys.ScimKey = scimProbeToken
+	}
+	if probe.keys.ProjectKeyB == "" {
+		probe.keys.ProjectKeyB = ProjectKeyB
+	}
+	if probe.keys.ProjectKeyC == "" {
+		probe.keys.ProjectKeyC = ProjectKeyC
+	}
+	return probePipeline(ctx, probe, out)
+}
+
+// probePipeline is the shared compare flow: fetch both specs, diff them,
+// probe the operation union in lockstep, then report.
+func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
+	if probe.method != "" && !openapidiff.IsHTTPMethod(probe.method) {
+		fmt.Fprintf(out.stderr, "invalid HTTP method %q\n", probe.method)
+		return exitError
+	}
+	if probe.concurrency != 1 {
+		fmt.Fprintln(out.stderr, "note: -concurrency is reserved; probing is lockstep (1)")
+	}
+
+	client := &http.Client{Timeout: probe.timeout}
+	fmt.Fprintf(out.stderr, "fetching %s from both instances\n", SpecPath)
+	specs, err := fetchBothSpecs(ctx, client, probe)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	changes, operations, err := specs.diffAndUnion()
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+
+	selected := SelectOperations(operations, probe.filter())
+	fmt.Fprintf(out.stderr, "probing %d operations (lockstep)\n", len(selected))
+	result := ProbeAll(ctx, ProbeOptions{
+		A:               probe.a,
+		B:               probe.b,
+		Keys:            probe.keys,
+		Schemes:         SecuritySchemes(specs.a, specs.b),
+		Timeout:         probe.timeout,
+		Filter:          probe.filter(),
+		ExcludePrefixes: probe.excludePrefixes,
+		ExactStatus:     probe.exactStatus,
+		Client:          client,
+		Progress:        out.stderr,
+	}, operations)
+
+	report := BuildReport(changes, result)
+	if code := emitReport(report, probe, out); code != exitEqual {
+		return code
+	}
+	if report.Differences > 0 {
+		return exitDifferences
+	}
+	return exitEqual
+}
+
+// fetchedSpecs holds both instances' parsed documents and raw bytes.
+type fetchedSpecs struct {
+	a, b           map[string]any
+	aBytes, bBytes []byte
+}
+
+func fetchBothSpecs(ctx context.Context, client *http.Client, probe *probeFlags) (*fetchedSpecs, error) {
+	specs := &fetchedSpecs{}
+	var err error
+	if specs.a, specs.aBytes, err = FetchSpec(ctx, client, probe.a); err != nil {
+		return nil, err
+	}
+	if specs.b, specs.bBytes, err = FetchSpec(ctx, client, probe.b); err != nil {
+		return nil, err
+	}
+	return specs, nil
+}
+
+// diffAndUnion runs the spec-level diff (B is the base, A the candidate —
+// mirroring openapidiff BASE CANDIDATE argument order) and parses the
+// operation union.
+func (specs *fetchedSpecs) diffAndUnion() ([]openapidiff.Change, []Operation, error) {
+	specDir, err := os.MkdirTemp("", "apidiff-spec-")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer os.RemoveAll(specDir)
+	changes, err := SpecDiff(specs.bBytes, specs.aBytes, specDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("spec diff: %w", err)
+	}
+	operationsA, err := Operations(specs.a)
+	if err != nil {
+		return nil, nil, fmt.Errorf("candidate spec: %w", err)
+	}
+	operationsB, err := Operations(specs.b)
+	if err != nil {
+		return nil, nil, fmt.Errorf("base spec: %w", err)
+	}
+	return changes, UnionOperations(operationsA, operationsB), nil
+}
+
+// emitReport writes the machine report file and the stdout rendering.
+func emitReport(report Report, probe *probeFlags, out streams) int {
+	if probe.reportFile != "" {
+		if err := writeReportFile(probe.reportFile, report); err != nil {
+			fmt.Fprintln(out.stderr, err)
+			return exitError
+		}
+	}
+	if probe.jsonOutput && probe.reportFile == "" {
+		if err := WriteJSONReport(out.stdout, report); err != nil {
+			fmt.Fprintln(out.stderr, err)
+			return exitError
+		}
+		return exitEqual
+	}
+	if err := WriteHumanSummary(out.stdout, report); err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	return exitEqual
+}
+
+func writeReportFile(path string, report Report) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	writeErr := WriteJSONReport(file, report)
+	closeErr := file.Close()
+	if writeErr != nil {
+		return fmt.Errorf("write report: %w", writeErr)
+	}
+	return closeErr
+}
