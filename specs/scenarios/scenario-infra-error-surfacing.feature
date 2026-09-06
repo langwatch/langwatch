@@ -165,6 +165,14 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     When the failure is classified
     Then it is reported as a failure in the agent's code, not an unreachable endpoint
 
+  @unit
+  Scenario: A user-code failure with no readable detail still never leaks internals
+    Given a scenario failed because the agent's Python code raised
+    And every candidate detail in that failure text exposes our internals
+    When the failure is classified
+    Then it is reported as a failure in the agent's code
+    And the message is the generic unreadable-failure sentence, not the raw internals
+
   Scenario: An unrecognised failure keeps its message under a generic infra code
     Given a scenario run failed with a raw error "Something unexpected happened"
     When the failure is classified
