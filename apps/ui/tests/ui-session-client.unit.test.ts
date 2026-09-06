@@ -78,22 +78,38 @@ describe("given the client the session is read with", () => {
   });
 
   describe("when the endpoint refuses the read", () => {
+    /** @scenario "A genuine refusal still goes to sign in" */
     it("reads nobody, and names the refusal rather than losing it", async () => {
       const reading = await readUiActor(
-        readingClient(() => Promise.resolve({ error: { status: 500 } })),
+        readingClient(() => Promise.resolve({ error: { status: 401, code: "unauthenticated" } })),
       );
 
       expect(reading.actor).toBeNull();
+      expect(reading.unreachable).toBe(false);
       expect(reading.failure?.code).toBe("session_read_failed");
     });
+  });
 
-    it("reads nobody when the read never reached the endpoint at all", async () => {
+  describe("when nothing answered on the API's address", () => {
+    /** @scenario "The API is not listening yet" */
+    it("reads nobody and names no refusal when the read never reached the endpoint", async () => {
       const reading = await readUiActor(
         readingClient(() => Promise.reject(new Error("Failed to fetch"))),
       );
 
       expect(reading.actor).toBeNull();
-      expect(reading.failure?.code).toBe("session_read_failed");
+      expect(reading.unreachable).toBe(true);
+      expect(reading.failure).toBeNull();
+    });
+
+    /** @scenario "The API is not listening yet" */
+    it("reads a proxy's own gateway refusal as nothing having answered", async () => {
+      const reading = await readUiActor(
+        readingClient(() => Promise.resolve({ error: { status: 502 } })),
+      );
+
+      expect(reading.unreachable).toBe(true);
+      expect(reading.failure).toBeNull();
     });
   });
 });

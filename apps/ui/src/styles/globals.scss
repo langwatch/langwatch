@@ -1,4 +1,28 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/*
+ * Sentient is the display voice of the LangWatch site and of this application's
+ * headings. It is not on a font CDN, so the woff2 files are vendored in
+ * `public/fonts` and declared here — once, for the whole document, rather than
+ * by each feature stylesheet that happens to want it. `swap` because a heading
+ * that is invisible until a font arrives is worse than a heading in the
+ * fallback serif for one frame.
+ */
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
 
 html,
 body {

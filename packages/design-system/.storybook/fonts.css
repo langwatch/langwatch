@@ -1,0 +1,23 @@
+/*
+ * The faces the tokens name. The application loads these from its own
+ * `globals.scss`; Storybook has no such stylesheet, so it declares the same
+ * two things here — and serves the same woff2 files, from `apps/ui/public`
+ * via `staticDirs`, rather than keeping a second copy of them.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}

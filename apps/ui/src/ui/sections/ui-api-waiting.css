@@ -1,0 +1,142 @@
+/*
+ * The screen a reader sees while the API is still coming up. The front door's
+ * own vocabulary — paper ground, ink text, the mesh band, Sentient for the one
+ * heading and JetBrains Mono for the one technical line — declared here in
+ * literal values rather than tokens: this screen renders when the platform is
+ * not answering, so it must not depend on anything else having loaded.
+ *
+ * Every animation lives inside a no-preference query rather than being switched
+ * off by a reduce one, so somebody who asked for less motion gets a completely
+ * static page instead of one that stops moving after it starts.
+ */
+
+.lw-api-waiting {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow: hidden;
+  background: #ffffff;
+  color: #16161a;
+}
+
+.dark .lw-api-waiting {
+  background: #0c0c0e;
+  color: #f4f2ef;
+}
+
+/* The mesh band: the site's own static gradient, held to a soft field behind
+   the words rather than painted edge to edge. */
+.lw-api-waiting-mesh {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
+  opacity: 0.34;
+}
+
+/* The white radial that keeps the reading area clean, the same instrument the
+   front door uses: the mesh is atmosphere, and words do not sit on weather. */
+.lw-api-waiting-mesh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 46% 40% at 50% 47%,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0.72) 45%,
+    rgba(255, 255, 255, 0) 78%
+  );
+}
+
+.dark .lw-api-waiting-mesh::after {
+  display: none;
+}
+
+.dark .lw-api-waiting-mesh {
+  background:
+    radial-gradient(circle at 50% 34%, rgba(91, 141, 239, 0.32), transparent 44%),
+    radial-gradient(circle at 58% 70%, rgba(201, 123, 58, 0.2), transparent 50%);
+  opacity: 1;
+}
+
+.lw-api-waiting-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 34rem;
+  text-align: center;
+}
+
+.lw-api-waiting-heading {
+  margin: 0;
+  font-family: "Sentient", ui-serif, Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.lw-api-waiting-endpoint,
+.lw-api-waiting-hint {
+  margin: 0;
+  font-family:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+  color: rgba(22, 22, 26, 0.62);
+  word-break: break-all;
+}
+
+.dark .lw-api-waiting-endpoint,
+.dark .lw-api-waiting-hint {
+  color: rgba(244, 242, 239, 0.62);
+}
+
+/* The pulse: a hairline that breathes, so the page reads as working without a
+   spinner claiming to measure something it cannot measure. */
+.lw-api-waiting-pulse {
+  width: 148px;
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 9999px;
+  background: rgba(22, 22, 26, 0.12);
+  overflow: hidden;
+}
+
+.dark .lw-api-waiting-pulse {
+  background: rgba(244, 242, 239, 0.16);
+}
+
+.lw-api-waiting-pulse::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: #c2510a;
+}
+
+.dark .lw-api-waiting-pulse::after {
+  background: #ff8a3d;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lw-api-waiting-pulse::after {
+    animation: lw-api-waiting-breathe 1800ms ease-in-out infinite;
+  }
+}
+
+@keyframes lw-api-waiting-breathe {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}

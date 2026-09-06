@@ -7,6 +7,7 @@
 import { createAuthClient } from "better-auth/react";
 import { HandledError } from "@langwatch/handled-error";
 import type { UiActor } from "@langwatch/ui-host/capabilities";
+import { isUiApiUnreachable } from "./ui-api-reachability";
 
 /** The session endpoint, relative to the auth client's own base URL. */
 export const UI_SESSION_PATH = "/session";
@@ -107,20 +108,31 @@ export class SessionReadFailedError extends HandledError {
  */
 export type UiSessionReading = {
   readonly actor: UiActor | null;
-  /** The refusal, when there was one. Nobody is signed in either way. */
+  /**
+   * The refusal, when there was one — always null while `unreachable` is
+   * true: an API that never answered refused nothing, and reporting it as a
+   * refusal is what signed a reader out of a stack that was merely booting.
+   */
   readonly failure: SessionReadFailedError | null;
+  /** Nothing answered on the API's address. The reader waits rather than leaves. */
+  readonly unreachable: boolean;
 };
+
+const UNREACHABLE: UiSessionReading = { actor: null, failure: null, unreachable: true };
+
+function refused(cause: unknown): UiSessionReading {
+  if (isUiApiUnreachable(cause)) return UNREACHABLE;
+  return { actor: null, failure: new SessionReadFailedError(cause), unreachable: false };
+}
 
 export async function readUiActor(
   client: UiAuthClient = uiAuthClient(),
 ): Promise<UiSessionReading> {
   try {
     const response = await client.$fetch(UI_SESSION_PATH);
-    if (response.error) {
-      return { actor: null, failure: new SessionReadFailedError(response.error) };
-    }
-    return { actor: toUiActor(response.data), failure: null };
+    if (response.error) return refused(response.error);
+    return { actor: toUiActor(response.data), failure: null, unreachable: false };
   } catch (error) {
-    return { actor: null, failure: new SessionReadFailedError(error) };
+    return refused(error);
   }
 }

@@ -33,6 +33,7 @@ import { BrowserUiRpc, UiRpcContextProvider } from "../../behavior/ui-rpc";
 import { useRouterUiNavigation, useRouterUiRoute } from "../../behavior/ui-router-navigation";
 import type { UiSessionSource } from "../../behavior/ui-session";
 import type { UiProviderShell } from "./ui-outer-providers";
+import { UiApiWaitingGate } from "./ui-api-waiting-gate";
 
 /** The device store the shell publishes to every feature. */
 const SHELL_UI_STORAGE = new BrowserUiStorage();
@@ -111,7 +112,9 @@ export function createUiFeatureShell({
     return (
       <UiCapabilityContextProvider value={resolved}>
         <UiScopeHostProvider value={resolved.session.scopeHost()}>
-          {children}
+          {/* Nothing is answering on the API's address, so the reader waits
+              here rather than being signed out of a stack that is booting. */}
+          <UiApiWaitingGate>{children}</UiApiWaitingGate>
           {/* Always mounted, one gate for every routed page — a surface
               without this reach opened a limit dialog nobody ever saw. */}
           <UiSlot name="globalUpgradeModal" props={{}} />

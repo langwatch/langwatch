@@ -55,15 +55,19 @@ export function uiSignedOutDeparture({
   isAnswered,
   isPublicRoute,
   isOnline,
+  isApiUnreachable,
   address,
 }: {
   actor: UiActor | null;
   isAnswered: boolean;
   isPublicRoute: boolean;
   isOnline: boolean;
+  /** Nothing answered, so nobody said this reader is signed out. */
+  isApiUnreachable: boolean;
   address: string;
 }): string | null {
   if (!isAnswered || actor !== null || isPublicRoute || !isOnline) return null;
+  if (isApiUnreachable) return null;
   return `${UI_SIGN_IN_PATH}?callbackUrl=${encodeURIComponent(address)}`;
 }
 
@@ -216,6 +220,7 @@ export function useBrowserUiSession({
     isAnswered: session.isSuccess,
     isPublicRoute: route.isPublicRoute,
     isOnline: navigator.onLine,
+    isApiUnreachable: session.data?.unreachable === true,
     address,
   });
 

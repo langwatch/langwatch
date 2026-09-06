@@ -1,4 +1,5 @@
 import type { Preview } from "@storybook/react-vite";
+import "./fonts.css";
 import { DesignSystemProvider } from "../src/provider";
 
 /**
