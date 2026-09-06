@@ -142,8 +142,9 @@ export class IdentityMatchService {
    *
    * Idempotent by construction: a person the last pass linked agrees with their
    * own open link and is silence, and a person the last pass halted is filtered
-   * out of the read entirely. So this is safe to run on a schedule, which is
-   * how it runs.
+   * out of the read entirely. So this is safe to run on a schedule — though no
+   * schedule runs it: it fires after each pull that discovered somebody
+   * (`pullers/pullerWorker.ts`).
    *
    * One person's failure does not end the pass. A link refused by the database
    * because a concurrent pass opened it first is exactly what the constraint is

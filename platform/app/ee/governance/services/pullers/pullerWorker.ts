@@ -472,8 +472,9 @@ async function writePulledEvents({
   const observedAt = new Date();
   // The do-not-reimport list, resolved once per run for the same reason the
   // cost flag above is. Without this check the pullers undo every erasure on
-  // their next pass: they look thirty days back, so an actor erased today is
-  // re-read and re-written tomorrow (ADR-128 §9 step 1). `event.actor` is what
+  // their next pass: each re-reads a window behind its own watermark so a
+  // restated figure is not missed, so an actor erased today is re-read and
+  // re-written on the next run (ADR-128 §9 step 1). `event.actor` is what
   // becomes `ActorEmail` and rides inside the raw OCSF payload, and it is the
   // actor id the cost record carries — one check covers both writes because a
   // suppressed event is not written at all rather than written and erased
@@ -558,8 +559,8 @@ async function writePulledEvents({
  *
  * `events` must be the post-partition list — the caller's `kept`, never the
  * raw pull: discovery running on the pre-partition list would re-create a
- * plaintext person row for an erased identifier on the next thirty-day
- * re-read (ADR-128 §9 step 1). And a discovery failure never costs the run
+ * plaintext person row for an erased identifier on the next re-read of the
+ * puller's lookback window (ADR-128 §9 step 1). And a discovery failure never costs the run
  * its events — the next run sees the same actors again, while audit rows
  * missed would be gone for good. Department facts ride the same directory
  * events, behind the same partition, with the same isolation: the directory

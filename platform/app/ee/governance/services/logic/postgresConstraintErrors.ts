@@ -26,9 +26,6 @@ const UNIQUE_VIOLATION = "23505";
  */
 const PRISMA_UNIQUE_VIOLATION = "P2002";
 
-/** Postgres' check-violation code: a row a named CHECK refuses. */
-const CHECK_VIOLATION = "23514";
-
 /**
  * The driver's SQLSTATE, read off whichever shape carried it.
  *
@@ -63,14 +60,4 @@ export function isUniqueViolation(error: unknown): boolean {
   if ((error as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION)
     return true;
   return hasSqlState(error, UNIQUE_VIOLATION);
-}
-
-/**
- * Whether a thrown value is a CHECK constraint refusing a row.
- *
- * In governance that is always a validity range that covers no time — a
- * zero-width or inverted `[validFrom, validTo)`.
- */
-export function isCheckViolation(error: unknown): boolean {
-  return hasSqlState(error, CHECK_VIOLATION);
 }

@@ -3,10 +3,11 @@
 /**
  * The check that makes an erasure hold (ADR-128 §9 step 1).
  *
- * Erasing a person from the governance tables is undone within a day by the
- * pipeline that produced them: the pullers look thirty days back, so the next
- * run re-reads the same window, finds the same email address on the same cost
- * row, and writes it all back. Deleting is therefore only half of an erasure.
+ * Erasing a person from the governance tables is undone by the pipeline that
+ * produced them: a puller re-reads a window behind its own watermark so a
+ * restated figure is not missed, so the next run re-reads the same events,
+ * finds the same identifier on them, and writes it all back. Deleting is
+ * therefore only half of an erasure.
  * The other half is a list of what must never be re-imported, consulted at
  * every write path that carries an identifier.
  *

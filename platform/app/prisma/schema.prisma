@@ -5205,7 +5205,7 @@ model GovernanceTenantHistory {
 /// It stores hashes and never identifiers, so it is not itself a copy of the
 /// data it exists to keep out. The stored `identifierHash` and the pseudonym
 /// written in place of the erased value are the same function of the same
-/// input - SHA-256(secret || original) - so a write path computes that digest
+/// input - HMAC-SHA256(secret, identifier) - so a write path computes that digest
 /// once and uses it twice: as the membership test, and, on a hit, as the
 /// replacement value. That is why no original-to-pseudonym mapping table
 /// exists; one would hold the erased identifier in plaintext forever.
