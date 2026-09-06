@@ -357,6 +357,35 @@ async def test_function_error_is_answered_and_the_connection_stays_open():
             await asyncio.to_thread(client.stop)
 
 
+# @scenario "A reply the platform cannot read answers agent_call_failed instead of silence"
+async def test_a_dict_reply_is_answered_as_agent_call_failed():
+    def agent(messages, thread_id=None):
+        return {"output": "pong", "thread_id": thread_id, "order_number": None}
+
+    async with FakePlatform() as platform:
+        client, connection, _, ids = await connect(
+            platform, ConnectedAgent(agent, name="fields")
+        )
+        try:
+            await connection.call(agent_id=ids["fields"])
+            await connection.expect("ack")
+            result = await connection.expect("result")
+            assert "output" not in result
+            assert result["error"]["code"] == "agent_call_failed"
+            message = result["error"]["message"]
+            assert message.startswith("fields returned a dict with keys ")
+            assert "order_number, output, thread_id" in message
+            assert "a message dict with a role and content" in message
+            assert "AgentReply(output, session=...)" in message
+
+            await connection.call(agent_id=ids["fields"], call_id="call-2")
+            await connection.expect("ack")
+            assert (await connection.expect("result"))["callId"] == "call-2"
+            assert not connection.closed.is_set()
+        finally:
+            await asyncio.to_thread(client.stop)
+
+
 # @scenario "A call past its deadline answers agent_call_timeout"
 async def test_deadline_answers_agent_call_timeout():
     async def agent(messages):

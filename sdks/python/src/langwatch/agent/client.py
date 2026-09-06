@@ -58,7 +58,7 @@ from .protocol import (
     register_frame,
     result_frame,
 )
-from .schema import AgentParameterInvalid
+from .schema import AgentParameterInvalid, AgentReplyInvalid
 
 if TYPE_CHECKING:
     from .decorator import ConnectedAgent
@@ -951,6 +951,11 @@ class AgentClient:
         except AgentParameterInvalid as error:
             result = error_result_frame(
                 call_id=call_id, code=error.code, message=str(error)
+            )
+        except AgentReplyInvalid as error:
+            logger.warning("connect_agent: %s %s", agent.name, error)
+            result = error_result_frame(
+                call_id=call_id, code=error.code, message=f"{agent.name} {error}"
             )
         except Exception as error:
             logger.exception("connect_agent: %s raised on call %s", agent.name, call_id)
