@@ -21,7 +21,7 @@ If a feature file path is given, **read it now** and extract the scenarios into 
 
 1. Explicit port in `$ARGUMENTS` → use it
 2. Read `.dev-port` file in the repo root → source it for `APP_PORT`
-3. **No port and no `.dev-port`?** → run `scripts/dev-up.sh` and then read the `.dev-port` it creates
+3. **No port and no `.dev-port`?** → run `dev/scripts/dev-up.sh` and then read the `.dev-port` it creates
 
 ```bash
 # .dev-port format (written by dev-up.sh):
@@ -142,7 +142,7 @@ When the sub-agent returns:
 <any observations>
 ```
 
-3. If you started the app (no `.dev-port` existed before), tear it down: `scripts/dev-down.sh`
+3. If you started the app (no `.dev-port` existed before), tear it down: `dev/scripts/dev-down.sh`
 
 ## Step 5: Upload screenshots and update the PR
 

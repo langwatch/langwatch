@@ -85,11 +85,11 @@ func bundleFromControlPlane(t *testing.T, payload string) *domain.Bundle {
 		Sign:    func(_ *http.Request, _ []byte) {},
 		Logger:  zap.NewNop(),
 	})
-	cfg, err := client.FetchConfig(context.Background(), "vk_acme")
+	res, err := client.FetchConfig(context.Background(), "vk_acme", "")
 	require.NoError(t, err)
 
 	bundle := testBundle()
-	bundle.Config.Guardrails = cfg.Guardrails
+	bundle.Config.Guardrails = res.Config.Guardrails
 	return bundle
 }
 

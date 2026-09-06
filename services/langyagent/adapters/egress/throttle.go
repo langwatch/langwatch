@@ -9,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// throttleConfig tunes the per-destination soft throttle (ADR-043 rung 1b).
+// throttleConfig tunes the per-destination soft throttle (ADR-076 rung 1b).
 // The throttle is deliberately soft: it slows and flags a suspicious flow
 // rather than hard-denying it, so a legitimate large clone degrades instead of
 // falling off a false-positive cliff. Thresholds are a step-3 tuning task
@@ -35,7 +35,7 @@ type throttleConfig struct {
 }
 
 // defaultThrottleConfig is a placeholder profile. Real numbers come from
-// monitoring (ADR-043 open question 3), not from a design guess.
+// monitoring (ADR-076 open question 3), not from a design guess.
 func defaultThrottleConfig() throttleConfig {
 	return throttleConfig{
 		connWindow:          10 * time.Second,

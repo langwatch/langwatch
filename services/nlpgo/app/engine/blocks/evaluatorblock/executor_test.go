@@ -213,7 +213,7 @@ func TestExecute_NonJSONErrorBodyPropagatesAsHTTPError(t *testing.T) {
 
 // Saved + workflow evaluators own their input typing (bool, float, int,
 // dict, json_schema) and the app resolves them against the evaluator's
-// declared inputs. The langevals/* coercion path stringifies non-strings
+// declared inputs. The services/langevals/* coercion path stringifies non-strings
 // so the receiving Pydantic schema accepts them — applying the same
 // stringification to a workflow evaluator would silently destroy the
 // caller's declared types. This test pins the boundary.

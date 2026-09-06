@@ -33,6 +33,7 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 func (w *stubWorker) Release()            {}
 func (w *stubWorker) Touch()              {}
 func (w *stubWorker) HasServedTurn() bool { return false }
+func (w *stubWorker) Prewarmed() bool     { return false }
 func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time, *domain.TurnFailure) {
 }
 
@@ -53,6 +54,8 @@ type stubPool struct {
 	liveWorker bool
 	lastSig    domain.CredentialSignature
 	lastCreds  domain.Credentials
+	// canceled records every CancelTurn as "conversationID/turnID".
+	canceled []string
 }
 
 func (p *stubPool) HasLiveWorker(_ string, sig domain.CredentialSignature) bool {
@@ -67,8 +70,14 @@ func (p *stubPool) Acquire(_ context.Context, _ string, creds domain.Credentials
 	}
 	return p.worker, nil
 }
-func (p *stubPool) Status() (int, int)                         { return 2, 20 }
-func (p *stubPool) KillSessionVanished(string)                 {}
+func (p *stubPool) AcquireWarm(ctx context.Context, id string, creds domain.Credentials) (app.Worker, error) {
+	return p.Acquire(ctx, id, creds)
+}
+func (p *stubPool) Status() (int, int)         { return 2, 20 }
+func (p *stubPool) KillSessionVanished(string) {}
+func (p *stubPool) CancelTurn(conversationID, turnID string) {
+	p.canceled = append(p.canceled, conversationID+"/"+turnID)
+}
 func (p *stubPool) StartReaper()                               {}
 func (p *stubPool) ShutdownHandoff(context.Context, time.Time) {}
 func (p *stubPool) Shutdown()                                  {}

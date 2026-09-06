@@ -67,7 +67,7 @@ func TestSignatureOf_BindsWorkerToProjectAndActor(t *testing.T) {
 	}
 }
 
-// A per-project egress allow-list change (ADR-043) must recycle the worker so a
+// A per-project egress allow-list change (ADR-076) must recycle the worker so a
 // live worker never runs a stale egress policy; a semantically-equal list must
 // NOT, or a benign re-save would needlessly kill the conversation's worker.
 func TestSignatureOf_EgressAllowlistChangeRecyclesWorker(t *testing.T) {
@@ -151,10 +151,10 @@ func TestSignatureOf_MirrorTierChangeRecyclesWorker(t *testing.T) {
 		t.Fatalf("an empty tier must fingerprint as skip (empty=%+v skip=%+v)", empty, skip)
 	}
 
-	// An unrecognised tier is fail-safe: it normalises to skip, never to a
+	// An unrecognized tier is fail-safe: it normalises to skip, never to a
 	// content-bearing tier.
 	garbage := SignatureOf("project-1", "user-1", "m", nil, nil, "wide-open")
 	if garbage != skip {
-		t.Fatalf("an unrecognised tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
+		t.Fatalf("an unrecognized tier must fingerprint as skip (garbage=%+v skip=%+v)", garbage, skip)
 	}
 }

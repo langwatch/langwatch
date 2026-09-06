@@ -85,7 +85,7 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, domain.ErrCredentialsRequired),
+	assert.ErrorIs(t, err, domain.ErrCredentialsRequired,
 		"a keyless spawn must ask the control plane to mint and retry, got: %v", err)
 }
 
@@ -196,8 +196,6 @@ func TestHasLiveWorker_MatchesOnCapabilitySignature(t *testing.T) {
 		"no worker means the control plane must mint")
 }
 
-// The signature the probe compares must never depend on the key itself — that is
-// precisely what makes "probe before minting" possible.
 func TestSignatureOf_IgnoresTheSessionKey(t *testing.T) {
 	base := domain.Credentials{Model: "openai/gpt-5-mini", LangwatchAPIKey: "key-one"}
 	rotated := base

@@ -33,11 +33,11 @@ Create a new prompts project:
 langwatch prompt init
 ```
 
-This will create the following structure to manage your prompts:
+This creates the following structure to manage your prompts:
 
 ```bash
 ├── prompts # directory to create your prompts
-│   └── .materialized # where remote fetched prompts will be stored
+│   └── .materialized # where remote fetched prompts are stored
 ├── prompts.json # prompt dependencies
 └── prompts-lock.json # lock file
 ```
@@ -56,7 +56,7 @@ Or add an existing remote prompt dependency:
 langwatch prompt add agent/customer-service
 ```
 
-Your newly created or fetched prompt will be on a yaml file in the `prompts/` directory, and look like this:
+Your newly created or fetched prompt is a yaml file in the `prompts/` directory, and looks like this:
 
 ```yaml
 model: openai/gpt-5.5
@@ -79,7 +79,7 @@ Go to [app.langwatch.ai](https://app.langwatch.ai) to see your new synced prompt
 
 ## Using the Prompts
 
-Once you've created your prompts, you can use them in your application code. The LangWatch SDK provides a simple interface to fetch and compile prompts with dynamic variables.
+Once you've created your prompts, you can use them in your application code. The LangWatch SDK fetches and compiles prompts with dynamic variables.
 
 <Tabs>
 <Tab title="Python">
@@ -144,7 +144,7 @@ console.log(result.text);
 
 ### Working with Local and Remote Prompts
 
-The SDK loads prompts dynamically at runtime, so you don't need to worry about whether they're local or remote:
+The SDK loads prompts dynamically at runtime, and fetches both kinds from LangWatch:
 
 - **Local prompts**: Fetched directly from your LangWatch project
 - **Remote prompts**: Also fetched from LangWatch after being synced from the materialized files

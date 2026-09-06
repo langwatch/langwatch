@@ -1,8 +1,8 @@
 ---
 title: "Overview"
-description: "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs."
+description: "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites."
 ---
 
 ## Intro
 
-Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.
+Deprecated. The `/api/suites` family stays for the clients that already call it, and its shapes do not change. New integrations use [Run Plans](/api-reference/run-plans/overview) (`/api/v1/run-plans`) and [Test Suites](/api-reference/test-suites/overview) (`/api/v1/test-suites`). On this family, `kind: folder` names what the rest of the API calls a test suite, `kind: custom` names a run plan, and the scope `{ "mode": "folders", "folderIds": [...] }` is the same as `{ "mode": "test_suites", "testSuiteIds": [...] }` on `/api/v1/run-plans`. The scope `{ "mode": "cases" }` is `{ "mode": "scenarios" }` there.

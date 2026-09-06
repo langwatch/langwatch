@@ -1,0 +1,21 @@
+id: require-fetch-timeout-ts
+valid:
+  # Inline AbortSignal.timeout.
+  - |
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  # Signal from a controller the caller aborts.
+  - |
+    const res = await fetch(url, { method: "POST", body, signal: controller.signal });
+  # Signal present alongside other init keys, shorthand form.
+  - |
+    const res = await fetch(url, { headers, signal });
+invalid:
+  # No init object at all.
+  - |
+    const res = await fetch(url);
+  # Init object with no signal.
+  - |
+    const res = await fetch(url, { method: "POST", body: JSON.stringify(payload) });
+  # Headers but still no signal.
+  - |
+    const res = await fetch(`${base}/session`, { headers: { Authorization: token } });

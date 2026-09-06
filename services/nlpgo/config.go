@@ -13,6 +13,10 @@ import (
 	"github.com/langwatch/langwatch/pkg/config"
 )
 
+// DefaultSandboxPython is the interpreter a code block runs on when nothing
+// names another one: whatever `python3` PATH resolves to inside the image.
+const DefaultSandboxPython = "python3"
+
 // Config is the top-level service configuration.
 type Config struct {
 	Environment                   string        `env:"ENVIRONMENT"`
@@ -35,6 +39,21 @@ type EngineConfig struct {
 	StreamIdleTimeoutSeconds int `env:"STREAM_IDLE_TIMEOUT_SECONDS"`
 	// CodeBlockTimeoutSeconds — kill the user-code subprocess after this.
 	CodeBlockTimeoutSeconds int `env:"CODE_BLOCK_TIMEOUT_SECONDS"`
+	// HTTPBlockTimeoutSeconds — wall-clock budget for one HTTP-block call
+	// (which is what an `agent_type=http` node runs as).
+	//
+	// This and the two knobs below are ceilings, not just defaults: a node's
+	// own `timeout_ms` may ask for a shorter budget but never a longer one,
+	// so the deployment always bounds how long a single node can hold a
+	// worker. Defaults match the values the executors hardcoded before the
+	// knobs existed, so an existing deployment sees no change.
+	HTTPBlockTimeoutSeconds int `env:"HTTP_BLOCK_TIMEOUT_SECONDS"`
+	// AgentWorkflowTimeoutSeconds — wall-clock budget for one
+	// `agent_type=workflow` sub-workflow call back into the LangWatch app.
+	AgentWorkflowTimeoutSeconds int `env:"AGENT_WORKFLOW_TIMEOUT_SECONDS"`
+	// EvaluatorTimeoutSeconds — wall-clock budget for one evaluator-block
+	// call back into the LangWatch app.
+	EvaluatorTimeoutSeconds int `env:"EVALUATOR_TIMEOUT_SECONDS"`
 	// AllowedProxyHosts — SSRF allowlist for HTTP blocks (comma-separated).
 	AllowedProxyHosts string `env:"ALLOWED_PROXY_HOSTS"`
 	// EgressStrictPublicOnly — refuse every outbound destination that is not
@@ -54,6 +73,11 @@ type EngineConfig struct {
 	EgressStrictPublicOnly bool `env:"EGRESS_STRICT_PUBLIC_ONLY"`
 	// SandboxPython — the python interpreter used for the code block.
 	// Default: python3 (resolved via PATH inside the container).
+	//
+	// The hydrator prefixes every field of this struct, so the name that
+	// reaches this field is NLPGO_ENGINE_SANDBOX_PYTHON. Both runtime images
+	// set the unprefixed SANDBOX_PYTHON instead, which resolveSandboxPython
+	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
@@ -80,9 +104,32 @@ func defaultConfig() Config {
 			// don't see the inbound stream torn down mid-call. Owner
 			// anchored both at 12min (under Lambda's 15min cap with
 			// margin for the outer connection to drain).
+			//
+			// Counterpart: NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS in
+			// platform/app/src/server/nlpgo/timeouts.ts, which bounds every
+			// code-block ceiling the platform will accept. Change both together.
 			StreamIdleTimeoutSeconds: 720,
-			CodeBlockTimeoutSeconds:  60,
-			SandboxPython:            "python3",
+			// 10min: raised from 60s because 60s was breaking legitimate
+			// user code blocks. Kept strictly below StreamIdleTimeoutSeconds
+			// (12min) rather than matched to it, since a long-running code
+			// block emits no SSE events while it runs and a ceiling at or
+			// above the idle timeout would race the stream shutting down
+			// mid-run.
+			//
+			// Counterpart: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS in
+			// platform/app/src/server/nlpgo/timeouts.ts, from which the platform
+			// DERIVES its client fetch deadline. This is the number production
+			// actually runs — cmd/root.go always passes it to newCodeExecutor, so
+			// the codeblock.New fallback never fires. Change both together.
+			CodeBlockTimeoutSeconds: 600,
+			// 12min for every block that calls out of the process, for the
+			// same reason the idle timeout above is 12min: a customer agent
+			// backend, sub-workflow or evaluator chain legitimately runs
+			// that long, and Lambda's hard cap is 15min.
+			HTTPBlockTimeoutSeconds:     720,
+			AgentWorkflowTimeoutSeconds: 720,
+			EvaluatorTimeoutSeconds:     720,
+			SandboxPython:               DefaultSandboxPython,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable

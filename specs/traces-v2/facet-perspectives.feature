@@ -3,11 +3,11 @@
 # Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/FilterSidebar/constants.ts       (FACET_GROUPS refined into finer sub-groups)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (perspective switcher + grouped checklist)
-#   langwatch/src/features/traces-v2/stores/facetLensStore.ts                    (built-in perspectives + activePerspectiveId)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/hooks/useFilterSidebarData.ts  (consumes groupOrder/sectionOrder)
-#   langwatch/src/features/traces-v2/components/FilterSidebar/__tests__/facetGroups.unit.test.ts  (pinned taxonomy)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/constants.ts       (FACET_GROUPS refined into finer sub-groups)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/FacetManagerPopover.tsx  (perspective switcher + grouped checklist)
+#   platform/app/src/features/traces-v2/stores/facetLensStore.ts                    (built-in perspectives + activePerspectiveId)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/hooks/useFilterSidebarData.ts  (consumes groupOrder/sectionOrder)
+#   platform/app/src/features/traces-v2/components/FilterSidebar/__tests__/facetGroups.unit.test.ts  (pinned taxonomy)
 #
 # Related specs:
 #   specs/traces-v2/lens-preset-groups.feature — the SEPARATE trace-list lens system (toolbar LensTabs); different control

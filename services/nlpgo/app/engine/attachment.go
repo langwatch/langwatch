@@ -345,14 +345,44 @@ func dataURL(att *fetchedAttachment) string {
 	return "data:" + att.mediaType + ";base64," + base64.StdEncoding.EncodeToString(att.data)
 }
 
-// redactAttachmentsForTracing returns a copy of messages with heavy inline
-// attachment bytes (base64 data URLs in image_url / file parts and raw base64 in
-// input_audio parts) replaced by a short "[media-type, N bytes]" summary. The
-// model still receives the full bytes — only the copy handed to tracing is
-// shrunk — so a fetched 20 MB image/PDF/audio is not JSON-serialized into the
-// span's langwatch.input (which would blow OTLP/ClickHouse size limits and store
-// the private payload). Text and plain (non-data) URLs are left untouched.
-func redactAttachmentsForTracing(messages []app.ChatMessage) []app.ChatMessage {
+// An attachment reaches the trace as real content when it fits, and keeps a
+// short "[media-type, N bytes]" summary when it does not.
+//
+// The ceiling is the collector's OTLP body limit, not the fetch limit: an
+// attachment fetch may return up to defaultMaxAttachmentBytes (20 MB) while the
+// collector refuses a body over 10 MB, and a rejected body loses the whole
+// trace, which is far worse than a summarized picture. The budget is shared
+// across the message set so several medium attachments cannot add up past the
+// same limit. Both figures count DECODED bytes; base64 inflates a payload by a
+// third, so they leave headroom for the encoding and for the rest of the batch.
+//
+// Anything under the ceiling is carried through verbatim and the ingestion edge
+// externalizes it to the content-addressed store, exactly as it does for media
+// sent by any other SDK. That is what puts the picture in the trace instead of
+// a placeholder that renders as broken media.
+const (
+	maxTracedAttachmentBytes       = 3 << 20
+	maxTracedAttachmentBudgetBytes = 4 << 20
+)
+
+// traceAttachmentBudget is the per-message-set allowance described above.
+type traceAttachmentBudget struct{ remaining int }
+
+// admit reports whether an attachment with this base64 payload is carried into
+// the trace, spending the budget when it is.
+func (b *traceAttachmentBudget) admit(payload string) bool {
+	n := approxBase64Bytes(payload)
+	if n > maxTracedAttachmentBytes || n > b.remaining {
+		return false
+	}
+	b.remaining -= n
+	return true
+}
+
+// messagesForTracing returns the copy of messages handed to the span. The model
+// always receives the originals, so nothing here changes what it sees.
+func messagesForTracing(messages []app.ChatMessage) []app.ChatMessage {
+	budget := &traceAttachmentBudget{remaining: maxTracedAttachmentBudgetBytes}
 	out := make([]app.ChatMessage, len(messages))
 	for i, m := range messages {
 		out[i] = m
@@ -360,48 +390,85 @@ func redactAttachmentsForTracing(messages []app.ChatMessage) []app.ChatMessage {
 		if !ok {
 			continue
 		}
-		redacted := make([]any, len(parts))
+		traced := make([]any, len(parts))
 		for j, p := range parts {
-			redacted[j] = redactPartForTracing(p)
+			traced[j] = partForTracing(p, budget)
 		}
-		out[i].Content = redacted
+		out[i].Content = traced
 	}
 	return out
 }
 
-// redactPartForTracing replaces the inline bytes of a single content part with a
-// summary, leaving every other part shape untouched.
-func redactPartForTracing(p any) any {
+// partForTracing carries one content part into the trace, summarizing its
+// inline bytes only when they do not fit. Every other part shape is untouched.
+func partForTracing(p any, budget *traceAttachmentBudget) any {
 	block, ok := p.(map[string]any)
 	if !ok {
 		return p
 	}
 	switch block["type"] {
 	case "image_url":
-		if img, ok := block["image_url"].(map[string]any); ok {
-			if u, _ := img["url"].(string); strings.HasPrefix(u, "data:") {
-				return map[string]any{"type": "image_url", "image_url": map[string]any{"url": summarizeDataURL(u)}}
-			}
-		}
+		return imageURLForTracing(p, block, budget)
 	case "file":
-		if file, ok := block["file"].(map[string]any); ok {
-			if fd, _ := file["file_data"].(string); strings.HasPrefix(fd, "data:") {
-				return map[string]any{"type": "file", "file": map[string]any{
-					"filename": file["filename"], "file_data": summarizeDataURL(fd),
-				}}
-			}
-		}
+		return fileForTracing(p, block, budget)
 	case "input_audio":
-		if audio, ok := block["input_audio"].(map[string]any); ok {
-			if data, _ := audio["data"].(string); data != "" {
-				format, _ := audio["format"].(string)
-				return map[string]any{"type": "input_audio", "input_audio": map[string]any{
-					"data": fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)), "format": format,
-				}}
-			}
-		}
+		return inputAudioForTracing(p, block, budget)
+	default:
+		return p
 	}
-	return p
+}
+
+func imageURLForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	img, ok := block["image_url"].(map[string]any)
+	if !ok {
+		return p
+	}
+	u, _ := img["url"].(string)
+	if !strings.HasPrefix(u, "data:") || budget.admit(dataURLPayload(u)) {
+		return p
+	}
+	return map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": summarizeDataURL(u)},
+	}
+}
+
+func fileForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	file, ok := block["file"].(map[string]any)
+	if !ok {
+		return p
+	}
+	fd, _ := file["file_data"].(string)
+	if !strings.HasPrefix(fd, "data:") || budget.admit(dataURLPayload(fd)) {
+		return p
+	}
+	return map[string]any{"type": "file", "file": map[string]any{
+		"filename": file["filename"], "file_data": summarizeDataURL(fd),
+	}}
+}
+
+func inputAudioForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
+	audio, ok := block["input_audio"].(map[string]any)
+	if !ok {
+		return p
+	}
+	data, _ := audio["data"].(string)
+	if data == "" || budget.admit(data) {
+		return p
+	}
+	format, _ := audio["format"].(string)
+	return map[string]any{"type": "input_audio", "input_audio": map[string]any{
+		"data":   fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)),
+		"format": format,
+	}}
+}
+
+// dataURLPayload returns the base64 payload of a data URL, or "" when it has none.
+func dataURLPayload(s string) string {
+	if comma := strings.IndexByte(s, ','); comma >= 0 {
+		return s[comma+1:]
+	}
+	return ""
 }
 
 // summarizeDataURL turns "data:image/png;base64,AAAA..." into a short
@@ -414,11 +481,7 @@ func summarizeDataURL(s string) string {
 			mediaType = rest[:i]
 		}
 	}
-	n := 0
-	if comma := strings.IndexByte(s, ','); comma >= 0 {
-		n = approxBase64Bytes(s[comma+1:])
-	}
-	return fmt.Sprintf("[%s, %d bytes]", mediaType, n)
+	return fmt.Sprintf("[%s, %d bytes]", mediaType, approxBase64Bytes(dataURLPayload(s)))
 }
 
 // approxBase64Bytes estimates the decoded byte length of a base64 string

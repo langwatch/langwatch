@@ -68,6 +68,13 @@ Feature: ClickHouse Analytics Column Pruning
     And wide columns like Input and Output are excluded from the stored_spans source
 
   @unit
+  Scenario: Stored spans JOIN materializes only the referenced SpanAttributes key
+    When an analytics query groups by "metadata.span_type"
+    Then the stored_spans source reconstructs a narrow map of only the referenced SpanAttributes key
+    And the whole SpanAttributes map column is not selected into the stored_spans source
+    And outer references still resolve against the reconstructed map
+
+  @unit
   Scenario: Stored spans JOIN adapts columns to event-based grouping
     When an analytics query groups by "events.event_type"
     Then the stored_spans source includes the Events.Name column

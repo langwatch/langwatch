@@ -14,7 +14,7 @@ Feature: Contact Sales URL points to public demo form
     Then it equals "https://langwatch.ai/get-a-demo"
 
 # --- AC Coverage Map ---
-# AC 1: "CONTACT_SALES_URL in langwatch/ee/licensing/constants.ts is changed to https://langwatch.ai/get-a-demo"
+# AC 1: "CONTACT_SALES_URL in platform/app/ee/licensing/constants.ts is changed to https://langwatch.ai/get-a-demo"
 #       → @unit Scenario: CONTACT_SALES_URL resolves to the public demo form
 # AC 2: "All 'Contact Sales' surfaces reflect the new URL — verified via grep that no other hardcoded HubSpot URL remains"
 #       → Verified by direct grep in PR body (one source of truth: every consumer imports CONTACT_SALES_URL by reference,

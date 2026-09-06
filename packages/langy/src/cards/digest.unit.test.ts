@@ -1,6 +1,6 @@
 /**
  * The digest extractor, pinned against the CLI's REAL `--format json` output
- * shapes (grounded on the command implementations in `typescript-sdk/src/cli`):
+ * shapes (grounded on the command implementations in `sdks/typescript/src/cli`):
  * trace search wraps in `{ traces, pagination.totalHits }`, dataset list in
  * `{ data, pagination.total }`, prompt/evaluator/scenario lists are bare
  * arrays, experiment status is a single run document, analytics is a
@@ -117,6 +117,51 @@ describe("extractDigest, given a collection read", () => {
 
       expect(digest.ids).toEqual(["trace_1"]);
       expect(digest.counts).toEqual({ returned: 1, total: 41 });
+    });
+  });
+
+  describe("when a reduced result states no total of its own", () => {
+    /** @scenario A list too large for the chat counts the rows the reduction removed */
+    it("counts the rows the marker stands for, not just the sample", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([
+          { id: "prompt_1" },
+          { id: "prompt_2" },
+          "… 29 more items truncated",
+        ]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 31 });
+    });
+
+    it("reads the newer marker form that states the total", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([
+          { id: "prompt_1" },
+          { id: "prompt_2" },
+          // The stated total disagrees with rows-plus-removed on purpose: the
+          // producer states what the query matched, and that is the number the
+          // card has to draw. Making them agree would pass either way and pin
+          // nothing.
+          "… 42 more items truncated, 50 total",
+        ]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 50 });
+    });
+
+    it("counts a plain list of its rows when nothing was removed", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([{ id: "prompt_1" }, { id: "prompt_2" }]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 2 });
     });
   });
 });

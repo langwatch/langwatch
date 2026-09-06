@@ -72,7 +72,7 @@ app.post("/chat", async (req, res) => {
     const history = await getConversationHistory(threadId);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-5-mini",
       messages: [...history, { role: "user", content: message }],
     });
 

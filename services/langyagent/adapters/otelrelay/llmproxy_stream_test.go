@@ -62,13 +62,16 @@ func TestLLMProxyStreamCut_InStreamHardLimit(t *testing.T) {
 	if !ok {
 		t.Fatal("an in-stream error event must leave a captured cause")
 	}
-	if e.Meta["message"] != "You exceeded your current quota, please check your plan and billing details." {
-		t.Errorf("captured message = %v, want the provider's own quota message", e.Meta["message"])
+	// The provider's prose stays out of the frame. OpenAI's quota body sets
+	// type == code, the exact shape isGatewayEnvelope reads as the gateway's
+	// own, so this event used to decode "typed" and carry its sentence through
+	// as though we had written it. The sniffer now decodes provider-native
+	// outright (see decodeProviderErrorBody): an error event inside a 200
+	// stream is never our envelope.
+	if _, hasMessage := e.Meta["message"]; hasMessage {
+		t.Errorf("captured message = %v, want the provider's prose dropped", e.Meta["message"])
 	}
-	// OpenAI's quota body has type == code, so it decodes as a typed envelope
-	// with the discriminant on the code itself (see isGatewayEnvelope); other
-	// dialects carry it as a typed reason. Accept the discriminant wherever
-	// hasHardLimitReason would find it.
+	// The discriminant is what survives, and it is all the panel needs.
 	hasDiscriminant := e.Code == "insufficient_quota"
 	for _, reason := range e.Reasons {
 		var cause herr.E
@@ -89,6 +92,50 @@ func TestLLMProxyStreamCut_InStreamHardLimit(t *testing.T) {
 	if !strings.Contains(string(secondBody), "insufficient_quota") ||
 		!strings.Contains(string(secondBody), "exceeded your current quota") {
 		t.Errorf("cut body must carry the provider's own error payload, got %s", secondBody)
+	}
+}
+
+// The gateway forwarding an upstream rejection under a 200 stream content
+// type: ONE bare JSON error object, no SSE framing, no trailing newline (the
+// shape observed live for an Anthropic invalid_request_error).
+const bareJSONErrorBody = `{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`
+
+// @scenario "A bare JSON error body under a stream content type is captured as the cause"
+func TestLLMProxyStreamCut_BareJSONErrorBody(t *testing.T) {
+	frames := bareJSONErrorBody
+	gateway := sseStreamGateway(t, &frames)
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-json", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	// The body passes through untouched for the worker's SDK.
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("call answered %d, want the 200 passed through", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != bareJSONErrorBody {
+		t.Errorf("body was altered in flight:\n got %s\nwant %s", body, bareJSONErrorBody)
+	}
+
+	// Reading to EOF must CAPTURE the rejection, not clear it as a clean end.
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("a bare JSON error body must leave a captured cause")
+	}
+	if _, hasMessage := e.Meta["message"]; hasMessage {
+		t.Errorf("captured message = %v, want the provider's prose dropped", e.Meta["message"])
+	}
+	hasDiscriminant := e.Code == "invalid_request_error"
+	for _, reason := range e.Reasons {
+		var cause herr.E
+		if errors.As(reason, &cause) && cause.Code == "invalid_request_error" {
+			hasDiscriminant = true
+		}
+	}
+	if !hasDiscriminant {
+		t.Errorf("captured code = %q, reasons = %v, want the invalid_request_error discriminant", e.Code, e.Reasons)
 	}
 }
 

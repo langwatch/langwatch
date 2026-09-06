@@ -100,7 +100,7 @@ Feature: Trace media blob extraction at the ingestion edge
 
   @integration
   Scenario: Media carried on span events is externalized like span attributes
-    Given a span whose gen_ai prompt rides in a span event attribute containing an inline image
+    Given an instrumentation that records the prompt on a span event, with an inline image in it
     When the span is ingested
     Then the event attribute is rewritten to reference the stored object
 
@@ -112,6 +112,61 @@ Feature: Trace media blob extraction at the ingestion edge
     Then every attribute value passes through byte-identical
     And no JSON parse of those values is attempted (cheap marker gate)
 
+  # Provider wire shapes. Instrumentation for the Anthropic and Google SDKs
+  # records the request the customer sent, not a normalized one, so the media
+  # part arrives in that provider's own vocabulary. Both name the media type
+  # with an underscore, which the camelCase markers and the AG-UI source
+  # decoder do not recognise, so before this the bytes passed the whole
+  # pipeline untouched and landed inline in ClickHouse.
+
+  @unit
+  Scenario: An Anthropic image block carries its bytes in a base64 source
+    Given a content part {type:"image", source:{type:"base64", media_type:"image/png", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to an image part with inline data of media type "image/png"
+    And the extractor treats it as extractable, exactly like a data-URI image_url part
+
+  @unit
+  Scenario: An Anthropic document block carries its bytes in a base64 source
+    Given a content part {type:"document", source:{type:"base64", media_type:"application/pdf", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to a document part with inline data of media type "application/pdf"
+
+  @unit
+  Scenario: An Anthropic image block pointing at a hosted URL keeps that URL
+    Given a content part {type:"image", source:{type:"url", url:"https://example.com/a.png"}}
+    When the content-part decoder reads it
+    Then it resolves to an image part sourced from that URL
+    And the extractor leaves it alone, because there are no inline bytes to store
+
+  @unit
+  Scenario: A Gemini inline-data part carries its bytes with no part type at all
+    Given a content part {inline_data:{mime_type:"application/pdf", data:"<base64>"}}
+    When the content-part decoder reads it
+    Then it resolves to a document part with inline data of media type "application/pdf"
+    And the camelCase spelling {inlineData:{mimeType, data}} resolves identically
+
+  @unit
+  Scenario: The media type of a Gemini inline-data part decides how it renders
+    Given inline-data parts of media type "image/png", "audio/wav" and "text/plain"
+    When the content-part decoder reads each of them
+    Then they resolve to an image part, an audio part and a document part
+
+  @integration
+  Scenario: An Anthropic image block inside a span input is externalized before staging
+    Given an OTLP span whose "langwatch.input" attribute is the Anthropic request,
+      carrying a {type:"image", source:{type:"base64", media_type, data}} block
+    When the span is ingested through the collector
+    Then the staged block references "/api/files/{projectId}/{id}" with no inline base64 data
+    And the trace summary carries a media reference for the image
+
+  @integration
+  Scenario: A Gemini inline-data part inside a span input is externalized before staging
+    Given an OTLP span whose "langwatch.input" attribute is the Gemini request,
+      carrying an {inline_data:{mime_type, data}} part
+    When the span is ingested through the collector
+    Then the staged part references "/api/files/{projectId}/{id}" with no inline base64 data
+
   # ===========================================================================
   # Track 2 — dedup and cost
   # ===========================================================================
@@ -122,6 +177,17 @@ Feature: Trace media blob extraction at the ingestion edge
     When a trace span carrying the byte-identical recording is ingested
     Then the span's reference resolves to the same stored object id
     And no second copy is written to storage
+
+  @integration
+  Scenario: The same bytes in two attributes of one span are stored once
+    Given a span that carries the same image both in its chat content and in a
+      prompt-variables attribute, as a managed-prompt run does
+    When the span is ingested
+    Then both attributes reference the same stored object id
+    And only one copy is written to storage
+    # The engine compiles the prompt from the dataset value and then sends the
+    # message, so the same picture legitimately appears twice in one span. It
+    # must cost one object, not two.
 
   @integration
   Scenario: Extraction before the spool check keeps the queue light

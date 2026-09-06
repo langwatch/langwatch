@@ -71,3 +71,29 @@ Feature: Latest-alias model resolution
       Then the named flagship tier wins
       # Without an explicit tier ranking the two sort equal and the
       # winner falls out of catalog iteration order.
+
+  Rule: Every read-time boundary hands a provider the concrete model
+
+    The pickers resolve an alias before they store a default, but the
+    prompts API, the CLI and agent-written configs store the alias
+    verbatim. No provider knows the word "latest", so the last stop before
+    the wire resolves it. A concrete model id passes through unchanged.
+
+    @unit
+    Scenario: The LiteLLM params carry the concrete model for an alias
+      Given a project with the OpenAI provider enabled
+      When LiteLLM params are prepared for the model "openai/latest-mini"
+      Then the params name the model the alias currently resolves to
+      And they do not name "latest-mini"
+
+    @unit
+    Scenario: A concrete model id is not rewritten
+      When LiteLLM params are prepared for the model "openai/gpt-5-mini"
+      Then the params name "openai/gpt-5-mini"
+
+    @unit
+    Scenario: An explicit alias handed to the model factory resolves before the provider lookup
+      Given a project with the OpenAI provider enabled
+      When a Vercel AI model is requested for the explicit model "openai/latest"
+      Then the LiteLLM params are prepared for the model the alias resolves to
+      And the provider is read from the resolved model

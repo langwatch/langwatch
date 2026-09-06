@@ -1,5 +1,5 @@
 # Builds the standalone `langwatch` CLI binary (Bun --compile, bytecode +
-# minify — see typescript-sdk/scripts/build-cli-binary.ts) for every supported
+# minify — see sdks/typescript/scripts/build-cli-binary.ts) for every supported
 # platform and attaches it (with sha256 sidecars, a signed SHA256SUMS and a
 # build-provenance attestation) to the typescript-sdk GitHub release, so users
 # can install the CLI without npm.
@@ -156,7 +156,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ needs.resolve.outputs.ref }}
           # This job runs `pnpm install` (arbitrary lifecycle scripts) and a
@@ -166,12 +166,12 @@ jobs:
           # lives in a different job entirely.
           persist-credentials: false
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.24.0
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
           # No dependency cache on purpose. These legs build the binaries that
@@ -202,12 +202,18 @@ jobs:
           "${HOME}/.bun/bin/bun" --version
 
       - name: Install dependencies
-        # Full monorepo checkout: `prepare` (run by install) generates
-        # src/internal/generated/* from langwatch/ + langevals/ sources and
-        # skills/ — the Bun compile fails to resolve those otherwise (same
-        # gotcha Dockerfile.langyagent's cli-builder stage documents).
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "langwatch..."
+
+      - name: Generate the SDK's derived sources
+        # src/internal/generated/* is gitignored and derived from platform/app/
+        # + services/langevals/ sources and skills/, so the Bun compile cannot
+        # resolve it until the generators have run. Invoked explicitly rather
+        # than left to an install hook: the app depends on the SDK with
+        # `workspace:*`, so an install hook here also fires on every consumer
+        # install — including the one `npx @langwatch/server` performs, where
+        # the generators' devDependencies are absent by definition.
+        # Dockerfile.langyagent's cli-builder stage does the same.
+        run: pnpm --filter langwatch run generate
 
       - name: Resolve asset name
         id: names
@@ -237,7 +243,7 @@ jobs:
       # since neither tool exists on ubuntu. Until then, do NOT claim the
       # darwin assets are signed anywhere in the docs or release notes.
       - name: Build binary
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           TARGET: ${{ matrix.target }}
           ASSET: ${{ steps.names.outputs.asset }}
@@ -257,7 +263,7 @@ jobs:
         # so a version mismatch now blocks ALL five uploads rather than being
         # noticed after four of them already landed.
         if: matrix.target == 'bun-linux-x64'
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
           VERSION: ${{ needs.resolve.outputs.version }}
@@ -271,7 +277,7 @@ jobs:
           fi
 
       - name: Compute sha256 sidecar
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
         run: |
@@ -287,8 +293,8 @@ jobs:
         with:
           name: cli-binary-${{ matrix.target }}
           path: |
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}.sha256
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -365,7 +371,7 @@ jobs:
         # verifiable with `gh attestation verify <file> --repo <owner>/<repo>`.
         # Brings the binary channel up to the guarantee the npm channel already
         # has via `pnpm publish --provenance` (sdk-javascript-cd.yml).
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           # `attest/` holds ONLY the five binaries (see the step above). Using a
           # dedicated directory rather than a negated glob over `bin/` keeps the

@@ -3,7 +3,15 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+
+If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+
+<Warning>
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
+
+The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+</Warning>
 
 ## Supported Providers
 
@@ -11,12 +19,14 @@ LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as 
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
 | AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
 | Okta | `okta` | Client ID, Client Secret, Issuer |
+| OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
+| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
 
 ## OAuth Redirect URL
 
@@ -26,7 +36,11 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+
+<Note>
+A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
+</Note>
 
 ## Provider Setup
 
@@ -34,9 +48,11 @@ Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `
 
 The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
 
-Reset links are sent through the same transactional email provider as the rest of LangWatch. Configure SendGrid or AWS SES as described in [Third-party integrations](/self-hosting/configuration/third-party-integrations) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive. With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled.
+When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+
+Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
 
 ### Auth0
 
@@ -67,39 +83,12 @@ Or via environment variables:
 | `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
 | `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
 
-### Azure AD
-
-1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
-2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
-3. Create a client secret under **Certificates & secrets**
-4. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: azureAd
-    providers:
-      azureAd:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: azureClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
-        tenantId:
-          value: "your-tenant-id"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `azureAd` |
-| `AZURE_AD_CLIENT_ID` | Application (client) ID |
-| `AZURE_AD_CLIENT_SECRET` | Client secret value |
-| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
-
 ### AWS Cognito
 
-1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
-2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
-3. Configure in Helm:
+1. In the [Cognito console](https://console.aws.amazon.com/cognito/), open your user pool and give it a hosted-UI domain if it does not have one yet (**App integration > Domain**)
+2. Create an app client with a client secret, and set its **Allowed callback URL** to `https://your-domain.com/api/auth/callback/cognito`
+3. Under the app client's login pages, enable the **Authorization code grant** flow and the `openid`, `email` and `profile` scopes
+4. Configure in Helm:
 
 ```yaml
 app:
@@ -112,15 +101,57 @@ app:
         clientSecret:
           secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
         issuer:
-          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
+          value: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123"
 ```
+
+Or via environment variables:
 
 | Variable | Value |
 |----------|-------|
 | `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | User pool app client ID |
-| `COGNITO_CLIENT_SECRET` | User pool app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
+| `COGNITO_CLIENT_ID` | Your app client ID |
+| `COGNITO_CLIENT_SECRET` | Your app client secret |
+| `COGNITO_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
+
+<Note>
+The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
+
+```bash
+curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
+```
+</Note>
+
+### Azure AD
+
+1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
+3. Create a client secret under **Certificates & secrets**
+4. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: azure-ad
+    providers:
+      azureAd:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: azureClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
+        tenantId:
+          value: "your-tenant-id"
+```
+
+<Note>
+The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
+</Note>
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `azure-ad` |
+| `AZURE_AD_CLIENT_ID` | Application (client) ID |
+| `AZURE_AD_CLIENT_SECRET` | Client secret value |
+| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
 
 ### GitHub
 
@@ -194,6 +225,75 @@ app:
 | `OKTA_CLIENT_ID` | Client ID |
 | `OKTA_CLIENT_SECRET` | Client secret |
 | `OKTA_ISSUER` | `https://your-org.okta.com` |
+
+### OneLogin
+
+1. In the [OneLogin Admin portal](https://www.onelogin.com/), add an **OpenID Connect (OIDC)** application
+2. Set the **Redirect URI** to `https://your-domain.com/api/auth/callback/onelogin`
+3. Under **SSO**, set the application type to **Web** so it is issued a client secret, and note the Client ID and Client Secret
+
+```yaml
+app:
+  nextAuth:
+    provider: onelogin
+    providers:
+      onelogin:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientSecret }
+        issuer:
+          value: "https://your-subdomain.onelogin.com/oidc/2"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `onelogin` |
+| `ONELOGIN_CLIENT_ID` | Client ID |
+| `ONELOGIN_CLIENT_SECRET` | Client secret |
+| `ONELOGIN_ISSUER` | `https://your-subdomain.onelogin.com/oidc/2` |
+
+<Note>
+If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
+</Note>
+
+### Any other OpenID Connect provider
+
+Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
+
+1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
+2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
+
+```yaml
+app:
+  nextAuth:
+    provider: oidc
+    providers:
+      oidc:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
+        issuer:
+          value: "https://idp.example.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `oidc` |
+| `OIDC_CLIENT_ID` | Client ID |
+| `OIDC_CLIENT_SECRET` | Client secret |
+| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
+
+<Note>
+Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
+
+```bash
+curl https://idp.example.com/.well-known/openid-configuration
+```
+
+JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
+</Note>
 
 ## Domain-to-Organization Mapping
 

@@ -20,14 +20,14 @@ in order on any pre-prod verification pass.
 |---|----|--------|-------|
 | 1 | [#4498](./pr-4498-trigger-outbox-dispatch.md) | `feat/trigger-outbox-dispatch` → `main` | Transactional outbox substrate, per-trigger cadence + debounce, Liquid templating, email abuse protections (per-project daily cap, per-recipient hourly cap, suppressions, unsubscribe deep links), ADR-035 persist-class debounce. |
 | 2 | [#5012](./pr-5012-trace-analytics-foundation.md) | `pr/03-trace-analytics-foundation` | `trace_analytics` slim + `trace_analytics_rollup` ClickHouse tables (ADR-034 Phases 0-3.5). App-layer read routing behind `release_event_sourced_analytics_read`. Optional tripwire behind `release_event_sourced_analytics_read_tripwire`. |
-| 3 | [#5013](./pr-5013-heartbeat-graph-triggers.md) | `pr/04-heartbeat-graph-triggers` | ADR-039 outbox heartbeat primitive + ADR-034 Phase 5 graph triggers via outbox reactor + heartbeat absence-resolve. Flipped per project by `release_es_graph_triggers_firing`; cron coexists for un-flagged projects. |
-| 4 | [#5014](./pr-5014-eval-write-side-aggregates.md) | `pr/05-eval-and-write-side-aggregates` | ADR-034 Phase 6 (`evaluation_analytics` slim + rollup + reactor). Phase 7 (sim/exp/suite aggregates) was pulled back in the 2026-07-07 stack review — only the evaluation pair shipped. The **same** `release_event_sourced_analytics_read` flag from PR2 now covers eval-source metrics too. `release_es_graph_triggers_firing` now also gates eval graph triggers. |
+| 3 | [#5013](./pr-5013-heartbeat-graph-triggers.md) | `pr/04-heartbeat-graph-triggers` | ADR-039 outbox heartbeat primitive + ADR-034 Phase 5 graph triggers via outbox subscriber + heartbeat absence-resolve. Flipped per project by `release_es_graph_triggers_firing`; cron coexists for un-flagged projects. |
+| 4 | [#5014](./pr-5014-eval-write-side-aggregates.md) | `pr/05-eval-and-write-side-aggregates` | ADR-034 Phase 6 (`evaluation_analytics` slim + rollup + subscriber). Phase 7 (sim/exp/suite aggregates) was pulled back in the 2026-07-07 stack review — only the evaluation pair shipped. The **same** `release_event_sourced_analytics_read` flag from PR2 now covers eval-source metrics too. `release_es_graph_triggers_firing` now also gates eval graph triggers. |
 | 5 | [#5015](./pr-5015-graph-alerts-ui-templates.md) | `pr/06-graph-alerts-ui-templates` | ADR-034 Phases 5.1 / 5.2 / 8 / 8.1: graph-threshold alerts inside the automations drawer, dashboard "Add alert" button repointed to the same drawer, graph alerts dispatched through Liquid templates. Also carries ADR-044 scheduled reports + the `ScheduledJob` scheduler, ADR-043's facet-shaped drawer and trace-query subjects, ADR-040/041 Block Kit templates + Slack bot-token delivery, and the outbox payload slimming. **Ships one consolidated Postgres migration** (`20260712000000_reports_scheduler_and_trigger_facets`: `ScheduledJob` table incl. retry columns; `TriggerKind` enum + backfilled NOT NULL column; `Trigger.filterQuery`; `TriggerSent.openIncidentKey` unique). No new flag — depends on `release_es_graph_triggers_firing` from PR3 being ON to see the new dispatch path fire. |
 
 ## Flag summary
 
 Read each PR's guide for full behaviour and rollback. Registered in
-`langwatch/src/server/featureFlag/registry.ts`; verified strings only.
+`platform/app/src/server/featureFlag/registry.ts`; verified strings only.
 
 | Flag | Default | Owns | Introduced by |
 |------|---------|------|---------------|
@@ -68,7 +68,7 @@ watch for them everywhere:
 
 Every guide assumes:
 
-1. `langwatch/.env` is populated (see `langwatch/.env.example`). `BASE_HOST`
+1. `platform/app/.env` is populated (see `platform/app/.env.example`). `BASE_HOST`
    must be set — the outbox dispatcher throws at setup if it's unset because
    trigger emails render broken deep links.
 2. `pnpm install` has run.
@@ -76,6 +76,6 @@ Every guide assumes:
    Zod, langevals types).
 4. `make quickstart all-local` (or the preset the guide names) is up
    and healthy.
-5. `pnpm dev` is running from `langwatch/`. Ports collide? paste the
+5. `pnpm dev` is running from `platform/app/`. Ports collide? paste the
    `PORT=5570 pnpm dev` command that `check-ports.sh` prints; do not
    invent your own process-tree walker.

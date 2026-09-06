@@ -1,0 +1,169 @@
+---
+title: Billing and spend events
+description: One spend event per request that reaches the LangWatch AI Gateway pipeline, with token counts, cost and attribution, delivered to your webhook endpoints and served over REST for reconciliation and rebilling.
+sidebarTitle: Billing and spend events
+keywords: spend events, billing events, rebilling, reconciliation, nano USD, settled, replay, usage metering
+---
+
+## What a spend event is
+
+A spend event is the record of one gateway request: the tokens by class, the cost, the virtual key, the end user and the metadata the request carried. LangWatch delivers spend events to your [webhook endpoints](/features/webhooks) and serves the same events over REST.
+
+Every request that reaches the gateway pipeline produces an event, including requests the gateway itself rejected for a budget breach, a guardrail, a rate limit, a routing policy rule or a missing end-user id. Those have `status: "error"` and a zero cost. A request rejected at authentication, for a disabled, revoked or unknown key, produces no event.
+
+Spend events, spend summaries and the webhook endpoints are an Enterprise capability. The routes need an organization API key with `gatewaySpend:view`; replay needs `gatewaySpend:manage`. A project API key on these routes gets HTTP 401 `credential_class_mismatch`. See [RBAC](/ai-gateway/rbac).
+
+## Event lifecycle
+
+| Status | Event type | Meaning |
+|---|---|---|
+| `admitted` | `gateway.request.admitted` | The request entered the pipeline. Served over REST only, never delivered by webhook. |
+| `success` | `gateway.request.completed` | The provider answered. Usage and cost are final. |
+| `error` | `gateway.request.completed` | The request failed, at the provider or in the gateway. Usage may be zero. |
+| `settled` | `gateway.request.settled` | No outcome arrived within 30 minutes of admission. The request is recorded with an unknown cost, and `needs_reconciliation` is `true`. |
+
+An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
+
+Event ids are stable: `<gateway_request_id>:<completed|settled|admitted>`. A retried or replayed delivery carries the same id, so you can dedupe on it. Recorded spend never changes: a budget reset moves a period boundary and leaves every event as it was.
+
+## The event payload
+
+Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type", "created", "schema_version": "1", "data" }`. The `data` object:
+
+| Field | Meaning |
+|---|---|
+| `event_id`, `event_type` | The same values as the envelope `id` and `type`. |
+| `gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
+| `occurred_at` | The request time. Periods and windows are placed on this time. |
+| `organization_id`, `project_id` | The organization, and the trace project of the virtual key. |
+| `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`. |
+| `trace_id` | The trace in Trace Explorer. |
+| `model`, `model_provider_id`, `request_type` | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `realtime_session` or `passthrough`. |
+| `usage` | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`. `input_tokens` excludes the cached and audio tokens. `reasoning_tokens` is a subset of `output_tokens`. `null` on `settled` and `admitted`. |
+| `cost` | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`. |
+| `status` | `success`, `error`, `settled` or `admitted`. |
+| `needs_reconciliation`, `settle_reason` | `true` and `confirmation_deadline_expired` on `settled`. |
+| `error` | `{ "class", "http_status" }` on `error`, else `null`. `class` is the gateway error code, for example `budget_exceeded` or `provider_error`. |
+| `duration_ms` | The request duration, `null` when unknown. |
+| `labels` | The tags set on the virtual key. |
+| `metadata` | The JSON object your request sent in the `X-LangWatch-Metadata` header, or `{}`. |
+
+Cost is priced by LangWatch from the token counts and the model pricing, in the same way as the cost on a trace. Sum `nano_usd` for money; use `total_usd` for display.
+
+## Attribution: what the request carries
+
+| Value | Source, in order |
+|---|---|
+| End user | The `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field on chat, messages, embeddings, responses and speech requests. |
+| Metadata | The `X-LangWatch-Metadata` header: a JSON object of at most 4096 bytes. An invalid value is dropped. |
+| Labels | The tags on the virtual key. |
+| Person | The principal of a personal key. |
+
+The gateway removes the `X-LangWatch-*` headers before it forwards the request to the provider. The `user` body field is forwarded unchanged. Every value is stored as sent, so keep personal data out of end-user ids and metadata; events are retained for 13 months.
+
+```python
+client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[{"role": "user", "content": "Hi"}],
+    user="cust_8841",
+    extra_headers={"X-LangWatch-Metadata": '{"plan": "pro", "feature": "summarize"}'},
+)
+```
+
+## Receive events by webhook
+
+Create an endpoint under **AI Gateway > Webhooks** and subscribe it to `gateway.request.completed` and `gateway.request.settled`, or to `gateway.*`. Deliveries are `POST` requests with a `{ "batch": [ ...envelopes ] }` body and these headers:
+
+| Header | Value |
+|---|---|
+| `X-LangWatch-Signature` | `t=<unix seconds>,v1=<hex>`: HMAC-SHA256 of `<t>.<raw body>` with the endpoint secret. During a secret rotation a second `v1=` is present for the previous secret, valid for 24 hours. Reject a timestamp older than 300 seconds. |
+| `X-LangWatch-Delivery-Id`, `X-LangWatch-Delivery-Attempt` | The delivery and the attempt number. |
+| `X-LangWatch-Test-Fire` | `true` on a test delivery sent from the endpoint page. |
+
+Answer with a 2xx. A failed delivery is retried after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours and 12 hours, then every 12 hours, up to 11 attempts. A `Retry-After` header on your response is honoured as a minimum. See [Webhooks](/features/webhooks) for endpoints, secrets and the delivery log.
+
+The same endpoints receive `gateway.budget.threshold_crossed`, `gateway.budget.breached` and the `gateway.virtual_key.*` lifecycle events. See [Budgets](/ai-gateway/budgets#block-and-warn) and [Virtual keys](/ai-gateway/virtual-keys#rotate-disable-expire-and-revoke).
+
+## Read events over REST
+
+The two list routes take `from` and `to` as epoch milliseconds, required, and a `cursor` from the previous page.
+
+```bash
+# One row per virtual key over July, for a checksum against your ledger
+curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-summaries?group_by=virtual_key&from=1782864000000&to=1785542400000" \
+  -H "X-Auth-Token: $LANGWATCH_ORG_API_KEY"
+
+# The events of one key, for the item diff
+curl -sS "https://app.langwatch.ai/api/gateway/v1/spend-events?virtual_key_id=vk_01HZX...&from=1782864000000&to=1785542400000" \
+  -H "X-Auth-Token: $LANGWATCH_ORG_API_KEY"
+```
+
+| Route | What it returns |
+|---|---|
+| `GET /api/gateway/v1/spend-summaries` | `{ "data": [{ "key", "group", "bucket_start", "event_count", "settled_count", "usage", "cost": { "total_usd", "nano_usd" } }], "next_cursor" }`. `group_by` takes one or two of `virtual_key`, `end_user`, `project`, `model`, `provider`, `principal`, `request_type`. `bucket` is `none`, `hour` or `day`, with `timezone` as an IANA name. `limit` defaults to 500, at most 1000. |
+| `GET /api/gateway/v1/spend-events` | `{ "data": [ ...envelopes ], "next_cursor" }`, oldest first. `limit` defaults to 50, at most 200. |
+| `GET /api/gateway/v1/end-users/:id/spend` | `{ "data": { "end_user_id", "window", "from", "to", "cost", "request_count", "usage", "caps": [...] } }`. `window` is `day`, `week` or `month` (24 hours, 7 days, 30 days back from now), or pass `from` and `to`. `caps` lists the per-end-user budgets that apply, each with `budget_id`, `window`, `on_breach`, `limit_usd`, `spent_usd` and `period_started_at`. |
+| `POST /api/gateway/v1/spend-events/replay` | Body `{ "from", "to", "endpoint_id" }`, at most 7 days and 10,000 events. Re-delivers the events in the window to that endpoint with their original ids. Needs `gatewaySpend:manage`. |
+
+Both list routes take the same filters, repeatable: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` as `key:value`, and `status`. The `status` filter also accepts `confirmed` for `success` and `failed` for `error`. Summaries exclude `admitted` from `status` and count only `success` and `error` events in their sums, with settled events in `settled_count`.
+
+A summary grouped by `model` or `provider`, or bucketed by time, is refused with `gateway_spend_group_by_unstable` when the window ends less than 30 minutes ago, because outcomes can still arrive. `meta.settles_at` says when the window is stable.
+
+## Reconcile with the SDKs
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_ORG_API_KEY });
+const from = Date.parse("2026-07-01T00:00:00Z");
+const to = Date.parse("2026-08-01T00:00:00Z");
+
+// Checksums first, one row per key.
+for await (const row of langwatch.spendEvents.iterSummaries({ groupBy: "virtual_key", from, to })) {
+  compareWithYourLedger(row.key, row.event_count, row.cost.nano_usd);
+}
+
+// Item diff only where a checksum disagreed.
+for await (const event of langwatch.spendEvents.iterate({ from, to, virtualKeyId: "vk_01HZX..." })) {
+  reconcile(event.gateway_request_id, event);
+}
+```
+
+```python Python
+import os
+
+import langwatch
+
+langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
+from_ms, to_ms = 1782864000000, 1785542400000  # 2026-07-01 to 2026-08-01 UTC
+
+# Checksums first, one row per key.
+for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
+    compare_with_your_ledger(row["key"], row["event_count"], row["cost"]["nano_usd"])
+
+# Item diff only where a checksum disagreed.
+for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtual_key_id="vk_01HZX..."):
+    reconcile(event["gateway_request_id"], event)
+```
+
+</CodeGroup>
+
+`iterSummaries` and `iterate` (`iter_summaries` and `iterate` in Python) fetch the pages for you. `summariesPage` and `listPage` (`summaries_page` and `list_page`) return one page with its cursor, for a reconciliation you checkpoint across runs. `replay` calls the replay route.
+
+## See events in the UI
+
+**AI Gateway > Billing Events** lists one row per request over the last 24 hours, 7 days or 30 days, with filters on virtual key id, end user id, model and status.
+
+<Frame caption="The Billing Events list: confirmed requests with tokens and cost, refused requests as failed at zero cost, and a realtime session mint still admitted.">
+  <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
+</Frame>
+
+The list labels a `success` event **confirmed**, an `error` event **failed** and a `settled` event **settled**. A realtime session mint stays **admitted** until its outcome arrives, with zero tokens and zero cost, because the call it opened has not started yet.
+
+The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts. It omits every counter whose value is zero.
+
+<Note>
+**Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.
+</Note>

@@ -10,9 +10,48 @@ Classes:
 - **DELETE** — aspirational/stale; remove from the spec.
 - **DUPLICATE** — already covered by another scenario or test; remove + cross-link.
 
+## Agent Testing v2 additions
+
+Spec files were added for Agent Testing v2. They are outside the #3458
+audit: every scenario in them carries a binding tag (`@unit` or
+`@integration`) and none is `@unimplemented`, so nothing in them is audit debt.
+They bind as the implementation phases land.
+
+| File | Phase that binds it |
+|------|---------------------|
+| test-suites.feature | WS1 phase 2 (test suites). Revised: a test suite holds a name and its scenarios only, and carries no execution settings |
+| test-suite-run-plan-reuse.feature | WS1 phase 2 (test suites), plus WS3 for the v2 Results list. Revised: a suite run resolves the run plan by name instead of reusing a plan bound to the test suite |
+| test-suite-membership-invariant.feature | WS1 phase 2 (test suites) |
+| run-notes.feature | WS1 phase 1 (notes), plus WS3/WS4 for the surfaces |
+| run-note-metadata-convention.feature | WS1 phase 1 (notes) |
+| internal-run-set-surface.feature | Existing behavior; the v2 rows bind in WS3 |
+| run-plan-identity-by-name.feature | WS1. Revised: the name is the plan's identity, so a run under a name that exists replaces that plan's configuration and joins its history |
+| default-suite.feature | WS1 phase 2 (test suites): every project gets a `Default` suite on migration |
+| run-plan-dynamic-scopes.feature | WS1: the scope modes `all`, `test_suites`, `labels` and `scenarios` |
+| one-off-runs-surface.feature | WS3: a single scenario run is a named plan like any other |
+
+The surfaces outside `specs/suites/` carry their own files, listed here so the
+whole v2 surface is readable from one place. Some of them land with the
+work of another agent on this branch and may not be present yet.
+
+| File | What it binds |
+|------|---------------|
+| specs/api-reference/run-plans-rest-api.feature | `/api/v1/run-plans`: run by name, re-run by id, list, get, archive |
+| specs/api-reference/test-suites-rest-api.feature | `/api/v1/test-suites`: list, create, get, rename, archive, run |
+| specs/api-reference/suites-legacy-alias.feature | The deprecated `/api/suites` family still answers |
+| specs/features/run-plan-cli.feature | `langwatch run-plan run/list/get/archive`, and the `suite run` and `scenario run` shorter forms |
+| specs/mcp-server/run-plan-tools.feature | `platform_run_plan`, `platform_list_run_plans`, `platform_get_run_plan`, `platform_rerun_run_plan`, `platform_archive_run_plan` |
+| specs/mcp-server/test-suite-tools.feature | `platform_list_test_suites`, `platform_create_test_suite`, `platform_get_test_suite`, `platform_rename_test_suite`, `platform_archive_test_suite`, `platform_run_test_suite` |
+| specs/python-sdk/run-plans-and-test-suites.feature | `langwatch.run_plans` and `langwatch.test_suites` |
+| specs/typescript-sdk/run-plans-and-test-suites.feature | `client.runPlans` and `client.testSuites` |
+
+The v1 specs under `specs/features/suites/`, and the v1 rows of the table
+below, stay as they are: they describe code that still ships behind the
+`release_ui_agent_testing_v2_enabled` flag.
+
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/suites/archived-scenario-exclusion.feature | "Run a suite that contains archived scenarios and targets" | KEEP | E2E flow for #1828 (`feat(suites): exclude archived scenarios and targets from suite runs`). Behavior is implemented in `langwatch/src/server/suites/suite.service.ts`; no e2e test bound. Phase 3 should add a Playwright run or convert to integration. |
+| specs/suites/archived-scenario-exclusion.feature | "Run a suite that contains archived scenarios and targets" | KEEP | E2E flow for #1828 (`feat(suites): exclude archived scenarios and targets from suite runs`). Behavior is implemented in `platform/app/src/server/suites/suite.service.ts`; no e2e test bound. Phase 3 should add a Playwright run or convert to integration. |
 | specs/suites/archived-scenario-exclusion.feature | "Suite run excludes archived scenarios from job scheduling" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given a suite with mixed active and archived scenarios". Bind via `@scenario` JSDoc rather than write new test. |
 | specs/suites/archived-scenario-exclusion.feature | "Suite run fails when all scenarios are archived" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given all scenarios in a suite are archived" (throws AllScenariosArchivedError). Bind via JSDoc. |
 | specs/suites/archived-scenario-exclusion.feature | "Deleted scenarios still cause validation errors" | KEEP | Behavior covered by `suite.service.unit.test.ts` "given a suite references a deleted scenario". Bind via JSDoc. |
@@ -86,9 +125,9 @@ Classes:
 | specs/suites/suite-workflow.feature | "Drawer validates at least one target selected" | UPDATE | Same outdated "+ New Suite" wording. Behavior covered by `SuiteFormDrawer.integration.test.tsx` "shows a targets validation error". Update + bind. |
 | specs/suites/suite-workflow.feature | "Search scenarios in the drawer" | KEEP | Covered by `SuiteFormDrawer.integration.test.tsx` "given the scenario search box — when a search query is typed — filters the visible scenarios" + `useSuiteForm.unit.test.ts` "filters scenarios by name (case-insensitive)". Bind via JSDoc. |
 | specs/suites/suite-workflow.feature | "Filter scenarios by label in the drawer" | KEEP | Covered by `useSuiteForm.unit.test.ts` "when activeLabelFilter is set — filters scenarios by label". Bind via JSDoc; integration coverage may be partial — Phase 3 may add ScenarioPicker integration test. |
-| specs/suites/suite-workflow.feature | "Select All and Clear scenarios" | KEEP | Covered by `useSuiteForm.unit.test.ts` "when selectAllScenarios is called — selects all filtered scenario ids" and "when clearScenarios is called — empties selectedScenarioIds". Counter wording from `TargetPicker.unit.test.tsx` "displays the selection count". Bind via JSDoc. |
+| specs/suites/suite-workflow.feature | "Select All and Clear scenarios" | KEEP | Covered by `useSuiteForm.unit.test.ts` "when selectAllScenarios is called — selects all filtered scenario ids" and "when clearScenarios is called — empties selectedScenarioIds". Counter wording from `TargetPicker.integration.test.tsx` "displays the selection count". Bind via JSDoc. |
 | specs/suites/suite-workflow.feature | "Search targets in the drawer" | KEEP | Covered by `useSuiteForm.unit.test.ts` "filters targets by name (case-insensitive)". Bind via JSDoc. |
-| specs/suites/suite-workflow.feature | "Target list shows type indicator" | KEEP | Covered by `TargetPicker.unit.test.tsx` "given a code agent target — displays the Code type label" (and HTTP/Prompt sibling cases). Bind via JSDoc. |
+| specs/suites/suite-workflow.feature | "Target list shows type indicator" | KEEP | Covered by `TargetPicker.integration.test.tsx` "given a code agent target — displays the Code type label" (and HTTP/Prompt sibling cases). Bind via JSDoc. |
 | specs/suites/suite-workflow.feature | "Set repeat count in execution options" | UPDATE | Spec asserts "3× trials" string; actual UI is `"3x"` plus a separate "trials" label (`SuiteDetailPanel.tsx`, `SuiteDetailPanel.integration.test.tsx` "displays '3x' in the trials stat"). Update wording, then bind to existing test. |
 | specs/suites/suite-workflow.feature | "Repeat count appears in suite stats bar" | UPDATE | Same "3× trials" → "3x" trials wording mismatch. Update + bind to `SuiteDetailPanel.integration.test.tsx` "displays '3x' in the trials stat". |
 | specs/suites/suite-workflow.feature | "Edit suite via header button" | UPDATE | Spec says drawer opens with title "Edit Suite"; actual is "Edit Run Plan" (`SuiteFormDrawer.tsx`). Edit wiring covered partly by `SuiteFormDrawer.integration.test.tsx` "displays the Edit Run Plan title" + pre-population tests. Update + bind. |

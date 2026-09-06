@@ -21,7 +21,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
-const gatewayEnv = `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}${process.env.LANGWATCH_GATEWAY_GPC_ID ? `LANGWATCH_GATEWAY_GPC_ID=${process.env.LANGWATCH_GATEWAY_GPC_ID}\n` : ""}`;
+const gatewayEnv = `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`;
 
 describe("LangWatch AI Gateway CLI — Agent Usability", () => {
   it.skipIf(isCI)(
@@ -47,14 +47,12 @@ export $(grep LANGWATCH_API_KEY .env)
 
 Workflow to exercise (in order):
 1. \`langwatch virtual-keys list\` — confirm CLI is authenticated.
-2. \`langwatch gateway-providers list\` — find an existing provider binding id (or report one is needed).
-3. If a provider id is available (env \`LANGWATCH_GATEWAY_GPC_ID\` OR first row of gateway-providers list): run \`langwatch virtual-keys create --name "scenario-dogfood-<timestamp>" --description "from scenario test" --environment test --provider <gpc_id> --format json\` — capture the vk_id + secret from the JSON output.
-4. \`langwatch virtual-keys get <vk_id>\` — verify the VK exists and is ACTIVE.
+2. \`langwatch virtual-keys create --name "scenario-dogfood-<timestamp>" --description "from scenario test" --budget-limit 5 --budget-window month -f json\` — capture the vk id + secret from the JSON output. No provider argument exists: the key's eligible providers derive from its scopes, and scope defaults to the calling project.
+3. \`langwatch virtual-keys get <vk_id>\` — verify the VK exists with status "active".
+4. \`langwatch virtual-keys spend <vk_id> -f json\` — read the key's month-to-date spend (a fresh key reports "0").
 5. \`langwatch virtual-keys rotate <vk_id>\` — capture the new secret.
 6. \`langwatch virtual-keys revoke <vk_id>\` — revoke the VK.
-7. \`langwatch virtual-keys get <vk_id>\` — verify status is REVOKED.
-
-If step 3's prerequisite (a provider binding) is missing, stop gracefully with \`gateway-providers list\` output and explain that a \`gpc_*\` id is required in \`LANGWATCH_GATEWAY_GPC_ID\` or must be created via \`gateway-providers create\`.
+7. \`langwatch virtual-keys get <vk_id>\` — verify status is "revoked".
 `,
       );
 
@@ -70,9 +68,9 @@ If step 3's prerequisite (a provider binding) is missing, stop gracefully with \
             model: judgeModel,
             criteria: [
               "Agent ran `langwatch virtual-keys list` to confirm CLI auth",
-              "Agent ran `langwatch gateway-providers list` to discover a provider binding id",
-              "Agent either created a VK successfully OR explained cleanly that a provider binding was needed with instructions to set LANGWATCH_GATEWAY_GPC_ID",
-              "If a VK was created, the agent then called rotate and revoke on it",
+              "Agent created a VK with an inline budget and captured the id + secret",
+              "Agent read the key's spend with `langwatch virtual-keys spend`",
+              "Agent then called rotate and revoke on the created key",
             ],
           }),
         ],
@@ -93,7 +91,7 @@ If step 3's prerequisite (a provider binding) is missing, stop gracefully with \
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+virtual-keys\s+list/);
-            expect(allText).toMatch(/langwatch\s+gateway-providers\s+list/);
+            expect(allText).toMatch(/langwatch\s+virtual-keys\s+create/);
           },
           scenario.judge(),
         ],
@@ -200,7 +198,7 @@ Explore the CLI via \`--help\`. In order:
 1. \`langwatch --help\` — top-level command inventory.
 2. \`langwatch virtual-keys --help\` (alias \`vk\`) — VK subcommands.
 3. \`langwatch gateway-budgets --help\` — budget subcommands.
-4. \`langwatch gateway-providers --help\` — provider-binding subcommands.
+4. \`langwatch model-provider --help\` — the providers a key may dispatch to.
 
 Your goal: report back which top-level command groups are available and what the \`virtual-keys create\` accepts as options.
 `,
@@ -217,8 +215,8 @@ Your goal: report back which top-level command groups are available and what the
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent discovered the three gateway command groups: virtual-keys, gateway-budgets, gateway-providers",
-              "Agent reported back the options available on `virtual-keys create` (at minimum --name, --provider)",
+              "Agent discovered the three gateway command groups: virtual-keys, gateway-budgets, model-provider",
+              "Agent reported back the options available on `virtual-keys create` (at minimum --name, --scope, --providers-allowed)",
               "Agent did NOT invoke any command that mutated state",
             ],
           }),
@@ -241,7 +239,7 @@ Your goal: report back which top-level command groups are available and what the
 
             expect(allText).toMatch(/virtual-keys.*--help|--help.*virtual-keys/);
             expect(allText).toMatch(/gateway-budgets/);
-            expect(allText).toMatch(/gateway-providers/);
+            expect(allText).toMatch(/model-provider/);
           },
           scenario.judge(),
         ],

@@ -100,6 +100,27 @@ Feature: Work-conserving max-min fair dispatch
       And the bigger tenant expands into the half the smaller one does not use
       And no slot is left idle while either has work waiting
 
+  # The override is the part of this design that is hardest to believe from the
+  # outside: when the parked count is high, the natural reading is "we are
+  # throttling work", and the answer "no, the fleet is saturated and the
+  # override has no idle slot to give" was unprovable because nothing counted
+  # it. A parked backlog and a starved backlog look identical without this.
+  Rule: An operator can tell whether the override is actually filling slots
+
+    @unit
+    Scenario: Slots filled by the override are counted separately from ordinary dispatch
+      Given the fleet has idle slots and work is parked behind a fair share
+      When dispatch fills those idle slots with the parked work
+      Then the jobs it admitted that way are counted as override dispatches
+      And they are also counted as ordinary dispatches, so no job is missed from the total
+
+    @unit
+    Scenario: A saturated fleet records no override dispatches
+      Given the fleet has no idle slots
+      When dispatch runs while work is parked
+      Then no override dispatches are counted
+      And the parked work stays parked because there was no capacity, not because of the cap
+
   Rule: Fairness engages only under contention (saturation and competing tenants)
 
     Scenario: Two equally-demanding tenants split a saturated fleet evenly

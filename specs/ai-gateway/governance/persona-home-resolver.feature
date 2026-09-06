@@ -16,7 +16,7 @@ Feature: Persona-aware home resolver
   Plus an override: `User.lastHomePath` (when explicitly set by user pinning).
 
   Spec scope: the resolver function contract and its 4 personas. Implementation
-  in `langwatch/src/server/governance/personaResolver.service.ts`. UI plumbing
+  in `platform/app/src/server/governance/personaResolver.service.ts`. UI plumbing
   in `pages/index.tsx` via the existing client-side hook + redirect pattern
   (the Vite SPA architecture rarely uses `getServerSideProps`; the tRPC
   procedure `api.governance.resolveHome` runs the resolver server-side).
@@ -174,26 +174,6 @@ Feature: Persona-aware home resolver
     Then the existing signin redirect chain runs
     And the resolver does not execute
 
-  # ---------------------------------------------------------------------------
-  # Last-visited home stickiness (client-side, pages/index.tsx)
-  # ---------------------------------------------------------------------------
-
-  Rule: the last-visited home sticks until the user visits the other kind, so a
-  user whose persona default is /me still returns to the project they last
-  opened, symmetric with how /me sticks for someone who last sat there. An
-  explicit picker pin always wins.
-
-    @unit
-    Scenario: A last-visited project sticks over the persona /me default
-      Given the persona resolver's default destination is "/me"
-      And the user has no explicit picker pin
-      And the user last opened a project
-      When the "/" destination is resolved on the client
-      Then the client redirects to that project's home, not /me
-
-    @unit
-    Scenario: An explicit picker pin still wins over the last-visited project
-      Given the user pinned a home via the picker
-      And the user last opened a project
-      When the "/" destination is resolved on the client
-      Then the client redirects to the pinned home
+  # Client-side "/" landing is covered by specs/navigation/navigation-v2-landing.feature.
+  # The device's per-organization product memory decides ahead of the server
+  # resolver, and an explicit picker pin still wins over both.

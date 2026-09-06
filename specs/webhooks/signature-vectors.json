@@ -1,0 +1,307 @@
+{
+  "$schema_note": "Generated file. Do not hand-edit: run `pnpm run task generateWebhookSignatureVectors` from platform/app.",
+  "generated_by": "platform/app/src/tasks/generateWebhookSignatureVectors.ts",
+  "generated_from": "platform/app/src/server/webhooks/signature.ts",
+  "headers": {
+    "signature": "X-LangWatch-Signature",
+    "delivery_id": "X-LangWatch-Delivery-Id",
+    "event_id": "X-LangWatch-Event-Id"
+  },
+  "algorithm": {
+    "header": "X-LangWatch-Signature: t=<unix seconds>,v1=<hex>[,v1=<hex>]",
+    "signed_payload": "`${timestamp}.${raw body}`, using the timestamp as parsed from `t`",
+    "digest": "HMAC-SHA256, lowercase hex, compared in constant time",
+    "repeated_v1": "During a secret rotation the header carries one v1 per valid secret, newest first. Verification passes when ANY (held secret, v1) pair matches."
+  },
+  "default_tolerance_seconds": 300,
+  "signing": [
+    {
+      "name": "documented_reference_vector",
+      "why": "The value the docs quote. Pinned so a published snippet cannot drift from the sender.",
+      "body": "{\"a\":1}",
+      "timestamp": 1700000000,
+      "secrets": [
+        "whsec_fixed"
+      ],
+      "expected_header": "t=1700000000,v1=9bc8e75d9aeea7b095d6f57ca0bbb0bc17fe72870d03beed18695fbf6e31a40e"
+    },
+    {
+      "name": "single_secret",
+      "why": "Steady state: one secret, one v1.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "timestamp": 1753000000,
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "expected_header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1"
+    },
+    {
+      "name": "rotation_two_secrets",
+      "why": "A rotation window signs with both, newest first, so a receiver reading only the first v1 follows the roll rather than lagging it.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "timestamp": 1753000000,
+      "secrets": [
+        "whsec_new_secret_value",
+        "whsec_previous_secret_value"
+      ],
+      "expected_header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a"
+    },
+    {
+      "name": "unicode_body",
+      "why": "The digest is over the body's bytes, so non-ASCII must survive without re-encoding.",
+      "body": "{\"note\":\"café \\\"quoted\\\" ✓\"}",
+      "timestamp": 1753000000,
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "expected_header": "t=1753000000,v1=151c682ff52835bb0c430232e3d8532332c6acaf4f69bea253e583279337dcba"
+    },
+    {
+      "name": "empty_secret_is_skipped",
+      "why": "An empty secret signs nothing rather than signing with an empty key.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "timestamp": 1753000000,
+      "secrets": [
+        "",
+        "whsec_new_secret_value"
+      ],
+      "expected_header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1"
+    }
+  ],
+  "verification": [
+    {
+      "name": "valid_single_secret",
+      "why": "The ordinary delivery.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_rotation_receiver_holds_new_only",
+      "why": "The receiver already swapped. The first v1 matches.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_rotation_receiver_holds_old_only",
+      "why": "The whole point of the window: a receiver that has not swapped yet keeps taking delivery. A verifier that reads only the LAST v1 would also pass here, which is why the next case exists.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a",
+      "secrets": [
+        "whsec_previous_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_rotation_receiver_holds_both",
+      "why": "Mid-swap the receiver may hold both. Either match is a pass.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a",
+      "secrets": [
+        "whsec_previous_secret_value",
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_rotation_first_v1_matches_only",
+      "why": "The regression that motivated these helpers: a verifier keeping only the LAST v1 rejects every delivery to a receiver already on the new secret.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_at_tolerance_edge",
+      "why": "The window is inclusive: exactly at the tolerance still verifies.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000300,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_custom_tolerance",
+      "why": "A receiver may tighten the window.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000005,
+      "tolerance_seconds": 10,
+      "expected": "valid"
+    },
+    {
+      "name": "valid_unicode_body",
+      "why": "Exact bytes in, exact bytes hashed.",
+      "body": "{\"note\":\"café \\\"quoted\\\" ✓\"}",
+      "header": "t=1753000000,v1=151c682ff52835bb0c430232e3d8532332c6acaf4f69bea253e583279337dcba",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "valid"
+    },
+    {
+      "name": "invalid_signature_never_issued_secret",
+      "why": "A secret this sender never used matches no v1.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1,v1=60eba7f5919ab700bb4bb1b4f4b2aec8c734b397121f78bcf170b2e2de54bb4a",
+      "secrets": [
+        "whsec_never_issued"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "invalid_signature"
+    },
+    {
+      "name": "invalid_signature_tampered_body",
+      "why": "One byte changed in transit.",
+      "body": "{\"batch\":[{\"id\":\"evt_9\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "invalid_signature"
+    },
+    {
+      "name": "invalid_signature_rolled_off_secret",
+      "why": "Once the window closes the sender stops emitting the old v1, so the old secret stops verifying.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_previous_secret_value"
+      ],
+      "now_seconds": 1753000010,
+      "expected": "invalid_signature"
+    },
+    {
+      "name": "stale_timestamp_in_the_past",
+      "why": "Past the window: a replay, or a receiver whose clock ran ahead.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000360,
+      "expected": "stale_timestamp"
+    },
+    {
+      "name": "stale_timestamp_in_the_future",
+      "why": "The window is symmetric, so a sender clock running ahead is caught too.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1752999640,
+      "expected": "stale_timestamp"
+    },
+    {
+      "name": "stale_timestamp_custom_tolerance",
+      "why": "A tightened window rejects what the default would have accepted.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000060,
+      "tolerance_seconds": 10,
+      "expected": "stale_timestamp"
+    },
+    {
+      "name": "stale_timestamp_beats_bad_signature",
+      "why": "Checks run in order, so a delivery that is both stale and wrongly signed reports the staleness.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000,v1=77a5cea8abf00ed9892f499256f3af4fc8c21d2c77cae93187b153b2717011a1",
+      "secrets": [
+        "whsec_never_issued"
+      ],
+      "now_seconds": 1753000360,
+      "expected": "stale_timestamp"
+    },
+    {
+      "name": "malformed_header_missing_t",
+      "why": "No timestamp means no freshness check is possible.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "v1=deadbeef",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000000,
+      "expected": "malformed_header"
+    },
+    {
+      "name": "malformed_header_missing_v1",
+      "why": "A timestamp on its own carries nothing to compare.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=1753000000",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000000,
+      "expected": "malformed_header"
+    },
+    {
+      "name": "malformed_header_non_numeric_t",
+      "why": "A `t` that is not a number fails parsing rather than being coerced to an epoch.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "t=not-a-number,v1=0000000000000000000000000000000000000000000000000000000000000000",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000000,
+      "expected": "malformed_header"
+    },
+    {
+      "name": "malformed_header_empty",
+      "why": "An absent header reaches the verifier as an empty string often enough to be worth pinning.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000000,
+      "expected": "malformed_header"
+    },
+    {
+      "name": "malformed_header_garbage",
+      "why": "Anything that is not the scheme is refused, not guessed at.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "sha256=deadbeef",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753000000,
+      "expected": "malformed_header"
+    },
+    {
+      "name": "malformed_header_beats_stale",
+      "why": "Malformed is reported first: there is no trustworthy timestamp to call stale.",
+      "body": "{\"batch\":[{\"id\":\"evt_1\",\"type\":\"gateway.request.completed\"},{\"id\":\"evt_2\",\"type\":\"gateway.request.settled\"}]}",
+      "header": "v1=deadbeef",
+      "secrets": [
+        "whsec_new_secret_value"
+      ],
+      "now_seconds": 1753100000,
+      "expected": "malformed_header"
+    }
+  ]
+}

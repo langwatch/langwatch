@@ -125,3 +125,9 @@ Feature: Langy suggests the next step after a result
     Scenario: A card with nothing worth suggesting shows no suggestion row
       When Langy renders a card that has no next step worth offering
       Then no empty suggestion row is rendered
+
+    @unit
+    Scenario: A prompts result earns no bare surface chips
+      When Langy lists prompts and the card renders
+      Then no chip offers Experiments or Scenarios
+      And the prompts card keeps only its own deep link into Prompts

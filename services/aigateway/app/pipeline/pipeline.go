@@ -26,16 +26,44 @@ type Call struct {
 	Bundle  *domain.Bundle
 	Request *domain.Request
 	Meta    *MetaAccumulator
+
+	// BudgetExcludedProviders records the providers whose provider-filtered
+	// blocking budgets are out of money. The interceptor only records them
+	// here; terminal dispatch is what subtracts them from the candidate
+	// chain, treats each like an unavailable provider (contract §4.6), and
+	// blocks, naming an excluding budget, only when nothing is left to
+	// dispatch to.
+	BudgetExcludedProviders []domain.ExcludedProvider
 }
 
 // Meta holds metadata accumulated during dispatch for response headers. It is
 // a snapshot: transports read it, interceptors write through MetaAccumulator.
 type Meta struct {
-	GatewayRequestID    string
-	FallbackCount       int
-	BudgetWarnings      []string
-	CacheMode           string
-	CustomerTraceparent string
+	GatewayRequestID string
+	FallbackCount    int
+	// DispatchedProviderID is the ModelProvider row id of the credential the
+	// request was actually dispatched to (the one that served it, or the
+	// last one tried when every attempt failed). Empty when nothing was
+	// dispatched. The trace interceptor stamps it on the customer span as
+	// langwatch.model_provider_id, which is what lets the control plane's
+	// trace fold debit provider-filtered budgets.
+	DispatchedProviderID string
+	BudgetWarnings       []string
+	CacheMode            string
+	CustomerTraceparent  string
+	// ParamsDropped lists request parameters the parameter policy removed
+	// on a translated lane (drop_tuning_params semantics). Surfaced as the
+	// X-LangWatch-Params-Dropped response header on both sync and stream
+	// lanes so a drop is never silent.
+	ParamsDropped []string
+	// GuardrailsNotApplied names why the key's guardrails did not run on
+	// this request, when they did not. Surfaced as the
+	// X-LangWatch-Guardrails-Not-Applied response header.
+	GuardrailsNotApplied string
+	// RealtimeSessionID is the LangWatch id of the voice session a mint
+	// opened. Surfaced as X-LangWatch-Session-Id so a caller can join its
+	// own session to the spend record without parsing the vendor body.
+	RealtimeSessionID string
 }
 
 // MetaAccumulator is what interceptors write response metadata into. Dispatch
@@ -62,6 +90,19 @@ func (a *MetaAccumulator) GatewayRequestID() string {
 	return a.meta.GatewayRequestID
 }
 
+// DispatchedProviderID reads the ModelProvider row id the request was
+// dispatched to, once dispatch has recorded it. The trace interceptor reads
+// it when ending the customer span. Nil-safe so span teardown paths never
+// trade a missing accumulator for a panic.
+func (a *MetaAccumulator) DispatchedProviderID() string {
+	if a == nil {
+		return ""
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.meta.DispatchedProviderID
+}
+
 // Snapshot copies the metadata accumulated so far. Safe to call while dispatch
 // is still in flight.
 func (a *MetaAccumulator) Snapshot() Meta {
@@ -69,6 +110,7 @@ func (a *MetaAccumulator) Snapshot() Meta {
 	defer a.mu.Unlock()
 	out := a.meta
 	out.BudgetWarnings = slices.Clone(a.meta.BudgetWarnings)
+	out.ParamsDropped = slices.Clone(a.meta.ParamsDropped)
 	return out
 }
 

@@ -1,0 +1,26 @@
+id: use-action-based-test-name-ts
+message: >
+  Test names state what the unit does, not what it should do. `it("checks
+  local first")`, not `it("should check local first")` — the "should" adds a
+  word and removes certainty, and the failure output reads worse for it. Names
+  like "works", "renders", "test" say nothing at all; the failure message is
+  the only thing a future reader gets, so make it carry the behaviour. See
+  CLAUDE.md, "Using 'should' in test descriptions".
+severity: error
+language: TypeScript
+rule:
+  any:
+    - pattern: it($NAME, $$$)
+    - pattern: test($NAME, $$$)
+constraints:
+  NAME:
+    any:
+      # "should ..." — banned outright by CLAUDE.md.
+      - regex: "^[\"'`]\\s*(?i)should\\b"
+      # Names that carry no behaviour at all.
+      - regex: "^[\"'`]\\s*(?i)(works?|test|tests|it works|renders?|ok|basic|simple|happy path|sanity)\\s*[\"'`]$"
+files:
+  - "platform/app/**/*.test.ts"
+  - "platform/app/**/*.spec.ts"
+  - "sdks/typescript/**/*.test.ts"
+  - "packages/**/*.test.ts"

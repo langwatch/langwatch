@@ -1,62 +1,15 @@
 ---
 title: Third-Party Integrations
-description: "Configure email, error tracking, analytics, and external services for LangWatch"
+description: "Configure email, analytics, and external services for LangWatch"
 ---
 
-LangWatch integrates with several third-party services for notifications, error tracking, and evaluation capabilities.
+LangWatch integrates with several third-party services for notifications, storage, and evaluation capabilities.
 
-## Email (SendGrid)
+## Email
 
-Email is used for alerts, team invitations, password resets, and system notifications. In `NEXTAUTH_PROVIDER="email"` mode, the sign-in screen's "Forgot password?" link sends the reset email through this same provider, so configuring it here is what enables self-service password recovery.
+Email carries alert notifications, scheduled reports, team invitations, usage warnings and password reset links. LangWatch sends through SMTP, AWS SES, SendGrid or Resend.
 
-### Helm Configuration
-
-```yaml
-app:
-  email:
-    enabled: true
-    defaultFrom: "langwatch@yourcompany.com"
-    provider: sendgrid
-    providers:
-      sendgrid:
-        apiKey:
-          secretKeyRef:
-            name: langwatch-email
-            key: sendgridApiKey
-```
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `EMAIL_ENABLED` | `true` to enable email |
-| `EMAIL_PROVIDER` | `sendgrid` |
-| `SENDGRID_API_KEY` | Your SendGrid API key |
-| `EMAIL_DEFAULT_FROM` | Default sender address |
-
-### Setup Steps
-
-1. Create a [SendGrid account](https://sendgrid.com/) and generate an API key
-2. Verify your sender domain in SendGrid
-3. Configure the API key via the Helm chart or environment variable
-4. Test by inviting a team member in the LangWatch UI
-
-## Error Tracking (Sentry)
-
-Capture application errors and exceptions for debugging.
-
-### Configuration
-
-| Variable | Description |
-|----------|-------------|
-| `SENTRY_DSN` | Sentry DSN for the LangWatch app |
-
-```yaml
-app:
-  extraEnvs:
-    - name: SENTRY_DSN
-      value: "https://examplePublicKey@o0.ingest.sentry.io/0"
-```
+See [Email](/self-hosting/configuration/email) for choosing a gateway, the settings each one takes, and sending through an outbound proxy.
 
 ## Usage Analytics
 

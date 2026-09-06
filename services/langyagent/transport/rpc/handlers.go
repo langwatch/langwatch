@@ -20,10 +20,10 @@ import (
 // route) is the only legitimate caller and is responsible for authn/authz of
 // the end user; we only verify the shared internal bearer secret.
 type chatRequest struct {
-	ConversationID string `json:"conversationId" validate:"required"`
-	ProjectID      string `json:"projectId" validate:"required"`
-	UserID         string `json:"userId" validate:"required"`
-	Prompt         string `json:"prompt" validate:"required"`
+	ConversationID string `json:"conversationId"   validate:"required"`
+	ProjectID      string `json:"projectId"        validate:"required"`
+	UserID         string `json:"userId"           validate:"required"`
+	Prompt         string `json:"prompt"           validate:"required"`
 	System         string `json:"system,omitempty"`
 	// HistorySeed is the conversation-so-far block the worker folds in ahead of
 	// the prompt on its session's FIRST delivered message only (fresh session ⇒
@@ -44,7 +44,7 @@ type chatRequest struct {
 	ResumeToken string `json:"resumeToken,omitempty"`
 	// TurnID is the control plane's per-turn idempotency key. The agent echoes it
 	// back on the durable final POST. Not required: an older control plane omits
-	// it, and the agent then skips the durable final (relay + reactor still run).
+	// it, and the agent then skips the durable final (relay + subscriber still run).
 	TurnID string `json:"turnId,omitempty"`
 	// RunToken is the per-conversation secret (frameauth) the manager SIGNS every
 	// pushed output frame with. Minted server-only at conversation_started,
@@ -61,11 +61,22 @@ type chatRequest struct {
 // must match the turn that follows, or the worker this spawns is killed and
 // respawned when the real /chat arrives.
 type warmRequest struct {
-	ProjectID      string             `json:"projectId" validate:"required"`
-	ActorUserID    string             `json:"actorUserId" validate:"required"`
-	ConversationID string             `json:"conversationId" validate:"required"`
+	ProjectID      string             `json:"projectId"               validate:"required"`
+	ActorUserID    string             `json:"actorUserId"             validate:"required"`
+	ConversationID string             `json:"conversationId"          validate:"required"`
 	Credentials    domain.Credentials `json:"credentials"`
 	ModelOverride  string             `json:"modelOverride,omitempty"`
+}
+
+// cancelRequest names the in-flight turn a user's Stop wants aborted
+// (ADR-078). Mirrors the control plane's caller body (langyWorker.ts cancel):
+// conversationId routes to the worker, turnId guards which turn may die, and
+// projectId rides along for the log line only: the internal secret is the
+// authority, exactly as on every other verb.
+type cancelRequest struct {
+	ConversationID string `json:"conversationId"      validate:"required"`
+	TurnID         string `json:"turnId"              validate:"required"`
+	ProjectID      string `json:"projectId,omitempty"`
 }
 
 // warmTimeout bounds a detached spawn so a wedged warm cannot leak a goroutine.
@@ -86,7 +97,7 @@ const (
 	workerIntentContinue = "continue"
 )
 
-// maxTurnDuration bounds a detached turn so a wedged opencode stream (one that
+// maxTurnDuration bounds a detached turn so a wedged agent stream (one that
 // never sends a terminal event) cannot leak the drive goroutine forever. It is a
 // generous ceiling well above any realistic turn — the turn normally ends on its
 // terminal frame long before this fires.
@@ -118,7 +129,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 		}
 
 		// Stamp the turn's identity + intent onto the context logger so every line
-		// the app, pool, worker, and opencode reader emit for this turn carries it —
+		// the app, pool, worker, and agent reader emit for this turn carries it —
 		// the thread to pull when reading logs for one conversation.
 		ctx = clog.With(ctx, turnLogFields(req.ConversationID, req.ProjectID, req.TurnID)...)
 		ctx = clog.With(ctx, zap.String("worker_intent", intent))
@@ -186,8 +197,8 @@ func turnLogFields(conversationID, projectID, turnID string) []zap.Field {
 // in the same text shape the flat manager used, so nothing downstream changes.
 func healthAlias(application *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		active, max := application.Pool().Status()
+		active, capacity := application.Pool().Status()
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "ok (%d/%d workers)", active, max)
+		fmt.Fprintf(w, "ok (%d/%d workers)", active, capacity)
 	}
 }

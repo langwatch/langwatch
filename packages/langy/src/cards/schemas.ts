@@ -16,7 +16,7 @@
  * type:
  *
  *   - MEASURED — the CLI actually ran. The kind is stamped once, server-side,
- *     from the command and the payload's shape (ADR-059). The acceptance
+ *     from the command and the payload's shape (ADR-079). The acceptance
  *     schemas below read those payloads.
  *   - DERIVED — Langy wrote the JSON itself, inline in a ```langy-card fence
  *     (ADR-060). `derived-safe.ts` builds those schemas, from the shapes
@@ -217,7 +217,7 @@ export const choicesCardFields = {
  * `timeseriesShape.ts` in the CLI) — and the registry only recognises the
  * shape once it is there (`timeseriesProbeSchema`).
  *
- * ADR-059 §5 also sketches a `langwatch present` command for an agent to emit
+ * ADR-079 §5 also sketches a `langwatch present` command for an agent to emit
  * a card directly. That command does not exist; nothing emits this card except
  * a command that shaped its own answer.
  *
@@ -340,15 +340,26 @@ const isNamedValue = (value: unknown): boolean =>
  * Evidence, not vibes: an id/name, or a non-empty collection of rows. A bare
  * `{ ok: true }` names nothing and does not pass — the card would have nothing
  * to title itself with or link to, which is precisely the state this guards.
+ *
+ * A LOCAL scaffold is the other lie a name can tell. `prompt create` writes a
+ * file on disk and exits 0 with `{ name, path, dependency: "file:..." }` — a
+ * true result about a file, and nothing about the platform. Its name must not
+ * carry the platform claim; only a server-minted id can. So a payload that
+ * declares a `file:` dependency passes on an id, never on a name alone.
  */
 export const namesCreatedResource = (payload: unknown): boolean => {
   if (Array.isArray(payload)) return payload.length > 0;
   if (!payload || typeof payload !== "object") return false;
 
   const record = payload as Record<string, unknown>;
+  const isLocalFileScaffold =
+    typeof record.dependency === "string" &&
+    record.dependency.startsWith("file:");
+
   for (const [key, value] of Object.entries(record)) {
-    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
     if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
+    if (isLocalFileScaffold) continue;
+    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
     if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
       return true;
     }

@@ -1,3 +1,4 @@
+{{- if .Values.langwatch_nlp.enabled }}
 # Service for the LangWatch NLP component
 apiVersion: v1
 kind: Service
@@ -16,3 +17,4 @@ spec:
   selector:
     app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
     app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

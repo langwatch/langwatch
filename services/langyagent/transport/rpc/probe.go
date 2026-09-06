@@ -12,9 +12,9 @@ package rpc
 // — domain.SignatureOf, here — instead of being reimplemented in TypeScript where
 // it could silently drift and cause every probe to miss.
 type probeRequest struct {
-	ProjectID      string `json:"projectId" validate:"required"`
-	ActorUserID    string `json:"actorUserId" validate:"required"`
-	ConversationID string `json:"conversationId" validate:"required"`
+	ProjectID      string `json:"projectId"       validate:"required"`
+	ActorUserID    string `json:"actorUserId"     validate:"required"`
+	ConversationID string `json:"conversationId"  validate:"required"`
 	Model          string `json:"model,omitempty"`
 	// HasGithubAuth, not the token: the probe never needs the secret, only whether
 	// the worker would have had one. Sending the token here would put a credential

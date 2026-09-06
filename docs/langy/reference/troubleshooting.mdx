@@ -10,7 +10,7 @@ Each problem below lists the check that resolves it. Start with the one that mat
 <AccordionGroup>
   <Accordion title="Langy is not available in my org">
     - **Cloud:** Langy is available. Open the panel to get started.
-    - **Self-hosted:** the agent pod deploys by default. Confirm it was not disabled (`langyagent.chartManaged=false`) and the pod is running. A running pod is not the whole story: with `enableForAllUsers: false` the install keeps the rollout flag authoritative, so Langy stays dark until you target the projects or organizations you want. See [Self-hosting overview](/self-hosting/langy/overview) and [Setup](/self-hosting/langy/setup#staged-rollout).
+    - **Self-hosted:** the agent pod deploys by default. Confirm it was not disabled (`langyagent.chartManaged=false`) and the pod is running. Then check the rollout flag: with `enableForAllUsers: false` the install keeps that flag authoritative, so Langy stays hidden until you target the projects or organizations you want. See [Self-hosting overview](/self-hosting/langy/overview) and [Setup](/self-hosting/langy/setup#staged-rollout).
   </Accordion>
 
   <Accordion title="Langy can't open a PR">
@@ -26,7 +26,7 @@ Each problem below lists the check that resolves it. Start with the one that mat
   </Accordion>
 
   <Accordion title="A turn was stopped">
-    You can stop a running turn for real, and you can continue or resume afterward. A stop is an intentional outcome, not a failure: Langy keeps the partial answer streamed so far, and nothing you did is wrong. Continue the conversation, or ask again. A refresh mid-turn rejoins the running turn rather than losing it.
+    You can stop a running turn, and you can continue or resume afterward. A stop is an intentional outcome: Langy keeps the partial answer streamed so far. Continue the conversation, or ask again. A refresh mid-turn rejoins the running turn rather than losing it.
   </Accordion>
 
   <Accordion title="Langy's worker stopped mid-reply">
