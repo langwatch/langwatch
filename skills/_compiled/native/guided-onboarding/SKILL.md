@@ -69,7 +69,7 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language.
 
-Then, still through `code-changes`, work on a branch of your own, never on the branch the user has checked out: pick the name from both lists and `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), exactly as step 2 of `code-changes` says. On that branch apply two skills to the code:
+Then, still through `code-changes` and before the first edit, work on a branch of your own, never on the branch the user has checked out: pick the name from both lists and `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), exactly as step 2 of `code-changes` says. On that branch apply two skills to the code:
 
 1. `tracing` for the detected framework, so every call is traced. The docs page is `langwatch docs integration/<python|typescript>/integrations/<framework>`, for example `integration/python/integrations/langgraph`.
 2. `connect-agent`, so the platform can run scenarios against the agent: the connect call with a stable agent name and the environment the process runs in. The connect function is an adapter you write beside the startup code: it calls the app's own function and returns the reply text, or one message, or a list of messages. Never put the decorator on a function the app already has that returns its own result, for example a dict with the output and a few ids: the SDK cannot turn that into a reply, and every turn of the run times out.
@@ -156,7 +156,7 @@ langwatch onboarding complete-path llmops
 
 ### When a step fails
 
-The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts): stop there. Say in one line what is not done and what it needs, and end the turn. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
+The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file or the process log: say in one line what is not done and what the error names as the cause, and end the turn. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 
 ## coding: Coding agents
 
